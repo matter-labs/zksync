@@ -17,7 +17,7 @@ pub struct AccountTransaction {
     pub verified: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq)]
 pub struct TransactionsHistoryItem {
     #[sql_type = "Nullable<Text>"]
     pub hash: Option<String>,

@@ -22,7 +22,7 @@ use crate::{
 pub mod records;
 
 /// Direction to perform search of transactions to.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchDirection {
     /// Find transactions older than specified one.
     OldToNew,
@@ -289,7 +289,7 @@ impl<'a> OperationsExtSchema<'a> {
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         // This query does the following:
-        // - creates a union of data above and the `executed_priority_operations`
+        // - creates a union of `executed_transactions` and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
         // - returns the obtained results.
@@ -435,7 +435,7 @@ impl<'a> OperationsExtSchema<'a> {
         );
 
         // This query does the following:
-        // - creates a union of data above and the `executed_priority_operations`
+        // - creates a union of `executed_transactions` and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
         // - returns the obtained results.

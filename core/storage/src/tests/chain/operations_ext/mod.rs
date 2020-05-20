@@ -4,10 +4,27 @@ use std::collections::HashMap;
 // Workspace imports
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
-use crate::tests::db_test;
-use crate::StorageProcessor;
+use crate::{chain::operations_ext::SearchDirection, tests::db_test, StorageProcessor};
 
 mod setup;
+
+/// Commits the data from the test setup to the database.
+fn commit_schema_data(
+    conn: &StorageProcessor,
+    setup: &TransactionsHistoryTestSetup,
+) -> diesel::QueryResult<()> {
+    for token in &setup.tokens {
+        conn.tokens_schema().store_token(token.clone())?;
+    }
+
+    for block in &setup.blocks {
+        conn.chain()
+            .block_schema()
+            .save_block_transactions(block.clone())?;
+    }
+
+    Ok(())
+}
 
 /// Here we take the account transactions using `get_account_transactions` and
 /// check `get_account_transactions_history` to match obtained results.
@@ -55,13 +72,7 @@ fn get_account_transactions_history() {
     // execute_operation
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
-        for token in &setup.tokens {
-            conn.tokens_schema().store_token(token.clone())?;
-        }
-
-        for block in setup.blocks {
-            conn.chain().block_schema().save_block_transactions(block)?;
-        }
+        commit_schema_data(&conn, &setup)?;
 
         let from_history = conn
             .chain()
@@ -97,6 +108,67 @@ fn get_account_transactions_history() {
 
         assert_eq!(from_history.len(), 7);
         assert_eq!(to_history.len(), 4);
+
+        Ok(())
+    });
+}
+
+/// Checks that all the transactions related to account address can be loaded
+/// with the `get_account_transactions_history_from` method and the result will
+/// be the same as if it'll be gotten via `get_account_transactions_history`.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn get_account_transactions_history_from() {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    setup.add_block(1);
+
+    // execute_operation
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        commit_schema_data(&conn, &setup)?;
+
+        let expected_from_history = conn
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions_history(&setup.from_zksync_account.address, 0, 10)?;
+        let expected_to_history = conn
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions_history(&setup.to_zksync_account.address, 0, 10)?;
+
+        let test_vector = vec![
+            // Go back from the future block (2) and fetch all the txs.
+            (2, 0, SearchDirection::NewToOld),
+            // Go forward from the genesis block (0) and fetch all the txs.
+            (0, 0, SearchDirection::OldToNew),
+        ];
+
+        for (block_id, tx_id, direction) in test_vector {
+            let from_history = conn
+                .chain()
+                .operations_ext_schema()
+                .get_account_transactions_history_from(
+                    &setup.from_zksync_account.address,
+                    (block_id, tx_id),
+                    direction,
+                    10,
+                )?;
+            let to_history = conn
+                .chain()
+                .operations_ext_schema()
+                .get_account_transactions_history_from(
+                    &setup.to_zksync_account.address,
+                    (block_id, tx_id),
+                    direction,
+                    10,
+                )?;
+
+            assert_eq!(from_history.len(), 7);
+            assert_eq!(to_history.len(), 4);
+
+            assert_eq!(from_history, expected_from_history);
+            assert_eq!(to_history, expected_to_history);
+        }
 
         Ok(())
     });
