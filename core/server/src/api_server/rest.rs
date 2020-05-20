@@ -8,8 +8,9 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use models::config_options::ThreadPanicNotify;
-use models::node::{Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp};
+use models::node::{Account, AccountId, Address, ExecutedOperations, PriorityOp, Token, TokenId};
 use models::NetworkStatus;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -426,6 +427,57 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(vec_tokens))
 }
 
+/// Converts a non-executed priority operation into a
+/// `TransactionsHistoryItem` to include it into the list of transactions
+/// in the client.
+fn priority_op_to_tx_history(
+    tokens: &HashMap<TokenId, Token>,
+    op: &PriorityOp,
+) -> TransactionsHistoryItem {
+    let deposit = op
+        .data
+        .try_get_deposit()
+        .expect("Not a deposit sent by eth_watch");
+    let token_symbol = tokens
+        .get(&deposit.token)
+        .map(|t| t.symbol.clone())
+        .unwrap_or_else(|| "unknown".into());
+
+    let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
+    let pq_id = Some(op.serial_id as i64);
+
+    // Account ID may not exist for depositing ops, so it'll be `null`.
+    let account_id: Option<u32> = None;
+
+    // Copy the JSON representation of the executed tx so the appearance
+    // will be the same as for txs from storage.
+    let tx_json = serde_json::json!({
+        "account_id": account_id,
+        "priority_op": {
+            "amount": deposit.amount,
+            "from": deposit.from,
+            "to": deposit.to,
+            "token": token_symbol
+        },
+        "type": "Deposit"
+    });
+
+    // As the time of creation is indefinite, we always will provide the current time.
+    let current_time = chrono::Utc::now();
+    let naitve_current_time = chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
+
+    TransactionsHistoryItem {
+        hash: Some(hash_str),
+        pq_id,
+        tx: tx_json,
+        success: None,
+        fail_reason: None,
+        commited: false,
+        verified: false,
+        created_at: naitve_current_time,
+    }
+}
+
 fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
     request_path: web::Path<(Address, u64, u64)>,
@@ -456,7 +508,7 @@ fn handle_get_account_transactions_history(
 
     // Fetch ongoing deposits, since they must be reported within the transactions history.
     let mut ongoing_ops = futures::executor::block_on(async move {
-        get_ongoing_priority_ops(&eth_watcher_request_sender).await
+        get_ongoing_priority_ops(&eth_watcher_request_sender, address).await
     })
     .map_err(|err| {
         log::warn!(
@@ -476,84 +528,27 @@ fn handle_get_account_transactions_history(
     // Note that we call `cmp` on `rhs` to achieve that.
     ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
 
-    // Filter only deposits for the requested address.
-    // `map` is used after filter to find the max block number without an
-    // additional list pass.
-    // `take` is used last to limit the amount of entries.
+    // Collect the unconfirmed priority operations with respect to the
+    // `offset` and `limit` parameters.
     let mut transactions_history: Vec<_> = ongoing_ops
         .iter()
-        .filter(|(_block, op)| match &op.data {
-            FranklinPriorityOp::Deposit(deposit) => {
-                // Address may be set to either sender or recipient.
-                deposit.from == address || deposit.to == address
-            }
-            _ => false,
-        })
-        .map(|(_block, op)| {
-            let deposit = op.data.try_get_deposit().unwrap();
-            let token_symbol = tokens
-                .get(&deposit.token)
-                .map(|t| t.symbol.clone())
-                .unwrap_or_else(|| "unknown".into());
-
-            let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
-            let pq_id = Some(op.serial_id as i64);
-
-            // Account ID may not exist for depositing ops, so it'll be `null`.
-            let account_id: Option<u32> = None;
-
-            // Copy the JSON representation of the executed tx so the appearance
-            // will be the same as for txs from storage.
-            let tx_json = serde_json::json!({
-                "account_id": account_id,
-                "priority_op": {
-                    "amount": deposit.amount,
-                    "from": deposit.from,
-                    "to": deposit.to,
-                    "token": token_symbol
-                },
-                "type": "Deposit"
-            });
-
-            // As the time of creation is indefinite, we always will provide the current time.
-            let current_time = chrono::Utc::now();
-            let naitve_current_time =
-                chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
-
-            TransactionsHistoryItem {
-                hash: Some(hash_str),
-                pq_id,
-                tx: tx_json,
-                success: None,
-                fail_reason: None,
-                commited: false,
-                verified: false,
-                created_at: naitve_current_time,
-            }
-        })
+        .map(|(_block, op)| priority_op_to_tx_history(&tokens, op))
         .skip(offset as usize)
         .take(limit as usize)
         .collect();
 
+    // Now we must include committed transactions, thus we have to modify `offset` and
+    // `limit` values.
     if !transactions_history.is_empty() {
         // We've taken at least one transaction, this means
         // offset is consumed completely, and limit is reduced.
         offset = 0;
         limit -= transactions_history.len() as u64;
     } else {
-        // reduce offset by the number of pending deposits
-        // that are soon to be added to the db.
-        let num_account_ongoing_deposits = ongoing_ops
-            .iter()
-            .filter(|(_block, op)| match &op.data {
-                FranklinPriorityOp::Deposit(deposit) => {
-                    // Address may be set to either sender or recipient.
-                    deposit.from == address || deposit.to == address
-                }
-                _ => false,
-            })
-            .count() as u64;
-
+        // Decrement the offset by the number of pending deposits
+        // that are soon to be added to the db. `ongoing_ops` consists
+        // of the deposits related to a target account only.
+        let num_account_ongoing_deposits = ongoing_ops.len() as u64;
         offset = offset.saturating_sub(num_account_ongoing_deposits);
     }
 
