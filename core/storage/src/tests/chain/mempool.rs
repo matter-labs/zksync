@@ -156,7 +156,7 @@ fn collect_garbage() {
             nonce: Default::default(),
             created_at: chrono::Utc::now(),
         };
-        OperationsSchema(&conn).store_executed_operation(executed_tx.clone())?;
+        OperationsSchema(&conn).store_executed_operation(executed_tx)?;
 
         // Collect the garbage. Execution transaction (very first one from the list)
         // should be removed from the schema.
