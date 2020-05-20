@@ -103,6 +103,7 @@ impl TransactionsHistoryTestSetup {
             },
             op: deposit_op,
             block_index,
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::PriorityOp(Box::new(executed_op))
@@ -127,6 +128,7 @@ impl TransactionsHistoryTestSetup {
             },
             op: full_exit_op,
             block_index,
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::PriorityOp(Box::new(executed_op))

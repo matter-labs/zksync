@@ -25,9 +25,9 @@ pub mod records;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchDirection {
     /// Find transactions older than specified one.
-    OldToNew,
+    Older,
     /// Find transactions newer than specified one.
-    NewToOld,
+    Newer,
 }
 
 /// `OperationsExt` schema is a logical extension for an `Operations` schema,
@@ -422,8 +422,8 @@ impl<'a> OperationsExtSchema<'a> {
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         let direction_sign = match direction {
-            SearchDirection::NewToOld => "<", // Older blocks have lesser block ID.
-            SearchDirection::OldToNew => ">", // Newer blocks have greater block ID.
+            SearchDirection::Older => "<", // Older blocks have lesser block ID.
+            SearchDirection::Newer => ">", // Newer blocks have greater block ID.
         };
 
         // Filter for txs that older/newer than provided tx ID.

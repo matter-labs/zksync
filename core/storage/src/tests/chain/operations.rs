@@ -97,6 +97,7 @@ fn executed_priority_operations() {
             priority_op_serialid: 0,
             deadline_block: 100,
             eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            created_at: chrono::Utc::now(),
         };
         OperationsSchema(&conn).store_executed_priority_operation(executed_tx.clone())?;
 
