@@ -1,5 +1,6 @@
 import config from './env-config';
 import * as constants from './constants';
+import { formatEther } from 'ethers/utils';
 import { readableEther } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
 const zksync_promise = import('zksync');
@@ -30,7 +31,7 @@ export class Client {
                 return Object.values(tokens)
                     .map(token => {
                         const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
-                        const syncSymbol = `zk${symbol}`;
+                        const syncSymbol = `${symbol}`;
                         return {
                             ...token,
                             symbol,
@@ -122,7 +123,7 @@ export class Client {
             .map(([tokenId, balance]) => {
                 return {
                     tokenId,
-                    balance: readableEther(balance),
+                    balance: formatEther(balance),
                     tokenName: tokensInfoList[tokenId].syncSymbol,
                 };
             });
@@ -132,7 +133,7 @@ export class Client {
     }
 
     tokenNameFromSymbol(symbol) {
-        return `zk${symbol.toString()}`;
+        return `${symbol.toString()}`;
     }
 
     async transactionsAsRenderableList(address, offset, limit) {
@@ -145,7 +146,7 @@ export class Client {
             const elem_id      = `history_${index}`;
             const type         = tx.tx.type || '';
             const hash         = tx.hash;
-
+            const created_at   = tx.created_at;
             const to
                 = type == 'Deposit' ? tx.tx.priority_op.to
                 : type == 'FullExit' ? tx.tx.priority_op.eth_address
@@ -183,7 +184,7 @@ export class Client {
                 elem_id,
                 type, direction,
                 status, row_status,
-                hash,
+                hash, created_at,
             };
 
             switch (true) {
@@ -206,7 +207,6 @@ export class Client {
                     };
                 }
                 case type == 'FullExit': {
-                    console.log(tx);
                     const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
                     const amount = readableEther(tx.tx.withdraw_amount || 0);
                     return {
@@ -244,7 +244,7 @@ export class Client {
                 }
                 case type == 'Withdraw': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
-                    const amount = readableEther(tx.tx.amount);   
+                    const amount = readableEther(tx.tx.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },

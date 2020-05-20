@@ -1,11 +1,14 @@
 import {ethers} from "ethers";
-import {franklinContractCode, governanceContractCode, verifierContractCode} from "../src.ts/deploy";
 import {Interface} from "ethers/utils";
+import {readContractCode, readProductionContracts} from "../src.ts/deploy";
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-const franklinInterface = new Interface(franklinContractCode.interface);
-const governanceInterface = new Interface(governanceContractCode.interface);
-const verifierInterface = new Interface(verifierContractCode.interface);
+
+const contracts = readProductionContracts();
+const franklinInterface = new Interface(contracts.zkSync.interface);
+const governanceInterface = new Interface(contracts.governance.interface);
+const verifierInterface = new Interface(contracts.governance.interface);
+const deployFactoryInterface = new Interface(readContractCode("DeployFactory").interface);
 
 function hex_to_ascii(str1) {
 	const hex  = str1.toString();
@@ -30,9 +33,8 @@ async function reason() {
         if (parsedTransaction) {
             console.log("parsed tx: ", parsedTransaction);
         } else {
-            console.log('tx:', tx);
+            console.log("tx:", tx);
         }
-
 
         const receipt = await provider.getTransactionReceipt(hash);
         console.log("receipt:", receipt);
@@ -51,13 +53,16 @@ async function reason() {
             console.log("revert code", code);
         }
 
-        for (let log of receipt.logs){
+        for (const log of receipt.logs) {
             let parsedLog = franklinInterface.parseLog(log);
             if (!parsedLog) {
                 parsedLog = governanceInterface.parseLog(log);
             }
             if (!parsedLog) {
                 parsedLog = verifierInterface.parseLog(log);
+            }
+            if (!parsedLog) {
+                parsedLog = deployFactoryInterface.parseLog(log);
             }
             if (parsedLog) {
                 console.log(parsedLog);

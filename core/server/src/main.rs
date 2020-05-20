@@ -9,7 +9,11 @@ use web3::types::H160;
 // Workspace uses
 use models::{
     config_options::{ConfigurationOptions, ProverOptions},
-    node::config::OBSERVER_MODE_PULL_INTERVAL,
+    node::{
+        config::OBSERVER_MODE_PULL_INTERVAL,
+        tokens::{get_genesis_token_list, Token},
+        TokenId,
+    },
 };
 use storage::ConnectionPool;
 // Local uses
@@ -42,11 +46,32 @@ fn main() {
         .get_matches();
 
     if cli.is_present("genesis") {
+        let pool = ConnectionPool::new(Some(1));
         log::info!("Generating genesis block.");
-        PlasmaStateKeeper::create_genesis_block(
-            ConnectionPool::new(Some(1)),
-            &config_opts.operator_franklin_addr,
-        );
+        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_franklin_addr);
+        log::info!("Adding initial tokens to db");
+        let genesis_tokens =
+            get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
+        for (id, token) in (1..).zip(genesis_tokens) {
+            log::info!(
+                "Adding token: {}, id:{}, address: {}, precision: {}",
+                token.symbol,
+                id,
+                token.address,
+                token.precision
+            );
+            pool.access_storage()
+                .expect("failed to access db")
+                .tokens_schema()
+                .store_token(Token {
+                    id: id as TokenId,
+                    symbol: token.symbol,
+                    address: token.address[2..]
+                        .parse()
+                        .expect("failed to parse token address"),
+                })
+                .expect("failed to store token");
+        }
         return;
     }
 

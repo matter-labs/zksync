@@ -9,7 +9,7 @@
         }
     },
     "ganacheOptions": {
-        "gasLimit": "7000000", 
+        "gasLimit": "10000000",
         "gasPrice": "0x77359400"
     }
 }

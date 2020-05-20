@@ -48,7 +48,6 @@ contract Governance is Config {
         address _networkGovernor = abi.decode(initializationParameters, (address));
 
         networkGovernor = _networkGovernor;
-        validators[_networkGovernor] = true;
     }
 
     /// @notice Change current governor

@@ -19,7 +19,9 @@ use storage::StorageProcessor;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
+    info!("Starting server supervisor");
     let storage = StorageProcessor::establish_connection().expect("failed connect to db");
+    info!("DB connection established");
     let namespace = env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let client = Client::from(Configuration::infer().await?);
     // We are interested in events related to the leader pod, but watch events of all pods

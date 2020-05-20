@@ -78,11 +78,11 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
         const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
         const MNEMONIC = process.env.MNEMONIC;
-        const ERC_20TOKEN = process.env.TEST_ERC20;
         const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
         console.log("Running integration test on the ", network, " network");
 
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
+        const ERC_20TOKEN = syncProvider.tokenSet.resolveTokenAddress("ERC20-1");
 
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
 

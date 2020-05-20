@@ -146,7 +146,7 @@ function assertEthOrSyncHash(hash: string) {
  * @param date: string to check
  */
 function assertDate(date: string) {
-    if (! /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}/.test(date)) {
+    if (! /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?/.test(date)) {
         throw new Error(date + `doesn't conform to 2020-04-29T11:14:03.198603 format.`);
     }
 }
@@ -293,18 +293,18 @@ async function test() {
     ethersProvider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     
     const ethWallet = ethers.Wallet.fromMnemonic(
-        process.env.MNEMONIC,
+        process.env.TEST_MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
     
     const ethWallet2 = ethers.Wallet.fromMnemonic(
-        process.env.MNEMONIC,
+        process.env.TEST_MNEMONIC,
         "m/44'/60'/0'/0/2"
     ).connect(ethersProvider);
 
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
 
-    for (const token of ['ETH', process.env.TEST_ERC20]) {
+    for (const token of ['ETH', "ERC20-1"]) {
         console.log('Balance of ' + token + ': ' + formatEther(await syncWallet.getEthereumBalance(token)));
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),

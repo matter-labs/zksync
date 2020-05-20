@@ -15,7 +15,7 @@ import "./Operations.sol";
 
 /// @title zkSync main contract
 /// @author Matter Labs
-contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
+contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMathUInt128 for uint128;
 
@@ -84,9 +84,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         (
         address _governanceAddress,
         address _verifierAddress,
-        ,
         bytes32 _genesisRoot
-        ) = abi.decode(initializationParameters, (address, address, address, bytes32));
+        ) = abi.decode(initializationParameters, (address, address, bytes32));
 
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
