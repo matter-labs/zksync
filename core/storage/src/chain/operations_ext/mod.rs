@@ -428,7 +428,7 @@ impl<'a> OperationsExtSchema<'a> {
 
         // Filter for txs that older/newer than provided tx ID.
         let ordered_filter = format!(
-            "(block_number {sign} {block_id} or (block_number == {block_id} and block_index {sign} {block_tx_id}",
+            "(block_number {sign} {block_id} or (block_number = {block_id} and block_index {sign} {block_tx_id}))",
             sign = direction_sign,
             block_id = tx_id.0,
             block_tx_id = tx_id.1
