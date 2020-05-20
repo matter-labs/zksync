@@ -21,6 +21,15 @@ use crate::{
 
 pub mod records;
 
+/// Direction to perform search of transactions to.
+#[derive(Debug)]
+pub enum SearchDirection {
+    /// Find transactions older than specified one.
+    OldToNew,
+    /// Find transactions newer than specified one.
+    NewToOld,
+}
+
 /// `OperationsExt` schema is a logical extension for an `Operations` schema,
 /// which provides more getters for transactions.
 /// While `Operations` getters are very basic, `OperationsExt` schema can transform
@@ -357,6 +366,159 @@ impl<'a> OperationsExtSchema<'a> {
             ",
             address = hex::encode(address.as_ref().to_vec()),
             offset = offset,
+            limit = limit
+        );
+        let mut tx_history =
+            diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
+        if !tx_history.is_empty() {
+            let tokens = TokensSchema(self.0).load_tokens()?;
+            for tx_item in &mut tx_history {
+                let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
+                    "NONE" => {
+                        log::warn!("Tx history item type not found, tx: {:?}", tx_item);
+                        continue;
+                    }
+                    "Deposit" | "FullExit" => tx_item.tx.get_mut("priority_op"),
+                    _ => Some(&mut tx_item.tx),
+                };
+
+                let tx_info = if let Some(tx_info) = tx_info {
+                    tx_info
+                } else {
+                    log::warn!("tx_info not found for tx: {:?}", tx_item);
+                    continue;
+                };
+
+                if let Some(tok_val) = tx_info.get_mut("token") {
+                    if let Some(token_id) = tok_val.as_u64() {
+                        let token_id = token_id as TokenId;
+                        let token_symbol = tokens
+                            .get(&token_id)
+                            .map(|t| t.symbol.clone())
+                            .unwrap_or_else(|| "UNKNOWN".to_string());
+                        *tok_val =
+                            serde_json::to_value(token_symbol).expect("json string to value");
+                    };
+                };
+            }
+        }
+        Ok(tx_history)
+    }
+
+    /// Loads the range of the transactions applied to the account starting
+    /// from the specified transaction ID.
+    ///
+    /// This method can be used to get transactions "older" than some transaction
+    /// or "newer" than one.
+    ///
+    /// Unlike `get_account_transactions_history`, this method does not use
+    /// a relative offset, and thus not prone to report the same tx twice if new
+    /// transactions were added to the database.
+    pub fn get_account_transactions_history_from(
+        &self,
+        address: &Address,
+        tx_id: (u64, u64),
+        direction: SearchDirection,
+        limit: u64,
+    ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+        let direction_sign = match direction {
+            SearchDirection::NewToOld => "<", // Older blocks have lesser block ID.
+            SearchDirection::OldToNew => ">", // Newer blocks have greater block ID.
+        };
+
+        // Filter for txs that older/newer than provided tx ID.
+        let ordered_filter = format!(
+            "(block_number {sign} {block_id} or (block_number == {block_id} and block_index {sign} {block_tx_id}",
+            sign = direction_sign,
+            block_id = tx_id.0,
+            block_tx_id = tx_id.1
+        );
+
+        // This query does the following:
+        // - creates a union of data above and the `executed_priority_operations`
+        // - unifies the information to match the `TransactionsHistoryItem`
+        //   structure layout
+        // - returns the obtained results.
+        let query = format!(
+            "
+            select
+                hash,
+                pq_id,
+                tx,
+                success,
+                fail_reason,
+                coalesce(commited, false) as commited,
+                coalesce(verified, false) as verified,
+                created_at
+            from (
+                select
+                    *
+                from (
+                    with vars (address_bytes) as ( select decode('{address}', 'hex') )
+                    select
+                        tx,
+                        'sync-tx:' || encode(tx_hash, 'hex') as hash,
+                        null as pq_id,
+                        success,
+                        fail_reason,
+                        block_number,
+                        created_at
+                    from
+                        executed_transactions, vars
+                    where
+                        (
+                            from_account = address_bytes
+                            or
+                            to_account = address_bytes
+                            or
+                            primary_account_address = address_bytes
+                        )
+                        and
+                        {ordered_filter}
+                    union all
+                    select
+                        operation as tx,
+                        '0x' || encode(eth_hash, 'hex') as hash,
+                        priority_op_serialid as pq_id,
+                        null as success,
+                        null as fail_reason,
+                        block_number,
+                        created_at
+                    from 
+                        executed_priority_operations, vars
+                    where 
+                        (
+                            from_account = address_bytes
+                            or
+                            to_account = address_bytes
+                        )
+                        and
+                        {ordered_filter}
+                    ) t
+                order by
+                    block_number desc, created_at desc
+                limit 
+                    {limit}
+            ) t
+            left join
+                crosstab($$
+                    select 
+                        block_number as rowid, 
+                        action_type as category, 
+                        true as values 
+                    from 
+                        operations
+                    order by
+                        block_number
+                    $$) t3 (
+                        block_number bigint, 
+                        commited boolean, 
+                        verified boolean)
+            using 
+                (block_number)
+            ",
+            address = hex::encode(address.as_ref().to_vec()),
+            ordered_filter = ordered_filter,
             limit = limit
         );
         let mut tx_history =
