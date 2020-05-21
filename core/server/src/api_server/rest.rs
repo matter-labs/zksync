@@ -579,16 +579,33 @@ fn handle_get_account_transactions_history(
     Ok(HttpResponse::Ok().json(transactions_history))
 }
 
+fn parse_tx_id(data: &str) -> ActixResult<(u64, u64)> {
+    let parts: Vec<u64> = data
+        .split(',')
+        .map(|val| {
+            val.parse()
+                .map_err(|_| HttpResponse::BadRequest().finish().into())
+        })
+        .collect::<Result<Vec<u64>, HttpResponse>>()?;
+
+    if parts.len() != 2 {
+        return Err(HttpResponse::BadRequest().finish().into());
+    }
+
+    Ok((parts[0], parts[1]))
+}
+
 fn handle_get_account_transactions_history_older_than(
     data: web::Data<AppState>,
     address: Address,
-    tx_id: (u64, u64),
+    tx_id: String,
     limit: u64,
 ) -> ActixResult<HttpResponse> {
     const MAX_LIMIT: u64 = 100;
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
+    let tx_id = parse_tx_id(&tx_id)?;
 
     let direction = SearchDirection::Older;
     let storage = data.access_storage()?;
@@ -616,13 +633,15 @@ fn handle_get_account_transactions_history_older_than(
 fn handle_get_account_transactions_history_newer_than(
     data: web::Data<AppState>,
     address: Address,
-    tx_id: (u64, u64),
+    tx_id: String,
     mut limit: u64,
 ) -> ActixResult<HttpResponse> {
     const MAX_LIMIT: u64 = 100;
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
+
+    let tx_id = parse_tx_id(&tx_id)?;
 
     let direction = SearchDirection::Newer;
     let storage = data.access_storage()?;
