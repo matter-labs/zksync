@@ -15,7 +15,10 @@ use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use storage::chain::block::records::BlockDetails;
-use storage::chain::operations_ext::records::{PriorityOpReceiptResponse, TxReceiptResponse};
+use storage::chain::operations_ext::{
+    records::{PriorityOpReceiptResponse, TxReceiptResponse},
+    SearchDirection,
+};
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
@@ -467,8 +470,7 @@ fn priority_op_to_tx_history(
     let naitve_current_time = chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
 
     TransactionsHistoryItem {
-        block_number: None,
-        block_index: None,
+        tx_id: "-".into(),
         hash: Some(hash_str),
         pq_id,
         tx: tx_json,
@@ -573,6 +575,140 @@ fn handle_get_account_transactions_history(
         })?;
 
     transactions_history.append(&mut storage_transactions);
+
+    Ok(HttpResponse::Ok().json(transactions_history))
+}
+
+fn handle_get_account_transactions_history_older_than(
+    data: web::Data<AppState>,
+    address: Address,
+    tx_id: (u64, u64),
+    limit: u64,
+) -> ActixResult<HttpResponse> {
+    const MAX_LIMIT: u64 = 100;
+    if limit > MAX_LIMIT {
+        return Err(HttpResponse::BadRequest().finish().into());
+    }
+
+    let direction = SearchDirection::Older;
+    let storage = data.access_storage()?;
+    let transactions_history = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_history_from(&address, tx_id, direction, limit)
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                address,
+                tx_id,
+                limit,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    Ok(HttpResponse::Ok().json(transactions_history))
+}
+
+fn handle_get_account_transactions_history_newer_than(
+    data: web::Data<AppState>,
+    address: Address,
+    tx_id: (u64, u64),
+    mut limit: u64,
+) -> ActixResult<HttpResponse> {
+    const MAX_LIMIT: u64 = 100;
+    if limit > MAX_LIMIT {
+        return Err(HttpResponse::BadRequest().finish().into());
+    }
+
+    let direction = SearchDirection::Newer;
+    let storage = data.access_storage()?;
+    let mut transactions_history = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_history_from(&address, tx_id, direction, limit)
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                address,
+                tx_id,
+                limit,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    limit -= transactions_history.len() as u64;
+
+    if limit > 0 {
+        // We've got some free space, so load unconfirmed operations to
+        // fill the rest of the limit.
+
+        let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
+        let storage = data.access_storage()?;
+        let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                address,
+                tx_id,
+                limit,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+        // Fetch ongoing deposits, since they must be reported within the transactions history.
+        let mut ongoing_ops = futures::executor::block_on(async move {
+            get_ongoing_priority_ops(&eth_watcher_request_sender, address).await
+        })
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                address,
+                tx_id,
+                limit,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+        // Sort operations by block number in a reverse order (so the newer ones are on top).
+        // Note that we call `cmp` on `rhs` to achieve that.
+        ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
+
+        // Collect the unconfirmed priority operations with respect to the
+        // `limit` parameters.
+        // Since we are bounded by the `limit` parameter, we must take the `limit` transactions
+        // from the *end* of the list (as the beginning contains the newest transactions, and the
+        // end contains transactions that are closer to the last executed tx).
+        let mut txs: Vec<_> = ongoing_ops
+            .iter()
+            .rev()
+            .map(|(_block, op)| priority_op_to_tx_history(&tokens, op))
+            .take(limit as usize)
+            .rev()
+            .collect();
+
+        // Merge `txs` and `transactions_history` and reassign the `transactions_history` to the
+        // merged list.
+        // Unprocessed operations must be in the beginning.
+        if !txs.is_empty() {
+            txs.append(&mut transactions_history);
+            transactions_history = txs;
+        }
+    }
 
     Ok(HttpResponse::Ok().json(transactions_history))
 }
