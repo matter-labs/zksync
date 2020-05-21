@@ -20,7 +20,7 @@ async function main() {
         await erc20.mint(testWallet.address, parseEther("3000000000"));
     }
 
-    console.log(JSON.stringify([{address: erc20.address, precision: 18, symbol: "ERC20-1"}], null, 2));
+    console.log(JSON.stringify([{address: erc20.address, decimals: 18, symbol: "ERC20-1"}], null, 2));
 }
 
 main();
