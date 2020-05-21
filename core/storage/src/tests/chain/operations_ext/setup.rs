@@ -1,6 +1,7 @@
 // Built-in imports
 // External imports
 use bigdecimal::BigDecimal;
+use chrono::{DateTime, Duration, Utc};
 // Workspace imports
 use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -21,6 +22,8 @@ pub struct TransactionsHistoryTestSetup {
 
     pub tokens: Vec<Token>,
     pub blocks: Vec<Block>,
+
+    pub next_tx_time: DateTime<Utc>,
 }
 
 impl TransactionsHistoryTestSetup {
@@ -49,6 +52,8 @@ impl TransactionsHistoryTestSetup {
 
             tokens,
             blocks: Vec::new(),
+
+            next_tx_time: Utc::now(),
         }
     }
 
@@ -83,7 +88,7 @@ impl TransactionsHistoryTestSetup {
         self.blocks.push(block);
     }
 
-    fn create_deposit_op(&self, block_index: u32) -> ExecutedOperations {
+    fn create_deposit_op(&mut self, block_index: u32) -> ExecutedOperations {
         let deposit_op = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op: Deposit {
                 from: self.from_zksync_account.address,
@@ -103,13 +108,13 @@ impl TransactionsHistoryTestSetup {
             },
             op: deposit_op,
             block_index,
-            created_at: chrono::Utc::now(),
+            created_at: self.get_tx_time(),
         };
 
         ExecutedOperations::PriorityOp(Box::new(executed_op))
     }
 
-    fn create_full_exit_op(&self, block_index: u32) -> ExecutedOperations {
+    fn create_full_exit_op(&mut self, block_index: u32) -> ExecutedOperations {
         let full_exit_op = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op: FullExit {
                 account_id: self.from_zksync_account.get_account_id().unwrap(),
@@ -128,13 +133,13 @@ impl TransactionsHistoryTestSetup {
             },
             op: full_exit_op,
             block_index,
-            created_at: chrono::Utc::now(),
+            created_at: self.get_tx_time(),
         };
 
         ExecutedOperations::PriorityOp(Box::new(executed_op))
     }
 
-    fn create_transfer_to_new_op(&self, block_index: Option<u32>) -> ExecutedOperations {
+    fn create_transfer_to_new_op(&mut self, block_index: Option<u32>) -> ExecutedOperations {
         let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx: self
                 .from_zksync_account
@@ -158,13 +163,13 @@ impl TransactionsHistoryTestSetup {
             op: Some(transfer_to_new_op),
             fail_reason: None,
             block_index,
-            created_at: chrono::Utc::now(),
+            created_at: self.get_tx_time(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op))
     }
 
-    fn create_transfer_tx(&self, block_index: Option<u32>) -> ExecutedOperations {
+    fn create_transfer_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
         let transfer_op = FranklinOp::Transfer(Box::new(TransferOp {
             tx: self
                 .from_zksync_account
@@ -188,13 +193,13 @@ impl TransactionsHistoryTestSetup {
             op: Some(transfer_op),
             fail_reason: None,
             block_index,
-            created_at: chrono::Utc::now(),
+            created_at: self.get_tx_time(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_op))
     }
 
-    fn create_withdraw_tx(&self, block_index: Option<u32>) -> ExecutedOperations {
+    fn create_withdraw_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
         let withdraw_op = FranklinOp::Withdraw(Box::new(WithdrawOp {
             tx: self
                 .from_zksync_account
@@ -217,13 +222,13 @@ impl TransactionsHistoryTestSetup {
             op: Some(withdraw_op),
             fail_reason: None,
             block_index,
-            created_at: chrono::Utc::now(),
+            created_at: self.get_tx_time(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_withdraw_op))
     }
 
-    fn create_close_tx(&self, block_index: Option<u32>) -> ExecutedOperations {
+    fn create_close_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
         let close_op = FranklinOp::Close(Box::new(CloseOp {
             tx: self.from_zksync_account.sign_close(None, false),
             account_id: self.from_zksync_account.get_account_id().unwrap(),
@@ -235,13 +240,13 @@ impl TransactionsHistoryTestSetup {
             op: Some(close_op),
             fail_reason: None,
             block_index,
-            created_at: chrono::Utc::now(),
+            created_at: self.get_tx_time(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_close_op))
     }
 
-    fn create_change_pubkey_tx(&self, block_index: Option<u32>) -> ExecutedOperations {
+    fn create_change_pubkey_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
         let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
             tx: self
                 .from_zksync_account
@@ -255,9 +260,21 @@ impl TransactionsHistoryTestSetup {
             op: Some(change_pubkey_op),
             fail_reason: None,
             block_index,
-            created_at: chrono::Utc::now(),
+            created_at: self.get_tx_time(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))
+    }
+
+    /// This method is important, since it seems that during database roundtrip timestamp
+    /// can be rounded and loose several microseconds in precision, which have lead to the
+    /// test failures (txs were using `chrono::Utc::now()` and had difference of 1-2 microsecond
+    /// between them, which was lost after loading from the DB => multiple txs had the same
+    /// timestamp and order could vary from call to call).
+    fn get_tx_time(&mut self) -> DateTime<Utc> {
+        let current_time = self.next_tx_time.clone();
+        self.next_tx_time = current_time + Duration::milliseconds(10);
+
+        current_time
     }
 }
