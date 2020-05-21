@@ -296,8 +296,7 @@ impl<'a> OperationsExtSchema<'a> {
         let query = format!(
             "
             select
-                block_number,
-                block_index,
+                tx_id,
                 hash,
                 pq_id,
                 tx,
@@ -312,13 +311,13 @@ impl<'a> OperationsExtSchema<'a> {
                 from (
                     with vars (address_bytes) as ( select decode('{address}', 'hex') )
                     select
+                        concat_ws(',', block_number, block_index) as tx_id,
                         tx,
                         'sync-tx:' || encode(tx_hash, 'hex') as hash,
                         null as pq_id,
                         success,
                         fail_reason,
                         block_number,
-                        block_index,
                         created_at
                     from
                         executed_transactions, vars
@@ -330,13 +329,13 @@ impl<'a> OperationsExtSchema<'a> {
                         primary_account_address = address_bytes
                     union all
                     select
+                        concat_ws(',', block_number, block_index) as tx_id,
                         operation as tx,
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         null as success,
                         null as fail_reason,
                         block_number,
-                        block_index,
                         created_at
                     from 
                         executed_priority_operations, vars
@@ -446,8 +445,7 @@ impl<'a> OperationsExtSchema<'a> {
         let query = format!(
             "
             select
-                block_number,
-                block_index,
+                tx_id,
                 hash,
                 pq_id,
                 tx,
@@ -462,13 +460,13 @@ impl<'a> OperationsExtSchema<'a> {
                 from (
                     with vars (address_bytes) as ( select decode('{address}', 'hex') )
                     select
+                        concat_ws(',', block_number, block_index) as tx_id,
                         tx,
                         'sync-tx:' || encode(tx_hash, 'hex') as hash,
                         null as pq_id,
                         success,
                         fail_reason,
                         block_number,
-                        block_index,
                         created_at
                     from
                         executed_transactions, vars
@@ -484,13 +482,13 @@ impl<'a> OperationsExtSchema<'a> {
                         {ordered_filter}
                     union all
                     select
+                        concat_ws(',', block_number, block_index) as tx_id,
                         operation as tx,
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         null as success,
                         null as fail_reason,
                         block_number,
-                        block_index,
                         created_at
                     from 
                         executed_priority_operations, vars
