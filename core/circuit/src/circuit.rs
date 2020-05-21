@@ -550,8 +550,17 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let generator = ecc::EdwardsPoint::witness(
             cs.namespace(|| "allocate public generator"),
-            Some(public_generator),
+            Some(public_generator.clone()),
             self.jubjub_params,
+        )?;
+        let (public_generator_x, public_generator_y) = public_generator.into_xy();
+        generator.get_x().assert_number(
+            cs.namespace(|| "assert generator x is constant"),
+            &public_generator_x,
+        )?;
+        generator.get_y().assert_number(
+            cs.namespace(|| "assert generator y is constant"),
+            &public_generator_y,
         )?;
 
         let op_data =
@@ -1062,9 +1071,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
-        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS_BIT_WIDTH=160
         pubdata_bits.resize(
-            DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH, //TODO: move to constant
+            DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1701,7 +1710,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
-        // TODO: add flag for is account address is correct(!)
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
