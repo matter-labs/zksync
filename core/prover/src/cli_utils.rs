@@ -1,11 +1,18 @@
-use crate::{client, start, ProverConfig, ProverImpl};
+// Built-in deps
+use std::{
+    sync::{
+        atomic::{AtomicI32, Ordering},
+        mpsc, Arc,
+    },
+    thread,
+    time::Duration,
+};
+// External deps
 use clap::{App, Arg};
-use models::config_options::parse_env;
-use models::node::config::PROVER_HEARTBEAT_INTERVAL;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::{mpsc, Arc};
-use std::thread;
-use std::time::Duration;
+// Workspace deps
+use models::config_options::{parse_env, ProverOptions};
+// Local deps
+use crate::{client, start, ProverConfig, ProverImpl};
 
 fn api_client_from_env(worker_name: &str) -> client::ApiClient {
     let server_api_url = parse_env("PROVER_SERVER_URL");
@@ -26,10 +33,10 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
     let worker_name = cli.value_of("worker_name").unwrap();
 
     // used env
+    let heartbeat_interval = ProverOptions::from_env().heartbeat_interval;
     let prover_config = <P as ProverImpl<client::ApiClient>>::Config::from_env();
     let api_client = api_client_from_env(&worker_name);
-    let prover =
-        P::create_from_config(prover_config, api_client.clone(), PROVER_HEARTBEAT_INTERVAL);
+    let prover = P::create_from_config(prover_config, api_client.clone(), heartbeat_interval);
 
     env_logger::init();
     const ABSENT_PROVER_ID: i32 = -1;

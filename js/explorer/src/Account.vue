@@ -85,12 +85,13 @@
 import store from './store';
 import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
-import { readableEther, shortenHash } from './utils';
-
+import { readableEther, shortenHash, formatDate } from './utils';
 import SearchField from './SearchField.vue';
+import CopyableAddress from './CopyableAddress.vue';
 
 const components = {
     SearchField,
+    CopyableAddress,
 };
 
 export default {
@@ -249,12 +250,15 @@ export default {
                         = tx.data.type == "ChangePubKey" ? ''
                         : `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
 
+                    const CreatedAt = formatDate(tx.data.created_at);
+
                     return {
                         Type,
                         TxnHash,
                         Amount,
                         From, 
                         To,
+                        CreatedAt,
 
                         hash: tx.data.hash,
                     };

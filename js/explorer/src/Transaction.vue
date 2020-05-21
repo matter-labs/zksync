@@ -44,6 +44,7 @@ import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
 
 import SearchField from './SearchField.vue';
+import { formatEther } from 'ethers/utils';
 
 const components = {
     SearchField,
@@ -164,7 +165,7 @@ export default {
                     { name: "Status",         value: `<b>${this.txData.status}</b>` },
                     { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
                     { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
-                    { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
+                    { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${formatEther(this.txData.amount)}`    },
                 ]
                 : [
                     { name: 'Tx hash',        value: tx_hash},
@@ -172,8 +173,8 @@ export default {
                     { name: "Status",         value: `<b>${this.txData.status}</b>` },
                     { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
                     { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
-                    { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
-                    { name: "fee",            value: `<b>${this.txData.feeTokenName}</b> ${readableEther(this.txData.fee)}` },
+                    { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${formatEther(this.txData.amount)}`    },
+                    { name: "fee",            value: `<b>${this.txData.feeTokenName}</b> ${formatEther(this.txData.fee)}` },
                     { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ];
 

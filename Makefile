@@ -73,7 +73,7 @@ db-drop: confirm_action
 db-wait:
 	@bin/db-wait
 
-genesis: confirm_action
+genesis: confirm_action db-reset
 	@bin/genesis.sh
 
 # Frontend clients
@@ -150,6 +150,9 @@ push-image-rust: image-rust push-image-server push-image-prover push-image-serve
 deploy-contracts: confirm_action build-contracts
 	@bin/deploy-contracts.sh
 
+publish-contracts: confirm_action
+	@bin/publish-contracts.sh
+
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
@@ -158,6 +161,7 @@ build-contracts: confirm_action prepare-contracts
 	@cd contracts && yarn build
 
 prepare-contracts:
+	@cargo run --release --bin gen_token_add_contract
 	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
 # testing
@@ -165,19 +169,8 @@ prepare-contracts:
 ci-check:
 	@ci-check.sh
 	
-integration-testkit: build-contracts
+integration-testkit:
 	@bin/integration-testkit.sh
-
-migration-test: build-contracts
-	cargo run --bin migration_test --release
-
-itest: # contracts simple integration tests
-	@bin/prepare-test-contracts.sh
-	@cd contracts && yarn itest
-
-utest: # contracts unit tests
-	@bin/prepare-test-contracts.sh
-	@cd contracts && yarn unit-test
 
 integration-simple:
 	@cd js/tests && yarn && yarn simple
@@ -206,9 +199,9 @@ promote-to-ropsten:
 	@bin/promote-to.sh ropsten $(ci-build)
 
 # (Re)deploy contracts and database
-redeploy: confirm_action stop deploy-contracts db-insert-contract
+redeploy: confirm_action stop init-deploy
 
-init-deploy: confirm_action deploy-contracts db-insert-contract
+init-deploy: confirm_action deploy-contracts db-insert-contract publish-contracts
 
 update-images: push-image-rust push-image-nginx
 
@@ -283,7 +276,6 @@ dev-up:
 	@docker-compose up -d postgres geth
 	@docker-compose up -d tesseracts
 
-
 dev-down:
 	@docker-compose stop tesseracts
 	@docker-compose stop postgres geth
@@ -314,3 +306,6 @@ data-restore-restart: confirm_action data-restore-db-prepare
 
 data-restore-continue:
 	@cargo run --bin data_restore --release -- --continue
+
+api-type-validate:
+	@cd js/tests && yarn && yarn api-type-validate --test

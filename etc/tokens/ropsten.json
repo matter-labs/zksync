@@ -1,0 +1,86 @@
+[
+  {
+    "address": "0x351714Df444b8213f2C46aaA28829Fc5a8921304",
+    "decimals": 18,
+    "symbol": "DAI",
+    "name": "Dai Stablecoin"
+  },
+  {
+    "address": "0x793f38AE147852C37071684CdffC1FF7c87f7d07",
+    "decimals": 18,
+    "symbol": "LINK",
+    "name": "ChainLink Token"
+  },
+  {
+    "address": "0x4DbAd9A2d633832fa6C3E3149C1982ec88270f8C",
+    "decimals": 18,
+    "symbol": "BNB",
+    "name": "BNB"
+  },
+  {
+    "address": "0x805e8a48ed5feC6e8ac22b97868133856D630D96",
+    "decimals": 18,
+    "symbol": "PAX",
+    "name": "Paxos Standard"
+  },
+  {
+    "address": "0xf53CFb24918883A9D4ba041D1392143A97b39C06",
+    "decimals": 18,
+    "symbol": "ZB",
+    "name": "ZBToken"
+  },
+  {
+    "address": "0x5Ae45f7f17F0dF0b24aBe25a5522a9c9341aC04D",
+    "decimals": 18,
+    "symbol": "OKB",
+    "name": "OKB"
+  },
+  {
+    "address": "0x7e317ceaa15fe7d5474349043332319C5f28cC11",
+    "decimals": 18,
+    "symbol": "FSN",
+    "name": "Fusion Token"
+  },
+  {
+    "address": "0x16c550a97Ad2ae12C0C8CF1CC3f8DB4e0c45238f",
+    "decimals": 18,
+    "symbol": "BUSD",
+    "name": "Binance USD"
+  },
+  {
+    "address": "0x6856eC11F56267e3326f536D0e9F36eC7f7D1498",
+    "decimals": 18,
+    "symbol": "TUSD",
+    "name": "TrueUSD"
+  },
+  {
+    "address": "0x25e2C55333E7CF706F6a9F0b0d1f8BF3a42ABC77",
+    "decimals": 18,
+    "symbol": "HT",
+    "name": "HuobiToken"
+  },
+  {
+    "address": "0x0e57c6481F7467A3f64AFFa55576df4bdD4Fd6C9",
+    "decimals": 18,
+    "symbol": "OMG",
+    "name": "OMGToken"
+  },
+  {
+    "address": "0xc66227E44bf1E6F043919A65707b826e3E9f1132",
+    "decimals": 18,
+    "symbol": "TRB",
+    "name": "Tellor Tributes"
+  },
+  {
+    "address": "0xC865bCBe4b6eF4B58a790052f2B51B4f06f586aC",
+    "decimals": 18,
+    "symbol": "ZRX",
+    "name": "0x Protocol Token"
+  },
+  {
+    "address": "0x1B46bd2FC40030B6959A2d407f7D16f66aFaDD52",
+    "decimals": 18,
+    "symbol": "BAT",
+    "name": "Basic Attention Token"
+  }
+]

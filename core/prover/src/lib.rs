@@ -15,9 +15,7 @@ use std::{
 // External deps
 use log::*;
 // Workspace deps
-use models::node::config::PROVER_CYCLE_WAIT;
-use models::node::Engine;
-use models::prover_utils::EncodedProofPlonk;
+use models::{config_options::ProverOptions, node::Engine, prover_utils::EncodedProofPlonk};
 
 /// Trait that provides type needed by prover to initialize.
 pub trait ProverConfig {
@@ -95,6 +93,7 @@ fn run_rounds<P: ProverImpl<C>, C: ApiClient>(
     start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
 ) -> BabyProverError {
     info!("Running worker rounds");
+    let cycle_wait_interval = ProverOptions::from_env().cycle_wait;
 
     loop {
         trace!("Starting a next round");
@@ -110,7 +109,7 @@ fn run_rounds<P: ProverImpl<C>, C: ApiClient>(
             };
         }
         trace!("round completed.");
-        thread::sleep(PROVER_CYCLE_WAIT);
+        thread::sleep(cycle_wait_interval);
     }
 }
 

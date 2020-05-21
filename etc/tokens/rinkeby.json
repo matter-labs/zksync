@@ -1,0 +1,110 @@
+[
+  {
+    "address": "0x8ecE0cb8B5cf0e2d49f135703B6436EFA26393c9",
+    "decimals": 18,
+    "symbol": "DAI",
+    "name": "Dai Stablecoin"
+  },
+  {
+    "address": "0x4da8d0795830f75BE471F072a034d42c369B5d0A",
+    "decimals": 18,
+    "symbol": "LINK",
+    "name": "ChainLink Token"
+  },
+  {
+    "address": "0x030b0a08eCaDdE5Ac33859a48d87416946C966A1",
+    "decimals": 18,
+    "symbol": "BNB",
+    "name": "BNB"
+  },
+  {
+    "address": "0x3fbd20f0b9A96CF9126f2C28f8976188D05B3A8c",
+    "decimals": 18,
+    "symbol": "PAX",
+    "name": "Paxos Standard"
+  },
+  {
+    "address": "0xCF19C55A1f728123fb41Cb7B4A15b705aA06a8B1",
+    "decimals": 18,
+    "symbol": "ZB",
+    "name": "ZBToken"
+  },
+  {
+    "address": "0xfA1e1aBc499Fcf23369bF2aD00662007801F4dAB",
+    "decimals": 18,
+    "symbol": "OKB",
+    "name": "OKB"
+  },
+  {
+    "address": "0x1351E94ed4314e4cD3d2E54eAF22aaBe7bC3060a",
+    "decimals": 18,
+    "symbol": "FSN",
+    "name": "Fusion Token"
+  },
+  {
+    "address": "0x4e2442A6f7AeCE64Ca33d31756B5390860BF973E",
+    "decimals": 18,
+    "symbol": "BUSD",
+    "name": "Binance USD"
+  },
+  {
+    "address": "0xd2255612F9b045e9c81244bB874aBb413Ca139a3",
+    "decimals": 18,
+    "symbol": "TUSD",
+    "name": "TrueUSD"
+  },
+  {
+    "address": "0x14700Cae8B2943bad34C70bB76AE27ECF5bC5013",
+    "decimals": 18,
+    "symbol": "HT",
+    "name": "HuobiToken"
+  },
+  {
+    "address": "0x2B203de02AD6109521e09985b3aF9B8c62541Cd6",
+    "decimals": 18,
+    "symbol": "OMG",
+    "name": "OMGToken"
+  },
+  {
+    "address": "0x2655F3a9eEB7F960be83098457144813ffaD07a4",
+    "decimals": 18,
+    "symbol": "TRB",
+    "name": "Tellor Tributes"
+  },
+  {
+    "address": "0xDB7F2B9f6a0cB35FE5D236e5ed871D3aD4184290",
+    "decimals": 18,
+    "symbol": "ZRX",
+    "name": "0x Protocol Token"
+  },
+  {
+    "address": "0xD2084eA2AE4bBE1424E4fe3CDE25B713632fb988",
+    "decimals": 18,
+    "symbol": "BAT",
+    "name": "Basic Attention Token"
+  },
+  {
+    "address": "0x9Cac8508b9ff26501439590a24893D80e7E84D21",
+    "decimals": 18,
+    "symbol": "REP",
+    "name": "Reputation"
+  },
+  {
+    "address": "0x02d01f0835B7FDfa5d801A8f5f74c37F2BB1aE6a",
+    "decimals": 18,
+    "symbol": "NEXO",
+    "name": "Nexo"
+  },
+  {
+    "address": "0x290EBa6EC56EcC9fF81C72E8eccc77D2c2BF63eB",
+    "decimals": 18,
+    "symbol": "KNC",
+    "name": "Kyber Network Crystal"
+  },
+  {
+    "address": "0x9ecec4d48Efdd96aE377aF3AB868f99De865CfF8",
+    "decimals": 18,
+    "symbol": "LAMB",
+    "name": "Lambda"
+  }
+]

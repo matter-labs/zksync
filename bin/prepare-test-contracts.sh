@@ -11,24 +11,24 @@ rm -rf $OUT_DIR
 mkdir -p $OUT_DIR
 cp $IN_DIR/Governance.sol $OUT_DIR/GovernanceTest.sol
 cp $IN_DIR/Verifier.sol $OUT_DIR/VerifierTest.sol
-cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
+cp $IN_DIR/ZkSync.sol $OUT_DIR/ZkSyncTest.sol
 cp $IN_DIR/Storage.sol $OUT_DIR/StorageTest.sol
 cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
 cp $IN_DIR/UpgradeGatekeeper.sol $OUT_DIR/UpgradeGatekeeperTest.sol
-cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTestNoInit.sol
+cp $IN_DIR/ZkSync.sol $OUT_DIR/ZkSyncTestNoInit.sol
 
 # Change dependencies
 ssed 's/import "\.\./import "\.\.\/\.\./' -i $OUT_DIR/*.sol
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
 ssed 's/\bVerifier\b/VerifierTest/' -i $OUT_DIR/*.sol
-ssed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
+ssed 's/ZkSync/ZkSyncTest/' -i $OUT_DIR/*.sol
 ssed 's/Storage/StorageTest/' -i $OUT_DIR/*.sol
 ssed 's/Config/ConfigTest/' -i $OUT_DIR/*.sol
 ssed 's/UpgradeGatekeeper/UpgradeGatekeeperTest/' -i $OUT_DIR/*.sol
 
-# Renaming of FranklinTestNoInit contract
-ssed 's/contract FranklinTest/contract FranklinTestNoInit/' -i $OUT_DIR/FranklinTestNoInit.sol
+# Renaming of ZkSyncTestNoInit contract
+ssed 's/contract ZkSyncTest/contract ZkSyncTestNoInit/' -i $OUT_DIR/ZkSyncTestNoInit.sol
 
 
 # Changes solidity constant to provided value
@@ -54,5 +54,5 @@ create_constant_getter UPGRADE_NOTICE_PERIOD $OUT_DIR/UpgradeGatekeeperTest.sol
 # Verify always true
 set_constant DUMMY_VERIFIER true $OUT_DIR/VerifierTest.sol
 
-# Make initialize function in FranklinTestNoInit contract to do nothing
-ssed -E "s/    function initialize(.*)/    function initialize\1\n        return;/" -i $OUT_DIR/FranklinTestNoInit.sol
+# Make initialize function in ZkSyncTestNoInit contract to do nothing
+ssed -E "s/    function initialize(.*)/    function initialize\1\n        return;/" -i $OUT_DIR/ZkSyncTestNoInit.sol

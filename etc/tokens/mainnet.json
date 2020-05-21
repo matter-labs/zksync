@@ -1,0 +1,128 @@
+[
+  {
+    "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    "decimals": 6,
+    "symbol": "USDT",
+    "name": "Tether USD"
+  },
+  {
+    "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "decimals": 6,
+    "symbol": "USDC",
+    "name": "USD Coin"
+  },
+  {
+    "address": "0x514910771af9ca656af840dff83e8264ecf986ca",
+    "decimals": 18,
+    "symbol": "LINK",
+    "name": "ChainLink Token"
+  },
+  {
+    "address": "0xB8c77482e45F1F44dE1745F52C74426C631bDD52",
+    "decimals": 18,
+    "symbol": "BNB",
+    "name": "BNB"
+  },
+  {
+    "address": "0x8e870d67f660d95d5be530380d0ec0bd388289e1",
+    "decimals": 18,
+    "symbol": "PAX",
+    "name": "Paxos Standard"
+  },
+  {
+    "address": "0xbd0793332e9fb844a52a205a233ef27a5b34b927",
+    "decimals": 18,
+    "symbol": "ZB",
+    "name": "ZBToken"
+  },
+  {
+    "address": "0x75231f58b43240c9718dd58b4967c5114342a86c",
+    "decimals": 18,
+    "symbol": "OKB",
+    "name": "OKB"
+  },
+  {
+    "address": "0xd0352a019e9ab9d757776f532377aaebd36fd541",
+    "decimals": 18,
+    "symbol": "FSN",
+    "name": "Fusion Token"
+  },
+  {
+    "address": "0x4fabb145d64652a948d72533023f6e7a623c7c53",
+    "decimals": 18,
+    "symbol": "BUSD",
+    "name": "Binance USD"
+  },
+  {
+    "address": "0x0000000000085d4780B73119b644AE5ecd22b376",
+    "decimals": 18,
+    "symbol": "TUSD",
+    "name": "TrueUSD"
+  },
+  {
+    "address": "0x6f259637dcd74c767781e37bc6133cd6a68aa161",
+    "decimals": 18,
+    "symbol": "HT",
+    "name": "HuobiToken"
+  },
+  {
+    "address": "0xd26114cd6EE289AccF82350c8d8487fedB8A0C07",
+    "decimals": 18,
+    "symbol": "OMG",
+    "name": "OMGToken"
+  },
+  {
+    "address": "0x0ba45a8b5d5575935b8158a88c631e9f9c95a2e5",
+    "decimals": 18,
+    "symbol": "TRB",
+    "name": "Tellor Tributes"
+  },
+  {
+    "address": "0xe41d2489571d322189246dafa5ebde1f4699f498",
+    "decimals": 18,
+    "symbol": "ZRX",
+    "name": "0x Protocol Token"
+  },
+  {
+    "address": "0x0d8775f648430679a709e98d2b0cb6250d2887ef",
+    "decimals": 18,
+    "symbol": "BAT",
+    "name": "Basic Attention Token"
+  },
+  {
+    "address": "0x1985365e9f78359a9B6AD760e32412f4a445E862",
+    "decimals": 18,
+    "symbol": "REP",
+    "name": "Reputation"
+  },
+  {
+    "address": "0xb64ef51c888972c908cfacf59b47c1afbc0ab8ac",
+    "decimals": 8,
+    "symbol": "STORJ",
+    "name": "StorjToken"
+  },
+  {
+    "address": "0xb62132e35a6c13ee1ee0f84dc5d40bad8d815206",
+    "decimals": 18,
+    "symbol": "NEXO",
+    "name": "Nexo"
+  },
+  {
+    "address": "0xb63b606ac810a52cca15e44bb630fd42d8d1d83d",
+    "decimals": 8,
+    "symbol": "MCO",
+    "name": "MCO"
+  },
+  {
+    "address": "0xdd974d5c2e2928dea5f71b9825b8b646686bd200",
+    "decimals": 18,
+    "symbol": "KNC",
+    "name": "Kyber Network Crystal"
+  },
+  {
+    "address": "0x8971f9fd7196e5cee2c1032b50f656855af7dd26",
+    "decimals": 18,
+    "symbol": "LAMB",
+    "name": "Lambda"
+  }
+]

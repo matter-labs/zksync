@@ -1,3 +1,4 @@
+---
 kind: pipeline
 type: docker
 name: loadtest-nightly
@@ -29,12 +30,10 @@ steps:
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
-  - zksync plonk-setup download monomial `get_required_plonk_setup_powers`
+  - zksync plonk-setup check || zksync plonk-setup download
   - zksync verify-keys unpack
-  - zksync db-wait
-  - zksync db-setup
+  - zksync deploy-dev-erc20
   - zksync build-contracts
-  - zksync db-reset
   - zksync genesis
   - zksync redeploy
   - f cargo build --release
@@ -87,6 +86,7 @@ volumes:
 trigger:
   event:
   - cron
+
 ---
 kind: pipeline
 type: docker
@@ -120,10 +120,10 @@ steps:
   - zksync dummy-prover ensure-disabled
   - zksync env ci
   - zksync yarn
-  - zksync db-wait
-  - zksync db-setup
   - zksync plonk-setup check || zksync plonk-setup download
   - zksync verify-keys unpack
+  - zksync db-setup
+  - zksync deploy-dev-erc20
   - zksync dummy-prover ensure-disabled
   depends_on:
   - restore-cache
@@ -280,10 +280,10 @@ steps:
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
-  - zksync db-wait
-  - zksync db-setup
+  - zksync plonk-setup check || zksync plonk-setup download
   - zksync verify-keys unpack
-  - zksync genesis
+  - zksync db-setup
+  - zksync deploy-dev-erc20
   - zksync dummy-prover enable
   - f cargo build --release --bin server
   - f cargo build --release --bin dummy_prover
@@ -318,6 +318,7 @@ steps:
   - sleep 15
   - zksync integration-simple
   - zksync integration-full-exit
+  - zksync api-type-validate
   depends_on:
   - start-server-detached
   - start-prover-detached
@@ -374,6 +375,7 @@ steps:
   - zksync env stage
   - zksync yarn
   - zksync plonk-setup check || zksync plonk-setup download
+  - zksync db-setup
   - zksync verify-keys unpack
   - zksync build-contracts
   environment:
