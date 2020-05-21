@@ -296,6 +296,8 @@ impl<'a> OperationsExtSchema<'a> {
         let query = format!(
             "
             select
+                block_number,
+                block_index,
                 hash,
                 pq_id,
                 tx,
@@ -316,6 +318,7 @@ impl<'a> OperationsExtSchema<'a> {
                         success,
                         fail_reason,
                         block_number,
+                        block_index,
                         created_at
                     from
                         executed_transactions, vars
@@ -333,6 +336,7 @@ impl<'a> OperationsExtSchema<'a> {
                         null as success,
                         null as fail_reason,
                         block_number,
+                        block_index,
                         created_at
                     from 
                         executed_priority_operations, vars
@@ -442,6 +446,8 @@ impl<'a> OperationsExtSchema<'a> {
         let query = format!(
             "
             select
+                block_number,
+                block_index,
                 hash,
                 pq_id,
                 tx,
@@ -462,6 +468,7 @@ impl<'a> OperationsExtSchema<'a> {
                         success,
                         fail_reason,
                         block_number,
+                        block_index,
                         created_at
                     from
                         executed_transactions, vars
@@ -483,6 +490,7 @@ impl<'a> OperationsExtSchema<'a> {
                         null as success,
                         null as fail_reason,
                         block_number,
+                        block_index,
                         created_at
                     from 
                         executed_priority_operations, vars

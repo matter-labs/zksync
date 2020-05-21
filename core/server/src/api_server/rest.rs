@@ -467,6 +467,8 @@ fn priority_op_to_tx_history(
     let naitve_current_time = chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
 
     TransactionsHistoryItem {
+        block_number: None,
+        block_index: None,
         hash: Some(hash_str),
         pq_id,
         tx: tx_json,

@@ -1,6 +1,6 @@
 // External imports
 use chrono::NaiveDateTime;
-use diesel::sql_types::{BigInt, Bool, Jsonb, Nullable, Text, Timestamp};
+use diesel::sql_types::{BigInt, Bool, Integer, Jsonb, Nullable, Text, Timestamp};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
 // Workspace imports
@@ -19,6 +19,12 @@ pub struct AccountTransaction {
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq)]
 pub struct TransactionsHistoryItem {
+    #[sql_type = "Nullable<BigInt>"]
+    pub block_number: Option<i64>,
+
+    #[sql_type = "Nullable<Integer>"]
+    pub block_index: Option<i32>,
+
     #[sql_type = "Nullable<Text>"]
     pub hash: Option<String>,
 
