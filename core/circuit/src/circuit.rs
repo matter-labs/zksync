@@ -550,8 +550,17 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let generator = ecc::EdwardsPoint::witness(
             cs.namespace(|| "allocate public generator"),
-            Some(public_generator),
+            Some(public_generator.clone()),
             self.jubjub_params,
+        )?;
+        let (public_generator_x, public_generator_y) = public_generator.into_xy();
+        generator.get_x().assert_number(
+            cs.namespace(|| "assert generator x is constant"),
+            &public_generator_x,
+        )?;
+        generator.get_y().assert_number(
+            cs.namespace(|| "assert generator y is constant"),
+            &public_generator_y,
         )?;
 
         let op_data =
@@ -1062,9 +1071,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
-        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS_BIT_WIDTH=160
         pubdata_bits.resize(
-            DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH, //TODO: move to constant
+            DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1252,105 +1261,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         Ok(tx_valid)
     }
-
-    // Close disable
-    // fn close_account<CS: ConstraintSystem<E>>(
-    //     &self,
-    //     mut cs: CS,
-    //     cur: &mut AllocatedOperationBranch<E>,
-    //     chunk_data: &AllocatedChunkData<E>,
-    //     ext_pubdata_chunk: &AllocatedNum<E>,
-    //     op_data: &AllocatedOperationData<E>,
-    //     signer_key: &AllocatedSignerPubkey<E>,
-    //     subtree_root: &CircuitElement<E>,
-    //     is_sig_verified: &Boolean,
-    // ) -> Result<Boolean, SynthesisError> {
-    //     let mut is_valid_flags = vec![];
-    //     //construct pubdata
-    //     let mut pubdata_bits = vec![];
-    //     pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-    //     pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-    //     pubdata_bits.resize(
-    //         params::CHUNK_BIT_WIDTH,
-    //         Boolean::constant(false),
-    //     );
-
-    //     // construct signature message preimage (serialized_tx)
-    //     let mut serialized_tx_bits = vec![];
-    //     serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-    //     serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
-    //     serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-
-    //     let pubdata_chunk = select_pubdata_chunk(
-    //         cs.namespace(|| "select_pubdata_chunk"),
-    //         &pubdata_bits,
-    //         &chunk_data.chunk_number,
-    //         1,
-    //     )?;
-
-    //     let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
-    //         cs.namespace(|| "is_pubdata_equal"),
-    //         &pubdata_chunk,
-    //         ext_pubdata_chunk,
-    //     )?);
-    //     is_valid_flags.push(is_pubdata_chunk_correct);
-
-    //     let is_close_account = Boolean::from(Expression::equals(
-    //         cs.namespace(|| "is_deposit"),
-    //         &chunk_data.tx_type.get_number(),
-    //         Expression::u64::<CS>(4), //close_account tx_type
-    //     )?);
-    //     is_valid_flags.push(is_close_account.clone());
-
-    //     let tmp = CircuitAccount::<E>::empty_balances_root_hash();
-    //     let mut r_repr = E::Fr::zero().into_repr();
-    //     r_repr.read_be(&tmp[..]).unwrap();
-    //     let empty_root = E::Fr::from_repr(r_repr).unwrap();
-
-    //     let are_balances_empty = Boolean::from(Expression::equals(
-    //         cs.namespace(|| "are_balances_empty"),
-    //         &subtree_root.get_number(),
-    //         Expression::constant::<CS>(empty_root), //This is precalculated root_hash of subtree with empty balances
-    //     )?);
-    //     is_valid_flags.push(are_balances_empty);
-
-    //     let is_serialized_tx_correct = verify_signature_message_construction(
-    //         cs.namespace(|| "is_serialized_tx_correct"),
-    //         serialized_tx_bits,
-    //         &op_data,
-    //     )?;
-
-    //     is_valid_flags.push(is_serialized_tx_correct);
-    //     is_valid_flags.push(is_sig_verified.clone());
-    //     let is_signer_valid = CircuitElement::equals(
-    //         cs.namespace(|| "signer_key_correct"),
-    //         &signer_key.pubkey.get_hash(),
-    //         &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
-    //     )?;
-
-    //     is_valid_flags.push(is_signer_valid);
-
-    //     let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
-
-    //     // below we conditionally update state if it is valid operation
-
-    //     // update pub_key
-    //     cur.account.pub_key_hash = CircuitElement::conditionally_select_with_number_strict(
-    //         cs.namespace(|| "mutated_pubkey"),
-    //         Expression::constant::<CS>(E::Fr::zero()),
-    //         &cur.account.pub_key_hash,
-    //         &tx_valid,
-    //     )?;
-    //     // update nonce
-    //     cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-    //         cs.namespace(|| "update cur nonce"),
-    //         Expression::constant::<CS>(E::Fr::zero()),
-    //         &cur.account.nonce,
-    //         &tx_valid,
-    //     )?;
-
-    //     Ok(tx_valid)
-    // }
 
     fn noop<CS: ConstraintSystem<E>>(
         &self,
@@ -1701,7 +1611,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
-        // TODO: add flag for is account address is correct(!)
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
