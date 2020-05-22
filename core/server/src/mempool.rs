@@ -15,10 +15,7 @@
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
 // Built-in deps
-use std::{
-    collections::{HashMap, VecDeque},
-    time::{Duration, Instant},
-};
+use std::collections::{HashMap, VecDeque};
 // External uses
 use failure::Fail;
 use futures::{
@@ -28,18 +25,13 @@ use futures::{
 use tokio::runtime::Runtime;
 // Workspace uses
 use models::node::{
-    tx::TxHash, AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
-    TransferOp, TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
+    TransferToNewOp,
 };
 use storage::ConnectionPool;
 // Local uses
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
 use models::config_options::ConfigurationOptions;
-
-/// Interval between calling the `collect_garbage` method of the mempool schema.
-/// This interval should be pretty big, as the operation has the very low priority
-/// and should not affect the overall server performance.
-const GARBAGE_COLLECTION_INTERVAL: Duration = Duration::from_secs(20 * 60);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
@@ -94,8 +86,6 @@ pub enum MempoolRequest {
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
     GetBlock(GetBlockRequest),
-    /// Remove committed txs from the persistent mempool storage.
-    RemoveCommittedTxs(Vec<TxHash>),
 }
 
 struct MempoolState {
@@ -257,37 +247,8 @@ impl Mempool {
                         }
                     }
                 }
-                MempoolRequest::RemoveCommittedTxs(tx_hashes) => {
-                    // Remove the transactions included into the block from the database.
-                    // Warning: we should not remove transactions from the database until we're
-                    // sure that all the transactions are committed to the database.
-                    if let Err(err) = self.remove_txs_from_mempool(&tx_hashes) {
-                        log::warn!("Unable to remove processed txs from the database: {}", err);
-                    }
-                }
             }
         }
-    }
-
-    /// Removes the transactions from the database persistent pool.
-    /// This method is used to remove transactions that will be included in the next block
-    /// and thus aren't a part of mempool anymore.
-    fn remove_txs_from_mempool(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage().map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-
-        storage
-            .chain()
-            .mempool_schema()
-            .remove_txs(txs)
-            .map_err(|err| {
-                log::warn!("Mempool storage access error: {}", err);
-                TxAddError::DbError
-            })?;
-
-        Ok(())
     }
 
     async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
@@ -348,39 +309,6 @@ impl Mempool {
     }
 }
 
-/// Function for any mempool managing tasks that have to be
-/// invoked periodically, but should not affect the main responder thread.
-///
-/// Currently does the following:
-/// * Invokes the mempool schema garbage collector method.
-async fn satellite_thread(db_pool: ConnectionPool) {
-    const THREAD_SLEEP_INTERVAL: Duration = Duration::from_secs(30);
-    let mut thread_sleep = tokio::time::interval(THREAD_SLEEP_INTERVAL);
-
-    let mut last_garbage_collection = Instant::now();
-
-    loop {
-        // Collect the garbage txs in the database if it's time to.
-        if last_garbage_collection.elapsed() >= GARBAGE_COLLECTION_INTERVAL {
-            let storage = match db_pool.access_storage() {
-                Ok(storage) => storage,
-                Err(err) => {
-                    log::warn!("Mempool storage access error: {}", err);
-                    return;
-                }
-            };
-
-            if let Err(err) = storage.chain().mempool_schema().collect_garbage() {
-                log::warn!("Mempool storage access error: {}", err);
-            }
-
-            last_garbage_collection = Instant::now();
-        }
-
-        thread_sleep.tick().await;
-    }
-}
-
 pub fn run_mempool_task(
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
@@ -402,6 +330,4 @@ pub fn run_mempool_task(
             .expect("failed to find max block chunks size"),
     };
     runtime.spawn(mempool.run());
-
-    runtime.spawn(satellite_thread(db_pool));
 }

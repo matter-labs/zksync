@@ -28,7 +28,7 @@ impl<'a> MempoolSchema<'a> {
 
     /// Adds a new transaction to the mempool schema.
     pub fn insert_tx(&self, tx_data: &FranklinTx) -> Result<(), failure::Error> {
-        let tx_hash = tx_data.hash().to_string();
+        let tx_hash = hex::encode(tx_data.hash().as_ref());
         let tx = serde_json::to_value(tx_data)?;
 
         let db_entry = NewMempoolTx { tx_hash, tx };
@@ -40,8 +40,17 @@ impl<'a> MempoolSchema<'a> {
         Ok(())
     }
 
-    pub fn remove_txs(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
-        let tx_hashes: Vec<_> = txs.iter().map(ToString::to_string).collect();
+    pub fn remove_tx(&self, tx: &[u8]) -> QueryResult<()> {
+        let tx_hash = hex::encode(tx);
+
+        diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq(&tx_hash)))
+            .execute(self.0.conn())?;
+
+        Ok(())
+    }
+
+    fn remove_txs(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
+        let tx_hashes: Vec<_> = txs.iter().map(hex::encode).collect();
 
         diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq_any(&tx_hashes)))
             .execute(self.0.conn())?;

@@ -109,11 +109,16 @@ fn remove_txs() {
         }
 
         // Remove several txs from the schema.
-        let hashes_to_remove: Vec<_> = txs[SPLIT_TXS_AT..].iter().map(|tx| tx.hash()).collect();
+        let hashes_to_remove: Vec<_> = txs[SPLIT_TXS_AT..]
+            .iter()
+            .map(|tx| tx.hash().as_ref().to_vec())
+            .collect();
         let retained_hashes: Vec<_> = txs[..SPLIT_TXS_AT].iter().map(|tx| tx.hash()).collect();
-        MempoolSchema(&conn)
-            .remove_txs(&hashes_to_remove)
-            .expect("Can't remove txs");
+        for hash in hashes_to_remove {
+            MempoolSchema(&conn)
+                .remove_tx(&hash)
+                .expect("Can't remove txs");
+        }
 
         // Load the txs and check that they match the expected list.
         let txs_from_db = MempoolSchema(&conn).load_txs().expect("Can't load txs");
