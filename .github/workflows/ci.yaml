@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ dev, master ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: matterlabs/ci:latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Compile
+        run: cargo check
