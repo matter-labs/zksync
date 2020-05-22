@@ -1,4 +1,5 @@
 type Deposit = {
+    "tx_id": string,
     "hash": string,
     "pq_id": number,
     "tx": {
@@ -19,6 +20,7 @@ type Deposit = {
 };
 
 type FullExit = {
+    "tx_id": string,
     "hash": string,
     "pq_id": number,
     "tx": {
@@ -38,6 +40,7 @@ type FullExit = {
 };
 
 type Transfer = {
+    "tx_id": string,
     "hash": string,
     "pq_id": null,
     "tx": {
@@ -62,6 +65,7 @@ type Transfer = {
 };
 
 type ChangePubKey = {
+    "tx_id": string,
     "hash": string,
     "pq_id": null,
     "tx": {
@@ -80,6 +84,7 @@ type ChangePubKey = {
 }
 
 type Withdraw =   {
+    "tx_id": string,
     "hash": string,
     "pq_id": null,
     "tx": {
