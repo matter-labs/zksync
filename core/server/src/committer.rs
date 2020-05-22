@@ -20,7 +20,7 @@ async fn handle_new_commit_task(
 ) {
     while let Some(request) = rx_for_ops.next().await {
         match request {
-            CommitRequest::Block(request) => {
+            CommitRequest::Block(request, notifier) => {
                 commit_block(
                     request,
                     &pool,
@@ -29,9 +29,13 @@ async fn handle_new_commit_task(
                     &mut mempool_req_sender,
                 )
                 .await;
+
+                notifier.send(()).expect("state keeper receiver dropped");
             }
-            CommitRequest::PendingBlock(pending_block) => {
+            CommitRequest::PendingBlock(pending_block, notifier) => {
                 save_pending_block(pending_block, &pool);
+
+                notifier.send(()).expect("state keeper receiver dropped");
             }
         }
     }

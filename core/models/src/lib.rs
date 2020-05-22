@@ -27,6 +27,7 @@ use crate::prover_utils::EncodedProofPlonk;
 
 use failure::format_err;
 use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use futures::channel::oneshot;
 use std::convert::TryFrom;
 use web3::types::{Address, Log, U256};
 
@@ -143,10 +144,10 @@ pub struct Operation {
     pub accounts_updated: AccountUpdates,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum CommitRequest {
-    PendingBlock(PendingBlock),
-    Block(BlockCommitRequest),
+    PendingBlock(PendingBlock, oneshot::Sender<()>),
+    Block(BlockCommitRequest, oneshot::Sender<()>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

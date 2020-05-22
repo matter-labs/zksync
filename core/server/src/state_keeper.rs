@@ -375,8 +375,8 @@ impl PlasmaStateKeeper {
                     executed_ops.push(exec_op);
                 }
                 Err(priority_op) => {
-                    self.notify_executed_ops(&mut executed_ops).await;
                     self.seal_pending_block().await;
+                    self.notify_executed_ops(&mut executed_ops).await;
 
                     priority_op_queue.push_front(priority_op);
                 }
@@ -390,8 +390,8 @@ impl PlasmaStateKeeper {
                     executed_ops.push(exec_op);
                 }
                 Err(tx) => {
-                    self.notify_executed_ops(&mut executed_ops).await;
                     self.seal_pending_block().await;
+                    self.notify_executed_ops(&mut executed_ops).await;
 
                     tx_queue.push_front(tx);
                 }
@@ -401,15 +401,14 @@ impl PlasmaStateKeeper {
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
             if self.pending_block.pending_block_iteration > MAX_PENDING_BLOCK_ITERATIONS {
-                self.notify_executed_ops(&mut executed_ops).await;
                 self.seal_pending_block().await;
+                self.notify_executed_ops(&mut executed_ops).await;
                 return;
             } else {
                 self.store_pending_block().await;
+                self.notify_executed_ops(&mut executed_ops).await;
             }
         }
-
-        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // Err if there is no space in current block
@@ -552,11 +551,17 @@ impl PlasmaStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let commit_request = CommitRequest::Block(block_commit_request);
+        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
+
+        let commit_request = CommitRequest::Block(block_commit_request, notification_sender);
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
+
+        notification_receiver
+            .await
+            .expect("committer sender dropped");
     }
 
     /// Stores intermediate representation of a pending block in the database,
@@ -580,11 +585,18 @@ impl PlasmaStateKeeper {
             pending_block.chunks_left,
             pending_block.pending_block_iteration
         );
-        let commit_request = CommitRequest::PendingBlock(pending_block);
+
+        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
+
+        let commit_request = CommitRequest::PendingBlock(pending_block, notification_sender);
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
+
+        notification_receiver
+            .await
+            .expect("committer sender dropped");
     }
 
     fn check_executed_in_pending_block(&self, op_id: ExecutedOpId) -> Option<(BlockNumber, bool)> {
