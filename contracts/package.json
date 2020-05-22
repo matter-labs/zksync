@@ -37,6 +37,7 @@
     "deploy-dev-erc20": "ts-node scripts/deploy-dev-erc20.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "ts-node scripts/publish.ts",
+    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
     "lint:solidity": "solhint contracts/**/*.sol",
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
