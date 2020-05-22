@@ -33,6 +33,8 @@ pub struct NewExecutedPriorityOperation {
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
     pub eth_hash: Vec<u8>,
+    pub eth_block: i64,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -46,7 +48,8 @@ pub struct StoredExecutedPriorityOperation {
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
     pub eth_hash: Vec<u8>,
-    pub created_at: DateTime<Utc>,
+    pub eth_block: i64,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Insertable)]

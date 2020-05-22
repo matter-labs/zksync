@@ -63,7 +63,8 @@ CREATE TABLE executed_priority_operations (
     priority_op_serialid BIGINT NOT NULL,
     deadline_block BIGINT NOT NULL,
     eth_hash bytea NOT NULL,
-    created_at timestamp with time zone not null default now(),
+    eth_block BIGINT NOT NULL,
+    created_at timestamp with time zone not null,
     PRIMARY KEY (eth_hash)
 );
 

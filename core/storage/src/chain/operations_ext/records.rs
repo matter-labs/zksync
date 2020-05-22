@@ -17,10 +17,16 @@ pub struct AccountTransaction {
     pub verified: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq)]
 pub struct TransactionsHistoryItem {
+    #[sql_type = "Text"]
+    pub tx_id: String,
+
     #[sql_type = "Nullable<Text>"]
     pub hash: Option<String>,
+
+    #[sql_type = "Nullable<BigInt>"]
+    pub eth_block: Option<i64>,
 
     #[sql_type = "Nullable<BigInt>"]
     pub pq_id: Option<i64>,

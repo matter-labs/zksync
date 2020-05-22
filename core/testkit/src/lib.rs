@@ -749,11 +749,13 @@ impl TestSetup {
     fn await_for_block_commit_request(&mut self) -> BlockCommitRequest {
         while let Some(new_block_event) = block_on(self.proposed_blocks_receiver.next()) {
             match new_block_event {
-                CommitRequest::Block(new_block) => {
+                CommitRequest::Block(new_block, receiver) => {
+                    receiver.send(()).unwrap();
                     return new_block;
                 }
-                CommitRequest::PendingBlock(_) => {
+                CommitRequest::PendingBlock(_, receiver) => {
                     // Pending blocks are ignored.
+                    receiver.send(()).unwrap();
                 }
             }
         }
