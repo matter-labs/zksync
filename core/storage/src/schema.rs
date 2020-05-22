@@ -158,6 +158,7 @@ table! {
         priority_op_serialid -> Int8,
         deadline_block -> Int8,
         eth_hash -> Bytea,
+        eth_block -> Int8,
         created_at -> Timestamptz,
     }
 }

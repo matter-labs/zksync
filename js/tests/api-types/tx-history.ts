@@ -1,6 +1,7 @@
 type Deposit = {
     "tx_id": string,
     "hash": string,
+    "eth_block": number,
     "pq_id": number,
     "tx": {
         "account_id": number,
@@ -22,6 +23,7 @@ type Deposit = {
 type FullExit = {
     "tx_id": string,
     "hash": string,
+    "eth_block": number,
     "pq_id": number,
     "tx": {
         "priority_op": {
@@ -42,6 +44,7 @@ type FullExit = {
 type Transfer = {
     "tx_id": string,
     "hash": string,
+    "eth_block": null,
     "pq_id": null,
     "tx": {
         "accountId": number,
@@ -67,6 +70,7 @@ type Transfer = {
 type ChangePubKey = {
     "tx_id": string,
     "hash": string,
+    "eth_block": null,
     "pq_id": null,
     "tx": {
         "account": string,
@@ -86,6 +90,7 @@ type ChangePubKey = {
 type Withdraw =   {
     "tx_id": string,
     "hash": string,
+    "eth_block": null,
     "pq_id": null,
     "tx": {
       "amount": string,

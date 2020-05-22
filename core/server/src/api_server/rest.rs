@@ -435,6 +435,7 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
 /// in the client.
 fn priority_op_to_tx_history(
     tokens: &HashMap<TokenId, Token>,
+    eth_block: u64,
     op: &PriorityOp,
 ) -> TransactionsHistoryItem {
     let deposit = op
@@ -472,6 +473,7 @@ fn priority_op_to_tx_history(
     TransactionsHistoryItem {
         tx_id: "-".into(),
         hash: Some(hash_str),
+        eth_block: Some(eth_block as i64),
         pq_id,
         tx: tx_json,
         success: None,
@@ -535,7 +537,7 @@ fn handle_get_account_transactions_history(
     // `offset` and `limit` parameters.
     let mut ongoing_transactions_history: Vec<_> = ongoing_ops
         .iter()
-        .map(|(_block, op)| priority_op_to_tx_history(&tokens, op))
+        .map(|(block, op)| priority_op_to_tx_history(&tokens, *block, op))
         .skip(offset as usize)
         .take(limit as usize)
         .collect();
@@ -751,7 +753,7 @@ fn handle_get_account_transactions_history_newer_than(
         // `limit` parameters.
         let mut txs: Vec<_> = ongoing_ops
             .iter()
-            .map(|(_block, op)| priority_op_to_tx_history(&tokens, op))
+            .map(|(block, op)| priority_op_to_tx_history(&tokens, *block, op))
             .take(limit as usize)
             .collect();
 

@@ -26,6 +26,9 @@ pub struct TransactionsHistoryItem {
     pub hash: Option<String>,
 
     #[sql_type = "Nullable<BigInt>"]
+    pub eth_block: Option<i64>,
+
+    #[sql_type = "Nullable<BigInt>"]
     pub pq_id: Option<i64>,
 
     #[sql_type = "Jsonb"]
