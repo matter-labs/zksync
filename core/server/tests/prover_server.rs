@@ -225,6 +225,7 @@ pub fn test_operation_and_wanted_prover_data(
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
                 eth_hash: vec![0; 8],
+                eth_block: 10,
             },
             block_index: 0,
             created_at: chrono::Utc::now(),
