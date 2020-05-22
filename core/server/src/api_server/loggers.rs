@@ -1,8 +1,8 @@
 //! Loggers for rest.rs, and HTTP/WS RPC.
 //!
-//! All logs report ip and country of the user, as well as headers in AUX_HEADERS constant.
+//! All logs print headers in HEADERS constant.
 //! Rest logs also report request url, response duration in milliseconds,
-//! response code and size in bytes.
+//! and response code.
 //!
 //! To enable all logs, add to RUST_LOG env variable:
 //! actix_web=info,server::api_server::loggers=info
@@ -11,54 +11,37 @@
 //! and not for http rpc or api_server:
 //! server::api_server::loggers::ws_rpc=info,
 
-/// We print cf-connecting-ip and cf-ipcountry in every request.
-/// This is the list of headers that are not too much relevant,
-/// but still will be printed at the end of log message.
-/// You can add headers to that constant, reorder them, delete them.
-const AUX_HEADERS: [&str; 19] = [
+/// Headers to be printed in every request
+const HEADERS: [&str; 5] = [
+    "cf-connecting-ip",
+    "cf-ipcountry",
     "user-agent",
     "cf-request-id",
-    "host",
     "cf-ray",
-    "cf-visitor",
-    "content-length",
-    "accept-encoding",
-    "accept",
-    "content-type",
-    "referrer",
-    "x-request-id",
-    "x-real-ip",
-    "x-forwarded-for",
-    "x-forwarded-host",
-    "x-forwarded-port",
-    "x-forwarded-proto",
-    "x-original-uri",
-    "x-scheme",
-    "x-original-forwarded-for",
 ];
 
 pub mod rest {
-    use super::AUX_HEADERS;
+    use super::HEADERS;
     use itertools::Itertools;
 
     pub fn get_logger_format() -> String {
-        let aux_headers_formatted = AUX_HEADERS
+        let headers_formatted = HEADERS
             .iter()
-            .map(|&h| format!("{}: \"%{{{}}}i\"", h, h))
-            .join(", ");
+            .map(|&h| format!("{}=\"%{{{}}}i\"", h, h))
+            .join(" ");
 
-        // Looks like
-        // req { "GET /endpoint" from 192.168.0.1, US }, resp { code: 200, bytes: 10, duration: 0.01ms }, req headers { name: "value", name: "value" }
         format!(
-            "req {{ \"%r\" from %{{cf-connecting-ip}}i, %{{cf-ipcountry}}i }}, \
-            resp {{ code: %s, bytes: %b, duration: %Dms }}, req headers {{ {} }}",
-            aux_headers_formatted
+            "request=\"%r\" \
+            {}
+            resp-code=\"%s\" \
+            resp-duration=\"%Dms\"",
+            headers_formatted,
         )
     }
 }
 
 pub mod http_rpc {
-    use super::AUX_HEADERS;
+    use super::HEADERS;
     use itertools::Itertools;
     use jsonrpc_http_server::{
         hyper::{http::HeaderValue, Body, Request},
@@ -78,17 +61,12 @@ pub mod http_rpc {
                     .unwrap_or("-")
             };
 
-            let aux_headers_formatted = AUX_HEADERS
+            let headers_formatted = HEADERS
                 .iter()
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            info!(
-                "req from {}, {}, req headers {{ {} }}",
-                get_header("cf-connecting-ip"),
-                get_header("cf-ipcountry"),
-                aux_headers_formatted,
-            );
+            info!("{}", headers_formatted,);
         }
 
         request.into()
@@ -96,7 +74,7 @@ pub mod http_rpc {
 }
 
 pub mod ws_rpc {
-    use super::AUX_HEADERS;
+    use super::HEADERS;
     use itertools::Itertools;
     use jsonrpc_ws_server::ws::{Request, Response};
     use log::Level;
@@ -113,17 +91,12 @@ pub mod ws_rpc {
 
             let get_header = |header| headers.get(header).map(Deref::deref).unwrap_or("-");
 
-            let aux_headers_formatted = AUX_HEADERS
+            let headers_formatted = HEADERS
                 .iter()
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            info!(
-                "req from {}, {}, req headers {{ {} }}",
-                get_header("cf-connecting-ip"),
-                get_header("cf-ipcountry"),
-                aux_headers_formatted,
-            );
+            info!("{}", headers_formatted,);
         }
 
         None
