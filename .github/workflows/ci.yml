@@ -1,8 +1,10 @@
 name: Rust
 
 on:
+  push:
+    branches: [ dev, test-github-ci ]
   pull_request:
-    branches: [ dev ]
+    branches: [ dev, test-github-ci ]
 
 jobs:
   build:
@@ -12,4 +14,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo check
+      run: echo cargo check
