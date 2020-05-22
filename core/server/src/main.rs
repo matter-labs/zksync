@@ -97,8 +97,6 @@ fn main() {
         );
     }
 
-    let current_zksync_info = CurrentZksyncInfo::new(&connection_pool);
-
     // Start observing the state and try to become leader.
     let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
     let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
@@ -122,6 +120,8 @@ fn main() {
     stop_observer_mode_tx.send(()).expect("unexpected failure");
     let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
     jh.join().unwrap();
+
+    let current_zksync_info = CurrentZksyncInfo::new(&connection_pool);
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
