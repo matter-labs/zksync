@@ -1,15 +1,18 @@
-name: Rust
+name: CI
 
 on:
+  push:
+    branches: [ test-github-ci ]
   pull_request:
-    branches: [ dev ]
+    branches: [ test-github-ci ]
 
 jobs:
+
   build:
 
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo check
+      - uses: actions/checkout@v2
+      - name: Compile
+        run: cargo check
