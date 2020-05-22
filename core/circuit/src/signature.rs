@@ -6,7 +6,7 @@ use crypto_exports::franklin_crypto::{
         boolean::{le_bits_into_le_bytes, AllocatedBit, Boolean},
         ecc,
         expression::Expression,
-        multipack, pedersen_hash, rescue, sha256,
+        multipack, rescue,
     },
     jubjub::JubjubEngine,
     rescue::RescueEngine,
@@ -261,134 +261,6 @@ pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSyst
         ],
     )?;
     Ok(is_serialized_transaction_correct)
-}
-
-pub fn is_pedersen_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
-    mut cs: CS,
-    sig_data_bits: &[Boolean],
-    signature: &EddsaSignature<E>,
-    params: &E::Params,
-    generator: ecc::EdwardsPoint<E>,
-) -> Result<Boolean, SynthesisError> {
-    let mut sig_data_bits = sig_data_bits.to_vec();
-    assert!(
-        sig_data_bits.len() <= MAX_SIGN_MESSAGE_BIT_WIDTH,
-        "Signature message len is too big {}/{}",
-        sig_data_bits.len(),
-        MAX_SIGN_MESSAGE_BIT_WIDTH
-    );
-    sig_data_bits.resize(MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
-
-    let mut first_round_bits: Vec<Boolean> = vec![];
-
-    let mut pk_x_serialized = signature
-        .pk
-        .get_x()
-        .clone()
-        .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
-    pk_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
-
-    let mut r_x_serialized = signature
-        .r
-        .get_x()
-        .clone()
-        .into_bits_le(cs.namespace(|| "r_x_bits"))?;
-    r_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
-
-    first_round_bits.extend(pk_x_serialized);
-    first_round_bits.extend(r_x_serialized);
-
-    let first_round_hash = pedersen_hash::pedersen_hash(
-        cs.namespace(|| "first_round_hash"),
-        pedersen_hash::Personalization::NoteCommitment,
-        &first_round_bits,
-        params,
-    )?;
-    let mut first_round_hash_bits = first_round_hash
-        .get_x()
-        .into_bits_le(cs.namespace(|| "first_round_hash_bits"))?;
-    first_round_hash_bits.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
-
-    let mut second_round_bits = vec![];
-    second_round_bits.extend(first_round_hash_bits);
-    second_round_bits.extend(sig_data_bits);
-    let second_round_hash = pedersen_hash::pedersen_hash(
-        cs.namespace(|| "second_hash"),
-        pedersen_hash::Personalization::NoteCommitment,
-        &second_round_bits,
-        params,
-    )?
-    .get_x()
-    .clone();
-
-    let h_bits = second_round_hash.into_bits_le(cs.namespace(|| "h_bits"))?;
-
-    let max_message_len = 32 as usize; //since it is the result of pedersen hash
-
-    let is_sig_verified = verify_schnorr_relationship(
-        signature,
-        cs.namespace(|| "verify transaction signature"),
-        params,
-        &h_bits,
-        generator,
-        max_message_len,
-    )?;
-    Ok(is_sig_verified)
-}
-
-pub fn is_sha256_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
-    mut cs: CS,
-    sig_data_bits: &[Boolean],
-    signature: &EddsaSignature<E>,
-    params: &E::Params,
-    generator: ecc::EdwardsPoint<E>,
-) -> Result<Boolean, SynthesisError> {
-    // this contant is also used inside franklin_crypto verify sha256(enforce version of this check)
-    const INPUT_PAD_LEN_FOR_SHA256: usize = 768;
-
-    let mut sig_data_bits = sig_data_bits.to_vec();
-    assert!(
-        sig_data_bits.len() <= MAX_SIGN_MESSAGE_BIT_WIDTH,
-        "Signature message len is too big {}/{}",
-        sig_data_bits.len(),
-        MAX_SIGN_MESSAGE_BIT_WIDTH
-    );
-    sig_data_bits.resize(MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
-    sig_data_bits = le_bits_into_le_bytes(sig_data_bits);
-
-    let mut hash_input: Vec<Boolean> = vec![];
-    {
-        let mut pk_x_serialized = signature
-            .pk
-            .get_x()
-            .into_bits_le_fixed(cs.namespace(|| "pk_x_bits"), FR_BIT_WIDTH)?;
-        pk_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
-        hash_input.extend(le_bits_into_le_bytes(pk_x_serialized));
-    }
-    {
-        let mut r_x_serialized = signature
-            .r
-            .get_x()
-            .into_bits_le_fixed(cs.namespace(|| "r_x_bits"), FR_BIT_WIDTH)?;
-        r_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
-        hash_input.extend(le_bits_into_le_bytes(r_x_serialized));
-    }
-    hash_input.extend(sig_data_bits);
-
-    hash_input.resize(INPUT_PAD_LEN_FOR_SHA256, Boolean::constant(false));
-    let h_bits = sha256::sha256(cs.namespace(|| "sha256"), &hash_input)?;
-
-    let max_message_len = 32 as usize; //since it is the result of sha256 hash
-
-    let is_sig_verified = verify_schnorr_relationship(
-        signature,
-        cs.namespace(|| "verify transaction signature"),
-        params,
-        &le_bits_into_le_bytes(h_bits),
-        generator,
-        max_message_len,
-    )?;
-    Ok(is_sig_verified)
 }
 
 pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(

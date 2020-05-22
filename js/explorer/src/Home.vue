@@ -6,7 +6,7 @@
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">zkSync Wallet</b-nav-item>
+            <!-- <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">zkSync Wallet</b-nav-item> -->
             <b-nav-item v-bind:href="`${blockchainExplorerAddress}/${contractAddress}`" target="_blank" rel="noopener noreferrer">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
@@ -21,7 +21,6 @@
     </b-navbar>
     <br>
     <b-container>
-        <ClosableJumbotron></ClosableJumbotron>
         <b-alert v-if="updateError" variant="danger" show>
             {{updateError}}. Try again later.
         </b-alert>

@@ -84,10 +84,10 @@ client:
 explorer:
 	@cd js/explorer && yarn serve
 
-dist-client:
+dist-client: yarn build-contracts
 	@cd js/client && yarn build
 
-dist-explorer:
+dist-explorer: yarn build-contracts
 	@cd js/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
@@ -116,7 +116,7 @@ sandbox:
 	@cargo run --bin sandbox
 
 # See more more at https://github.com/emk/rust-musl-builder#caching-builds
-build-target:
+build-target: build-contracts
 	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
 
@@ -132,20 +132,18 @@ image-server-supervisor: build-target
 image-prover: build-target
 	@docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
-image-rust: image-server image-prover
+image-rust: image-server image-prover image-server-supervisor
 
 push-image-server:
 	docker push "${SERVER_DOCKER_IMAGE}"
 
-push-image-server-supervisor:
-	docker push "${SERVER_SUPERVISOR_DOCKER_NAME}"
-
 push-image-prover:
 	docker push "${PROVER_DOCKER_IMAGE}"
 
-push-image-rust: image-rust
-	push-image-server
-	push-image-prover
+push-image-server-supervisor:
+	docker push "${SERVER_SUPERVISOR_DOCKER_NAME}"
+
+push-image-rust: image-rust push-image-server push-image-prover push-image-server-supervisor
 
 # Contracts
 
@@ -205,40 +203,16 @@ redeploy: confirm_action stop init-deploy
 
 init-deploy: confirm_action deploy-contracts db-insert-contract publish-contracts
 
-dockerhub-push: image-nginx image-rust
-	docker push "${NGINX_DOCKER_IMAGE}"
+update-images: push-image-rust push-image-nginx
 
-apply-kubeconfig-server:
+update-kubeconfig:
 	@bin/k8s-gen-resource-definitions
-	@bin/k8s-apply-server
-
-apply-kubeconfig-provers:
-	@bin/k8s-gen-resource-definitions
-	@bin/k8s-apply-provers
-
-apply-kubeconfig-nginx:
-	@bin/k8s-gen-resource-definitions
-	@bin/k8s-apply-nginx
-
-apply-kubeconfig: apply-kubeconfig-server apply-kubeconfig-provers apply-kubeconfig-nginx
-
-update-provers: push-image-prover apply-kubeconfig-server
-	@kubectl patch deployment $(ZKSYNC_ENV)-server  --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
-
-update-server: push-image-server apply-kubeconfig-provers
-	@bin/provers-patch-deployments
-
-update-nginx: push-image-nginx apply-kubeconfig-nginx
-	@kubectl patch deployment $(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
-
-update-all: update-rust update-nginx apply-kubeconfig
-
-start-kube: apply-kubeconfig
+	@bin/k8s-apply
 
 ifeq (dev,$(ZKSYNC_ENV))
-start: image-nginx image-rust start-local
+start:
 else
-start: apply-kubeconfig start-provers start-server-supervisor start-server start-nginx
+start: start-provers start-server-supervisor start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
