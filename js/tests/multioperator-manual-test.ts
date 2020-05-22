@@ -53,7 +53,7 @@ async function test() {
     await ethW1.sendTransaction({ to: ethW2.address, value: parseEther('1.0') });
 
     //* Deposit for extra validator to add it to the account tree.
-    for (const token of ['ETH'/* , process.env.TEST_ERC20 */]) {
+    for (const token of ['ETH']) {
         console.log('Balance of ' + token + ': ' + formatEther(await syncW2.getEthereumBalance(token)));
         const deposit = await syncW2.depositToSyncFromEthereum({
             depositTo: syncW2.address(),
@@ -102,7 +102,7 @@ async function test() {
     await reconnectServer();
 
     //* now let's make a withdraw from operator account
-    for (const token of ['ETH'/* , process.env.TEST_ERC20 */]) {
+    for (const token of ['ETH']) {
         const before = await syncW2.getBalance(token, "verified");
         
         const withdraw = await syncW2.withdrawFromSyncToEthereum({
@@ -125,7 +125,7 @@ async function test() {
     console.log("So, how do you like new balance?");
     console.log("You may run zksync integration-simple again,");
     console.log("just to ensure everything works.");
-    console.log()
+    console.log();
     console.log("Congratulations, continuing running from another validator works!");
 
     await syncProvider.disconnect();
