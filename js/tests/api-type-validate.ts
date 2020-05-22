@@ -146,7 +146,7 @@ function assertEthOrSyncHash(hash: string) {
  * @param date: string to check
  */
 function assertDate(date: string) {
-    if (! /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}/.test(date)) {
+    if (! /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?/.test(date)) {
         throw new Error(date + `doesn't conform to 2020-04-29T11:14:03.198603 format.`);
     }
 }

@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: api-ingress
+  namespace: ${ZKSYNC_ENV}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+spec:
+  tls:
+    - hosts:
+      - ${SERVER_API_HOST}
+      secretName: ${SERVER_API_HOST_CERT}
+    - hosts:
+      - ${EXPLORER_HOST}
+      secretName: ${EXPLORER_HOST_CERT}
+  rules:
+    - host: ${SERVER_API_HOST}
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: ${ZKSYNC_ENV}-server
+              servicePort: 3000
+          - path: /jsrpc
+            backend:
+              serviceName: ${ZKSYNC_ENV}-server
+              servicePort: 3030
+          - path: /jsrpc-ws
+            backend:
+              serviceName: ${ZKSYNC_ENV}-server
+              servicePort: 3031
+    - host: ${EXPLORER_HOST}
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: ${ZKSYNC_ENV}-nginx
+              servicePort: 80
+
