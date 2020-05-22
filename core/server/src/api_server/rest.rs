@@ -611,10 +611,7 @@ fn parse_tx_id(data: &str, storage: &StorageProcessor) -> ActixResult<(u64, u64)
 
     let parts: Vec<u64> = data
         .split(',')
-        .map(|val| {
-            val.parse()
-                .map_err(|_| HttpResponse::BadRequest().finish().into())
-        })
+        .map(|val| val.parse().map_err(|_| HttpResponse::BadRequest().finish()))
         .collect::<Result<Vec<u64>, HttpResponse>>()?;
 
     if parts.len() != 2 {

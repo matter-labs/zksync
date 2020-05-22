@@ -227,6 +227,7 @@ pub fn test_operation_and_wanted_prover_data(
                 eth_hash: vec![0; 8],
             },
             block_index: 0,
+            created_at: chrono::Utc::now(),
         },
     )));
 

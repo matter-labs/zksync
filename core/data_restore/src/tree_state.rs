@@ -315,6 +315,7 @@ impl TreeState {
                 eth_hash: Vec::new(),
             },
             block_index,
+            created_at: chrono::Utc::now(),
         };
         ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
         self.current_unprocessed_priority_op += 1;

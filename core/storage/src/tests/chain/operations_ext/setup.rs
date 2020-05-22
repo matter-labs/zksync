@@ -272,7 +272,7 @@ impl TransactionsHistoryTestSetup {
     /// between them, which was lost after loading from the DB => multiple txs had the same
     /// timestamp and order could vary from call to call).
     fn get_tx_time(&mut self) -> DateTime<Utc> {
-        let current_time = self.next_tx_time.clone();
+        let current_time = self.next_tx_time;
         self.next_tx_time = current_time + Duration::milliseconds(10);
 
         current_time
