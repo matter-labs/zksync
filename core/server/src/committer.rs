@@ -5,7 +5,7 @@ use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 // Workspace uses
 use crate::mempool::MempoolRequest;
-use models::{Action, BlockCommitRequest, CommitRequest, Operation};
+use models::{node::block::PendingBlock, Action, BlockCommitRequest, CommitRequest, Operation};
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 
@@ -30,11 +30,25 @@ async fn handle_new_commit_task(
                 )
                 .await;
             }
-            CommitRequest::PendingBlock(_n) => {
-                unimplemented!("TODO");
+            CommitRequest::PendingBlock(pending_block) => {
+                save_pending_block(pending_block, &pool);
             }
         }
     }
+}
+
+fn save_pending_block(pending_block: PendingBlock, pool: &ConnectionPool) {
+    let storage = pool
+        .access_storage()
+        .expect("db connection fail for committer");
+
+    log::trace!("persist pending block #{}", pending_block.number);
+
+    storage
+        .chain()
+        .block_schema()
+        .save_pending_block(pending_block)
+        .expect("committer must commit the pending block into db");
 }
 
 async fn commit_block(

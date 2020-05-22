@@ -44,10 +44,10 @@ CREATE TABLE blocks (
 -- Pending block header entry.
 CREATE TABLE pending_block (
     -- Pending block ID
-    number BIGINT PRIMARY KEY,
-    chunks_left BIGINT,
-    unprocessed_priority_op_before BIGINT,
-    pending_block_iteration BIGINT
+    number BIGINT PRIMARY KEY NOT NULL,
+    chunks_left BIGINT NOT NULL,
+    unprocessed_priority_op_before BIGINT NOT NULL,
+    pending_block_iteration BIGINT NOT NULL
 );
 
 -- Table for the executed priority operations (e.g. deposit).

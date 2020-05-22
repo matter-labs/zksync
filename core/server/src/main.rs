@@ -151,6 +151,9 @@ fn main() {
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
+    let proposed_block = observer_mode_final_state
+        .state_keeper_init
+        .get_proposed_block();
     let state_keeper = PlasmaStateKeeper::new(
         observer_mode_final_state.state_keeper_init,
         config_opts.operator_franklin_addr,
@@ -159,7 +162,7 @@ fn main() {
         executed_tx_notify_sender,
         config_opts.available_block_chunk_sizes.clone(),
     );
-    start_state_keeper(state_keeper, &main_runtime);
+    start_state_keeper(state_keeper, proposed_block, &main_runtime);
 
     let (eth_send_request_sender, eth_send_request_receiver) = mpsc::channel(256);
     let (zksync_commit_notify_sender, zksync_commit_notify_receiver) = mpsc::channel(256);

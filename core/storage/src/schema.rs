@@ -208,9 +208,9 @@ table! {
 table! {
     pending_block (number) {
         number -> Int8,
-        chunks_left -> Nullable<Int8>,
-        unprocessed_priority_op_before -> Nullable<Int8>,
-        pending_block_iteration -> Nullable<Int8>,
+        chunks_left -> Int8,
+        unprocessed_priority_op_before -> Int8,
+        pending_block_iteration -> Int8,
     }
 }
 

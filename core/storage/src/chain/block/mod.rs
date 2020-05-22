@@ -461,21 +461,51 @@ impl<'a> BlockSchema<'a> {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
+    pub fn load_pending_block(&self) -> QueryResult<Option<PendingBlock>> {
+        use crate::schema::pending_block::dsl::*;
+        self.0.conn().transaction(|| {
+            let pending_block_result: QueryResult<StoragePendingBlock> =
+                pending_block.first(self.0.conn());
+
+            let block = match pending_block_result {
+                Ok(block) => block,
+                Err(DieselError::NotFound) => return Ok(None),
+                Err(err) => return Err(err),
+            };
+
+            let executed_ops = self.get_block_executed_ops(block.number as u32)?;
+
+            let result = PendingBlock {
+                number: block.number as u32,
+                chunks_left: block.chunks_left as usize,
+                unprocessed_priority_op_before: block.unprocessed_priority_op_before as u64,
+                pending_block_iteration: block.pending_block_iteration as usize,
+                success_operations: executed_ops,
+            };
+
+            Ok(Some(result))
+        })
+    }
+
     pub fn save_pending_block(&self, pending_block: PendingBlock) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            let pending_block = StoragePendingBlock {
+            let storage_block = StoragePendingBlock {
                 number: pending_block.number.into(),
                 chunks_left: pending_block.chunks_left as i64,
                 unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
                 pending_block_iteration: pending_block.pending_block_iteration as i64,
             };
 
+            // Store the pending block header.
             diesel::insert_into(pending_block::table)
-                .values(&pending_block)
+                .values(&storage_block)
                 .on_conflict(pending_block::number)
                 .do_update()
-                .set(&pending_block)
+                .set(&storage_block)
                 .execute(self.0.conn())?;
+
+            // Store the transactions from the block.
+            self.save_block_transactions(pending_block.number, pending_block.success_operations)?;
 
             Ok(())
         })
