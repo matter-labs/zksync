@@ -138,6 +138,7 @@ pub struct PriorityOp {
     pub data: FranklinPriorityOp,
     pub deadline_block: u64,
     pub eth_hash: Vec<u8>,
+    pub eth_block: u64,
 }
 
 impl TryFrom<Log> for PriorityOp {
@@ -186,6 +187,10 @@ impl TryFrom<Log> for PriorityOp {
                 .expect("Event transaction hash is missing")
                 .as_bytes()
                 .to_vec(),
+            eth_block: event
+                .block_number
+                .expect("Event block number is missing")
+                .as_u64(),
         })
     }
 }
