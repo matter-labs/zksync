@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
 // External uses
 use bigdecimal::BigDecimal;
 use futures::{
@@ -18,7 +17,7 @@ use models::{
         Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
         Token, TokenId, TokenLike,
     },
-    primitives::{big_decimal_to_u128, floor_big_decimal},
+    primitives::{big_decimal_to_u128, floor_big_decimal, u128_to_bigdecimal},
 };
 use storage::{
     chain::{
@@ -103,7 +102,7 @@ impl DepositingAccountBalances {
                 .entry(token_symbol)
                 .or_insert_with(DepositingFunds::default);
 
-            balance.amount += BigDecimal::from(op.amount);
+            balance.amount += u128_to_bigdecimal(op.amount);
 
             // `balance.expected_accept_block` should be the greatest block number among
             // all the deposits for a certain token.
@@ -164,19 +163,16 @@ pub struct ContractAddressResp {
 pub struct OngoingDeposit {
     received_on_block: u64,
     token_id: u16,
-    amount: u64,
+    amount: u128,
     eth_tx_hash: String,
 }
 
 impl OngoingDeposit {
     pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
         let (token_id, amount) = match priority_op.data {
-            FranklinPriorityOp::Deposit(deposit) => (
-                deposit.token,
-                big_decimal_to_u128(&deposit.amount)
-                    .try_into()
-                    .expect("Too big deposit amount"),
-            ),
+            FranklinPriorityOp::Deposit(deposit) => {
+                (deposit.token, big_decimal_to_u128(&deposit.amount))
+            }
             other => {
                 panic!("Incorrect input for OngoingDeposit: {:?}", other);
             }

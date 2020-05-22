@@ -34,8 +34,8 @@ pub struct Token {
 pub struct TokenGenesisListItem {
     /// Address (prefixed with 0x)
     pub address: String,
-    /// precision (18 for default ETH-like tokens)
-    pub precision: u8,
+    /// Powers of 10 in 1.0 token (18 for default ETH-like tokens)
+    pub decimals: u8,
     /// Token symbol
     pub symbol: String,
 }

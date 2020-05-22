@@ -4,9 +4,9 @@ import {ethers} from "ethers";
 import {gatherSources} from "@resolver-engine/imports";
 import {ImportsFsEngine} from "@resolver-engine/imports-fs";
 
-export async function publishSourceCodeToEtherscan(address: string, contractName: string, constructorArguments) {
+export async function publishSourceCodeToEtherscan(address: string, contractName: string, constructorArguments, contractDirPath = "contracts") {
     const SUPPORTED_NETWORKS = ["mainnet", "rinkeby", "ropsten"];
-    const contractPath = `contracts/${contractName}.sol`;
+    const contractPath = `${contractDirPath}/${contractName}.sol`;
     const sourceCode = await getSolidityInput(contractPath);
 
     const network = process.env.ETH_NETWORK;

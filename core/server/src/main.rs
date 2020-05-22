@@ -53,11 +53,11 @@ fn main() {
             get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
         for (id, token) in (1..).zip(genesis_tokens) {
             log::info!(
-                "Adding token: {}, id:{}, address: {}, precision: {}",
+                "Adding token: {}, id:{}, address: {}, decimals: {}",
                 token.symbol,
                 id,
                 token.address,
-                token.precision
+                token.decimals
             );
             pool.access_storage()
                 .expect("failed to access db")
