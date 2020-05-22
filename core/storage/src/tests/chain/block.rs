@@ -5,7 +5,7 @@ use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
 use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
 use models::{ethereum::OperationType, fe_to_bytes, Action, Operation};
 // Local imports
-use super::utils::{acc_create_random_updates, get_operation};
+use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
 use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{
@@ -498,6 +498,207 @@ fn load_commits_after_block() {
                 assert_eq!(expect_hash_proof, got_hash_proof);
             }
         }
+
+        Ok(())
+    });
+}
+
+/// Checks the pending block workflow:
+/// - Transactions from the pending block are available for getting.
+/// - `load_pending_block` loads the block correctly.
+/// - Committing the final block causes pending block to be removed.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn pending_block_workflow() {
+    use crate::chain::operations_ext::OperationsExtSchema;
+    use models::node::{
+        block::PendingBlock,
+        operations::{ChangePubKeyOp, TransferToNewOp},
+        ExecutedOperations, ExecutedTx, FranklinOp, FranklinTx,
+    };
+    use testkit::zksync_account::ZksyncAccount;
+
+    let _ = env_logger::try_init();
+
+    let from_account_id = 0xbabe;
+    let from_zksync_account = ZksyncAccount::rand();
+    from_zksync_account.set_account_id(Some(from_account_id));
+
+    let to_account_id = 0xdcba;
+    let to_zksync_account = ZksyncAccount::rand();
+    to_zksync_account.set_account_id(Some(to_account_id));
+
+    let (tx_1, executed_tx_1) = {
+        let tx = from_zksync_account.create_change_pubkey_tx(None, false, false);
+
+        let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
+            tx: tx.clone(),
+            account_id: from_account_id,
+        }));
+
+        let executed_change_pubkey_op = ExecutedTx {
+            tx: change_pubkey_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(change_pubkey_op.clone()),
+            fail_reason: None,
+            block_index: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        (
+            FranklinTx::ChangePubKey(Box::new(tx)),
+            ExecutedOperations::Tx(Box::new(executed_change_pubkey_op)),
+        )
+    };
+    let (tx_2, executed_tx_2) = {
+        let tx = from_zksync_account
+            .sign_transfer(
+                0,
+                "",
+                1.into(),
+                0.into(),
+                &to_zksync_account.address,
+                None,
+                true,
+            )
+            .0;
+
+        let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+            tx: tx.clone(),
+            from: from_account_id,
+            to: to_account_id,
+        }));
+
+        let executed_transfer_to_new_op = ExecutedTx {
+            tx: transfer_to_new_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(transfer_to_new_op.clone()),
+            fail_reason: None,
+            block_index: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        (
+            FranklinTx::Transfer(Box::new(tx)),
+            ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op)),
+        )
+    };
+
+    let txs_1 = vec![executed_tx_1];
+    let txs_2 = vec![executed_tx_2];
+
+    let block_1 = get_operation_with_txs(
+        1,
+        Action::Commit,
+        Default::default(),
+        BLOCK_SIZE_CHUNKS,
+        txs_1.clone(),
+    );
+    let block_2 = get_operation_with_txs(
+        2,
+        Action::Commit,
+        Default::default(),
+        BLOCK_SIZE_CHUNKS,
+        txs_2.clone(),
+    );
+
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        let pending_block_1 = PendingBlock {
+            number: 1,
+            chunks_left: 10,
+            unprocessed_priority_op_before: 0,
+            pending_block_iteration: 1,
+            success_operations: txs_1,
+        };
+        let pending_block_2 = PendingBlock {
+            number: 2,
+            chunks_left: 12,
+            unprocessed_priority_op_before: 0,
+            pending_block_iteration: 2,
+            success_operations: txs_2,
+        };
+
+        // Save pending block
+        BlockSchema(&conn).save_pending_block(pending_block_1.clone())?;
+
+        // Load saved block and check its correctness.
+        let pending_block = BlockSchema(&conn)
+            .load_pending_block()?
+            .expect("No pending block");
+        assert_eq!(pending_block.number, pending_block_1.number);
+        assert_eq!(pending_block.chunks_left, pending_block_1.chunks_left);
+        assert_eq!(
+            pending_block.unprocessed_priority_op_before,
+            pending_block_1.unprocessed_priority_op_before
+        );
+        assert_eq!(
+            pending_block.pending_block_iteration,
+            pending_block_1.pending_block_iteration
+        );
+        assert_eq!(
+            pending_block.success_operations.len(),
+            pending_block_1.success_operations.len()
+        );
+
+        // Check that stored tx can already be loaded from the database.
+        let pending_ops = BlockSchema(&conn).get_block_executed_ops(1)?;
+        assert_eq!(pending_ops.len(), 1);
+
+        // Also check that we can find the transaction by its hash.
+        assert!(
+            OperationsExtSchema(&conn)
+                .get_tx_by_hash(&tx_1.hash().as_ref())?
+                .is_some(),
+            "Cannot find the pending transaction by hash"
+        );
+
+        // Finalize the block.
+        BlockSchema(&conn).execute_operation(block_1)?;
+
+        // Ensure that pending block is no more available.
+        assert!(
+            BlockSchema(&conn).load_pending_block()?.is_none(),
+            "Pending block was not removed after commit"
+        );
+
+        // Repeat the checks with the second block. Now we'll check for
+        // both committed (1st) and pending (2nd) blocks data to be available.
+        BlockSchema(&conn).save_pending_block(pending_block_2.clone())?;
+
+        let pending_block = BlockSchema(&conn)
+            .load_pending_block()?
+            .expect("No pending block");
+        assert_eq!(pending_block.number, pending_block_2.number);
+
+        // Check that stored tx can already be loaded from the database.
+        let committed_ops = BlockSchema(&conn).get_block_executed_ops(1)?;
+        assert_eq!(committed_ops.len(), 1);
+        let pending_ops = BlockSchema(&conn).get_block_executed_ops(2)?;
+        assert_eq!(pending_ops.len(), 1);
+
+        // Also check that we can find the transaction by its hash.
+        assert!(
+            OperationsExtSchema(&conn)
+                .get_tx_by_hash(&tx_1.hash().as_ref())?
+                .is_some(),
+            "Cannot find the pending transaction by hash"
+        );
+        assert!(
+            OperationsExtSchema(&conn)
+                .get_tx_by_hash(&tx_2.hash().as_ref())?
+                .is_some(),
+            "Cannot find the pending transaction by hash"
+        );
+
+        // Finalize the block.
+        BlockSchema(&conn).execute_operation(block_2)?;
+
+        // Ensure that pending block is no more available.
+        assert!(
+            BlockSchema(&conn).load_pending_block()?.is_none(),
+            "Pending block was not removed after commit"
+        );
 
         Ok(())
     });
