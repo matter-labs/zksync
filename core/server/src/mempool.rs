@@ -319,7 +319,7 @@ pub fn run_mempool_task(
     let mempool_state = MempoolState::restore_from_db(&db_pool);
 
     let mempool = Mempool {
-        db_pool: db_pool.clone(),
+        db_pool,
         mempool_state,
         requests,
         eth_watch_req,

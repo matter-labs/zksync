@@ -539,7 +539,7 @@ fn pending_block_workflow() {
         let executed_change_pubkey_op = ExecutedTx {
             tx: change_pubkey_op.try_get_tx().unwrap(),
             success: true,
-            op: Some(change_pubkey_op.clone()),
+            op: Some(change_pubkey_op),
             fail_reason: None,
             block_index: None,
             created_at: chrono::Utc::now(),
@@ -572,7 +572,7 @@ fn pending_block_workflow() {
         let executed_transfer_to_new_op = ExecutedTx {
             tx: transfer_to_new_op.try_get_tx().unwrap(),
             success: true,
-            op: Some(transfer_to_new_op.clone()),
+            op: Some(transfer_to_new_op),
             fail_reason: None,
             block_index: None,
             created_at: chrono::Utc::now(),
