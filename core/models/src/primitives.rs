@@ -530,8 +530,6 @@ impl<'de> Deserialize<'de> for BigUintSerdeWrapper {
     }
 }
 
-impl From<BigUint> for BigUintSerdeWrapper {}
-
 impl UnsignedRatioSerializeAsDecimal {
     pub fn deserialize_for_str_with_dot(input: &str) -> Result<Ratio<BigUint>, failure::Error> {
         big_decimal_to_ratio(&BigDecimal::from_str(input)?)

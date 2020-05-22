@@ -10,7 +10,7 @@ async function main() {
 
     const result = [];
 
-    for (const token of [{symbol: "DAI", precision: 18}, {symbol: "wBTC", precision: 8}]) {
+    for (const token of [{symbol: "DAI", decimals: 18}, {symbol: "wBTC", decimals: 8}]) {
         const erc20 = await deployContract(
             wallet,
             readContractCode("TEST-ERC20"), [],
@@ -22,7 +22,7 @@ async function main() {
             const testWallet = Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).connect(provider);
             await erc20.mint(testWallet.address, parseEther("3000000000"));
         }
-        result.push({address: erc20.address, precision: token.precision, symbol: token.symbol});
+        result.push({address: erc20.address, decimals: token.decimals, symbol: token.symbol});
     }
 
     console.log(JSON.stringify(result, null, 2));

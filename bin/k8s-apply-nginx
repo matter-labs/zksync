@@ -1,4 +1,0 @@
-#!/bin/bash
-set -e
-
-kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/nginx.yaml -n $ZKSYNC_ENV

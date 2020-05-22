@@ -11,10 +11,16 @@ export default {
        WS_API_ADDR: "wss://stage-api.zksync.dev/jsrpc-ws",
        HTTP_RPC_API_ADDR: "https://stage-api.zksync.dev/jsrpc",
     },
-    "https://demo.zksync.dev": {
-        API_SERVER: "https://testnet.zksync.dev",
+    "https://rinkeby.zkscan.io": {
+        API_SERVER: "https://rinkeby-api.zksync.dev",
         ETH_NETWORK: "rinkeby",
-        WS_API_ADDR: "wss://testnet.zksync.dev/jsrpc-ws",
-        HTTP_RPC_API_ADDR: "https://testnet.zksync.dev/jsrpc",
+        WS_API_ADDR: "wss://rinkeby-api.zksync.dev/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://rinkeby-api.zksync.dev/jsrpc",
+    },
+    "https://ropsten.zkscan.io": {
+        API_SERVER: "https://ropsten-api.zksync.dev",
+        ETH_NETWORK: "ropsten",
+        WS_API_ADDR: "wss://ropsten-api.zksync.dev/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://ropsten-api.zksync.dev/jsrpc",
     },
 }[`${location.protocol}//${location.hostname}`];

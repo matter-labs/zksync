@@ -24,7 +24,7 @@ import {
 } from "./utils";
 
 export async function getDefaultProvider(
-    network: "localhost" | "testnet",
+    network: "localhost" | "rinkeby" | "ropsten",
     transport: "WS" | "HTTP" = "WS"
 ): Promise<Provider> {
     if (network == "localhost") {
@@ -33,14 +33,24 @@ export async function getDefaultProvider(
         } else if (transport == "HTTP") {
             return await Provider.newHttpProvider("http://127.0.0.1:3030");
         }
-    } else if (network == "testnet") {
+    } else if (network == "ropsten") {
         if (transport == "WS") {
             return await Provider.newWebsocketProvider(
-                "wss://testnet.zksync.dev/jsrpc-ws"
+                "wss://ropsten-api.zksync.dev/jsrpc-ws"
             );
         } else if (transport == "HTTP") {
             return await Provider.newHttpProvider(
-                "https://testnet.zksync.dev/jsrpc"
+                "https://ropsten-api.zksync.dev/jsrpc"
+            );
+        }
+    } else if (network == "rinkeby") {
+        if (transport == "WS") {
+            return await Provider.newWebsocketProvider(
+                "wss://rinkeby-api.zksync.dev/jsrpc-ws"
+            );
+        } else if (transport == "HTTP") {
+            return await Provider.newHttpProvider(
+                "https://rinkeby-api.zksync.dev/jsrpc"
             );
         }
     }

@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+set -x
+
+kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/configmap.yaml  -n $ZKSYNC_ENV --record=true --validate=true
+kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/server.yaml  -n $ZKSYNC_ENV --record=true --validate=true
+kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/prover.yaml  -n $ZKSYNC_ENV --record=true --validate=true
+kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/nginx.yaml  -n $ZKSYNC_ENV --record=true --validate=true
+kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/ingress.yaml  -n $ZKSYNC_ENV --record=true --validate=true
