@@ -65,18 +65,22 @@ impl<'a> OperationsSchema<'a> {
     pub(crate) fn store_executed_operation(
         &self,
         operation: NewExecutedTransaction,
-    ) -> QueryResult<StoredExecutedTransaction> {
+    ) -> QueryResult<()> {
         diesel::insert_into(executed_transactions::table)
             .values(&operation)
-            .get_result(self.0.conn())
+            .on_conflict_do_nothing()
+            .execute(self.0.conn())?;
+        Ok(())
     }
 
     pub(crate) fn store_executed_priority_operation(
         &self,
         operation: NewExecutedPriorityOperation,
-    ) -> QueryResult<StoredExecutedPriorityOperation> {
+    ) -> QueryResult<()> {
         diesel::insert_into(executed_priority_operations::table)
             .values(&operation)
-            .get_result(self.0.conn())
+            .on_conflict_do_nothing()
+            .execute(self.0.conn())?;
+        Ok(())
     }
 }

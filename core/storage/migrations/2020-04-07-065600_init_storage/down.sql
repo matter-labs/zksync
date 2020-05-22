@@ -25,6 +25,7 @@ DROP INDEX executed_priority_operations_to_account_index;
 
 -- Clear transactions/operations section
 DROP TABLE IF EXISTS blocks;
+DROP TABLE IF EXISTS pending_block;
 DROP TABLE IF EXISTS operations;
 DROP TABLE IF EXISTS executed_priority_operations;
 DROP TABLE IF EXISTS rollup_ops;

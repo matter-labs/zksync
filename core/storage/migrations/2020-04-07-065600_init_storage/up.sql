@@ -41,9 +41,17 @@ CREATE TABLE blocks (
     block_size BIGINT NOT NULL
 );
 
+-- Pending block header entry.
+CREATE TABLE pending_block (
+    -- Pending block ID
+    number BIGINT PRIMARY KEY,
+    chunks_left BIGINT,
+    unprocessed_priority_op_before BIGINT,
+    pending_block_iteration BIGINT
+);
+
 -- Table for the executed priority operations (e.g. deposit).
 CREATE TABLE executed_priority_operations (
-    id serial PRIMARY KEY,
     -- sidechain block info
     block_number BIGINT NOT NULL,
     block_index INT NOT NULL,
@@ -55,12 +63,12 @@ CREATE TABLE executed_priority_operations (
     priority_op_serialid BIGINT NOT NULL,
     deadline_block BIGINT NOT NULL,
     eth_hash bytea NOT NULL,
-    created_at timestamp with time zone not null default now()
+    created_at timestamp with time zone not null default now(),
+    PRIMARY KEY (eth_hash)
 );
 
 -- Table for the executed common operations (e.g. transfer).
 CREATE TABLE executed_transactions (
-    id serial PRIMARY KEY,
     -- sidechain block info
     block_number BIGINT NOT NULL,
     block_index INT,
@@ -75,7 +83,8 @@ CREATE TABLE executed_transactions (
     fail_reason TEXT,
     primary_account_address bytea NOT NULL,
     nonce BIGINT NOT NULL,
-    created_at TIMESTAMP with time zone NOT NULL
+    created_at TIMESTAMP with time zone NOT NULL,
+    PRIMARY KEY (tx_hash)
 );
 
 -- -------------- --

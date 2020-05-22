@@ -38,7 +38,6 @@ pub struct NewExecutedPriorityOperation {
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "executed_priority_operations"]
 pub struct StoredExecutedPriorityOperation {
-    pub id: i32,
     pub block_number: i64,
     pub block_index: i32,
     pub operation: Value,
@@ -70,7 +69,6 @@ pub struct NewExecutedTransaction {
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "executed_transactions"]
 pub struct StoredExecutedTransaction {
-    pub id: i32,
     pub block_number: i64,
     pub block_index: Option<i32>,
     pub tx: Value,

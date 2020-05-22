@@ -57,7 +57,7 @@ fn get_account_transactions_history() {
                 serial_id: 0,
                 data: deposit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_hash: b"1234567890".to_vec(),
+                eth_hash: b"00000001".to_vec(),
             },
             op: deposit_op,
             block_index: 31,
@@ -81,7 +81,7 @@ fn get_account_transactions_history() {
                 serial_id: 0,
                 data: full_exit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_hash: b"1234567890".to_vec(),
+                eth_hash: b"00000002".to_vec(),
             },
             op: full_exit_op,
             block_index: 31,
@@ -268,7 +268,9 @@ fn get_account_transactions_history() {
             conn.tokens_schema().store_token(token.clone())?;
         }
 
-        conn.chain().block_schema().save_block_transactions(block)?;
+        conn.chain()
+            .block_schema()
+            .save_block_transactions(block.block_number, block.block_transactions)?;
 
         let from_history = conn
             .chain()

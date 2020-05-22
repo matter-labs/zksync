@@ -4,9 +4,12 @@ use models::ActionType;
 // Local imports
 use crate::tests::db_test;
 use crate::{
-    chain::operations::{
-        records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
-        OperationsSchema,
+    chain::{
+        block::BlockSchema,
+        operations::{
+            records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
+            OperationsSchema,
+        },
     },
     StorageProcessor,
 };
@@ -115,6 +118,63 @@ fn executed_priority_operations() {
         );
         assert_eq!(stored_operation.deadline_block, executed_tx.deadline_block);
         assert_eq!(stored_operation.eth_hash, executed_tx.eth_hash);
+
+        Ok(())
+    });
+}
+
+/// Checks that attempt to save the duplicate txs is ignored by the DB.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn duplicated_operations() {
+    const BLOCK_NUMBER: i64 = 1;
+
+    let executed_tx = NewExecutedTransaction {
+        block_number: BLOCK_NUMBER,
+        tx_hash: vec![0x12, 0xAD, 0xBE, 0xEF],
+        tx: Default::default(),
+        operation: Default::default(),
+        from_account: Default::default(),
+        to_account: None,
+        success: true,
+        fail_reason: None,
+        block_index: None,
+        primary_account_address: Default::default(),
+        nonce: Default::default(),
+        created_at: chrono::Utc::now(),
+    };
+
+    let executed_priority_op = NewExecutedPriorityOperation {
+        block_number: BLOCK_NUMBER,
+        block_index: 1,
+        operation: Default::default(),
+        from_account: Default::default(),
+        to_account: Default::default(),
+        priority_op_serialid: 0,
+        deadline_block: 100,
+        eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+    };
+
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        // Save the same operations twice.
+        OperationsSchema(&conn).store_executed_operation(executed_tx.clone())?;
+        OperationsSchema(&conn).store_executed_operation(executed_tx.clone())?;
+        OperationsSchema(&conn).store_executed_priority_operation(executed_priority_op.clone())?;
+        OperationsSchema(&conn).store_executed_priority_operation(executed_priority_op.clone())?;
+
+        // Check that we can still load it.
+        assert!(OperationsSchema(&conn)
+            .get_executed_operation(executed_tx.tx_hash.as_ref())?
+            .is_some());
+        assert!(OperationsSchema(&conn)
+            .get_executed_priority_operation(executed_priority_op.priority_op_serialid as u32)?
+            .is_some());
+
+        // Get the block transactions and check if there are exactly 2 txs.
+        let block_txs = BlockSchema(&conn).get_block_transactions(BLOCK_NUMBER as u32)?;
+
+        assert_eq!(block_txs.len(), 2);
 
         Ok(())
     });

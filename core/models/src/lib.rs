@@ -20,7 +20,7 @@ pub mod serialization;
 pub use crypto_exports::franklin_crypto;
 pub use crypto_exports::rand;
 
-use crate::node::block::Block;
+use crate::node::block::{Block, PendingBlock};
 use crate::node::BlockNumber;
 use crate::node::{AccountUpdates, TokenId};
 use crate::prover_utils::EncodedProofPlonk;
@@ -143,8 +143,14 @@ pub struct Operation {
     pub accounts_updated: AccountUpdates,
 }
 
+#[derive(Clone, Debug)]
+pub enum CommitRequest {
+    PendingBlock(PendingBlock),
+    Block(BlockCommitRequest),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CommitRequest {
+pub struct BlockCommitRequest {
     pub block: Block,
     pub accounts_updated: AccountUpdates,
 }

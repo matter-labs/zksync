@@ -14,7 +14,7 @@ use models::config_options::ConfigurationOptions;
 use models::node::{
     Account, AccountId, AccountMap, Address, FranklinTx, Nonce, PriorityOp, TokenId,
 };
-use models::CommitRequest;
+use models::{BlockCommitRequest, CommitRequest};
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
@@ -746,6 +746,20 @@ impl TestSetup {
         self.execute_tx(withdraw);
     }
 
+    fn await_for_block_commit_request(&mut self) -> BlockCommitRequest {
+        while let Some(new_block_event) = block_on(self.proposed_blocks_receiver.next()) {
+            match new_block_event {
+                CommitRequest::Block(new_block) => {
+                    return new_block;
+                }
+                CommitRequest::PendingBlock(_) => {
+                    // Pending blocks are ignored.
+                }
+            }
+        }
+        panic!("Proposed blocks receiver dropped");
+    }
+
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
     pub fn execute_commit_block(&mut self) -> ETHExecResult {
         let block_sender = async {
@@ -756,8 +770,8 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block =
-            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
+
+        let new_block = self.await_for_block_commit_request();
 
         block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
     }
@@ -771,8 +785,7 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block =
-            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
+        let new_block = self.await_for_block_commit_request();
 
         block_on(self.commit_account.commit_block(&new_block.block))
             .expect("block commit send tx")

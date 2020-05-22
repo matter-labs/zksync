@@ -7,13 +7,15 @@ use tokio::runtime::Runtime;
 // Workspace uses
 use crate::mempool::ProposedBlock;
 use crypto_exports::ff;
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use models::node::block::{
+    Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, PendingBlock as SendablePendingBlock,
+};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
 };
 use models::ActionType;
-use models::CommitRequest;
+use models::{BlockCommitRequest, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 use web3::types::Address;
@@ -473,7 +475,7 @@ impl PlasmaStateKeeper {
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 
-        let commit_request = CommitRequest {
+        let block_commit_request = BlockCommitRequest {
             block: Block::new_from_availabe_block_sizes(
                 self.state.block_number,
                 self.state.root_hash(),
@@ -491,11 +493,12 @@ impl PlasmaStateKeeper {
 
         info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
-            commit_request.block.block_number,
-            commit_request.block.block_transactions.len(),
+            block_commit_request.block.block_number,
+            block_commit_request.block.block_transactions.len(),
             pending_block.chunks_left,
             pending_block.pending_block_iteration
         );
+        let commit_request = CommitRequest::Block(block_commit_request);
         self.tx_for_commitments
             .send(commit_request)
             .await
