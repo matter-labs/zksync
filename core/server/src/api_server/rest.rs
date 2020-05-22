@@ -528,13 +528,12 @@ fn handle_get_account_transactions_history(
         HttpResponse::InternalServerError().finish()
     })?;
 
-    // Sort operations by block number in a reverse order (so the newer ones are on top).
-    // Note that we call `cmp` on `rhs` to achieve that.
+    // Sort operations by block number from smaller (older) to greater (newer).
     ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
 
     // Collect the unconfirmed priority operations with respect to the
     // `offset` and `limit` parameters.
-    let mut transactions_history: Vec<_> = ongoing_ops
+    let mut ongoing_transactions_history: Vec<_> = ongoing_ops
         .iter()
         .map(|(_block, op)| priority_op_to_tx_history(&tokens, op))
         .skip(offset as usize)
@@ -543,11 +542,11 @@ fn handle_get_account_transactions_history(
 
     // Now we must include committed transactions, thus we have to modify `offset` and
     // `limit` values.
-    if !transactions_history.is_empty() {
+    if !ongoing_transactions_history.is_empty() {
         // We've taken at least one transaction, this means
         // offset is consumed completely, and limit is reduced.
         offset = 0;
-        limit -= transactions_history.len() as u64;
+        limit -= ongoing_transactions_history.len() as u64;
     } else {
         // Decrement the offset by the number of pending deposits
         // that are soon to be added to the db. `ongoing_ops` consists
@@ -556,7 +555,7 @@ fn handle_get_account_transactions_history(
         offset = offset.saturating_sub(num_account_ongoing_deposits);
     }
 
-    let mut storage_transactions = storage
+    let mut transactions_history = storage
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
@@ -574,12 +573,42 @@ fn handle_get_account_transactions_history(
             HttpResponse::InternalServerError().finish()
         })?;
 
-    transactions_history.append(&mut storage_transactions);
+    // Append ongoing operations to the end of the end of the list, as the history
+    // goes from oldest tx to the newest tx.
+    transactions_history.append(&mut ongoing_transactions_history);
 
     Ok(HttpResponse::Ok().json(transactions_history))
 }
 
-fn parse_tx_id(data: &str) -> ActixResult<(u64, u64)> {
+#[derive(Debug, Deserialize)]
+struct TxHistoryQuery {
+    tx_id: Option<String>,
+    limit: Option<u64>,
+}
+
+fn parse_tx_id(data: &str, storage: &StorageProcessor) -> ActixResult<(u64, u64)> {
+    if data.is_empty() || data == "-" {
+        let last_block_id = storage
+            .chain()
+            .block_schema()
+            .get_last_committed_block()
+            .map_err(|err| {
+                log::warn!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: ({})",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                    data,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
+
+        let next_block_id = last_block_id + 1;
+
+        return Ok((next_block_id as u64, 0));
+    }
+
     let parts: Vec<u64> = data
         .split(',')
         .map(|val| {
@@ -597,18 +626,26 @@ fn parse_tx_id(data: &str) -> ActixResult<(u64, u64)> {
 
 fn handle_get_account_transactions_history_older_than(
     data: web::Data<AppState>,
-    address: Address,
-    tx_id: String,
-    limit: u64,
+    request_path: web::Path<Address>,
+    request_query: web::Query<TxHistoryQuery>,
 ) -> ActixResult<HttpResponse> {
+    let address = request_path.into_inner();
+    let tx_id = request_query
+        .tx_id
+        .as_ref()
+        .map(|s| s.as_ref())
+        .unwrap_or("-");
+    let limit = request_query.limit.unwrap_or(MAX_LIMIT);
+
     const MAX_LIMIT: u64 = 100;
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
-    let tx_id = parse_tx_id(&tx_id)?;
+    let storage = data.access_storage()?;
+
+    let tx_id = parse_tx_id(&tx_id, &storage)?;
 
     let direction = SearchDirection::Older;
-    let storage = data.access_storage()?;
     let transactions_history = storage
         .chain()
         .operations_ext_schema()
@@ -632,19 +669,26 @@ fn handle_get_account_transactions_history_older_than(
 
 fn handle_get_account_transactions_history_newer_than(
     data: web::Data<AppState>,
-    address: Address,
-    tx_id: String,
-    mut limit: u64,
+    request_path: web::Path<Address>,
+    request_query: web::Query<TxHistoryQuery>,
 ) -> ActixResult<HttpResponse> {
+    let address = request_path.into_inner();
+    let tx_id = request_query
+        .tx_id
+        .as_ref()
+        .map(|s| s.as_ref())
+        .unwrap_or("-");
+    let mut limit = request_query.limit.unwrap_or(MAX_LIMIT);
+
     const MAX_LIMIT: u64 = 100;
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
+    let storage = data.access_storage()?;
 
-    let tx_id = parse_tx_id(&tx_id)?;
+    let tx_id = parse_tx_id(&tx_id, &storage)?;
 
     let direction = SearchDirection::Newer;
-    let storage = data.access_storage()?;
     let mut transactions_history = storage
         .chain()
         .operations_ext_schema()
@@ -703,30 +747,21 @@ fn handle_get_account_transactions_history_newer_than(
             HttpResponse::InternalServerError().finish()
         })?;
 
-        // Sort operations by block number in a reverse order (so the newer ones are on top).
-        // Note that we call `cmp` on `rhs` to achieve that.
+        // Sort operations by block number from smaller (older) to greater (newer).
         ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
 
         // Collect the unconfirmed priority operations with respect to the
         // `limit` parameters.
-        // Since we are bounded by the `limit` parameter, we must take the `limit` transactions
-        // from the *end* of the list (as the beginning contains the newest transactions, and the
-        // end contains transactions that are closer to the last executed tx).
         let mut txs: Vec<_> = ongoing_ops
             .iter()
-            .rev()
             .map(|(_block, op)| priority_op_to_tx_history(&tokens, op))
             .take(limit as usize)
-            .rev()
             .collect();
 
         // Merge `txs` and `transactions_history` and reassign the `transactions_history` to the
         // merged list.
-        // Unprocessed operations must be in the beginning.
-        if !txs.is_empty() {
-            txs.append(&mut transactions_history);
-            transactions_history = txs;
-        }
+        // Unprocessed operations must be in the end (as the newest ones).
+        transactions_history.append(&mut txs);
     }
 
     Ok(HttpResponse::Ok().json(transactions_history))
@@ -920,6 +955,14 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     .route(
                         "/account/{address}/history/{offset}/{limit}",
                         web::get().to(handle_get_account_transactions_history),
+                    )
+                    .route(
+                        "/account/{address}/history/older_than",
+                        web::get().to(handle_get_account_transactions_history_older_than),
+                    )
+                    .route(
+                        "/account/{address}/history/newer_than",
+                        web::get().to(handle_get_account_transactions_history_newer_than),
                     )
                     .route(
                         "/transactions/{tx_hash}",
