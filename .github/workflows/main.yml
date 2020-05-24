@@ -1,33 +1,43 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
 on:
   push:
     branches: [ test-github-ci, dev ]
   pull_request:
     branches: [ test-github-ci, dev ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
-    # Runs a single command using the runners shell
-    - name: Run a one-line script
-      run: echo Hello, world!
+    - name: init
+      - echo "::set-env name=ZKSYNC_HOME::$(pwd)"
+      - echo "::set-env name=PATH::$($ZKSYNC_HOME/bin:$PATH)"
+      - ci-prepare-env.sh
+      - zksync env ci
+      - zksync yarn
 
-    # Runs a set of commands using the runners shell
-    - name: Run a multi-line script
-      run: |
-        echo Add other actions to build,
-        echo test, and deploy your project.
+  services:
+    geth:
+      image: matterlabs/geth:latest
+      ports:
+        - 8545:8545
+        - 8546:8546
+      env:
+        config: standard
+
+    geth-fast:
+      image: matterlabs/geth:latest
+      ports:
+        - 8545:8545
+        - 8546:8546
+      env:
+        config: fast
+
+    postgres:
+      image: postgres:10.4
+      ports:
+        - 5432:5432
