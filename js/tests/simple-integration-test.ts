@@ -385,6 +385,6 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         await syncProvider.disconnect();
     } catch (e) {
         console.error("Error: ", e);
-        process.exit(0); // TODO: undestand why it does not work on CI and fix(task is created).
+        process.exit(1);
     }
 })();
