@@ -180,15 +180,6 @@ table! {
 }
 
 table! {
-    leader_election (id) {
-        id -> Int4,
-        name -> Text,
-        created_at -> Timestamp,
-        bail_at -> Nullable<Timestamp>,
-    }
-}
-
-table! {
     mempool_txs (id) {
         id -> Int8,
         tx_hash -> Text,
@@ -274,7 +265,6 @@ allow_tables_to_appear_in_same_query!(
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
-    leader_election,
     mempool_txs,
     operations,
     pending_block,
