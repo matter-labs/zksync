@@ -10,7 +10,6 @@ use std::process::Command;
 ///
 /// Panics on failed connection to db.
 pub fn block_until_leader() -> Result<(), failure::Error> {
-    // detect if in kubernetes:
     if Path::new("/etc/podinfo/labels").exists() {
         info!("Kubernetes detected, checking if node is leader");
         loop {

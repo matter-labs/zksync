@@ -1,8 +1,8 @@
-name: Promote dev
+name: Promote to stage
 
 on:
-  pull_request:
-    branches: [ test-github-ci ]
+  push:
+    branches: [ dev ]
 
 jobs:
   build-images:
@@ -34,19 +34,13 @@ jobs:
         cp etc/tokens/{test,localhost}.json
         zksync verify-keys unpack
 
-    - name: build-rust-images
-      run: zksync image-rust
-
-    - name: build-nginx-image
-      run: zksync image-nginx
-
-    - name: update-selfhosted-cache
-      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
-
     - name: update-images
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zksync update-images
+
+    - name: update-selfhosted-cache
+      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
 
     - name: update-stage
       run: |
