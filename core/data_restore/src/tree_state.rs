@@ -313,8 +313,10 @@ impl TreeState {
                 data: priority_op,
                 deadline_block: 0,
                 eth_hash: Vec::new(),
+                eth_block: 0,
             },
             block_index,
+            created_at: chrono::Utc::now(),
         };
         ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
         self.current_unprocessed_priority_op += 1;

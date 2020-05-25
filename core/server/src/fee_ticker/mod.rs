@@ -139,7 +139,7 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             .get_last_quote(TokenLike::Id(token.id))
             .await?
             .usd_price
-            / BigUint::from(10u32).pow(u32::from(token.precision));
+            / BigUint::from(10u32).pow(u32::from(token.decimals));
 
         Ok(
             ((zkp_cost_chunk * op_chunks + wei_price_usd * gas_cost_tx * gas_price_wei)
@@ -275,7 +275,7 @@ mod test {
             let fee_in_token =
                 block_on(ticker.get_fee_from_ticker_in_wei_rounded(tx_type, token.clone()))
                     .expect("failed to get fee in token");
-            let token_precision = MockApiProvider.get_token(token.clone()).unwrap().precision;
+            let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
             let fee_in_usd = block_on(MockApiProvider.get_last_quote(token.clone()))
                 .expect("failed to get fee in usd")
                 .usd_price

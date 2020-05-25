@@ -76,8 +76,8 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
 (async () => {
     try {
         const WEB3_URL = process.env.WEB3_URL;
-// Mnemonic for eth wallet.
-        const MNEMONIC = process.env.MNEMONIC;
+        // Mnemonic for eth wallet.
+        const MNEMONIC = process.env.TEST_MNEMONIC;
         const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
         console.log("Running integration test on the ", network, " network");
 

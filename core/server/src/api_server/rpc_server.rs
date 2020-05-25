@@ -390,6 +390,7 @@ impl RpcApp {
 
 pub(crate) async fn get_ongoing_priority_ops(
     eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
+    address: Address,
 ) -> Result<Vec<(u64, PriorityOp)>> {
     let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
 
@@ -397,7 +398,8 @@ pub(crate) async fn get_ongoing_priority_ops(
 
     // Get all the ongoing priority ops from the `EthWatcher`.
     eth_watcher_request_sender
-        .send(EthWatchRequest::GetUnconfirmedQueueOps {
+        .send(EthWatchRequest::GetUnconfirmedDeposits {
+            address,
             resp: eth_watcher_response.0,
         })
         .await
@@ -429,23 +431,15 @@ impl RpcApp {
     async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
         let confirmations_for_eth_event = self.confirmations_for_eth_event;
 
-        let ongoing_ops = get_ongoing_priority_ops(&self.eth_watcher_request_sender).await?;
+        let ongoing_ops =
+            get_ongoing_priority_ops(&self.eth_watcher_request_sender, address).await?;
 
         let mut max_block_number = 0;
 
-        // Filter only deposits for the requested address.
-        // `map` is used after filter to find the max block number without an
-        // additional list pass.
+        // Transform operations into `OngoingDeposit` and find the maximum block number in a
+        // single pass.
         let deposits: Vec<_> = ongoing_ops
             .into_iter()
-            .filter(|(_block, op)| {
-                if let FranklinPriorityOp::Deposit(deposit) = &op.data {
-                    // Address may be set to either sender or recipient.
-                    deposit.from == address || deposit.to == address
-                } else {
-                    false
-                }
-            })
             .map(|(block, op)| {
                 if block > max_block_number {
                     max_block_number = block;

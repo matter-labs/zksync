@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+     - '*'
+
+jobs:
+  ci-all:
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: restore-selfhosted-runner-cache
+      run: tar xf ~/runner-cache.tar || true
+
+    - name: setup-env
+      run: |
+        echo "::set-env name=ZKSYNC_HOME::$(pwd)"
+        echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
+        echo "::set-env name=CI::1"
+
+    - name: lints
+      run: |
+        zksync dummy-prover ensure-disabled
+        cargo fmt -- --check
+        cargo clippy --tests --benches -- -D warnings
+        pushd js/zksync-crypto
+        cargo fmt -- --check
+        cargo clippy --tests --benches -- -D warnings
+
+    - name: init
+      run: zksync init
+
+    - name: integration-simple-full-exit
+      run: ci-integration-simple-fullexit.sh
+
+    - name: integration-testkit
+      run: zksync integration-testkit
+
+    - name: test-contracts
+      run: zksync test-contracts
+
+    - name: rust-tests
+      run: f cargo test --release
+
+    - name: zksync-crypto-tests
+      run: pushd js/zksync-crypto && f cargo test --release
+
+    - name: db-tests
+      run: zksync db-test
+
+    - name: prover-tests
+      run: zksync prover-tests
+
+    - name: circuit-tests
+      run: zksync circuit-tests "" `nproc`
+
+    - name: update-selfhosted-cache
+      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
+
+    services:
+      geth:
+        image: matterlabs/geth:latest
+        ports:
+          - 8545:8545
+          - 8546:8546
+        env:
+          CONFIG: standard
+
+      postgres:
+        image: postgres:10.4
+        ports:
+          - 5432:5432

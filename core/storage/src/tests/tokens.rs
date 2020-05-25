@@ -20,7 +20,7 @@ fn tokens_storage() {
             id: 0,
             address: "0000000000000000000000000000000000000000".parse().unwrap(),
             symbol: "ETH".into(),
-            precision: 18,
+            decimals: 18,
         };
         assert_eq!(tokens[&0], eth_token);
 
@@ -29,13 +29,13 @@ fn tokens_storage() {
             id: 1,
             address: "0000000000000000000000000000000000000001".parse().unwrap(),
             symbol: "ABC".into(),
-            precision: 9,
+            decimals: 9,
         };
         let token_b = Token {
             id: 2,
             address: "0000000000000000000000000000000000000002".parse().unwrap(),
             symbol: "DEF".into(),
-            precision: 6,
+            decimals: 6,
         };
 
         TokensSchema(&conn)

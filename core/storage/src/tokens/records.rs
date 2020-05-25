@@ -35,7 +35,7 @@ impl From<Token> for DbToken {
             id: token.id as i32,
             address: address_to_stored_string(&token.address),
             symbol: token.symbol,
-            precision: token.precision as i32,
+            precision: token.decimals as i32,
         }
     }
 }
@@ -46,7 +46,7 @@ impl Into<Token> for DbToken {
             id: self.id as TokenId,
             address: stored_str_address_to_address(&self.address),
             symbol: self.symbol,
-            precision: self.precision as u8,
+            decimals: self.precision as u8,
         }
     }
 }

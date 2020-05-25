@@ -23,6 +23,7 @@ pub struct ExecutedPriorityOp {
     pub priority_op: PriorityOp,
     pub op: FranklinOp,
     pub block_index: u32,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
