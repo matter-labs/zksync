@@ -69,7 +69,9 @@ impl EthereumHttpClient {
             transport,
             zksync_contract(),
             options.operator_eth_addr,
-            options.operator_private_key,
+            options
+                .operator_private_key
+                .expect("Operator private key is required for eth_sender"),
             options.contract_eth_addr,
             options.chain_id,
             options.gas_price_factor,

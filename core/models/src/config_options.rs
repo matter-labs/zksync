@@ -117,7 +117,7 @@ pub struct ConfigurationOptions {
     pub governance_genesis_tx_hash: H256,
     pub operator_franklin_addr: Address,
     pub operator_eth_addr: H160,
-    pub operator_private_key: H256,
+    pub operator_private_key: Option<H256>,
     pub chain_id: u8,
     pub gas_price_factor: usize,
     pub prover_server_address: SocketAddr,
@@ -146,7 +146,11 @@ impl ConfigurationOptions {
             governance_genesis_tx_hash: parse_env_with("GOVERNANCE_GENESIS_TX_HASH", |s| &s[2..]),
             operator_franklin_addr: parse_env_with("OPERATOR_FRANKLIN_ADDRESS", |s| &s[2..]),
             operator_eth_addr: parse_env_with("OPERATOR_ETH_ADDRESS", |s| &s[2..]),
-            operator_private_key: parse_env("OPERATOR_PRIVATE_KEY"),
+            operator_private_key: if env::var("OPERATOR_PRIVATE_KEY").is_ok() {
+                Some(parse_env("OPERATOR_PRIVATE_KEY"))
+            } else {
+                None
+            },
             chain_id: parse_env("CHAIN_ID"),
             gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
