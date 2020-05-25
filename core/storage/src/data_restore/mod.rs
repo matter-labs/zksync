@@ -131,7 +131,10 @@ impl<'a> DataRestoreSchema<'a> {
             self.update_block_events(block_events)?;
 
             for &NewTokenEvent { id, address } in token_events.iter() {
-                let token = Token::new(id, address, &format!("ERC20-{}", id));
+                // The only way to know decimals is to query ERC20 contract 'decimals' function
+                // that may or may not (in most cases, may not) be there, so we just assume it to be 18
+                let decimals = 18;
+                let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
                 TokensSchema(self.0).store_token(token)?;
             }
 

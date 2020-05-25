@@ -8,6 +8,7 @@ import {
     TokenSymbol
 } from "./types";
 import { serializeAccountId, serializeNonce } from "./signer";
+import { BigNumberish, BigNumber } from "ethers/utils";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -309,6 +310,36 @@ export class TokenSet {
             }
         }
         throw new Error(`Token ${tokenLike} is not supported`);
+    }
+
+    public isTokenTransactionAmountPackable(
+        tokenLike: TokenLike,
+        amount: string
+    ): boolean {
+        const parsedAmount = this.parseToken(tokenLike, amount);
+        return isTransactionAmountPackable(parsedAmount);
+    }
+
+    public isTokenTransactionFeePackable(
+        tokenLike: TokenLike,
+        amount: string
+    ): boolean {
+        const parsedAmount = this.parseToken(tokenLike, amount);
+        return isTransactionFeePackable(parsedAmount);
+    }
+
+    public formatToken(tokenLike: TokenLike, amount: BigNumberish): string {
+        const decimals = this.resolveTokenDecimals(tokenLike);
+        return utils.formatUnits(amount, decimals);
+    }
+
+    public parseToken(tokenLike: TokenLike, amount: string): BigNumber {
+        const decimals = this.resolveTokenDecimals(tokenLike);
+        return utils.parseUnits(amount, decimals);
+    }
+
+    public resolveTokenDecimals(tokenLike: TokenLike): number {
+        return this.resolveTokenObject(tokenLike).decimals;
     }
 
     public resolveTokenId(tokenLike: TokenLike): number {

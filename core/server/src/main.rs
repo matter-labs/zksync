@@ -68,6 +68,7 @@ fn main() {
                     address: token.address[2..]
                         .parse()
                         .expect("failed to parse token address"),
+                    decimals: token.decimals,
                 })
                 .expect("failed to store token");
         }

@@ -88,7 +88,8 @@ CREATE TABLE executed_transactions (
 CREATE TABLE tokens (
     id INTEGER NOT NULL PRIMARY KEY,
     address TEXT NOT NULL,
-    symbol TEXT NOT NULL
+    symbol TEXT NOT NULL,
+    decimals INTEGER NOT NULL
 );
 
 -- ---------------- --
@@ -318,5 +319,6 @@ INSERT INTO tokens
 VALUES (
     0,
     '0x0000000000000000000000000000000000000000',
-    'ETH'
+    'ETH',
+    18
 );
