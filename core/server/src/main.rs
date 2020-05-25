@@ -74,6 +74,27 @@ fn main() {
         return;
     }
 
+    // Start observing the state and try to become leader.
+    let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
+    let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
+    let jh = std::thread::Builder::new()
+        .name("Observer mode".to_owned())
+        .spawn(move || {
+            let state = observer_mode::run(
+                ConnectionPool::new(Some(1)),
+                OBSERVER_MODE_PULL_INTERVAL,
+                stop_observer_mode_rx,
+            );
+            observed_state_tx.send(state).expect("unexpected failure");
+        })
+        .expect("failed to start observer mode");
+    leader_election::block_until_leader().expect("voting for leader fail");
+    stop_observer_mode_tx.send(()).expect("unexpected failure");
+    let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
+    jh.join().unwrap();
+
+    // spawn threads for different processes
+    // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
     let connection_pool = ConnectionPool::new(None);
 
     log::debug!("starting server");
@@ -95,33 +116,6 @@ fn main() {
             contract_addr, config_opts.contract_eth_addr
         );
     }
-
-    // Start observing the state and try to become leader.
-    let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
-    let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
-    let conn_pool_clone = connection_pool.clone();
-    let jh = std::thread::Builder::new()
-        .name("Observer mode".to_owned())
-        .spawn(move || {
-            let state = observer_mode::run(
-                conn_pool_clone.clone(),
-                OBSERVER_MODE_PULL_INTERVAL,
-                stop_observer_mode_rx,
-            );
-            observed_state_tx.send(state).expect("unexpected failure");
-        })
-        .expect("failed to start observer mode");
-    leader_election::keep_voting_to_be_leader(
-        config_opts.replica_name.clone(),
-        connection_pool.clone(),
-    )
-    .expect("voting for leader fail");
-    stop_observer_mode_tx.send(()).expect("unexpected failure");
-    let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
-    jh.join().unwrap();
-
-    // spawn threads for different processes
-    // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
 
     log::info!("starting actors");
 
