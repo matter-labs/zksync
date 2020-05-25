@@ -1,6 +1,5 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
-export SERVER_SUPERVISOR_DOCKER_NAME ?=matterlabs/server_supervisor:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
@@ -133,13 +132,10 @@ clean-target:
 image-server: build-target
 	@docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
 
-image-server-supervisor: build-target
-	@docker build -t "${SERVER_SUPERVISOR_DOCKER_NAME}" -f ./docker/server_supervisor/Dockerfile .
-
 image-prover: build-target
 	@docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
-image-rust: image-server image-prover image-server-supervisor
+image-rust: image-server image-prover
 
 push-image-server:
 	docker push "${SERVER_DOCKER_IMAGE}"
@@ -147,10 +143,7 @@ push-image-server:
 push-image-prover:
 	docker push "${PROVER_DOCKER_IMAGE}"
 
-push-image-server-supervisor:
-	docker push "${SERVER_SUPERVISOR_DOCKER_NAME}"
-
-push-image-rust: image-rust push-image-server push-image-prover push-image-server-supervisor
+push-image-rust: image-rust push-image-server push-image-prover
 
 # Contracts
 
@@ -219,7 +212,7 @@ update-kubeconfig:
 ifeq (dev,$(ZKSYNC_ENV))
 start:
 else
-start: start-provers start-server-supervisor start-server start-nginx
+start: start-provers start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
@@ -227,7 +220,7 @@ stop:
 else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
-stop: confirm_action stop-provers stop-server stop-nginx stop-server-supervisor
+stop: confirm_action stop-provers stop-server stop-nginx
 endif
 
 restart: stop start
@@ -239,20 +232,13 @@ start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-server:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=2
-
-start-server-supervisor:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server-supervisor --namespace $(ZKSYNC_ENV) --replicas=1
-
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
 
 stop-provers:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=0
-
-stop-server-supervisor:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server-supervisor --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=0

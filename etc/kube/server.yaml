@@ -1,88 +1,31 @@
 apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: pod-supervisor
-  namespace: ${ZKSYNC_ENV}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  namespace: ${ZKSYNC_ENV}
-  name: pod-reader
-rules:
-  - apiGroups: [""] # "" indicates the core API group
-    resources: ["pods"]
-    verbs: ["get", "watch", "list"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: read-pods
-  namespace: ${ZKSYNC_ENV}
-subjects:
-  - kind: ServiceAccount
-    name: pod-supervisor
-    apiGroup: ""
-roleRef:
-  kind: Role
-  name: pod-reader
-  apiGroup: rbac.authorization.k8s.io
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${ZKSYNC_ENV}-server-supervisor
-  namespace: ${ZKSYNC_ENV}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ${ZKSYNC_ENV}-server-supervisor
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        app: ${ZKSYNC_ENV}-server-supervisor
-    spec:
-      serviceAccountName: pod-supervisor
-      containers:
-        - name: server
-          image: matterlabs/server_supervisor:${IMAGE_TAG}
-          imagePullPolicy: Always
-          envFrom:
-            - configMapRef:
-                name: ${ZKSYNC_ENV}-configmap
-          env:
-            - name: NAMESPACE
-              value: "${ZKSYNC_ENV}"
----
-apiVersion: v1
 kind: Service
 metadata:
   name: ${ZKSYNC_ENV}-server
   namespace: ${ZKSYNC_ENV}
+  annotations:
+    qoqo.dev/service-mode: active-standby
   labels:
     app: ${ZKSYNC_ENV}-server
 spec:
   type: ClusterIP
   ports:
-  - port: 3000
-    targetPort: 3000
-    protocol: TCP
-    name: ${ZKSYNC_ENV}-server-rest
-  - port: 3030
-    targetPort: 3030
-    protocol: TCP
-    name: ${ZKSYNC_ENV}-server-jsrpc
-  - port: 3031
-    targetPort: 3031
-    protocol: TCP
-    name: ${ZKSYNC_ENV}-server-jsrpc-ws
-  - port: 8088
-    targetPort: 8088
-    protocol: TCP
-    name: ${ZKSYNC_ENV}-prover-server-port
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: ${ZKSYNC_ENV}-server-rest
+    - port: 3030
+      targetPort: 3030
+      protocol: TCP
+      name: ${ZKSYNC_ENV}-server-jsrpc
+    - port: 3031
+      targetPort: 3031
+      protocol: TCP
+      name: ${ZKSYNC_ENV}-server-jsrpc-ws
+    - port: 8088
+      targetPort: 8088
+      protocol: TCP
+      name: ${ZKSYNC_ENV}-prover-server-port
   selector:
     app: ${ZKSYNC_ENV}-server
 ---
@@ -94,7 +37,7 @@ metadata:
 spec:
   strategy:
     type: Recreate
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ${ZKSYNC_ENV}-server
@@ -108,11 +51,6 @@ spec:
           image: matterlabs/server:${IMAGE_TAG}
           imagePullPolicy: Always
           resources: ${SERVER_CONTAINER_RESOURCES}
-          readinessProbe:
-            tcpSocket:
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 100
           ports:
             - containerPort: 3000
             - containerPort: 3030
@@ -122,15 +60,28 @@ spec:
             - configMapRef:
                 name: ${ZKSYNC_ENV}-configmap
           env:
-          - name: ZKSYNC_ENV
-            value: "${ZKSYNC_ENV}"
-          - name: SERVER_REPLICA_NAME
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: metadata.name
-          - name: OPERATOR_PRIVATE_KEY
-            valueFrom:
-              secretKeyRef:
-                name: ${ZKSYNC_ENV}-operator
-                key: private_key
+            - name: ZKSYNC_ENV
+              value: "${ZKSYNC_ENV}"
+            - name: SERVER_REPLICA_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: OPERATOR_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ${ZKSYNC_ENV}-operator
+                  key: private_key
+          volumeMounts:
+            - name: podinfo
+              mountPath: /etc/podinfo
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations

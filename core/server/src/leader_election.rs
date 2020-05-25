@@ -1,37 +1,30 @@
 //! Leader election is a always live routine that continuously votes to become the leader.
 
 use models::node::config::LEADER_LOOKUP_INTERVAL;
-use std::thread;
+use std::path::Path;
+use std::process::Command;
 
-/// Places itself as candidate to leader_election table and continuously looks up who is current leader.
-/// Lookups happen with `LEADER_LOOKUP_INTERVAL` period.
-/// Current leader is the oldest candidate in leader_election table who did not bail.
+/// Blocks thread until node is leader .
 ///
 /// # Panics
 ///
 /// Panics on failed connection to db.
-pub fn keep_voting_to_be_leader(
-    name: String,
-    connection_pool: storage::ConnectionPool,
-) -> Result<(), failure::Error> {
-    let st = connection_pool
-        .access_storage()
-        .map_err(|e| failure::format_err!("could not access storage: {}", e))?;
-    st.leader_election_schema()
-        .place_candidate(&name)
-        .map_err(|e| failure::format_err!("could not place candidate: {}", e))?;
-    log::info!("placed candidate to leader election board {}", name);
-    loop {
-        let leader = st
-            .leader_election_schema()
-            .current_leader()
-            .map_err(|e| failure::format_err!("could not get current leader: {}", e))?;
-        if let Some(leader) = leader {
-            if leader.name == name {
+pub fn block_until_leader() -> Result<(), failure::Error> {
+    // detect if in kubernetes:
+    if Path::new("/etc/podinfo/labels").exists() {
+        info!("Kubernetes detected, checking if node is leader");
+        loop {
+            let result = Command::new("kube-is-leader.sh")
+                .output()
+                .expect("Failed to check if node is leader");
+            if result.status.success() {
                 break;
             }
+            std::thread::sleep(LEADER_LOOKUP_INTERVAL);
         }
-        thread::sleep(LEADER_LOOKUP_INTERVAL);
+    } else {
+        info!("No kubernetes detected, node is selected as leader")
     }
+    info!("Node is selected as leader");
     Ok(())
 }
