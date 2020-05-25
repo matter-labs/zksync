@@ -8,4 +8,4 @@ fi
 . .setup_env
 
 cd js/tests;
-yarn --silent print-test-accounts | jq
+yarn --silent print-test-accounts | jq .

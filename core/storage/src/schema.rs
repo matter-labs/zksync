@@ -158,6 +158,7 @@ table! {
         priority_op_serialid -> Int8,
         deadline_block -> Int8,
         eth_hash -> Bytea,
+        eth_block -> Int8,
         created_at -> Timestamptz,
     }
 }
@@ -177,15 +178,6 @@ table! {
         primary_account_address -> Bytea,
         nonce -> Int8,
         created_at -> Timestamptz,
-    }
-}
-
-table! {
-    leader_election (id) {
-        id -> Int4,
-        name -> Text,
-        created_at -> Timestamp,
-        bail_at -> Nullable<Timestamp>,
     }
 }
 
@@ -258,7 +250,6 @@ allow_tables_to_appear_in_same_query!(
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
-    leader_election,
     operations,
     proofs,
     prover_runs,

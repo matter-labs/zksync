@@ -389,6 +389,7 @@ impl PlasmaStateKeeper {
             op: executed_op,
             priority_op,
             block_index,
+            created_at: chrono::Utc::now(),
         }));
         self.pending_block
             .success_operations
