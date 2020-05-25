@@ -1,0 +1,44 @@
+name: Promote dev
+
+on:
+  pull_request:
+    branches: [ test-github-ci ]
+
+jobs:
+  build-images:
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v2
+
+#    - name: Get env from keybase
+#      uses: ./.github/actions/keybase-secrets
+#      with:
+#        repo: keybase://team/matter_labs/zk-secret
+#      env:
+#        KEYBASE_PAPERKEY: ${{ secrets.KEYBASE_PAPERKEY }}
+#        KEYBASE_USERNAME: ${{ secrets.KEYBASE_USERNAME }}
+
+    - name: restore-selfhosted-runner-cache
+      run: tar xf ~/runner-cache.tar
+
+    - name: setup-env
+      run: |
+        echo "::set-env name=ZKSYNC_HOME::$(pwd)"
+        echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
+        echo "::set-env name=CI::1"
+
+    - name: init
+      run: |
+        zksync yarn
+        cp etc/tokens/{test,localhost}.json
+        zksync verify-keys unpack
+
+    - name: build-rust-images
+      run: zksync image-rust
+
+    - name: build-nginx-image
+      run: zksync image-nginx
+
+    - name: update-selfhosted-cache
+      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target

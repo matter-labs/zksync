@@ -4,6 +4,7 @@ export SERVER_SUPERVISOR_DOCKER_NAME ?=matterlabs/server_supervisor:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
+export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
 # Getting started
@@ -102,6 +103,12 @@ image-ci:
 push-image-ci: image-ci
 	docker push "${CI_DOCKER_IMAGE}"
 
+image-keybase:
+	@docker build -t "${KEYBASE_DOCKER_IMAGE}" -f ./docker/keybase-secrets/Dockerfile .
+
+push-image-keybase: image-keybase
+	docker push "${KEYBASE_DOCKER_IMAGE}"
+
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
@@ -117,7 +124,7 @@ sandbox:
 
 # See more more at https://github.com/emk/rust-musl-builder#caching-builds
 build-target: build-contracts
-	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
+	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/src/target /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
 
 clean-target:

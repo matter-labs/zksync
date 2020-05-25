@@ -2,17 +2,17 @@ name: CI
 
 on:
   pull_request:
-    branches: [ test-github-ci ]
+    branches: [ dev ]
 
 jobs:
-  build:
+  ci-all:
     runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v2
 
     - name: restore-selfhosted-runner-cache
-      run: tar xf ~/runner-cache.tar
+      run: tar xf ~/runner-cache.tar || true
 
     - name: setup-env
       run: |
