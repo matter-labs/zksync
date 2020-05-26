@@ -22,7 +22,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace uses
 use models::node::{
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
@@ -268,13 +268,14 @@ impl Mempool {
     }
 }
 
+#[must_use]
 pub fn run_mempool_task(
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     config: &ConfigurationOptions,
     runtime: &Runtime,
-) {
+) -> JoinHandle<()> {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
 
     let mempool = Mempool {
@@ -287,5 +288,5 @@ pub fn run_mempool_task(
             .max()
             .expect("failed to find max block chunks size"),
     };
-    runtime.spawn(mempool.run());
+    runtime.spawn(mempool.run())
 }
