@@ -19,6 +19,7 @@ use crate::{
 };
 
 mod event_notify;
+mod loggers;
 mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;

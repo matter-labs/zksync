@@ -1,22 +1,28 @@
 use std::collections::{HashMap, VecDeque};
 // External uses
-use futures::channel::{mpsc, oneshot};
-use futures::stream::StreamExt;
-use futures::SinkExt;
-use tokio::runtime::Runtime;
+use futures::{
+    channel::{mpsc, oneshot},
+    stream::StreamExt,
+    SinkExt,
+};
+use tokio::{runtime::Runtime, task::JoinHandle};
+use web3::types::Address;
 // Workspace uses
 use crate::mempool::ProposedBlock;
 use crypto_exports::ff;
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::tx::{FranklinTx, TxHash};
-use models::node::{
-    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+use models::{
+    node::{
+        block::{
+            Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
+            PendingBlock as SendablePendingBlock,
+        },
+        tx::{FranklinTx, TxHash},
+        Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+    },
+    ActionType, BlockCommitRequest, CommitRequest,
 };
-use models::ActionType;
-use models::CommitRequest;
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
-use web3::types::Address;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),
@@ -85,6 +91,7 @@ pub struct PlasmaStateInitParams {
     pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
+    pub proposed_block: Option<ProposedBlock>,
 }
 
 impl Default for PlasmaStateInitParams {
@@ -100,23 +107,50 @@ impl PlasmaStateInitParams {
             acc_id_by_addr: HashMap::new(),
             last_block_number: 0,
             unprocessed_priority_op: 0,
+            proposed_block: None,
         }
     }
 
-    pub fn restore_from_db(db_pool: ConnectionPool) -> Result<Self, failure::Error> {
-        let storage = db_pool
-            .access_storage()
-            .expect("db connection failed for state restore");
+    pub fn get_proposed_block(&self) -> Option<ProposedBlock> {
+        self.proposed_block.clone()
+    }
 
+    pub fn restore_from_db(storage: &storage::StorageProcessor) -> Result<Self, failure::Error> {
         let mut init_params = Self::new();
         init_params.load_from_db(&storage)?;
+
+        let pending_block = storage.chain().block_schema().load_pending_block()?;
+
+        if let Some(pending_block) = pending_block {
+            // Check that stored block matches loaded state.
+            assert_eq!(pending_block.number, init_params.last_block_number + 1);
+
+            let mut proposed_block = ProposedBlock {
+                priority_ops: Vec::new(),
+                txs: Vec::new(),
+            };
+
+            // Transform executed operations into non-executed, so they will be executed again.
+            // Since it's a pending block, the state updates were not actually applied in the
+            // database (as it happens only when full block is committed).
+            for operation in pending_block.success_operations {
+                match operation {
+                    ExecutedOperations::Tx(tx) => {
+                        proposed_block.txs.push(tx.tx);
+                    }
+                    ExecutedOperations::PriorityOp(op) => {
+                        proposed_block.priority_ops.push(op.priority_op);
+                    }
+                }
+            }
+
+            init_params.proposed_block = Some(proposed_block);
+        }
+
         Ok(init_params)
     }
 
-    pub fn load_from_db(
-        &mut self,
-        storage: &storage::StorageProcessor,
-    ) -> Result<(), failure::Error> {
+    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
@@ -127,6 +161,11 @@ impl PlasmaStateInitParams {
         }
         self.last_block_number = block_number;
         self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, block_number)?;
+
+        info!(
+            "Loaded committed state: last block number: {}, unprocessed priority op: {}",
+            self.last_block_number, self.unprocessed_priority_op
+        );
         Ok(())
     }
 
@@ -235,6 +274,20 @@ impl PlasmaStateKeeper {
         keeper
     }
 
+    pub async fn initialize(&mut self, proposed_block: Option<ProposedBlock>) {
+        if let Some(proposed_block) = proposed_block {
+            log::info!(
+                "Restored non-finished block from the database: {} transactions, {} priority operations",
+                proposed_block.txs.len(),
+                proposed_block.priority_ops.len()
+            );
+            self.execute_tx_batch(proposed_block).await;
+            log::info!("Executed restored proposed block");
+        } else {
+            log::info!("There is no pending block to restore");
+        }
+    }
+
     pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
         let storage = pool
             .access_storage()
@@ -273,7 +326,9 @@ impl PlasmaStateKeeper {
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }
 
-    async fn run(mut self) {
+    async fn run(mut self, proposed_block: Option<ProposedBlock>) {
+        self.initialize(proposed_block).await;
+
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
                 StateKeeperRequest::GetAccount(addr, sender) => {
@@ -324,8 +379,8 @@ impl PlasmaStateKeeper {
                     executed_ops.push(exec_op);
                 }
                 Err(priority_op) => {
-                    self.notify_executed_ops(&mut executed_ops).await;
                     self.seal_pending_block().await;
+                    self.notify_executed_ops(&mut executed_ops).await;
 
                     priority_op_queue.push_front(priority_op);
                 }
@@ -339,8 +394,8 @@ impl PlasmaStateKeeper {
                     executed_ops.push(exec_op);
                 }
                 Err(tx) => {
-                    self.notify_executed_ops(&mut executed_ops).await;
                     self.seal_pending_block().await;
+                    self.notify_executed_ops(&mut executed_ops).await;
 
                     tx_queue.push_front(tx);
                 }
@@ -350,12 +405,14 @@ impl PlasmaStateKeeper {
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
             if self.pending_block.pending_block_iteration > MAX_PENDING_BLOCK_ITERATIONS {
-                self.notify_executed_ops(&mut executed_ops).await;
                 self.seal_pending_block().await;
+                self.notify_executed_ops(&mut executed_ops).await;
+                return;
+            } else {
+                self.store_pending_block().await;
+                self.notify_executed_ops(&mut executed_ops).await;
             }
         }
-
-        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // Err if there is no space in current block
@@ -389,6 +446,7 @@ impl PlasmaStateKeeper {
             op: executed_op,
             priority_op,
             block_index,
+            created_at: chrono::Utc::now(),
         }));
         self.pending_block
             .success_operations
@@ -453,6 +511,7 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
+    /// Finalizes the pending block, transforming it into a full block.
     async fn seal_pending_block(&mut self) {
         let pending_block = std::mem::replace(
             &mut self.pending_block,
@@ -473,7 +532,7 @@ impl PlasmaStateKeeper {
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 
-        let commit_request = CommitRequest {
+        let block_commit_request = BlockCommitRequest {
             block: Block::new_from_availabe_block_sizes(
                 self.state.block_number,
                 self.state.root_hash(),
@@ -491,15 +550,58 @@ impl PlasmaStateKeeper {
 
         info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
-            commit_request.block.block_number,
-            commit_request.block.block_transactions.len(),
+            block_commit_request.block.block_number,
+            block_commit_request.block.block_transactions.len(),
             pending_block.chunks_left,
             pending_block.pending_block_iteration
         );
+
+        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
+
+        let commit_request = CommitRequest::Block(block_commit_request, notification_sender);
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
+
+        notification_receiver
+            .await
+            .expect("committer sender dropped");
+    }
+
+    /// Stores intermediate representation of a pending block in the database,
+    /// so the executed transactions are persisted and won't be lost.
+    async fn store_pending_block(&mut self) {
+        // Create a pending block object to send.
+        // Note that failed operations are not included, as per any operation failure
+        // the full block is created immediately.
+        let pending_block = SendablePendingBlock {
+            number: self.state.block_number,
+            chunks_left: self.pending_block.chunks_left,
+            unprocessed_priority_op_before: self.pending_block.unprocessed_priority_op_before,
+            pending_block_iteration: self.pending_block.pending_block_iteration,
+            success_operations: self.pending_block.success_operations.clone(),
+        };
+
+        log::trace!(
+            "Persisting mini block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
+            pending_block.number,
+            pending_block.success_operations.len(),
+            pending_block.chunks_left,
+            pending_block.pending_block_iteration
+        );
+
+        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
+
+        let commit_request = CommitRequest::PendingBlock(pending_block, notification_sender);
+        self.tx_for_commitments
+            .send(commit_request)
+            .await
+            .expect("committer receiver dropped");
+
+        notification_receiver
+            .await
+            .expect("committer sender dropped");
     }
 
     fn check_executed_in_pending_block(&self, op_id: ExecutedOpId) -> Option<(BlockNumber, bool)> {
@@ -538,6 +640,11 @@ impl PlasmaStateKeeper {
     }
 }
 
-pub fn start_state_keeper(sk: PlasmaStateKeeper, runtime: &Runtime) {
-    runtime.spawn(sk.run());
+#[must_use]
+pub fn start_state_keeper(
+    sk: PlasmaStateKeeper,
+    proposed_block: Option<ProposedBlock>,
+    runtime: &Runtime,
+) -> JoinHandle<()> {
+    runtime.spawn(sk.run(proposed_block))
 }

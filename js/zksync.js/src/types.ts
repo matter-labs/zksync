@@ -126,5 +126,6 @@ export interface Tokens {
         address: string;
         id: number;
         symbol: string;
+        decimals: number;
     };
 }

@@ -6,8 +6,7 @@
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
 
 // Built-in deps
-use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 // External uses
 use failure::format_err;
 use futures::{
@@ -15,20 +14,24 @@ use futures::{
     compat::Future01CompatExt,
     SinkExt, StreamExt,
 };
-use web3::contract::{Contract, Options};
-use web3::types::{Address, BlockNumber, Filter, FilterBuilder, H160};
-use web3::{Transport, Web3};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
+use web3::{
+    contract::{Contract, Options},
+    transports::EventLoopHandle,
+    types::{Address, BlockNumber, Filter, FilterBuilder, H160},
+    Transport, Web3,
+};
 // Workspace deps
-use models::abi::{eip1271_contract, governance_contract, zksync_contract};
-use models::config_options::ConfigurationOptions;
-use models::misc::constants::EIP1271_SUCCESS_RETURN_VALUE;
-use models::node::tx::EIP1271Signature;
-use models::node::{Nonce, PriorityOp, PubKeyHash, Token, TokenId};
-use models::params::PRIORITY_EXPIRATION;
-use models::NewTokenEvent;
+use models::{
+    abi::{eip1271_contract, governance_contract, zksync_contract},
+    config_options::ConfigurationOptions,
+    misc::constants::EIP1271_SUCCESS_RETURN_VALUE,
+    node::tx::EIP1271Signature,
+    node::{FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash, Token, TokenId},
+    params::PRIORITY_EXPIRATION,
+    NewTokenEvent,
+};
 use storage::ConnectionPool;
-use tokio::{runtime::Runtime, time};
-use web3::transports::EventLoopHandle;
 
 type EthBlockId = u64;
 pub enum EthWatchRequest {
@@ -44,7 +47,8 @@ pub enum EthWatchRequest {
         max_chunks: usize,
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
-    GetUnconfirmedQueueOps {
+    GetUnconfirmedDeposits {
+        address: Address,
         resp: oneshot::Sender<Vec<(EthBlockId, PriorityOp)>>,
     },
     CheckEIP1271Signature {
@@ -362,7 +366,8 @@ impl<T: Transport> EthWatch<T> {
             .access_storage()
             .map(|storage| {
                 for (&id, &address) in &self.eth_state.tokens {
-                    let token = Token::new(id, address, &format!("ERC20-{}", id));
+                    let decimals = 18;
+                    let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
                     if let Err(e) = storage.tokens_schema().store_token(token) {
                         warn!("Failed to add token to db: {:?}", e);
                     }
@@ -434,6 +439,21 @@ impl<T: Transport> EthWatch<T> {
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
+    fn get_ongoing_deposits_for(&self, address: Address) -> Vec<(EthBlockId, PriorityOp)> {
+        self.eth_state
+            .unconfirmed_queue
+            .iter()
+            .filter(|(_block, op)| match &op.data {
+                FranklinPriorityOp::Deposit(deposit) => {
+                    // Address may be set to either sender or recipient.
+                    deposit.from == address || deposit.to == address
+                }
+                _ => false,
+            })
+            .cloned()
+            .collect()
+    }
+
     pub async fn run(mut self) {
         let block = self
             .web3
@@ -473,9 +493,9 @@ impl<T: Transport> EthWatch<T> {
                     resp.send(self.get_priority_requests(op_start_id, max_chunks))
                         .unwrap_or_default();
                 }
-                EthWatchRequest::GetUnconfirmedQueueOps { resp } => {
-                    resp.send(self.eth_state.unconfirmed_queue.clone())
-                        .unwrap_or_default();
+                EthWatchRequest::GetUnconfirmedDeposits { address, resp } => {
+                    let deposits_for_address = self.get_ongoing_deposits_for(address);
+                    resp.send(deposits_for_address).unwrap_or_default();
                 }
                 EthWatchRequest::IsPubkeyChangeAuthorized {
                     address,
@@ -506,13 +526,14 @@ impl<T: Transport> EthWatch<T> {
     }
 }
 
+#[must_use]
 pub fn start_eth_watch(
     pool: ConnectionPool,
     config_options: ConfigurationOptions,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     runtime: &Runtime,
-) {
+) -> JoinHandle<()> {
     let (web3_event_loop_handle, transport) =
         web3::transports::Http::new(&config_options.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
@@ -539,5 +560,5 @@ pub fn start_eth_watch(
                 .await
                 .expect("ETH watch receiver dropped");
         }
-    });
+    })
 }

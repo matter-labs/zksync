@@ -27,6 +27,8 @@ pub struct Token {
     pub address: Address,
     /// Token symbol (e.g. "ETH" or "USDC")
     pub symbol: String,
+    /// Precision in decimals ('1.0' means 1 * 10 ** 18 if decimals is 18)
+    pub decimals: u8,
 }
 
 /// Tokens that added when deploying contract
@@ -41,11 +43,12 @@ pub struct TokenGenesisListItem {
 }
 
 impl Token {
-    pub fn new(id: TokenId, address: Address, symbol: &str) -> Self {
+    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
         Self {
             id,
             address,
             symbol: symbol.to_string(),
+            decimals,
         }
     }
 }

@@ -7,15 +7,16 @@
 use std::collections::VecDeque;
 // External uses
 use futures::channel::mpsc;
-use tokio::runtime::Runtime;
-use tokio::time;
-use web3::contract::Options;
-use web3::types::{TransactionReceipt, H256};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
+use web3::{
+    contract::Options,
+    types::{TransactionReceipt, H256},
+};
 // Workspace uses
 use crate::utils::current_zksync_info::CurrentZksyncInfo;
 use eth_client::SignedCallResult;
 use models::{
-    config_options::{ConfigurationOptions, EthSenderOptions, ThreadPanicNotify},
+    config_options::{ConfigurationOptions, EthSenderOptions},
     ethereum::{ETHOperation, OperationType},
     node::config,
     Action, Operation,
@@ -595,6 +596,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
                         root,
+                        H256([0u8; 32]), // TODO: now equals to zero -> should be fixed in #570
                         public_data,
                         witness_data.0,
                         witness_data.1,
@@ -655,36 +657,29 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     }
 }
 
+#[must_use]
 pub fn start_eth_sender(
+    runtime: &Runtime,
     pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
     op_notify_sender: mpsc::Sender<Operation>,
     send_requst_receiver: mpsc::Receiver<Operation>,
     config_options: ConfigurationOptions,
     current_zksync_info: CurrentZksyncInfo,
-) {
-    std::thread::Builder::new()
-        .name("eth_sender".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+) -> JoinHandle<()> {
+    let ethereum =
+        EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
 
-            let ethereum =
-                EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
+    let db = Database::new(pool);
 
-            let db = Database::new(pool);
+    let eth_sender_options = EthSenderOptions::from_env();
+    let eth_sender = ETHSender::new(
+        eth_sender_options,
+        db,
+        ethereum,
+        send_requst_receiver,
+        op_notify_sender,
+        current_zksync_info,
+    );
 
-            let eth_sender_options = EthSenderOptions::from_env();
-
-            let mut runtime = Runtime::new().expect("eth-sender-runtime");
-            let eth_sender = ETHSender::new(
-                eth_sender_options,
-                db,
-                ethereum,
-                send_requst_receiver,
-                op_notify_sender,
-                current_zksync_info,
-            );
-            runtime.block_on(eth_sender.run());
-        })
-        .expect("Eth sender thread");
+    runtime.spawn(eth_sender.run())
 }

@@ -1,7 +1,6 @@
 import config from './env-config';
 import * as constants from './constants';
-import { formatEther } from 'ethers/utils';
-import { readableEther } from './utils';
+import { readableEther, formatToken } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
 const zksync_promise = import('zksync');
 import axios from 'axios';
@@ -25,8 +24,8 @@ export class Client {
 
     static async new() {
         const zksync = await zksync_promise;
-        const syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
-        const tokensPromise = syncProvider.getTokens()
+        window.syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
+        const tokensPromise = window.syncProvider.getTokens()
             .then(tokens => {
                 return Object.values(tokens)
                     .map(token => {
@@ -123,7 +122,7 @@ export class Client {
             .map(([tokenId, balance]) => {
                 return {
                     tokenId,
-                    balance: formatEther(balance),
+                    balance: formatToken(tokenId, balance),
                     tokenName: tokensInfoList[tokenId].syncSymbol,
                 };
             });

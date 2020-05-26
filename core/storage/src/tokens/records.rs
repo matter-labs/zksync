@@ -23,6 +23,7 @@ pub struct DbToken {
     pub id: i32,
     pub address: String,
     pub symbol: String,
+    pub decimals: i16,
 }
 
 impl From<Token> for DbToken {
@@ -31,6 +32,7 @@ impl From<Token> for DbToken {
             id: token.id as i32,
             address: address_to_stored_string(&token.address),
             symbol: token.symbol,
+            decimals: token.decimals as i16,
         }
     }
 }
@@ -41,6 +43,7 @@ impl Into<Token> for DbToken {
             id: self.id as TokenId,
             address: stored_str_address_to_address(&self.address),
             symbol: self.symbol,
+            decimals: self.decimals as u8,
         }
     }
 }
