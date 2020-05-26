@@ -153,7 +153,7 @@ fn main() {
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let state_keeper = PlasmaStateKeeper::new(
         observer_mode_final_state.state_keeper_init,
-        config_opts.operator_franklin_addr,
+        config_opts.operator_eth_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,

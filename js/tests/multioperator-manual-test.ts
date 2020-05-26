@@ -22,21 +22,10 @@ async function reconnectServer() {
 
     //* ethW1, syncW1 is the validator wallet.
     //* The other ones are extra validators.
-    [ 
-        [ ethW1, syncW1 ], 
-        [ ethW2, syncW2 ],
-    ] = await Promise.all(
-        [
-            process.env.MNEMONIC,
-            process.env.EXTRA_OPERATOR_MNEMONIC_1,
-        ]
-        .map(mnemonic => ethers.Wallet.fromMnemonic(mnemonic, "m/44'/60'/0'/0/1"))
-        .map(ethW => ethW.connect(ethersProvider))
-        .map(async ethW => (<[ethers.Wallet, zksync.Wallet]>[
-            ethW,
-            await zksync.Wallet.fromEthSigner(ethW, syncProvider)
-        ]))
-    );
+    ethW1 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(ethersProvider);
+    syncW1 = await zksync.Wallet.fromEthSigner(ethW1, syncProvider);
+    ethW2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1000").connect(ethersProvider);
+    syncW2 = await zksync.Wallet.fromEthSigner(ethW1, syncProvider);
 
     deployer = new Deployer({deployWallet: ethW1});
 }
@@ -78,10 +67,8 @@ async function test() {
     console.log(`Now let's add extra validator to Governance.`);
     console.log("Copy these lines:");
     console.log();
-    console.log(`MNEMONIC="${process.env.EXTRA_OPERATOR_MNEMONIC_1}"`);
     console.log(`OPERATOR_PRIVATE_KEY=${ethW2.privateKey.slice(2)}`);
     console.log(`OPERATOR_ETH_ADDRESS=${ethW2.address}`);
-    console.log(`OPERATOR_FRANKLIN_ADDRESS=${ethW2.address}`);
     console.log();
     console.log("to the end of dev.env");
 

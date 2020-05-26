@@ -21,7 +21,6 @@ describe("zkSync signature verification unit tests", function() {
     let testContract;
     const randomWallet = ethers.Wallet.createRandom();
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
         contracts.zkSync = readContractCode("ZKSyncUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
@@ -101,7 +100,6 @@ describe("ZK priority queue ops unit tests", function() {
     let ethProxy;
     let operationTestContract;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
@@ -238,7 +236,6 @@ describe("zkSync withdraw unit tests", function() {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
         contracts.zkSync = readContractCode("ZKSyncUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
@@ -399,7 +396,6 @@ describe("zkSync auth pubkey onchain unit tests", function() {
     let tokenContract;
     let ethProxy;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
         contracts.zkSync = readContractCode("ZKSyncUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
@@ -477,7 +473,6 @@ describe("zkSync test process next operation", function() {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
         contracts.zkSync = readContractCode("ZKSyncUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
