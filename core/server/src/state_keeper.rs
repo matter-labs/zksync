@@ -1,22 +1,25 @@
 use std::collections::{HashMap, VecDeque};
 // External uses
-use futures::channel::{mpsc, oneshot};
-use futures::stream::StreamExt;
-use futures::SinkExt;
-use tokio::runtime::Runtime;
+use futures::{
+    channel::{mpsc, oneshot},
+    stream::StreamExt,
+    SinkExt,
+};
+use tokio::{runtime::Runtime, task::JoinHandle};
+use web3::types::Address;
 // Workspace uses
 use crate::mempool::ProposedBlock;
 use crypto_exports::ff;
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::tx::{FranklinTx, TxHash};
-use models::node::{
-    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+use models::{
+    node::{
+        block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx},
+        tx::{FranklinTx, TxHash},
+        Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+    },
+    ActionType, CommitRequest,
 };
-use models::ActionType;
-use models::CommitRequest;
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
-use web3::types::Address;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),
@@ -539,6 +542,7 @@ impl PlasmaStateKeeper {
     }
 }
 
-pub fn start_state_keeper(sk: PlasmaStateKeeper, runtime: &Runtime) {
-    runtime.spawn(sk.run());
+#[must_use]
+pub fn start_state_keeper(sk: PlasmaStateKeeper, runtime: &Runtime) -> JoinHandle<()> {
+    runtime.spawn(sk.run())
 }
