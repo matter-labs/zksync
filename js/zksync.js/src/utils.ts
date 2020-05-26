@@ -312,7 +312,7 @@ export class TokenSet {
         throw new Error(`Token ${tokenLike} is not supported`);
     }
 
-    public isTokenTransactionAmountPackable(
+    public isTokenTransferAmountPackable(
         tokenLike: TokenLike,
         amount: string
     ): boolean {

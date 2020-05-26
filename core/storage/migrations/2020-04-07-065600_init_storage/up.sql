@@ -88,7 +88,8 @@ CREATE TABLE executed_transactions (
 CREATE TABLE tokens (
     id INTEGER NOT NULL PRIMARY KEY,
     address TEXT NOT NULL,
-    symbol TEXT NOT NULL
+    symbol TEXT NOT NULL,
+    decimals SMALLINT NOT NULL
 );
 
 -- ---------------- --
@@ -315,8 +316,7 @@ CREATE EXTENSION IF NOT EXISTS tablefunc;
 
 -- Add ETH token
 INSERT INTO tokens
-VALUES (
-    0,
-    '0x0000000000000000000000000000000000000000',
-    'ETH'
-);
+VALUES (0,
+        '0x0000000000000000000000000000000000000000',
+        'ETH',
+        18);
