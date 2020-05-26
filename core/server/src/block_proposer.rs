@@ -5,13 +5,19 @@
 //!
 //! Right now logic of this actor is simple, but in future consensus will replace it using the same API.
 
-use crate::mempool::{GetBlockRequest, MempoolRequest, ProposedBlock};
-use crate::state_keeper::StateKeeperRequest;
-use futures::channel::{mpsc, oneshot};
-use futures::SinkExt;
+// External deps
+use futures::{
+    channel::{mpsc, oneshot},
+    SinkExt,
+};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
+// Workspace deps
 use models::node::config::TX_MINIBATCH_CREATE_TIME;
-use tokio::runtime::Runtime;
-use tokio::time;
+// Local deps
+use crate::{
+    mempool::{GetBlockRequest, MempoolRequest, ProposedBlock},
+    state_keeper::StateKeeperRequest,
+};
 
 fn create_mempool_req(
     last_priority_op_number: u64,
@@ -56,11 +62,12 @@ impl BlockProposer {
 }
 
 // driving engine of the application
+#[must_use]
 pub fn run_block_proposer_task(
     mempool_requests: mpsc::Sender<MempoolRequest>,
     mut statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
     runtime: &Runtime,
-) {
+) -> JoinHandle<()> {
     runtime.spawn(async move {
         let mut timer = time::interval(TX_MINIBATCH_CREATE_TIME);
 
@@ -87,5 +94,5 @@ pub fn run_block_proposer_task(
 
             block_proposer.commit_new_tx_mini_batch().await;
         }
-    });
+    })
 }

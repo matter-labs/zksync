@@ -148,8 +148,7 @@ table! {
 }
 
 table! {
-    executed_priority_operations (id) {
-        id -> Int4,
+    executed_priority_operations (eth_hash) {
         block_number -> Int8,
         block_index -> Int4,
         operation -> Jsonb,
@@ -164,8 +163,7 @@ table! {
 }
 
 table! {
-    executed_transactions (id) {
-        id -> Int4,
+    executed_transactions (tx_hash) {
         block_number -> Int8,
         block_index -> Nullable<Int4>,
         tx -> Jsonb,
@@ -182,11 +180,10 @@ table! {
 }
 
 table! {
-    leader_election (id) {
-        id -> Int4,
-        name -> Text,
-        created_at -> Timestamp,
-        bail_at -> Nullable<Timestamp>,
+    mempool_txs (id) {
+        id -> Int8,
+        tx_hash -> Text,
+        tx -> Jsonb,
     }
 }
 
@@ -197,6 +194,15 @@ table! {
         action_type -> Text,
         created_at -> Timestamptz,
         confirmed -> Bool,
+    }
+}
+
+table! {
+    pending_block (number) {
+        number -> Int8,
+        chunks_left -> Int8,
+        unprocessed_priority_op_before -> Int8,
+        pending_block_iteration -> Int8,
     }
 }
 
@@ -259,8 +265,9 @@ allow_tables_to_appear_in_same_query!(
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
-    leader_election,
+    mempool_txs,
     operations,
+    pending_block,
     proofs,
     prover_runs,
     server_config,

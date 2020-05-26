@@ -9,6 +9,7 @@
 *.bak
 node_modules
 yarn-error.log
+*.log
 target
 a.out 
 .gitconfig
