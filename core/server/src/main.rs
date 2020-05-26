@@ -47,7 +47,7 @@ fn main() {
     if cli.is_present("genesis") {
         let pool = ConnectionPool::new(Some(1));
         log::info!("Generating genesis block.");
-        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_franklin_addr);
+        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_eth_addr);
         log::info!("Adding initial tokens to db");
         let genesis_tokens =
             get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
@@ -151,7 +151,7 @@ fn main() {
         .get_proposed_block();
     let state_keeper = PlasmaStateKeeper::new(
         observer_mode_final_state.state_keeper_init,
-        config_opts.operator_franklin_addr,
+        config_opts.operator_eth_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
