@@ -353,6 +353,20 @@ pub fn public_data_commitment<E: JubjubEngine>(
 
     debug!("hash with new root as hex {}", hex::encode(hash_result));
 
+    let mut packed_with_op_tree_root_hash = vec![];
+    packed_with_op_tree_root_hash.extend(hash_result.iter());
+    packed_with_op_tree_root_hash.extend(&[0u8; 32]); // TODO: now equals to zero -> should be fixed in #570
+
+    h = Sha256::new();
+    h.input(&packed_with_op_tree_root_hash);
+    hash_result = [0u8; 32];
+    h.result(&mut hash_result[..]);
+
+    debug!(
+        "hash with op tree root hash as hex {}",
+        hex::encode(hash_result)
+    );
+
     let mut final_bytes = vec![];
     let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits.to_vec());
     final_bytes.extend(hash_result.iter());
