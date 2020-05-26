@@ -13,8 +13,12 @@
         class="clickable"
     >
         <template v-slot:cell(type)="data"><span v-html="data.item['type']" /></template>
-        <template v-slot:cell(from)="data"><span v-html="data.item['from']" /></template>
-        <template v-slot:cell(to)="data"><span v-html="data.item['to']" /></template>
+        <template v-slot:cell(from)="data">
+            <CopyableAddress :address="data.item['fromAddr']" :linkHtml="data.item['from'] "/>
+        </template>
+        <template v-slot:cell(to)="data">
+            <CopyableAddress :address="data.item['toAddr']" :linkHtml="data.item['to'] "/>
+        </template>
     </b-table>
     <b-pagination 
         v-if="transactions.length > rowsPerPage"
@@ -27,6 +31,12 @@
 </template>
 
 <script>
+import CopyableAddress from './CopyableAddress.vue';
+
+const components = {
+    CopyableAddress,
+};
+
 export default {
     name: 'transaction-list',
     props: ['blockNumber', 'transactions'],
@@ -42,9 +52,10 @@ export default {
     computed: {
         fields() {
             return this.transactions.length == 0 ? []
-                 : Object.keys(this.transactions[0]).filter(k => k != 'tx_hash');
+                 : Object.keys(this.transactions[0]).filter(k => ! ['tx_hash', 'fromAddr', 'toAddr'].includes(k));
         },
     },
+    components,
 };
 </script>
 
