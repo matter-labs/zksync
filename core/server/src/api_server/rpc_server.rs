@@ -855,7 +855,11 @@ pub fn start_rpc_server(
             );
             rpc_app.extend(&mut io);
 
-            let server = ServerBuilder::new(io).threads(8).start_http(&addr).unwrap();
+            let server = ServerBuilder::new(io)
+                .request_middleware(super::loggers::http_rpc::request_middleware)
+                .threads(8)
+                .start_http(&addr)
+                .unwrap();
 
             server.wait();
         })
