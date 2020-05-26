@@ -33,12 +33,13 @@ pub struct NewExecutedPriorityOperation {
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
     pub eth_hash: Vec<u8>,
+    pub eth_block: i64,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "executed_priority_operations"]
 pub struct StoredExecutedPriorityOperation {
-    pub id: i32,
     pub block_number: i64,
     pub block_index: i32,
     pub operation: Value,
@@ -47,7 +48,8 @@ pub struct StoredExecutedPriorityOperation {
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
     pub eth_hash: Vec<u8>,
-    pub created_at: DateTime<Utc>,
+    pub eth_block: i64,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -70,7 +72,6 @@ pub struct NewExecutedTransaction {
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "executed_transactions"]
 pub struct StoredExecutedTransaction {
-    pub id: i32,
     pub block_number: i64,
     pub block_index: Option<i32>,
     pub tx: Value,

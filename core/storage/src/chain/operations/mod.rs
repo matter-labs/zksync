@@ -9,7 +9,7 @@ use self::records::{
     StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
 };
 use crate::schema::*;
-use crate::StorageProcessor;
+use crate::{chain::mempool::MempoolSchema, StorageProcessor};
 
 pub mod records;
 
@@ -65,18 +65,26 @@ impl<'a> OperationsSchema<'a> {
     pub(crate) fn store_executed_operation(
         &self,
         operation: NewExecutedTransaction,
-    ) -> QueryResult<StoredExecutedTransaction> {
-        diesel::insert_into(executed_transactions::table)
-            .values(&operation)
-            .get_result(self.0.conn())
+    ) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            MempoolSchema(&self.0).remove_tx(&operation.tx_hash)?;
+
+            diesel::insert_into(executed_transactions::table)
+                .values(&operation)
+                .on_conflict_do_nothing()
+                .execute(self.0.conn())?;
+            Ok(())
+        })
     }
 
     pub(crate) fn store_executed_priority_operation(
         &self,
         operation: NewExecutedPriorityOperation,
-    ) -> QueryResult<StoredExecutedPriorityOperation> {
+    ) -> QueryResult<()> {
         diesel::insert_into(executed_priority_operations::table)
             .values(&operation)
-            .get_result(self.0.conn())
+            .on_conflict_do_nothing()
+            .execute(self.0.conn())?;
+        Ok(())
     }
 }

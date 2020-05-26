@@ -1,0 +1,12 @@
+name: Get env from keybase
+
+inputs:
+  repo:
+    description: 'Git repo URL'
+    required: true
+
+runs:
+  using: 'docker'
+  image: matterlabs/keybase-secret:latest
+  args:
+    - ${{ inputs.repo }}
