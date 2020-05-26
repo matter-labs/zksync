@@ -7,7 +7,6 @@ use std::time::Duration;
 use futures::{channel::mpsc, executor::block_on, SinkExt};
 use web3::types::{H160, H256};
 // Local uses
-use crate::node::Address;
 use crate::params::block_chunk_sizes;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.

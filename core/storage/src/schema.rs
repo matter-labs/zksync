@@ -237,6 +237,7 @@ table! {
         id -> Int4,
         address -> Text,
         symbol -> Text,
+        decimals -> Int2,
     }
 }
 

@@ -47,7 +47,7 @@ fn main() {
     if cli.is_present("genesis") {
         let pool = ConnectionPool::new(Some(1));
         log::info!("Generating genesis block.");
-        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_franklin_addr);
+        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_eth_addr);
         log::info!("Adding initial tokens to db");
         let genesis_tokens =
             get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
@@ -68,6 +68,7 @@ fn main() {
                     address: token.address[2..]
                         .parse()
                         .expect("failed to parse token address"),
+                    decimals: token.decimals,
                 })
                 .expect("failed to store token");
         }
