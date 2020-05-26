@@ -28,6 +28,7 @@ use server::{
     observer_mode,
     prover_server::start_prover_server,
     state_keeper::{start_state_keeper, PlasmaStateKeeper},
+    utils::current_zksync_info::CurrentZksyncInfo,
 };
 
 fn main() {
@@ -118,6 +119,8 @@ fn main() {
         );
     }
 
+    let current_zksync_info = CurrentZksyncInfo::new(&connection_pool);
+
     log::info!("starting actors");
 
     let mut main_runtime = Runtime::new().expect("main runtime start");
@@ -167,6 +170,7 @@ fn main() {
         zksync_commit_notify_sender.clone(), // eth sender sends only verify blocks notifications
         eth_send_request_receiver,
         config_opts.clone(),
+        current_zksync_info.clone(),
     );
 
     let committer_task = run_committer(
@@ -186,6 +190,7 @@ fn main() {
         state_keeper_req_sender.clone(),
         eth_watch_req_sender.clone(),
         config_opts.clone(),
+        current_zksync_info,
     );
 
     let prover_options = ProverOptions::from_env();
