@@ -3,8 +3,8 @@ use std::cell::RefCell;
 use std::time::Duration;
 // External uses
 use clap::{App, Arg};
-use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
-use tokio::runtime::Runtime;
+use futures::{channel::mpsc, executor::block_on, future, SinkExt, StreamExt};
+use tokio::{runtime::Runtime, task::JoinHandle};
 use web3::types::H160;
 // Workspace uses
 use models::{
@@ -122,7 +122,7 @@ fn main() {
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
     // handle ctrl+c
-    let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
+    let (stop_signal_sender, stop_signal_receiver) = mpsc::channel(256);
     {
         let stop_signal_sender = RefCell::new(stop_signal_sender.clone());
         ctrlc::set_handler(move || {
@@ -133,7 +133,7 @@ fn main() {
     }
 
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(256);
-    start_eth_watch(
+    let eth_watch_task = start_eth_watch(
         connection_pool.clone(),
         config_opts.clone(),
         eth_watch_req_sender.clone(),
@@ -156,19 +156,19 @@ fn main() {
         executed_tx_notify_sender,
         config_opts.available_block_chunk_sizes.clone(),
     );
-    start_state_keeper(state_keeper, proposed_block, &main_runtime);
+    let state_keeper_task = start_state_keeper(state_keeper, proposed_block, &main_runtime);
 
     let (eth_send_request_sender, eth_send_request_receiver) = mpsc::channel(256);
     let (zksync_commit_notify_sender, zksync_commit_notify_receiver) = mpsc::channel(256);
-    eth_sender::start_eth_sender(
+    let eth_sender_task = eth_sender::start_eth_sender(
+        &main_runtime,
         connection_pool.clone(),
-        stop_signal_sender.clone(),
         zksync_commit_notify_sender.clone(), // eth sender sends only verify blocks notifications
         eth_send_request_receiver,
         config_opts.clone(),
     );
 
-    run_committer(
+    let committer_task = run_committer(
         proposed_blocks_receiver,
         eth_send_request_sender,
         zksync_commit_notify_sender, // commiter sends only commit block notifications
@@ -198,19 +198,68 @@ fn main() {
         observer_mode_final_state.circuit_tree_block,
     );
 
-    run_mempool_task(
+    let mempool_task = run_mempool_task(
         connection_pool,
         mempool_request_receiver,
         eth_watch_req_sender,
         &config_opts,
         &main_runtime,
     );
-    run_block_proposer_task(
+    let proposer_task = run_block_proposer_task(
         mempool_request_sender,
         state_keeper_req_sender,
         &main_runtime,
     );
 
-    main_runtime.block_on(async move { stop_signal_receiver.next().await });
+    let task_futures = vec![
+        eth_watch_task,
+        state_keeper_task,
+        eth_sender_task,
+        committer_task,
+        mempool_task,
+        proposer_task,
+    ];
+
+    main_runtime.block_on(async move {
+        /// Waits for *any* of the tokio tasks to be finished.
+        /// Since the main tokio tasks are used as actors which should live as long
+        /// as application runs, any possible outcome (either `Ok` or `Err`) is considered
+        /// as a reason to stop the server completely.
+        async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
+            match future::select_all(task_futures).await {
+                (Ok(_), _, _) => {
+                    panic!("One of the actors finished its run, while it wasn't expected to do it");
+                }
+                (Err(error), _, _) => {
+                    log::warn!("One of the tokio actors unexpectedly finished, shutting down");
+                    if error.is_panic() {
+                        // Resume the panic on the main task
+                        std::panic::resume_unwind(error.into_panic());
+                    }
+                }
+            }
+        }
+
+        /// Waits for a message on a `stop_signal_receiver`. This receiver exists
+        /// for threads that aren't using the tokio Runtime to run on, and thus
+        /// cannot be handled the same way as the tokio tasks.
+        async fn wait_for_stop_signal(mut stop_signal_receiver: mpsc::Receiver<bool>) {
+            stop_signal_receiver.next().await;
+        }
+
+        let task_future = wait_for_tasks(task_futures);
+        let signal_future = wait_for_stop_signal(stop_signal_receiver);
+
+        // Select either of futures: completion of the any will mean that
+        // server has to be stopped.
+        tokio::select! {
+            _ = task_future => {
+                // Do nothing, task future always panic upon finishing.
+            },
+            _ = signal_future => {
+                log::warn!("Stop signal received, shutting down");
+            },
+        }
+    });
     main_runtime.shutdown_timeout(Duration::from_secs(0));
 }
