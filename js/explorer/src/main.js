@@ -44,11 +44,6 @@ Vue.mixin({
         store,
         routerBase: getRouterBase(),
     }),
-    methods: {
-        formatFranklin(value) {
-            return ethers.utils.formatEther(ethers.utils.bigNumberify(value).mul(1000000000000));
-        },
-    },
     computed: {
         blockchainExplorerTx() {
             return this.store.network === 'localhost' ? 'http://localhost:8000'
