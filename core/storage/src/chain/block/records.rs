@@ -19,6 +19,15 @@ pub struct StorageBlock {
     pub block_size: i64,
 }
 
+#[derive(Debug, Insertable, Queryable, AsChangeset)]
+#[table_name = "pending_block"]
+pub struct StoragePendingBlock {
+    pub number: i64,
+    pub chunks_left: i64,
+    pub unprocessed_priority_op_before: i64,
+    pub pending_block_iteration: i64,
+}
+
 #[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq, Clone)]
 pub struct BlockDetails {
     #[sql_type = "BigInt"]

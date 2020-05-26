@@ -31,7 +31,8 @@ pub struct DataRestoreSchema<'a>(pub &'a StorageProcessor);
 impl<'a> DataRestoreSchema<'a> {
     pub fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            BlockSchema(self.0).save_block_transactions(block)?;
+            BlockSchema(self.0)
+                .save_block_transactions(block.block_number, block.block_transactions)?;
             self.update_storage_state(self.new_storage_state("None"))?;
             Ok(())
         })
