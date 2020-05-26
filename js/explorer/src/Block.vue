@@ -34,7 +34,7 @@
 <script>
 
 import store from './store';
-import { readableEther, shortenHash, formatDate } from './utils';
+import { readableEther, shortenHash, formatDate, formatToken } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
@@ -46,10 +46,6 @@ const components = {
     SearchField,
     CopyableAddress,
 };
-
-function formatToken(amount, token) {
-    return readableEther(amount);
-}
 
 export default {
     name: 'Block',

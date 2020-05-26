@@ -248,7 +248,7 @@ export function closestPackableTransactionFee(
 }
 
 export function isTransactionFeePackable(amount: utils.BigNumberish): boolean {
-    return closestPackableTransactionAmount(amount).eq(amount);
+    return closestPackableTransactionFee(amount).eq(amount);
 }
 
 export function buffer2bitsLE(buff) {
