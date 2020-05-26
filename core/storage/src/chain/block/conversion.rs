@@ -5,6 +5,7 @@
 // Built-in deps
 use std::convert::TryFrom;
 // External imports
+use chrono::{DateTime, Utc};
 // Workspace imports
 use diesel::prelude::*;
 use models::{
@@ -70,7 +71,7 @@ impl StoredExecutedTransaction {
             block_index: self
                 .block_index
                 .map(|val| u32::try_from(val).expect("Invalid block index")),
-            created_at: chrono::Utc::now(),
+            created_at: DateTime::<Utc>::from_utc(self.created_at, Utc),
         })
     }
 }
@@ -87,9 +88,11 @@ impl StoredExecutedPriorityOperation {
                     .expect("FranklinOp should have priority op"),
                 deadline_block: self.deadline_block as u64,
                 eth_hash: self.eth_hash,
+                eth_block: self.eth_block as u64,
             },
             op: franklin_op,
             block_index: self.block_index as u32,
+            created_at: DateTime::<Utc>::from_utc(self.created_at, Utc),
         }
     }
 }
@@ -122,6 +125,8 @@ impl NewExecutedPriorityOperation {
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
             eth_hash: exec_prior_op.priority_op.eth_hash,
+            eth_block: exec_prior_op.priority_op.eth_block as i64,
+            created_at: exec_prior_op.created_at,
         }
     }
 }

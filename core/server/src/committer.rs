@@ -3,11 +3,12 @@ use std::time::Duration;
 // External uses
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
 // Workspace uses
-use crate::mempool::MempoolRequest;
 use models::{Action, CommitRequest, Operation};
 use storage::ConnectionPool;
-use tokio::{runtime::Runtime, time};
+// Local uses
+use crate::mempool::MempoolRequest;
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -129,6 +130,7 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
     }
 }
 
+#[must_use]
 pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
     tx_for_eth: Sender<Operation>,
@@ -136,7 +138,7 @@ pub fn run_committer(
     mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
     runtime: &Runtime,
-) {
+) -> JoinHandle<()> {
     runtime.spawn(handle_new_commit_task(
         rx_for_ops,
         tx_for_eth.clone(),
@@ -144,5 +146,5 @@ pub fn run_committer(
         mempool_req_sender,
         pool.clone(),
     ));
-    runtime.spawn(poll_for_new_proofs_task(tx_for_eth, pool));
+    runtime.spawn(poll_for_new_proofs_task(tx_for_eth, pool))
 }
