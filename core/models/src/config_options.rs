@@ -7,7 +7,6 @@ use std::time::Duration;
 use futures::{channel::mpsc, executor::block_on, SinkExt};
 use web3::types::{H160, H256};
 // Local uses
-use crate::node::Address;
 use crate::params::block_chunk_sizes;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
@@ -115,7 +114,6 @@ pub struct ConfigurationOptions {
     pub web3_url: String,
     pub governance_eth_addr: H160,
     pub governance_genesis_tx_hash: H256,
-    pub operator_franklin_addr: Address,
     pub operator_eth_addr: H160,
     pub operator_private_key: Option<H256>,
     pub chain_id: u8,
@@ -144,7 +142,6 @@ impl ConfigurationOptions {
             web3_url: get_env("WEB3_URL"),
             governance_eth_addr: parse_env_with("GOVERNANCE_ADDR", |s| &s[2..]),
             governance_genesis_tx_hash: parse_env_with("GOVERNANCE_GENESIS_TX_HASH", |s| &s[2..]),
-            operator_franklin_addr: parse_env_with("OPERATOR_FRANKLIN_ADDRESS", |s| &s[2..]),
             operator_eth_addr: parse_env_with("OPERATOR_ETH_ADDRESS", |s| &s[2..]),
             operator_private_key: if env::var("OPERATOR_PRIVATE_KEY").is_ok() {
                 Some(parse_env("OPERATOR_PRIVATE_KEY"))
