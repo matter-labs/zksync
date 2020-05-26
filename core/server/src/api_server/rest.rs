@@ -933,10 +933,11 @@ fn handle_block_explorer_search(
 }
 
 fn start_server(state: AppState, bind_to: SocketAddr) {
+    let logger_format = crate::api_server::loggers::rest::get_logger_format();
     HttpServer::new(move || {
         App::new()
             .data(state.clone())
-            .wrap(middleware::Logger::default())
+            .wrap(middleware::Logger::new(&logger_format))
             .wrap(Cors::new().send_wildcard().max_age(3600))
             .service(
                 web::scope("/api/v0.1")

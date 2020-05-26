@@ -20,7 +20,7 @@ fn commit_schema_data(
     for block in &setup.blocks {
         conn.chain()
             .block_schema()
-            .save_block_transactions(block.clone())?;
+            .save_block_transactions(block.block_number, block.block_transactions.clone())?;
     }
 
     Ok(())

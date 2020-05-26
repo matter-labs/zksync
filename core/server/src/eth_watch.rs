@@ -14,7 +14,7 @@ use futures::{
     compat::Future01CompatExt,
     SinkExt, StreamExt,
 };
-use tokio::{runtime::Runtime, time};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
 use web3::{
     contract::{Contract, Options},
     transports::EventLoopHandle,
@@ -526,13 +526,14 @@ impl<T: Transport> EthWatch<T> {
     }
 }
 
+#[must_use]
 pub fn start_eth_watch(
     pool: ConnectionPool,
     config_options: ConfigurationOptions,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     runtime: &Runtime,
-) {
+) -> JoinHandle<()> {
     let (web3_event_loop_handle, transport) =
         web3::transports::Http::new(&config_options.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
@@ -559,5 +560,5 @@ pub fn start_eth_watch(
                 .await
                 .expect("ETH watch receiver dropped");
         }
-    });
+    })
 }

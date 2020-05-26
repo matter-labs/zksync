@@ -8,6 +8,15 @@ use chrono::DateTime;
 use chrono::Utc;
 use web3::types::H256;
 
+#[derive(Clone, Debug)]
+pub struct PendingBlock {
+    pub number: u32,
+    pub chunks_left: usize,
+    pub unprocessed_priority_op_before: u64,
+    pub pending_block_iteration: usize,
+    pub success_operations: Vec<ExecutedOperations>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
     pub tx: FranklinTx,
@@ -38,6 +47,13 @@ impl ExecutedOperations {
         match self {
             ExecutedOperations::Tx(exec_tx) => exec_tx.op.as_ref(),
             ExecutedOperations::PriorityOp(exec_op) => Some(&exec_op.op),
+        }
+    }
+
+    pub fn get_executed_tx(&self) -> Option<&ExecutedTx> {
+        match self {
+            ExecutedOperations::Tx(exec_tx) => Some(exec_tx),
+            ExecutedOperations::PriorityOp(_) => None,
         }
     }
 

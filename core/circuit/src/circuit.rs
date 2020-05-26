@@ -351,6 +351,13 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
+            pack_bits.extend(vec![Boolean::Constant(false); 256]); // TODO: now equals to zero -> should be fixed in #570
+
+            hash_block =
+                sha256::sha256(cs.namespace(|| "hash with op_tree_root_hash"), &pack_bits)?;
+
+            let mut pack_bits = vec![];
+            pack_bits.extend(hash_block);
             pack_bits.extend(block_pub_data_bits.into_iter());
 
             hash_block = sha256::sha256(cs.namespace(|| "final hash public"), &pack_bits)?;

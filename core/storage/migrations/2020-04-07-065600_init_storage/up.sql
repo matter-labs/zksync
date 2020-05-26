@@ -41,9 +41,17 @@ CREATE TABLE blocks (
     block_size BIGINT NOT NULL
 );
 
+-- Pending block header entry.
+CREATE TABLE pending_block (
+    -- Pending block ID
+    number BIGINT PRIMARY KEY NOT NULL,
+    chunks_left BIGINT NOT NULL,
+    unprocessed_priority_op_before BIGINT NOT NULL,
+    pending_block_iteration BIGINT NOT NULL
+);
+
 -- Table for the executed priority operations (e.g. deposit).
 CREATE TABLE executed_priority_operations (
-    id serial PRIMARY KEY,
     -- sidechain block info
     block_number BIGINT NOT NULL,
     block_index INT NOT NULL,
@@ -56,12 +64,12 @@ CREATE TABLE executed_priority_operations (
     deadline_block BIGINT NOT NULL,
     eth_hash bytea NOT NULL,
     eth_block BIGINT NOT NULL,
-    created_at timestamp with time zone not null
+    created_at timestamp with time zone not null,
+    PRIMARY KEY (eth_hash)
 );
 
 -- Table for the executed common operations (e.g. transfer).
 CREATE TABLE executed_transactions (
-    id serial PRIMARY KEY,
     -- sidechain block info
     block_number BIGINT NOT NULL,
     block_index INT,
@@ -76,7 +84,8 @@ CREATE TABLE executed_transactions (
     fail_reason TEXT,
     primary_account_address bytea NOT NULL,
     nonce BIGINT NOT NULL,
-    created_at TIMESTAMP with time zone NOT NULL
+    created_at TIMESTAMP with time zone NOT NULL,
+    PRIMARY KEY (tx_hash)
 );
 
 -- -------------- --
@@ -154,9 +163,9 @@ CREATE TABLE balances (
     PRIMARY KEY (account_id, coin_id)
 );
 
--- ------------- --
+-- -------------------- --
 -- Data restore section --
--- ------------- --
+-- -------------------- --
 
 CREATE TABLE data_restore_events_state (
     id SERIAL PRIMARY KEY,
@@ -276,6 +285,17 @@ CREATE TABLE eth_tx_hashes (
 );
 
 -- --------------- --
+-- Mempool section --
+-- --------------- --
+CREATE TABLE mempool_txs (
+    id bigserial PRIMARY KEY,
+    -- Hash of the transaction
+    tx_hash TEXT NOT NULL,
+    -- Transaction contents
+    tx jsonb NOT NULL
+);
+
+-- --------------- --
 -- Indexes section --
 -- --------------- --
 
@@ -285,6 +305,7 @@ CREATE INDEX blocks_root_hash_index ON blocks (root_hash);
 CREATE INDEX tokens_symbol_index ON tokens (symbol);
 CREATE INDEX eth_ops_binding_op_id_index ON eth_ops_binding (op_id);
 CREATE INDEX eth_tx_hashes_eth_op_id_index ON eth_tx_hashes (eth_op_id);
+CREATE INDEX mempool_txs_hash_index ON mempool_txs (tx_hash);
 
 CREATE INDEX accounts_block_index ON accounts (last_block);
 CREATE INDEX accounts_address_index ON accounts (address);
