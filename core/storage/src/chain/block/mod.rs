@@ -261,8 +261,8 @@ impl<'a> BlockSchema<'a> {
                     left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
                     left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
             ) \
-            select \
-                DISTINCT blocks.number as block_number, \
+            select distinct on (block_number) \
+                blocks.number as block_number, \
                 blocks.root_hash as new_state_root, \
                 blocks.block_size as block_size, \
                 committed.tx_hash as commit_tx_hash, \
