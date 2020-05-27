@@ -13,6 +13,7 @@ use web3::{
     types::{TransactionReceipt, H256},
 };
 // Workspace uses
+use crate::utils::current_zksync_info::CurrentZksyncInfo;
 use eth_client::SignedCallResult;
 use models::{
     config_options::{ConfigurationOptions, EthSenderOptions},
@@ -121,6 +122,8 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
+    /// struct to communicate current verified block number to api server
+    current_zksync_info: CurrentZksyncInfo,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
@@ -130,6 +133,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
+        current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
         let (ongoing_ops, unprocessed_ops) = db.restore_state().expect("Can't restore state");
 
@@ -155,6 +159,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             tx_queue,
             gas_adjuster,
             options,
+            current_zksync_info,
         };
 
         // Add all the unprocessed operations to the queue.
@@ -240,6 +245,15 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     self.tx_queue.report_commitment();
 
                     if current_op.is_verify() {
+                        self.current_zksync_info.set_new_verified_block(
+                            current_op
+                                .op
+                                .as_ref()
+                                .expect("Should be verify operation")
+                                .block
+                                .block_number,
+                        );
+
                         // We notify about verify only when it's confirmed on the Ethereum.
                         self.op_notify
                             .try_send(current_op.op.expect("Should be verify operation"))
@@ -650,6 +664,7 @@ pub fn start_eth_sender(
     op_notify_sender: mpsc::Sender<Operation>,
     send_requst_receiver: mpsc::Receiver<Operation>,
     config_options: ConfigurationOptions,
+    current_zksync_info: CurrentZksyncInfo,
 ) -> JoinHandle<()> {
     let ethereum =
         EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
@@ -663,6 +678,7 @@ pub fn start_eth_sender(
         ethereum,
         send_requst_receiver,
         op_notify_sender,
+        current_zksync_info,
     );
 
     runtime.spawn(eth_sender.run())
