@@ -85,6 +85,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         connection_pool: ConnectionPool,
         web3_transport: T,
