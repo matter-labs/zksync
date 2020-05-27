@@ -24,7 +24,7 @@ if (network == "localhost") {
 let syncProvider: Provider;
 
 async function getOperatorBalance(token: types.TokenLike, type: "committed" | "verified" = "committed") {
-    const accountState = await syncProvider.getState(process.env.OPERATOR_ETH_ADDRESS);
+    const accountState = await syncProvider.getState(process.env.OPERATOR_FEE_ETH_ADDRESS);
     const tokenSet = syncProvider.tokenSet;
     const tokenSymbol = tokenSet.resolveTokenSymbol(token);
     let balance;
