@@ -8,6 +8,8 @@ where:
     run               do not wipe the database and run data restore in finite mode
     check             wipe the database, run the data restore in finite mode and check the root hash.
                       Root hash must be provided as a single argument of hexadecimal string
+    check-existing    like `check`, but instead of taking expected hash as an argument, it is loaded
+                      from the database before wiping it
     fetch-root-hash   find the hash of the latest verified block and print it to the stdout'
 
 if [ -z $ZKSYNC_ENV ];
@@ -42,6 +44,11 @@ case $COMMAND in
     ;;
   check)
       EXPECTED_HASH=$2
+      zksync db-reset
+      f cargo run --bin data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
+    ;;
+  check-existing)
+      EXPECTED_HASH=`fetch_root_hash`
       zksync db-reset
       f cargo run --bin data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
     ;;
