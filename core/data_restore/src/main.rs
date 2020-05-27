@@ -42,9 +42,8 @@ fn main() {
     let (_event_loop, transport) =
         Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
     let governance_addr = config_opts.governance_eth_addr;
-    let governance_genesis_tx_hash = config_opts.governance_genesis_tx_hash;
+    let genesis_tx_hash = config_opts.genesis_tx_hash;
     let contract_addr = config_opts.contract_eth_addr;
-    let contract_genesis_tx_hash = config_opts.contract_genesis_tx_hash;
     let available_block_chunk_sizes = config_opts.available_block_chunk_sizes;
 
     let mut driver = DataRestoreDriver::new(
@@ -59,7 +58,7 @@ fn main() {
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if cli.is_present("genesis") {
-        driver.set_genesis_state(governance_genesis_tx_hash, contract_genesis_tx_hash);
+        driver.set_genesis_state(genesis_tx_hash);
     }
 
     if cli.is_present("continue") {
