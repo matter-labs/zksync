@@ -30,17 +30,19 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
     // ```
     // constructor(
     //    Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget,
-    //    bytes32 _genesisRoot, address _firstValidator, address _governor
+    //    bytes32 _genesisRoot, address _firstValidator, address _governor,
+    //    address _feeAccountAddress
     // )
     let init_parameters_types = vec![
         ethabi::ParamType::Address, // Governance contract address
         ethabi::ParamType::Address, // Verifier contract address
         ethabi::ParamType::Address, // zkSync contract address
         ethabi::ParamType::FixedBytes(INPUT_DATA_ROOT_HASH_BYTES_WIDTH), // Genesis root
-        ethabi::ParamType::Address, // First validator (fee account) address
+        ethabi::ParamType::Address, // First validator (committer) address
         ethabi::ParamType::Address, // Governor address
+        ethabi::ParamType::Address, // Fee account address
     ];
-    let validator_address_argument_id = 4;
+    let fee_account_address_argument_id = 6;
 
     let decoded_init_parameters = ethabi::decode(
         init_parameters_types.as_slice(),
@@ -52,7 +54,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
             "can't get decoded init parameters from contract creation transaction",
         )))
     })?;
-    match &decoded_init_parameters[validator_address_argument_id] {
+    match &decoded_init_parameters[fee_account_address_argument_id] {
         ethabi::Token::Address(genesis_operator_address) => {
             Some(Account::default_with_address(&genesis_operator_address))
         }
