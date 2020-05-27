@@ -14,7 +14,7 @@ use web3::Transport;
 ///
 pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account, failure::Error> {
     const ENCODED_INIT_PARAMETERS_WIDTH: usize =
-        5 * INPUT_DATA_ADDRESS_BYTES_WIDTH + INPUT_DATA_ROOT_HASH_BYTES_WIDTH;
+        6 * INPUT_DATA_ADDRESS_BYTES_WIDTH + INPUT_DATA_ROOT_HASH_BYTES_WIDTH;
 
     let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
 
