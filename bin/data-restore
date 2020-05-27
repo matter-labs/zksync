@@ -18,6 +18,8 @@ then
   exit 1
 fi
 
+BLOCK_HASH_ERR="Error: Unable to load the latest block hash" 
+
 function fetch_root_hash {
   # Select the latest verified block and find its hash
   QUERY="WITH last_block (number) AS (SELECT max(block_number) FROM operations WHERE action_type = 'VERIFY')
@@ -25,6 +27,12 @@ function fetch_root_hash {
   # By piping we make `psql` simply return value instead of drawing the table.
   # `xargs` is used to trim spaces around the value.
   BLOCK_HASH=`echo $QUERY | psql "postgres://postgres@localhost/plasma" -t | xargs`
+
+  if [ -z "$BLOCK_HASH" ]
+  then
+      echo "$BLOCK_HASH_ERR"
+      exit 1
+  fi
 
   echo $BLOCK_HASH
 }
@@ -49,6 +57,14 @@ case $COMMAND in
     ;;
   check-existing)
       EXPECTED_HASH=`fetch_root_hash`
+      # This kludge is required, as bash scripts don't really support returning values from function
+      # Instead, we are parsing result of the execution of `fetch_root_hash` and check if it's
+      # indicating the error.
+      if [ "$EXPECTED_HASH" == "$BLOCK_HASH_ERR" ]; then
+        echo "$BLOCK_HASH_ERR"
+        exit 1
+      fi
+      echo "Expected hash is $EXPECTED_HASH"
       zksync db-reset
       f cargo run --bin data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
     ;;
