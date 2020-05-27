@@ -27,6 +27,11 @@ zksync dummy-prover &> integration-prover.log &
 PROVER_PID=$!
 
 sleep 15
+echo "Performing integration-simple test..."
 zksync integration-simple
+echo "Performing integration-full-exit test..."
 zksync integration-full-exit
+echo "Performing api-type-validate test..."
 zksync api-type-validate
+echo "Performing data-restore test..."
+zksync data-restore check-existing
