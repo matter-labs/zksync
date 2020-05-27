@@ -149,21 +149,21 @@ impl<T: Transport> DataRestoreDriver<T> {
             genesis_eth_block_number,
         );
 
-        let genesis_account =
+        let genesis_fee_account =
             get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
 
         info!(
-            "genesis account address: 0x{}",
-            hex::encode(genesis_account.address.as_ref())
+            "genesis fee account address: 0x{}",
+            hex::encode(genesis_fee_account.address.as_ref())
         );
 
         let account_update = AccountUpdate::Create {
-            address: genesis_account.address,
-            nonce: genesis_account.nonce,
+            address: genesis_fee_account.address,
+            nonce: genesis_fee_account.nonce,
         };
 
         let mut account_map = AccountMap::default();
-        account_map.insert(0, genesis_account);
+        account_map.insert(0, genesis_fee_account);
 
         let current_block = 0;
         let current_unprocessed_priority_op = 0;

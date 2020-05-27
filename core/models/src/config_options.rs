@@ -113,7 +113,8 @@ pub struct ConfigurationOptions {
     pub genesis_tx_hash: H256,
     pub contract_eth_addr: H160,
     pub governance_eth_addr: H160,
-    pub operator_eth_addr: H160,
+    pub operator_fee_eth_addr: H160,
+    pub operator_commit_eth_addr: H160,
     pub operator_private_key: Option<H256>,
     pub chain_id: u8,
     pub gas_price_factor: usize,
@@ -140,7 +141,8 @@ impl ConfigurationOptions {
             genesis_tx_hash: parse_env_with("GENESIS_TX_HASH", |s| &s[2..]),
             contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
             governance_eth_addr: parse_env_with("GOVERNANCE_ADDR", |s| &s[2..]),
-            operator_eth_addr: parse_env_with("OPERATOR_ETH_ADDRESS", |s| &s[2..]),
+            operator_commit_eth_addr: parse_env_with("OPERATOR_COMMIT_ETH_ADDRESS", |s| &s[2..]),
+            operator_fee_eth_addr: parse_env_with("OPERATOR_FEE_ETH_ADDRESS", |s| &s[2..]),
             operator_private_key: if env::var("OPERATOR_PRIVATE_KEY").is_ok() {
                 Some(parse_env("OPERATOR_PRIVATE_KEY"))
             } else {

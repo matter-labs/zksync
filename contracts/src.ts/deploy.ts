@@ -160,8 +160,8 @@ export class Deployer {
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode, [this.addresses.GovernanceTarget, this.addresses.VerifierTarget,
-                this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_ETH_ADDRESS,
-                this.governorAddress,
+                this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_COMMIT_ETH_ADDRESS,
+                this.governorAddress, process.env.OPERATOR_FEE_ETH_ADDRESS
             ],
             {gasLimit: 5000000, ...ethTxOptions},
         );

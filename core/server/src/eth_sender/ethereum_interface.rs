@@ -68,7 +68,7 @@ impl EthereumHttpClient {
         let eth_client = ETHClient::new(
             transport,
             zksync_contract(),
-            options.operator_eth_addr,
+            options.operator_commit_eth_addr,
             options
                 .operator_private_key
                 .expect("Operator private key is required for eth_sender"),

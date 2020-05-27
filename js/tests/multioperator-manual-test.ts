@@ -68,7 +68,7 @@ async function test() {
     console.log("Copy these lines:");
     console.log();
     console.log(`OPERATOR_PRIVATE_KEY=${ethW2.privateKey.slice(2)}`);
-    console.log(`OPERATOR_ETH_ADDRESS=${ethW2.address}`);
+    console.log(`OPERATOR_COMMIT_ETH_ADDRESS=${ethW2.address}`);
     console.log();
     console.log("to the end of dev.env");
 
