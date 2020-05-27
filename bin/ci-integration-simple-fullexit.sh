@@ -33,5 +33,3 @@ echo "Performing integration-full-exit test..."
 zksync integration-full-exit
 echo "Performing api-type-validate test..."
 zksync api-type-validate
-echo "Performing data-restore test..."
-zksync data-restore check-existing
