@@ -312,6 +312,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _blockNumber,
         uint24 _feeAccount,
         bytes32 _newRoot,
+        bytes32 _opTreeRootHash,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
@@ -331,7 +332,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
-            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, publicData, withdrawalsDataHash, nPriorityRequestProcessed);
+            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _opTreeRootHash, publicData, withdrawalsDataHash, nPriorityRequestProcessed);
             totalBlocksCommitted++;
 
             emit BlockCommit(_blockNumber);
@@ -344,6 +345,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _blockNumber,
         uint24 _feeAccount,
         bytes32 _newRoot,
+        bytes32 _opTreeRootHash,
         bytes memory _publicData,
         bytes32 _withdrawalDataHash,
         uint64 _nCommittedPriorityRequests
@@ -359,6 +361,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             _feeAccount,
             blocks[_blockNumber - 1].stateRoot,
             _newRoot,
+            _opTreeRootHash,
             _publicData
         );
 
@@ -368,7 +371,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             blockChunks,
             _withdrawalDataHash, // hash of onchain withdrawals data (will be used during checking block withdrawal data in verifyBlock function)
             commitment, // blocks' commitment
-            _newRoot // new root
+            _newRoot, // new root
+            _opTreeRootHash // operations tree root hash
         );
     }
 
@@ -538,6 +542,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint24 _feeAccount,
         bytes32 _oldRoot,
         bytes32 _newRoot,
+        bytes32 _opTreeRootHash,
         bytes memory _publicData
     ) internal view returns (bytes32 commitment) {
         bytes32 hash = sha256(
@@ -545,6 +550,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         );
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
+        hash = sha256(abi.encodePacked(hash, uint256(_opTreeRootHash)));
 
         /// The code below is equivalent to `commitment = sha256(abi.encodePacked(hash, _publicData))`
 

@@ -22,7 +22,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace uses
 use models::node::{
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
@@ -58,6 +58,9 @@ pub enum TxAddError {
 
     #[fail(display = "Internal error")]
     Other,
+
+    #[fail(display = "Database unavailable")]
+    DbError,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -125,10 +128,31 @@ impl MempoolState {
             account_nonces.insert(account.address, account.nonce);
         }
 
+        // Remove any possible duplicates of already executed transactions
+        // from the database.
+        storage
+            .chain()
+            .mempool_schema()
+            .collect_garbage()
+            .expect("Collecting garbage in the mempool schema failed");
+
+        // Load transactions that were not yet processed and are awaiting in the
+        // mempool.
+        let ready_txs = storage
+            .chain()
+            .mempool_schema()
+            .load_txs()
+            .expect("Attempt to restore mempool txs from DB failed");
+
+        log::info!(
+            "{} transactions were restored from the persistent mempool storage",
+            ready_txs.len()
+        );
+
         Self {
             account_nonces,
             account_ids,
-            ready_txs: VecDeque::new(),
+            ready_txs,
         }
     }
 
@@ -150,6 +174,7 @@ impl MempoolState {
 }
 
 struct Mempool {
+    db_pool: ConnectionPool,
     mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
@@ -158,6 +183,20 @@ struct Mempool {
 
 impl Mempool {
     fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+        let storage = self.db_pool.access_storage().map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        storage
+            .chain()
+            .mempool_schema()
+            .insert_tx(&tx)
+            .map_err(|err| {
+                log::warn!("Mempool storage access error: {}", err);
+                TxAddError::DbError
+            })?;
+
         self.mempool_state.add_tx(tx)
     }
 
@@ -169,9 +208,14 @@ impl Mempool {
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
+                    // Generate proposed block.
+                    let proposed_block =
+                        self.propose_new_block(block.last_priority_op_number).await;
+
+                    // Send the proposed block to the request initiator.
                     block
                         .response_sender
-                        .send(self.propose_new_block(block.last_priority_op_number).await)
+                        .send(proposed_block)
                         .expect("mempool proposed block response send failed");
                 }
                 MempoolRequest::UpdateNonces(updates) => {
@@ -215,6 +259,7 @@ impl Mempool {
             .select_priority_ops(current_unprocessed_priority_op)
             .await;
         let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left);
+
         trace!("Proposed priority ops for block: {:#?}", priority_ops);
         trace!("Proposed txs for block: {:#?}", txs);
         ProposedBlock { priority_ops, txs }
@@ -250,7 +295,6 @@ impl Mempool {
 
     fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
         let mut txs_for_commit = Vec::new();
-        let mut tx_for_reinsert = None;
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
             let chunks_for_tx = self.mempool_state.chunks_for_tx(&tx);
@@ -258,29 +302,28 @@ impl Mempool {
                 txs_for_commit.push(tx);
                 chunks_left -= chunks_for_tx;
             } else {
-                tx_for_reinsert = Some(tx);
+                // Push the taken tx back, it does not fit.
+                self.mempool_state.ready_txs.push_front(tx);
                 break;
             }
-        }
-
-        if let Some(tx) = tx_for_reinsert {
-            self.mempool_state.ready_txs.push_front(tx);
         }
 
         (chunks_left, txs_for_commit)
     }
 }
 
+#[must_use]
 pub fn run_mempool_task(
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     config: &ConfigurationOptions,
     runtime: &Runtime,
-) {
+) -> JoinHandle<()> {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
 
     let mempool = Mempool {
+        db_pool,
         mempool_state,
         requests,
         eth_watch_req,
@@ -290,5 +333,5 @@ pub fn run_mempool_task(
             .max()
             .expect("failed to find max block chunks size"),
     };
-    runtime.spawn(mempool.run());
+    runtime.spawn(mempool.run())
 }

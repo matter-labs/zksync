@@ -29,14 +29,17 @@ impl RollupOpsBlock {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
+        let fee_account_argument_id = 1;
+        let public_data_argument_id = 4;
         let decoded_commitment_parameters = ethabi::decode(
             vec![
-                ethabi::ParamType::Uint(32),
-                ethabi::ParamType::Uint(24),
-                ethabi::ParamType::FixedBytes(32),
-                ethabi::ParamType::Bytes,
-                ethabi::ParamType::Bytes,
-                ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))),
+                ethabi::ParamType::Uint(32),       // uint32 _blockNumber,
+                ethabi::ParamType::Uint(24),       // uint24 _feeAccount,
+                ethabi::ParamType::FixedBytes(32), // bytes32 _newRoot,
+                ethabi::ParamType::FixedBytes(32), // bytes32 _opTreeRootHash,
+                ethabi::ParamType::Bytes,          // bytes calldata _publicData,
+                ethabi::ParamType::Bytes,          // bytes calldata _ethWitness,
+                ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))), // uint32[] calldata _ethWitnessSizes
             ]
             .as_slice(),
             input_data.as_slice(),
@@ -49,8 +52,8 @@ impl RollupOpsBlock {
         })?;
 
         if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
-            &decoded_commitment_parameters[1],
-            &decoded_commitment_parameters[3],
+            &decoded_commitment_parameters[fee_account_argument_id],
+            &decoded_commitment_parameters[public_data_argument_id],
         ) {
             let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
             let fee_account = fee_acc.as_u32();

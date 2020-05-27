@@ -1,7 +1,7 @@
 // Built-in imports
 // External imports
-use bigdecimal::BigDecimal;
 use chrono::{DateTime, Duration, Utc};
+use num::BigUint;
 // Workspace imports
 use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -18,7 +18,7 @@ pub struct TransactionsHistoryTestSetup {
     pub from_zksync_account: ZksyncAccount,
     pub to_zksync_account: ZksyncAccount,
 
-    pub amount: BigDecimal,
+    pub amount: BigUint,
 
     pub tokens: Vec<Token>,
     pub blocks: Vec<Block>,
@@ -42,7 +42,7 @@ impl TransactionsHistoryTestSetup {
         let to_zksync_account = ZksyncAccount::rand();
         to_zksync_account.set_account_id(Some(to_account_id));
 
-        let amount = BigDecimal::from(1);
+        let amount = 1u32.into();
 
         Self {
             from_zksync_account,
@@ -58,13 +58,13 @@ impl TransactionsHistoryTestSetup {
     }
 
     pub fn add_block(&mut self, block_id: u32) {
-        let executed_deposit_op = self.create_deposit_op(0);
+        let executed_deposit_op = self.create_deposit_op(block_id, 0);
         let executed_transfer_to_new_op = self.create_transfer_to_new_op(Some(1));
         let executed_transfer_op = self.create_transfer_tx(Some(2));
         let executed_close_op = self.create_close_tx(Some(3));
         let executed_change_pubkey_op = self.create_change_pubkey_tx(Some(4));
         let executed_withdraw_op = self.create_withdraw_tx(Some(5));
-        let executed_full_exit_op = self.create_full_exit_op(6);
+        let executed_full_exit_op = self.create_full_exit_op(block_id, 6);
 
         let operations = vec![
             executed_deposit_op,
@@ -88,7 +88,7 @@ impl TransactionsHistoryTestSetup {
         self.blocks.push(block);
     }
 
-    fn create_deposit_op(&mut self, block_index: u32) -> ExecutedOperations {
+    fn create_deposit_op(&mut self, block: u32, block_index: u32) -> ExecutedOperations {
         let deposit_op = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op: Deposit {
                 from: self.from_zksync_account.address,
@@ -104,7 +104,7 @@ impl TransactionsHistoryTestSetup {
                 serial_id: 0,
                 data: deposit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_hash: b"1234567890".to_vec(),
+                eth_hash: hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
                 eth_block: 10,
             },
             op: deposit_op,
@@ -115,7 +115,7 @@ impl TransactionsHistoryTestSetup {
         ExecutedOperations::PriorityOp(Box::new(executed_op))
     }
 
-    fn create_full_exit_op(&mut self, block_index: u32) -> ExecutedOperations {
+    fn create_full_exit_op(&mut self, block: u32, block_index: u32) -> ExecutedOperations {
         let full_exit_op = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op: FullExit {
                 account_id: self.from_zksync_account.get_account_id().unwrap(),
@@ -130,7 +130,7 @@ impl TransactionsHistoryTestSetup {
                 serial_id: 0,
                 data: full_exit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_hash: b"1234567890".to_vec(),
+                eth_hash: hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
                 eth_block: 11,
             },
             op: full_exit_op,
@@ -149,7 +149,7 @@ impl TransactionsHistoryTestSetup {
                     self.tokens[1].id,
                     &self.tokens[1].symbol,
                     self.amount.clone(),
-                    BigDecimal::from(0),
+                    0u32.into(),
                     &self.to_zksync_account.address,
                     None,
                     true,
@@ -179,7 +179,7 @@ impl TransactionsHistoryTestSetup {
                     self.tokens[1].id,
                     &self.tokens[1].symbol,
                     self.amount.clone(),
-                    BigDecimal::from(0),
+                    0u32.into(),
                     &self.to_zksync_account.address,
                     None,
                     true,
@@ -209,7 +209,7 @@ impl TransactionsHistoryTestSetup {
                     self.tokens[2].id,
                     &self.tokens[2].symbol,
                     self.amount.clone(),
-                    BigDecimal::from(0),
+                    0u32.into(),
                     &self.to_zksync_account.address,
                     None,
                     true,

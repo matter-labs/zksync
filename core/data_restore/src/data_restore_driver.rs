@@ -131,22 +131,14 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     /// * `franklin_contract_genesis_tx_hash` - Rollup contract creation tx hash
     ///
-    pub fn set_genesis_state(
-        &mut self,
-        governance_contract_genesis_tx_hash: H256,
-        franklin_contract_genesis_tx_hash: H256,
-    ) {
-        let genesis_franklin_transaction =
-            get_ethereum_transaction(&self.web3, &franklin_contract_genesis_tx_hash)
-                .expect("Cant get franklin genesis transaction");
-        let genesis_governance_transaction =
-            get_ethereum_transaction(&self.web3, &governance_contract_genesis_tx_hash)
-                .expect("Cant get governance genesis transaction");
+    pub fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
+        let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
+            .expect("Cant get franklin genesis transaction");
 
         // Setting genesis block number for events state
         let genesis_eth_block_number = self
             .events_state
-            .set_genesis_block_number(&genesis_governance_transaction)
+            .set_genesis_block_number(&genesis_transaction)
             .expect("Cant set genesis block number for events state");
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
@@ -157,16 +149,21 @@ impl<T: Transport> DataRestoreDriver<T> {
             genesis_eth_block_number,
         );
 
-        let genesis_account = get_genesis_account(&genesis_franklin_transaction)
-            .expect("Cant get genesis account address");
+        let genesis_fee_account =
+            get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
+
+        info!(
+            "genesis fee account address: 0x{}",
+            hex::encode(genesis_fee_account.address.as_ref())
+        );
 
         let account_update = AccountUpdate::Create {
-            address: genesis_account.address,
-            nonce: genesis_account.nonce,
+            address: genesis_fee_account.address,
+            nonce: genesis_fee_account.nonce,
         };
 
         let mut account_map = AccountMap::default();
-        account_map.insert(0, genesis_account);
+        account_map.insert(0, genesis_fee_account);
 
         let current_block = 0;
         let current_unprocessed_priority_op = 0;

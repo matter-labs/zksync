@@ -56,8 +56,12 @@
                     <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"   /></template>
                     <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']"  /></template>
                     <template v-slot:cell(Age)    ="data"><span v-html="data.item['Age']"     /></template>
-                    <template v-slot:cell(From)   ="data"><span v-html="data.item['From']"    /></template>
-                    <template v-slot:cell(To)     ="data"><span v-html="data.item['To']"      /></template>
+                    <template v-slot:cell(From)   ="data">
+                        <CopyableAddress :address="data.item['fromAddr']" :linkHtml="data.item['From'] "/>
+                    </template>
+                    <template v-slot:cell(To)   ="data">
+                        <CopyableAddress :address="data.item['toAddr']" :linkHtml="data.item['To'] "/>
+                    </template>
                     <template v-slot:cell(Fee)    ="data"><span v-html="data.item['Fee']"     /></template>
                 </b-table>
             </b-card>
@@ -211,7 +215,7 @@ export default {
                         <a href="${this.routerBase}transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
                             ${shortenHash(tx.data.hash, 'unknown! hash')}
                         </a>
-                    </code>`;                    
+                    </code>`;
 
                     const link_from
                         = tx.data.type == 'Deposit' ? `${this.blockchainExplorerAddress}/${tx.data.from}`
@@ -260,13 +264,16 @@ export default {
                         To,
                         CreatedAt,
 
+                        fromAddr: tx.data.from,
+                        toAddr: tx.data.to,
                         hash: tx.data.hash,
                     };
                 });
         },
         transactionFields() {
             return this.transactionProps && this.transactionProps.length
-                 ? Object.keys(this.transactionProps[0]).filter(k => k != 'hash')
+                 ? Object.keys(this.transactionProps[0])
+                    .filter(k => ! ['hash', 'fromAddr', 'toAddr'].includes(k))
                  : [];
         }
     },

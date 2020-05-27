@@ -29,9 +29,7 @@ impl<'a> TokensSchema<'a> {
         diesel::insert_into(tokens::table)
             .values(&new_token)
             .on_conflict(tokens::id)
-            .do_update()
-            // update token address but not symbol -- so we can update it externally
-            .set(tokens::address.eq(new_token.address.clone()))
+            .do_nothing()
             .execute(self.0.conn())
             .map(drop)
     }

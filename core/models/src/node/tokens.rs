@@ -30,7 +30,7 @@ pub struct Token {
     pub address: Address,
     /// Token symbol (e.g. "ETH" or "USDC")
     pub symbol: String,
-    /// Token precision (e.g. 18 for "ETH" and some ERC20-tokens)
+    /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
 }
 

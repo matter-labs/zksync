@@ -11,7 +11,7 @@ NONCE=`curl \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
     -X POST \
-    --data '{"jsonrpc":"2.0","method":"eth_getTransactionCount","params":['"\"$OPERATOR_ETH_ADDRESS\""',"pending"],"id":1}' \
+    --data '{"jsonrpc":"2.0","method":"eth_getTransactionCount","params":['"\"$OPERATOR_COMMIT_ETH_ADDRESS\""',"pending"],"id":1}' \
     $WEB3_URL 2> /dev/null \
     | jq '.result'`
 

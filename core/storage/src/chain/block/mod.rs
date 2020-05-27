@@ -8,13 +8,11 @@ use models::node::{
     block::{Block, ExecutedOperations},
     AccountId, BlockNumber, FranklinOp,
 };
-use models::{fe_from_bytes, fe_to_bytes, Action, ActionType, Operation};
+use models::{
+    fe_from_bytes, fe_to_bytes, node::block::PendingBlock, Action, ActionType, Operation,
+};
 // Local imports
-use self::records::{BlockDetails, BlockTransactionItem, StorageBlock};
-use crate::prover::records::StoredProof;
-use crate::prover::ProverSchema;
-use crate::schema::*;
-use crate::StorageProcessor;
+use self::records::{BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock};
 use crate::{
     chain::{
         operations::{
@@ -27,6 +25,9 @@ use crate::{
         state::StateSchema,
     },
     ethereum::records::ETHBinding,
+    prover::{records::StoredProof, ProverSchema},
+    schema::*,
+    StorageProcessor,
 };
 
 mod conversion;
@@ -78,19 +79,23 @@ impl<'a> BlockSchema<'a> {
     }
 
     /// Given a block, stores its transactions in the database.
-    pub fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
-        for block_tx in block.block_transactions.into_iter() {
+    pub fn save_block_transactions(
+        &self,
+        block_number: u32,
+        operations: Vec<ExecutedOperations>,
+    ) -> QueryResult<()> {
+        for block_tx in operations.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
                     // Store the executed operation in the corresponding schema.
-                    let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block.block_number);
+                    let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
                     OperationsSchema(self.0).store_executed_operation(new_tx)?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     // For priority operation we should only store it in the Operations schema.
                     let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
                         *prior_op,
-                        block.block_number,
+                        block_number,
                     );
                     OperationsSchema(self.0).store_executed_priority_operation(new_priority_op)?;
                 }
@@ -261,8 +266,8 @@ impl<'a> BlockSchema<'a> {
                     left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
                     left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
             ) \
-            select \
-                DISTINCT blocks.number as block_number, \
+            select distinct on (block_number) \
+                blocks.number as block_number, \
                 blocks.root_hash as new_state_root, \
                 blocks.block_size as block_size, \
                 committed.tx_hash as commit_tx_hash, \
@@ -441,8 +446,8 @@ impl<'a> BlockSchema<'a> {
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
         use crate::schema::operations::dsl::*;
         operations
-            .select(max(block_number))
             .filter(action_type.eq(&ActionType::COMMIT.to_string()))
+            .select(max(block_number))
             .get_result::<Option<i64>>(self.0.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
@@ -450,10 +455,60 @@ impl<'a> BlockSchema<'a> {
     pub fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
         use crate::schema::operations::dsl::*;
         operations
-            .select(max(block_number))
             .filter(action_type.eq(&ActionType::VERIFY.to_string()))
+            .select(max(block_number))
             .get_result::<Option<i64>>(self.0.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
+    }
+
+    pub fn load_pending_block(&self) -> QueryResult<Option<PendingBlock>> {
+        use crate::schema::pending_block::dsl::*;
+        self.0.conn().transaction(|| {
+            let pending_block_result: QueryResult<StoragePendingBlock> =
+                pending_block.first(self.0.conn());
+
+            let block = match pending_block_result {
+                Ok(block) => block,
+                Err(DieselError::NotFound) => return Ok(None),
+                Err(err) => return Err(err),
+            };
+
+            let executed_ops = self.get_block_executed_ops(block.number as u32)?;
+
+            let result = PendingBlock {
+                number: block.number as u32,
+                chunks_left: block.chunks_left as usize,
+                unprocessed_priority_op_before: block.unprocessed_priority_op_before as u64,
+                pending_block_iteration: block.pending_block_iteration as usize,
+                success_operations: executed_ops,
+            };
+
+            Ok(Some(result))
+        })
+    }
+
+    pub fn save_pending_block(&self, pending_block: PendingBlock) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            let storage_block = StoragePendingBlock {
+                number: pending_block.number.into(),
+                chunks_left: pending_block.chunks_left as i64,
+                unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
+                pending_block_iteration: pending_block.pending_block_iteration as i64,
+            };
+
+            // Store the pending block header.
+            diesel::insert_into(pending_block::table)
+                .values(&storage_block)
+                .on_conflict(pending_block::number)
+                .do_update()
+                .set(&storage_block)
+                .execute(self.0.conn())?;
+
+            // Store the transactions from the block.
+            self.save_block_transactions(pending_block.number, pending_block.success_operations)?;
+
+            Ok(())
+        })
     }
 
     pub(crate) fn save_block(&self, block: Block) -> QueryResult<()> {
@@ -465,7 +520,7 @@ impl<'a> BlockSchema<'a> {
             let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
             let block_size = block.block_chunks_size as i64;
 
-            self.save_block_transactions(block)?;
+            self.save_block_transactions(block.block_number, block.block_transactions)?;
 
             let new_block = StorageBlock {
                 number,
@@ -476,6 +531,11 @@ impl<'a> BlockSchema<'a> {
                 block_size,
             };
 
+            // Remove pending block (as it's now completed).
+            diesel::delete(pending_block::table.filter(pending_block::number.eq(number)))
+                .execute(self.0.conn())?;
+
+            // Save new completed block.
             diesel::insert_into(blocks::table)
                 .values(&new_block)
                 .execute(self.0.conn())?;

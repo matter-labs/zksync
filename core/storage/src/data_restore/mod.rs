@@ -31,7 +31,8 @@ pub struct DataRestoreSchema<'a>(pub &'a StorageProcessor);
 impl<'a> DataRestoreSchema<'a> {
     pub fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            BlockSchema(self.0).save_block_transactions(block)?;
+            BlockSchema(self.0)
+                .save_block_transactions(block.block_number, block.block_transactions)?;
             self.update_storage_state(self.new_storage_state("None"))?;
             Ok(())
         })
@@ -131,8 +132,10 @@ impl<'a> DataRestoreSchema<'a> {
             self.update_block_events(block_events)?;
 
             for &NewTokenEvent { id, address } in token_events.iter() {
-                // TODO: don't add tokens using ETH events.
-                let token = Token::new(id, address, &format!("ERC20-{}", id), 18);
+                // The only way to know decimals is to query ERC20 contract 'decimals' function
+                // that may or may not (in most cases, may not) be there, so we just assume it to be 18
+                let decimals = 18;
+                let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
                 TokensSchema(self.0).store_token(token)?;
             }
 

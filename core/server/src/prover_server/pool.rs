@@ -75,12 +75,8 @@ impl OperationsQueue {
     }
 
     /// Return block number of the next operation to take.
-    fn next_block_number(&self) -> Option<u32> {
-        if self.operations.is_empty() {
-            None
-        } else {
-            Some(self.operations[0].0.block.block_number)
-        }
+    fn next_block_number(&self) -> Option<BlockNumber> {
+        self.operations.front().map(|(op, _)| op.block.block_number)
     }
 
     // Whether queue is empty or not.
@@ -189,7 +185,7 @@ impl Maintainer {
 
         // Clone the required data to process it without holding the lock.
         let (mut queue, limit) = {
-            let pool = self.data.read().expect("failed to get write lock on data");
+            let pool = self.data.read().expect("failed to get read lock on data");
             (pool.op_queue.clone(), pool.limit)
         };
 

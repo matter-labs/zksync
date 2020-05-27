@@ -18,6 +18,7 @@
     "full-exit": "f ts-node full-exit-inegration-test.ts",
     "withdraws": "f ts-node withdraws.ts",
     "api-type-validate": "f ts-node api-type-validate.ts",
-    "print-test-accounts": "f ts-node print-test-accounts.ts"
+    "print-test-accounts": "f ts-node print-test-accounts.ts",
+    "multioperator-manual-test": "f ts-node multioperator-manual-test.ts"
   }
 }

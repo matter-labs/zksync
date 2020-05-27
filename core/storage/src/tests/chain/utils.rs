@@ -3,7 +3,10 @@ use web3::types::Address;
 // Workspace imports
 use crypto_exports::rand::Rng;
 use models::{
-    node::{block::Block, AccountUpdate, BlockNumber, Fr, PubKeyHash},
+    node::{
+        block::{Block, ExecutedOperations},
+        AccountUpdate, BlockNumber, Fr, PubKeyHash,
+    },
     Action, Operation,
 };
 use num::BigUint;
@@ -72,6 +75,21 @@ pub fn get_operation(
             (0, 0),
             block_size,
         ),
+        accounts_updated,
+    }
+}
+
+pub fn get_operation_with_txs(
+    block_number: BlockNumber,
+    action: Action,
+    accounts_updated: Vec<(u32, AccountUpdate)>,
+    block_size: usize,
+    txs: Vec<ExecutedOperations>,
+) -> Operation {
+    Operation {
+        id: None,
+        action,
+        block: Block::new(block_number, Fr::default(), 0, txs, (0, 0), block_size),
         accounts_updated,
     }
 }

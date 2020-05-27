@@ -13,7 +13,7 @@ use models::config_options::ConfigurationOptions;
 use models::node::{
     Account, AccountId, AccountMap, Address, FranklinTx, Nonce, PriorityOp, TokenId,
 };
-use models::CommitRequest;
+use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
@@ -227,11 +227,12 @@ pub fn spawn_state_keeper(
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
     let sk_thread_handle = std::thread::spawn(move || {
         let mut main_runtime = Runtime::new().expect("main runtime start");
-        start_state_keeper(state_keeper, &main_runtime);
+        let state_keeper_task = start_state_keeper(state_keeper, None, &main_runtime);
         main_runtime.block_on(async move {
-            stop_state_keeper_receiver
-                .await
-                .expect("stop sk sender dropped");
+            tokio::select! {
+                _ = stop_state_keeper_receiver => {},
+                _ = state_keeper_task => {},
+            }
         })
     });
 
@@ -558,7 +559,7 @@ impl TestSetup {
         self.execute_priority_op(deposit);
     }
 
-    fn execute_tx(&self, tx: FranklinTx) {
+    fn execute_tx(&mut self, tx: FranklinTx) {
         let block = ProposedBlock {
             priority_ops: Vec::new(),
             txs: vec![tx],
@@ -570,10 +571,13 @@ impl TestSetup {
                 .await
                 .expect("sk receiver dropped");
         };
+        // Request miniblock execution.
         block_on(block_sender);
+        // Receive the pending block processing request from state keeper.
+        block_on(self.await_for_pending_block_request());
     }
 
-    fn execute_priority_op(&self, op: PriorityOp) {
+    fn execute_priority_op(&mut self, op: PriorityOp) {
         let block = ProposedBlock {
             priority_ops: vec![op],
             txs: Vec::new(),
@@ -585,7 +589,10 @@ impl TestSetup {
                 .await
                 .expect("sk receiver dropped");
         };
+        // Request miniblock execution.
         block_on(block_sender);
+        // Receive the pending block processing request from state keeper.
+        block_on(self.await_for_pending_block_request());
     }
 
     pub fn exit(
@@ -742,6 +749,46 @@ impl TestSetup {
         self.execute_tx(withdraw);
     }
 
+    /// Waits for `CommitRequest::Block` to appear on proposed blocks receiver, ignoring
+    /// the pending blocks.
+    async fn await_for_block_commit_request(&mut self) -> BlockCommitRequest {
+        while let Some(new_block_event) = self.proposed_blocks_receiver.next().await {
+            match new_block_event {
+                CommitRequest::Block(new_block, receiver) => {
+                    receiver.send(()).unwrap();
+                    return new_block;
+                }
+                CommitRequest::PendingBlock(_, receiver) => {
+                    // Pending blocks are ignored.
+                    receiver.send(()).unwrap();
+                }
+            }
+        }
+        panic!("Proposed blocks receiver dropped");
+    }
+
+    /// Takes the next `CommitRequest` from the proposed blocks receiver and expects
+    /// it to be `PendingBlock`. Panics otherwise.
+    async fn await_for_pending_block_request(&mut self) {
+        let new_block_event = self
+            .proposed_blocks_receiver
+            .next()
+            .await
+            .expect("StateKeeper sender dropped");
+        match new_block_event {
+            CommitRequest::Block(new_block, _) => {
+                panic!(
+                    "Expected pending block, got full block proposed. Block: {:?}",
+                    new_block
+                );
+            }
+            CommitRequest::PendingBlock(_, receiver) => {
+                // Notify state keeper that we've processed the request.
+                receiver.send(()).unwrap();
+            }
+        }
+    }
+
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
     pub fn execute_commit_block(&mut self) -> ETHExecResult {
         let block_sender = async {
@@ -752,8 +799,8 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block =
-            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
+
+        let new_block = block_on(self.await_for_block_commit_request());
 
         block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
     }
@@ -767,8 +814,7 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block =
-            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
+        let new_block = block_on(self.await_for_block_commit_request());
 
         block_on(self.commit_account.commit_block(&new_block.block))
             .expect("block commit send tx")

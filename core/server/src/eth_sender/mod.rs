@@ -10,14 +10,16 @@ use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
 };
-use tokio::runtime::Runtime;
-use tokio::time::timeout;
-use web3::contract::Options;
-use web3::types::{TransactionReceipt, H256, U256};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
+use web3::{
+    contract::Options,
+    types::{TransactionReceipt, H256, U256},
+};
 // Workspace uses
+use crate::utils::current_zksync_info::CurrentZksyncInfo;
 use eth_client::SignedCallResult;
 use models::{
-    config_options::{ConfigurationOptions, EthSenderOptions, ThreadPanicNotify},
+    config_options::{ConfigurationOptions, EthSenderOptions},
     ethereum::{ETHOperation, OperationType},
     node::config,
     Action, Operation,
@@ -129,6 +131,8 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
+    /// struct to communicate current verified block number to api server
+    current_zksync_info: CurrentZksyncInfo,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
@@ -138,6 +142,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
+        current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
         let (ongoing_ops, unprocessed_ops) = db.restore_state().expect("Can't restore state");
 
@@ -163,6 +168,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             tx_queue,
             gas_adjuster,
             options,
+            current_zksync_info,
         };
 
         // Add all the unprocessed operations to the queue.
@@ -182,7 +188,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            timeout(self.options.tx_poll_period, self.process_requests())
+            time::timeout(self.options.tx_poll_period, self.process_requests())
                 .await
                 .unwrap_or_default();
 
@@ -253,6 +259,15 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     self.tx_queue.report_commitment();
 
                     if current_op.is_verify() {
+                        self.current_zksync_info.set_new_verified_block(
+                            current_op
+                                .op
+                                .as_ref()
+                                .expect("Should be verify operation")
+                                .block
+                                .block_number,
+                        );
+
                         // We notify about verify only when it's confirmed on the Ethereum.
                         self.op_notify
                             .try_send(current_op.op.expect("Should be verify operation"))
@@ -595,6 +610,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
                         root,
+                        H256([0u8; 32]), // TODO: now equals to zero -> should be fixed in #570
                         public_data,
                         witness_data.0,
                         witness_data.1,
@@ -655,34 +671,29 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     }
 }
 
+#[must_use]
 pub fn start_eth_sender(
+    runtime: &Runtime,
     pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
     op_notify_sender: mpsc::Sender<Operation>,
     send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
     config_options: ConfigurationOptions,
-) {
-    std::thread::Builder::new()
-        .name("eth_sender".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+    current_zksync_info: CurrentZksyncInfo,
+) -> JoinHandle<()> {
+    let ethereum =
+        EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
 
-            let ethereum =
-                EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
+    let db = Database::new(pool);
 
-            let db = Database::new(pool);
+    let eth_sender_options = EthSenderOptions::from_env();
+    let eth_sender = ETHSender::new(
+        eth_sender_options,
+        db,
+        ethereum,
+        send_request_receiver,
+        op_notify_sender,
+        current_zksync_info,
+    );
 
-            let eth_sender_options = EthSenderOptions::from_env();
-
-            let mut runtime = Runtime::new().expect("eth-sender-runtime");
-            let eth_sender = ETHSender::new(
-                eth_sender_options,
-                db,
-                ethereum,
-                send_request_receiver,
-                op_notify_sender,
-            );
-            runtime.block_on(eth_sender.run());
-        })
-        .expect("Eth sender thread");
+    runtime.spawn(eth_sender.run())
 }

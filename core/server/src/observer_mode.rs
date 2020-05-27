@@ -40,7 +40,7 @@ impl ObservedState {
     fn init(&mut self) -> Result<(), failure::Error> {
         self.init_circuit_tree()?;
         info!("updated circuit tree to block: {}", self.circuit_tree_block);
-        self.state_keeper_init.load_from_db(&self.storage)?;
+        self.state_keeper_init = PlasmaStateInitParams::restore_from_db(&self.storage)?;
         info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
