@@ -362,13 +362,14 @@ impl<'a> OperationsExtSchema<'a> {
                     from 
                         operations
                     order by
-                        block_number
+                        block_number desc
                     $$) t3 (
                         block_number bigint, 
                         commited boolean, 
                         verified boolean)
             using 
                 (block_number)
+            order by block_number desc, created_at desc
             ",
             address = hex::encode(address.as_ref().to_vec()),
             offset = offset,

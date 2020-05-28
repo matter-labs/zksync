@@ -15,8 +15,15 @@
         <b-breadcrumb class="" :items="breadcrumbs"></b-breadcrumb>
         <h5 class="mt-3 mb-2">Account data</h5>
         <b-card no-body class="table-margin-hack">
-            <b-table responsive thead-class="hidden_header" class="my-0 py-0" :items="accountDataProps">
-                <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
+            <b-table responsive thead-class="hidden_header" :items="accountDataProps">
+                <template v-slot:cell(value)="data">
+                    <CopyableAddress
+                        class="bigger-text"
+                        :address="address" 
+                        :linkHtml="data.item['value']"
+                        :tooltipRight="true"
+                    />
+                </template>
             </b-table>
         </b-card>
         <h5 class="mt-3 mb-2">Account balances</h5>
@@ -51,16 +58,18 @@
                     :fields="transactionFields" 
                     @row-clicked="onRowClicked">
                     <template v-slot:cell(Type)   ="data"><span v-html="data.item['Type']"    /></template>
-                    <template v-slot:cell(TxnHash)="data"><span v-html="data.item['TxnHash']" /></template>
+                    <template v-slot:cell(TxnHash)   ="data">
+                        <CopyableAddress class="normalize-text" :address="data.item['hash']" :linkHtml="data.item['TxnHash'] "/>
+                    </template>
                     <template v-slot:cell(Block)  ="data"><span v-html="data.item['Block']"   /></template>
                     <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"   /></template>
                     <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']"  /></template>
                     <template v-slot:cell(Age)    ="data"><span v-html="data.item['Age']"     /></template>
                     <template v-slot:cell(From)   ="data">
-                        <CopyableAddress :address="data.item['fromAddr']" :linkHtml="data.item['From'] "/>
+                        <CopyableAddress class="normalize-text" :address="data.item['fromAddr']" :linkHtml="data.item['From'] "/>
                     </template>
                     <template v-slot:cell(To)   ="data">
-                        <CopyableAddress :address="data.item['toAddr']" :linkHtml="data.item['To'] "/>
+                        <CopyableAddress class="normalize-text" :address="data.item['toAddr']" :linkHtml="data.item['To'] "/>
                     </template>
                     <template v-slot:cell(Fee)    ="data"><span v-html="data.item['Fee']"     /></template>
                 </b-table>
@@ -77,12 +86,6 @@
     </b-container>
 </div>
 </template>
-
-<style>
-.hidden_header {
-  display: none;
-}
-</style>
 
 <script>
 
@@ -140,7 +143,7 @@ export default {
         async update() {
             const balances = await this.client.getCommitedBalances(this.address);
             this.balances = balances
-                .map(bal => ({ name: bal.tokenName, value: bal.balance }));
+                .map(bal => ({ name: bal.tokenSymbol, value: bal.balance }));
 
             const offset = (this.currentPage - 1) * this.rowsPerPage;
             const limit = this.rowsPerPage;
@@ -190,7 +193,7 @@ export default {
         },
         accountDataProps() {
             return [
-                { name: 'Address',          value: `<code>${this.address}</code>`},
+                { name: 'Address',          value: `<a><code>${this.address}</code></a> ` },
             ];
         },
         balancesProps() {
@@ -217,25 +220,34 @@ export default {
                         </a>
                     </code>`;
 
-                    const link_from
-                        = tx.data.type == 'Deposit' ? `${this.blockchainExplorerAddress}/${tx.data.from}`
+                    const link_from = tx.data.type == 'Deposit' 
+                        ? `${this.blockchainExplorerAddress}/${tx.data.from}`
                         : `${this.routerBase}accounts/${tx.data.from}`;
 
-                    const link_to
-                        = tx.data.type == 'Withdraw' ? `${this.blockchainExplorerAddress}/${tx.data.to}`
+                    const link_to = tx.data.type == 'Withdraw' 
+                        ? `${this.blockchainExplorerAddress}/${tx.data.to}`
                         : `${this.routerBase}accounts/${tx.data.to}`;
 
-                    const target_from
-                        = tx.data.type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
+                    const target_from = tx.data.type == 'Deposit' 
+                        ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    const target_to
-                        = tx.data.type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
+                    const target_to = tx.data.type == 'Withdraw' 
+                        ? `target="_blank" rel="noopener noreferrer"`
+                        : '';
+
+                    const onchain_from = tx.data.type == 'Deposit' 
+                        ? '<i class="fas fa-external-link-alt"></i> '
+                        : '';
+
+                    const onchain_to = tx.data.type == 'Withdraw' 
+                        ? '<i class="fas fa-external-link-alt"></i> '
                         : '';
 
                     const From = `<code>
                         <a href="${link_from}" ${target_from}>
                             ${shortenHash(tx.data.from, 'unknown! from')}
+                            ${onchain_from}
                         </a>
                     </code>`;
 
@@ -246,6 +258,8 @@ export default {
                                     ? ''
                                     : shortenHash(tx.data.to, 'unknown! to')
                             }
+
+                            ${ tx.data.type == "ChangePubKey" ? '' : onchain_to }
                         </a>
                     </code>`;
 
@@ -289,5 +303,15 @@ export default {
 
 .table-width-hack td:first-child {
     width: 10em;
+}
+.normalize-text {
+    font-size: 1.0em;
+}
+.bigger-text {
+    font-size: 1.05em;
+}
+
+.hidden_header {
+    display: none;
 }
 </style>

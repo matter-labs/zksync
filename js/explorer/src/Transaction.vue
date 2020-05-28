@@ -27,7 +27,24 @@
             <h5 class="mt-3">Transaction data</h5>
             <b-card no-body class="table-margin-hack">
                 <b-table responsive thead-class="hidden_header" :items="props">
-                    <template v-slot:cell(value)="data"><span v-html="data.item['value']" /></template>
+                    <template v-slot:cell(value)="data">
+                        <CopyableAddress class="normalize-text"
+                            v-if="data.item['name'] == 'From'" 
+                            :address="txData.from" 
+                            :linkHtml="`${data.item['value']} `"
+                        />
+                        <CopyableAddress class="normalize-text" 
+                            v-else-if="data.item['name'] == 'To'" 
+                            :address="txData.to" 
+                            :linkHtml="`${data.item['value']} `"
+                        />
+                        <CopyableAddress class="normalize-text" 
+                            v-else-if="data.item['name'] == 'Tx hash'" 
+                            :address="tx_hash" 
+                            :linkHtml="`${data.item['value']} `"
+                        />
+                        <span v-else v-html="data.item['value']" />
+                    </template>
                 </b-table>
             </b-card>
             <br>
@@ -44,9 +61,11 @@ import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
 
 import SearchField from './SearchField.vue';
+import CopyableAddress from './CopyableAddress.vue';
 
 const components = {
     SearchField,
+    CopyableAddress,
 };
 
 export default {
@@ -153,7 +172,7 @@ export default {
                     { name: 'Tx hash',                  value: tx_hash},
                     { name: "Type",                     value: `<b>${this.txData.tx_type}</b>`   },
                     { name: "Status",                   value: `<b>${this.txData.status}</b>` },
-                    { name: "Account",                  value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                    { name: "Account",                  value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>` },
                     { name: "New signer key hash",      value: `<code>${this.txData.to}</code>`},
                     { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ]
@@ -162,7 +181,7 @@ export default {
                     { name: 'Tx hash',        value: tx_hash},
                     { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
                     { name: "Status",         value: `<b>${this.txData.status}</b>` },
-                    { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                    { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>` },
                     { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
                     { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${formatToken(this.txData.amount, this.txData.tokenName)}`    },
                 ]
@@ -170,7 +189,7 @@ export default {
                     { name: 'Tx hash',        value: tx_hash},
                     { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
                     { name: "Status",         value: `<b>${this.txData.status}</b>` },
-                    { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                    { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>` },
                     { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
                     { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${formatToken(this.txData.amount, this.txData.tokenName)}`    },
                     { name: "fee",            value: `<b>${this.txData.feeTokenName}</b> ${formatToken(this.txData.fee, this.txData.tokenName)}` },
@@ -206,5 +225,9 @@ export default {
     border-radius: 5px;
     padding: 0 .2em;
     color: white;
+}
+
+.normalize-text {
+    font-size: 1.0em;
 }
 </style>
