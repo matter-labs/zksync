@@ -38,8 +38,8 @@ jobs:
 
     - name: data-restore
       run: |
-        ps -aux | grep zksync
-        killall zksync
+        psql "postgres://postgres@localhost/plasma" -c "copy (select * from operations) to stdout with null as '';"
+        sleep 3
         zksync data-restore check-existing
 
     - name: integration-testkit

@@ -8,6 +8,8 @@ SERVER_PID=""
 PROVER_PID=""
 
 function cat_logs() {
+    # Wait for server to finish any ongoing jobs
+    sleep 60
     exitcode=$?
     set +e
     kill -9 $SERVER_PID
@@ -17,6 +19,10 @@ function cat_logs() {
     echo ===========
     echo Prover logs:
     cat integration-prover.log
+
+    # Wait for server to be surely killed
+    sleep 10
+
     exit $exitcode
 }
 
