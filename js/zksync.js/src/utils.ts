@@ -9,6 +9,9 @@ import {
 } from "./types";
 import { serializeAccountId, serializeNonce } from "./signer";
 import { BigNumberish, BigNumber } from "ethers/utils";
+import getRandomValues from "get-random-values";
+import * as pbkdf2 from "pbkdf2";
+import nanoBase32 from "nano-base32";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -386,4 +389,37 @@ export function getEthSignatureType(
     return recovered.toLowerCase() === address.toLowerCase()
         ? "EthereumSignature"
         : "EIP1271Signature";
+}
+
+/**
+ * Returns 20 random bytes in a base32 encoding.
+ */
+export function getRandomCheck(): string {
+    const SEED_LEN = 20;
+    const checkArr = new Uint8Array(SEED_LEN);
+    getRandomValues(checkArr);
+    return nanoBase32.encode(checkArr);
+}
+
+/**
+ * Restores eth private key from string.
+ * @param checkStr: 20 bytes in a base32 encoding
+ */
+export function restoreEthPrivateKeyFromCheck(checkStr: string): Promise<Buffer> {
+    const SALT = "";
+    const NUM_ITERATIONS = 1000;
+    const KEY_LEN = 32;
+    return new Promise((resolve, reject) => {
+        pbkdf2.pbkdf2(
+            checkStr,
+            SALT,
+            NUM_ITERATIONS,
+            KEY_LEN,
+            "sha256",
+            (err, key) => {
+                if (err) reject(err);
+                else resolve(key);
+            }
+        );
+    });
 }

@@ -14,6 +14,7 @@
     "zksync": "link:../zksync.js"
   },
   "scripts": {
+    "build-zksync": "cd ../zksync.js && yarn build && cd ../tests",
     "simple": "f ts-node simple-integration-test.ts",
     "full-exit": "f ts-node full-exit-inegration-test.ts",
     "withdraws": "f ts-node withdraws.ts",
