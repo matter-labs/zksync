@@ -131,7 +131,8 @@ mod test {
             .expect("USD not found");
         assert_eq!(
             quote.price,
-            UnsignedRatioSerializeAsDecimal::deserialize_for_str_with_dot("170.692214992").unwrap()
+            UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot("170.692214992")
+                .unwrap()
         );
         assert_eq!(
             quote.last_updated,

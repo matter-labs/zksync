@@ -209,7 +209,7 @@ impl FeeTickerAPI for TickerApi {
         let eth_sender_req = oneshot::channel();
         self.eth_sender_request_sender
             .clone()
-            .send(ETHSenderRequest::GetGasPriceLimit(eth_sender_req.0))
+            .send(ETHSenderRequest::GetAverageUsedGasPrice(eth_sender_req.0))
             .await
             .expect("Eth sender receiver dropped");
         let eth_sender_resp = BigUint::from(eth_sender_req.1.await?.as_u128());

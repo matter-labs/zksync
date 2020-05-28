@@ -171,12 +171,12 @@ mod test {
         fn new(id: TokenId, price_usd: f64, risk_factor: Option<f64>, precision: u8) -> Self {
             Self {
                 id,
-                price_usd: UnsignedRatioSerializeAsDecimal::deserialize_for_str_with_dot(
+                price_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot(
                     &price_usd.to_string(),
                 )
                 .unwrap(),
                 risk_factor: risk_factor.map(|risk_factor| {
-                    UnsignedRatioSerializeAsDecimal::deserialize_for_str_with_dot(
+                    UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot(
                         &risk_factor.to_string(),
                     )
                     .unwrap()
@@ -209,7 +209,7 @@ mod test {
 
     fn get_test_ticker_config() -> TickerConfig {
         TickerConfig {
-            zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_for_str_with_dot(
+            zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot(
                 "0.001",
             )
             .unwrap(),

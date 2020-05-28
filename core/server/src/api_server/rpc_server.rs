@@ -580,15 +580,48 @@ impl RpcApp {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
-                tx_type,
+                tx_type: tx_type.clone(),
                 amount,
-                token,
+                token: token.clone(),
                 response: req.0,
             })
             .await
-            .map_err(|_| Error::internal_error())?;
-        let resp = req.1.await.map_err(|_| Error::internal_error())?;
-        resp.map_err(|_| Error::internal_error())
+            .map_err(|err| {
+                log::warn!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                    tx_type,
+                    token,
+                );
+                Error::internal_error()
+            })?;
+        let resp = req.1.await.map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                tx_type,
+                token,
+            );
+            Error::internal_error()
+        })?;
+        resp.map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                tx_type,
+                token,
+            );
+            Error::internal_error()
+        })
     }
 
     fn get_verified_account_state(&self, address: &Address) -> Result<ResponseAccountState> {
@@ -773,7 +806,12 @@ impl Rpc for RpcApp {
             if let Some((tx_type, token, amount, provided_fee)) = tx_fee_info {
                 let required_fee =
                     Self::ticker_request(ticker_request_sender, tx_type, amount, token).await?;
-                if required_fee < provided_fee {
+                // We allow fee to be 5% off the required fee
+                if required_fee < &provided_fee * BigUint::from(105u32) / BigUint::from(100u32) {
+                    warn!(
+                        "User provided fee is too low, required: {}, provided: {}",
+                        required_fee, provided_fee
+                    );
                     return Err(Error {
                         code: RpcErrorCodes::from(TxAddError::TxFeeTooLow).into(),
                         message: TxAddError::TxFeeTooLow.to_string(),

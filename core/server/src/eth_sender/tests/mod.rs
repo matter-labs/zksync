@@ -26,11 +26,6 @@ mod test_data;
 fn retrieve_all_operations<ETH: EthereumInterface, DB: DatabaseAccess>(
     eth_sender: &mut ETHSender<ETH, DB>,
 ) {
-    let mut runtime = Builder::new()
-        .basic_scheduler()
-        .enable_time()
-        .build()
-        .expect("Tokio runtime build");
     async fn process_with_timeout<ETH2: EthereumInterface, DB2: DatabaseAccess>(
         eth_sender: &mut ETHSender<ETH2, DB2>,
     ) {
@@ -38,6 +33,12 @@ fn retrieve_all_operations<ETH: EthereumInterface, DB: DatabaseAccess>(
             .await
             .unwrap_or_default()
     }
+
+    let mut runtime = Builder::new()
+        .basic_scheduler()
+        .enable_time()
+        .build()
+        .expect("Tokio runtime build");
     runtime.block_on(process_with_timeout(eth_sender));
 }
 
@@ -125,7 +126,7 @@ fn transaction_state() {
                 TxCheckMode::Latest,
                 &operations[0],
                 &operations[0].used_tx_hashes[0],
-                current_block + committed_response.confirmations
+                current_block + committed_response.confirmations,
             )
             .unwrap(),
         TxCheckOutcome::Committed
@@ -138,7 +139,7 @@ fn transaction_state() {
                 TxCheckMode::Latest,
                 &operations[1],
                 &operations[1].used_tx_hashes[0],
-                current_block + pending_response.confirmations
+                current_block + pending_response.confirmations,
             )
             .unwrap(),
         TxCheckOutcome::Pending
@@ -151,7 +152,7 @@ fn transaction_state() {
                 TxCheckMode::Latest,
                 &operations[2],
                 &operations[2].used_tx_hashes[0],
-                current_block + failed_response.confirmations
+                current_block + failed_response.confirmations,
             )
             .unwrap(),
         TxCheckOutcome::Failed(Default::default())
@@ -164,7 +165,7 @@ fn transaction_state() {
                 TxCheckMode::Latest,
                 &operations[3],
                 &operations[3].used_tx_hashes[0],
-                current_block + EXPECTED_WAIT_TIME_BLOCKS
+                current_block + EXPECTED_WAIT_TIME_BLOCKS,
             )
             .unwrap(),
         TxCheckOutcome::Stuck
@@ -177,7 +178,7 @@ fn transaction_state() {
                 TxCheckMode::Latest,
                 &operations[4],
                 &operations[4].used_tx_hashes[0],
-                current_block + EXPECTED_WAIT_TIME_BLOCKS - 1
+                current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .unwrap(),
         TxCheckOutcome::Pending
@@ -190,7 +191,7 @@ fn transaction_state() {
                 TxCheckMode::Old,
                 &operations[4],
                 &operations[4].used_tx_hashes[0],
-                current_block + EXPECTED_WAIT_TIME_BLOCKS - 1
+                current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .unwrap(),
         TxCheckOutcome::Stuck

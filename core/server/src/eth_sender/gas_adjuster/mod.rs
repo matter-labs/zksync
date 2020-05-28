@@ -111,6 +111,14 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     pub fn get_current_max_price(&self) -> U256 {
         self.statistics.get_limit()
     }
+
+    /// Get estimate of the average gas prices used for past transactions based on the current gas_limit.
+    pub fn get_average_gas_price(&self) -> U256 {
+        let scale_factor = parameters::limit_scale_factor();
+        let divider = U256::from((scale_factor * 100.0f64).round() as u64);
+        let multiplier = U256::from(100);
+        self.statistics.get_limit() * multiplier / divider
+    }
 }
 
 /// Helper structure responsible for collecting the data about recent transactions,

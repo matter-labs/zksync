@@ -124,7 +124,7 @@ sandbox:
 
 # See more more at https://github.com/emk/rust-musl-builder#caching-builds
 build-target: build-contracts
-	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/src/target /home/rust/.cargo/git /home/rust/.cargo/registry
+	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
 
 clean-target:
@@ -286,7 +286,7 @@ dev-build-geth:
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
 
-image-dev-ticker:
+image-dev-ticker: build-target
 	@docker build -t "${DEV_TICKER_DOCKER_IMAGE}" ./docker/dev-ticker
 
 push-image-dev-ticker: image-dev-ticker

@@ -46,7 +46,7 @@ mod tests;
 #[derive(Debug)]
 pub enum ETHSenderRequest {
     SendOperation(Operation),
-    GetGasPriceLimit(oneshot::Sender<U256>),
+    GetAverageUsedGasPrice(oneshot::Sender<U256>),
 }
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
@@ -214,8 +214,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     );
                     self.add_operation_to_queue(operation);
                 }
-                ETHSenderRequest::GetGasPriceLimit(response_sender) => response_sender
-                    .send(self.gas_adjuster.get_current_max_price())
+                ETHSenderRequest::GetAverageUsedGasPrice(response_sender) => response_sender
+                    .send(self.gas_adjuster.get_average_gas_price())
                     .unwrap_or_default(),
             }
         }

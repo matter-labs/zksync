@@ -1,5 +1,6 @@
 // Built-in deps
 use std::convert::TryInto;
+use std::str::FromStr;
 // External deps
 use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
@@ -24,7 +25,6 @@ use crate::merkle_tree::{
     hasher::Hasher, pedersen_hasher::BabyPedersenHasher, rescue_hasher::BabyRescueHasher,
 };
 use crate::params;
-use std::str::FromStr;
 
 // TODO: replace Vec with Iterator?
 
@@ -476,7 +476,7 @@ pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
     Some(array)
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct UnsignedRatioSerializeAsDecimal;
 impl UnsignedRatioSerializeAsDecimal {
     pub fn serialize<S>(value: &Ratio<BigUint>, serializer: S) -> Result<S::Ok, S::Error>
@@ -495,6 +495,17 @@ impl UnsignedRatioSerializeAsDecimal {
         let big_decimal_string = BigDecimal::deserialize(deserializer)?;
 
         big_decimal_to_ratio(&big_decimal_string).map_err(de::Error::custom)
+    }
+
+    pub fn deserialize_from_str_with_dot(input: &str) -> Result<Ratio<BigUint>, failure::Error> {
+        big_decimal_to_ratio(&BigDecimal::from_str(input)?)
+    }
+
+    pub fn serialize_to_str_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
+        ratio_to_big_decimal(num, precision)
+            .to_string()
+            .trim_end_matches('0')
+            .to_string()
     }
 }
 
@@ -527,19 +538,6 @@ impl<'de> Deserialize<'de> for BigUintSerdeWrapper {
                 .map(BigUintSerdeWrapper)
                 .ok_or_else(|| Error::custom("Expected positive value"))
         })
-    }
-}
-
-impl UnsignedRatioSerializeAsDecimal {
-    pub fn deserialize_for_str_with_dot(input: &str) -> Result<Ratio<BigUint>, failure::Error> {
-        big_decimal_to_ratio(&BigDecimal::from_str(input)?)
-    }
-
-    pub fn serialize_to_str_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
-        ratio_to_big_decimal(num, precision)
-            .to_string()
-            .trim_end_matches('0')
-            .to_string()
     }
 }
 
