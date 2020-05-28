@@ -6,6 +6,7 @@ use crypto_exports::franklin_crypto::{
     },
     rescue::RescueEngine,
 };
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -14,7 +15,7 @@ use models::{
     },
     node::operations::TransferOp,
     params as franklin_constants,
-    primitives::{big_decimal_to_u128, convert_to_float},
+    primitives::convert_to_float,
 };
 // Local deps
 use crate::{
@@ -54,8 +55,8 @@ impl Witness for TransferWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, transfer: &TransferOp) -> Self {
         let transfer_data = TransferData {
-            amount: big_decimal_to_u128(&transfer.tx.amount),
-            fee: big_decimal_to_u128(&transfer.tx.fee),
+            amount: transfer.tx.amount.to_u128().unwrap(),
+            fee: transfer.tx.fee.to_u128().unwrap(),
             token: u32::from(transfer.tx.token),
             from_account_address: transfer.from,
             to_account_address: transfer.to,

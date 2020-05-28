@@ -29,13 +29,13 @@ fn tokens_storage() {
             id: 1,
             address: "0000000000000000000000000000000000000001".parse().unwrap(),
             symbol: "ABC".into(),
-            decimals: 18,
+            decimals: 9,
         };
         let token_b = Token {
             id: 2,
             address: "0000000000000000000000000000000000000002".parse().unwrap(),
             symbol: "DEF".into(),
-            decimals: 18,
+            decimals: 6,
         };
 
         TokensSchema(&conn)

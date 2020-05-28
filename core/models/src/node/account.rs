@@ -1,13 +1,13 @@
 use crate::params;
-use crate::primitives::GetBits;
+use crate::primitives::{BigUintSerdeWrapper, GetBits};
 
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-use bigdecimal::BigDecimal;
 use crypto_exports::franklin_crypto::bellman::pairing::ff::{self, PrimeField};
 use crypto_exports::franklin_crypto::eddsa::PublicKey;
 use failure::ensure;
+use num::{BigUint, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::Engine;
@@ -96,7 +96,7 @@ impl<'de> Deserialize<'de> for PubKeyHash {
 pub struct Account {
     pub pub_key_hash: PubKeyHash,
     pub address: Address,
-    balances: HashMap<TokenId, BigDecimal>,
+    balances: HashMap<TokenId, BigUintSerdeWrapper>,
     pub nonce: Nonce,
 }
 
@@ -120,7 +120,7 @@ pub enum AccountUpdate {
         old_nonce: Nonce,
         new_nonce: Nonce,
         // (token, old, new)
-        balance_update: (TokenId, BigDecimal, BigDecimal),
+        balance_update: (TokenId, BigUint, BigUint),
     },
     ChangePubKeyHash {
         old_pub_key_hash: PubKeyHash,
@@ -142,7 +142,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
                 (
                     *id,
                     Balance {
-                        value: Fr::from_str(&b.to_string()).unwrap(),
+                        value: Fr::from_str(&b.0.to_string()).unwrap(),
                     },
                 )
             })
@@ -235,23 +235,23 @@ impl Account {
         (account, updates)
     }
 
-    pub fn get_balance(&self, token: TokenId) -> BigDecimal {
-        self.balances.get(&token).cloned().unwrap_or_default()
+    pub fn get_balance(&self, token: TokenId) -> BigUint {
+        self.balances.get(&token).cloned().unwrap_or_default().0
     }
 
-    pub fn set_balance(&mut self, token: TokenId, amount: BigDecimal) {
-        self.balances.insert(token, amount);
+    pub fn set_balance(&mut self, token: TokenId, amount: BigUint) {
+        self.balances.insert(token, amount.into());
     }
 
-    pub fn add_balance(&mut self, token: TokenId, amount: &BigDecimal) {
+    pub fn add_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
-        balance += amount;
+        balance.0 += amount;
         self.balances.insert(token, balance);
     }
 
-    pub fn sub_balance(&mut self, token: TokenId, amount: &BigDecimal) {
+    pub fn sub_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
-        balance -= amount;
+        balance.0 -= amount;
         self.balances.insert(token, balance);
     }
 
@@ -307,9 +307,9 @@ impl Account {
         }
     }
 
-    pub fn get_nonzero_balances(&self) -> HashMap<TokenId, BigDecimal> {
+    pub fn get_nonzero_balances(&self) -> HashMap<TokenId, BigUintSerdeWrapper> {
         let mut balances = self.balances.clone();
-        balances.retain(|_, v| v != &BigDecimal::from(0));
+        balances.retain(|_, v| v.0 != BigUint::zero());
         balances
     }
 }
@@ -335,7 +335,7 @@ mod test {
         let bal_update = AccountUpdate::UpdateBalance {
             old_nonce: 1,
             new_nonce: 2,
-            balance_update: (0, BigDecimal::from(0), BigDecimal::from(5)),
+            balance_update: (0, 0u32.into(), 5u32.into()),
         };
 
         let delete = AccountUpdate::Delete {
@@ -368,7 +368,7 @@ mod test {
             {
                 let mut updated_account = Account::default();
                 updated_account.nonce = 2;
-                updated_account.set_balance(0, BigDecimal::from(5));
+                updated_account.set_balance(0, 5u32.into());
                 assert_eq!(
                     Account::apply_update(Some(Account::default()), bal_update)
                         .unwrap()
@@ -401,7 +401,7 @@ mod test {
             let mut map = AccountMap::default();
             let mut account_1 = Account::default();
             account_1.nonce = 17;
-            account_1.set_balance(0, BigDecimal::from(256));
+            account_1.set_balance(0, 256u32.into());
             map.insert(1, account_1);
             let mut account_2 = Account::default();
             account_2.nonce = 36;
@@ -423,7 +423,7 @@ mod test {
                 AccountUpdate::UpdateBalance {
                     old_nonce: 16,
                     new_nonce: 17,
-                    balance_update: (0, BigDecimal::from(0), BigDecimal::from(256)),
+                    balance_update: (0, 0u32.into(), 256u32.into()),
                 },
             ));
             updates.push((

@@ -11,6 +11,7 @@ use crypto_exports::franklin_crypto::{
     rescue::bn256::Bn256RescueParams,
 };
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -25,7 +26,6 @@ use models::{
     },
     params as franklin_constants,
     params::total_tokens,
-    primitives::big_decimal_to_u128,
 };
 use plasma::state::CollectedFee;
 // Local deps
@@ -124,7 +124,7 @@ impl<'a> WitnessBuilder<'a> {
                 &mut self.account_tree,
                 self.fee_account_id,
                 u32::from(*token),
-                big_decimal_to_u128(amount),
+                amount.to_u128().unwrap(),
             );
             root_after_fee = root;
             fee_account_witness = acc_witness;

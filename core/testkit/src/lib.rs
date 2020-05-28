@@ -3,7 +3,6 @@
 use crate::eth_account::{parse_ether, ETHExecResult, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
-use bigdecimal::BigDecimal;
 use failure::bail;
 use futures::{
     channel::{mpsc, oneshot},
@@ -15,6 +14,7 @@ use models::node::{
     Account, AccountId, AccountMap, Address, FranklinTx, Nonce, PriorityOp, TokenId,
 };
 use models::{BlockCommitRequest, CommitRequest};
+use num::BigUint;
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
@@ -55,7 +55,7 @@ impl<T: Transport> AccountSet<T> {
         from: ETHAccountId,
         to: ZKSyncAccountId,
         token: Option<Address>, // None for ETH
-        amount: BigDecimal,
+        amount: BigUint,
     ) -> PriorityOp {
         let from = &self.eth_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
@@ -78,8 +78,8 @@ impl<T: Transport> AccountSet<T> {
         from: ZKSyncAccountId,
         to: ZKSyncAccountId,
         token_id: Token,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> FranklinTx {
@@ -109,8 +109,8 @@ impl<T: Transport> AccountSet<T> {
         from: ZKSyncAccountId,
         to: ETHAccountId,
         token_id: Token,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> FranklinTx {
@@ -246,11 +246,7 @@ pub fn spawn_state_keeper(
     )
 }
 
-pub fn perform_basic_operations(
-    token: u16,
-    test_setup: &mut TestSetup,
-    deposit_amount: BigDecimal,
-) {
+pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_amount: BigUint) {
     // test deposit to other account
     test_setup.start_block();
     test_setup.deposit(
@@ -293,8 +289,8 @@ pub fn perform_basic_operations(
         ZKSyncAccountId(1),
         ZKSyncAccountId(1),
         Token(token),
-        &deposit_amount / &BigDecimal::from(8),
-        &deposit_amount / &BigDecimal::from(8),
+        &deposit_amount / BigUint::from(8u32),
+        &deposit_amount / BigUint::from(8u32),
     );
 
     //should be executed as a transfer
@@ -302,8 +298,8 @@ pub fn perform_basic_operations(
         ZKSyncAccountId(1),
         ZKSyncAccountId(2),
         Token(token),
-        &deposit_amount / &BigDecimal::from(8),
-        &deposit_amount / &BigDecimal::from(8),
+        &deposit_amount / BigUint::from(8u32),
+        &deposit_amount / BigUint::from(8u32),
     );
 
     let nonce = test_setup.accounts.zksync_accounts[1].nonce();
@@ -312,7 +308,7 @@ pub fn perform_basic_operations(
         ZKSyncAccountId(0),
         Token(token),
         deposit_amount.clone(),
-        BigDecimal::from(0),
+        BigUint::from(0u32),
         Some(nonce + 1),
         false,
     );
@@ -323,8 +319,8 @@ pub fn perform_basic_operations(
         ZKSyncAccountId(1),
         ZKSyncAccountId(2),
         Token(token),
-        &deposit_amount / &BigDecimal::from(4),
-        &deposit_amount / &BigDecimal::from(4),
+        &deposit_amount / BigUint::from(4u32),
+        &deposit_amount / BigUint::from(4u32),
     );
 
     test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
@@ -333,8 +329,8 @@ pub fn perform_basic_operations(
         ZKSyncAccountId(2),
         ETHAccountId(0),
         Token(token),
-        &deposit_amount / &BigDecimal::from(4),
-        &deposit_amount / &BigDecimal::from(4),
+        &deposit_amount / BigUint::from(4u32),
+        &deposit_amount / BigUint::from(4u32),
     );
     test_setup
         .execute_commit_and_verify_block()
@@ -441,8 +437,8 @@ pub fn perform_basic_tests() {
 #[derive(Default)]
 pub struct ExpectedAccountState {
     // First number is balance, second one is allowed error in balance(used for ETH because eth is used for transaction fees).
-    eth_accounts_state: HashMap<(ETHAccountId, TokenId), (BigDecimal, BigDecimal)>,
-    sync_accounts_state: HashMap<(ZKSyncAccountId, TokenId), BigDecimal>,
+    eth_accounts_state: HashMap<(ETHAccountId, TokenId), (BigUint, BigUint)>,
+    sync_accounts_state: HashMap<(ZKSyncAccountId, TokenId), BigUint>,
 }
 
 /// Used to create transactions between accounts and check for their validity.
@@ -489,19 +485,19 @@ impl TestSetup {
         &self,
         account: ETHAccountId,
         token: TokenId,
-    ) -> (BigDecimal, BigDecimal) {
+    ) -> (BigUint, BigUint) {
         self.expected_changes_for_current_block
             .eth_accounts_state
             .get(&(account, token))
             .cloned()
-            .unwrap_or_else(|| (self.get_eth_balance(account, token), BigDecimal::from(0)))
+            .unwrap_or_else(|| (self.get_eth_balance(account, token), BigUint::from(0u32)))
     }
 
     pub fn get_expected_zksync_account_balance(
         &self,
         account: ZKSyncAccountId,
         token: TokenId,
-    ) -> BigDecimal {
+    ) -> BigUint {
         self.expected_changes_for_current_block
             .sync_accounts_state
             .get(&(account, token))
@@ -522,7 +518,7 @@ impl TestSetup {
         from: ETHAccountId,
         to: ZKSyncAccountId,
         token: Token,
-        amount: BigDecimal,
+        amount: BigUint,
     ) {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0);
         from_eth_balance.0 -= &amount;
@@ -604,7 +600,7 @@ impl TestSetup {
         sending_account: ETHAccountId,
         account_id: AccountId,
         token_id: Token,
-        amount: &BigDecimal,
+        amount: &BigUint,
         proof: EncodedProofPlonk,
     ) -> ETHExecResult {
         block_on(
@@ -628,7 +624,7 @@ impl TestSetup {
         let zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         self.expected_changes_for_current_block
             .sync_accounts_state
-            .insert((from, token.0), BigDecimal::from(0));
+            .insert((from, token.0), BigUint::from(0u32));
 
         let mut post_by_eth_balance = self.get_expected_eth_account_balance(post_by, token.0);
         post_by_eth_balance.0 += zksync0_old;
@@ -688,8 +684,8 @@ impl TestSetup {
         from: ZKSyncAccountId,
         to: ZKSyncAccountId,
         token: Token,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
     ) {
         let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         zksync0_old -= &amount;
@@ -723,8 +719,8 @@ impl TestSetup {
         from: ZKSyncAccountId,
         to: ETHAccountId,
         token: Token,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
     ) {
         let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         zksync0_old -= &amount;
@@ -836,7 +832,7 @@ impl TestSetup {
         {
             let real_balance = self.get_eth_balance(*eth_account, *token);
             let diff = balance - &real_balance;
-            let is_diff_valid = diff >= BigDecimal::from(0) && diff <= *allowed_margin;
+            let is_diff_valid = diff >= BigUint::from(0u32) && diff <= *allowed_margin;
             if !is_diff_valid {
                 println!(
                     "eth acc: {}, token: {}, diff: {}, within bounds: {}",
@@ -852,7 +848,7 @@ impl TestSetup {
             &self.expected_changes_for_current_block.sync_accounts_state
         {
             let real = self.get_zksync_balance(*zksync_account, *token);
-            let is_diff_valid = real.clone() - balance == BigDecimal::from(0);
+            let is_diff_valid = real.clone() - balance == BigUint::from(0u32);
             if !is_diff_valid {
                 println!(
                     "zksync acc {} diff {}, real: {}",
@@ -896,13 +892,13 @@ impl TestSetup {
             .map(|a| a.0)
     }
 
-    fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigDecimal {
+    fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigUint {
         self.get_zksync_account_committed_state(zksync_id)
             .map(|(_, acc)| acc.get_balance(token))
             .unwrap_or_default()
     }
 
-    fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigDecimal {
+    fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigUint {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
         let result = if token == 0 {
             block_on(account.eth_balance()).expect("Failed to get eth balance")
@@ -913,11 +909,7 @@ impl TestSetup {
         result + self.get_balance_to_withdraw(eth_account_id, Token(token))
     }
 
-    pub fn get_balance_to_withdraw(
-        &self,
-        eth_account_id: ETHAccountId,
-        token: Token,
-    ) -> BigDecimal {
+    pub fn get_balance_to_withdraw(&self, eth_account_id: ETHAccountId, token: Token) -> BigUint {
         block_on(self.accounts.eth_accounts[eth_account_id.0].balances_to_withdraw(token.0))
             .expect("failed to query balance to withdraws")
     }
@@ -969,7 +961,7 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedProofPlonk, BigDecimal) {
+    ) -> (EncodedProofPlonk, BigUint) {
         let owner = &self.accounts.zksync_accounts[fund_owner.0];
         let owner_id = owner
             .get_account_id()

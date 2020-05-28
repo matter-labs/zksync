@@ -12,11 +12,10 @@ use crate::params::{
     FR_ADDRESS_LEN, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{
-    big_decimal_to_u128, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
-    u128_to_bigdecimal,
+    bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32, BigUintSerdeWrapper,
 };
-use bigdecimal::BigDecimal;
 use failure::{ensure, format_err};
+use num::{BigUint, FromPrimitive, ToPrimitive};
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +33,7 @@ impl DepositOp {
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
-        data.extend_from_slice(&big_decimal_to_u128(&self.priority_op.amount).to_be_bytes());
+        data.extend_from_slice(&self.priority_op.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&self.priority_op.to.as_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
         data
@@ -58,7 +57,7 @@ impl DepositOp {
         let token =
             bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get token id from deposit pubdata"))?;
-        let amount = u128_to_bigdecimal(
+        let amount = BigUint::from(
             bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get amount from deposit pubdata"))?,
         );
@@ -264,7 +263,7 @@ impl WithdrawOp {
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(self.tx.to.as_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
@@ -276,7 +275,7 @@ impl WithdrawOp {
         data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
         data.extend_from_slice(self.tx.to.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data
     }
 
@@ -303,10 +302,11 @@ impl WithdrawOp {
         let to = Address::from_slice(
             &bytes[eth_address_offset..eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8],
         );
-        let amount = u128_to_bigdecimal(
+        let amount = BigUint::from_u128(
             bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get amount from withdraw pubdata"))?,
-        );
+        )
+        .unwrap();
         let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
         )
@@ -445,7 +445,7 @@ impl ChangePubKeyOp {
 pub struct FullExitOp {
     pub priority_op: FullExit,
     /// None if withdraw was unsuccessful
-    pub withdraw_amount: Option<BigDecimal>,
+    pub withdraw_amount: Option<BigUintSerdeWrapper>,
 }
 
 impl FullExitOp {
@@ -460,7 +460,14 @@ impl FullExitOp {
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(
-            &big_decimal_to_u128(&self.withdraw_amount.clone().unwrap_or_default()).to_be_bytes(),
+            &self
+                .withdraw_amount
+                .clone()
+                .unwrap_or_default()
+                .0
+                .to_u128()
+                .unwrap()
+                .to_be_bytes(),
         );
         data.resize(Self::CHUNKS * 8, 0x00);
         data
@@ -472,7 +479,12 @@ impl FullExitOp {
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(
-            &big_decimal_to_u128(&self.withdraw_amount.clone().unwrap_or_default()).to_be_bytes(),
+            &self
+                .withdraw_amount
+                .clone()
+                .map(|a| a.0.to_u128().unwrap())
+                .unwrap_or(0)
+                .to_be_bytes(),
         );
         data
     }
@@ -493,10 +505,11 @@ impl FullExitOp {
         let eth_address = Address::from_slice(&bytes[eth_address_offset..token_offset]);
         let token = bytes_slice_to_uint16(&bytes[token_offset..amount_offset])
             .ok_or_else(|| format_err!("Cant get token id from full exit pubdata"))?;
-        let amount = u128_to_bigdecimal(
+        let amount = BigUint::from_u128(
             bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get amount from full exit pubdata"))?,
-        );
+        )
+        .unwrap();
 
         Ok(Self {
             priority_op: FullExit {
@@ -504,7 +517,7 @@ impl FullExitOp {
                 eth_address,
                 token,
             },
-            withdraw_amount: Some(amount),
+            withdraw_amount: Some(amount.into()),
         })
     }
 }
