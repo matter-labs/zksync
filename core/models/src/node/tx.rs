@@ -100,7 +100,6 @@ impl Default for VerifiedSignatureCache {
 }
 
 /// Signed by user.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transfer {
@@ -185,7 +184,10 @@ impl Transfer {
     }
 
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid = is_token_amount_packable(&self.amount) && is_fee_amount_packable(&self.fee);
+        let mut valid = self.amount <= BigUint::from(u128::max_value())
+            && self.fee <= BigUint::from(u128::max_value())
+            && is_token_amount_packable(&self.amount)
+            && is_fee_amount_packable(&self.fee);
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();

@@ -304,12 +304,12 @@ async function test() {
 
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
 
-    for (const token of ['ETH', "ERC20-1"]) {
+    for (const token of ['ETH', "DAI", "wBTC"]) {
         console.log('Balance of ' + token + ': ' + formatEther(await syncWallet.getEthereumBalance(token)));
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
             token,
-            amount: parseEther("0.01"),
+            amount: parseEther("10"),
             approveDepositAmountForERC20: true,
         });
         await deposit.awaitReceipt();
@@ -321,21 +321,23 @@ async function test() {
             console.log('changePubKey hash:', changePubKey.txHash);
         }
 
+        const tranferFee = await syncWallet.provider.getTransactionFee("Transfer", "3", token);
         const transfer = await syncWallet.syncTransfer({
             to: ethWallet2.address,
             token,
-            amount: parseEther("0.002"),
-            fee: parseEther('0.0'),
+            amount: parseEther("3"),
+            fee: tranferFee
         });
         await transfer.awaitReceipt();
         console.log('transfer hash:', transfer.txHash);
 
 
+        const withdrawFee = await syncWallet.provider.getTransactionFee("Withdraw", "2", token);
         const withdraw = await syncWallet.withdrawFromSyncToEthereum({
             ethAddress: syncWallet.address(),
             token,
-            amount: parseEther("0.002"),
-            fee: parseEther('0.0'),
+            amount: parseEther("2"),
+            fee: withdrawFee
         })
         await withdraw.awaitReceipt();
         console.log('withdraw hash:', withdraw.txHash);

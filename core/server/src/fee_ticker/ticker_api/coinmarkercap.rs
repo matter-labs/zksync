@@ -15,7 +15,7 @@ pub(super) async fn fetch_coimarketcap_data(
 ) -> Result<TokenPrice, failure::Error> {
     let request_url = base_url
         .join(&format!(
-            "cryptocurrency/quotes/latest?symbol={}&aux=",
+            "cryptocurrency/quotes/latest?symbol={}",
             token_symbol
         ))
         .expect("failed to join url path");

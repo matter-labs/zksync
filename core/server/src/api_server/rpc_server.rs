@@ -299,7 +299,7 @@ pub trait Rpc {
         token_like: TokenLike,
     ) -> Box<dyn futures01::Future<Item = BigUintSerdeWrapper, Error = Error> + Send>;
 
-    #[rpc(name = "get_tx_fee", returns = "BigDecimal")]
+    #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(
         &self,
         token_like: TokenLike,
@@ -817,12 +817,13 @@ impl Rpc for RpcApp {
         let mempool_resp = async move {
             if let Some((tx_type, token, amount, provided_fee)) = tx_fee_info {
                 let required_fee =
-                    Self::ticker_request(ticker_request_sender, tx_type, amount, token).await?;
+                    Self::ticker_request(ticker_request_sender, tx_type, amount, token.clone())
+                        .await?;
                 // We allow fee to be 5% off the required fee
                 if required_fee >= &provided_fee * BigUint::from(105u32) / BigUint::from(100u32) {
                     warn!(
-                        "User provided fee is too low, required: {}, provided: {}",
-                        required_fee, provided_fee
+                        "User provided fee is too low, required: {}, provided: {}, token: {:?}",
+                        required_fee, provided_fee, token
                     );
                     return Err(Error {
                         code: RpcErrorCodes::from(TxAddError::TxFeeTooLow).into(),
