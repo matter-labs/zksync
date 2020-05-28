@@ -6,6 +6,7 @@ use crypto_exports::franklin_crypto::{
     },
     rescue::RescueEngine,
 };
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -14,7 +15,7 @@ use models::{
     },
     node::operations::WithdrawOp,
     params as franklin_constants,
-    primitives::{big_decimal_to_u128, convert_to_float},
+    primitives::convert_to_float,
 };
 // Local deps
 use crate::{
@@ -48,8 +49,8 @@ impl Witness for WithdrawWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, withdraw: &WithdrawOp) -> Self {
         let withdraw_data = WithdrawData {
-            amount: big_decimal_to_u128(&withdraw.tx.amount),
-            fee: big_decimal_to_u128(&withdraw.tx.fee),
+            amount: withdraw.tx.amount.to_u128().unwrap(),
+            fee: withdraw.tx.fee.to_u128().unwrap(),
             token: u32::from(withdraw.tx.token),
             account_address: withdraw.account_id,
             eth_address: eth_address_to_fr(&withdraw.tx.to),

@@ -400,7 +400,7 @@ fn priority_op_to_tx_history(
     let tx_json = serde_json::json!({
         "account_id": account_id,
         "priority_op": {
-            "amount": deposit.amount,
+            "amount": deposit.amount.to_string(),
             "from": deposit.from,
             "to": deposit.to,
             "token": token_symbol

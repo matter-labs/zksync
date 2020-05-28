@@ -21,8 +21,8 @@ fn franklin_txs() -> Vec<FranklinTx> {
         Address::random(),
         Address::random(),
         0,
-        100.into(),
-        10.into(),
+        100u32.into(),
+        10u32.into(),
         10,
         None,
     );
@@ -32,8 +32,8 @@ fn franklin_txs() -> Vec<FranklinTx> {
         Address::random(),
         Address::random(),
         0,
-        500.into(),
-        20.into(),
+        500u32.into(),
+        20u32.into(),
         11,
         None,
     );
@@ -43,8 +43,8 @@ fn franklin_txs() -> Vec<FranklinTx> {
         Address::random(),
         Address::random(),
         0,
-        100.into(),
-        10.into(),
+        100u32.into(),
+        10u32.into(),
         12,
         None,
     );

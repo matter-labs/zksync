@@ -1,6 +1,6 @@
 // External deps
-use bigdecimal::BigDecimal;
 use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+use num::BigUint;
 // Workspace deps
 use models::node::operations::TransferOp;
 use plasma::state::CollectedFee;
@@ -21,7 +21,7 @@ use crate::witness::{
 fn test_transfer_success() {
     // Test vector of (initial_balance, transfer_amount, fee_amount).
     let test_vector = vec![
-        (10, 7, 3),                // Basic transfer
+        (10u64, 7u64, 3u64),       // Basic transfer
         (0, 0, 0),                 // Zero transfer
         (std::u64::MAX, 1, 1),     // Small transfer from rich account,
         (std::u64::MAX, 10000, 1), // Big transfer from rich account (too big values can't be used, since they're not packable),
@@ -41,8 +41,8 @@ fn test_transfer_success() {
                 .sign_transfer(
                     0,
                     "",
-                    BigDecimal::from(transfer_amount),
-                    BigDecimal::from(fee_amount),
+                    BigUint::from(transfer_amount),
+                    BigUint::from(fee_amount),
                     &account_to.account.address,
                     None,
                     true,
@@ -84,8 +84,8 @@ fn test_transfer_to_self() {
             .sign_transfer(
                 0,
                 "",
-                BigDecimal::from(7),
-                BigDecimal::from(3),
+                BigUint::from(7u32),
+                BigUint::from(3u32),
                 &account.account.address,
                 None,
                 true,
@@ -128,8 +128,8 @@ fn corrupted_ops_input() {
             .sign_transfer(
                 0,
                 "",
-                BigDecimal::from(7),
-                BigDecimal::from(3),
+                BigUint::from(7u32),
+                BigUint::from(3u32),
                 &account.account.address,
                 None,
                 true,
@@ -189,8 +189,8 @@ fn test_incorrect_transfer_account_from() {
             .sign_transfer(
                 TOKEN_ID,
                 "",
-                BigDecimal::from(TOKEN_AMOUNT),
-                BigDecimal::from(FEE_AMOUNT),
+                BigUint::from(TOKEN_AMOUNT),
+                BigUint::from(FEE_AMOUNT),
                 &account_to.account.address,
                 None,
                 true,
@@ -243,8 +243,8 @@ fn test_incorrect_transfer_account_to() {
             .sign_transfer(
                 TOKEN_ID,
                 "",
-                BigDecimal::from(TOKEN_AMOUNT),
-                BigDecimal::from(FEE_AMOUNT),
+                BigUint::from(TOKEN_AMOUNT),
+                BigUint::from(FEE_AMOUNT),
                 &incorrect_account_to.account.address,
                 None,
                 true,
@@ -283,9 +283,9 @@ fn test_incorrect_transfer_amount() {
 
     // Test vector of (initial_balance, transfer_amount, fee_amount).
     let test_vector = vec![
-        (10, 15, 0), // Transfer too big
-        (10, 7, 4),  // Fee too big
-        (0, 1, 1),   // Transfer from 0 balance
+        (10u64, 15u64, 0u64), // Transfer too big
+        (10, 7, 4),           // Fee too big
+        (0, 1, 1),            // Transfer from 0 balance
     ];
 
     for (initial_balance, transfer_amount, fee_amount) in test_vector {
@@ -301,8 +301,8 @@ fn test_incorrect_transfer_amount() {
                 .sign_transfer(
                     TOKEN_ID,
                     "",
-                    BigDecimal::from(transfer_amount),
-                    BigDecimal::from(fee_amount),
+                    BigUint::from(transfer_amount),
+                    BigUint::from(fee_amount),
                     &account_to.account.address,
                     None,
                     true,
@@ -363,8 +363,8 @@ fn test_transfer_replay() {
             .sign_transfer(
                 TOKEN_ID,
                 "",
-                BigDecimal::from(TOKEN_AMOUNT),
-                BigDecimal::from(FEE_AMOUNT),
+                BigUint::from(TOKEN_AMOUNT),
+                BigUint::from(FEE_AMOUNT),
                 &account_to.account.address,
                 None,
                 true,

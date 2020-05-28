@@ -18,6 +18,7 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local uses
+use crate::fee_ticker::TickerRequest;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
@@ -189,6 +190,7 @@ pub fn start_ws_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+    ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
     each_cache_size: usize,
     current_zksync_info: CurrentZksyncInfo,
@@ -206,6 +208,7 @@ pub fn start_ws_server(
         state_keeper_request_sender.clone(),
         sign_verify_request_sender,
         eth_watcher_request_sender,
+        ticker_request_sender,
         current_zksync_info,
     );
     req_rpc_app.extend(&mut io);

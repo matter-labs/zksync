@@ -3,7 +3,7 @@
 // Built-in deps
 use std::time::{Duration, Instant};
 // External deps
-use bigdecimal::BigDecimal;
+use num::BigUint;
 use rand::Rng;
 use tokio::time;
 use web3::types::U256;
@@ -15,15 +15,15 @@ use crate::{
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 
 // generates random amount for transaction within given range [from, to).
-pub fn rand_amount(from: u64, to: u64) -> BigDecimal {
+pub fn rand_amount(from: u64, to: u64) -> BigUint {
     let amount = rand::thread_rng().gen_range(from, to);
-    BigDecimal::from(amount)
+    BigUint::from(amount)
 }
 
 /// Deposits to contract and waits for node to execute it.
 pub async fn deposit_single(
     test_acc: &TestAccount,
-    deposit_amount: BigDecimal,
+    deposit_amount: BigUint,
     rpc_client: &RpcClient,
 ) -> Result<u64, failure::Error> {
     let nonce = {

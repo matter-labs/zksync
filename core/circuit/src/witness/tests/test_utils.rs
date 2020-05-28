@@ -1,9 +1,9 @@
 // External deps
-use bigdecimal::BigDecimal;
 use crypto_exports::franklin_crypto::{
     bellman::{pairing::ff::PrimeField, Circuit},
     circuit::test::TestConstraintSystem,
 };
+use num::BigUint;
 // Workspace deps
 use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
@@ -97,7 +97,7 @@ impl WitnessTestAccount {
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
-            account.add_balance(0, &BigDecimal::from(balance));
+            account.add_balance(0, &BigUint::from(balance));
             account.pub_key_hash = zksync_account.pubkey_hash.clone();
             account
         };

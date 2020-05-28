@@ -57,7 +57,7 @@ impl Witness for FullExitWitness<Bn256> {
             full_exit_amount: full_exit
                 .withdraw_amount
                 .clone()
-                .map(|amount| Fr::from_str(&amount.to_string()).unwrap())
+                .map(|amount| Fr::from_str(&amount.0.to_string()).unwrap())
                 .unwrap_or_else(Fr::zero),
         };
 

@@ -8,6 +8,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt};
 use web3::types::{H160, H256};
 // Local uses
 use crate::params::block_chunk_sizes;
+use url::Url;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
 pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
@@ -124,6 +125,7 @@ pub struct ConfigurationOptions {
     pub available_block_chunk_sizes: Vec<usize>,
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
+    pub ticker_url: Url,
 }
 
 impl ConfigurationOptions {
@@ -158,6 +160,7 @@ impl ConfigurationOptions {
                 "ETH_WATCH_POLL_INTERVAL",
             )),
             eth_network: parse_env("ETH_NETWORK"),
+            ticker_url: parse_env("TICKER_URL"),
         }
     }
 }

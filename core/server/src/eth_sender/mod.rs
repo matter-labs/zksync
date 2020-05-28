@@ -6,11 +6,14 @@
 // Built-in deps
 use std::collections::VecDeque;
 // External uses
-use futures::channel::mpsc;
+use futures::{
+    channel::{mpsc, oneshot},
+    StreamExt,
+};
 use tokio::{runtime::Runtime, task::JoinHandle, time};
 use web3::{
     contract::Options,
-    types::{TransactionReceipt, H256},
+    types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
 use crate::utils::current_zksync_info::CurrentZksyncInfo;
@@ -39,6 +42,12 @@ mod tx_queue;
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug)]
+pub enum ETHSenderRequest {
+    SendOperation(Operation),
+    GetAverageUsedGasPrice(oneshot::Sender<U256>),
+}
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -113,7 +122,7 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     /// Ethereum intermediator.
     ethereum: ETH,
     /// Channel for receiving operations to commit.
-    rx_for_eth: mpsc::Receiver<Operation>,
+    rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
     /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
     /// Queue for ordered transaction processing.
@@ -131,7 +140,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         options: EthSenderOptions,
         db: DB,
         ethereum: ETH,
-        rx_for_eth: mpsc::Receiver<Operation>,
+        rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
         current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
@@ -178,12 +187,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
-        let mut timer = time::interval(self.options.tx_poll_period);
-
         loop {
-            // Update the incoming operations.
-            self.retrieve_operations();
-            timer.tick().await;
+            time::timeout(self.options.tx_poll_period, self.process_requests())
+                .await
+                .unwrap_or_default();
 
             // ...and proceed them.
             self.proceed_next_operations();
@@ -195,15 +202,22 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Gets the incoming operations from the channel and adds them to the
     /// transactions queue.
-    fn retrieve_operations(&mut self) {
-        while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
-            info!(
-                "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
-                operation.id.expect("ID must be set"),
-                operation.action.to_string(),
-                operation.block.block_number
-            );
-            self.add_operation_to_queue(operation);
+    async fn process_requests(&mut self) {
+        while let Some(request) = self.rx_for_eth.next().await {
+            match request {
+                ETHSenderRequest::SendOperation(operation) => {
+                    info!(
+                        "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
+                        operation.id.expect("ID must be set"),
+                        operation.action.to_string(),
+                        operation.block.block_number
+                    );
+                    self.add_operation_to_queue(operation);
+                }
+                ETHSenderRequest::GetAverageUsedGasPrice(response_sender) => response_sender
+                    .send(self.gas_adjuster.get_average_gas_price())
+                    .unwrap_or_default(),
+            }
         }
     }
 
@@ -662,7 +676,7 @@ pub fn start_eth_sender(
     runtime: &Runtime,
     pool: ConnectionPool,
     op_notify_sender: mpsc::Sender<Operation>,
-    send_requst_receiver: mpsc::Receiver<Operation>,
+    send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
     config_options: ConfigurationOptions,
     current_zksync_info: CurrentZksyncInfo,
 ) -> JoinHandle<()> {
@@ -676,7 +690,7 @@ pub fn start_eth_sender(
         eth_sender_options,
         db,
         ethereum,
-        send_requst_receiver,
+        send_request_receiver,
         op_notify_sender,
         current_zksync_info,
     );
