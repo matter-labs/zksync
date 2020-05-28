@@ -37,10 +37,7 @@ jobs:
       run: ci-integration-simple-fullexit.sh
 
     - name: data-restore
-      run: |
-        psql "postgres://postgres@localhost/plasma" -c "copy (select * from operations) to stdout with null as '';"
-        sleep 3
-        zksync data-restore check-existing
+      run: zksync data-restore check-existing
 
     - name: integration-testkit
       run: zksync integration-testkit

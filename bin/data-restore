@@ -65,12 +65,7 @@ case $COMMAND in
         exit 1
       fi
       echo "Expected hash is $EXPECTED_HASH"
-      sleep 3
       zksync db-reset
-      sleep 3
-
-      # TODO for debugging remove later
-      psql "postgres://postgres@localhost/plasma" -c "copy (select * from operations) to stdout with null as '';"
       f cargo run --bin data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
     ;;
   fetch-root-hash)

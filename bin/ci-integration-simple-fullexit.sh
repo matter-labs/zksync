@@ -10,6 +10,7 @@ PROVER_PID=""
 function cat_logs() {
     # Wait for server to finish any ongoing jobs
     sleep 60
+
     exitcode=$?
     set +e
     kill -9 $SERVER_PID
