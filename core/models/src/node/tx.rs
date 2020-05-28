@@ -19,7 +19,7 @@ use crate::franklin_crypto::rescue::RescueEngine;
 use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
-use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg};
+use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg, BigUintSerdeAsRadix10Str};
 use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
     public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
@@ -108,7 +108,9 @@ pub struct Transfer {
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub amount: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     pub nonce: Nonce,
     pub signature: TxSignature,
@@ -227,7 +229,9 @@ pub struct Withdraw {
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub amount: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     pub nonce: Nonce,
     pub signature: TxSignature,

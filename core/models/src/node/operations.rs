@@ -11,7 +11,9 @@ use crate::params::{
     BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
     FR_ADDRESS_LEN, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
-use crate::primitives::{bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32};
+use crate::primitives::{
+    bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32, BigUintSerdeWrapper,
+};
 use failure::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use web3::types::Address;
@@ -443,7 +445,7 @@ impl ChangePubKeyOp {
 pub struct FullExitOp {
     pub priority_op: FullExit,
     /// None if withdraw was unsuccessful
-    pub withdraw_amount: Option<BigUint>,
+    pub withdraw_amount: Option<BigUintSerdeWrapper>,
 }
 
 impl FullExitOp {
@@ -462,6 +464,7 @@ impl FullExitOp {
                 .withdraw_amount
                 .clone()
                 .unwrap_or_default()
+                .0
                 .to_u128()
                 .unwrap()
                 .to_be_bytes(),
@@ -479,7 +482,7 @@ impl FullExitOp {
             &self
                 .withdraw_amount
                 .clone()
-                .map(|a| a.to_u128().unwrap())
+                .map(|a| a.0.to_u128().unwrap())
                 .unwrap_or(0)
                 .to_be_bytes(),
         );
@@ -514,7 +517,7 @@ impl FullExitOp {
                 eth_address,
                 token,
             },
-            withdraw_amount: Some(amount),
+            withdraw_amount: Some(amount.into()),
         })
     }
 }

@@ -202,7 +202,7 @@ impl FeeTickerAPI for TickerApi {
         if let Some((cached_gas_price, cache_time)) = cached_value.take() {
             if cache_time.elapsed() < Duration::from_secs(API_PRICE_EXPIRATION_TIME_SECS as u64) {
                 *cached_value = Some((cached_gas_price.clone(), cache_time));
-                return Ok(cached_gas_price.clone());
+                return Ok(cached_gas_price);
             }
         }
 

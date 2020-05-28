@@ -511,20 +511,18 @@ impl UnsignedRatioSerializeAsDecimal {
 
 /// Used to serialize BigUint as radix 10 string.
 #[derive(Clone, Debug)]
-pub struct BigUintSerdeWrapper(pub BigUint);
+pub struct BigUintSerdeAsRadix10Str;
 
-impl Serialize for BigUintSerdeWrapper {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl BigUintSerdeAsRadix10Str {
+    pub fn serialize<S>(val: &BigUint, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let big_dec = BigDecimal::from(self.0.to_bigint().unwrap());
+        let big_dec = BigDecimal::from(val.to_bigint().unwrap());
         BigDecimal::serialize(&big_dec, serializer)
     }
-}
 
-impl<'de> Deserialize<'de> for BigUintSerdeWrapper {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -535,9 +533,17 @@ impl<'de> Deserialize<'de> for BigUintSerdeWrapper {
                 .ok_or_else(|| Error::custom("Expected integer value"))?;
             big_int
                 .to_biguint()
-                .map(BigUintSerdeWrapper)
                 .ok_or_else(|| Error::custom("Expected positive value"))
         })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct BigUintSerdeWrapper(#[serde(with = "BigUintSerdeAsRadix10Str")] pub BigUint);
+
+impl From<BigUint> for BigUintSerdeWrapper {
+    fn from(uint: BigUint) -> BigUintSerdeWrapper {
+        BigUintSerdeWrapper(uint)
     }
 }
 
@@ -550,7 +556,7 @@ pub fn ratio_to_big_decimal(num: &Ratio<BigUint>, precision: usize) -> BigDecima
 
 pub fn big_decimal_to_ratio(num: &BigDecimal) -> Result<Ratio<BigUint>, failure::Error> {
     let (big_int, exp) = num.as_bigint_and_exponent();
-    failure::ensure!(big_int.is_positive(), "BigDecimal should be unsigned");
+    failure::ensure!(!big_int.is_negative(), "BigDecimal should be unsigned");
     let big_uint = big_int.to_biguint().unwrap();
     let ten_pow = BigUint::from(10 as u32).pow(exp as u128);
     Ok(Ratio::new(big_uint, ten_pow))

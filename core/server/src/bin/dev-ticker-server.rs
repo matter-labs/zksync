@@ -42,6 +42,7 @@ fn handle_token_price_query(query: web::Query<TokenQuery>) -> Result<HttpRespons
             }
         }
     });
+    log::info!("1.0 {} = {} USD", query.symbol, price);
     Ok(HttpResponse::Ok().json(resp))
 }
 

@@ -14,8 +14,9 @@ use models::{
     node::{
         tx::{TxEthSignature, TxHash},
         Account, AccountId, Address, BlockNumber, FranklinPriorityOp, FranklinTx, Nonce,
-        PriorityOp, PubKeyHash, Token, TokenId, TokenLike,
+        PriorityOp, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes,
     },
+    primitives::BigUintSerdeWrapper,
 };
 use storage::{
     chain::{
@@ -36,12 +37,12 @@ use crate::{
     utils::shared_lru_cache::SharedLruCache,
     utils::token_db_cache::TokenDBCache,
 };
-use models::node::TxFeeTypes;
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
-    pub balances: HashMap<String, BigUint>,
+    pub balances: HashMap<String, BigUintSerdeWrapper>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
@@ -290,13 +291,19 @@ pub trait Rpc {
     #[rpc(name = "tokens")]
     fn tokens(&self) -> Result<HashMap<String, Token>>;
 
-    #[rpc(name = "get_tx_fee", returns = "BigUint")]
+    #[rpc(name = "get_tx_fee", returns = "BigUintSerdeWrapper")]
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        amount: BigUint,
+        amount: BigUintSerdeWrapper,
         token_like: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send>;
+    ) -> Box<dyn futures01::Future<Item = BigUintSerdeWrapper, Error = Error> + Send>;
+
+    #[rpc(name = "get_tx_fee", returns = "BigDecimal")]
+    fn get_token_price(
+        &self,
+        token_like: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = BigDecimal, Error = Error> + Send>;
 
     #[rpc(name = "get_confirmations_for_eth_op_amount", returns = "u64")]
     fn get_confirmations_for_eth_op_amount(&self) -> Result<u64>;
@@ -323,6 +330,7 @@ pub struct RpcApp {
 }
 
 impl RpcApp {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config_options: &ConfigurationOptions,
         connection_pool: ConnectionPool,
@@ -586,19 +594,9 @@ impl RpcApp {
                 response: req.0,
             })
             .await
-            .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    tx_type,
-                    token,
-                );
-                Error::internal_error()
-            })?;
-        let resp = req.1.await.map_err(|err| {
+            .expect("ticker receiver dropped");
+        let resp = req.1.await.expect("ticker answer sender dropped");
+        resp.map_err(|err| {
             log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
                 file!(),
@@ -609,15 +607,29 @@ impl RpcApp {
                 token,
             );
             Error::internal_error()
-        })?;
+        })
+    }
+
+    async fn ticker_price_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+    ) -> Result<BigDecimal> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetTokenPrice {
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
             log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
+                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}",
                 file!(),
                 line!(),
                 column!(),
                 err,
-                tx_type,
                 token,
             );
             Error::internal_error()
@@ -807,7 +819,7 @@ impl Rpc for RpcApp {
                 let required_fee =
                     Self::ticker_request(ticker_request_sender, tx_type, amount, token).await?;
                 // We allow fee to be 5% off the required fee
-                if required_fee < &provided_fee * BigUint::from(105u32) / BigUint::from(100u32) {
+                if required_fee >= &provided_fee * BigUint::from(105u32) / BigUint::from(100u32) {
                     warn!(
                         "User provided fee is too low, required: {}, provided: {}",
                         required_fee, provided_fee
@@ -911,11 +923,23 @@ impl Rpc for RpcApp {
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        amount: BigUint,
+        amount: BigUintSerdeWrapper,
         token: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send> {
+    ) -> Box<dyn futures01::Future<Item = BigUintSerdeWrapper, Error = Error> + Send> {
         Box::new(
-            Self::ticker_request(self.ticker_request_sender.clone(), tx_type, amount, token)
+            Self::ticker_request(self.ticker_request_sender.clone(), tx_type, amount.0, token)
+                .map(|r| r.map(BigUintSerdeWrapper))
+                .boxed()
+                .compat(),
+        )
+    }
+
+    fn get_token_price(
+        &self,
+        token: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = BigDecimal, Error = Error> + Send> {
+        Box::new(
+            Self::ticker_price_request(self.ticker_request_sender.clone(), token)
                 .boxed()
                 .compat(),
         )

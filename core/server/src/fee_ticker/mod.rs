@@ -1,11 +1,18 @@
+//! Module used to calculate fee for transactions.
+//!
+//! base formula for calculation:
+//! `( zkp cost of chunk * number of chunks + gas price of transaction) * token risk factor / cost of token is usd`
+
 use crate::eth_sender::ETHSenderRequest;
 use crate::fee_ticker::ticker_api::TickerApi;
+use bigdecimal::BigDecimal;
 use futures::channel::mpsc::{self, Receiver};
 use futures::channel::oneshot;
 use futures::StreamExt;
-use models::node::{TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp};
-use models::params::FEE_MANTISSA_BIT_WIDTH;
-use models::primitives::round_precision;
+use models::node::{
+    pack_fee_amount, unpack_fee_amount, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
+};
+use models::primitives::{ratio_to_big_decimal, round_precision};
 use num::rational::Ratio;
 use num::traits::{Inv, Pow};
 use num::BigUint;
@@ -30,6 +37,10 @@ pub enum TickerRequest {
         amount: BigUint,
         token: TokenLike,
         response: oneshot::Sender<Result<BigUint, failure::Error>>,
+    },
+    GetTokenPrice {
+        token: TokenLike,
+        response: oneshot::Sender<Result<BigDecimal, failure::Error>>,
     },
 }
 
@@ -86,8 +97,19 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
                         .await;
                     response.send(fee).unwrap_or_default();
                 }
+                TickerRequest::GetTokenPrice { token, response } => {
+                    let price = self.get_token_price(token).await;
+                    response.send(price).unwrap_or_default();
+                }
             }
         }
+    }
+
+    async fn get_token_price(&self, token: TokenLike) -> Result<BigDecimal, failure::Error> {
+        self.api
+            .get_last_quote(token)
+            .await
+            .map(|price| ratio_to_big_decimal(&price.usd_price, 6))
     }
 
     async fn get_fee_from_ticker_in_wei_rounded(
@@ -100,15 +122,9 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             .await?;
 
         let rounded = round_precision(&ratio, 18).ceil().to_integer();
-        let mut rounded_radix_2 = rounded.to_radix_be(2);
-        let radix2_len = rounded_radix_2.len();
-        if radix2_len > FEE_MANTISSA_BIT_WIDTH {
-            rounded_radix_2.truncate(FEE_MANTISSA_BIT_WIDTH);
-            rounded_radix_2.resize(radix2_len, 0);
-        }
-
-        Ok(BigUint::from_radix_be(&rounded_radix_2, 2)
-            .expect("Failed to convert fee from rounded value radix 2"))
+        let rounded =
+            unpack_fee_amount(&pack_fee_amount(&rounded)).expect("Failed to round fee amount.");
+        Ok(rounded)
     }
 
     async fn get_fee_from_ticker_in_wei_exact(
@@ -158,6 +174,7 @@ mod test {
     use futures::executor::block_on;
     use models::node::{Address, Token, TokenId, TokenPrice};
     use models::primitives::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
+    use std::str::FromStr;
 
     #[derive(Debug, Clone)]
     struct TestToken {
@@ -196,10 +213,10 @@ mod test {
         }
 
         fn cheap() -> Self {
-            Self::new(1, 0.0016789, Some(2.5), 6)
+            Self::new(1, 1.0, Some(2.5), 6)
         }
         fn expensive() -> Self {
-            Self::new(2, 173_134.1923, Some(0.9), 18)
+            Self::new(2, 173_134.192_3, Some(0.9), 18)
         }
 
         fn all_tokens() -> Vec<Self> {
@@ -268,66 +285,36 @@ mod test {
     #[test]
     fn test_ticker_formula() {
         let config = get_test_ticker_config();
-
-        let ticker = FeeTicker::new(MockApiProvider, mpsc::channel(1).1, config.clone());
+        let ticker = FeeTicker::new(MockApiProvider, mpsc::channel(1).1, config);
 
         let get_token_fee_in_usd = |tx_type: TxFeeTypes, token: TokenLike| -> Ratio<BigUint> {
             let fee_in_token =
                 block_on(ticker.get_fee_from_ticker_in_wei_rounded(tx_type, token.clone()))
                     .expect("failed to get fee in token");
             let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
-            let fee_in_usd = block_on(MockApiProvider.get_last_quote(token.clone()))
+
+            // Fee in usd
+            (block_on(MockApiProvider.get_last_quote(token))
                 .expect("failed to get fee in usd")
                 .usd_price
-                / BigUint::from(10u32).pow(u32::from(token_precision))
-                * fee_in_token;
-            fee_in_usd
+                / BigUint::from(10u32).pow(u32::from(token_precision)))
+                * fee_in_token
         };
 
-        let expected_price_of_eth_token_tx = |fee_type: TxFeeTypes| -> Ratio<BigUint> {
-            let zkp_chunk_cost = config.zkp_cost_chunk_usd.clone();
-            let gas_price_wei =
-                block_on(ticker.api.get_gas_price_wei()).unwrap() * BigUint::from(10u32).pow(6u32);
-            let risk_factor_eth = config
-                .tokens_risk_factors
-                .get(&TestToken::eth().id)
-                .cloned()
-                .unwrap_or_else(|| Ratio::<BigUint>::from_integer(1u32.into()));
-            let gas_cost_op = config.gas_cost_tx.get(&fee_type).cloned().unwrap();
-            let wei_cost_usd = block_on(ticker.api.get_last_quote(TestToken::eth().id.into()))
-                .unwrap()
-                .usd_price
-                / BigUint::from(10u32).pow(18u32);
-
-            let chunks = match fee_type {
-                TxFeeTypes::Transfer => TransferOp::CHUNKS,
-                TxFeeTypes::Withdraw => WithdrawOp::CHUNKS,
-            };
-
-            (zkp_chunk_cost * BigUint::from(chunks as u64)
-                + wei_cost_usd * gas_price_wei * gas_cost_op)
-                * risk_factor_eth
-        };
-
-        let threshold = ratio_to_big_decimal(
-            &Ratio::new(
-                BigUint::from(2u32),
-                BigUint::from(2u32).pow(FEE_MANTISSA_BIT_WIDTH),
-            ),
-            6,
-        );
         let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
             let max = std::cmp::max(a.clone(), b.clone());
             let min = std::cmp::min(a.clone(), b.clone());
-            ratio_to_big_decimal(&((&max - &min) / max), 6)
+            ratio_to_big_decimal(&((&max - &min) / min), 6)
         };
 
         {
             let expected_price_of_eth_token_transfer_usd =
-                expected_price_of_eth_token_tx(TxFeeTypes::Transfer);
+                get_token_fee_in_usd(TxFeeTypes::Transfer, 0.into());
             let expected_price_of_eth_token_withdraw_usd =
-                expected_price_of_eth_token_tx(TxFeeTypes::Withdraw);
+                get_token_fee_in_usd(TxFeeTypes::Withdraw, 0.into());
 
+            // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits (mantissa len == 11)
+            let threshold = BigDecimal::from_str("0.01").unwrap();
             for token in TestToken::all_tokens() {
                 let transfer_fee = get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into());
                 let expected_fee =

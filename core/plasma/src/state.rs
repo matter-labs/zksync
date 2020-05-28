@@ -12,6 +12,7 @@ use models::node::{
 };
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
+use models::primitives::BigUintSerdeWrapper;
 use num::BigUint;
 use std::collections::HashMap;
 
@@ -152,7 +153,8 @@ impl PlasmaState {
         let account_balance = self
             .get_account(priority_op.account_id)
             .filter(|account| account.address == priority_op.eth_address)
-            .map(|acccount| acccount.get_balance(priority_op.token));
+            .map(|acccount| acccount.get_balance(priority_op.token))
+            .map(BigUintSerdeWrapper);
 
         trace!("Balance: {:?}", account_balance);
         let op = FullExitOp {
@@ -185,7 +187,7 @@ impl PlasmaState {
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
 
-        account.sub_balance(op.priority_op.token, &amount);
+        account.sub_balance(op.priority_op.token, &amount.0);
 
         let new_balance = account.get_balance(op.priority_op.token);
         assert_eq!(

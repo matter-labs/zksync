@@ -24,7 +24,7 @@ fn test_full_exit_success() {
             eth_address: account.account.address,
             token: 0,
         },
-        withdraw_amount: Some(BigUint::from(10u32)),
+        withdraw_amount: Some(BigUint::from(10u32).into()),
     };
     let success = true;
 
@@ -93,7 +93,7 @@ fn test_incorrect_full_exit_withdraw_amount() {
                 eth_address: account.account.address,
                 token: 0,
             },
-            withdraw_amount: Some(withdraw_amount.into()),
+            withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
         };
 
         incorrect_op_test_scenario::<FullExitWitness<Bn256>, _>(

@@ -3,7 +3,7 @@ use super::TokenId;
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
-use crate::primitives::bytes_slice_to_uint32;
+use crate::primitives::{bytes_slice_to_uint32, BigUintSerdeAsRadix10Str};
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
 use num::BigUint;
@@ -16,6 +16,7 @@ use super::operations::{DepositOp, FullExitOp};
 pub struct Deposit {
     pub from: Address,
     pub token: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub amount: BigUint,
     pub to: Address,
 }

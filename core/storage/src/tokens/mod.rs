@@ -90,7 +90,7 @@ impl<'a> TokensSchema<'a> {
             .values(&DbTickerPrice {
                 token_id: token_id as i32,
                 usd_price: usd_price_rounded.clone(),
-                last_updated: price.last_updated.clone(),
+                last_updated: price.last_updated,
             })
             .on_conflict(ticker_price::token_id)
             .do_update()

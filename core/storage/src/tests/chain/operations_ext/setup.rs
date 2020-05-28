@@ -122,7 +122,7 @@ impl TransactionsHistoryTestSetup {
                 eth_address: self.from_zksync_account.address,
                 token: self.tokens[2].id,
             },
-            withdraw_amount: Some(self.amount.clone()),
+            withdraw_amount: Some(self.amount.clone().into()),
         }));
 
         let executed_op = ExecutedPriorityOp {

@@ -222,8 +222,8 @@ fn main() {
     );
 
     run_ticker_task(
-        config_opts.ticker_url.clone(),
-        connection_pool.clone(),
+        config_opts.ticker_url,
+        connection_pool,
         eth_send_request_sender,
         ticker_request_receiver,
         &main_runtime,

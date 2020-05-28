@@ -73,7 +73,7 @@ mod test {
         let ticker_url = parse_env("TICKER_URL");
         let client = reqwest::Client::new();
         runtime
-            .block_on(fetch_coimarketcap_data(&client, &ticker_url, "ERC-1"))
+            .block_on(fetch_coimarketcap_data(&client, &ticker_url, "ETH"))
             .expect("Failed to get data from ticker");
     }
 

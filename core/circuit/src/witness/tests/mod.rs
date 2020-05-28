@@ -144,7 +144,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
             eth_address: account.account.address,
             token: 0,
         },
-        withdraw_amount: Some(BigUint::from(900u32)),
+        withdraw_amount: Some(BigUint::from(900u32).into()),
     };
     let full_exit_success = true;
 

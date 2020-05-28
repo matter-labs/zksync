@@ -108,6 +108,7 @@ mod test {
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
         TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
+    use num::BigUint;
 
     #[test]
     fn test_deposit() {
@@ -161,7 +162,7 @@ mod test {
         };
         let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
-            withdraw_amount: Some(444u32.into()),
+            withdraw_amount: Some(BigUint::from(444u32).into()),
         }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)

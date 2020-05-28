@@ -1,5 +1,5 @@
 use crate::params;
-use crate::primitives::GetBits;
+use crate::primitives::{BigUintSerdeWrapper, GetBits};
 
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -96,7 +96,7 @@ impl<'de> Deserialize<'de> for PubKeyHash {
 pub struct Account {
     pub pub_key_hash: PubKeyHash,
     pub address: Address,
-    balances: HashMap<TokenId, BigUint>,
+    balances: HashMap<TokenId, BigUintSerdeWrapper>,
     pub nonce: Nonce,
 }
 
@@ -142,7 +142,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
                 (
                     *id,
                     Balance {
-                        value: Fr::from_str(&b.to_string()).unwrap(),
+                        value: Fr::from_str(&b.0.to_string()).unwrap(),
                     },
                 )
             })
@@ -236,22 +236,22 @@ impl Account {
     }
 
     pub fn get_balance(&self, token: TokenId) -> BigUint {
-        self.balances.get(&token).cloned().unwrap_or_default()
+        self.balances.get(&token).cloned().unwrap_or_default().0
     }
 
     pub fn set_balance(&mut self, token: TokenId, amount: BigUint) {
-        self.balances.insert(token, amount);
+        self.balances.insert(token, amount.into());
     }
 
     pub fn add_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
-        balance += amount;
+        balance.0 += amount;
         self.balances.insert(token, balance);
     }
 
     pub fn sub_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
-        balance -= amount;
+        balance.0 -= amount;
         self.balances.insert(token, balance);
     }
 
@@ -307,9 +307,9 @@ impl Account {
         }
     }
 
-    pub fn get_nonzero_balances(&self) -> HashMap<TokenId, BigUint> {
+    pub fn get_nonzero_balances(&self) -> HashMap<TokenId, BigUintSerdeWrapper> {
         let mut balances = self.balances.clone();
-        balances.retain(|_, v| v != &BigUint::zero());
+        balances.retain(|_, v| v.0 != BigUint::zero());
         balances
     }
 }
