@@ -43,7 +43,7 @@ contract Verifier is KeysWithPlonkVerifier {
 
     function verifyExitProof(
         bytes32 _root_hash,
-        uint24 _accountId,
+        uint32 _accountId,
         address _owner,
         uint16 _tokenId,
         uint128 _amount,
