@@ -10,7 +10,8 @@ use futures::channel::mpsc::{self, Receiver};
 use futures::channel::oneshot;
 use futures::StreamExt;
 use models::node::{
-    pack_fee_amount, unpack_fee_amount, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
+    pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp, TxFeeTypes,
+    WithdrawOp,
 };
 use models::primitives::{ratio_to_big_decimal, round_precision};
 use num::rational::Ratio;
@@ -58,7 +59,7 @@ pub struct TickerConfig {
 pub enum TickerRequest {
     GetTxFee {
         tx_type: TxFeeTypes,
-        amount: BigUint,
+        address: Address,
         token: TokenLike,
         response: oneshot::Sender<Result<Fee, failure::Error>>,
     },

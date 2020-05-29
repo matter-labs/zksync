@@ -295,7 +295,7 @@ pub trait Rpc {
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        amount: BigUintSerdeWrapper,
+        address: Address,
         token_like: TokenLike,
     ) -> Box<dyn futures01::Future<Item = serde_json::Value, Error = Error> + Send>;
 
@@ -582,14 +582,14 @@ impl RpcApp {
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
-        amount: BigUint,
+        address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
                 tx_type: tx_type.clone(),
-                amount,
+                address,
                 token: token.clone(),
                 response: req.0,
             })
@@ -799,13 +799,13 @@ impl Rpc for RpcApp {
             FranklinTx::Withdraw(withdraw) => Some((
                 TxFeeTypes::Withdraw,
                 TokenLike::Id(withdraw.token),
-                withdraw.amount.clone(),
+                withdraw.from.clone(),
                 withdraw.fee.clone(),
             )),
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
-                transfer.amount.clone(),
+                transfer.from.clone(),
                 transfer.fee.clone(),
             )),
             _ => None,
@@ -815,9 +815,9 @@ impl Rpc for RpcApp {
         let sign_verify_channel = self.sign_verify_request_sender.clone();
         let ticker_request_sender = self.ticker_request_sender.clone();
         let mempool_resp = async move {
-            if let Some((tx_type, token, amount, provided_fee)) = tx_fee_info {
+            if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
                 let required_fee =
-                    Self::ticker_request(ticker_request_sender, tx_type, amount, token.clone())
+                    Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                         .await?;
                 // We allow fee to be 5% off the required fee
                 let scaled_provided_fee =
@@ -926,11 +926,11 @@ impl Rpc for RpcApp {
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        amount: BigUintSerdeWrapper,
+        address: Address,
         token: TokenLike,
     ) -> Box<dyn futures01::Future<Item = serde_json::Value, Error = Error> + Send> {
         Box::new(
-            Self::ticker_request(self.ticker_request_sender.clone(), tx_type, amount.0, token)
+            Self::ticker_request(self.ticker_request_sender.clone(), tx_type, address, token)
                 .map(|result| {
                     result.map(|fee| {
                         serde_json::json!({
