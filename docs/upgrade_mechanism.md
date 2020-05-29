@@ -9,7 +9,7 @@ Source: [link](https://docs.google.com/drawings/d/13SlGac7BHqFeL0J0J3BHdn_nx2tZc
 
 ### Ownable
 
-`Ownable` is a contract that stores the address of its **master** at the storage slot with index `keccak256("master")`.
+`Ownable` is a contract that stores the address of its **master** at the storage slot with index `bytes32(uint256(keccak256('eip1967.proxy.admin')) - 1)`.
 
 ### UpgradeableMaster
 
@@ -25,7 +25,7 @@ Source: [link](https://docs.google.com/drawings/d/13SlGac7BHqFeL0J0J3BHdn_nx2tZc
 
 `contract Proxy is Upgradeable, UpgradeableMaster, Ownable`.
 
-**Note: storage of this contract will be a context in which all processes of the target will work.** Proxy will store address of its **target** at the storage slot with index `keccak256("target")`.
+**Note: storage of this contract will be a context in which all processes of the target will work.** Proxy will store address of its **target** at the storage slot with index `bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1)`.
 
 `Proxy` implements `Upgradeable` interface: `master` of Proxy can change its target.
 

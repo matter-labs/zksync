@@ -10,7 +10,7 @@ import "./Upgradeable.sol";
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Storage position of "target" (actual implementation address)
-    bytes32 private constant targetPosition = keccak256("target");
+    bytes32 private constant targetPosition = bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1);
 
     /// @notice Contract constructor
     /// @dev Calls Ownable contract constructor and initialize target
