@@ -131,10 +131,14 @@ export interface Tokens {
 }
 
 export interface Fee {
-    // Total fee amount
-    total_fee: utils.BigNumber,
-    // Zero-knowledge proof part of fee
-    zkp_fee: utils.BigNumber,
-    // Ethereum gas part of fee
+    // Amount of gas used by transaction
+    gas_tx_amount: utils.BigNumber,
+    // Gas price (in wei)
+    gas_price_wei: utils.BigNumber,
+    // Ethereum gas part of fee (in wei)
     gas_fee: utils.BigNumber,
+    // Zero-knowledge proof part of fee (in wei)
+    zkp_fee: utils.BigNumber,
+    // Total fee amount (in wei)
+    total_fee: utils.BigNumber,
 }

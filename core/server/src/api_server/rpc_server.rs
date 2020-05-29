@@ -799,13 +799,13 @@ impl Rpc for RpcApp {
             FranklinTx::Withdraw(withdraw) => Some((
                 TxFeeTypes::Withdraw,
                 TokenLike::Id(withdraw.token),
-                withdraw.from.clone(),
+                withdraw.from,
                 withdraw.fee.clone(),
             )),
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
-                transfer.from.clone(),
+                transfer.from,
                 transfer.fee.clone(),
             )),
             _ => None,

@@ -192,9 +192,11 @@ export class Provider {
             tokenLike
         ]);
         return {
-            total_fee: utils.bigNumberify(transactionFee.total_fee),
-            zkp_fee: utils.bigNumberify(transactionFee.zkp_fee),
+            gas_tx_amount: utils.bigNumberify(transactionFee.gas_tx_amount),
+            gas_price_wei: utils.bigNumberify(transactionFee.gas_price_wei),
             gas_fee: utils.bigNumberify(transactionFee.gas_fee),
+            zkp_fee: utils.bigNumberify(transactionFee.zkp_fee),
+            total_fee: utils.bigNumberify(transactionFee.total_fee),
         };
     }
 

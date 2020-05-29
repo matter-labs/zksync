@@ -27,13 +27,20 @@ mod ticker_api;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Fee {
-    pub zkp_fee: BigUint,
+    pub gas_tx_amount: BigUint,
+    pub gas_price_wei: BigUint,
     pub gas_fee: BigUint,
+    pub zkp_fee: BigUint,
     pub total_fee: BigUint,
 }
 
 impl Fee {
-    pub fn new(zkp_fee: Ratio<BigUint>, gas_fee: Ratio<BigUint>) -> Self {
+    pub fn new(
+        zkp_fee: Ratio<BigUint>,
+        gas_fee: Ratio<BigUint>,
+        gas_tx_amount: BigUint,
+        gas_price_wei: BigUint,
+    ) -> Self {
         let zkp_fee = round_precision(&zkp_fee, 18).ceil().to_integer();
         let gas_fee = round_precision(&gas_fee, 18).ceil().to_integer();
 
@@ -42,8 +49,10 @@ impl Fee {
             .expect("Failed to round gas fee amount.");
 
         Self {
-            zkp_fee,
+            gas_tx_amount,
+            gas_price_wei,
             gas_fee,
+            zkp_fee,
             total_fee,
         }
     }
@@ -153,7 +162,7 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             TxFeeTypes::Withdraw => WithdrawOp::CHUNKS,
             TxFeeTypes::Transfer => TransferOp::CHUNKS,
         });
-        let gas_cost_tx = self.config.gas_cost_tx.get(&tx_type).cloned().unwrap();
+        let gas_tx_amount = self.config.gas_cost_tx.get(&tx_type).cloned().unwrap();
         let gas_price_wei = self.api.get_gas_price_wei().await?;
         let wei_price_usd = self.api.get_last_quote(TokenLike::Id(0)).await?.usd_price
             / BigUint::from(10u32).pow(18u32);
@@ -167,10 +176,11 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
 
         let zkp_fee =
             (zkp_cost_chunk * op_chunks) * token_risk_factor.clone() / token_price_usd.clone();
-        let gas_fee =
-            (wei_price_usd * gas_cost_tx * gas_price_wei) * token_risk_factor / token_price_usd;
+        let gas_fee = (wei_price_usd * gas_tx_amount.clone() * gas_price_wei.clone())
+            * token_risk_factor
+            / token_price_usd;
 
-        Ok(Fee::new(zkp_fee, gas_fee))
+        Ok(Fee::new(zkp_fee, gas_fee, gas_tx_amount, gas_price_wei))
     }
 }
 
