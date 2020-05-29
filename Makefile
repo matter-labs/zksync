@@ -292,13 +292,5 @@ image-dev-ticker: build-target
 push-image-dev-ticker: image-dev-ticker
 	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
-# Data Restore
-
-data-restore-restart: db-reset
-	@cargo run --bin data_restore --release -- --genesis
-
-data-restore-continue:
-	@cargo run --bin data_restore --release -- --continue
-
 api-type-validate:
 	@cd js/tests && yarn && yarn api-type-validate --test
