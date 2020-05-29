@@ -102,8 +102,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
             abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
         );
-        bool callReturnValue = abi.decode(callReturnValueEncoded, (bool));
-        return callSuccess && callReturnValue;
+        // `transfer` method may return (bool) or nothing.
+        bool returnedSuccess = callReturnValueEncoded == 0 || abi.decode(callReturnValueEncoded, (bool));
+        return callSuccess && returnedSuccess;
     }
 
     /// @notice Sends ETH
