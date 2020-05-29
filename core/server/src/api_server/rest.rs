@@ -941,6 +941,27 @@ fn handle_block_explorer_search(
     }
 }
 
+/// Returns the amount of blocks for which there is no prover job started (or completed).
+fn handle_unstarted_prover_jobs(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+    let storage = data.access_storage()?;
+
+    let txs = storage
+        .prover_schema()
+        .unstarted_jobs_count()
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+                file!(),
+                line!(),
+                column!(),
+                err,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    Ok(HttpResponse::Ok().json(txs))
+}
+
 fn start_server(state: AppState, bind_to: SocketAddr) {
     let logger_format = crate::api_server::loggers::rest::get_logger_format();
     HttpServer::new(move || {
@@ -995,7 +1016,11 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/blocks/{block_id}", web::get().to(handle_get_block_by_id))
                     .route("/blocks", web::get().to(handle_get_blocks))
-                    .route("/search", web::get().to(handle_block_explorer_search)),
+                    .route("/search", web::get().to(handle_block_explorer_search))
+                    .route(
+                        "/prover/unstarted_jobs_count",
+                        web::get().to(handle_unstarted_prover_jobs),
+                    ),
             )
             // Endpoint needed for js isReachable
             .route(
