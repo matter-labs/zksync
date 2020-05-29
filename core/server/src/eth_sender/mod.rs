@@ -52,6 +52,8 @@ pub enum ETHSenderRequest {
 
 /// Wait this amount of time if we hit rate limit on infura https://infura.io/docs/ethereum/json-rpc/ratelimits
 const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);
+/// Rate limit error will contain this response code
+const RATE_LIMIT_HTTP_CODE: &str = "429";
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -197,7 +199,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 .unwrap_or_default();
 
             // ...and proceed them.
-            self.proceed_next_operations();
+            self.proceed_next_operations().await;
 
             // Update the gas adjuster to maintain the up-to-date max gas price limit.
             self.gas_adjuster.keep_updated(&self.db);
@@ -230,12 +232,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// 1. Pops all the available transactions from the `TxQueue` and sends them.
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
-    fn proceed_next_operations(&mut self) {
+    async fn proceed_next_operations(&mut self) {
         // Queue for storing all the operations that were not finished at this iteration.
         let mut new_ongoing_ops = VecDeque::new();
 
         while let Some(tx) = self.tx_queue.pop_front() {
-            self.initialize_operation(tx.clone()).unwrap_or_else(|e| {
+            if let Err(e) = self.initialize_operation(tx.clone()) {
                 warn!(
                     "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
                     file!(),
@@ -243,14 +245,18 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     column!(),
                     e
                 );
-                if e.to_string().contains("429 Too Many Requests") {
-                    std::thread::sleep(RATE_LIMIT_BACKOFF_PERIOD);
+                if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
+                    warn!(
+                        "Received rate limit response, waiting for {}s",
+                        RATE_LIMIT_BACKOFF_PERIOD.as_secs()
+                    );
+                    time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
                 }
 
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
                 self.tx_queue.return_popped(tx);
-            });
+            }
         }
 
         // Commit the next operations (if any).
@@ -259,9 +265,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             // network issue which won't appear the next time, so we report the situation to the
             // log and consider the operation pending (meaning that we won't process it on this
             // step, but will try to do so on the next one).
-            let commitment = self
-                .perform_commitment_step(&mut current_op)
-                .map_err(|e| {
+            let commitment = match self.perform_commitment_step(&mut current_op) {
+                Ok(commitment) => commitment,
+                Err(e) => {
                     warn!(
                         "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
                         file!(),
@@ -269,11 +275,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         column!(),
                         e
                     );
-                    if e.to_string().contains("429 Too Many Requests") {
-                        std::thread::sleep(RATE_LIMIT_BACKOFF_PERIOD);
+                    if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
+                        warn!(
+                            "Received rate limit response, waiting for {}s",
+                            RATE_LIMIT_BACKOFF_PERIOD.as_secs()
+                        );
+                        time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
                     }
-                })
-                .unwrap_or(OperationCommitment::Pending);
+                    OperationCommitment::Pending
+                }
+            };
 
             match commitment {
                 OperationCommitment::Committed => {
