@@ -529,6 +529,8 @@ impl<'a> OperationsExtSchema<'a> {
                         verified boolean)
             using 
                 (block_number)
+            order by
+                block_number desc, created_at desc
             ",
             address = hex::encode(address.as_ref().to_vec()),
             ordered_filter = ordered_filter,
