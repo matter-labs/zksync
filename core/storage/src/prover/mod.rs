@@ -26,7 +26,13 @@ impl<'a> ProverSchema<'a> {
         use crate::schema::prover_runs::dsl::*;
 
         self.0.conn().transaction(|| {
-            let last_committed_block = BlockSchema(&self.0).get_last_committed_block()? as u64;
+            let mut last_committed_block = BlockSchema(&self.0).get_last_committed_block()? as u64;
+
+            if BlockSchema(&self.0).pending_block_exists()? {
+                // Existence of the pending block means that soon there will be one more block.
+                last_committed_block += 1;
+            }
+
             let last_verified_block = BlockSchema(&self.0).get_last_verified_block()? as u64;
 
             let num_ongoing_jobs = prover_runs

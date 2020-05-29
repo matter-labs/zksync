@@ -2,7 +2,7 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use models::Action;
+use models::{node::block::PendingBlock, Action};
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, StorageProcessor};
@@ -250,6 +250,18 @@ fn unstarted_prover_jobs_count() {
         ))?;
         let blocks_count = ProverSchema(&conn).unstarted_jobs_count()?;
         assert_eq!(blocks_count, 1);
+
+        // Add pending block. Amount of blocks should increase.
+
+        BlockSchema(&conn).save_pending_block(PendingBlock {
+            number: 5,
+            chunks_left: 0,
+            unprocessed_priority_op_before: 0,
+            pending_block_iteration: 1,
+            success_operations: vec![],
+        })?;
+        let blocks_count = ProverSchema(&conn).unstarted_jobs_count()?;
+        assert_eq!(blocks_count, 2);
 
         Ok(())
     });
