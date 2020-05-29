@@ -332,7 +332,7 @@ async function test() {
             console.log('changePubKey hash:', changePubKey.txHash);
         }
 
-        const tranferFee = await syncWallet.provider.getTransactionFee("Transfer", "3", token);
+        const tranferFee = await syncWallet.provider.getTransactionFee("Transfer", "0x7639d75b7cb9f536ea82e1954f8555dc6ef64fd6", token);
         const transfer = await syncWallet.syncTransfer({
             to: ethWallet2.address,
             token,
@@ -343,7 +343,7 @@ async function test() {
         console.log('transfer hash:', transfer.txHash);
 
 
-        const withdrawFee = await syncWallet.provider.getTransactionFee("Withdraw", "2", token);
+        const withdrawFee = await syncWallet.provider.getTransactionFee("Withdraw", "0x7639d75b7cb9f536ea82e1954f8555dc6ef64fd6", token);
         const withdraw = await syncWallet.withdrawFromSyncToEthereum({
             ethAddress: syncWallet.address(),
             token,
