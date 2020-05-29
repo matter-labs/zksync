@@ -1,14 +1,16 @@
 // Built-in deps
 use std::time;
 // External imports
-use diesel::dsl::{insert_into, now, sql_query};
-use diesel::prelude::*;
+use diesel::{
+    dsl::{insert_into, now, sql_query},
+    prelude::*,
+};
 // Workspace imports
 use models::node::BlockNumber;
 use models::prover_utils::EncodedProofPlonk;
 // Local imports
 use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
-use crate::StorageProcessor;
+use crate::{chain::block::BlockSchema, StorageProcessor};
 
 pub mod records;
 
@@ -18,6 +20,36 @@ pub mod records;
 pub struct ProverSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> ProverSchema<'a> {
+    /// Returns the amount of blocks which await for proof, but have
+    /// no assigned prover run.
+    pub fn unstarted_jobs_count(&self) -> QueryResult<u64> {
+        use crate::schema::prover_runs::dsl::*;
+
+        self.0.conn().transaction(|| {
+            let last_committed_block = BlockSchema(&self.0).get_last_committed_block()? as u64;
+            let last_verified_block = BlockSchema(&self.0).get_last_verified_block()? as u64;
+
+            let num_ongoing_jobs = prover_runs
+                .filter(block_number.gt(last_verified_block as i64))
+                .count()
+                .first::<i64>(self.0.conn())? as u64;
+
+            assert!(
+                last_verified_block + num_ongoing_jobs <= last_committed_block,
+                "There are more ongoing prover jobs than blocks without proofs. \
+                Last verifier block: {}, last committed block: {}, amount of ongoing \
+                prover runs: {}",
+                last_verified_block,
+                last_committed_block,
+                num_ongoing_jobs,
+            );
+
+            let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
+
+            Ok(result)
+        })
+    }
+
     /// Given the block size, chooses the next block to prove for the certain prover.
     /// Returns `None` if either there are no blocks of given size to prove, or
     /// there is already an ongoing job for non-proved block.
