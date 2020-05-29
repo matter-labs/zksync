@@ -25,6 +25,30 @@ use tokio::runtime::Runtime;
 mod ticker_api;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Fee {
+    pub zkp_fee: BigUint,
+    pub gas_fee: BigUint,
+    pub total_fee: BigUint,
+}
+
+impl Fee {
+    pub fn new(zkp_fee: Ratio<BigUint>, gas_fee: Ratio<BigUint>) -> Self {
+        let zkp_fee = round_precision(&zkp_fee, 18).ceil().to_integer();
+        let gas_fee = round_precision(&gas_fee, 18).ceil().to_integer();
+
+        let total_fee = zkp_fee.clone() + gas_fee.clone();
+        let total_fee = unpack_fee_amount(&pack_fee_amount(&total_fee))
+            .expect("Failed to round gas fee amount.");
+
+        Self {
+            zkp_fee,
+            gas_fee,
+            total_fee,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TickerConfig {
     zkp_cost_chunk_usd: Ratio<BigUint>,
     gas_cost_tx: HashMap<TxFeeTypes, BigUint>, //wei
@@ -36,7 +60,7 @@ pub enum TickerRequest {
         tx_type: TxFeeTypes,
         amount: BigUint,
         token: TokenLike,
-        response: oneshot::Sender<Result<BigUint, failure::Error>>,
+        response: oneshot::Sender<Result<Fee, failure::Error>>,
     },
     GetTokenPrice {
         token: TokenLike,
@@ -92,9 +116,7 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
                     response,
                     ..
                 } => {
-                    let fee = self
-                        .get_fee_from_ticker_in_wei_rounded(tx_type, token)
-                        .await;
+                    let fee = self.get_fee_from_ticker_in_wei(tx_type, token).await;
                     response.send(fee).unwrap_or_default();
                 }
                 TickerRequest::GetTokenPrice { token, response } => {
@@ -112,26 +134,11 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             .map(|price| ratio_to_big_decimal(&price.usd_price, 6))
     }
 
-    async fn get_fee_from_ticker_in_wei_rounded(
+    async fn get_fee_from_ticker_in_wei(
         &self,
         tx_type: TxFeeTypes,
         token: TokenLike,
-    ) -> Result<BigUint, failure::Error> {
-        let ratio = self
-            .get_fee_from_ticker_in_wei_exact(tx_type, token)
-            .await?;
-
-        let rounded = round_precision(&ratio, 18).ceil().to_integer();
-        let rounded =
-            unpack_fee_amount(&pack_fee_amount(&rounded)).expect("Failed to round fee amount.");
-        Ok(rounded)
-    }
-
-    async fn get_fee_from_ticker_in_wei_exact(
-        &self,
-        tx_type: TxFeeTypes,
-        token: TokenLike,
-    ) -> Result<Ratio<BigUint>, failure::Error> {
+    ) -> Result<Fee, failure::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token)?;
         let token_risk_factor = self
@@ -157,11 +164,12 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             .usd_price
             / BigUint::from(10u32).pow(u32::from(token.decimals));
 
-        Ok(
-            ((zkp_cost_chunk * op_chunks + wei_price_usd * gas_cost_tx * gas_price_wei)
-                * token_risk_factor)
-                / token_price_usd,
-        )
+        let zkp_fee =
+            (zkp_cost_chunk * op_chunks) * token_risk_factor.clone() / token_price_usd.clone();
+        let gas_fee =
+            (wei_price_usd * gas_cost_tx * gas_price_wei) * token_risk_factor / token_price_usd;
+
+        Ok(Fee::new(zkp_fee, gas_fee))
     }
 }
 
@@ -288,9 +296,8 @@ mod test {
         let ticker = FeeTicker::new(MockApiProvider, mpsc::channel(1).1, config);
 
         let get_token_fee_in_usd = |tx_type: TxFeeTypes, token: TokenLike| -> Ratio<BigUint> {
-            let fee_in_token =
-                block_on(ticker.get_fee_from_ticker_in_wei_rounded(tx_type, token.clone()))
-                    .expect("failed to get fee in token");
+            let fee_in_token = block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone()))
+                .expect("failed to get fee in token");
             let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
 
             // Fee in usd
@@ -298,7 +305,7 @@ mod test {
                 .expect("failed to get fee in usd")
                 .usd_price
                 / BigUint::from(10u32).pow(u32::from(token_precision)))
-                * fee_in_token
+                * fee_in_token.total_fee
         };
 
         let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {

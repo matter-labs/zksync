@@ -27,9 +27,9 @@ use storage::{
 };
 
 // Local uses
-use crate::fee_ticker::TickerRequest;
 use crate::{
     eth_watch::EthWatchRequest,
+    fee_ticker::{Fee, TickerRequest},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
@@ -291,13 +291,13 @@ pub trait Rpc {
     #[rpc(name = "tokens")]
     fn tokens(&self) -> Result<HashMap<String, Token>>;
 
-    #[rpc(name = "get_tx_fee", returns = "BigUintSerdeWrapper")]
+    #[rpc(name = "get_tx_fee", returns = "Fee")]
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
         amount: BigUintSerdeWrapper,
         token_like: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = BigUintSerdeWrapper, Error = Error> + Send>;
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(
@@ -584,7 +584,7 @@ impl RpcApp {
         tx_type: TxFeeTypes,
         amount: BigUint,
         token: TokenLike,
-    ) -> Result<BigUint> {
+    ) -> Result<Fee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
@@ -820,10 +820,12 @@ impl Rpc for RpcApp {
                     Self::ticker_request(ticker_request_sender, tx_type, amount, token.clone())
                         .await?;
                 // We allow fee to be 5% off the required fee
-                if required_fee >= &provided_fee * BigUint::from(105u32) / BigUint::from(100u32) {
+                let scaled_provided_fee =
+                    provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
+                if required_fee.total_fee >= scaled_provided_fee {
                     warn!(
-                        "User provided fee is too low, required: {}, provided: {}, token: {:?}",
-                        required_fee, provided_fee, token
+                        "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
+                        required_fee, provided_fee, scaled_provided_fee, token
                     );
                     return Err(Error {
                         code: RpcErrorCodes::from(TxAddError::TxFeeTooLow).into(),
@@ -926,10 +928,9 @@ impl Rpc for RpcApp {
         tx_type: TxFeeTypes,
         amount: BigUintSerdeWrapper,
         token: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = BigUintSerdeWrapper, Error = Error> + Send> {
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send> {
         Box::new(
             Self::ticker_request(self.ticker_request_sender.clone(), tx_type, amount.0, token)
-                .map(|r| r.map(BigUintSerdeWrapper))
                 .boxed()
                 .compat(),
         )
