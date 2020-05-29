@@ -934,9 +934,11 @@ impl Rpc for RpcApp {
                 .map(|result| {
                     result.map(|fee| {
                         serde_json::json!({
-                            "total_fee": BigUintSerdeWrapper(fee.total_fee),
-                            "zkp_fee": BigUintSerdeWrapper(fee.zkp_fee),
+                            "gas_tx_amount": BigUintSerdeWrapper(fee.gas_tx_amount),
+                            "gas_price_wei": BigUintSerdeWrapper(fee.gas_price_wei),
                             "gas_fee": BigUintSerdeWrapper(fee.gas_fee),
+                            "zkp_fee": BigUintSerdeWrapper(fee.zkp_fee),
+                            "total_fee": BigUintSerdeWrapper(fee.total_fee),
                         })
                     })
                 })
