@@ -5,6 +5,7 @@
 
 // Built-in deps
 use std::collections::VecDeque;
+use std::time::Duration;
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -48,6 +49,9 @@ pub enum ETHSenderRequest {
     SendOperation(Operation),
     GetAverageUsedGasPrice(oneshot::Sender<U256>),
 }
+
+/// Wait this amount of time if we hit rate limit on infura https://infura.io/docs/ethereum/json-rpc/ratelimits
+const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -232,7 +236,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         while let Some(tx) = self.tx_queue.pop_front() {
             self.initialize_operation(tx.clone()).unwrap_or_else(|e| {
-                warn!("Error while trying to complete uncommitted op: {}", e);
+                warn!(
+                    "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    e
+                );
+                if e.to_string().contains("429 Too Many Requests") {
+                    std::thread::sleep(RATE_LIMIT_BACKOFF_PERIOD);
+                }
 
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
@@ -249,7 +262,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             let commitment = self
                 .perform_commitment_step(&mut current_op)
                 .map_err(|e| {
-                    warn!("Error while trying to complete uncommitted op: {}", e);
+                    warn!(
+                        "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
+                        file!(),
+                        line!(),
+                        column!(),
+                        e
+                    );
+                    if e.to_string().contains("429 Too Many Requests") {
+                        std::thread::sleep(RATE_LIMIT_BACKOFF_PERIOD);
+                    }
                 })
                 .unwrap_or(OperationCommitment::Pending);
 
