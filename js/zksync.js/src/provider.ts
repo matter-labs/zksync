@@ -183,12 +183,12 @@ export class Provider {
 
     async getTransactionFee(
         txType: "Withdraw" | "Transfer",
-        amount: utils.BigNumberish,
+        address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {
         const transactionFee = await this.transport.request("get_tx_fee", [
             txType,
-            amount.toString(),
+            address.toString(),
             tokenLike
         ]);
         return {

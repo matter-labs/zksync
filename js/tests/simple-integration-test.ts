@@ -240,12 +240,12 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
     // we do two transfers to test transfer to new and ordinary transfer.
     const transfersAmount = depositAmount.div(10);
-    const transfersFeeFull = await syncProvider.getTransactionFee("Transfer", transfersAmount, token);
+    const transfersFeeFull = await syncProvider.getTransactionFee("Transfer", depositWallet.address(), token);
     const transfersFee = transfersFeeFull.total_fee;
 
 
     const withdrawAmount = transfersAmount.div(10);
-    const withdrawFeeFull = await syncProvider.getTransactionFee("Withdraw", withdrawAmount, token);
+    const withdrawFeeFull = await syncProvider.getTransactionFee("Withdraw", depositWallet.address(), token);
     const withdrawFee = withdrawFeeFull.total_fee;
 
     await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
