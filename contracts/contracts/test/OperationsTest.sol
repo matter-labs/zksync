@@ -36,7 +36,7 @@ contract OperationsTest {
 
     function testFullExit() external pure {
         Operations.FullExit memory x = Operations.FullExit({
-            accountId:  0x010203,
+            accountId:  0x01020304,
             owner:      0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
             tokenId:    0x3132,
             amount:     0x101112131415161718191a1b1c1d1e1f
@@ -54,7 +54,7 @@ contract OperationsTest {
 
     function testFullExitMatch(bytes calldata offchain) external pure returns (bool) {
         Operations.FullExit memory x = Operations.FullExit({
-            accountId:  0x010203,
+            accountId:  0x01020304,
             owner:      0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
             tokenId:    0x3132,
             amount:     0
