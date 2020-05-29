@@ -337,7 +337,7 @@ async function test() {
             to: ethWallet2.address,
             token,
             amount: parseEther("3"),
-            fee: tranferFee
+            fee: tranferFee.total_fee
         });
         await transfer.awaitReceipt();
         console.log('transfer hash:', transfer.txHash);
@@ -348,7 +348,7 @@ async function test() {
             ethAddress: syncWallet.address(),
             token,
             amount: parseEther("2"),
-            fee: withdrawFee
+            fee: withdrawFee.total_fee
         })
         await withdraw.awaitReceipt();
         console.log('withdraw hash:', withdraw.txHash);

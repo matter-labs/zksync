@@ -129,3 +129,12 @@ export interface Tokens {
         decimals: number;
     };
 }
+
+export interface Fee {
+    // Total fee amount
+    total_fee: utils.BigNumber,
+    // Zero-knowledge proof part of fee
+    zkp_fee: utils.BigNumber,
+    // Ethereum gas part of fee
+    gas_fee: utils.BigNumber,
+}
