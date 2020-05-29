@@ -268,7 +268,6 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     for (const {block_number} of blocks.slice(-10)) {
         await apitype.checkBlockTransactionsResponseType(block_number);
     }
-    await apitype.checkAccountInfoResponseType(syncWallet1.address());
     await apitype.checkTxHistoryResponseType(syncWallet1.address());
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
 

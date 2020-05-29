@@ -46,19 +46,6 @@ fn remove_prefix(query: &str) -> &str {
     }
 }
 
-fn try_parse_address(query: &str) -> Option<Address> {
-    const ADDRESS_SIZE: usize = 20; // 20 bytes
-
-    let query = remove_prefix(query);
-    let b = hex::decode(query).ok()?;
-
-    if b.len() == ADDRESS_SIZE {
-        Some(Address::from_slice(&b))
-    } else {
-        None
-    }
-}
-
 fn try_parse_hash(query: &str) -> Option<Vec<u8>> {
     const HASH_SIZE: usize = 32; // 32 bytes
 
@@ -364,60 +351,6 @@ struct AccountStateResponse {
     id: Option<AccountId>,
     commited: Account,
     verified: Account,
-}
-
-fn handle_get_account_state(
-    data: web::Data<AppState>,
-    account_address: web::Path<String>,
-) -> ActixResult<HttpResponse> {
-    let account_address =
-        try_parse_address(&account_address).ok_or_else(|| HttpResponse::BadRequest().finish())?;
-
-    let storage = data.access_storage()?;
-
-    let (id, verified, commited) = {
-        let stored_account_state = storage
-            .chain()
-            .account_schema()
-            .account_state_by_address(&account_address)
-            .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    account_address,
-                );
-                HttpResponse::InternalServerError().finish()
-            })?;
-
-        let empty_state = |address: &Address| {
-            let mut acc = Account::default();
-            acc.address = *address;
-            acc
-        };
-
-        let id = stored_account_state.committed.as_ref().map(|(id, _)| *id);
-        let committed = stored_account_state
-            .committed
-            .map(|(_, acc)| acc)
-            .unwrap_or_else(|| empty_state(&account_address));
-        let verified = stored_account_state
-            .verified
-            .map(|(_, acc)| acc)
-            .unwrap_or_else(|| empty_state(&account_address));
-
-        (id, verified, committed)
-    };
-
-    let res = AccountStateResponse {
-        id,
-        commited,
-        verified,
-    };
-
-    Ok(HttpResponse::Ok().json(res))
 }
 
 fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
@@ -979,10 +912,6 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/testnet_config", web::get().to(handle_get_testnet_config))
                     .route("/status", web::get().to(handle_get_network_status))
-                    .route(
-                        "/account/{address}",
-                        web::get().to(handle_get_account_state),
-                    )
                     .route("/tokens", web::get().to(handle_get_tokens))
                     .route(
                         "/account/{address}/history/{offset}/{limit}",

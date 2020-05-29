@@ -13,8 +13,8 @@ use models::{
     config_options::{ConfigurationOptions, ThreadPanicNotify},
     node::{
         tx::{TxEthSignature, TxHash},
-        Account, AccountId, Address, BlockNumber, FranklinPriorityOp, FranklinTx, Nonce,
-        PriorityOp, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes,
+        Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
+        Token, TokenId, TokenLike, TxFeeTypes,
     },
     primitives::BigUintSerdeWrapper,
 };
@@ -314,7 +314,6 @@ pub struct RpcApp {
     cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
-    cache_of_verified_account_states: SharedLruCache<Address, (BlockNumber, ResponseAccountState)>,
 
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
@@ -350,7 +349,6 @@ impl RpcApp {
             cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
-            cache_of_verified_account_states: SharedLruCache::new(api_requests_caches_size),
 
             connection_pool,
 
@@ -637,31 +635,20 @@ impl RpcApp {
     }
 
     fn get_verified_account_state(&self, address: &Address) -> Result<ResponseAccountState> {
-        let verified_block_number = self.current_zksync_info.get_last_verified_block_number();
-        Ok(match self.cache_of_verified_account_states.get(address) {
-            Some((block_number, acc_state)) if block_number == verified_block_number => acc_state,
-            _ => {
-                let storage = self.access_storage()?;
-                let account = storage
-                    .chain()
-                    .account_schema()
-                    .account_state_by_address(address)
-                    .map_err(|_| Error::internal_error())?;
+        let storage = self.access_storage()?;
+        let account = storage
+            .chain()
+            .account_schema()
+            .account_state_by_address(address)
+            .map_err(|_| Error::internal_error())?;
 
-                let verified = account
-                    .verified
-                    .map(|(_, account)| {
-                        ResponseAccountState::try_restore(account, &self.token_cache)
-                    })
-                    .transpose()?
-                    .unwrap_or_default();
+        let verified_state = account
+            .verified
+            .map(|(_, account)| ResponseAccountState::try_restore(account, &self.token_cache))
+            .transpose()?
+            .unwrap_or_default();
 
-                self.cache_of_verified_account_states
-                    .insert(*address, (verified_block_number, verified.clone()));
-
-                verified
-            }
-        })
+        Ok(verified_state)
     }
 }
 
