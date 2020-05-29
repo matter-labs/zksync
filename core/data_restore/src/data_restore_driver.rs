@@ -7,7 +7,7 @@ use web3::{
 // Workspace deps
 use models::{
     abi::{governance_contract, zksync_contract},
-    node::{AccountMap, AccountUpdate},
+    node::{AccountMap, AccountUpdate, Fr},
 };
 use storage::ConnectionPool;
 // Local deps
@@ -64,6 +64,13 @@ pub struct DataRestoreDriver<T: Transport> {
     pub end_eth_blocks_offset: u64,
     /// Available block chunk sizes
     pub available_block_chunk_sizes: Vec<usize>,
+    /// Finite mode flag. In finite mode, driver will only work until
+    /// amount of restored blocks will become equal to amount of known
+    /// verified blocks. After that, it will stop.
+    pub finite_mode: bool,
+    /// Expected root hash to be observed after restoring process. Only
+    /// available in finite mode, and intended for tests.
+    pub final_hash: Option<Fr>,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -78,6 +85,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         connection_pool: ConnectionPool,
         web3_transport: T,
@@ -86,6 +94,8 @@ impl<T: Transport> DataRestoreDriver<T> {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         available_block_chunk_sizes: Vec<usize>,
+        finite_mode: bool,
+        final_hash: Option<Fr>,
     ) -> Self {
         let web3 = Web3::new(web3_transport);
 
@@ -119,6 +129,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             eth_blocks_step,
             end_eth_blocks_offset,
             available_block_chunk_sizes,
+            finite_mode,
+            final_hash,
         }
     }
 
@@ -255,6 +267,23 @@ impl<T: Transport> DataRestoreDriver<T> {
                         total_verified_blocks,
                         self.tree_state.root_hash()
                     );
+
+                    if self.finite_mode && last_verified_block == total_verified_blocks {
+                        // If there is an expected root hash, check that it matches the observed
+                        // one.
+                        if let Some(root_hash) = self.final_hash {
+                            assert_eq!(
+                                root_hash,
+                                self.tree_state.root_hash(),
+                                "Root hash after the tree restoring doesn't match expected one"
+                            );
+
+                            info!("Root hash is verified against expected one and it's correct");
+                        }
+
+                        // We've restored all the blocks, our job is done.
+                        break;
+                    }
                 }
             }
 

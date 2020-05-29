@@ -982,7 +982,7 @@ msg.value equals amount to deposit.
 #### Deposit ERC-20 token
 Deposit ERC-20 token to Rollup - transfer token from user L1 address into Rollup address
 ```solidity
-depositERC20(IERC20 _token, uint128 _amount, address _rollupAddr) payable
+depositERC20(IERC20 _token, uint104 _amount, address _rollupAddr) payable
 ```
 - _token: Token address in L1 chain
 - _amount: Amount to deposit 
