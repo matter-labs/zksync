@@ -204,14 +204,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _token Token address
     /// @param _amount Token amount
     /// @param _franklinAddr Receiver Layer 2 address
-    function depositERC20(IERC20 _token, uint128 _amount, address _franklinAddr) external nonReentrant {
+    function depositERC20(IERC20 _token, uint104 _amount, address _franklinAddr) external nonReentrant {
         requireActive();
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(address(_token));
 
         uint256 balance_before = _token.balanceOf(address(this));
-        require(_token.transferFrom(msg.sender, address(this), _amount), "fd012"); // token transfer failed deposit
+        require(_token.transferFrom(msg.sender, address(this), uint128(_amount)), "fd012"); // token transfer failed deposit
         uint256 balance_after = _token.balanceOf(address(this));
         uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 
