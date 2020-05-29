@@ -84,7 +84,7 @@ contract OperationsTest {
         return (r.tokenId, r.amount, r.owner);
     }
 
-    function parseFullExitFromPubdata(bytes calldata _pubdata) external pure returns (uint24 accountId, address owner, uint16 tokenId, uint128 amount) {
+    function parseFullExitFromPubdata(bytes calldata _pubdata) external pure returns (uint32 accountId, address owner, uint16 tokenId, uint128 amount) {
         Operations.FullExit memory r = Operations.readFullExitPubdata(_pubdata);
         accountId = r.accountId;
         owner = r.owner;

@@ -173,7 +173,7 @@ impl Transfer {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(&self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -297,7 +297,7 @@ impl Withdraw {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -396,7 +396,7 @@ impl ChangePubKey {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -411,7 +411,7 @@ impl ChangePubKey {
         nonce: Nonce,
         new_pubkey_hash: &PubKeyHash,
     ) -> Result<Vec<u8>, failure::Error> {
-        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 150;
+        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 152;
         let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
         eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");
         eth_signed_msg.extend_from_slice(
@@ -422,7 +422,7 @@ impl ChangePubKey {
                  \n\n",
                 hex::encode(&new_pubkey_hash.data).to_ascii_lowercase(),
                 hex::encode(&nonce.to_be_bytes()).to_ascii_lowercase(),
-                hex::encode(&account_id.to_be_bytes()[1..]).to_ascii_lowercase()
+                hex::encode(&account_id.to_be_bytes()).to_ascii_lowercase()
             )
             .as_bytes(),
         );
@@ -970,7 +970,7 @@ mod test {
 
         let signed_fields = vec![
             ("type", vec![Transfer::TX_TYPE]),
-            ("accountId", transfer.account_id.to_be_bytes()[1..].to_vec()),
+            ("accountId", transfer.account_id.to_be_bytes().to_vec()),
             ("from", transfer.from.as_bytes().to_vec()),
             ("to", transfer.to.as_bytes().to_vec()),
             ("token", transfer.token.to_be_bytes().to_vec()),
@@ -1020,7 +1020,7 @@ mod test {
 
         let signed_fields = vec![
             ("type", vec![Withdraw::TX_TYPE]),
-            ("accountId", withdraw.account_id.to_be_bytes()[1..].to_vec()),
+            ("accountId", withdraw.account_id.to_be_bytes().to_vec()),
             ("from", withdraw.from.as_bytes().to_vec()),
             ("to", withdraw.to.as_bytes().to_vec()),
             ("token", withdraw.token.to_be_bytes().to_vec()),

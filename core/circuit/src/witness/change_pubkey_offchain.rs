@@ -13,7 +13,10 @@ use models::{
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
     node::operations::ChangePubKeyOp,
-    params as franklin_constants,
+    params::{
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
+        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    },
 };
 // Local deps
 use crate::{
@@ -59,43 +62,36 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
 
     fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.tx_type.unwrap(),
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.address.unwrap(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            NEW_PUBKEY_HASH_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.eth_address.unwrap(),
-            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+            ETH_ADDRESS_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
+            NONCE_BIT_WIDTH,
         );
 
-        assert!(pubdata_bits.len() <= ChangePubKeyOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH);
-        pubdata_bits.resize(
-            ChangePubKeyOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
-            false,
-        );
+        assert!(pubdata_bits.len() <= ChangePubKeyOp::CHUNKS * CHUNK_BIT_WIDTH);
+        pubdata_bits.resize(ChangePubKeyOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 
     fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
         self.get_pubdata()
-            .chunks(64)
+            .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
             .enumerate()
             .map(|(chunk_n, pubdata_chunk)| Operation {
@@ -128,7 +124,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
             get_audits(tree, change_pubkey_offcahin.account_id, 0);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        assert_eq!(capacity, 1 << account_tree_depth());
         let account_id_fe = Fr::from_str(&change_pubkey_offcahin.account_id.to_string()).unwrap();
         //calculate a and b
         let a = Fr::zero();

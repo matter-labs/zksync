@@ -30,6 +30,7 @@ use crate::{
         utils::{apply_fee, get_audits, public_data_commitment},
     },
 };
+use models::params::CHUNK_BIT_WIDTH;
 
 /// Creates a random private key and returns a public key hash for it.
 fn generate_pubkey_hash(
@@ -145,7 +146,7 @@ fn test_noop() {
     let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
 
     let public_data_commitment = public_data_commitment::<Bn256>(
-        &[false; 64],
+        &[false; CHUNK_BIT_WIDTH],
         Some(tree.root_hash()),
         Some(tree.root_hash()),
         Some(validator_address),

@@ -56,7 +56,7 @@ contract Events {
 
     event DepositCommit(
         uint32 franklinBlockId,
-        uint24 accountId,
+        uint32 accountId,
         address owner,
         uint16 tokenId,
         uint128 amount
@@ -64,7 +64,7 @@ contract Events {
 
     event FullExitCommit(
         uint32 franklinBlockId,
-        uint24 accountId,
+        uint32 accountId,
         address owner,
         uint16 tokenId,
         uint128 amount

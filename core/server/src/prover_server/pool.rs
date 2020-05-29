@@ -12,6 +12,7 @@ use circuit::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
     TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
+use models::params::CHUNK_BIT_WIDTH;
 use models::{
     circuit::CircuitAccountTree,
     config_options::ThreadPanicNotify,
@@ -372,7 +373,7 @@ impl Maintainer {
 
         witness_accum.add_operation_with_pubdata(operations, pub_data);
         witness_accum.extend_pubdata_with_noops(block_size);
-        assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
+        assert_eq!(witness_accum.pubdata.len(), CHUNK_BIT_WIDTH * block_size);
         assert_eq!(witness_accum.operations.len(), block_size);
 
         witness_accum.collect_fees(&fees);
