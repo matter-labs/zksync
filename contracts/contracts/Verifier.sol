@@ -36,8 +36,9 @@ contract Verifier is KeysWithPlonkVerifier {
         uint256[] memory inputs = new uint256[](1);
         uint256 mask = (~uint256(0)) >> 3;
         inputs[0] = uint256(_commitment) & mask;
-        Proof memory proof = deserialize_proof(1, inputs, _proof);
+        Proof memory proof = deserialize_proof(inputs, _proof);
         VerificationKey memory vk = getVkBlock(_chunks);
+        require(vk.num_inputs == inputs.length);
         return verify(proof, vk);
     }
 
@@ -54,8 +55,9 @@ contract Verifier is KeysWithPlonkVerifier {
         uint256[] memory inputs = new uint256[](1);
         uint256 mask = (~uint256(0)) >> 3;
         inputs[0] = uint256(commitment) & mask;
-        Proof memory proof = deserialize_proof(1, inputs, _proof);
+        Proof memory proof = deserialize_proof(inputs, _proof);
         VerificationKey memory vk = getVkExit();
+        require(vk.num_inputs == inputs.length);
         return verify(proof, vk);
     }
 }

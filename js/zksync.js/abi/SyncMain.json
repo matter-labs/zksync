@@ -436,9 +436,9 @@
           "type": "address"
         },
         {
-          "internalType": "uint128",
+          "internalType": "uint104",
           "name": "_amount",
-          "type": "uint128"
+          "type": "uint104"
         },
         {
           "internalType": "address",
