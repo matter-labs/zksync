@@ -945,7 +945,7 @@ fn handle_block_explorer_search(
 fn handle_unstarted_prover_jobs(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
 
-    let txs = storage
+    let jobs = storage
         .prover_schema()
         .unstarted_jobs_count()
         .map_err(|err| {
@@ -959,7 +959,9 @@ fn handle_unstarted_prover_jobs(data: web::Data<AppState>) -> ActixResult<HttpRe
             HttpResponse::InternalServerError().finish()
         })?;
 
-    Ok(HttpResponse::Ok().json(txs))
+    let response = serde_json::json!({ "unstarted_jobs": jobs });
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 fn start_server(state: AppState, bind_to: SocketAddr) {
