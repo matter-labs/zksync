@@ -19,12 +19,8 @@ import {
     MAX_ERC20_APPROVE_AMOUNT,
     signChangePubkeyMessage,
     getEthSignatureType,
-    SYNC_MAIN_CONTRACT_INTERFACE,
-    getRandomCheck,
-    restoreEthPrivateKeyFromCheck,
-    sleep
+    SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
-import { BigNumberish } from "ethers/utils";
 
 // Our MetaMask users sometimes use custom gas price values,
 // which we can't know. We use this constant to assure that
@@ -573,91 +569,6 @@ export class Wallet {
             } else {
                 this.accountId = accountIdFromServer;
             }
-        }
-    }
-
-    /**
-     * Send money to a random-generated account and get a check — a link
-     * from which money can be redeemed.
-     * 
-     * @param token: TokenLike
-     * @param amount: BigNumberish
-     */
-    public async createCheck(
-        token: TokenLike,
-        amount: BigNumberish
-    ): Promise<string> {
-        const check = getRandomCheck();
-        const toEthWallet = new ethers.Wallet(await restoreEthPrivateKeyFromCheck(check));
-        const toSyncWallet = await Wallet.fromEthSigner(
-            toEthWallet,
-            this.provider
-        );
-
-        const transfer = await this.syncTransfer({
-            to: toEthWallet.address,
-            token,
-            amount,
-            fee: 0
-        });
-        await transfer.awaitReceipt();
-
-        // better to set signing key here, as it requires block verification
-        const changePubKey = await toSyncWallet.setSigningKey();
-        await changePubKey.awaitReceipt();
-
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(token);
-        const stringAmount = this.provider.tokenSet.formatToken(token, amount);
-        return (
-            `Here is ${stringAmount} ${stringToken} for you. ` +
-            `Click on this link to claim them:\n\n` +
-            `https://zksync.io/check#${check}`
-        );
-    }
-
-    /**
-     * Get dict of balances that can be redeemed from this check.
-     * 
-     * @param check: 20 bytes encoded as base32 string
-     */
-    public async getCheckDetails(
-        check: string
-    ): Promise<{ [s: string]: BigNumberish }> {
-        const toEthWallet = new ethers.Wallet(await restoreEthPrivateKeyFromCheck(check));
-        const accState = await this.provider.getState(toEthWallet.address);
-        return accState.committed.balances;
-    }
-
-    /**
-     * Get all the balances from this check.
-     * 
-     * @param check: 20 bytes encoded as base32 string
-     */
-    public async claimCheck(check: string) {
-        const toEthWallet = new ethers.Wallet(await restoreEthPrivateKeyFromCheck(check));
-        const toSyncWallet = await Wallet.fromEthSigner(
-            toEthWallet,
-            this.provider
-        );
-        const accState = await toSyncWallet.getAccountState();
-
-        const amounts = Object.entries(accState.committed.balances);
-        if (amounts.length === 0) {
-            return;
-        }
-
-        while (! await toSyncWallet.isSigningKeySet()) {
-            sleep(2000);
-        }
-
-        for (const [token, amount] of amounts) {
-            const transfer = await toSyncWallet.syncTransfer({
-                to: this.address(),
-                token,
-                amount,
-                fee: 0,
-            });
-            await transfer.awaitReceipt();
         }
     }
 }
