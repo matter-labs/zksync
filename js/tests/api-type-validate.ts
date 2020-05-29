@@ -5,7 +5,6 @@ import * as assert from 'assert';
 import { Interface as StatusInterface } from './api-types/status';
 import { Interface as BlockInterface } from './api-types/block';
 import { Interface as BlocksInterface } from './api-types/blocks';
-import { Interface as AccountInterface } from './api-types/account';
 import { Interface as TxHistoryInterface } from './api-types/tx-history';
 import { Interface as TestnetConfigInterface } from './api-types/config';
 import { Interface as BlockTransactionsInterface } from './api-types/block-transactions';
@@ -163,26 +162,6 @@ export async function checkStatusResponseType(): Promise<StatusInterface> {
 }
 
 /**
- * Check `/account/${address}` method of our rest api
- */
-export async function checkAccountInfoResponseType(address: string): Promise<AccountInterface> {
-    const url = `${process.env.REST_API_ADDR}/api/v0.1/account/${address}`;
-    const typeFilePath = `${apiTypesFolder}/account.ts`;
-    const data: AccountInterface = await validateResponseFromUrl(typeFilePath, url);
-
-    // additional checks
-    assertPubKey(data.commited.pub_key_hash);
-    assertAddress(data.commited.address);
-    Object.values(data.commited.balances).forEach(assertNumeric);
-
-    assertPubKey(data.verified.pub_key_hash);
-    assertAddress(data.verified.address);
-    Object.values(data.verified.balances).forEach(assertNumeric);
-
-    return data;
-}
-
-/**
  * Check `/account/${address}/history/${offset}/${limit}` method of our rest api
  */
 export async function checkTxHistoryResponseType(address: string): Promise<TxHistoryInterface> {
@@ -305,11 +284,11 @@ async function test() {
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
 
     for (const token of ['ETH', "DAI", "wBTC"]) {
-        console.log('Balance of ' + token + ': ' + formatEther(await syncWallet.getEthereumBalance(token)));
+        console.log('Balance of ' + token + ': ' + syncProvider.tokenSet.formatToken(token, await syncWallet.getEthereumBalance(token)));
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
             token,
-            amount: parseEther("10"),
+            amount: syncProvider.tokenSet.parseToken(token, "10"),
             approveDepositAmountForERC20: true,
         });
         await deposit.awaitReceipt();
@@ -321,31 +300,35 @@ async function test() {
             console.log('changePubKey hash:', changePubKey.txHash);
         }
 
-        const tranferFee = await syncWallet.provider.getTransactionFee("Transfer", "3", token);
         const transfer = await syncWallet.syncTransfer({
             to: ethWallet2.address,
             token,
-            amount: parseEther("3"),
-            fee: tranferFee
+            amount: syncProvider.tokenSet.parseToken(token, "3"),
         });
         await transfer.awaitReceipt();
         console.log('transfer hash:', transfer.txHash);
 
 
-        const withdrawFee = await syncWallet.provider.getTransactionFee("Withdraw", "2", token);
         const withdraw = await syncWallet.withdrawFromSyncToEthereum({
             ethAddress: syncWallet.address(),
             token,
-            amount: parseEther("2"),
-            fee: withdrawFee
-        })
+            amount: syncProvider.tokenSet.parseToken(token, "2"),
+        });
         await withdraw.awaitReceipt();
         console.log('withdraw hash:', withdraw.txHash);
-
 
         const fullExit = await syncWallet.emergencyWithdraw({token});
         await fullExit.awaitReceipt();
         console.log('fullExit hash:', fullExit.ethTx.hash);
+
+        const deposit2 = await syncWallet.depositToSyncFromEthereum({
+            depositTo: syncWallet.address(),
+            token,
+            amount: syncProvider.tokenSet.parseToken(token, "1"),
+            approveDepositAmountForERC20: true,
+        });
+        await deposit2.awaitReceipt();
+        console.log('deposit2 hash:', deposit.ethTx.hash);
     }
 
     deleteUnusedGenFiles();
@@ -354,8 +337,7 @@ async function test() {
     await checkStatusResponseType();
     await checkTestnetConfigResponseType();
 
-    console.log("Checking account and tx history");
-    await checkAccountInfoResponseType(syncWallet.address());
+    console.log("Checking tx history");
     await checkTxHistoryResponseType(syncWallet.address());
     
     const numBlocksToCheck = 10;

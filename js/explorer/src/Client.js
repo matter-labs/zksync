@@ -108,22 +108,17 @@ export class Client {
     }
 
     getAccount(address) {
-        return fetch({
-            method: 'get',
-            url: `${config.API_SERVER}/api/v0.1/account/${address}`,
-        });
+        return window.syncProvider.getState(address);
     }
 
     async getCommitedBalances(address) {
         const account = await this.getAccount(address);
-        const tokensInfoList = await this.tokensPromise;
 
-        return Object.entries(account.commited.balances)
-            .map(([tokenId, balance]) => {
+        return Object.entries(account.committed.balances)
+            .map(([tokenSymbol, balance]) => {
                 return {
-                    tokenId,
-                    balance: formatToken(tokenId, balance),
-                    tokenName: tokensInfoList[tokenId].syncSymbol,
+                    tokenSymbol,
+                    balance: formatToken(balance, tokenSymbol),
                 };
             });
     }
