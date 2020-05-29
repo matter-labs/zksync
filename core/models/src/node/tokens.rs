@@ -1,10 +1,13 @@
 use crate::config_options::parse_env;
 use crate::node::{Address, TokenId};
+use crate::primitives::UnsignedRatioSerializeAsDecimal;
+use chrono::{DateTime, Utc};
+use num::{rational::Ratio, BigUint};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
 /// Order of the fields are important (from more specific types to less specific types)
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum TokenLike {
     Id(TokenId),
@@ -27,7 +30,7 @@ pub struct Token {
     pub address: Address,
     /// Token symbol (e.g. "ETH" or "USDC")
     pub symbol: String,
-    /// Precision in decimals ('1.0' means 1 * 10 ** 18 if decimals is 18)
+    /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
 }
 
@@ -60,4 +63,17 @@ pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>
     file_path.push(network);
     file_path.set_extension("json");
     Ok(serde_json::from_str(&read_to_string(file_path)?)?)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenPrice {
+    #[serde(with = "UnsignedRatioSerializeAsDecimal")]
+    pub usd_price: Ratio<BigUint>,
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+pub enum TxFeeTypes {
+    Withdraw,
+    Transfer,
 }

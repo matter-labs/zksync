@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 // External uses
-use bigdecimal::BigDecimal;
+use num::BigUint;
 use tokio::{runtime::Handle, time};
 use web3::transports::Http;
 // Workspace uses
@@ -137,13 +137,13 @@ async fn send_transactions_from_acc(
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
     let addr_hex = hex::encode(test_acc.eth_acc.address);
-    let wei_in_gwei = BigDecimal::from(1_000_000_000);
+    let wei_in_gwei = BigUint::from(1_000_000_000u32);
 
     // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
     test_acc.update_nonce_values(&rpc_client).await?;
 
     // Perform the deposit operation.
-    let deposit_amount = BigDecimal::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
+    let deposit_amount = BigUint::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
     let op_id = deposit_single(&test_acc, deposit_amount.clone(), &rpc_client).await?;
 
     log::info!(

@@ -257,7 +257,7 @@ fn find_block_by_height_or_hash() {
                 OperationType::Commit,
                 Some(ethereum_op_id),
                 100,
-                100.into(),
+                100u32.into(),
                 Default::default(),
             )?;
             EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
@@ -290,7 +290,7 @@ fn find_block_by_height_or_hash() {
                         OperationType::Verify,
                         Some(ethereum_op_id),
                         100,
-                        100.into(),
+                        100u32.into(),
                         Default::default(),
                     )?;
                     EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
@@ -385,7 +385,7 @@ fn block_range() {
                 OperationType::Commit,
                 Some(ethereum_op_id),
                 100,
-                100.into(),
+                100u32.into(),
                 Default::default(),
             )?;
             EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
@@ -406,7 +406,7 @@ fn block_range() {
                     OperationType::Verify,
                     Some(ethereum_op_id),
                     100,
-                    100.into(),
+                    100u32.into(),
                     Default::default(),
                 )?;
                 EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
@@ -555,8 +555,8 @@ fn pending_block_workflow() {
             .sign_transfer(
                 0,
                 "",
-                1.into(),
-                0.into(),
+                1u32.into(),
+                0u32.into(),
                 &to_zksync_account.address,
                 None,
                 true,

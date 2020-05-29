@@ -4,8 +4,8 @@ use crate::node::{
     is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
     public_key_from_private, AccountId, CloseOp, TransferOp, WithdrawOp,
 };
-use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
+use num::{BigUint, ToPrimitive};
 
 use super::account::PubKeyHash;
 use super::Engine;
@@ -19,9 +19,7 @@ use crate::franklin_crypto::rescue::RescueEngine;
 use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
-use crate::primitives::{
-    big_decimal_to_u128, pedersen_hash_tx_msg, rescue_hash_tx_msg, u128_to_bigdecimal,
-};
+use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg, BigUintSerdeAsRadix10Str};
 use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
     public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
@@ -102,7 +100,6 @@ impl Default for VerifiedSignatureCache {
 }
 
 /// Signed by user.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transfer {
@@ -110,8 +107,10 @@ pub struct Transfer {
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
-    pub amount: BigDecimal,
-    pub fee: BigDecimal,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub amount: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub fee: BigUint,
     pub nonce: Nonce,
     pub signature: TxSignature,
     #[serde(skip)]
@@ -129,8 +128,8 @@ impl Transfer {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         signature: Option<TxSignature>,
     ) -> Self {
@@ -158,8 +157,8 @@ impl Transfer {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
@@ -185,8 +184,8 @@ impl Transfer {
     }
 
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.amount.is_integer() // TODO: remove after # 366
-            && self.fee.is_integer()
+        let mut valid = self.amount <= BigUint::from(u128::max_value())
+            && self.fee <= BigUint::from(u128::max_value())
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee);
         if valid {
@@ -232,8 +231,10 @@ pub struct Withdraw {
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
-    pub amount: BigDecimal,
-    pub fee: BigDecimal,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub amount: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub fee: BigUint,
     pub nonce: Nonce,
     pub signature: TxSignature,
     #[serde(skip)]
@@ -251,8 +252,8 @@ impl Withdraw {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         signature: Option<TxSignature>,
     ) -> Self {
@@ -280,8 +281,8 @@ impl Withdraw {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
@@ -300,17 +301,15 @@ impl Withdraw {
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&big_decimal_to_u128(&self.amount).to_be_bytes());
+        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
 
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.amount <= u128_to_bigdecimal(u128::max_value())
-            && self.amount.is_integer() // TODO: remove after # 366
-            && self.fee.is_integer()
-            && is_fee_amount_packable(&self.fee);
+        let mut valid =
+            self.amount <= BigUint::from(u128::max_value()) && is_fee_amount_packable(&self.fee);
 
         if valid {
             let signer = self.verify_signature();
@@ -952,8 +951,8 @@ mod test {
             Address::from(rng.gen::<[u8; 20]>()),
             Address::from(rng.gen::<[u8; 20]>()),
             rng.gen(),
-            BigDecimal::from(12_340_000_000_000u64),
-            BigDecimal::from(56_700_000_000u64),
+            BigUint::from(12_340_000_000_000u64),
+            BigUint::from(56_700_000_000u64),
             rng.gen(),
             &key,
         )
@@ -1002,8 +1001,8 @@ mod test {
             Address::from(rng.gen::<[u8; 20]>()),
             Address::from(rng.gen::<[u8; 20]>()),
             rng.gen(),
-            BigDecimal::from(12_340_000_000_000u64),
-            BigDecimal::from(56_700_000_000u64),
+            BigUint::from(12_340_000_000_000u64),
+            BigUint::from(56_700_000_000u64),
             rng.gen(),
             &key,
         )
@@ -1027,7 +1026,7 @@ mod test {
             ("token", withdraw.token.to_be_bytes().to_vec()),
             (
                 "fullAmount",
-                big_decimal_to_u128(&withdraw.amount).to_be_bytes().to_vec(),
+                withdraw.amount.to_u128().unwrap().to_be_bytes().to_vec(),
             ),
             ("fee", pack_fee_amount(&withdraw.fee)),
             ("nonce", withdraw.nonce.to_be_bytes().to_vec()),

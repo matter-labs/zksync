@@ -1,6 +1,5 @@
 //! Generate exit proof for exodus mode given account and token
 
-use bigdecimal::BigDecimal;
 use circuit::exit_circuit::create_exit_circuit_with_public_input;
 use failure::format_err;
 use log::info;
@@ -8,6 +7,7 @@ use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::node::{AccountId, AccountMap, Address, TokenId};
 use models::prover_utils::{gen_verified_proof_for_exit_circuit, EncodedProofPlonk};
+use num::BigUint;
 use std::time::Instant;
 
 pub fn create_exit_proof(
@@ -15,7 +15,7 @@ pub fn create_exit_proof(
     account_id: AccountId,
     owner: Address,
     token_id: TokenId,
-) -> Result<(EncodedProofPlonk, BigDecimal), failure::Error> {
+) -> Result<(EncodedProofPlonk, BigUint), failure::Error> {
     let timer = Instant::now();
     let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
 

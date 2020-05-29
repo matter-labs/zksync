@@ -5,7 +5,7 @@ pragma solidity ^0.5.0;
 contract Ownable {
 
     /// @notice Storage position of the masters address
-    bytes32 private constant masterPosition = keccak256("master");
+    bytes32 private constant masterPosition = bytes32(uint256(keccak256('eip1967.proxy.admin')) - 1);
 
     /// @notice Contract constructor
     /// @dev Sets msg sender address as masters address

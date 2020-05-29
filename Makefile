@@ -3,6 +3,7 @@ export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
+export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
@@ -123,7 +124,7 @@ sandbox:
 
 # See more more at https://github.com/emk/rust-musl-builder#caching-builds
 build-target: build-contracts
-	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/src/target /home/rust/.cargo/git /home/rust/.cargo/registry
+	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/src /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
 
 clean-target:
@@ -266,12 +267,12 @@ nodes:
 # Dev environment
 
 dev-up:
-	@docker-compose up -d postgres geth
+	@docker-compose up -d postgres geth dev-ticker
 	@docker-compose up -d tesseracts
 
 dev-down:
 	@docker-compose stop tesseracts
-	@docker-compose stop postgres geth
+	@docker-compose stop postgres geth dev-ticker
 
 geth-up: geth
 	@docker-compose up geth
@@ -284,6 +285,12 @@ dev-build-geth:
 
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
+
+image-dev-ticker: build-target
+	@docker build -t "${DEV_TICKER_DOCKER_IMAGE}" -f ./docker/dev-ticker/Dockerfile .
+
+push-image-dev-ticker: image-dev-ticker
+	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
 api-type-validate:
 	@cd js/tests && yarn && yarn api-type-validate --test
