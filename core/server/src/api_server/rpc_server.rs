@@ -16,7 +16,7 @@ use models::{
         Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
         Token, TokenId, TokenLike, TxFeeTypes,
     },
-    primitives::BigUintSerdeWrapper,
+    primitives::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper},
 };
 use storage::{
     chain::{
@@ -74,6 +74,7 @@ impl ResponseAccountState {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositingFunds {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     amount: BigUint,
     expected_accept_block: u64,
 }
