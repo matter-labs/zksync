@@ -170,11 +170,11 @@ pub fn create_exit_circuit_with_public_input(
 #[cfg(test)]
 mod test {
     use super::*;
-    use bigdecimal::BigDecimal;
     use crypto_exports::franklin_crypto::circuit::test::TestConstraintSystem;
     use models::circuit::account::CircuitAccount;
     use models::circuit::CircuitAccountTree;
     use models::node::Account;
+    use num::BigUint;
 
     #[test]
     #[ignore]
@@ -184,7 +184,7 @@ mod test {
         let mut test_account = Account::default_with_address(
             &"abababababababababababababababababababab".parse().unwrap(),
         );
-        test_account.set_balance(token_id, BigDecimal::from(0xbeef));
+        test_account.set_balance(token_id, BigUint::from(0xbeefu32));
         test_account.nonce = 0xbabe;
 
         let mut circuit_account_tree =

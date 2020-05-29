@@ -7,8 +7,8 @@
 //! - Generic tests for the combinations of different operations are placed in this module.
 
 // External deps
-use bigdecimal::BigDecimal;
 use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+use num::BigUint;
 // Workspace deps
 use models::node::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
@@ -60,8 +60,8 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 
     // Deposit two types of tokens on the account.
     let deposit_data = [
-        (ETH_TOKEN, 1000), // 1000 of ETH
-        (NNM_TOKEN, 2000), // 2000 of token with ID 2
+        (ETH_TOKEN, 1000u32), // 1000 of ETH
+        (NNM_TOKEN, 2000u32), // 2000 of token with ID 2
     ];
     let deposit_ops = deposit_data
         .iter()
@@ -69,7 +69,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
             priority_op: Deposit {
                 from: account.account.address,
                 token: *token_id,
-                amount: BigDecimal::from(*token_amount),
+                amount: BigUint::from(*token_amount),
                 to: account.account.address,
             },
             account_id: account.id,
@@ -82,8 +82,8 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
             .sign_transfer(
                 ETH_TOKEN,
                 "",
-                BigDecimal::from(97),
-                BigDecimal::from(3),
+                BigUint::from(97u32),
+                BigUint::from(3u32),
                 &account_to.account.address,
                 None,
                 true,
@@ -103,8 +103,8 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
             .sign_transfer(
                 NNM_TOKEN,
                 "",
-                BigDecimal::from(1900),
-                BigDecimal::from(90),
+                BigUint::from(1900u32),
+                BigUint::from(90u32),
                 &account_to.account.address,
                 None,
                 true,
@@ -124,8 +124,8 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
             .sign_withdraw(
                 NNM_TOKEN,
                 "",
-                BigDecimal::from(5),
-                BigDecimal::from(5),
+                BigUint::from(5u32),
+                BigUint::from(5u32),
                 &Address::zero(),
                 None,
                 true,
@@ -144,7 +144,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
             eth_address: account.account.address,
             token: 0,
         },
-        withdraw_amount: Some(BigDecimal::from(900)),
+        withdraw_amount: Some(BigUint::from(900u32).into()),
     };
     let full_exit_success = true;
 

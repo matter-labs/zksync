@@ -243,7 +243,4 @@ export default {
 </script>
 
 <style>
-.hidden_header {
-    display: none;
-}
 </style>

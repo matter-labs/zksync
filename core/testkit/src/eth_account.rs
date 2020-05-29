@@ -1,4 +1,3 @@
-use bigdecimal::BigDecimal;
 use eth_client::ETHClient;
 use ethabi::ParamType;
 use failure::{bail, ensure, format_err};
@@ -6,8 +5,8 @@ use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::node::block::Block;
 use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
-use models::primitives::big_decimal_to_u128;
 use models::prover_utils::EncodedProofPlonk;
+use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
@@ -20,7 +19,7 @@ use web3::{Transport, Web3};
 
 const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
-pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
+pub fn parse_ether(eth_value: &str) -> Result<BigUint, failure::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();
     ensure!(split.len() == 1 || split.len() == 2, "Wrong eth value");
     let string_wei_value = if split.len() == 1 {
@@ -38,7 +37,7 @@ pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
         unreachable!()
     };
 
-    Ok(BigDecimal::from_str(&string_wei_value)?)
+    Ok(BigUint::from_str(&string_wei_value)?)
 }
 
 /// Used to sign and post ETH transactions for the zkSync contracts.
@@ -49,12 +48,12 @@ pub struct EthereumAccount<T: Transport> {
     pub main_contract_eth_client: ETHClient<T>,
 }
 
-fn big_dec_to_u256(bd: BigDecimal) -> U256 {
+fn big_dec_to_u256(bd: BigUint) -> U256 {
     U256::from_dec_str(&bd.to_string()).unwrap()
 }
 
-fn u256_to_big_dec(u256: U256) -> BigDecimal {
-    BigDecimal::from_str(&u256.to_string()).unwrap()
+fn u256_to_big_dec(u256: U256) -> BigUint {
+    BigUint::from_str(&u256.to_string()).unwrap()
 }
 
 impl<T: Transport> EthereumAccount<T> {
@@ -144,7 +143,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         account_id: AccountId,
         token_id: TokenId,
-        amount: &BigDecimal,
+        amount: &BigUint,
         proof: EncodedProofPlonk,
     ) -> Result<ETHExecResult, failure::Error> {
         let signed_tx = self
@@ -154,7 +153,7 @@ impl<T: Transport> EthereumAccount<T> {
                 (
                     u64::from(account_id),
                     u64::from(token_id),
-                    U128::from(big_decimal_to_u128(amount)),
+                    U128::from(amount.to_u128().unwrap()),
                     proof.proof,
                 ),
                 Options::default(),
@@ -218,7 +217,7 @@ impl<T: Transport> EthereumAccount<T> {
 
     pub async fn deposit_eth(
         &self,
-        amount: BigDecimal,
+        amount: BigUint,
         to: &Address,
         nonce: Option<U256>,
     ) -> Result<PriorityOp, failure::Error> {
@@ -246,7 +245,7 @@ impl<T: Transport> EthereumAccount<T> {
             .expect("no priority op log in deposit"))
     }
 
-    pub async fn eth_balance(&self) -> Result<BigDecimal, failure::Error> {
+    pub async fn eth_balance(&self) -> Result<BigUint, failure::Error> {
         Ok(u256_to_big_dec(
             self.main_contract_eth_client
                 .web3
@@ -257,10 +256,7 @@ impl<T: Transport> EthereumAccount<T> {
         ))
     }
 
-    pub async fn erc20_balance(
-        &self,
-        token_contract: &Address,
-    ) -> Result<BigDecimal, failure::Error> {
+    pub async fn erc20_balance(&self, token_contract: &Address) -> Result<BigUint, failure::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             *token_contract,
@@ -274,7 +270,7 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
-    pub async fn balances_to_withdraw(&self, token: TokenId) -> Result<BigDecimal, failure::Error> {
+    pub async fn balances_to_withdraw(&self, token: TokenId) -> Result<BigUint, failure::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             self.main_contract_eth_client.contract_addr,
@@ -298,7 +294,7 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn approve_erc20(
         &self,
         token_contract: Address,
-        amount: BigDecimal,
+        amount: BigUint,
     ) -> Result<(), failure::Error> {
         let erc20_client = ETHClient::new(
             self.main_contract_eth_client.web3.transport().clone(),
@@ -332,7 +328,7 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn deposit_erc20(
         &self,
         token_contract: Address,
-        amount: BigDecimal,
+        amount: BigUint,
         to: &Address,
     ) -> Result<PriorityOp, failure::Error> {
         self.approve_erc20(token_contract, amount.clone()).await?;
@@ -548,7 +544,7 @@ async fn get_revert_reason<T: Transport>(
             .compat()
             .await?;
 
-        // For some strange, reason this could happen
+        // For some strange reason this could happen
         if encoded_revert_reason.0.len() < 4 {
             return Ok("".to_string());
         }

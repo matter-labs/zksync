@@ -55,7 +55,7 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
                 AccountUpdate::UpdateBalance {
                     old_nonce: upd.old_nonce as u32,
                     new_nonce: upd.new_nonce as u32,
-                    balance_update: (upd.coin_id as TokenId, upd.old_balance, upd.new_balance),
+                    balance_update: (upd.coin_id as TokenId, upd.old_balance.0, upd.new_balance.0),
                 },
             ),
             StorageAccountDiff::Create(upd) => (

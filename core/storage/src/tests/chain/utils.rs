@@ -7,9 +7,9 @@ use models::{
         block::{Block, ExecutedOperations},
         AccountUpdate, BlockNumber, Fr, PubKeyHash,
     },
-    primitives::u128_to_bigdecimal,
     Action, Operation,
 };
+use num::BigUint;
 // Local imports
 
 pub fn acc_create_random_updates<R: Rng>(
@@ -27,7 +27,7 @@ pub fn acc_create_random_updates<R: Rng>(
     a.pub_key_hash = pub_key_hash;
 
     let old_balance = a.get_balance(0);
-    a.set_balance(0, u128_to_bigdecimal(balance));
+    a.set_balance(0, BigUint::from(balance));
     let new_balance = a.get_balance(0);
     vec![
         (
