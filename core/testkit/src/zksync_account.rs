@@ -1,7 +1,7 @@
 // Built-in imports
 use std::{fmt, sync::Mutex};
 // External uses
-use bigdecimal::BigDecimal;
+use num::BigUint;
 use web3::types::H256;
 // Workspace uses
 use crypto_exports::rand::{thread_rng, Rng};
@@ -104,8 +104,8 @@ impl ZksyncAccount {
         &self,
         token_id: TokenId,
         token_symbol: &str,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         to: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
@@ -143,8 +143,8 @@ impl ZksyncAccount {
         &self,
         token_id: TokenId,
         token_symbol: &str,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         eth_address: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,

@@ -1,6 +1,6 @@
 // External deps
-use bigdecimal::BigDecimal;
 use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+use num::BigUint;
 // Workspace deps
 use models::node::{operations::DepositOp, Deposit};
 // Local deps
@@ -21,7 +21,7 @@ fn test_deposit_in_empty_leaf() {
         priority_op: Deposit {
             from: account.account.address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: account.account.address,
         },
         account_id: account.id,
@@ -59,7 +59,7 @@ fn test_deposit_existing_account() {
             priority_op: Deposit {
                 from: account.account.address,
                 token: token_id,
-                amount: BigDecimal::from(token_amount),
+                amount: BigUint::from(token_amount),
                 to: account.account.address,
             },
             account_id: account.id,
@@ -94,7 +94,7 @@ fn test_incorrect_deposit_address() {
         priority_op: Deposit {
             from: account.account.address,
             token: TOKEN_ID,
-            amount: BigDecimal::from(TOKEN_AMOUNT),
+            amount: BigUint::from(TOKEN_AMOUNT),
             to: Default::default(),
         },
         account_id: account.id,

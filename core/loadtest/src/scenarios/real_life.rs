@@ -51,8 +51,8 @@
 // Built-in deps
 use std::time::{Duration, Instant};
 // External deps
-use bigdecimal::BigDecimal;
 use chrono::Utc;
+use num::BigUint;
 use tokio::{fs, time};
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
@@ -217,7 +217,7 @@ impl ScenarioExecutor {
         // Initialize it with the raw amount: only sum of transfers per account.
         // Fees will be set to zero, so there is no need in any additional funds.
         let amount_to_deposit =
-            BigDecimal::from(self.transfer_size) * BigDecimal::from(self.n_accounts as u64);
+            BigUint::from(self.transfer_size) * BigUint::from(self.n_accounts as u64);
 
         let account_balance = self.main_account.eth_acc.eth_balance().await?;
         log::info!("Main account ETH balance: {}", account_balance);
@@ -434,7 +434,7 @@ impl ScenarioExecutor {
         let mut sent_txs = SentTransactions::new();
 
         let amount_to_withdraw =
-            BigDecimal::from(self.transfer_size) * BigDecimal::from(self.n_accounts as u64);
+            BigUint::from(self.transfer_size) * BigUint::from(self.n_accounts as u64);
 
         let current_balance = self.main_account.eth_acc.eth_balance().await?;
 
@@ -470,8 +470,8 @@ impl ScenarioExecutor {
     /// Returns an error if funds are not received within a reasonable amount of time.
     async fn wait_for_eth_balance(
         &self,
-        current_balance: BigDecimal,
-        withdraw_amount: BigDecimal,
+        current_balance: BigUint,
+        withdraw_amount: BigUint,
     ) -> Result<(), failure::Error> {
         log::info!("Awaiting for ETH funds to be received");
 
@@ -514,8 +514,8 @@ impl ScenarioExecutor {
         let (tx, eth_signature) = from.sign_transfer(
             0, // ETH
             "ETH",
-            BigDecimal::from(amount),
-            BigDecimal::from(0),
+            BigUint::from(amount),
+            BigUint::from(0u64),
             &to.address,
             None,
             true,

@@ -102,20 +102,20 @@ impl RollupOpsBlock {
 #[cfg(test)]
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
-    use bigdecimal::BigDecimal;
     use models::node::operations::ChangePubKeyOp;
     use models::node::tx::{ChangePubKey, TxSignature};
     use models::node::{
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
         TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
+    use num::BigUint;
 
     #[test]
     fn test_deposit() {
         let priority_op = Deposit {
             from: "1111111111111111111111111111111111111111".parse().unwrap(),
             token: 1,
-            amount: BigDecimal::from(10),
+            amount: 10u32.into(),
             to: "7777777777777777777777777777777777777777".parse().unwrap(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
@@ -138,8 +138,8 @@ mod test {
             "7777777777777777777777777777777777777777".parse().unwrap(),
             [9u8; 20].into(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(10),
+            20u32.into(),
+            10u32.into(),
             2,
             None,
         );
@@ -162,7 +162,7 @@ mod test {
         };
         let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
-            withdraw_amount: Some(BigDecimal::from(444)),
+            withdraw_amount: Some(BigUint::from(444u32).into()),
         }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
@@ -200,8 +200,8 @@ mod test {
             "7777777777777777777777777777777777777777".parse().unwrap(),
             "8888888888888888888888888888888888888888".parse().unwrap(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(10),
+            20u32.into(),
+            20u32.into(),
             3,
             None,
         );
@@ -226,8 +226,8 @@ mod test {
             "7777777777777777777777777777777777777777".parse().unwrap(),
             "8888888888888888888888888888888888888888".parse().unwrap(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(10),
+            20u32.into(),
+            10u32.into(),
             3,
             None,
         );
