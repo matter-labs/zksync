@@ -13,7 +13,11 @@ use models::{
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
     node::operations::DepositOp,
-    params as franklin_constants,
+    params::{
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH,
+        ETH_ADDRESS_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
+        TX_TYPE_BIT_WIDTH,
+    },
 };
 // Local deps
 use crate::{
@@ -58,35 +62,30 @@ impl Witness for DepositWitness<Bn256> {
 
     fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.tx_type.unwrap(),
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.address.unwrap(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
+            TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.full_amount.unwrap(),
-            franklin_constants::BALANCE_BIT_WIDTH,
+            BALANCE_BIT_WIDTH,
         );
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.eth_address.unwrap(),
-            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+            ETH_ADDRESS_BIT_WIDTH,
         );
-        //        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        pubdata_bits.resize(DepositOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 
@@ -98,7 +97,7 @@ impl Witness for DepositWitness<Bn256> {
         let signer_pub_key_packed = &[Some(false); 256]; //doesn't matter for deposit
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()
-            .chunks(64)
+            .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
             .collect();
 
@@ -122,11 +121,11 @@ impl Witness for DepositWitness<Bn256> {
             rhs: self.before.clone(),
         };
 
-        let operation_one = Operation {
+        let rest_operations = (1..DepositOp::CHUNKS).map(|chunk| Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("1").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[1]),
+            chunk: Some(Fr::from_str(&chunk.to_string()).unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[chunk]),
             first_sig_msg: Some(*first_sig_msg),
             second_sig_msg: Some(*second_sig_msg),
             third_sig_msg: Some(*third_sig_msg),
@@ -135,76 +134,10 @@ impl Witness for DepositWitness<Bn256> {
             args: self.args.clone(),
             lhs: self.after.clone(),
             rhs: self.after.clone(),
-        };
-
-        let operation_two = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("2").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[2]),
-            first_sig_msg: Some(*first_sig_msg),
-            second_sig_msg: Some(*second_sig_msg),
-            third_sig_msg: Some(*third_sig_msg),
-            signer_pub_key_packed: signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-            signature_data: signature_data.clone(),
-        };
-
-        let operation_three = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("3").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[3]),
-            first_sig_msg: Some(*first_sig_msg),
-            second_sig_msg: Some(*second_sig_msg),
-            third_sig_msg: Some(*third_sig_msg),
-            signer_pub_key_packed: signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-            signature_data: signature_data.clone(),
-        };
-
-        let operation_four = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("4").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[4]),
-            first_sig_msg: Some(*first_sig_msg),
-            second_sig_msg: Some(*second_sig_msg),
-            third_sig_msg: Some(*third_sig_msg),
-            signer_pub_key_packed: signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-            signature_data: signature_data.clone(),
-        };
-
-        let operation_five = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("5").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[5]),
-            first_sig_msg: Some(*first_sig_msg),
-            second_sig_msg: Some(*second_sig_msg),
-            third_sig_msg: Some(*third_sig_msg),
-            signer_pub_key_packed: signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-            signature_data: signature_data.clone(),
-        };
-        let operations: Vec<Operation<_>> = vec![
-            operation_zero,
-            operation_one,
-            operation_two,
-            operation_three,
-            operation_four,
-            operation_five,
-        ];
-        operations
+        });
+        std::iter::once(operation_zero)
+            .chain(rest_operations)
+            .collect()
     }
 }
 
@@ -215,27 +148,23 @@ impl<E: RescueEngine> DepositWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("1").unwrap(), //Corresponding tx_type
-            franklin_constants::TX_TYPE_BIT_WIDTH,
+            TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            NEW_PUBKEY_HASH_WIDTH,
         );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut sig_bits, &self.before.token.unwrap(), TOKEN_BIT_WIDTH);
         append_be_fixed_width(
             &mut sig_bits,
             &self.args.full_amount.unwrap(),
-            franklin_constants::BALANCE_BIT_WIDTH,
+            BALANCE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
+            NONCE_BIT_WIDTH,
         );
         sig_bits
     }
@@ -250,7 +179,7 @@ impl DepositWitness<Bn256> {
             get_audits(tree, deposit.account_address, deposit.token);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        assert_eq!(capacity, 1 << account_tree_depth());
         let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
         let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
         let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();

@@ -62,9 +62,9 @@
         },
         {
           "indexed": false,
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "indexed": false,
@@ -130,9 +130,9 @@
         },
         {
           "indexed": false,
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "indexed": false,
@@ -376,9 +376,9 @@
           "type": "uint32"
         },
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_feeAccount",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "bytes32",
@@ -471,9 +471,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "uint16",
@@ -501,9 +501,9 @@
       "constant": true,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "uint16",
@@ -572,9 +572,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "address",

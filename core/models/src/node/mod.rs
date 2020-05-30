@@ -61,7 +61,6 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
 
 pub type TokenId = u16;
 
-/// 3 bytes used.
 pub type AccountId = u32;
 pub type BlockNumber = u32;
 pub type Nonce = u32;

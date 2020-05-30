@@ -173,8 +173,7 @@ export function serializeAccountId(accountId: number): Buffer {
     }
     const buffer = Buffer.alloc(4);
     buffer.writeUInt32BE(accountId, 0);
-    // only 3 bytes
-    return buffer.slice(1);
+    return buffer;
 }
 
 export function serializeTokenId(tokenId: number): Buffer {

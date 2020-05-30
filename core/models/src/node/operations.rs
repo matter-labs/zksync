@@ -8,8 +8,9 @@ use crate::node::{
 };
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
-    BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
-    FR_ADDRESS_LEN, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH,
+    FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
+    TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{
     bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32, BigUintSerdeWrapper,
@@ -31,17 +32,17 @@ impl DepositOp {
     pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(&self.priority_op.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&self.priority_op.to.as_bytes());
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
-            bytes.len() == Self::CHUNKS * 8,
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for deposit pubdata"
         );
 
@@ -88,7 +89,7 @@ impl NoopOp {
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
-            bytes == [0, 0, 0, 0, 0, 0, 0, 0],
+            bytes == [0; CHUNK_BYTES],
             format!("Wrong pubdata for noop operation {:?}", bytes)
         );
         Ok(Self {})
@@ -96,7 +97,7 @@ impl NoopOp {
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 }
@@ -109,25 +110,25 @@ pub struct TransferToNewOp {
 }
 
 impl TransferToNewOp {
-    pub const CHUNKS: usize = 5;
+    pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x02;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.from.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.from.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&pack_token_amount(&self.tx.amount));
         data.extend_from_slice(&self.tx.to.as_bytes());
-        data.extend_from_slice(&self.to.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.to.to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
-            bytes.len() == Self::CHUNKS * 8,
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for transfer to new pubdata"
         );
 
@@ -187,18 +188,18 @@ impl TransferOp {
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.from.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.from.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&self.to.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.to.to_be_bytes());
         data.extend_from_slice(&pack_token_amount(&self.tx.amount));
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
-            bytes.len() == Self::CHUNKS * 8,
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for transfer pubdata"
         );
 
@@ -261,12 +262,12 @@ impl WithdrawOp {
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(self.tx.to.as_bytes());
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 
@@ -281,7 +282,7 @@ impl WithdrawOp {
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
-            bytes.len() == Self::CHUNKS * 8,
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for withdraw pubdata"
         );
 
@@ -333,14 +334,14 @@ impl CloseOp {
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.extend_from_slice(&self.account_id.to_be_bytes());
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
-            bytes.len() == Self::CHUNKS * 8,
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for close pubdata"
         );
 
@@ -376,11 +377,11 @@ impl ChangePubKeyOp {
     pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.new_pk_hash.data);
         data.extend_from_slice(&self.tx.account.as_bytes());
         data.extend_from_slice(&self.tx.nonce.to_be_bytes());
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 
@@ -456,7 +457,7 @@ impl FullExitOp {
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.priority_op.account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.priority_op.account_id.to_be_bytes());
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(
@@ -469,7 +470,7 @@ impl FullExitOp {
                 .unwrap()
                 .to_be_bytes(),
         );
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
 
@@ -491,7 +492,7 @@ impl FullExitOp {
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
-            bytes.len() == Self::CHUNKS * 8,
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for full exit pubdata"
         );
 
@@ -608,16 +609,17 @@ impl FranklinOp {
 
     pub fn public_data_length(op_type: u8) -> Result<usize, failure::Error> {
         match op_type {
-            NoopOp::OP_CODE => Ok(NoopOp::CHUNKS * 8),
-            DepositOp::OP_CODE => Ok(DepositOp::CHUNKS * 8),
-            TransferToNewOp::OP_CODE => Ok(TransferToNewOp::CHUNKS * 8),
-            WithdrawOp::OP_CODE => Ok(WithdrawOp::CHUNKS * 8),
-            CloseOp::OP_CODE => Ok(CloseOp::CHUNKS * 8),
-            TransferOp::OP_CODE => Ok(TransferOp::CHUNKS * 8),
-            FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS * 8),
-            ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS * 8),
+            NoopOp::OP_CODE => Ok(NoopOp::CHUNKS),
+            DepositOp::OP_CODE => Ok(DepositOp::CHUNKS),
+            TransferToNewOp::OP_CODE => Ok(TransferToNewOp::CHUNKS),
+            WithdrawOp::OP_CODE => Ok(WithdrawOp::CHUNKS),
+            CloseOp::OP_CODE => Ok(CloseOp::CHUNKS),
+            TransferOp::OP_CODE => Ok(TransferOp::CHUNKS),
+            FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
+            ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
+        .map(|chunks| chunks * CHUNK_BYTES)
     }
 
     pub fn try_get_tx(&self) -> Result<FranklinTx, failure::Error> {
