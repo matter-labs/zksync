@@ -55,21 +55,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return !exodusMode && totalOpenPriorityRequests == 0;
     }
 
-    // // Migration
-
-    // // Address of the new version of the contract to migrate accounts to
-    // // Can be proposed by network governor
-    // address public migrateTo;
-
-    // // Migration deadline: after this ETH block number migration may happen with the contract
-    // // entering exodus mode for all users who have not opted in for migration
-    // uint32  public migrateByBlock;
-
-    // // Flag for the new contract to indicate that the migration has been sealed
-    // bool    public migrationSealed;
-
-    // mapping (uint32 => bool) tokenMigrated;
-
     constructor() public {}
 
     /// @notice Franklin contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -102,8 +87,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
             abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
         );
-        bool callReturnValue = abi.decode(callReturnValueEncoded, (bool));
-        return callSuccess && callReturnValue;
+        // `transfer` method may return (bool) or nothing.
+        bool returnedSuccess = callReturnValueEncoded.length == 0 || abi.decode(callReturnValueEncoded, (bool));
+        return callSuccess && returnedSuccess;
     }
 
     /// @notice Sends ETH
@@ -230,7 +216,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Register full exit request - pack pubdata, add priority request
     /// @param _accountId Numerical id of the account
     /// @param _token Token address, 0 address for ether
-    function fullExit (uint24 _accountId, address _token) external nonReentrant {
+    function fullExit (uint32 _accountId, address _token) external nonReentrant {
         requireActive();
 
         uint16 tokenId;
@@ -310,19 +296,20 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// _blockNumber is not necessary but it may help to catch server-side errors.
     function commitBlock(
         uint32 _blockNumber,
-        uint24 _feeAccount,
+        uint32 _feeAccount,
         bytes32 _newRoot,
         bytes32 _opTreeRootHash,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
     ) external nonReentrant {
-        bytes memory publicData = _publicData;
-
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
         require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
+
+        bytes memory publicData = _publicData;
+
         if(!triggerExodusIfNeeded()) {
             // Unpack onchain operations and store them.
             // Get priority operations number for this block.
@@ -343,16 +330,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _nCommittedPriorityRequests - number of priority requests in block
     function createCommittedBlock(
         uint32 _blockNumber,
-        uint24 _feeAccount,
+        uint32 _feeAccount,
         bytes32 _newRoot,
         bytes32 _opTreeRootHash,
         bytes memory _publicData,
         bytes32 _withdrawalDataHash,
         uint64 _nCommittedPriorityRequests
     ) internal {
-        require(_publicData.length % 8 == 0, "cbb10"); // Public data size is not multiple of 8
+        require(_publicData.length % CHUNK_BYTES == 0, "cbb10"); // Public data size is not multiple of CHUNK_BYTES
 
-        uint32 blockChunks = uint32(_publicData.length / 8);
+        uint32 blockChunks = uint32(_publicData.length / CHUNK_BYTES);
         require(verifier.isBlockSizeSupported(blockChunks), "ccb11");
 
         // Create block commitment for verification proof
@@ -384,7 +371,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// Priority operations must be committed in the same order as they are in the priority queue.
     function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
         internal returns (bytes32 withdrawalsDataHash) {
-        require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
+        require(_publicData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
 
         uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
 
@@ -514,15 +501,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return ecrecover(keccak256(_message), signV, signR, signS);
     }
 
-    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) internal pure returns (bool) {
-        require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
-
+    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) internal pure returns (bool) {
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n150",
+            "\x19Ethereum Signed Message:\n152",
             "Register zkSync pubkey:\n\n",
             Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)), "\n",
             "nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n",
-            "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt24(_accountId)),
+            "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
             "\n\n",
             "Only sign this message for a trusted client!"
         );
@@ -539,7 +524,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @return block commitment
     function createBlockCommitment(
         uint32 _blockNumber,
-        uint24 _feeAccount,
+        uint32 _feeAccount,
         bytes32 _oldRoot,
         bytes32 _newRoot,
         bytes32 _opTreeRootHash,
@@ -720,7 +705,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
-    function exit(uint24 _accountId, uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
+    function exit(uint32 _accountId, uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
         require(exodusMode, "fet11"); // must be in exodus mode
         require(!exited[_accountId][_tokenId], "fet12"); // already exited

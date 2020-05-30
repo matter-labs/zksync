@@ -3,6 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use crate::params::CHUNK_BIT_WIDTH;
 use crate::serialization::*;
 use chrono::DateTime;
 use chrono::Utc;
@@ -140,7 +141,7 @@ impl Block {
             .collect::<Vec<_>>();
 
         // Pad block with noops.
-        executed_tx_pub_data.resize(self.block_chunks_size * 8, 0x00);
+        executed_tx_pub_data.resize(self.block_chunks_size * CHUNK_BIT_WIDTH / 8, 0x00);
 
         executed_tx_pub_data
     }

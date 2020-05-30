@@ -82,7 +82,7 @@ contract Storage {
     }
 
     /// @notice Flag indicates that a user has exited certain token balance (per account id and tokenId)
-    mapping(uint24 => mapping(uint16 => bool)) public exited;
+    mapping(uint32 => mapping(uint16 => bool)) public exited;
 
     /// @notice Flag indicates that exodus (mass exit) mode is triggered
     /// @notice Once it was raised, it can not be cleared again, and all users must exit
@@ -118,7 +118,7 @@ contract Storage {
 
     /// @notice Packs address and token id into single word to use as a key in balances mapping
     function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {
-        return bytes22(uint176(uint(_address) | (_tokenId << 160)));
+        return bytes22((uint176(_address) | (uint176(_tokenId) << 160)));
     }
 
     /// @notice Gets value from balancesToWithdraw
