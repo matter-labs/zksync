@@ -6,6 +6,7 @@ use crypto_exports::franklin_crypto::{
     },
     rescue::RescueEngine,
 };
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -13,8 +14,13 @@ use models::{
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
     node::operations::WithdrawOp,
-    params as franklin_constants,
-    primitives::{big_decimal_to_u128, convert_to_float},
+    params::{
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH,
+        AMOUNT_MANTISSA_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    },
+    primitives::convert_to_float,
 };
 // Local deps
 use crate::{
@@ -48,8 +54,8 @@ impl Witness for WithdrawWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, withdraw: &WithdrawOp) -> Self {
         let withdraw_data = WithdrawData {
-            amount: big_decimal_to_u128(&withdraw.tx.amount),
-            fee: big_decimal_to_u128(&withdraw.tx.fee),
+            amount: withdraw.tx.amount.to_u128().unwrap(),
+            fee: withdraw.tx.fee.to_u128().unwrap(),
             token: u32::from(withdraw.tx.token),
             account_address: withdraw.account_id,
             eth_address: eth_address_to_fr(&withdraw.tx.to),
@@ -60,47 +66,43 @@ impl Witness for WithdrawWitness<Bn256> {
 
     fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.tx_type.unwrap(),
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.address.unwrap(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
+            TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.full_amount.unwrap(),
-            franklin_constants::BALANCE_BIT_WIDTH,
+            BALANCE_BIT_WIDTH,
         );
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.fee.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.eth_address.unwrap(),
-            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+            ETH_ADDRESS_BIT_WIDTH,
         );
-        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        pubdata_bits.resize(WithdrawOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()
-            .chunks(64)
+            .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
             .collect();
 
@@ -119,11 +121,11 @@ impl Witness for WithdrawWitness<Bn256> {
             rhs: self.before.clone(),
         };
 
-        let operation_one = Operation {
+        let rest_operations = (1..WithdrawOp::CHUNKS).map(|chunk| Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("1").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[1]),
+            chunk: Some(Fr::from_str(&chunk.to_string()).unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[chunk]),
             first_sig_msg: Some(input.first_sig_msg),
             second_sig_msg: Some(input.second_sig_msg),
             third_sig_msg: Some(input.third_sig_msg),
@@ -132,73 +134,10 @@ impl Witness for WithdrawWitness<Bn256> {
             args: self.args.clone(),
             lhs: self.after.clone(),
             rhs: self.after.clone(),
-        };
-
-        let operation_two = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("2").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[2]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-        };
-
-        let operation_three = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("3").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[3]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-        };
-        let operation_four = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("4").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[4]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-        };
-        let operation_five = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("5").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[5]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-        };
-        vec![
-            operation_zero,
-            operation_one,
-            operation_two,
-            operation_three,
-            operation_four,
-            operation_five,
-        ]
+        });
+        std::iter::once(operation_zero)
+            .chain(rest_operations)
+            .collect()
     }
 }
 
@@ -208,37 +147,33 @@ impl<E: RescueEngine> WithdrawWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("3").unwrap(), //Corresponding tx_type
-            franklin_constants::TX_TYPE_BIT_WIDTH,
+            TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.before.witness.account_witness.pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            NEW_PUBKEY_HASH_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.args.eth_address.unwrap(),
-            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+            ETH_ADDRESS_BIT_WIDTH,
         );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut sig_bits, &self.before.token.unwrap(), TOKEN_BIT_WIDTH);
         append_be_fixed_width(
             &mut sig_bits,
             &self.args.full_amount.unwrap(),
-            franklin_constants::BALANCE_BIT_WIDTH,
+            BALANCE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.args.fee.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
+            NONCE_BIT_WIDTH,
         );
         sig_bits
     }
@@ -253,15 +188,15 @@ impl WithdrawWitness<Bn256> {
             get_audits(tree, withdraw.account_address, withdraw.token);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        assert_eq!(capacity, 1 << account_tree_depth());
         let account_address_fe = Fr::from_str(&withdraw.account_address.to_string()).unwrap();
         let token_fe = Fr::from_str(&withdraw.token.to_string()).unwrap();
         let amount_as_field_element = Fr::from_str(&withdraw.amount.to_string()).unwrap();
 
         let amount_bits = convert_to_float(
             withdraw.amount,
-            franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+            AMOUNT_EXPONENT_BIT_WIDTH,
+            AMOUNT_MANTISSA_BIT_WIDTH,
             10,
         )
         .unwrap();
@@ -272,8 +207,8 @@ impl WithdrawWitness<Bn256> {
 
         let fee_bits = convert_to_float(
             withdraw.fee,
-            franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+            FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH,
             10,
         )
         .unwrap();

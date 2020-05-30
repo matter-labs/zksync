@@ -17,6 +17,9 @@ contract Config {
     /// @notice ETH token withdrawal gas limit, used only for complete withdrawals
     uint256 constant ETH_WITHDRAWAL_GAS_LIMIT = 10000;
 
+    /// @notice Bytes in one chunk
+    uint8 constant CHUNK_BYTES = 9;
+
     /// @notice zkSync address length
     uint8 constant ADDRESS_BYTES = 20;
 
@@ -41,20 +44,20 @@ contract Config {
     /// @notice ETH blocks verification expectation
     uint256 constant EXPECT_VERIFICATION_IN = 2 days / BLOCK_PERIOD;
 
-    uint256 constant NOOP_BYTES = 1 * 8;
-    uint256 constant DEPOSIT_BYTES = 6 * 8;
-    uint256 constant TRANSFER_TO_NEW_BYTES = 5 * 8;
-    uint256 constant PARTIAL_EXIT_BYTES = 6 * 8;
-    uint256 constant TRANSFER_BYTES = 2 * 8;
+    uint256 constant NOOP_BYTES = 1 * CHUNK_BYTES;
+    uint256 constant DEPOSIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 constant TRANSFER_TO_NEW_BYTES = 6 * CHUNK_BYTES;
+    uint256 constant PARTIAL_EXIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 constant TRANSFER_BYTES = 2 * CHUNK_BYTES;
 
     /// @notice Full exit operation length
-    uint256 constant FULL_EXIT_BYTES = 6 * 8;
+    uint256 constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
 
     /// @notice OnchainWithdrawal data length
     uint256 constant ONCHAIN_WITHDRAWAL_BYTES = 1 + 20 + 2 + 16; // (uint8 addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
 
     /// @notice ChangePubKey operation length
-    uint256 constant CHANGE_PUBKEY_BYTES = 6 * 8;
+    uint256 constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     /// NOTE: Priority expiration should be > EXPECT_VERIFICATION_IN, otherwise incorrect block with priority op could not be reverted.

@@ -6,6 +6,7 @@ use crypto_exports::franklin_crypto::{
     },
     rescue::RescueEngine,
 };
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -13,8 +14,12 @@ use models::{
         utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
     node::operations::TransferOp,
-    params as franklin_constants,
-    primitives::{big_decimal_to_u128, convert_to_float},
+    params::{
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH,
+        AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
+        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    },
+    primitives::convert_to_float,
 };
 // Local deps
 use crate::{
@@ -54,8 +59,8 @@ impl Witness for TransferWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, transfer: &TransferOp) -> Self {
         let transfer_data = TransferData {
-            amount: big_decimal_to_u128(&transfer.tx.amount),
-            fee: big_decimal_to_u128(&transfer.tx.fee),
+            amount: transfer.tx.amount.to_u128().unwrap(),
+            fee: transfer.tx.fee.to_u128().unwrap(),
             token: u32::from(transfer.tx.token),
             from_account_address: transfer.from,
             to_account_address: transfer.to,
@@ -67,47 +72,42 @@ impl Witness for TransferWitness<Bn256> {
     fn get_pubdata(&self) -> Vec<bool> {
         // construct pubdata
         let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.tx_type.unwrap(),
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.from_before.address.unwrap(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.from_before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
+            TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.to_before.address.unwrap(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.amount_packed.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            AMOUNT_MANTISSA_BIT_WIDTH + AMOUNT_EXPONENT_BIT_WIDTH,
         );
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.fee.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
-        pubdata_bits.resize(2 * franklin_constants::CHUNK_BIT_WIDTH, false); //TODO verify if right padding is okay
+        pubdata_bits.resize(TransferOp::CHUNKS * CHUNK_BIT_WIDTH, false); //TODO verify if right padding is okay
         pubdata_bits
     }
 
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()
-            .chunks(64)
+            .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
             .collect();
 
@@ -150,7 +150,7 @@ impl<E: RescueEngine> TransferWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("5").unwrap(), //Corresponding tx_type
-            franklin_constants::TX_TYPE_BIT_WIDTH,
+            TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -160,34 +160,33 @@ impl<E: RescueEngine> TransferWitness<E> {
                 .account_witness
                 .pub_key_hash
                 .unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            NEW_PUBKEY_HASH_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.to_before.witness.account_witness.pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            NEW_PUBKEY_HASH_WIDTH,
         );
 
         append_be_fixed_width(
             &mut sig_bits,
             &self.from_before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
+            TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.args.amount_packed.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            AMOUNT_MANTISSA_BIT_WIDTH + AMOUNT_EXPONENT_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.args.fee.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.from_before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
+            NONCE_BIT_WIDTH,
         );
         sig_bits
     }
@@ -205,7 +204,7 @@ impl TransferWitness<Bn256> {
             get_audits(tree, transfer.to_account_address, transfer.token);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        assert_eq!(capacity, 1 << account_tree_depth());
         let account_address_from_fe =
             Fr::from_str(&transfer.from_account_address.to_string()).unwrap();
         let account_address_to_fe = Fr::from_str(&transfer.to_account_address.to_string()).unwrap();
@@ -214,8 +213,8 @@ impl TransferWitness<Bn256> {
 
         let amount_bits = convert_to_float(
             transfer.amount,
-            franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+            AMOUNT_EXPONENT_BIT_WIDTH,
+            AMOUNT_MANTISSA_BIT_WIDTH,
             10,
         )
         .unwrap();
@@ -226,8 +225,8 @@ impl TransferWitness<Bn256> {
 
         let fee_bits = convert_to_float(
             transfer.fee,
-            franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+            FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH,
             10,
         )
         .unwrap();

@@ -12,8 +12,11 @@ use models::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
-    node::operations::FullExitOp,
-    params as franklin_constants,
+    node::FullExitOp,
+    params::{
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH,
+        ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    },
 };
 // Local deps
 use crate::{
@@ -57,7 +60,7 @@ impl Witness for FullExitWitness<Bn256> {
             full_exit_amount: full_exit
                 .withdraw_amount
                 .clone()
-                .map(|amount| Fr::from_str(&amount.to_string()).unwrap())
+                .map(|amount| Fr::from_str(&amount.0.to_string()).unwrap())
                 .unwrap_or_else(Fr::zero),
         };
 
@@ -67,40 +70,36 @@ impl Witness for FullExitWitness<Bn256> {
 
     fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.tx_type.unwrap(),
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.address.unwrap(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.eth_address.unwrap(),
-            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+            ETH_ADDRESS_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
+            TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.full_amount.unwrap(),
-            franklin_constants::BALANCE_BIT_WIDTH,
+            BALANCE_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        pubdata_bits.resize(FullExitOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 
     fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
         let pubdata_chunks = self
             .get_pubdata()
-            .chunks(64)
+            .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
             .collect::<Vec<_>>();
 
@@ -158,7 +157,7 @@ impl FullExitWitness<Bn256> {
             get_audits(tree, full_exit.account_address, full_exit.token);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        assert_eq!(capacity, 1 << account_tree_depth());
         let account_address_fe = Fr::from_str(&full_exit.account_address.to_string()).unwrap();
         let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
 

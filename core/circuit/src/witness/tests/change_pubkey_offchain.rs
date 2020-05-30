@@ -69,7 +69,7 @@ fn test_incorrect_change_pubkey_account() {
         || {
             vec![CollectedFee {
                 token: 0,
-                amount: 0.into(),
+                amount: 0u32.into(),
             }]
         },
     );

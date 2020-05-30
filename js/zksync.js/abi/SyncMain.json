@@ -62,9 +62,9 @@
         },
         {
           "indexed": false,
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "indexed": false,
@@ -130,9 +130,9 @@
         },
         {
           "indexed": false,
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "indexed": false,
@@ -241,9 +241,9 @@
         },
         {
           "indexed": false,
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "amount",
-          "type": "uint256"
+          "type": "uint128"
         }
       ],
       "name": "OnchainWithdrawal",
@@ -287,9 +287,9 @@
       "name": "balancesToWithdraw",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "balanceToWithdraw",
-          "type": "uint256"
+          "type": "uint128"
         },
         {
           "internalType": "uint8",
@@ -341,6 +341,11 @@
           "internalType": "bytes32",
           "name": "stateRoot",
           "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "opTreeRootHash",
+          "type": "bytes32"
         }
       ],
       "payable": false,
@@ -371,13 +376,18 @@
           "type": "uint32"
         },
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_feeAccount",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "bytes32",
           "name": "_newRoot",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_opTreeRootHash",
           "type": "bytes32"
         },
         {
@@ -426,9 +436,9 @@
           "type": "address"
         },
         {
-          "internalType": "uint128",
+          "internalType": "uint104",
           "name": "_amount",
-          "type": "uint128"
+          "type": "uint104"
         },
         {
           "internalType": "address",
@@ -461,9 +471,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "uint16",
@@ -491,9 +501,9 @@
       "constant": true,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "uint16",
@@ -562,9 +572,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "address",
@@ -595,9 +605,9 @@
       "name": "getBalanceToWithdraw",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "",
-          "type": "uint256"
+          "type": "uint128"
         }
       ],
       "payable": false,
@@ -946,9 +956,9 @@
           "type": "address"
         },
         {
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "_amount",
-          "type": "uint256"
+          "type": "uint128"
         }
       ],
       "name": "withdrawERC20",
@@ -961,9 +971,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "_amount",
-          "type": "uint256"
+          "type": "uint128"
         }
       ],
       "name": "withdrawETH",

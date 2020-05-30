@@ -36,7 +36,7 @@ contract OperationsTest {
 
     function testFullExit() external pure {
         Operations.FullExit memory x = Operations.FullExit({
-            accountId:  0x010203,
+            accountId:  0x01020304,
             owner:      0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
             tokenId:    0x3132,
             amount:     0x101112131415161718191a1b1c1d1e1f
@@ -54,7 +54,7 @@ contract OperationsTest {
 
     function testFullExitMatch(bytes calldata offchain) external pure returns (bool) {
         Operations.FullExit memory x = Operations.FullExit({
-            accountId:  0x010203,
+            accountId:  0x01020304,
             owner:      0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
             tokenId:    0x3132,
             amount:     0
@@ -84,7 +84,7 @@ contract OperationsTest {
         return (r.tokenId, r.amount, r.owner);
     }
 
-    function parseFullExitFromPubdata(bytes calldata _pubdata) external pure returns (uint24 accountId, address owner, uint16 tokenId, uint128 amount) {
+    function parseFullExitFromPubdata(bytes calldata _pubdata) external pure returns (uint32 accountId, address owner, uint16 tokenId, uint128 amount) {
         Operations.FullExit memory r = Operations.readFullExitPubdata(_pubdata);
         accountId = r.accountId;
         owner = r.owner;

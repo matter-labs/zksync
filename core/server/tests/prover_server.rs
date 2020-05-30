@@ -12,6 +12,7 @@ use models::{
     params::{account_tree_depth, total_tokens},
     prover_utils::EncodedProofPlonk,
 };
+use num::BigUint;
 use prover::{client, ApiClient};
 // Local deps
 use server::prover_server;
@@ -183,7 +184,7 @@ pub fn test_operation_and_wanted_prover_data(
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
         from: validator_account.address,
         token: 0,
-        amount: bigdecimal::BigDecimal::from(10),
+        amount: BigUint::from(10u32),
         to: validator_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
@@ -325,7 +326,7 @@ fn api_server_publish_dummy() {
     let rounds_interval = time::Duration::from_secs(10);
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::new();
     let res = client
         .post(&format!("http://{}/publish", &addr))
         .json(&client::PublishReq {

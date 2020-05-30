@@ -74,7 +74,7 @@ pub fn total_tokens() -> usize {
 }
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-pub const ACCOUNT_ID_BIT_WIDTH: usize = 24;
+pub const ACCOUNT_ID_BIT_WIDTH: usize = 32;
 
 pub const INPUT_DATA_ADDRESS_BYTES_WIDTH: usize = 32;
 pub const INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH: usize = 32;
@@ -99,7 +99,8 @@ pub const ADDRESS_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
-pub const CHUNK_BIT_WIDTH: usize = 64;
+pub const CHUNK_BIT_WIDTH: usize = 72;
+pub const CHUNK_BYTES: usize = CHUNK_BIT_WIDTH / 8;
 
 pub const MAX_CIRCUIT_MSG_HASH_BITS: usize = 736;
 
