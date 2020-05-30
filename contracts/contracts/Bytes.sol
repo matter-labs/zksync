@@ -89,7 +89,7 @@ library Bytes {
     }
 
     function bytesToBytes32(bytes memory  _bytes, uint256 _start) internal pure returns (bytes32 r) {
-        require(_bytes.length >= 0x20, "btb32");
+        require(_bytes.length >= _start + 0x20, "btb32");
         assembly {
             r := mload(add(add(_bytes, 0x20), _start))
         }

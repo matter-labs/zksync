@@ -103,7 +103,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
         );
         // `transfer` method may return (bool) or nothing.
-        bool returnedSuccess = callReturnValueEncoded == 0 || abi.decode(callReturnValueEncoded, (bool));
+        bool returnedSuccess = callReturnValueEncoded.length == 0 || abi.decode(callReturnValueEncoded, (bool));
         return callSuccess && returnedSuccess;
     }
 
