@@ -111,7 +111,7 @@ This includes, in particular, the following claims:
 
 |Type|Byte len|Encoding|Comment|
 |--|--|--|--|
-|AccountId|4|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 2^32 = 4.294967296 × 10^9|
+|AccountId|4|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 2^32 - 1 = 4.294967295 × 10^9|
 |TokenId|2|BE integer|Incremented number of tokens in Rollup, max value is 65535|
 |PackedTxAmount|5|[Parameters](#amount-packing)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa * 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 * 10^31, providing 10 full decimal digit precision.|
 |PackedFee|2|[Parameters](#amount-packing)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|

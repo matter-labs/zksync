@@ -555,7 +555,7 @@ describe("zkSync test process next operation", function() {
         let offset = 1;
         pubdata.writeUInt32BE(0xccaabbff, offset);
         offset += 4;
-        // token = 0
+        pubdata.writeUInt16BE(0, offset); // token
         offset += 2;
         Buffer.from(depositAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, offset);
         offset += 16;
