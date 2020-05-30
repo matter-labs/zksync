@@ -138,7 +138,8 @@ export class Wallet {
                 : await this.getNonce();
 
         if (transfer.fee == null) {
-            transfer.fee = await this.provider.getTransactionFee("Transfer", transfer.amount, transfer.token);
+            const fullFee = await this.provider.getTransactionFee("Transfer", this.address(), transfer.token);
+            transfer.fee = fullFee.total_fee;
         }
 
         const transactionData = {
@@ -205,7 +206,8 @@ export class Wallet {
                 : await this.getNonce();
             
         if (withdraw.fee == null) {
-            withdraw.fee = await this.provider.getTransactionFee("Withdraw", withdraw.amount, withdraw.token);
+            const fullFee = await this.provider.getTransactionFee("Withdraw", this.address(), withdraw.token);
+            withdraw.fee = fullFee.total_fee;
         }
 
         const transactionData = {

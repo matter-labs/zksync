@@ -487,6 +487,17 @@ impl<'a> BlockSchema<'a> {
         })
     }
 
+    /// Returns `true` if there is a stored pending block in the database.
+    pub fn pending_block_exists(&self) -> QueryResult<bool> {
+        use crate::schema::pending_block::dsl::*;
+        let result = pending_block
+            .first::<StoragePendingBlock>(self.0.conn())
+            .optional()?
+            .is_some();
+
+        Ok(result)
+    }
+
     pub fn save_pending_block(&self, pending_block: PendingBlock) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             let storage_block = StoragePendingBlock {

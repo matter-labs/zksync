@@ -58,7 +58,7 @@ async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet
     }
 }
 
-async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumberish) {
+async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
 
     const startTime = new Date().getTime();
@@ -240,11 +240,13 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
     // we do two transfers to test transfer to new and ordinary transfer.
     const transfersAmount = depositAmount.div(10);
-    const transfersFee = await syncProvider.getTransactionFee("Transfer", transfersAmount, token);
+    const transfersFeeFull = await syncProvider.getTransactionFee("Transfer", depositWallet.address(), token);
+    const transfersFee = transfersFeeFull.total_fee;
 
 
     const withdrawAmount = transfersAmount.div(10);
-    const withdrawFee = await syncProvider.getTransactionFee("Withdraw", withdrawAmount, token);
+    const withdrawFeeFull = await syncProvider.getTransactionFee("Withdraw", depositWallet.address(), token);
+    const withdrawFee = withdrawFeeFull.total_fee;
 
     await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Auto approved deposit ok, Token: ${token}`);
