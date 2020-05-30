@@ -118,7 +118,7 @@ contract Storage {
 
     /// @notice Packs address and token id into single word to use as a key in balances mapping
     function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {
-        return bytes22(uint176(uint(_address) | (_tokenId << 160)));
+        return bytes22((uint176(_address) | (uint176(_tokenId) << 160)));
     }
 
     /// @notice Gets value from balancesToWithdraw

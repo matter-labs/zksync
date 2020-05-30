@@ -55,21 +55,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return !exodusMode && totalOpenPriorityRequests == 0;
     }
 
-    // // Migration
-
-    // // Address of the new version of the contract to migrate accounts to
-    // // Can be proposed by network governor
-    // address public migrateTo;
-
-    // // Migration deadline: after this ETH block number migration may happen with the contract
-    // // entering exodus mode for all users who have not opted in for migration
-    // uint32  public migrateByBlock;
-
-    // // Flag for the new contract to indicate that the migration has been sealed
-    // bool    public migrationSealed;
-
-    // mapping (uint32 => bool) tokenMigrated;
-
     constructor() public {}
 
     /// @notice Franklin contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -102,8 +87,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
             abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
         );
-        bool callReturnValue = abi.decode(callReturnValueEncoded, (bool));
-        return callSuccess && callReturnValue;
+        // `transfer` method may return (bool) or nothing.
+        bool returnedSuccess = callReturnValueEncoded.length == 0 || abi.decode(callReturnValueEncoded, (bool));
+        return callSuccess && returnedSuccess;
     }
 
     /// @notice Sends ETH
@@ -317,12 +303,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
     ) external nonReentrant {
-        bytes memory publicData = _publicData;
-
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
         require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
+
+        bytes memory publicData = _publicData;
+
         if(!triggerExodusIfNeeded()) {
             // Unpack onchain operations and store them.
             // Get priority operations number for this block.
@@ -515,8 +502,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) internal pure returns (bool) {
-        require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
-
         bytes memory signedMessage = abi.encodePacked(
             "\x19Ethereum Signed Message:\n152",
             "Register zkSync pubkey:\n\n",
