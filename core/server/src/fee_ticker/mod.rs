@@ -110,12 +110,7 @@ pub fn run_ticker_task(
     };
 
     let ticker_api = TickerApi::new(api_base_url, db_pool.clone(), eth_sender_request_sender);
-    let fee_ticker = FeeTicker::new(
-        ticker_api,
-        tricker_requests,
-        ticker_config,
-        Some(db_pool.clone()),
-    );
+    let fee_ticker = FeeTicker::new(ticker_api, tricker_requests, ticker_config, Some(db_pool));
 
     runtime.spawn(fee_ticker.run());
 }
