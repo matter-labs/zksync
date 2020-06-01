@@ -235,8 +235,8 @@ pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     bits: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     assert!(
-        bits.len() <= E::Fr::CAPACITY as usize,
-        "can not pack bits into field element with loss of precision"
+        bits.len() <= E::Fr::NUM_BITS as usize,
+        "can not pack bits into field element: number of bits is larger than number of bits in a field"
     );
     let mut data_from_lc = Num::<E>::zero();
     let mut coeff = E::Fr::one();
@@ -257,6 +257,18 @@ pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     );
 
     Ok(data_packed)
+}
+
+pub fn pack_bits_to_element_strict<E: Engine, CS: ConstraintSystem<E>>(
+    cs: CS,
+    bits: &[Boolean],
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert!(
+        bits.len() <= E::Fr::CAPACITY as usize,
+        "can not pack bits into field element over the precision"
+    );
+
+    pack_bits_to_element(cs, bits)
 }
 
 // count a number of non-zero bits in a bit decomposition
