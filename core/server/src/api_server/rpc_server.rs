@@ -922,11 +922,11 @@ impl Rpc for RpcApp {
                 .map(|result| {
                     result.map(|fee| {
                         serde_json::json!({
-                            "gas_tx_amount": BigUintSerdeWrapper(fee.gas_tx_amount),
-                            "gas_price_wei": BigUintSerdeWrapper(fee.gas_price_wei),
-                            "gas_fee": BigUintSerdeWrapper(fee.gas_fee),
-                            "zkp_fee": BigUintSerdeWrapper(fee.zkp_fee),
-                            "total_fee": BigUintSerdeWrapper(fee.total_fee),
+                            "gasTxAmount": BigUintSerdeWrapper(fee.gas_tx_amount),
+                            "gasPriceWei": BigUintSerdeWrapper(fee.gas_price_wei),
+                            "gasFee": BigUintSerdeWrapper(fee.gas_fee),
+                            "zkpFee": BigUintSerdeWrapper(fee.zkp_fee),
+                            "totalFee": BigUintSerdeWrapper(fee.total_fee),
                         })
                     })
                 })

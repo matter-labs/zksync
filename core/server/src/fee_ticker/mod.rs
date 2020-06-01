@@ -26,6 +26,7 @@ use tokio::runtime::Runtime;
 mod ticker_api;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Fee {
     pub gas_tx_amount: BigUint,
     pub gas_price_wei: BigUint,
