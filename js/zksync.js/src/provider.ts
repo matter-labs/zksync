@@ -201,6 +201,15 @@ export class Provider {
         };
     }
 
+    async getTokenPrice(
+        tokenLike: TokenLike
+    ): Promise<number> {
+        const tokenPrice = await this.transport.request("get_token_price", [
+            tokenLike
+        ]);
+        return parseFloat(tokenPrice);
+    }
+
     async disconnect() {
         return await this.transport.disconnect();
     }
