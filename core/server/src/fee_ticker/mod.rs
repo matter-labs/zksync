@@ -13,7 +13,7 @@ use models::node::{
     pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp, TransferToNewOp,
     TxFeeTypes, WithdrawOp,
 };
-use models::primitives::{ratio_to_big_decimal, round_precision};
+use models::primitives::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str};
 use num::rational::Ratio;
 use num::traits::{Inv, Pow};
 use num::BigUint;
@@ -29,10 +29,15 @@ mod ticker_api;
 #[serde(rename_all = "camelCase")]
 pub struct Fee {
     pub fee_type: String,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub gas_tx_amount: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub gas_price_wei: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub gas_fee: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub zkp_fee: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub total_fee: BigUint,
 }
 

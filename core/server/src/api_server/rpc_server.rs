@@ -298,7 +298,7 @@ pub trait Rpc {
         tx_type: TxFeeTypes,
         address: Address,
         token_like: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = serde_json::Value, Error = Error> + Send>;
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(
@@ -916,21 +916,9 @@ impl Rpc for RpcApp {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = serde_json::Value, Error = Error> + Send> {
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send> {
         Box::new(
             Self::ticker_request(self.ticker_request_sender.clone(), tx_type, address, token)
-                .map(|result| {
-                    result.map(|fee| {
-                        serde_json::json!({
-                            "feeType": fee.fee_type,
-                            "gasTxAmount": BigUintSerdeWrapper(fee.gas_tx_amount),
-                            "gasPriceWei": BigUintSerdeWrapper(fee.gas_price_wei),
-                            "gasFee": BigUintSerdeWrapper(fee.gas_fee),
-                            "zkpFee": BigUintSerdeWrapper(fee.zkp_fee),
-                            "totalFee": BigUintSerdeWrapper(fee.total_fee),
-                        })
-                    })
-                })
                 .boxed()
                 .compat(),
         )
