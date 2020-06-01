@@ -1131,12 +1131,19 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         //keys are same or account is empty
-        let is_pubkey_correct = Boolean::and(
-            cs.namespace(|| "acc not empty and keys are not the same"),
-            &is_pub_equal_to_previous.not(),
-            &is_account_empty.not(),
-        )?
-        .not();
+
+        let is_pubkey_correct = Boolean::xor(
+            cs.namespace(|| "keys are same or account is empty"),
+            &is_pub_equal_to_previous,
+            &is_account_empty,
+        )?;
+
+        // let is_pubkey_correct = Boolean::and(
+        //     cs.namespace(|| "acc not empty and keys are not the same"),
+        //     &is_pub_equal_to_previous.not(),
+        //     &is_account_empty.not(),
+        // )?
+        // .not();
         is_valid_flags.push(is_pubkey_correct);
 
         //verify correct amounts
@@ -1689,12 +1696,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_rhs_valid,
         )?;
 
-        Ok(Boolean::and(
-            cs.namespace(|| "lhs_valid nand rhs_valid"),
-            &lhs_valid.not(),
-            &is_rhs_valid.not(),
-        )?
-        .not())
+        // Either LHS or RHS are correct (due to chunking at least)
+        let correct = Boolean::xor(
+            cs.namespace(|| "lhs_valid XOR rhs_valid"), 
+            &lhs_valid, 
+            &is_rhs_valid,
+        )?;
+
+        Ok(correct)
     }
 }
 

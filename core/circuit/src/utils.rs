@@ -357,3 +357,19 @@ pub fn resize_grow_only<T: Clone>(to_resize: &mut Vec<T>, new_size: usize, pad_w
     assert!(to_resize.len() <= new_size);
     to_resize.resize(new_size, pad_with);
 }
+
+pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    x: &Boolean,
+    y: &Boolean
+) -> Result<Boolean, SynthesisError> {
+    // A OR B = ( A NAND A ) NAND ( B NAND B ) = (NOT(A)) NAND (NOT (B))
+    let result = Boolean::and(
+        cs.namespace(|| "lhs_valid nand rhs_valid"),
+        &x.not(),
+        &y.not(),
+    )?
+    .not();
+
+    Ok(result)
+}
