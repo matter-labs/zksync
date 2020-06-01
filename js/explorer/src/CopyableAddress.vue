@@ -1,5 +1,5 @@
 <template>
-    <code v-if="address">
+    <span v-if="address">
         <span class="link-html-span" v-html="linkHtml" />
         <i v-if="tooltipRight===true"
             @click="clicked"
@@ -15,7 +15,7 @@
             v-clipboard="address"
             @mouseenter="mouseEntered"
         ></i>
-    </code>
+    </span>
 </template>
 
 <script>

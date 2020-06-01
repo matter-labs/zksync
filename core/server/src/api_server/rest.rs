@@ -8,7 +8,9 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use models::config_options::ThreadPanicNotify;
-use models::node::{Account, AccountId, Address, ExecutedOperations, PriorityOp, Token, TokenId};
+use models::node::{
+    Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
+};
 use models::NetworkStatus;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -23,9 +25,9 @@ use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
 
-use super::rpc_server::get_ongoing_priority_ops;
-use crate::eth_watch::EthWatchRequest;
-use storage::chain::operations_ext::records::TransactionsHistoryItem;
+use super::rpc_server::{get_ongoing_priority_ops, get_unconfirmed_op_by_hash};
+use crate::eth_watch::{EthBlockId, EthWatchRequest};
+use storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -106,13 +108,7 @@ impl AppState {
         self.connection_pool
             .access_storage_fragile()
             .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] DB await timeout: '{}';",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                );
+                vlog::warn!("DB await timeout: '{}';", err);
                 HttpResponse::RequestTimeout().finish().into()
             })
     }
@@ -217,14 +213,7 @@ impl AppState {
             .operations_ext_schema()
             .get_priority_op_receipt(id)
             .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    id,
-                );
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, id);
                 HttpResponse::InternalServerError().finish()
             })?;
 
@@ -250,14 +239,7 @@ impl AppState {
             .block_schema()
             .get_block_executed_ops(block_id)
             .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    block_id,
-                );
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
                 HttpResponse::InternalServerError().finish()
             })?;
 
@@ -287,14 +269,7 @@ impl AppState {
             .block_schema()
             .load_block_range(block_id, 1)
             .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    block_id,
-                );
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
                 HttpResponse::InternalServerError().finish()
             })?;
 
@@ -356,13 +331,7 @@ struct AccountStateResponse {
 fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
     let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-        log::warn!(
-            "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-            file!(),
-            line!(),
-            column!(),
-            err
-        );
+        vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
         HttpResponse::InternalServerError().finish()
     })?;
 
@@ -370,6 +339,57 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     vec_tokens.sort_by_key(|t| t.id);
 
     Ok(HttpResponse::Ok().json(vec_tokens))
+}
+
+fn priority_op_to_tx_by_hash(
+    tokens: &HashMap<TokenId, Token>,
+    op: &PriorityOp,
+    eth_block: EthBlockId,
+) -> Option<TxByHashResponse> {
+    match &op.data {
+        FranklinPriorityOp::Deposit(deposit) => {
+            // As the time of creation is indefinite, we always will provide the current time.
+            let current_time = chrono::Utc::now();
+            let naive_current_time =
+                chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
+
+            // Account ID may not exist for depositing ops, so it'll be `null`.
+            let account_id: Option<u32> = None;
+
+            let token_symbol = tokens.get(&deposit.token).map(|t| t.symbol.clone());
+
+            // Copy the JSON representation of the executed tx so the appearance
+            // will be the same as for txs from storage.
+            let tx_json = serde_json::json!({
+                "account_id": account_id,
+                "priority_op": {
+                    "amount": deposit.amount,
+                    "from": deposit.from,
+                    "to": deposit.to,
+                    "token": token_symbol
+                },
+                "type": "Deposit",
+                "eth_block_number": eth_block,
+            });
+
+            Some(TxByHashResponse {
+                tx_type: "Deposit".into(),
+                from: format!("{:?}", deposit.from),
+                to: format!("{:?}", deposit.to),
+                token: deposit.token,
+                amount: deposit.amount.to_string(),
+                fee: None,
+                block_number: -1,
+                nonce: -1,
+                created_at: naive_current_time
+                    .format("%Y-%m-%dT%H:%M:%S%.6f")
+                    .to_string(),
+                fail_reason: None,
+                tx: tx_json,
+            })
+        }
+        _ => None,
+    }
 }
 
 /// Converts a non-executed priority operation into a
@@ -410,7 +430,7 @@ fn priority_op_to_tx_history(
 
     // As the time of creation is indefinite, we always will provide the current time.
     let current_time = chrono::Utc::now();
-    let naitve_current_time = chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
+    let naive_current_time = chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
 
     TransactionsHistoryItem {
         tx_id: "-".into(),
@@ -422,7 +442,7 @@ fn priority_op_to_tx_history(
         fail_reason: None,
         commited: false,
         verified: false,
-        created_at: naitve_current_time,
+        created_at: naive_current_time,
     }
 }
 
@@ -437,15 +457,10 @@ fn handle_get_account_transactions_history(
         return Err(HttpResponse::BadRequest().finish().into());
     }
 
-    let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
-
     let storage = data.access_storage()?;
     let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-        log::warn!(
-            "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
-            file!(),
-            line!(),
-            column!(),
+        vlog::warn!(
+            "Internal Server Error: '{}'; input: ({}, {}, {})",
             err,
             address,
             offset,
@@ -454,16 +469,14 @@ fn handle_get_account_transactions_history(
         HttpResponse::InternalServerError().finish()
     })?;
 
+    let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
     // Fetch ongoing deposits, since they must be reported within the transactions history.
     let mut ongoing_ops = futures::executor::block_on(async move {
         get_ongoing_priority_ops(&eth_watcher_request_sender, address).await
     })
     .map_err(|err| {
-        log::warn!(
-            "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
-            file!(),
-            line!(),
-            column!(),
+        vlog::warn!(
+            "Internal Server Error: '{}'; input: ({}, {}, {})",
             err,
             address,
             offset,
@@ -504,11 +517,8 @@ fn handle_get_account_transactions_history(
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
         .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {}, {})",
                 err,
                 address,
                 offset,
@@ -537,14 +547,7 @@ fn parse_tx_id(data: &str, storage: &StorageProcessor) -> ActixResult<(u64, u64)
             .block_schema()
             .get_last_committed_block()
             .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: ({})",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    data,
-                );
+                vlog::warn!("Internal Server Error: '{}'; input: ({})", err, data,);
                 HttpResponse::InternalServerError().finish()
             })?;
 
@@ -592,11 +595,8 @@ fn handle_get_account_transactions_history_older_than(
         .operations_ext_schema()
         .get_account_transactions_history_from(&address, tx_id, direction, limit)
         .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {:?}, {})",
                 err,
                 address,
                 tx_id,
@@ -635,11 +635,8 @@ fn handle_get_account_transactions_history_newer_than(
         .operations_ext_schema()
         .get_account_transactions_history_from(&address, tx_id, direction, limit)
         .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {:?}, {})",
                 err,
                 address,
                 tx_id,
@@ -657,11 +654,8 @@ fn handle_get_account_transactions_history_newer_than(
         let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
         let storage = data.access_storage()?;
         let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {:?}, {})",
                 err,
                 address,
                 tx_id,
@@ -675,11 +669,8 @@ fn handle_get_account_transactions_history_newer_than(
             get_ongoing_priority_ops(&eth_watcher_request_sender, address).await
         })
         .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {:?}, {})",
                 err,
                 address,
                 tx_id,
@@ -735,21 +726,41 @@ fn handle_get_tx_by_hash(
         try_parse_hash(&hash_hex_with_prefix).ok_or_else(|| HttpResponse::BadRequest().finish())?;
     let storage = data.access_storage()?;
 
-    let res = storage
-        .chain()
-        .operations_ext_schema()
-        .get_tx_by_hash(hash.as_slice())
-        .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                file!(),
-                line!(),
-                column!(),
-                err,
-                hex::encode(&hash),
-            );
+    let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
+    let unconfirmed_op = futures::executor::block_on(async {
+        get_unconfirmed_op_by_hash(&eth_watcher_request_sender, &hash).await
+    })
+    .map_err(|err| {
+        vlog::warn!(
+            "Internal Server Error: '{}'; input({})",
+            err,
+            hex::encode(&hash)
+        );
+        HttpResponse::InternalServerError().finish()
+    })?;
+
+    let res = if let Some((eth_block, priority_op)) = unconfirmed_op {
+        let storage = data.access_storage()?;
+        let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+            vlog::warn!("Internal Server Error: '{}';", err);
             HttpResponse::InternalServerError().finish()
         })?;
+
+        priority_op_to_tx_by_hash(&tokens, &priority_op, eth_block)
+    } else {
+        storage
+            .chain()
+            .operations_ext_schema()
+            .get_tx_by_hash(hash.as_slice())
+            .map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: {}",
+                    err,
+                    hex::encode(&hash)
+                );
+                HttpResponse::InternalServerError().finish()
+            })?
+    };
 
     Ok(HttpResponse::Ok().json(res))
 }
@@ -801,14 +812,11 @@ fn handle_get_blocks(
         .block_schema()
         .load_block_range(max_block, limit)
         .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {})",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {})",
                 err,
                 max_block,
-                limit,
+                limit
             );
             HttpResponse::InternalServerError().finish()
         })?;
@@ -841,14 +849,7 @@ fn handle_get_block_transactions(
         .block_schema()
         .get_block_transactions(block_number)
         .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                file!(),
-                line!(),
-                column!(),
-                err,
-                block_number,
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_number);
             HttpResponse::InternalServerError().finish()
         })?;
 
