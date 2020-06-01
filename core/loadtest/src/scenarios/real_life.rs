@@ -62,7 +62,10 @@ use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
     config_options::ConfigurationOptions,
-    node::{tx::PackedEthSignature, FranklinTx},
+    node::{
+        closest_packable_fee_amount, closest_packable_token_amount, tx::PackedEthSignature,
+        FranklinTx,
+    },
 };
 use testkit::zksync_account::ZksyncAccount;
 // Local deps
@@ -90,7 +93,7 @@ struct ScenarioExecutor {
     /// Amount of intermediate accounts.
     n_accounts: usize,
     /// Transfer amount per accounts (in wei).
-    transfer_size: u64,
+    transfer_size: BigUint,
     /// Amount of cycles for funds rotation.
     cycles_amount: u32,
 
@@ -100,6 +103,10 @@ struct ScenarioExecutor {
 
     /// Amount of time to wait for one zkSync block to be verified.
     verify_timeout: Duration,
+
+    /// Fee to be used in operations. It is assumed that dev-ticker is used
+    /// and fee amount is constant between calls.
+    operation_fee: BigUint,
 
     /// Event loop handle so transport for Eth account won't be invalidated.
     _event_loop_handle: EventLoopHandle,
@@ -132,6 +139,8 @@ impl ScenarioExecutor {
             );
         }
 
+        let transfer_size = closest_packable_token_amount(&BigUint::from(config.transfer_size));
+
         Self {
             rpc_client,
 
@@ -139,12 +148,14 @@ impl ScenarioExecutor {
             accounts,
 
             n_accounts: config.n_accounts,
-            transfer_size: config.transfer_size,
+            transfer_size,
             cycles_amount: config.cycles_amount,
 
             block_sizes,
 
             verify_timeout: Duration::from_secs(config.block_timeout),
+
+            operation_fee: 0u32.into(),
 
             _event_loop_handle,
         }
@@ -222,6 +233,24 @@ impl ScenarioExecutor {
             .update_nonce_values(&self.rpc_client)
             .await?;
 
+        // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
+        // the fee in such a way that it will always be sufficient).
+        // Withdraw operation has more chunks, so we estimate fee for it.
+        let mut fee: BigUint = self
+            .rpc_client
+            .get_tx_fee("Withdraw", self.main_account.zk_acc.address, "ETH")
+            .await
+            .expect("Can't get tx fee");
+
+        // The base USD price is randomized in 0.9..1.1 range of the constant value, so
+        // by dividing on the 0.9 we surely will obtain an appropriate value.
+        fee = fee * BigUint::from(100u32) / BigUint::from(90u32);
+
+        // And after that we have to make the fee packable.
+        fee = closest_packable_fee_amount(&fee);
+
+        self.operation_fee = fee;
+
         Ok(())
     }
 
@@ -229,9 +258,21 @@ impl ScenarioExecutor {
     async fn deposit(&mut self) -> Result<(), failure::Error> {
         // Amount of money we need to deposit.
         // Initialize it with the raw amount: only sum of transfers per account.
-        // Fees will be set to zero, so there is no need in any additional funds.
-        let amount_to_deposit =
-            BigUint::from(self.transfer_size) * BigUint::from(self.n_accounts as u64);
+        // Fees are taken into account below.
+        let mut amount_to_deposit =
+            self.transfer_size.clone() * BigUint::from(self.n_accounts as u64);
+
+        // Count the fees: we need to provide fee for each of initial transfer transactions,
+        // for each funds rotating transaction, and for each withdraw transaction.
+
+        // Sum of fees for one tx per every account.
+        let fee_for_all_accounts =
+            self.operation_fee.clone() * BigUint::from(self.n_accounts as u64);
+        // Total amount of cycles is amount of funds rotation cycles + one for initial transfers +
+        // one for collecting funds back to the main account.
+        amount_to_deposit += fee_for_all_accounts * (self.cycles_amount + 2);
+        // Also the fee is required to perform a final withdraw
+        amount_to_deposit += self.operation_fee.clone();
 
         let account_balance = self.main_account.eth_acc.eth_balance().await?;
         log::info!("Main account ETH balance: {}", account_balance);
@@ -283,13 +324,23 @@ impl ScenarioExecutor {
             self.n_accounts
         );
 
-        let signed_transfers: Vec<_> = (0..self.n_accounts)
-            .map(|to_idx| {
-                let from_acc = &self.main_account.zk_acc;
-                let to_acc = &self.accounts[to_idx];
-                self.sign_transfer(from_acc, to_acc, self.transfer_size)
-            })
-            .collect();
+        let mut signed_transfers = Vec::with_capacity(self.n_accounts);
+
+        for to_idx in 0..self.n_accounts {
+            let from_acc = &self.main_account.zk_acc;
+            let to_acc = &self.accounts[to_idx];
+            // Transfer size is (transfer_amount) + (fee for every tx to be sent) + (fee for final transfer
+            // back to the main account).
+            let transfer_amount =
+                self.transfer_size.clone() + self.operation_fee.clone() * (self.cycles_amount + 1);
+
+            // Make amount packable.
+            let packable_transfer_amount = closest_packable_fee_amount(&transfer_amount);
+
+            let transfer = self.sign_transfer(from_acc, to_acc, packable_transfer_amount);
+
+            signed_transfers.push(transfer);
+        }
 
         log::info!("Signed all the initial transfer transactions, sending");
 
@@ -298,6 +349,7 @@ impl ScenarioExecutor {
         let mut verified = 0;
         let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
         for tx_batch in txs_chunks {
+            log::info!("Batch size: {}", tx_batch.len());
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
@@ -373,14 +425,16 @@ impl ScenarioExecutor {
     /// Transfers the money between intermediate accounts. For each account with
     /// ID `N`, money are transferred to the account with ID `N + 1`.
     async fn funds_rotation_step(&mut self) -> Result<(), failure::Error> {
-        let signed_transfers: Vec<_> = (0..self.n_accounts)
-            .map(|from_id| {
-                let from_acc = &self.accounts[from_id];
-                let to_id = self.acc_for_transfer(from_id);
-                let to_acc = &self.accounts[to_id];
-                self.sign_transfer(from_acc, to_acc, self.transfer_size)
-            })
-            .collect();
+        let mut signed_transfers = Vec::with_capacity(self.n_accounts);
+
+        for from_id in 0..self.n_accounts {
+            let from_acc = &self.main_account.zk_acc;
+            let to_id = self.acc_for_transfer(from_id);
+            let to_acc = &self.accounts[to_id];
+            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone());
+
+            signed_transfers.push(transfer);
+        }
 
         log::info!("Signed transfers, sending");
 
@@ -389,6 +443,7 @@ impl ScenarioExecutor {
         let mut verified = 0;
         let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
         for tx_batch in txs_chunks {
+            log::info!("Batch size: {}", tx_batch.len());
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
@@ -420,15 +475,17 @@ impl ScenarioExecutor {
 
     /// Transfers all the money from the intermediate accounts back to the main account.
     async fn collect_funds(&mut self) -> Result<(), failure::Error> {
-        log::info!("Starting collecting funds back to the main account",);
+        log::info!("Starting collecting funds back to the main account");
 
-        let signed_transfers: Vec<_> = (0..self.n_accounts)
-            .map(|from_id| {
-                let from_acc = &self.accounts[from_id];
-                let to_acc = &self.main_account.zk_acc;
-                self.sign_transfer(from_acc, to_acc, self.transfer_size)
-            })
-            .collect();
+        let mut signed_transfers = Vec::with_capacity(self.n_accounts);
+
+        for from_id in 0..self.n_accounts {
+            let from_acc = &self.accounts[from_id];
+            let to_acc = &self.main_account.zk_acc;
+            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone());
+
+            signed_transfers.push(transfer);
+        }
 
         log::info!("Signed transfers, sending");
 
@@ -469,8 +526,7 @@ impl ScenarioExecutor {
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
         let mut sent_txs = SentTransactions::new();
 
-        let amount_to_withdraw =
-            BigUint::from(self.transfer_size) * BigUint::from(self.n_accounts as u64);
+        let amount_to_withdraw = self.transfer_size.clone() * BigUint::from(self.n_accounts as u64);
 
         let current_balance = self.main_account.eth_acc.eth_balance().await?;
 
@@ -481,7 +537,7 @@ impl ScenarioExecutor {
 
         let (tx, eth_sign) = self
             .main_account
-            .sign_withdraw_single(amount_to_withdraw.clone());
+            .sign_withdraw(amount_to_withdraw.clone(), self.operation_fee.clone());
         let tx_hash = self
             .rpc_client
             .send_tx(tx.clone(), eth_sign.clone())
@@ -545,13 +601,13 @@ impl ScenarioExecutor {
         &self,
         from: &ZksyncAccount,
         to: &ZksyncAccount,
-        amount: u64,
+        amount: impl Into<BigUint>,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
         let (tx, eth_signature) = from.sign_transfer(
             0, // ETH
             "ETH",
-            BigUint::from(amount),
-            BigUint::from(0u64),
+            amount.into(),
+            self.operation_fee.clone(),
             &to.address,
             None,
             true,

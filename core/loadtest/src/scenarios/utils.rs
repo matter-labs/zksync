@@ -146,7 +146,7 @@ impl<T: Clone> Iterator for DynamicChunks<T> {
         self.chunk_size_id = (self.chunk_size_id + 1) % self.chunk_sizes.len();
 
         let start_pos = self.pos;
-        let end_pos = std::cmp::max(start_pos + chunk_size, self.iterable.len());
+        let end_pos = std::cmp::min(start_pos + chunk_size, self.iterable.len());
         self.pos = end_pos;
 
         Some(self.iterable[start_pos..end_pos].to_vec())
