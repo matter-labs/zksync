@@ -131,6 +131,8 @@ export interface Tokens {
 }
 
 export interface Fee {
+    // Operation type (amount of chunks in operation differs and impacts the total fee).
+    feeType: "Withdraw" | "Transfer" | "TransferToNew",
     // Amount of gas used by transaction
     gasTxAmount: utils.BigNumber,
     // Gas price (in wei)

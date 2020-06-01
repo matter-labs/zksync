@@ -922,6 +922,7 @@ impl Rpc for RpcApp {
                 .map(|result| {
                     result.map(|fee| {
                         serde_json::json!({
+                            "feeType": fee.fee_type,
                             "gasTxAmount": BigUintSerdeWrapper(fee.gas_tx_amount),
                             "gasPriceWei": BigUintSerdeWrapper(fee.gas_price_wei),
                             "gasFee": BigUintSerdeWrapper(fee.gas_fee),
