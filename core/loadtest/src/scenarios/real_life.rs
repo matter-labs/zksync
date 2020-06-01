@@ -49,7 +49,10 @@
 //! testnet Ethereum chain).
 
 // Built-in deps
-use std::time::{Duration, Instant};
+use std::{
+    iter::Iterator,
+    time::{Duration, Instant},
+};
 // External deps
 use chrono::Utc;
 use num::BigUint;
@@ -66,7 +69,7 @@ use crate::{
     rpc_client::RpcClient,
     scenarios::{
         configs::RealLifeConfig,
-        utils::{deposit_single, wait_for_verify},
+        utils::{deposit_single, wait_for_verify, DynamicChunks},
         ScenarioContext,
     },
     sent_transactions::SentTransactions,
@@ -90,9 +93,9 @@ struct ScenarioExecutor {
     /// Amount of cycles for funds rotation.
     cycles_amount: u32,
 
-    /// Biggest supported block size (to not overload the node
-    /// with too many txs at the moment)
-    max_block_size: usize,
+    /// Block sizes supported by server and suitable to use in this test
+    /// (to not overload the node with too many txs at the moment)
+    block_sizes: Vec<usize>,
 
     /// Amount of time to wait for one zkSync block to be verified.
     verify_timeout: Duration,
@@ -128,7 +131,8 @@ impl ScenarioExecutor {
             n_accounts: config.n_accounts,
             transfer_size: config.transfer_size,
             cycles_amount: config.cycles_amount,
-            max_block_size: Self::get_max_supported_block_size(),
+
+            block_sizes: Self::get_block_sizes(config.use_all_block_sizes),
 
             verify_timeout: Duration::from_secs(config.block_timeout),
 
@@ -282,7 +286,8 @@ impl ScenarioExecutor {
         // Send txs by batches that can fit in one block.
         let to_verify = signed_transfers.len();
         let mut verified = 0;
-        for tx_batch in signed_transfers.chunks(self.max_block_size) {
+        let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
+        for tx_batch in txs_chunks {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
@@ -293,12 +298,18 @@ impl ScenarioExecutor {
                 sent_txs.add_tx_hash(tx_hash);
             }
 
-            verified += sent_txs.len();
+            let sent_txs_amount = sent_txs.len();
+            verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
             wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
-            log::info!("Sent and verified {}/{} txs", verified, to_verify);
+            log::info!(
+                "Sent and verified {}/{} txs ({} on this iteration)",
+                verified,
+                to_verify,
+                sent_txs_amount
+            );
         }
 
         log::info!("All the initial transfers are completed");
@@ -324,7 +335,8 @@ impl ScenarioExecutor {
             sent_txs.add_tx_hash(tx_hash);
         }
         // Calculate the estimated amount of blocks for all the txs to be processed.
-        let n_blocks = (self.accounts.len() / self.max_block_size + 1) as u32;
+        let max_block_size = *self.block_sizes.iter().max().unwrap();
+        let n_blocks = (self.accounts.len() / max_block_size + 1) as u32;
         wait_for_verify(sent_txs, self.verify_timeout * n_blocks, &self.rpc_client).await?;
 
         log::info!("All the accounts are prepared");
@@ -365,7 +377,8 @@ impl ScenarioExecutor {
         // Send txs by batches that can fit in one block.
         let to_verify = signed_transfers.len();
         let mut verified = 0;
-        for tx_batch in signed_transfers.chunks(self.max_block_size) {
+        let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
+        for tx_batch in txs_chunks {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
@@ -376,12 +389,18 @@ impl ScenarioExecutor {
                 sent_txs.add_tx_hash(tx_hash);
             }
 
-            verified += sent_txs.len();
+            let sent_txs_amount = sent_txs.len();
+            verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
             wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
-            log::info!("Sent and verified {}/{} txs", verified, to_verify);
+            log::info!(
+                "Sent and verified {}/{} txs ({} on this iteration)",
+                verified,
+                to_verify,
+                sent_txs_amount
+            );
         }
 
         log::info!("Transfers are sent and verified");
@@ -406,7 +425,8 @@ impl ScenarioExecutor {
         // Send txs by batches that can fit in one block.
         let to_verify = signed_transfers.len();
         let mut verified = 0;
-        for tx_batch in signed_transfers.chunks(self.max_block_size) {
+        let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
+        for tx_batch in txs_chunks {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
@@ -417,12 +437,18 @@ impl ScenarioExecutor {
                 sent_txs.add_tx_hash(tx_hash);
             }
 
-            verified += sent_txs.len();
+            let sent_txs_amount = sent_txs.len();
+            verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
             wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
-            log::info!("Sent and verified {}/{} txs", verified, to_verify);
+            log::info!(
+                "Sent and verified {}/{} txs ({} on this iteration)",
+                verified,
+                to_verify,
+                sent_txs_amount
+            );
         }
 
         log::info!("Collecting funds completed");
@@ -532,13 +558,20 @@ impl ScenarioExecutor {
         (from_idx + 1) % self.accounts.len()
     }
 
-    /// Loads the biggest supported block size.
+    /// Load block sizes to use in test for generated blocks.
     /// This method assumes that loadtest and server share the same env config,
     /// since the value is loaded from the env.
-    fn get_max_supported_block_size() -> usize {
+    fn get_block_sizes(use_all_block_sizes: bool) -> Vec<usize> {
         let options = ConfigurationOptions::from_env();
+        if use_all_block_sizes {
+            // Load all the supported block sizes.
+            options.available_block_chunk_sizes
+        } else {
+            // Use only the max block size (for more quick execution).
+            let max_size = *options.available_block_chunk_sizes.iter().max().unwrap();
 
-        *options.available_block_chunk_sizes.iter().max().unwrap()
+            vec![max_size]
+        }
     }
 }
 
