@@ -10,8 +10,8 @@ use futures::channel::mpsc::{self, Receiver};
 use futures::channel::oneshot;
 use futures::StreamExt;
 use models::node::{
-    pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp, TxFeeTypes,
-    WithdrawOp,
+    pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp, TransferToNewOp,
+    TxFeeTypes, WithdrawOp,
 };
 use models::primitives::{ratio_to_big_decimal, round_precision};
 use num::rational::Ratio;
@@ -83,6 +83,9 @@ struct FeeTicker<API> {
     api: API,
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
+    // `Option` is introduced here for simpler testing and quick implementation.
+    // TODO: Replace with a template parameter, just like `API`.
+    db_pool: Option<ConnectionPool>,
 }
 
 pub fn run_ticker_task(
@@ -103,18 +106,29 @@ pub fn run_ticker_task(
         tokens_risk_factors: HashMap::new(),
     };
 
-    let ticker_api = TickerApi::new(api_base_url, db_pool, eth_sender_request_sender);
-    let fee_ticker = FeeTicker::new(ticker_api, tricker_requests, ticker_config);
+    let ticker_api = TickerApi::new(api_base_url, db_pool.clone(), eth_sender_request_sender);
+    let fee_ticker = FeeTicker::new(
+        ticker_api,
+        tricker_requests,
+        ticker_config,
+        Some(db_pool.clone()),
+    );
 
     runtime.spawn(fee_ticker.run());
 }
 
 impl<API: FeeTickerAPI> FeeTicker<API> {
-    fn new(api: API, requests: Receiver<TickerRequest>, config: TickerConfig) -> Self {
+    fn new(
+        api: API,
+        requests: Receiver<TickerRequest>,
+        config: TickerConfig,
+        db_pool: Option<ConnectionPool>,
+    ) -> Self {
         Self {
             api,
             requests,
             config,
+            db_pool,
         }
     }
 
@@ -125,9 +139,11 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
                     tx_type,
                     token,
                     response,
-                    ..
+                    address,
                 } => {
-                    let fee = self.get_fee_from_ticker_in_wei(tx_type, token).await;
+                    let fee = self
+                        .get_fee_from_ticker_in_wei(tx_type, token, address)
+                        .await;
                     response.send(fee).unwrap_or_default();
                 }
                 TickerRequest::GetTokenPrice { token, response } => {
@@ -145,10 +161,44 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             .map(|price| ratio_to_big_decimal(&price.usd_price, 6))
     }
 
+    /// Returns `true` if account does not yet exist in the zkSync network.
+    fn is_account_new(&self, address: Address) -> bool {
+        let db_pool = match &self.db_pool {
+            Some(pool) => pool,
+            None => {
+                // Testing setup, just return false.
+                return false;
+            }
+        };
+
+        let storage = match db_pool.access_storage_fragile() {
+            Ok(storage) => storage,
+            Err(err) => {
+                // We don't want the ticker request to cause panic, so we're taking the
+                // safe road and just assume that account is not new.
+                // It will result in a slightly higher fee reported, but as we don't really
+                // expect the storage to be unavailable, this doesn't suppose to happen.
+                log::warn!(
+                    "Failed accessing the storage, assuming the recipient as not new. Error: {}",
+                    err
+                );
+                return false;
+            }
+        };
+
+        storage
+            .chain()
+            .account_schema()
+            .account_state_by_address(&address)
+            .map(|state| state.committed.is_some())
+            .unwrap_or(false)
+    }
+
     async fn get_fee_from_ticker_in_wei(
         &self,
         tx_type: TxFeeTypes,
         token: TokenLike,
+        recipient: Address,
     ) -> Result<Fee, failure::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token)?;
@@ -161,7 +211,13 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
 
         let op_chunks = BigUint::from(match tx_type {
             TxFeeTypes::Withdraw => WithdrawOp::CHUNKS,
-            TxFeeTypes::Transfer => TransferOp::CHUNKS,
+            TxFeeTypes::Transfer => {
+                if self.is_account_new(recipient) {
+                    TransferToNewOp::CHUNKS
+                } else {
+                    TransferOp::CHUNKS
+                }
+            }
         });
         let gas_tx_amount = self.config.gas_cost_tx.get(&tx_type).cloned().unwrap();
         let gas_price_wei = self.api.get_gas_price_wei().await?;
@@ -305,20 +361,22 @@ mod test {
     #[test]
     fn test_ticker_formula() {
         let config = get_test_ticker_config();
-        let ticker = FeeTicker::new(MockApiProvider, mpsc::channel(1).1, config);
+        let ticker = FeeTicker::new(MockApiProvider, mpsc::channel(1).1, config, None);
 
-        let get_token_fee_in_usd = |tx_type: TxFeeTypes, token: TokenLike| -> Ratio<BigUint> {
-            let fee_in_token = block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone()))
-                .expect("failed to get fee in token");
-            let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
+        let get_token_fee_in_usd =
+            |tx_type: TxFeeTypes, token: TokenLike, address: Address| -> Ratio<BigUint> {
+                let fee_in_token =
+                    block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
+                        .expect("failed to get fee in token");
+                let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
 
-            // Fee in usd
-            (block_on(MockApiProvider.get_last_quote(token))
-                .expect("failed to get fee in usd")
-                .usd_price
-                / BigUint::from(10u32).pow(u32::from(token_precision)))
-                * fee_in_token.total_fee
-        };
+                // Fee in usd
+                (block_on(MockApiProvider.get_last_quote(token))
+                    .expect("failed to get fee in usd")
+                    .usd_price
+                    / BigUint::from(10u32).pow(u32::from(token_precision)))
+                    * fee_in_token.total_fee
+            };
 
         let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
             let max = std::cmp::max(a.clone(), b.clone());
@@ -328,14 +386,15 @@ mod test {
 
         {
             let expected_price_of_eth_token_transfer_usd =
-                get_token_fee_in_usd(TxFeeTypes::Transfer, 0.into());
+                get_token_fee_in_usd(TxFeeTypes::Transfer, 0.into(), Address::default());
             let expected_price_of_eth_token_withdraw_usd =
-                get_token_fee_in_usd(TxFeeTypes::Withdraw, 0.into());
+                get_token_fee_in_usd(TxFeeTypes::Withdraw, 0.into(), Address::default());
 
             // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits (mantissa len == 11)
             let threshold = BigDecimal::from_str("0.01").unwrap();
             for token in TestToken::all_tokens() {
-                let transfer_fee = get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into());
+                let transfer_fee =
+                    get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into(), Address::default());
                 let expected_fee =
                     expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
                 let transfer_diff = get_relative_diff(&transfer_fee, &expected_fee);
@@ -346,7 +405,8 @@ mod test {
                     UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&expected_fee,6),
                     transfer_diff, &threshold);
 
-                let withdraw_fee = get_token_fee_in_usd(TxFeeTypes::Withdraw, token.id.into());
+                let withdraw_fee =
+                    get_token_fee_in_usd(TxFeeTypes::Withdraw, token.id.into(), Address::default());
                 let expected_fee =
                     expected_price_of_eth_token_withdraw_usd.clone() * token.risk_factor();
                 let withdraw_diff = get_relative_diff(&withdraw_fee, &expected_fee);
