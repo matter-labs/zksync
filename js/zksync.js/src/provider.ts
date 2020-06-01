@@ -192,6 +192,7 @@ export class Provider {
             tokenLike
         ]);
         return {
+            feeType: transactionFee.feeType,
             gasTxAmount: utils.bigNumberify(transactionFee.gasTxAmount),
             gasPriceWei: utils.bigNumberify(transactionFee.gasPriceWei),
             gasFee: utils.bigNumberify(transactionFee.gasFee),
