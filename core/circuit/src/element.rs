@@ -51,6 +51,7 @@ impl<E: Engine> CircuitElement<E> {
         assert!(self.length <= n);
         assert!(n <= E::Fr::NUM_BITS as usize);
         let mut padded_bits = self.get_bits_le();
+        assert!(n >= padded_bits.len());
         padded_bits.resize(n, Boolean::constant(false));
         CircuitElement {
             number: self.number,
@@ -127,6 +128,7 @@ impl<E: Engine> CircuitElement<E> {
     ) -> Result<Self, SynthesisError> {
         let mut bits = expr.into_bits_le(cs.namespace(|| "into_bits_le"))?;
         // this is safe due to "constants"
+        assert!(bits.len() <= E::Fr::NUM_BITS as usize);
         bits.resize(E::Fr::NUM_BITS as usize, Boolean::constant(false));
         let number = pack_bits_to_element(cs.namespace(|| "pack back"), &bits)?;
         let ce = CircuitElement {

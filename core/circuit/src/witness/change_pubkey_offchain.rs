@@ -27,6 +27,7 @@ use crate::{
         utils::{apply_leaf_operation, get_audits},
         Witness,
     },
+    utils::{resize_grow_only},
 };
 
 pub struct ChangePubkeyOffChainData {
@@ -84,8 +85,7 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             NONCE_BIT_WIDTH,
         );
 
-        assert!(pubdata_bits.len() <= ChangePubKeyOp::CHUNKS * CHUNK_BIT_WIDTH);
-        pubdata_bits.resize(ChangePubKeyOp::CHUNKS * CHUNK_BIT_WIDTH, false);
+        resize_grow_only(&mut pubdata_bits, ChangePubKeyOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 

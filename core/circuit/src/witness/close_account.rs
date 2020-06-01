@@ -25,6 +25,7 @@ use crate::{
         utils::{apply_leaf_operation, get_audits, SigDataInput},
         Witness,
     },
+    utils::{resize_grow_only},
 };
 
 pub struct CloseAccountData {
@@ -60,7 +61,7 @@ impl Witness for CloseAccountWitness<Bn256> {
             ACCOUNT_ID_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(CloseOp::CHUNKS * CHUNK_BIT_WIDTH, false);
+        resize_grow_only(&mut pubdata_bits, CloseOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 

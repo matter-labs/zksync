@@ -28,6 +28,7 @@ use crate::{
         utils::{apply_leaf_operation, get_audits},
         Witness,
     },
+    utils::{resize_grow_only},
 };
 
 pub struct DepositData {
@@ -85,7 +86,7 @@ impl Witness for DepositWitness<Bn256> {
             &self.args.eth_address.unwrap(),
             ETH_ADDRESS_BIT_WIDTH,
         );
-        pubdata_bits.resize(DepositOp::CHUNKS * CHUNK_BIT_WIDTH, false);
+        resize_grow_only(&mut pubdata_bits, DepositOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 
