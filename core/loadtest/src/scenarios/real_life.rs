@@ -37,6 +37,7 @@
 //!     "transfer_size": 100,  // Amount of money to be used in the transfer, in wei.
 //!     "cycles_amount": 10,   // Amount of iterations to rotate funds, "length" of the test.
 //!     "block_timeout": 120,  // Amount of time to wait for one zkSync block to be verified.
+//!     "use_all_block_sizes": false, // Whether to use different block sizes (may slowdown the test execution).
 //!     "input_account": {     // Address/private key of the Ethereum account to deposit money for test from.
 //!         "address": "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049",
 //!         "private_key": "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110"
@@ -122,6 +123,15 @@ impl ScenarioExecutor {
         // Create main account to deposit money from and to return money back later.
         let main_account = TestAccount::from_info(&config.input_account, &transport, &ctx.options);
 
+        let block_sizes = Self::get_block_sizes(config.use_all_block_sizes);
+
+        if config.use_all_block_sizes {
+            log::info!(
+                "Following block sizes will be used in test: {:?}",
+                block_sizes
+            );
+        }
+
         Self {
             rpc_client,
 
@@ -132,7 +142,7 @@ impl ScenarioExecutor {
             transfer_size: config.transfer_size,
             cycles_amount: config.cycles_amount,
 
-            block_sizes: Self::get_block_sizes(config.use_all_block_sizes),
+            block_sizes,
 
             verify_timeout: Duration::from_secs(config.block_timeout),
 
