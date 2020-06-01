@@ -130,8 +130,11 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
 
-        let old_root =
-            CircuitElement::from_number(cs.namespace(|| "old_root"), rolling_root.clone())?;
+        let old_root = rolling_root.clone();
+
+        // let old_root =
+        //     CircuitElement::from_number(cs.namespace(|| "old_root"), rolling_root.clone())?;
+
         // first chunk of block should always have number 0
         let mut next_chunk_number = zero;
 
@@ -311,10 +314,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             self.rescue_params,
         )?;
 
-        let final_root = CircuitElement::from_number(
-            cs.namespace(|| "final_root"),
-            root_from_operator_after_fees,
-        )?;
+        let final_root = root_from_operator_after_fees;
+
+        // let final_root = CircuitElement::from_number(
+        //     cs.namespace(|| "final_root"),
+        //     root_from_operator_after_fees,
+        // )?;
 
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
@@ -341,13 +346,33 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(old_root.into_padded_be_bits(256));
+
+            // Perform bit decomposition with an explicit in-field check
+            // and change to MSB first bit order
+            let mut old_root_le_bits = old_root.into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
+            assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+            resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
+            let mut old_root_be_bits = old_root_le_bits;
+            old_root_be_bits.reverse();
+            assert_eq!(old_root_be_bits.len(), 256);
+            pack_bits.extend(old_root_be_bits);
+            // pack_bits.extend(old_root.into_padded_be_bits(256));
 
             hash_block = sha256::sha256(cs.namespace(|| "hash old_root"), &pack_bits)?;
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(final_root.into_padded_be_bits(256));
+
+            // Perform bit decomposition with an explicit in-field check
+            // and change to MSB first bit order
+            let mut final_root_le_bits = final_root.into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
+            assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+            resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
+            let mut final_root_be_bits = final_root_le_bits;
+            final_root_be_bits.reverse();
+            assert_eq!(final_root_be_bits.len(), 256);
+            pack_bits.extend(final_root_be_bits);
+            // pack_bits.extend(final_root.into_padded_be_bits(256));
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with new_root"), &pack_bits)?;
 

@@ -78,6 +78,7 @@ impl<E: Engine> CircuitElement<E> {
         )
     }
 
+    /// Does not check for congruency
     pub fn from_fe<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
         mut cs: CS,
         field_element: F,
@@ -161,12 +162,12 @@ impl<E: Engine> CircuitElement<E> {
         Ok(ce)
     }
 
+    /// Does not check for congruency
     pub fn from_number<CS: ConstraintSystem<E>>(
         mut cs: CS,
         number: AllocatedNum<E>,
     ) -> Result<Self, SynthesisError> {
-        // let bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        let bits = number.into_bits_le_strict(cs.namespace(|| "into_bits_le_strict"))?;
+        let bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
         assert_eq!(bits.len(), E::Fr::NUM_BITS as usize);
 
         let bits_len = bits.len();
