@@ -1771,7 +1771,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
         &account_data,
     )?;
 
-    assert_eq!(account_data.len(), 2);
+    assert_eq!(account_data_packed_as_field_elements.len(), 2);
 
     let mut account_words_are_empty =
         Vec::with_capacity(account_data_packed_as_field_elements.len());
