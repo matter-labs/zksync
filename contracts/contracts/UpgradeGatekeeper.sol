@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 import "./Events.sol";
 import "./Ownable.sol";
 import "./Upgradeable.sol";
+import "./UpgradeableMaster.sol";
 
 
 /// @title Upgrade Gatekeeper Contract
@@ -82,7 +83,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.NoticePeriod, "ugp11"); // ugp11 - unable to activate preparation status in case of not active notice period status
 
-        if (now >= noticePeriodActivationTime + mainContract.upgradeNoticePeriod()) {
+        if (now >= noticePeriodActivationTime + mainContract.getNoticePeriod()) {
             upgradeStatus = UpgradeStatus.Preparation;
             mainContract.upgradePreparationStarted();
             emit PreparationStart();
@@ -98,7 +99,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.Preparation, "fpu11"); // fpu11 - unable to finish upgrade without preparation status active
         require(targetsInitializationParameters.length == managedContracts.length, "fpu12"); // fpu12 - number of new targets initialization parameters must be equal to the number of managed contracts
-        require(mainContract.readyForUpgrade(), "fpu13"); // fpu13 - main contract is not ready for upgrade
+        require(mainContract.isReadyForUpgrade(), "fpu13"); // fpu13 - main contract is not ready for upgrade
         mainContract.upgradeFinishes();
 
         for (uint64 i = 0; i < managedContracts.length; i++) {

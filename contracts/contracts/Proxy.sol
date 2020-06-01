@@ -2,6 +2,7 @@ pragma solidity ^0.5.0;
 
 import "./Ownable.sol";
 import "./Upgradeable.sol";
+import "./UpgradeableMaster.sol";
 
 
 /// @title Proxy Contract
@@ -101,8 +102,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// UpgradeableMaster functions
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function upgradeNoticePeriod() external returns (uint) {
-        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("upgradeNoticePeriod()"));
+    function getNoticePeriod() external returns (uint) {
+        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("getNoticePeriod()"));
         require(success, "unp11"); // unp11 - upgradeNoticePeriod delegatecall failed
         return abi.decode(result, (uint));
     }
@@ -137,8 +138,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
-    function readyForUpgrade() external returns (bool) {
-        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("readyForUpgrade()"));
+    function isReadyForUpgrade() external returns (bool) {
+        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("isReadyForUpgrade()"));
         require(success, "rfu11"); // rfu11 - readyForUpgrade delegatecall failed
         return abi.decode(result, (bool));
     }
