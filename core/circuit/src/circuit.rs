@@ -133,9 +133,6 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let old_root = rolling_root.clone();
 
-        // let old_root =
-        //     CircuitElement::from_number(cs.namespace(|| "old_root"), rolling_root.clone())?;
-
         // first chunk of block should always have number 0
         let mut next_chunk_number = zero;
 
@@ -317,11 +314,6 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let final_root = root_from_operator_after_fees;
 
-        // let final_root = CircuitElement::from_number(
-        //     cs.namespace(|| "final_root"),
-        //     root_from_operator_after_fees,
-        // )?;
-
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
             // and start rolling the hash
@@ -350,15 +342,17 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             // Perform bit decomposition with an explicit in-field check
             // and change to MSB first bit order
-            let mut old_root_le_bits = old_root
-                .into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
-            assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
-            resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
-            let mut old_root_be_bits = old_root_le_bits;
-            old_root_be_bits.reverse();
-            assert_eq!(old_root_be_bits.len(), 256);
+            let old_root_be_bits = {
+                let mut old_root_le_bits = old_root
+                    .into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
+                assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+                resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
+                let mut old_root_be_bits = old_root_le_bits;
+                old_root_be_bits.reverse();
+                assert_eq!(old_root_be_bits.len(), 256);
+                old_root_be_bits
+            };
             pack_bits.extend(old_root_be_bits);
-            // pack_bits.extend(old_root.into_padded_be_bits(256));
 
             hash_block = sha256::sha256(cs.namespace(|| "hash old_root"), &pack_bits)?;
 
@@ -367,15 +361,17 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             // Perform bit decomposition with an explicit in-field check
             // and change to MSB first bit order
-            let mut final_root_le_bits = final_root
-                .into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
-            assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
-            resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
-            let mut final_root_be_bits = final_root_le_bits;
-            final_root_be_bits.reverse();
-            assert_eq!(final_root_be_bits.len(), 256);
+            let final_root_be_bits = {
+                let mut final_root_le_bits = final_root
+                    .into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
+                assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+                resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
+                let mut final_root_be_bits = final_root_le_bits;
+                final_root_be_bits.reverse();
+                assert_eq!(final_root_be_bits.len(), 256);
+                final_root_be_bits
+            };
             pack_bits.extend(final_root_be_bits);
-            // pack_bits.extend(final_root.into_padded_be_bits(256));
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with new_root"), &pack_bits)?;
 
@@ -1160,12 +1156,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_account_empty,
         )?;
 
-        // let is_pubkey_correct = Boolean::and(
-        //     cs.namespace(|| "acc not empty and keys are not the same"),
-        //     &is_pub_equal_to_previous.not(),
-        //     &is_account_empty.not(),
-        // )?
-        // .not();
         is_valid_flags.push(is_pubkey_correct);
 
         //verify correct amounts
