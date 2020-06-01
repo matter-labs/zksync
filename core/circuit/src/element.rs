@@ -111,7 +111,13 @@ impl<E: Engine> CircuitElement<E> {
     ) -> Result<Self, SynthesisError> {
         assert!(max_length <= E::Fr::NUM_BITS as usize);
         // decode into the fixed number of bits
-        let bits = number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?;
+        let bits = if max_length <= E::Fr::CAPACITY as usize {
+            number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?
+        } else {
+            number.into_bits_le_strict(cs.namespace(|| "into_bits_le_strict"))?
+        };
+
+        assert_eq!(bits.len(), max_length);
 
         let ce = CircuitElement {
             number,
@@ -159,7 +165,8 @@ impl<E: Engine> CircuitElement<E> {
         mut cs: CS,
         number: AllocatedNum<E>,
     ) -> Result<Self, SynthesisError> {
-        let bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        // let bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        let bits = number.into_bits_le_strict(cs.namespace(|| "into_bits_le_strict"))?;
         assert_eq!(bits.len(), E::Fr::NUM_BITS as usize);
 
         let bits_len = bits.len();

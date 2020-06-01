@@ -35,7 +35,7 @@ use crate::{
         AllocatedSignerPubkey,
     },
     utils::{
-        allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, resize_grow_only,
+        allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element_strict, resize_grow_only,
     },
 };
 
@@ -369,7 +369,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             hash_block.reverse();
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
-            let final_hash = pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
+            let final_hash = pack_bits_to_element_strict(cs.namespace(|| "final_hash"), &hash_block)?;
             cs.enforce(
                 || "enforce external data hash equality",
                 |lc| lc + public_data_commitment.get_variable(),
@@ -1925,7 +1925,7 @@ fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
         let pub_chunk_bits =
             pubdata_bits[i * params::CHUNK_BIT_WIDTH..(i + 1) * params::CHUNK_BIT_WIDTH].to_vec();
         let current_chunk =
-            pack_bits_to_element(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
+            pack_bits_to_element_strict(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
 
         result = Expression::select_ifeq(
             cs.namespace(|| "select if correct chunk number"),
