@@ -1785,9 +1785,9 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     let mut account_words_are_empty =
         Vec::with_capacity(account_data_packed_as_field_elements.len());
 
-    for el in account_data_packed_as_field_elements.into_iter() {
+    for (i, el) in account_data_packed_as_field_elements.into_iter().enumerate() {
         let is_word_empty = Expression::equals(
-            cs.namespace(|| "is account word empty"),
+            cs.namespace(|| format!("is account word {} empty", i)),
             &el,
             Expression::constant::<CS>(E::Fr::zero()),
         )?;
