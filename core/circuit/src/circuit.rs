@@ -35,7 +35,8 @@ use crate::{
         AllocatedSignerPubkey,
     },
     utils::{
-        allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element_strict, resize_grow_only,
+        allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element_strict,
+        resize_grow_only,
     },
 };
 
@@ -349,7 +350,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             // Perform bit decomposition with an explicit in-field check
             // and change to MSB first bit order
-            let mut old_root_le_bits = old_root.into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
+            let mut old_root_le_bits = old_root
+                .into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
             assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
             resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
             let mut old_root_be_bits = old_root_le_bits;
@@ -365,7 +367,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             // Perform bit decomposition with an explicit in-field check
             // and change to MSB first bit order
-            let mut final_root_le_bits = final_root.into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
+            let mut final_root_le_bits = final_root
+                .into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
             assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
             resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
             let mut final_root_be_bits = final_root_le_bits;
@@ -394,7 +397,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             hash_block.reverse();
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
-            let final_hash = pack_bits_to_element_strict(cs.namespace(|| "final_hash"), &hash_block)?;
+            let final_hash =
+                pack_bits_to_element_strict(cs.namespace(|| "final_hash"), &hash_block)?;
             cs.enforce(
                 || "enforce external data hash equality",
                 |lc| lc + public_data_commitment.get_variable(),
@@ -1949,8 +1953,10 @@ fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
         let cs = &mut cs.namespace(|| format!("chunk number {}", i));
         let pub_chunk_bits =
             pubdata_bits[i * params::CHUNK_BIT_WIDTH..(i + 1) * params::CHUNK_BIT_WIDTH].to_vec();
-        let current_chunk =
-            pack_bits_to_element_strict(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
+        let current_chunk = pack_bits_to_element_strict(
+            cs.namespace(|| "chunk as field element"),
+            &pub_chunk_bits,
+        )?;
 
         result = Expression::select_ifeq(
             cs.namespace(|| "select if correct chunk number"),

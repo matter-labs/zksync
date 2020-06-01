@@ -294,7 +294,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
             .pk
             .get_x()
             .into_bits_le_strict(cs.namespace(|| "pk_x_bits into bits strict"))?;
-            // .into_bits_le_fixed(cs.namespace(|| "pk_x_bits"), FR_BIT_WIDTH)?;
+        // .into_bits_le_fixed(cs.namespace(|| "pk_x_bits"), FR_BIT_WIDTH)?;
 
         assert_eq!(pk_x_serialized.len(), FR_BIT_WIDTH);
 
@@ -310,7 +310,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
             .r
             .get_x()
             .into_bits_le_strict(cs.namespace(|| "r_x_bits into bits strict"))?;
-            // .into_bits_le_fixed(cs.namespace(|| "r_x_bits"), FR_BIT_WIDTH)?;
+        // .into_bits_le_fixed(cs.namespace(|| "r_x_bits"), FR_BIT_WIDTH)?;
 
         assert_eq!(r_x_serialized.len(), FR_BIT_WIDTH);
 
@@ -361,8 +361,10 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
         &rescue_params,
     )?;
 
-    let s0_bits = s0.into_bits_le_strict(cs.namespace(|| "make bits of first word for FS challenge"))?;
-    let s1_bits = s1.into_bits_le_strict(cs.namespace(|| "make bits of second word for FS challenge"))?;
+    let s0_bits =
+        s0.into_bits_le_strict(cs.namespace(|| "make bits of first word for FS challenge"))?;
+    let s1_bits =
+        s1.into_bits_le_strict(cs.namespace(|| "make bits of second word for FS challenge"))?;
 
     let take_bits = (<E as JubjubEngine>::Fs::CAPACITY / 2) as usize;
 
