@@ -48,7 +48,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(upgradeStatus == UpgradeStatus.Idle, "apc11"); /// apc11 - upgradeable contract can't be added during upgrade
 
         managedContracts.push(Upgradeable(addr));
-        emit UpgradeableAdd(Upgradeable(addr));
+        emit NewUpgradable(addr);
     }
 
     /// @notice Starts upgrade (activates notice period)
@@ -58,11 +58,12 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(upgradeStatus == UpgradeStatus.Idle, "spu11"); // spu11 - unable to activate active upgrade mode
         require(newTargets.length == managedContracts.length, "spu12"); // spu12 - number of new targets must be equal to the number of managed contracts
 
+        uint noticePeriod = mainContract.getNoticePeriod();
         mainContract.upgradeNoticePeriodStarted();
         upgradeStatus = UpgradeStatus.NoticePeriod;
-        noticePeriodFinishTimestamp = now + mainContract.getNoticePeriod();
+        noticePeriodFinishTimestamp = now + noticePeriod;
         nextTargets = newTargets;
-        emit NoticePeriodStart(newTargets);
+        emit NoticePeriodStart(newTargets, noticePeriod);
     }
 
     /// @notice Cancels upgrade

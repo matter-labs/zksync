@@ -31,7 +31,8 @@ describe("UpgradeGatekeeper unit tests", function() {
         });
         await proxyTestContract.transferMastership(UpgradeGatekeeperContract.address);
 
-        await UpgradeGatekeeperContract.addUpgradeable(proxyTestContract.address);
+        await expect(UpgradeGatekeeperContract.addUpgradeable(proxyTestContract.address))
+            .to.emit(UpgradeGatekeeperContract, "NewUpgradable");
 
         // check initial dummy index and storage
         expect(await proxyDummyInterface.get_DUMMY_INDEX())
