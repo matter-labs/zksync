@@ -65,8 +65,6 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation
     /// This function will return whatever the implementation call returns
     function() external payable {
-        require(msg.data.length > 0, "pfb11"); // pfb11 - calldata must not be empty
-
         address _target = getTarget();
         assembly {
             // The pointer to the free memory slot
