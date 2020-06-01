@@ -100,8 +100,7 @@ describe("UpgradeGatekeeper unit tests", function() {
         // finish upgrade
         await proxyDummyInterface.verifyPriorityOperation();
         await expect(UpgradeGatekeeperContract.finishUpgrade([[bytes[2], bytes[3]]]))
-            .to.emit(UpgradeGatekeeperContract, "UpgradeComplete")
-            .withArgs(proxyTestContract.address, DummySecond.address);
+            .to.emit(UpgradeGatekeeperContract, "UpgradeComplete");
 
         await expect(await proxyTestContract.getTarget())
             .to.equal(DummySecond.address);

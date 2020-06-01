@@ -93,8 +93,7 @@ contract UpgradeEvents {
 
     /// @notice Upgrade mode complete event
     event UpgradeComplete(
-        Upgradeable upgradeable,
-        address newTargetAddress
+        address[] newTargets
     );
 
 }

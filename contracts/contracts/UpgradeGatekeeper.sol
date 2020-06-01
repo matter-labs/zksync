@@ -23,9 +23,9 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
     UpgradeStatus public upgradeStatus;
 
-    /// @notice Notice period activation timestamp (as seconds since unix epoch)
+    /// @notice Notice period finish timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint public noticePeriodActivationTime;
+    uint public noticePeriodFinishTimestamp;
 
     /// @notice Addresses of the next versions of the contracts to be upgraded (if element of this array is equal to zero address it means that appropriate upgradeable contract wouldn't be upgraded this time)
     /// @dev Will be empty in case of not active upgrade mode
@@ -60,7 +60,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
         mainContract.upgradeNoticePeriodStarted();
         upgradeStatus = UpgradeStatus.NoticePeriod;
-        noticePeriodActivationTime = now;
+        noticePeriodFinishTimestamp = now + mainContract.getNoticePeriod();
         nextTargets = newTargets;
         emit NoticePeriodStart(newTargets);
     }
@@ -72,7 +72,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
         mainContract.upgradeCanceled();
         upgradeStatus = UpgradeStatus.Idle;
-        noticePeriodActivationTime = 0;
+        noticePeriodFinishTimestamp = 0;
         delete nextTargets;
         emit UpgradeCancel();
     }
@@ -83,7 +83,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.NoticePeriod, "ugp11"); // ugp11 - unable to activate preparation status in case of not active notice period status
 
-        if (now >= noticePeriodActivationTime + mainContract.getNoticePeriod()) {
+        if (now >= noticePeriodFinishTimestamp) {
             upgradeStatus = UpgradeStatus.Preparation;
             mainContract.upgradePreparationStarted();
             emit PreparationStart();
@@ -106,12 +106,12 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
             address newTarget = nextTargets[i];
             if (newTarget != address(0)) {
                 managedContracts[i].upgradeTarget(newTarget, targetsInitializationParameters[i]);
-                emit UpgradeComplete(managedContracts[i], newTarget);
             }
         }
+        emit UpgradeComplete(nextTargets);
 
         upgradeStatus = UpgradeStatus.Idle;
-        noticePeriodActivationTime = 0;
+        noticePeriodFinishTimestamp = 0;
         delete nextTargets;
     }
 
