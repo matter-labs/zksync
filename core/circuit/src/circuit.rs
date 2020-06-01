@@ -1698,8 +1698,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         // Either LHS or RHS are correct (due to chunking at least)
         let correct = Boolean::xor(
-            cs.namespace(|| "lhs_valid XOR rhs_valid"), 
-            &lhs_valid, 
+            cs.namespace(|| "lhs_valid XOR rhs_valid"),
+            &lhs_valid,
             &is_rhs_valid,
         )?;
 
