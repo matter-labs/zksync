@@ -288,7 +288,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
-    /// @param _newRoots New root hashes of block. (first element is account root hash, rest of the array is reserved for future)
+    /// @param _newBlockInfo New state of the block. (first element is the account tree root hash, rest of the array is reserved for the future)
     /// @param _publicData Operations pubdata
     /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
@@ -297,7 +297,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function commitBlock(
         uint32 _blockNumber,
         uint32 _feeAccount,
-        bytes32[] calldata _newRoots,
+        bytes32[] calldata _newBlockInfo,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
@@ -306,7 +306,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
         require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
-        require(_newRoots.length == 1, "fck13"); // This version of the contract expects only account tree root hash
+        require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
         bytes memory publicData = _publicData;
 
@@ -319,7 +319,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
-            createCommittedBlock(_blockNumber, _feeAccount, _newRoots[0], publicData, withdrawalsDataHash, nPriorityRequestProcessed);
+            createCommittedBlock(_blockNumber, _feeAccount, _newBlockInfo[0], publicData, withdrawalsDataHash, nPriorityRequestProcessed);
             totalBlocksCommitted++;
 
             emit BlockCommit(_blockNumber);
