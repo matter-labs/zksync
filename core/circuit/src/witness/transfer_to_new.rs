@@ -23,11 +23,11 @@ use models::{
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
+    utils::resize_grow_only,
     witness::{
         utils::{apply_leaf_operation, get_audits, SigDataInput},
         Witness,
     },
-    utils::{resize_grow_only},
 };
 use models::node::operations::ChangePubKeyOp;
 
@@ -108,7 +108,11 @@ impl Witness for TransferToNewWitness<Bn256> {
             &self.args.fee.unwrap(),
             FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
-        resize_grow_only(&mut pubdata_bits, TransferToNewOp::CHUNKS * CHUNK_BIT_WIDTH, false);
+        resize_grow_only(
+            &mut pubdata_bits,
+            TransferToNewOp::CHUNKS * CHUNK_BIT_WIDTH,
+            false,
+        );
         pubdata_bits
     }
 

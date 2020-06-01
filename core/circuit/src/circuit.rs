@@ -34,7 +34,9 @@ use crate::{
         unpack_point_if_possible, verify_circuit_signature, verify_signature_message_construction,
         AllocatedSignerPubkey,
     },
-    utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, resize_grow_only},
+    utils::{
+        allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, resize_grow_only,
+    },
 };
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
@@ -794,7 +796,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         resize_grow_only(
             &mut pubdata_bits,
             WithdrawOp::CHUNKS * params::CHUNK_BIT_WIDTH,
-            Boolean::constant(false)
+            Boolean::constant(false),
         );
 
         // construct signature message
@@ -1765,13 +1767,14 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     account_data.extend(branch.account.address.get_bits_le());
 
     let account_data_packed_as_field_elements = multipack::pack_into_witness(
-        cs.namespace(|| "pack account data to check if empty"), 
-        &account_data
+        cs.namespace(|| "pack account data to check if empty"),
+        &account_data,
     )?;
 
     assert_eq!(account_data.len(), 2);
 
-    let mut account_words_are_empty = Vec::with_capacity(account_data_packed_as_field_elements.len());
+    let mut account_words_are_empty =
+        Vec::with_capacity(account_data_packed_as_field_elements.len());
 
     for el in account_data_packed_as_field_elements.into_iter() {
         let is_word_empty = Expression::equals(
@@ -1784,8 +1787,8 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     }
 
     let is_account_empty = multi_and(
-        cs.namespace(|| "check if all account words are empty"), 
-        &account_words_are_empty
+        cs.namespace(|| "check if all account words are empty"),
+        &account_words_are_empty,
     )?;
 
     let balance_subtree_root =
@@ -1799,11 +1802,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     // this is safe and just allows the convention. TODO: may be cut to Fr width only?
     account_data.extend(state_tree_root.into_padded_le_bits(params::FR_BIT_WIDTH_PADDED)); // !!!!!
 
-    Ok((
-        account_data,
-        is_account_empty,
-        balance_subtree_root,
-    ))
+    Ok((account_data, is_account_empty, balance_subtree_root))
 }
 
 pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(

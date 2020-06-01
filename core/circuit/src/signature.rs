@@ -18,7 +18,7 @@ use crate::{
     allocated_structures::*,
     element::{CircuitElement, CircuitPubkey},
     operation::SignatureData,
-    utils::{multi_and, pack_bits_to_element, reverse_bytes, resize_grow_only},
+    utils::{multi_and, pack_bits_to_element, resize_grow_only, reverse_bytes},
 };
 
 /// Max len of message for signature, we use Pedersen hash to compress message to this len before signing.
@@ -178,11 +178,7 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
 
     let sig_msg = sponge_output.pop().expect("must get an element");
     let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
-    resize_grow_only(
-        &mut sig_msg_bits,
-        256, 
-        Boolean::constant(false)
-    );
+    resize_grow_only(&mut sig_msg_bits, 256, Boolean::constant(false));
 
     let is_sig_verified = is_rescue_signature_verified(
         cs.namespace(|| "musig sha256"),
@@ -285,7 +281,11 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
         sig_data_bits.len(),
         MAX_SIGN_MESSAGE_BIT_WIDTH
     );
-    resize_grow_only(&mut sig_data_bits, MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
+    resize_grow_only(
+        &mut sig_data_bits,
+        MAX_SIGN_MESSAGE_BIT_WIDTH,
+        Boolean::constant(false),
+    );
     sig_data_bits = le_bits_into_le_bytes(sig_data_bits);
 
     let mut hash_input: Vec<Boolean> = vec![];
@@ -294,7 +294,11 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
             .pk
             .get_x()
             .into_bits_le_fixed(cs.namespace(|| "pk_x_bits"), FR_BIT_WIDTH)?;
-        resize_grow_only(&mut pk_x_serialized, FR_BIT_WIDTH_PADDED, Boolean::constant(false));
+        resize_grow_only(
+            &mut pk_x_serialized,
+            FR_BIT_WIDTH_PADDED,
+            Boolean::constant(false),
+        );
         hash_input.extend(le_bits_into_le_bytes(pk_x_serialized));
     }
     {
@@ -302,11 +306,19 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
             .r
             .get_x()
             .into_bits_le_fixed(cs.namespace(|| "r_x_bits"), FR_BIT_WIDTH)?;
-        resize_grow_only(&mut r_x_serialized, FR_BIT_WIDTH_PADDED, Boolean::constant(false));
+        resize_grow_only(
+            &mut r_x_serialized,
+            FR_BIT_WIDTH_PADDED,
+            Boolean::constant(false),
+        );
         hash_input.extend(le_bits_into_le_bytes(r_x_serialized));
     }
     hash_input.extend(sig_data_bits);
-    resize_grow_only(&mut hash_input, INPUT_PAD_LEN_FOR_RESCUE, Boolean::constant(false));
+    resize_grow_only(
+        &mut hash_input,
+        INPUT_PAD_LEN_FOR_RESCUE,
+        Boolean::constant(false),
+    );
 
     let hash_input = multipack::pack_into_witness(
         cs.namespace(|| "pack FS parameter bits into fiedl elements"),

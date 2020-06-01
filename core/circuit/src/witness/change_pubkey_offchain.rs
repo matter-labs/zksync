@@ -23,11 +23,11 @@ use crate::{
     operation::{
         Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
     },
+    utils::resize_grow_only,
     witness::{
         utils::{apply_leaf_operation, get_audits},
         Witness,
     },
-    utils::{resize_grow_only},
 };
 
 pub struct ChangePubkeyOffChainData {
@@ -85,7 +85,11 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             NONCE_BIT_WIDTH,
         );
 
-        resize_grow_only(&mut pubdata_bits, ChangePubKeyOp::CHUNKS * CHUNK_BIT_WIDTH, false);
+        resize_grow_only(
+            &mut pubdata_bits,
+            ChangePubKeyOp::CHUNKS * CHUNK_BIT_WIDTH,
+            false,
+        );
         pubdata_bits
     }
 

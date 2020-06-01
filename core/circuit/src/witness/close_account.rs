@@ -21,11 +21,11 @@ use models::{
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
+    utils::resize_grow_only,
     witness::{
         utils::{apply_leaf_operation, get_audits, SigDataInput},
         Witness,
     },
-    utils::{resize_grow_only},
 };
 
 pub struct CloseAccountData {
