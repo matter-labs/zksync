@@ -341,11 +341,6 @@
           "internalType": "bytes32",
           "name": "stateRoot",
           "type": "bytes32"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "opTreeRootHash",
-          "type": "bytes32"
         }
       ],
       "payable": false,
@@ -381,14 +376,9 @@
           "type": "uint32"
         },
         {
-          "internalType": "bytes32",
-          "name": "_newRoot",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "_opTreeRootHash",
-          "type": "bytes32"
+          "internalType": "bytes32[]",
+          "name": "_newBlockInfo",
+          "type": "bytes32[]"
         },
         {
           "internalType": "bytes",
