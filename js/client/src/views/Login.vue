@@ -56,6 +56,12 @@ export default {
                 
                 const signer = ethersProvider.getSigner();
                 const syncWallet = await zksync.Wallet.fromEthSigner(signer, syncProvider);
+
+                if (! await syncWallet.isSigningKeySet()) {
+                    const changePubKey = await syncWallet.setSigningKey();
+                    await changePubKey.awaitReceipt();
+                }
+
                 window.ethProvider = ethersProvider;
                 window.ethSigner = signer;
                 window.syncWallet = syncWallet;

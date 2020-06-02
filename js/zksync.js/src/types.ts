@@ -129,3 +129,18 @@ export interface Tokens {
         decimals: number;
     };
 }
+
+export interface Fee {
+    // Operation type (amount of chunks in operation differs and impacts the total fee).
+    feeType: "Withdraw" | "Transfer" | "TransferToNew",
+    // Amount of gas used by transaction
+    gasTxAmount: utils.BigNumber,
+    // Gas price (in wei)
+    gasPriceWei: utils.BigNumber,
+    // Ethereum gas part of fee (in wei)
+    gasFee: utils.BigNumber,
+    // Zero-knowledge proof part of fee (in wei)
+    zkpFee: utils.BigNumber,
+    // Total fee amount (in wei)
+    totalFee: utils.BigNumber,
+}

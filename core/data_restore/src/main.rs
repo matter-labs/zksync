@@ -14,6 +14,7 @@ use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
 use models::{
     config_options::ConfigurationOptions,
+    fe_from_hex,
     node::{
         tokens::{get_genesis_token_list, Token},
         TokenId,
@@ -69,6 +70,17 @@ fn main() {
                 .long("continue")
                 .help("Continues data restoring"),
         )
+        .arg(
+            Arg::with_name("finite")
+                .long("finite")
+                .help("Restore data until the last verified block and exit"),
+        )
+        .arg(
+            Arg::with_name("final_hash")
+                .long("final_hash")
+                .takes_value(true)
+                .help("Expected tree root hash after restoring. This argument is ignored if mode is not `finite`")
+        )
         .get_matches();
 
     let (_event_loop, transport) =
@@ -78,6 +90,14 @@ fn main() {
     let contract_addr = config_opts.contract_eth_addr;
     let available_block_chunk_sizes = config_opts.available_block_chunk_sizes;
 
+    let finite_mode = cli.is_present("finite");
+    let final_hash = if finite_mode {
+        cli.value_of("final_hash")
+            .map(|value| fe_from_hex(value).expect("Can't parse the final hash"))
+    } else {
+        None
+    };
+
     let mut driver = DataRestoreDriver::new(
         connection_pool,
         transport,
@@ -86,6 +106,8 @@ fn main() {
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         available_block_chunk_sizes,
+        finite_mode,
+        final_hash,
     );
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

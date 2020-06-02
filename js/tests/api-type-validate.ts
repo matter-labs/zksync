@@ -5,11 +5,11 @@ import * as assert from 'assert';
 import { Interface as StatusInterface } from './api-types/status';
 import { Interface as BlockInterface } from './api-types/block';
 import { Interface as BlocksInterface } from './api-types/blocks';
-import { Interface as AccountInterface } from './api-types/account';
 import { Interface as TxHistoryInterface } from './api-types/tx-history';
 import { Interface as TestnetConfigInterface } from './api-types/config';
 import { Interface as BlockTransactionsInterface } from './api-types/block-transactions';
 import { Interface as TransactionInterface } from './api-types/transaction';
+import { Interface as ProverUnstartedJobsInterface } from './api-types/prover';
 
 import * as zksync from 'zksync';
 import * as ethers from 'ethers';
@@ -163,26 +163,6 @@ export async function checkStatusResponseType(): Promise<StatusInterface> {
 }
 
 /**
- * Check `/account/${address}` method of our rest api
- */
-export async function checkAccountInfoResponseType(address: string): Promise<AccountInterface> {
-    const url = `${process.env.REST_API_ADDR}/api/v0.1/account/${address}`;
-    const typeFilePath = `${apiTypesFolder}/account.ts`;
-    const data: AccountInterface = await validateResponseFromUrl(typeFilePath, url);
-
-    // additional checks
-    assertPubKey(data.commited.pub_key_hash);
-    assertAddress(data.commited.address);
-    Object.values(data.commited.balances).forEach(assertNumeric);
-
-    assertPubKey(data.verified.pub_key_hash);
-    assertAddress(data.verified.address);
-    Object.values(data.verified.balances).forEach(assertNumeric);
-
-    return data;
-}
-
-/**
  * Check `/account/${address}/history/${offset}/${limit}` method of our rest api
  */
 export async function checkTxHistoryResponseType(address: string): Promise<TxHistoryInterface> {
@@ -250,6 +230,16 @@ export async function checkTestnetConfigResponseType(): Promise<TestnetConfigInt
     return data;
 }
 /**
+ * Check `/prover/unstarted_jobs_count` method of our rest api
+ */
+export async function checkProverUnstartedJobsCountResponseType(): Promise<ProverUnstartedJobsInterface> {
+    const url = `${process.env.REST_API_ADDR}/api/v0.1/prover/unstarted_jobs_count`;
+    const typeFilePath = `${apiTypesFolder}/prover.ts`;
+    const data: ProverUnstartedJobsInterface = await validateResponseFromUrl(typeFilePath, url);
+
+    return data;
+}
+/**
  * Check `/transactions_all/${txHash}` method of our rest api
  */
 export async function checkTransactionsResponseType(txHash: string): Promise<TransactionInterface> {
@@ -304,12 +294,12 @@ async function test() {
 
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
 
-    for (const token of ['ETH', "ERC20-1"]) {
-        console.log('Balance of ' + token + ': ' + formatEther(await syncWallet.getEthereumBalance(token)));
+    for (const token of ['ETH', "DAI", "wBTC"]) {
+        console.log('Balance of ' + token + ': ' + syncProvider.tokenSet.formatToken(token, await syncWallet.getEthereumBalance(token)));
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
             token,
-            amount: parseEther("0.01"),
+            amount: syncProvider.tokenSet.parseToken(token, "10"),
             approveDepositAmountForERC20: true,
         });
         await deposit.awaitReceipt();
@@ -324,26 +314,31 @@ async function test() {
         const transfer = await syncWallet.syncTransfer({
             to: ethWallet2.address,
             token,
-            amount: parseEther("0.002"),
-            fee: parseEther('0.0'),
+            amount: syncProvider.tokenSet.parseToken(token, "3")
         });
         await transfer.awaitReceipt();
         console.log('transfer hash:', transfer.txHash);
 
-
         const withdraw = await syncWallet.withdrawFromSyncToEthereum({
             ethAddress: syncWallet.address(),
             token,
-            amount: parseEther("0.002"),
-            fee: parseEther('0.0'),
-        })
+            amount: syncProvider.tokenSet.parseToken(token, "2")
+        });
         await withdraw.awaitReceipt();
         console.log('withdraw hash:', withdraw.txHash);
-
 
         const fullExit = await syncWallet.emergencyWithdraw({token});
         await fullExit.awaitReceipt();
         console.log('fullExit hash:', fullExit.ethTx.hash);
+
+        const deposit2 = await syncWallet.depositToSyncFromEthereum({
+            depositTo: syncWallet.address(),
+            token,
+            amount: syncProvider.tokenSet.parseToken(token, "1"),
+            approveDepositAmountForERC20: true,
+        });
+        await deposit2.awaitReceipt();
+        console.log('deposit2 hash:', deposit.ethTx.hash);
     }
 
     deleteUnusedGenFiles();
@@ -352,8 +347,10 @@ async function test() {
     await checkStatusResponseType();
     await checkTestnetConfigResponseType();
 
-    console.log("Checking account and tx history");
-    await checkAccountInfoResponseType(syncWallet.address());
+    console.log("Checking prover unstarted jobs endpoint");
+    await checkProverUnstartedJobsCountResponseType();
+
+    console.log("Checking tx history");
     await checkTxHistoryResponseType(syncWallet.address());
     
     const numBlocksToCheck = 10;

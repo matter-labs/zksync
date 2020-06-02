@@ -1,7 +1,7 @@
 // Built-in imports
 // External imports
-use bigdecimal::BigDecimal;
 use chrono::{DateTime, Duration, Utc};
+use num::BigUint;
 // Workspace imports
 use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -18,7 +18,7 @@ pub struct TransactionsHistoryTestSetup {
     pub from_zksync_account: ZksyncAccount,
     pub to_zksync_account: ZksyncAccount,
 
-    pub amount: BigDecimal,
+    pub amount: BigUint,
 
     pub tokens: Vec<Token>,
     pub blocks: Vec<Block>,
@@ -31,7 +31,7 @@ impl TransactionsHistoryTestSetup {
         let tokens = vec![
             Token::new(0, Address::zero(), "ETH", 18), // used for deposits
             Token::new(1, Address::random(), "DAI", 18), // used for transfers
-            Token::new(2, Address::random(), "FAU", 18), // used for withdraws
+            Token::new(2, Address::random(), "FAU", 6), // used for withdraws
         ];
 
         let from_account_id = 0xbabe;
@@ -42,7 +42,7 @@ impl TransactionsHistoryTestSetup {
         let to_zksync_account = ZksyncAccount::rand();
         to_zksync_account.set_account_id(Some(to_account_id));
 
-        let amount = BigDecimal::from(1);
+        let amount = 1u32.into();
 
         Self {
             from_zksync_account,
@@ -122,7 +122,7 @@ impl TransactionsHistoryTestSetup {
                 eth_address: self.from_zksync_account.address,
                 token: self.tokens[2].id,
             },
-            withdraw_amount: Some(self.amount.clone()),
+            withdraw_amount: Some(self.amount.clone().into()),
         }));
 
         let executed_op = ExecutedPriorityOp {
@@ -149,7 +149,7 @@ impl TransactionsHistoryTestSetup {
                     self.tokens[1].id,
                     &self.tokens[1].symbol,
                     self.amount.clone(),
-                    BigDecimal::from(0),
+                    0u32.into(),
                     &self.to_zksync_account.address,
                     None,
                     true,
@@ -179,7 +179,7 @@ impl TransactionsHistoryTestSetup {
                     self.tokens[1].id,
                     &self.tokens[1].symbol,
                     self.amount.clone(),
-                    BigDecimal::from(0),
+                    0u32.into(),
                     &self.to_zksync_account.address,
                     None,
                     true,
@@ -209,7 +209,7 @@ impl TransactionsHistoryTestSetup {
                     self.tokens[2].id,
                     &self.tokens[2].symbol,
                     self.amount.clone(),
-                    BigDecimal::from(0),
+                    0u32.into(),
                     &self.to_zksync_account.address,
                     None,
                     true,

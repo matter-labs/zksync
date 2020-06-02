@@ -1,10 +1,17 @@
 <template>
     <code v-if="address">
-        <span v-html="linkHtml" />
-        <i @click="clicked" 
+        <span class="link-html-span" v-html="linkHtml" />
+        <i v-if="tooltipRight===true"
+            @click="clicked"
             class="far fa-copy" 
-            v-b-tooltip.hover
-            :title="hover_title"
+            v-b-tooltip.hover.right="hover_title"
+            v-clipboard="address"
+            @mouseenter="mouseEntered"
+        ></i>
+        <i v-else
+            @click="clicked"
+            class="far fa-copy" 
+            v-b-tooltip="hover_title"
             v-clipboard="address"
             @mouseenter="mouseEntered"
         ></i>
@@ -16,7 +23,7 @@ import { shortenHash } from './utils';
 
 export default {
     name: 'CopyableAddress',
-    props: ['address', 'linkHtml'],
+    props: ['address', 'linkHtml', 'tooltipRight'],
     data: () => ({
         hover_title: ''
     }),
@@ -31,3 +38,9 @@ export default {
     },
 };
 </script>
+
+<style scoped>
+.link-html-span {
+    font-size: 1.0em;
+}
+</style>

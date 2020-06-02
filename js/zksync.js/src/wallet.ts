@@ -118,7 +118,7 @@ export class Wallet {
         to: Address;
         token: TokenLike;
         amount: utils.BigNumberish;
-        fee: utils.BigNumberish;
+        fee?: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
         if (!this.signer) {
@@ -136,6 +136,12 @@ export class Wallet {
             transfer.nonce != null
                 ? await this.getNonce(transfer.nonce)
                 : await this.getNonce();
+
+        if (transfer.fee == null) {
+            const fullFee = await this.provider.getTransactionFee("Transfer", transfer.to, transfer.token);
+            transfer.fee = fullFee.totalFee;
+        }
+
         const transactionData = {
             accountId: this.accountId,
             from: this.address(),
@@ -181,7 +187,7 @@ export class Wallet {
         ethAddress: string;
         token: TokenLike;
         amount: utils.BigNumberish;
-        fee: utils.BigNumberish;
+        fee?: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
         if (!this.signer) {
@@ -198,6 +204,12 @@ export class Wallet {
             withdraw.nonce != null
                 ? await this.getNonce(withdraw.nonce)
                 : await this.getNonce();
+            
+        if (withdraw.fee == null) {
+            const fullFee = await this.provider.getTransactionFee("Withdraw", withdraw.ethAddress, withdraw.token);
+            withdraw.fee = fullFee.totalFee;
+        }
+
         const transactionData = {
             accountId: this.accountId,
             from: this.address(),

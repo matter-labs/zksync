@@ -66,7 +66,6 @@ contract Storage {
         bytes32 withdrawalsDataHash; /// can be restricted to 16 bytes to reduce number of required storage slots
         bytes32 commitment;
         bytes32 stateRoot;
-        bytes32 opTreeRootHash;
     }
 
     /// @notice Blocks by Franklin block id
@@ -82,7 +81,7 @@ contract Storage {
     }
 
     /// @notice Flag indicates that a user has exited certain token balance (per account id and tokenId)
-    mapping(uint24 => mapping(uint16 => bool)) public exited;
+    mapping(uint32 => mapping(uint16 => bool)) public exited;
 
     /// @notice Flag indicates that exodus (mass exit) mode is triggered
     /// @notice Once it was raised, it can not be cleared again, and all users must exit

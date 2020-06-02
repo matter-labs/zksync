@@ -5,6 +5,7 @@ use crypto_exports::franklin_crypto::bellman::pairing::{
 };
 // Workspace deps
 use models::circuit::{account::CircuitAccountTree, utils::le_bit_vector_into_field_element};
+use models::params::CHUNK_BIT_WIDTH;
 // Local deps
 use crate::{
     account::AccountWitness,
@@ -28,9 +29,9 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
         None => Fr::zero(),
         Some(bal) => bal.value,
     };
-    let pubdata = vec![false; 64];
+    let pubdata = vec![false; CHUNK_BIT_WIDTH];
     let pubdata_chunks: Vec<_> = pubdata
-        .chunks(64)
+        .chunks(CHUNK_BIT_WIDTH)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
     let (audit_account, audit_balance) = get_audits(tree, acc_id, 0);

@@ -23,6 +23,7 @@ use server::{
     committer::run_committer,
     eth_sender,
     eth_watch::start_eth_watch,
+    fee_ticker::run_ticker_task,
     leader_election,
     mempool::run_mempool_task,
     observer_mode,
@@ -77,26 +78,27 @@ fn main() {
     }
 
     // Start observing the state and try to become leader.
-    let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
-    let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
-    let jh = std::thread::Builder::new()
-        .name("Observer mode".to_owned())
-        .spawn(move || {
-            let state = observer_mode::run(
-                ConnectionPool::new(Some(1)),
-                OBSERVER_MODE_PULL_INTERVAL,
-                stop_observer_mode_rx,
-            );
-            observed_state_tx.send(state).expect("unexpected failure");
-        })
-        .expect("failed to start observer mode");
-    leader_election::block_until_leader().expect("voting for leader fail");
-    stop_observer_mode_tx.send(()).expect("unexpected failure");
-    let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
-    jh.join().unwrap();
+    let observer_mode_final_state = {
+        let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
+        let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
+        let jh = std::thread::Builder::new()
+            .name("Observer mode".to_owned())
+            .spawn(move || {
+                let state = observer_mode::run(
+                    ConnectionPool::new(Some(1)),
+                    OBSERVER_MODE_PULL_INTERVAL,
+                    stop_observer_mode_rx,
+                );
+                observed_state_tx.send(state).expect("unexpected failure");
+            })
+            .expect("failed to start observer mode");
+        leader_election::block_until_leader().expect("voting for leader fail");
+        stop_observer_mode_tx.send(()).expect("unexpected failure");
+        let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
+        jh.join().unwrap();
+        observer_mode_final_state
+    };
 
-    // spawn threads for different processes
-    // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
     let connection_pool = ConnectionPool::new(None);
 
     log::debug!("starting server");
@@ -149,6 +151,7 @@ fn main() {
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
+    let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(512);
     let proposed_block = observer_mode_final_state
         .state_keeper_init
         .get_proposed_block();
@@ -175,7 +178,7 @@ fn main() {
 
     let committer_task = run_committer(
         proposed_blocks_receiver,
-        eth_send_request_sender,
+        eth_send_request_sender.clone(),
         zksync_commit_notify_sender, // commiter sends only commit block notifications
         mempool_request_sender.clone(),
         connection_pool.clone(),
@@ -189,6 +192,7 @@ fn main() {
         executed_tx_notify_receiver,
         state_keeper_req_sender.clone(),
         eth_watch_req_sender.clone(),
+        ticker_request_sender,
         config_opts.clone(),
         current_zksync_info,
     );
@@ -205,7 +209,7 @@ fn main() {
     );
 
     let mempool_task = run_mempool_task(
-        connection_pool,
+        connection_pool.clone(),
         mempool_request_receiver,
         eth_watch_req_sender,
         &config_opts,
@@ -213,7 +217,16 @@ fn main() {
     );
     let proposer_task = run_block_proposer_task(
         mempool_request_sender,
+        state_keeper_req_sender.clone(),
+        &main_runtime,
+    );
+
+    let ticker_task = run_ticker_task(
+        config_opts.ticker_url,
+        connection_pool,
+        eth_send_request_sender,
         state_keeper_req_sender,
+        ticker_request_receiver,
         &main_runtime,
     );
 
@@ -224,6 +237,7 @@ fn main() {
         committer_task,
         mempool_task,
         proposer_task,
+        ticker_task,
     ];
 
     main_runtime.block_on(async move {

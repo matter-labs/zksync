@@ -11,6 +11,7 @@ use crypto_exports::franklin_crypto::{
     rescue::bn256::Bn256RescueParams,
 };
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -23,9 +24,7 @@ use models::{
         tx::PackedPublicKey,
         AccountId, BlockNumber, Engine,
     },
-    params as franklin_constants,
-    params::total_tokens,
-    primitives::big_decimal_to_u128,
+    params::{total_tokens, CHUNK_BIT_WIDTH},
 };
 use plasma::state::CollectedFee;
 // Local deps
@@ -35,6 +34,7 @@ use crate::{
     operation::{Operation, SignatureData},
     utils::sign_rescue,
 };
+use models::params::MAX_CIRCUIT_MSG_HASH_BITS;
 
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
@@ -94,7 +94,7 @@ impl<'a> WitnessBuilder<'a> {
                 &self.account_tree,
                 self.fee_account_id,
             ));
-            self.pubdata.extend(vec![false; 64]);
+            self.pubdata.extend(vec![false; CHUNK_BIT_WIDTH]);
         }
     }
 
@@ -124,7 +124,7 @@ impl<'a> WitnessBuilder<'a> {
                 &mut self.account_tree,
                 self.fee_account_id,
                 u32::from(*token),
-                big_decimal_to_u128(amount),
+                amount.to_u128().unwrap(),
             );
             root_after_fee = root;
             fee_account_witness = acc_witness;
@@ -191,9 +191,9 @@ pub fn generate_dummy_sig_data(
     let sender_pk = PublicKey::from_private(&private_key, p_g, &jubjub_params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
+    sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -222,9 +222,9 @@ pub fn generate_sig_witness(
     _params: &AltJubjubBn256,
 ) -> (Fr, Fr, Fr) {
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
+    sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -243,9 +243,9 @@ pub fn generate_sig_data(
 ) -> (SignatureData, Fr, Fr, Fr) {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
+    assert!(sig_bits_to_hash.len() <= MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
+    sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
     debug!(
         "inside generation after resize: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits_to_hash))
@@ -352,20 +352,6 @@ pub fn public_data_commitment<E: JubjubEngine>(
     h.result(&mut hash_result[..]);
 
     debug!("hash with new root as hex {}", hex::encode(hash_result));
-
-    let mut packed_with_op_tree_root_hash = vec![];
-    packed_with_op_tree_root_hash.extend(hash_result.iter());
-    packed_with_op_tree_root_hash.extend(&[0u8; 32]); // TODO: now equals to zero -> should be fixed in #570
-
-    h = Sha256::new();
-    h.input(&packed_with_op_tree_root_hash);
-    hash_result = [0u8; 32];
-    h.result(&mut hash_result[..]);
-
-    debug!(
-        "hash with op tree root hash as hex {}",
-        hex::encode(hash_result)
-    );
 
     let mut final_bytes = vec![];
     let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits.to_vec());

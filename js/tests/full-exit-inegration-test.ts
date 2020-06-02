@@ -82,7 +82,7 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
         console.log("Running integration test on the ", network, " network");
 
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
-        const ERC_20TOKEN = syncProvider.tokenSet.resolveTokenAddress("ERC20-1");
+        const ERC_20TOKEN = syncProvider.tokenSet.resolveTokenAddress("DAI");
 
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
 

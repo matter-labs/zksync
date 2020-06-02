@@ -5,16 +5,16 @@ use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use tokio::{runtime::Runtime, task::JoinHandle, time};
 // Workspace uses
+use crate::eth_sender::ETHSenderRequest;
+use crate::mempool::MempoolRequest;
 use models::{node::block::PendingBlock, Action, BlockCommitRequest, CommitRequest, Operation};
 use storage::ConnectionPool;
-// Local uses
-use crate::mempool::MempoolRequest;
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 async fn handle_new_commit_task(
     mut rx_for_ops: Receiver<CommitRequest>,
-    mut tx_for_eth: Sender<Operation>,
+    mut tx_for_eth: Sender<ETHSenderRequest>,
     mut op_notify_sender: Sender<Operation>,
     mut mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
@@ -59,7 +59,7 @@ fn save_pending_block(pending_block: PendingBlock, pool: &ConnectionPool) {
 async fn commit_block(
     request: BlockCommitRequest,
     pool: &ConnectionPool,
-    tx_for_eth: &mut Sender<Operation>,
+    tx_for_eth: &mut Sender<ETHSenderRequest>,
     op_notify_sender: &mut Sender<Operation>,
     mempool_req_sender: &mut Sender<MempoolRequest>,
 ) {
@@ -100,7 +100,7 @@ async fn commit_block(
         .expect("committer must commit the op into db");
 
     tx_for_eth
-        .send(op.clone())
+        .send(ETHSenderRequest::SendOperation(op.clone()))
         .await
         .expect("must send an operation for commitment to ethereum");
 
@@ -118,7 +118,7 @@ async fn commit_block(
         .unwrap_or_default();
 }
 
-async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: ConnectionPool) {
+async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool: ConnectionPool) {
     let mut last_verified_block = {
         let storage = pool
             .access_storage()
@@ -162,7 +162,7 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
                     .execute_operation(op.clone())
                     .expect("committer must commit the op into db");
                 tx_for_eth
-                    .send(op)
+                    .send(ETHSenderRequest::SendOperation(op))
                     .await
                     .expect("must send an operation for verification to ethereum");
                 last_verified_block += 1;
@@ -176,7 +176,7 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
 #[must_use]
 pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
-    tx_for_eth: Sender<Operation>,
+    tx_for_eth: Sender<ETHSenderRequest>,
     op_notify_sender: Sender<Operation>,
     mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
