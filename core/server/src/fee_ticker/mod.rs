@@ -43,10 +43,23 @@ use crate::{
 mod ticker_api;
 mod ticker_info;
 
+/// Type of the fee calculation pattern.
+/// Unlike the `TxFeeTypes`, this enum represents the fee
+/// from the point of zkSync view, rather than from the users
+/// point of view.
+/// Users do not divide transfers into `Transfer` and
+/// `TransferToNew`, while in zkSync it's two different operations.
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum OutputFeeType {
+    Transfer,
+    TransferToNew,
+    Withdraw,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Fee {
-    pub fee_type: String,
+    pub fee_type: OutputFeeType,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub gas_tx_amount: BigUint,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
@@ -61,7 +74,7 @@ pub struct Fee {
 
 impl Fee {
     pub fn new(
-        fee_type: &str,
+        fee_type: OutputFeeType,
         zkp_fee: Ratio<BigUint>,
         gas_fee: Ratio<BigUint>,
         gas_tx_amount: BigUint,
@@ -75,7 +88,7 @@ impl Fee {
             .expect("Failed to round gas fee amount.");
 
         Self {
-            fee_type: fee_type.to_string(),
+            fee_type,
             gas_tx_amount,
             gas_price_wei,
             gas_fee,
@@ -199,12 +212,12 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
             .unwrap_or_else(|| Ratio::from_integer(1u32.into()));
 
         let (fee_type, op_chunks) = match tx_type {
-            TxFeeTypes::Withdraw => ("Withdraw", WithdrawOp::CHUNKS),
+            TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::Transfer => {
                 if self.is_account_new(recipient).await {
-                    ("TransferToNew", TransferToNewOp::CHUNKS)
+                    (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)
                 } else {
-                    ("Transfer", TransferOp::CHUNKS)
+                    (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
         };
