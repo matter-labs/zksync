@@ -51,6 +51,7 @@ impl<E: Engine> CircuitElement<E> {
         assert!(self.length <= n);
         assert!(n <= E::Fr::NUM_BITS as usize);
         let mut padded_bits = self.get_bits_le();
+        assert!(n >= padded_bits.len());
         padded_bits.resize(n, Boolean::constant(false));
         CircuitElement {
             number: self.number,
@@ -77,6 +78,7 @@ impl<E: Engine> CircuitElement<E> {
         )
     }
 
+    /// Does not check for congruency
     pub fn from_fe<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
         mut cs: CS,
         field_element: F,
@@ -110,7 +112,13 @@ impl<E: Engine> CircuitElement<E> {
     ) -> Result<Self, SynthesisError> {
         assert!(max_length <= E::Fr::NUM_BITS as usize);
         // decode into the fixed number of bits
-        let bits = number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?;
+        let bits = if max_length <= E::Fr::CAPACITY as usize {
+            number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?
+        } else {
+            number.into_bits_le_strict(cs.namespace(|| "into_bits_le_strict"))?
+        };
+
+        assert_eq!(bits.len(), max_length);
 
         let ce = CircuitElement {
             number,
@@ -127,6 +135,7 @@ impl<E: Engine> CircuitElement<E> {
     ) -> Result<Self, SynthesisError> {
         let mut bits = expr.into_bits_le(cs.namespace(|| "into_bits_le"))?;
         // this is safe due to "constants"
+        assert!(bits.len() <= E::Fr::NUM_BITS as usize);
         bits.resize(E::Fr::NUM_BITS as usize, Boolean::constant(false));
         let number = pack_bits_to_element(cs.namespace(|| "pack back"), &bits)?;
         let ce = CircuitElement {
@@ -153,6 +162,7 @@ impl<E: Engine> CircuitElement<E> {
         Ok(ce)
     }
 
+    /// Does not check for congruency
     pub fn from_number<CS: ConstraintSystem<E>>(
         mut cs: CS,
         number: AllocatedNum<E>,
@@ -338,7 +348,7 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
         let hash = sponge_output.pop().expect("must get an element");
 
         debug!("hash when fromxy: {:?}", hash.get_value());
-        let mut hash_bits = hash.into_bits_le(cs.namespace(|| "hash into_bits"))?;
+        let mut hash_bits = hash.into_bits_le_strict(cs.namespace(|| "pubkey hash into bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
         let element = CircuitElement::from_le_bits(cs.namespace(|| "repack_hash"), hash_bits)?;
 

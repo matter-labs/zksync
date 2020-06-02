@@ -24,6 +24,7 @@ use models::{
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
+    utils::resize_grow_only,
     witness::{
         utils::{apply_leaf_operation, get_audits, SigDataInput},
         Witness,
@@ -100,7 +101,11 @@ impl Witness for TransferWitness<Bn256> {
             &self.args.fee.unwrap(),
             FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
-        pubdata_bits.resize(TransferOp::CHUNKS * CHUNK_BIT_WIDTH, false); //TODO verify if right padding is okay
+        resize_grow_only(
+            &mut pubdata_bits,
+            TransferOp::CHUNKS * CHUNK_BIT_WIDTH,
+            false,
+        ); //TODO verify if right padding is okay
         pubdata_bits
     }
 
