@@ -298,7 +298,7 @@ pub trait Rpc {
         tx_type: TxFeeTypes,
         address: Address,
         token_like: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = serde_json::Value, Error = Error> + Send>;
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(
@@ -819,13 +819,13 @@ impl Rpc for RpcApp {
             FranklinTx::Withdraw(withdraw) => Some((
                 TxFeeTypes::Withdraw,
                 TokenLike::Id(withdraw.token),
-                withdraw.from,
+                withdraw.to,
                 withdraw.fee.clone(),
             )),
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
-                transfer.from,
+                transfer.to,
                 transfer.fee.clone(),
             )),
             _ => None,
@@ -948,20 +948,9 @@ impl Rpc for RpcApp {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = serde_json::Value, Error = Error> + Send> {
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send> {
         Box::new(
             Self::ticker_request(self.ticker_request_sender.clone(), tx_type, address, token)
-                .map(|result| {
-                    result.map(|fee| {
-                        serde_json::json!({
-                            "gas_tx_amount": BigUintSerdeWrapper(fee.gas_tx_amount),
-                            "gas_price_wei": BigUintSerdeWrapper(fee.gas_price_wei),
-                            "gas_fee": BigUintSerdeWrapper(fee.gas_fee),
-                            "zkp_fee": BigUintSerdeWrapper(fee.zkp_fee),
-                            "total_fee": BigUintSerdeWrapper(fee.total_fee),
-                        })
-                    })
-                })
                 .boxed()
                 .compat(),
         )

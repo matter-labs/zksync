@@ -34,7 +34,10 @@ use crate::{
         unpack_point_if_possible, verify_circuit_signature, verify_signature_message_construction,
         AllocatedSignerPubkey,
     },
-    utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element},
+    utils::{
+        allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element_strict,
+        resize_grow_only,
+    },
 };
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
@@ -128,8 +131,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
 
-        let old_root =
-            CircuitElement::from_number(cs.namespace(|| "old_root"), rolling_root.clone())?;
+        let old_root = rolling_root.clone();
+
         // first chunk of block should always have number 0
         let mut next_chunk_number = zero;
 
@@ -309,10 +312,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             self.rescue_params,
         )?;
 
-        let final_root = CircuitElement::from_number(
-            cs.namespace(|| "final_root"),
-            root_from_operator_after_fees,
-        )?;
+        let final_root = root_from_operator_after_fees;
 
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
@@ -339,22 +339,41 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(old_root.into_padded_be_bits(256));
+
+            // Perform bit decomposition with an explicit in-field check
+            // and change to MSB first bit order
+            let old_root_be_bits = {
+                let mut old_root_le_bits = old_root
+                    .into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
+                assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+                resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
+                let mut old_root_be_bits = old_root_le_bits;
+                old_root_be_bits.reverse();
+                assert_eq!(old_root_be_bits.len(), 256);
+                old_root_be_bits
+            };
+            pack_bits.extend(old_root_be_bits);
 
             hash_block = sha256::sha256(cs.namespace(|| "hash old_root"), &pack_bits)?;
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(final_root.into_padded_be_bits(256));
+
+            // Perform bit decomposition with an explicit in-field check
+            // and change to MSB first bit order
+            let final_root_be_bits = {
+                let mut final_root_le_bits = final_root
+                    .into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
+                assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+                resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
+                let mut final_root_be_bits = final_root_le_bits;
+                final_root_be_bits.reverse();
+                assert_eq!(final_root_be_bits.len(), 256);
+                final_root_be_bits
+            };
+            pack_bits.extend(final_root_be_bits);
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with new_root"), &pack_bits)?;
-
-            let mut pack_bits = vec![];
-            pack_bits.extend(hash_block);
-            pack_bits.extend(vec![Boolean::Constant(false); 256]); // TODO: now equals to zero -> should be fixed in #570
-
-            hash_block =
-                sha256::sha256(cs.namespace(|| "hash with op_tree_root_hash"), &pack_bits)?;
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
@@ -367,7 +386,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             hash_block.reverse();
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
-            let final_hash = pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
+            let final_hash =
+                pack_bits_to_element_strict(cs.namespace(|| "final_hash"), &hash_block)?;
             cs.enforce(
                 || "enforce external data hash equality",
                 |lc| lc + public_data_commitment.get_variable(),
@@ -790,7 +810,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS=160
                                                                 //        assert_eq!(pubdata_bits.len(), 30 * 8);
-        pubdata_bits.resize(
+
+        resize_grow_only(
+            &mut pubdata_bits,
             WithdrawOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -957,10 +979,13 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 pub_data.extend(op_data.eth_address.get_bits_be()); //20
                 pub_data.extend(cur.token.get_bits_be()); // 2
                 pub_data.extend(op_data.full_amount.get_bits_be());
-                pub_data.resize(
+
+                resize_grow_only(
+                    &mut pub_data,
                     FullExitOp::CHUNKS * params::CHUNK_BIT_WIDTH,
                     Boolean::constant(false),
                 );
+
                 pub_data
             };
 
@@ -1079,7 +1104,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS_BIT_WIDTH=160
-        pubdata_bits.resize(
+        resize_grow_only(
+            &mut pubdata_bits,
             DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -1123,12 +1149,13 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         //keys are same or account is empty
-        let is_pubkey_correct = Boolean::and(
-            cs.namespace(|| "acc not empty and keys are not the same"),
-            &is_pub_equal_to_previous.not(),
-            &is_account_empty.not(),
-        )?
-        .not();
+
+        let is_pubkey_correct = Boolean::xor(
+            cs.namespace(|| "keys are same or account is empty"),
+            &is_pub_equal_to_previous,
+            &is_account_empty,
+        )?;
+
         is_valid_flags.push(is_pubkey_correct);
 
         //verify correct amounts
@@ -1184,7 +1211,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
                                                                 // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
         pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
-        pubdata_bits.resize(
+        resize_grow_only(
+            &mut pubdata_bits,
             ChangePubKeyOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -1328,7 +1356,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //160
         pubdata_bits.extend(rhs.account_id.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
-        pubdata_bits.resize(
+        resize_grow_only(
+            &mut pubdata_bits,
             TransferToNewOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -1537,7 +1566,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
 
-        pubdata_bits.resize(
+        resize_grow_only(
+            &mut pubdata_bits,
             TransferOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -1678,12 +1708,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_rhs_valid,
         )?;
 
-        Ok(Boolean::and(
-            cs.namespace(|| "lhs_valid nand rhs_valid"),
-            &lhs_valid.not(),
-            &is_rhs_valid.not(),
-        )?
-        .not())
+        // Either LHS or RHS are correct (due to chunking at least)
+        let correct = Boolean::xor(
+            cs.namespace(|| "lhs_valid XOR rhs_valid"),
+            &lhs_valid,
+            &is_rhs_valid,
+        )?;
+
+        Ok(correct)
     }
 }
 
@@ -1755,14 +1787,34 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     account_data.extend(branch.account.pub_key_hash.get_bits_le());
     account_data.extend(branch.account.address.get_bits_le());
 
-    let account_data_packed =
-        pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
-
-    let is_account_empty = Expression::equals(
-        cs.namespace(|| "is_account_empty"),
-        &account_data_packed,
-        Expression::constant::<CS>(E::Fr::zero()),
+    let account_data_packed_as_field_elements = multipack::pack_into_witness(
+        cs.namespace(|| "pack account data to check if empty"),
+        &account_data,
     )?;
+
+    assert_eq!(account_data_packed_as_field_elements.len(), 2);
+
+    let mut account_words_are_empty =
+        Vec::with_capacity(account_data_packed_as_field_elements.len());
+
+    for (i, el) in account_data_packed_as_field_elements
+        .into_iter()
+        .enumerate()
+    {
+        let is_word_empty = Expression::equals(
+            cs.namespace(|| format!("is account word {} empty", i)),
+            &el,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?;
+
+        account_words_are_empty.push(Boolean::from(is_word_empty));
+    }
+
+    let is_account_empty = multi_and(
+        cs.namespace(|| "check if all account words are empty"),
+        &account_words_are_empty,
+    )?;
+
     let balance_subtree_root =
         CircuitElement::from_number(cs.namespace(|| "balance_subtree_root_ce"), balance_root)?;
     let state_tree_root = calc_account_state_tree_root(
@@ -1774,11 +1826,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     // this is safe and just allows the convention. TODO: may be cut to Fr width only?
     account_data.extend(state_tree_root.into_padded_le_bits(params::FR_BIT_WIDTH_PADDED)); // !!!!!
 
-    Ok((
-        account_data,
-        Boolean::from(is_account_empty),
-        balance_subtree_root,
-    ))
+    Ok((account_data, is_account_empty, balance_subtree_root))
 }
 
 pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
@@ -1888,8 +1936,10 @@ fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
         let cs = &mut cs.namespace(|| format!("chunk number {}", i));
         let pub_chunk_bits =
             pubdata_bits[i * params::CHUNK_BIT_WIDTH..(i + 1) * params::CHUNK_BIT_WIDTH].to_vec();
-        let current_chunk =
-            pack_bits_to_element(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
+        let current_chunk = pack_bits_to_element_strict(
+            cs.namespace(|| "chunk as field element"),
+            &pub_chunk_bits,
+        )?;
 
         result = Expression::select_ifeq(
             cs.namespace(|| "select if correct chunk number"),

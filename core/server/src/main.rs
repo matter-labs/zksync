@@ -217,14 +217,15 @@ fn main() {
     );
     let proposer_task = run_block_proposer_task(
         mempool_request_sender,
-        state_keeper_req_sender,
+        state_keeper_req_sender.clone(),
         &main_runtime,
     );
 
-    run_ticker_task(
+    let ticker_task = run_ticker_task(
         config_opts.ticker_url,
         connection_pool,
         eth_send_request_sender,
+        state_keeper_req_sender,
         ticker_request_receiver,
         &main_runtime,
     );
@@ -236,6 +237,7 @@ fn main() {
         committer_task,
         mempool_task,
         proposer_task,
+        ticker_task,
     ];
 
     main_runtime.block_on(async move {

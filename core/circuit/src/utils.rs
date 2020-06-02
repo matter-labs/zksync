@@ -107,15 +107,27 @@ where
     let (sig_x, sig_y) = signature.clone().r.into_xy();
     let mut signature_s_be_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
     signature_s_be_bits.reverse();
-    signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    resize_grow_only(
+        &mut signature_s_be_bits,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+        false,
+    );
     signature_s_be_bits.reverse();
     let mut signature_r_x_be_bits: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
     signature_r_x_be_bits.reverse();
-    signature_r_x_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    resize_grow_only(
+        &mut signature_r_x_be_bits,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+        false,
+    );
     signature_r_x_be_bits.reverse();
     let mut signature_r_y_be_bits: Vec<bool> = BitIterator::new(sig_y.into_repr()).collect();
     signature_r_y_be_bits.reverse();
-    signature_r_y_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    resize_grow_only(
+        &mut signature_r_y_be_bits,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+        false,
+    );
     signature_r_y_be_bits.reverse();
     let mut sig_r_packed_bits = vec![];
     sig_r_packed_bits.push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]);
@@ -222,6 +234,10 @@ pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     bits: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert!(
+        bits.len() <= E::Fr::NUM_BITS as usize,
+        "can not pack bits into field element: number of bits is larger than number of bits in a field"
+    );
     let mut data_from_lc = Num::<E>::zero();
     let mut coeff = E::Fr::one();
     for bit in bits {
@@ -241,6 +257,18 @@ pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     );
 
     Ok(data_packed)
+}
+
+pub fn pack_bits_to_element_strict<E: Engine, CS: ConstraintSystem<E>>(
+    cs: CS,
+    bits: &[Boolean],
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert!(
+        bits.len() <= E::Fr::CAPACITY as usize,
+        "can not pack bits into field element over the precision"
+    );
+
+    pack_bits_to_element(cs, bits)
 }
 
 // count a number of non-zero bits in a bit decomposition
@@ -335,4 +363,25 @@ pub fn print_boolean_vec(bits: &[Boolean]) {
     }
 
     debug!("Hex: {}", hex::encode(&bytes));
+}
+
+pub fn resize_grow_only<T: Clone>(to_resize: &mut Vec<T>, new_size: usize, pad_with: T) {
+    assert!(to_resize.len() <= new_size);
+    to_resize.resize(new_size, pad_with);
+}
+
+pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    x: &Boolean,
+    y: &Boolean,
+) -> Result<Boolean, SynthesisError> {
+    // A OR B = ( A NAND A ) NAND ( B NAND B ) = (NOT(A)) NAND (NOT (B))
+    let result = Boolean::and(
+        cs.namespace(|| "lhs_valid nand rhs_valid"),
+        &x.not(),
+        &y.not(),
+    )?
+    .not();
+
+    Ok(result)
 }
