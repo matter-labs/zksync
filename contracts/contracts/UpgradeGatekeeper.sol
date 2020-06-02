@@ -31,6 +31,9 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @dev Will be empty in case of not active upgrade mode
     address[] public nextTargets;
 
+    /// @notice Version id of contracts
+    uint public versionId;
+
     /// @notice Contract which defines notice period duration and allows finish upgrade during preparation of it
     UpgradeableMaster public mainContract;
 
@@ -39,6 +42,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @dev Calls Ownable contract constructor
     constructor(UpgradeableMaster _mainContract) Ownable(msg.sender) public {
         mainContract = _mainContract;
+        versionId=0;
     }
 
     /// @notice Adds a new upgradeable contract to the list of contracts managed by the gatekeeper
@@ -48,7 +52,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(upgradeStatus == UpgradeStatus.Idle, "apc11"); /// apc11 - upgradeable contract can't be added during upgrade
 
         managedContracts.push(Upgradeable(addr));
-        emit NewUpgradable(addr);
+        emit NewUpgradable(versionId, addr);
     }
 
     /// @notice Starts upgrade (activates notice period)
@@ -63,7 +67,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         upgradeStatus = UpgradeStatus.NoticePeriod;
         noticePeriodFinishTimestamp = now + noticePeriod;
         nextTargets = newTargets;
-        emit NoticePeriodStart(newTargets, noticePeriod);
+        emit NoticePeriodStart(versionId, newTargets, noticePeriod);
     }
 
     /// @notice Cancels upgrade
@@ -75,7 +79,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         upgradeStatus = UpgradeStatus.Idle;
         noticePeriodFinishTimestamp = 0;
         delete nextTargets;
-        emit UpgradeCancel();
+        emit UpgradeCancel(versionId);
     }
 
     /// @notice Activates preparation status
@@ -87,7 +91,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         if (now >= noticePeriodFinishTimestamp) {
             upgradeStatus = UpgradeStatus.Preparation;
             mainContract.upgradePreparationStarted();
-            emit PreparationStart();
+            emit PreparationStart(versionId);
             return true;
         } else {
             return false;
@@ -109,7 +113,8 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
                 managedContracts[i].upgradeTarget(newTarget, targetsInitializationParameters[i]);
             }
         }
-        emit UpgradeComplete(nextTargets);
+        versionId++;
+        emit UpgradeComplete(versionId, nextTargets);
 
         upgradeStatus = UpgradeStatus.Idle;
         noticePeriodFinishTimestamp = 0;

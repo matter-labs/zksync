@@ -77,23 +77,30 @@ interface UpgradeEvents {
 
     /// @notice Event emitted when new upgradeable contract is added to upgrade gatekeeper's list of managed contracts
     event NewUpgradable(
+        uint versionId,
         address upgradeable
     );
 
     /// @notice Upgrade mode enter event
     event NoticePeriodStart(
+        uint versionId,
         address[] newTargets,
         uint noticePeriod // notice period (in seconds)
     );
 
     /// @notice Upgrade mode cancel event
-    event UpgradeCancel();
+    event UpgradeCancel(
+        uint versionId
+    );
 
     /// @notice Upgrade mode preparation status event
-    event PreparationStart();
+    event PreparationStart(
+        uint versionId
+    );
 
     /// @notice Upgrade mode complete event
     event UpgradeComplete(
+        uint versionId,
         address[] newTargets
     );
 
