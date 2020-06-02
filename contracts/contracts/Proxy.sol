@@ -10,8 +10,8 @@ import "./UpgradeableMaster.sol";
 /// @author Matter Labs
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
-    /// @notice Storage position of "target" (actual implementation address)
-    bytes32 private constant targetPosition = bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1);
+    /// @notice Storage position of "target" (actual implementation address: keccak256('eip1967.proxy.implementation') - 1)
+    bytes32 private constant targetPosition = bytes32(0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc);
 
     /// @notice Contract constructor
     /// @dev Calls Ownable contract constructor and initialize target
@@ -28,6 +28,11 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @notice Intercepts initialization calls
     function initialize(bytes calldata) external pure {
         revert("ini11"); // ini11 - interception of initialization call
+    }
+
+    /// @notice Intercepts upgrade calls
+    function upgrade(bytes calldata) external pure {
+        revert("upg11"); // upg11 - interception of upgrade call
     }
 
     /// @notice Returns target of contract
@@ -50,15 +55,15 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Upgrades target
     /// @param newTarget New target
-    /// @param newTargetInitializationParameters New target initialization parameters
-    function upgradeTarget(address newTarget, bytes calldata newTargetInitializationParameters) external {
+    /// @param newTargetUpgradeParameters New target initialization parameters
+    function upgradeTarget(address newTarget, bytes calldata newTargetUpgradeParameters) external {
         requireMaster(msg.sender);
 
         setTarget(newTarget);
-        (bool initializationSuccess, ) = getTarget().delegatecall(
-            abi.encodeWithSignature("initialize(bytes)", newTargetInitializationParameters)
+        (bool upgradeSuccess, ) = getTarget().delegatecall(
+            abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters)
         );
-        require(initializationSuccess, "ufu11"); // ufu11 - target initialization failed
+        require(upgradeSuccess, "ufu11"); // ufu11 - target initialization failed
     }
 
     /// @notice Performs a delegatecall to the contract implementation
