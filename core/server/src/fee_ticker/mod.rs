@@ -3,27 +3,45 @@
 //! base formula for calculation:
 //! `( zkp cost of chunk * number of chunks + gas price of transaction) * token risk factor / cost of token is usd`
 
-use crate::eth_sender::ETHSenderRequest;
-use crate::fee_ticker::ticker_api::TickerApi;
-use bigdecimal::BigDecimal;
-use futures::channel::mpsc::{self, Receiver};
-use futures::channel::oneshot;
-use futures::StreamExt;
-use models::node::{
-    pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp, TransferToNewOp,
-    TxFeeTypes, WithdrawOp,
-};
-use models::primitives::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str};
-use num::rational::Ratio;
-use num::traits::{Inv, Pow};
-use num::BigUint;
-use reqwest::Url;
+// Built-in deps
 use std::collections::HashMap;
+// External deps
+use bigdecimal::BigDecimal;
+use futures::{
+    channel::{
+        mpsc::{self, Receiver},
+        oneshot,
+    },
+    StreamExt,
+};
+use num::{
+    rational::Ratio,
+    traits::{Inv, Pow},
+    BigUint,
+};
+use reqwest::Url;
+use tokio::{runtime::Runtime, task::JoinHandle};
+// Workspace deps
+use models::{
+    node::{
+        pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp,
+        TransferToNewOp, TxFeeTypes, WithdrawOp,
+    },
+    primitives::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str},
+};
 use storage::ConnectionPool;
-use ticker_api::FeeTickerAPI;
-use tokio::runtime::Runtime;
+// Local deps
+use crate::{
+    eth_sender::ETHSenderRequest,
+    fee_ticker::{
+        ticker_api::{FeeTickerAPI, TickerApi},
+        ticker_info::{FeeTickerInfo, TickerInfo},
+    },
+    state_keeper::StateKeeperRequest,
+};
 
 mod ticker_api;
+mod ticker_info;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -87,22 +105,22 @@ pub enum TickerRequest {
     },
 }
 
-struct FeeTicker<API> {
+struct FeeTicker<API, INFO> {
     api: API,
+    info: INFO,
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
-    // `Option` is introduced here for simpler testing and quick implementation.
-    // TODO: Replace with a template parameter, just like `API`.
-    db_pool: Option<ConnectionPool>,
 }
 
+#[must_use]
 pub fn run_ticker_task(
     api_base_url: Url,
     db_pool: ConnectionPool,
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
+    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
     runtime: &Runtime,
-) {
+) -> JoinHandle<()> {
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: vec![
@@ -115,23 +133,19 @@ pub fn run_ticker_task(
     };
 
     let ticker_api = TickerApi::new(api_base_url, db_pool.clone(), eth_sender_request_sender);
-    let fee_ticker = FeeTicker::new(ticker_api, tricker_requests, ticker_config, Some(db_pool));
+    let ticker_info = TickerInfo::new(state_keeper_request_sender);
+    let fee_ticker = FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
-    runtime.spawn(fee_ticker.run());
+    runtime.spawn(fee_ticker.run())
 }
 
-impl<API: FeeTickerAPI> FeeTicker<API> {
-    fn new(
-        api: API,
-        requests: Receiver<TickerRequest>,
-        config: TickerConfig,
-        db_pool: Option<ConnectionPool>,
-    ) -> Self {
+impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
+    fn new(api: API, info: INFO, requests: Receiver<TickerRequest>, config: TickerConfig) -> Self {
         Self {
             api,
+            info,
             requests,
             config,
-            db_pool,
         }
     }
 
@@ -165,40 +179,12 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.
-    fn is_account_new(&self, address: Address) -> bool {
-        let db_pool = match &self.db_pool {
-            Some(pool) => pool,
-            None => {
-                // Testing setup, just return false.
-                return false;
-            }
-        };
-
-        let storage = match db_pool.access_storage_fragile() {
-            Ok(storage) => storage,
-            Err(err) => {
-                // We don't want the ticker request to cause panic, so we're taking the
-                // safe road and just assume that account is not new.
-                // It will result in a slightly higher fee reported, but as we don't really
-                // expect the storage to be unavailable, this doesn't suppose to happen.
-                log::warn!(
-                    "Failed accessing the storage, assuming the recipient as not new. Error: {}",
-                    err
-                );
-                return false;
-            }
-        };
-
-        storage
-            .chain()
-            .account_schema()
-            .account_state_by_address(&address)
-            .map(|state| state.committed.is_some())
-            .unwrap_or(false)
+    async fn is_account_new(&mut self, address: Address) -> bool {
+        self.info.is_account_new(address).await
     }
 
     async fn get_fee_from_ticker_in_wei(
-        &self,
+        &mut self,
         tx_type: TxFeeTypes,
         token: TokenLike,
         recipient: Address,
@@ -215,7 +201,7 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => ("Withdraw", WithdrawOp::CHUNKS),
             TxFeeTypes::Transfer => {
-                if self.is_account_new(recipient) {
+                if self.is_account_new(recipient).await {
                     ("TransferToNew", TransferToNewOp::CHUNKS)
                 } else {
                     ("Transfer", TransferOp::CHUNKS)
@@ -369,12 +355,22 @@ mod test {
         }
     }
 
+    struct MockTickerInfo;
+    #[async_trait]
+    impl FeeTickerInfo for MockTickerInfo {
+        async fn is_account_new(&mut self, _address: Address) -> bool {
+            // Always false for simplicity.
+            false
+        }
+    }
+
     #[test]
     fn test_ticker_formula() {
         let config = get_test_ticker_config();
-        let ticker = FeeTicker::new(MockApiProvider, mpsc::channel(1).1, config, None);
+        let mut ticker =
+            FeeTicker::new(MockApiProvider, MockTickerInfo, mpsc::channel(1).1, config);
 
-        let get_token_fee_in_usd =
+        let mut get_token_fee_in_usd =
             |tx_type: TxFeeTypes, token: TokenLike, address: Address| -> Ratio<BigUint> {
                 let fee_in_token =
                     block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
