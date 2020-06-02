@@ -22,7 +22,7 @@ pragma solidity ^0.5.0;
 contract ReentrancyGuard {
     /// Address of lock flag variable.
     /// Flag is placed at random memory location to not interfere with Storage contract.
-    uint constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf5; // keccak256("ReentrancyGuard");
+    uint constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4; // keccak256("ReentrancyGuard") - 1;
 
     function initializeReentrancyGuard () internal {
         // Storing an initial non-zero value makes deployment a bit more
