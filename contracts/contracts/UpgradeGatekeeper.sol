@@ -1,15 +1,16 @@
 pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
 
+import "./SafeMath.sol";
 import "./Events.sol";
 import "./Ownable.sol";
 import "./Upgradeable.sol";
 import "./UpgradeableMaster.sol";
 
-
 /// @title Upgrade Gatekeeper Contract
 /// @author Matter Labs
 contract UpgradeGatekeeper is UpgradeEvents, Ownable {
+    using SafeMath for uint256;
 
     /// @notice Array of addresses of upgradeable contracts managed by the gatekeeper
     Upgradeable[] public managedContracts;
@@ -42,7 +43,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @dev Calls Ownable contract constructor
     constructor(UpgradeableMaster _mainContract) Ownable(msg.sender) public {
         mainContract = _mainContract;
-        versionId=0;
+        versionId = 0;
     }
 
     /// @notice Adds a new upgradeable contract to the list of contracts managed by the gatekeeper
@@ -65,7 +66,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         uint noticePeriod = mainContract.getNoticePeriod();
         mainContract.upgradeNoticePeriodStarted();
         upgradeStatus = UpgradeStatus.NoticePeriod;
-        noticePeriodFinishTimestamp = now + noticePeriod;
+        noticePeriodFinishTimestamp = now.add(noticePeriod);
         nextTargets = newTargets;
         emit NoticePeriodStart(versionId, newTargets, noticePeriod);
     }
