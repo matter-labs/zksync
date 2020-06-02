@@ -145,7 +145,7 @@ pub fn run_ticker_task(
         tokens_risk_factors: HashMap::new(),
     };
 
-    let ticker_api = TickerApi::new(api_base_url, db_pool.clone(), eth_sender_request_sender);
+    let ticker_api = TickerApi::new(api_base_url, db_pool, eth_sender_request_sender);
     let ticker_info = TickerInfo::new(state_keeper_request_sender);
     let fee_ticker = FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
