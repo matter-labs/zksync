@@ -341,6 +341,13 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(vec_tokens))
 }
 
+/// Converts a non-executed priority operation into a
+/// `TxByHashResponse` so the user can track its status in explorer.
+/// It also adds new field `tx.eth_block_number`, which is normally not there,
+/// which is the block number of Ethereum tx of the priority operation,
+/// it enables tracking the number of blocks (confirmations) user needs to wait
+/// before the priority op is included into zkSync block.
+/// Currently returns Some(TxByHashResponse) if PriorityOp is Deposit, and None in other cases.
 fn priority_op_to_tx_by_hash(
     tokens: &HashMap<TokenId, Token>,
     op: &PriorityOp,
@@ -726,6 +733,27 @@ fn handle_get_tx_by_hash(
         try_parse_hash(&hash_hex_with_prefix).ok_or_else(|| HttpResponse::BadRequest().finish())?;
     let storage = data.access_storage()?;
 
+    let mut res;
+
+    res = storage
+        .chain()
+        .operations_ext_schema()
+        .get_tx_by_hash(hash.as_slice())
+        .map_err(|err| {
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: {}",
+                err,
+                hex::encode(&hash)
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
+
+    // If storage returns Some, return the result.
+    if res.is_some() {
+        return Ok(HttpResponse::Ok().json(res));
+    }
+
+    // Or try to find this priority op in eth_watcher
     let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
     let unconfirmed_op = futures::executor::block_on(async {
         get_unconfirmed_op_by_hash(&eth_watcher_request_sender, &hash).await
@@ -739,29 +767,18 @@ fn handle_get_tx_by_hash(
         HttpResponse::InternalServerError().finish()
     })?;
 
-    let res = if let Some((eth_block, priority_op)) = unconfirmed_op {
-        let storage = data.access_storage()?;
+    // If eth watcher has a priority op with given hash, transform it
+    // to TxByHashResponse and assign it to res.
+    if let Some((eth_block, priority_op)) = unconfirmed_op {
         let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
             vlog::warn!("Internal Server Error: '{}';", err);
             HttpResponse::InternalServerError().finish()
         })?;
 
-        priority_op_to_tx_by_hash(&tokens, &priority_op, eth_block)
-    } else {
-        storage
-            .chain()
-            .operations_ext_schema()
-            .get_tx_by_hash(hash.as_slice())
-            .map_err(|err| {
-                vlog::warn!(
-                    "Internal Server Error: '{}'; input: {}",
-                    err,
-                    hex::encode(&hash)
-                );
-                HttpResponse::InternalServerError().finish()
-            })?
-    };
+        res = priority_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
+    }
 
+    // Return res
     Ok(HttpResponse::Ok().json(res))
 }
 

@@ -406,6 +406,8 @@ impl RpcApp {
     }
 }
 
+/// Sends an EthWatchRequest asking for an unconfirmed priority op
+/// with given hash. If no such priority op exists, returns Ok(None).
 pub(crate) async fn get_unconfirmed_op_by_hash(
     eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
     eth_hash: &[u8],
