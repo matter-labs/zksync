@@ -41,3 +41,5 @@ Cargo.lock
 .ipynb_checkpoints
 
 emergency_output_*
+
+go_to_env.sh
