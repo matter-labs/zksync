@@ -384,7 +384,7 @@ pub(crate) async fn get_unconfirmed_op_by_hash(
 /// it enables tracking the number of blocks (confirmations) user needs to wait
 /// before the priority op is included into zkSync block.
 /// Currently returns Some(TxByHashResponse) if PriorityOp is Deposit, and None in other cases.
-fn priority_op_to_tx_by_hash(
+fn deposit_op_to_tx_by_hash(
     tokens: &HashMap<TokenId, Token>,
     op: &PriorityOp,
     eth_block: EthBlockId,
@@ -811,7 +811,7 @@ fn handle_get_tx_by_hash(
             HttpResponse::InternalServerError().finish()
         })?;
 
-        res = priority_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
+        res = deposit_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
     }
 
     // Return res

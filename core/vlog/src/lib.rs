@@ -6,7 +6,7 @@
 //!
 //! In fact, printing file, line and column can be done with a custom formatter for env_logger, like so:
 //!
-//! ```no_run,rust
+//!```ignore
 //! use env_logger::Builder;
 //! use std::io::Write;
 //!
