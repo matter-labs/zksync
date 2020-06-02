@@ -1,26 +1,47 @@
-mod pool;
-
 // Built-in
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::{net, time};
+use std::{
+    net,
+    time::{self, Duration},
+};
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{error, info, trace};
 // Workspace deps
-use models::circuit::CircuitAccountTree;
-use models::config_options::ThreadPanicNotify;
-use models::node::BlockNumber;
+use models::{circuit::CircuitAccountTree, config_options::ThreadPanicNotify, node::BlockNumber};
 use prover::client;
+use storage::ConnectionPool;
+// Local deps
+use crate::prover_server::scaler::ScalerOracle;
+
+mod pool;
+mod scaler;
 
 struct AppState {
     connection_pool: storage::ConnectionPool,
     preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
-    prover_timeout: time::Duration,
+    scaler_oracle: Arc<RwLock<ScalerOracle>>,
+    prover_timeout: Duration,
 }
 
 impl AppState {
+    pub fn new(
+        connection_pool: ConnectionPool,
+        preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
+        prover_timeout: Duration,
+    ) -> Self {
+        let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(connection_pool.clone())));
+
+        Self {
+            connection_pool,
+            preparing_data_pool,
+            scaler_oracle,
+            prover_timeout,
+        }
+    }
+
     fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor> {
         self.connection_pool
             .access_storage_fragile()
@@ -163,6 +184,32 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
         })
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequiredReplicasInput {
+    current_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequiredReplicasOutput {
+    needed_count: u32,
+}
+
+fn required_replicas(
+    data: web::Data<AppState>,
+    input: web::Json<RequiredReplicasInput>,
+) -> actix_web::Result<HttpResponse> {
+    let input = input.into_inner();
+    let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
+
+    let needed_count = oracle
+        .provers_required(input.current_count)
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    let response = RequiredReplicasOutput { needed_count };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
 pub fn start_prover_server(
     connection_pool: storage::ConnectionPool,
     bind_to: net::SocketAddr,
@@ -195,11 +242,11 @@ pub fn start_prover_server(
             HttpServer::new(move || {
                 App::new()
                     .wrap(actix_web::middleware::Logger::default())
-                    .data(AppState {
-                        connection_pool: connection_pool.clone(),
-                        preparing_data_pool: data_pool.clone(),
+                    .data(AppState::new(
+                        connection_pool.clone(),
+                        data_pool.clone(),
                         prover_timeout,
-                    })
+                    ))
                     .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
                     .route("/block_to_prove", web::get().to(block_to_prove))
@@ -207,6 +254,7 @@ pub fn start_prover_server(
                     .route("/prover_data", web::get().to(prover_data))
                     .route("/publish", web::post().to(publish))
                     .route("/stopped", web::post().to(stopped))
+                    .route("/scaler/replicas", web::post().to(required_replicas))
             })
             .bind(&bind_to)
             .expect("failed to bind")
