@@ -95,7 +95,10 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
     }
 }
 
-async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet.address(), token);
+    const fee = fullFee.totalFee;
+
     const walletBeforeTransfer = await syncWallet.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
     const startTime = new Date().getTime();
@@ -119,7 +122,10 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
     }
 }
 
-async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
+    const fee = fullFee.totalFee;
+
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
@@ -146,7 +152,10 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
-async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+    const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
+    const fee = fullFee.totalFee;
+
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
     const operatorBeforeWithdraw = await getOperatorBalance(token);
     const onchainBalanceBeforeWithdraw = await withdrawTo.getEthereumBalance(token);
@@ -240,13 +249,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
     // we do two transfers to test transfer to new and ordinary transfer.
     const transfersAmount = depositAmount.div(10);
-    const transfersFeeFull = await syncProvider.getTransactionFee("Transfer", depositWallet.address(), token);
-    const transfersFee = transfersFeeFull.total_fee;
-
-
     const withdrawAmount = transfersAmount.div(10);
-    const withdrawFeeFull = await syncProvider.getTransactionFee("Withdraw", depositWallet.address(), token);
-    const withdrawFee = withdrawFeeFull.total_fee;
 
     await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Auto approved deposit ok, Token: ${token}`);
@@ -254,11 +257,11 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Forever approved deposit ok, Token: ${token}`);
     await testChangePubkeyOnchain(syncWallet1);
     console.log(`Change pubkey onchain ok`);
-    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, transfersFee);
+    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount);
     console.log(`Transfer to new ok, Token: ${token}`);
-    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, transfersFee);
+    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount,);
     console.log(`Transfer ok, Token: ${token}`);
-    await testTransferToSelf(syncWallet1, token, transfersAmount, transfersFee);
+    await testTransferToSelf(syncWallet1, token, transfersAmount);
     console.log(`Transfer to self with fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
@@ -271,7 +274,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     await apitype.checkTxHistoryResponseType(syncWallet1.address());
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
 
-    await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
+    await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount);
     console.log(`Withdraw ok, Token: ${token}`);
 }
 

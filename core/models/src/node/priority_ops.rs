@@ -110,7 +110,8 @@ impl FranklinPriorityOp {
                 // amount
                 ensure!(
                     pub_data_left.len() == BALANCE_BIT_WIDTH / 8,
-                    "FullExitOp parse failed: input too big"
+                    "FullExitOp parse failed: input too big: {:?}",
+                    pub_data_left
                 );
 
                 Ok(Self::FullExit(FullExit {
