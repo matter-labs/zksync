@@ -54,8 +54,10 @@ contract Governance is Config {
     /// @param _newGovernor Address of the new governor
     function changeGovernor(address _newGovernor) external {
         requireGovernor(msg.sender);
-        networkGovernor = _newGovernor;
-        emit NewGovernor(_newGovernor);
+        if (networkGovernor != _newGovernor) {
+            networkGovernor = _newGovernor;
+            emit NewGovernor(_newGovernor);
+        }
     }
 
     /// @notice Add token to the list of networks tokens
@@ -78,8 +80,10 @@ contract Governance is Config {
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external {
         requireGovernor(msg.sender);
-        validators[_validator] = _active;
-        emit ValidatorStatusUpdate(_validator, _active);
+        if (validators[_validator] != _active) {
+            validators[_validator] = _active;
+            emit ValidatorStatusUpdate(_validator, _active);
+        }
     }
 
     /// @notice Check if specified address is is governor

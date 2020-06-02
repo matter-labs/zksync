@@ -44,11 +44,10 @@ library Operations {
     uint8 constant SIGNATURE_BYTES = 64;
 
     // Deposit pubdata
-
     struct Deposit {
         uint24 accountId;
         uint16 tokenId;
-        uint128 amount; 
+        uint128 amount;
         address owner;
     }
 
@@ -72,10 +71,10 @@ library Operations {
     /// Serialize deposit pubdata
     function writeDepositPubdata(Deposit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
-            new bytes(ACCOUNT_ID_BYTES),          // accountId (ignored)
-            Bytes.toBytesFromUInt16(op.tokenId),  // tokenId
-            Bytes.toBytesFromUInt128(op.amount),  // amount
-            Bytes.toBytesFromAddress(op.owner)    // owner
+            bytes3(0),   // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            op.tokenId,  // tokenId
+            op.amount,   // amount
+            op.owner     // owner
         );
     }
 
@@ -114,10 +113,10 @@ library Operations {
 
     function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
-            Bytes.toBytesFromUInt24(op.accountId),  // accountId
-            Bytes.toBytesFromAddress(op.owner),     // owner
-            Bytes.toBytesFromUInt16(op.tokenId),    // tokenId
-            Bytes.toBytesFromUInt128(op.amount)     // amount
+            op.accountId,  // accountId
+            op.owner,      // owner
+            op.tokenId,    // tokenId
+            op.amount      // amount
         );
     }
 
@@ -152,11 +151,11 @@ library Operations {
 
     function writePartialExitPubdata(PartialExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
-            new bytes(ACCOUNT_ID_BYTES),          // accountId (ignored)
-            Bytes.toBytesFromUInt16(op.tokenId),  // tokenId
-            Bytes.toBytesFromUInt128(op.amount),  // amount
-            new bytes(FEE_BYTES),                 // fee (ignored)
-            Bytes.toBytesFromAddress(op.owner)    // owner
+            bytes3(0),  // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            op.tokenId, // tokenId
+            op.amount,  // amount
+            bytes2(0),  // fee (ignored)  (update when FEE_BYTES is changed)
+            op.owner    // owner
         );
     }
 
@@ -172,8 +171,6 @@ library Operations {
     function readChangePubKeyPubdata(bytes memory _data, uint _offset) internal pure
         returns (ChangePubKey memory parsed)
     {
-        require(PUBKEY_HASH_BYTES == 20, "rcp11"); // expected PUBKEY_HASH_BYTES to be 20
-
         uint offset = _offset;
         (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);                // accountId
         (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset);              // pubKeyHash
