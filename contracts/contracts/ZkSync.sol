@@ -77,6 +77,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         blocks[0].stateRoot = _genesisRoot;
     }
 
+    /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
+    /// @param upgradeParameters Encoded representation of upgrade parameters
+    function upgrade(bytes calldata upgradeParameters) external {
+        revert("upgzk"); // it is the first version, upgrade is not supported, use initialize
+    }
+
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external nonReentrant {

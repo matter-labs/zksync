@@ -43,11 +43,17 @@ contract Governance is Config {
 
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
-        /// _networkGovernor The address of network governor
+    ///     _networkGovernor The address of network governor
     function initialize(bytes calldata initializationParameters) external {
         address _networkGovernor = abi.decode(initializationParameters, (address));
 
         networkGovernor = _networkGovernor;
+    }
+
+    /// @notice Governance contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
+    /// @param upgradeParameters Encoded representation of upgrade parameters
+    function upgrade(bytes calldata upgradeParameters) external {
+        revert("upggv"); // it is the first version, upgrade is not supported, use initialize
     }
 
     /// @notice Change current governor

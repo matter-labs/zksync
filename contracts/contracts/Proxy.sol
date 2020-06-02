@@ -29,6 +29,11 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
         revert("ini11"); // ini11 - interception of initialization call
     }
 
+    /// @notice Intercepts upgrade calls
+    function upgrade(bytes calldata) external pure {
+        revert("upg11"); // ini11 - interception of upgrade call
+    }
+
     /// @notice Returns target of contract
     /// @return Actual implementation address
     function getTarget() public view returns (address target) {
@@ -55,7 +60,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
         setTarget(newTarget);
         (bool initializationSuccess, ) = getTarget().delegatecall(
-            abi.encodeWithSignature("initialize(bytes)", newTargetInitializationParameters)
+            abi.encodeWithSignature("upgrade(bytes)", newTargetInitializationParameters)
         );
         require(initializationSuccess, "ufu11"); // ufu11 - target initialization failed
     }

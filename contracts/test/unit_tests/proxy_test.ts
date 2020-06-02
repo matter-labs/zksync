@@ -34,6 +34,7 @@ describe("Proxy unit tests", function() {
 
     it("checking Proxy reverts", async () => {
         expect((await getCallRevertReason( () => proxyTestContract.initialize([]) )).revertReason).equal("ini11");
+        expect((await getCallRevertReason( () => proxyTestContract.upgrade([]) )).revertReason).equal("upg11");
         expect((await getCallRevertReason( () => proxyTestContract.upgradeTarget(proxyTestContract.address, []) )).revertReason).equal("ufu11");
     });
 
