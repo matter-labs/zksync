@@ -349,7 +349,6 @@ impl ScenarioExecutor {
         let mut verified = 0;
         let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
         for tx_batch in txs_chunks {
-            log::info!("Batch size: {}", tx_batch.len());
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
