@@ -1,15 +1,6 @@
 <template>
 <div>
-    <b-navbar toggleable="md" type="dark" variant="info">
-        <b-container>
-            <b-navbar-brand href="/">zkSync Network</b-navbar-brand>
-            <b-navbar-nav class="ml-auto">
-                <b-nav-form>
-                    <SearchField :searchFieldInMenu="true" />
-                </b-nav-form>
-            </b-navbar-nav>
-        </b-container>
-    </b-navbar>
+    <Navbar />
     <br>
     <b-container>
         <b-breadcrumb class="" :items="breadcrumbs"></b-breadcrumb>
@@ -92,13 +83,15 @@
 import store from './store';
 import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
-import { readableEther, shortenHash, formatDate } from './utils';
+import { shortenHash, formatDate } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
+import Navbar from './Navbar.vue';
 
 const components = {
     SearchField,
     CopyableAddress,
+    Navbar,
 };
 
 export default {
@@ -193,7 +186,7 @@ export default {
         },
         accountDataProps() {
             return [
-                { name: 'Address',          value: `<a><code>${this.address}</code></a> ` },
+                { name: 'Address',          value: `<a>${this.address}</a> ` },
             ];
         },
         balancesProps() {
@@ -214,17 +207,24 @@ export default {
         transactionProps() {
             return this.transactions
                 .map(tx => {
-                    let TxnHash = `<code>
+                    if (tx.data.hash.startsWith('sync-tx:')) {
+                        tx.data.hash = tx.data.hash.slice('sync-tx:'.length);
+                    }
+
+                    if (tx.data.type == 'Withdraw') {
+                        tx.data.type = 'Withdrawal';
+                    }
+
+                    let TxnHash = `
                         <a href="${this.routerBase}transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
                             ${shortenHash(tx.data.hash, 'unknown! hash')}
-                        </a>
-                    </code>`;
+                        </a>`;
 
                     const link_from = tx.data.type == 'Deposit' 
                         ? `${this.blockchainExplorerAddress}/${tx.data.from}`
                         : `${this.routerBase}accounts/${tx.data.from}`;
 
-                    const link_to = tx.data.type == 'Withdraw' 
+                    const link_to = tx.data.type == 'Withdrawal' 
                         ? `${this.blockchainExplorerAddress}/${tx.data.to}`
                         : `${this.routerBase}accounts/${tx.data.to}`;
 
@@ -232,7 +232,7 @@ export default {
                         ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    const target_to = tx.data.type == 'Withdraw' 
+                    const target_to = tx.data.type == 'Withdrawal' 
                         ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
@@ -240,18 +240,17 @@ export default {
                         ? '<i class="fas fa-external-link-alt"></i> '
                         : '';
 
-                    const onchain_to = tx.data.type == 'Withdraw' 
+                    const onchain_to = tx.data.type == 'Withdrawal' 
                         ? '<i class="fas fa-external-link-alt"></i> '
                         : '';
 
-                    const From = `<code>
+                    const From = `
                         <a href="${link_from}" ${target_from}>
                             ${shortenHash(tx.data.from, 'unknown! from')}
                             ${onchain_from}
-                        </a>
-                    </code>`;
+                        </a>`;
 
-                    const To = `<code>
+                    const To = `
                         <a href="${link_to}" ${target_to}>
                             ${
                                 tx.data.type == "ChangePubKey" 
@@ -260,13 +259,12 @@ export default {
                             }
 
                             ${ tx.data.type == "ChangePubKey" ? '' : onchain_to }
-                        </a>
-                    </code>`;
+                        </a>`;
 
-                    const Type = `<b>${tx.data.type}</b>`;
+                    const Type = `${tx.data.type}`;
                     const Amount 
                         = tx.data.type == "ChangePubKey" ? ''
-                        : `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
+                        : `${tx.data.token} <span>${tx.data.amount}</span>`;
 
                     const CreatedAt = formatDate(tx.data.created_at);
 
