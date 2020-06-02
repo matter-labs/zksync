@@ -184,13 +184,18 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
         })
 }
 
+/// Input of the `/scaler/replicas` endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequiredReplicasInput {
+    /// Amount of currently running prover entities.
     current_count: u32,
 }
 
+/// Output of the `/scaler/replicas` endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequiredReplicasOutput {
+    /// Amount of the prover entities required for server
+    /// to run optimally.
     needed_count: u32,
 }
 
