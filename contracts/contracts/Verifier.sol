@@ -1,4 +1,4 @@
-pragma solidity >=0.5.0 <0.7.0;
+pragma solidity ^0.5.0;
 
 import "./KeysWithPlonkVerifier.sol";
 
@@ -6,8 +6,6 @@ import "./KeysWithPlonkVerifier.sol";
 contract Verifier is KeysWithPlonkVerifier {
 
     bool constant DUMMY_VERIFIER = false;
-
-    constructor() public {}
 
     function initialize(bytes calldata) external {
     }
@@ -34,7 +32,7 @@ contract Verifier is KeysWithPlonkVerifier {
         if (DUMMY_VERIFIER) {
             uint oldGasValue = gasleft();
             uint tmp;
-            while (gasleft() > oldGasValue - 470000) {
+            while (gasleft() + 470000 > oldGasValue) {
                 tmp += 1;
             }
             return true;
@@ -49,14 +47,14 @@ contract Verifier is KeysWithPlonkVerifier {
     }
 
     function verifyExitProof(
-        bytes32 _root_hash,
+        bytes32 _rootHash,
         uint32 _accountId,
         address _owner,
         uint16 _tokenId,
         uint128 _amount,
         uint256[] calldata _proof
     ) external view returns (bool) {
-        bytes32 commitment = sha256(abi.encodePacked(_root_hash, _accountId, _owner, _tokenId, _amount));
+        bytes32 commitment = sha256(abi.encodePacked(_rootHash, _accountId, _owner, _tokenId, _amount));
 
         uint256[] memory inputs = new uint256[](1);
         uint256 mask = (~uint256(0)) >> 3;

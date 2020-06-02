@@ -14,6 +14,8 @@ import "./Events.sol";
 import "./Bytes.sol";
 import "./Operations.sol";
 
+import "./UpgradeableMaster.sol";
+
 /// @title zkSync main contract
 /// @author Matter Labs
 contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
@@ -23,7 +25,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     // Upgrade functional
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function upgradeNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -52,7 +54,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
-    function readyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external returns (bool) {
         return !exodusMode && totalOpenPriorityRequests == 0;
     }
 
@@ -428,6 +430,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         );
     }
 
+    function emitDepositCommit(uint32 _blockNumber, Operations.Deposit memory depositData) internal {
+        emit DepositCommit(_blockNumber, depositData.accountId, depositData.owner, depositData.tokenId, depositData.amount);
+    }
+
+    function emitFullExitCommit(uint32 _blockNumber, Operations.FullExit memory fullExitData) internal {
+        emit FullExitCommit(_blockNumber, fullExitData.accountId, fullExitData.owner, fullExitData.tokenId, fullExitData.amount);
+    }
+
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
     /// @param _blockNumber Franklin block number
     /// @param _publicData Operations packed in bytes array
@@ -477,7 +487,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
 
                     Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
-                    emit DepositCommit(_blockNumber, depositData.accountId, depositData.owner, depositData.tokenId, depositData.amount);
+                    emitDepositCommit(_blockNumber, depositData);
 
                     OnchainOperation memory onchainOp = OnchainOperation(
                         Operations.OpType.Deposit,
@@ -498,7 +508,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
 
                     Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
-                    emit FullExitCommit(_blockNumber, fullExitData.accountId, fullExitData.owner, fullExitData.tokenId, fullExitData.amount);
+                    emitFullExitCommit(_blockNumber, fullExitData);
 
                     bool addToPendingWithdrawalsQueue = false;
                     withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, fullExitData.owner, fullExitData.tokenId, fullExitData.amount));
