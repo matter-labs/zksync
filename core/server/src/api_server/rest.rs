@@ -6,7 +6,10 @@ use actix_web::{
     web::{self},
     App, HttpResponse, HttpServer, Result as ActixResult,
 };
-use futures::channel::mpsc;
+use futures::{
+    channel::{mpsc, oneshot},
+    SinkExt,
+};
 use models::config_options::ThreadPanicNotify;
 use models::node::{
     Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
@@ -25,7 +28,7 @@ use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
 
-use super::rpc_server::{get_ongoing_priority_ops, get_unconfirmed_op_by_hash};
+use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
 use storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
 
@@ -339,6 +342,39 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     vec_tokens.sort_by_key(|t| t.id);
 
     Ok(HttpResponse::Ok().json(vec_tokens))
+}
+
+/// Sends an EthWatchRequest asking for an unconfirmed priority op
+/// with given hash. If no such priority op exists, returns Ok(None).
+pub(crate) async fn get_unconfirmed_op_by_hash(
+    eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
+    eth_hash: &[u8],
+) -> Result<Option<(EthBlockId, PriorityOp)>, failure::Error> {
+    let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
+
+    let eth_watcher_response = oneshot::channel();
+
+    // Find unconfirmed op with given hash
+    eth_watcher_request_sender
+        .send(EthWatchRequest::GetUnconfirmedOpByHash {
+            eth_hash: eth_hash.to_vec(),
+            resp: eth_watcher_response.0,
+        })
+        .await
+        .map_err(|err| {
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({})",
+                err,
+                hex::encode(&eth_hash)
+            );
+
+            failure::format_err!("Internal Server Error: '{}'", err)
+        })?;
+
+    eth_watcher_response
+        .1
+        .await
+        .map_err(|err| failure::format_err!("Failed to send response: {}", err))
 }
 
 /// Converts a non-executed priority operation into a

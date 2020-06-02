@@ -406,38 +406,6 @@ impl RpcApp {
     }
 }
 
-/// Sends an EthWatchRequest asking for an unconfirmed priority op
-/// with given hash. If no such priority op exists, returns Ok(None).
-pub(crate) async fn get_unconfirmed_op_by_hash(
-    eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
-    eth_hash: &[u8],
-) -> Result<Option<(EthBlockId, PriorityOp)>> {
-    let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
-
-    let eth_watcher_response = oneshot::channel();
-
-    // Find unconfirmed op with given hash
-    eth_watcher_request_sender
-        .send(EthWatchRequest::GetUnconfirmedOpByHash {
-            eth_hash: eth_hash.to_vec(),
-            resp: eth_watcher_response.0,
-        })
-        .await
-        .map_err(|err| {
-            vlog::warn!(
-                "Internal Server Error: '{}'; input: ({})",
-                err,
-                hex::encode(&eth_hash)
-            );
-            Error::internal_error()
-        })?;
-
-    eth_watcher_response
-        .1
-        .await
-        .map_err(|_| Error::internal_error())
-}
-
 pub(crate) async fn get_ongoing_priority_ops(
     eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
     address: Address,
