@@ -5,6 +5,7 @@ import "./ReentrancyGuard.sol";
 import "./SafeMath.sol";
 import "./SafeMathUInt128.sol";
 import "./SafeCast.sol";
+import "./Utils.sol";
 
 import "./Storage.sol";
 import "./Config.sol";
@@ -55,8 +56,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return !exodusMode && totalOpenPriorityRequests == 0;
     }
 
-    constructor() public {}
-
     /// @notice Franklin contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
     /// _governanceAddress The address of Governance contract
@@ -78,34 +77,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         blocks[0].stateRoot = _genesisRoot;
     }
 
-    /// @notice Sends tokens
-    /// @param _token Token address
-    /// @param _to Address of recipient
-    /// @param _amount Amount of tokens to transfer
-    /// @return bool flag indicating that transfer is successful
-    function sendERC20NoRevert(address _token, address _to, uint256 _amount) internal returns (bool) {
-        (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
-            abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
-        );
-        // `transfer` method may return (bool) or nothing.
-        bool returnedSuccess = callReturnValueEncoded.length == 0 || abi.decode(callReturnValueEncoded, (bool));
-        return callSuccess && returnedSuccess;
-    }
-
-    /// @notice Sends ETH
-    /// @param _to Address of recipient
-    /// @param _amount Amount of tokens to transfer
-    /// @return bool flag indicating that transfer is successful
-    function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
-        (bool callSuccess,) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
-        return callSuccess;
-    }
-
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external nonReentrant {
         // TODO: when switched to multi validators model we need to add incentive mechanism to call complete.
-        uint32 toProcess = minU32(_n, numberOfPendingWithdrawals);
+        uint32 toProcess = Utils.minU32(_n, numberOfPendingWithdrawals);
         uint32 startIndex = firstPendingWithdrawalIndex;
         numberOfPendingWithdrawals -= toProcess;
         if (numberOfPendingWithdrawals == 0) {
@@ -128,11 +104,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 bool sent = false;
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
-                    sent = sendETHNoRevert(toPayable, amount);
+                    sent = Utils.sendETHNoRevert(toPayable, amount);
                 } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
                     require(tokenAddr != address(0), "cwd11"); // unknown tokenId
-                    sent = sendERC20NoRevert(tokenAddr, to, amount);
+                    sent = Utils.sendERC20NoRevert(tokenAddr, to, amount);
                 }
                 if (!sent) {
                     balancesToWithdraw[packedBalanceKey].balanceToWithdraw += amount;
@@ -141,25 +117,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
     }
 
-    function minU32(uint32 a, uint32 b) internal pure returns (uint32) {
-        return a < b ? a : b;
-    }
-
-    function minU64(uint64 a, uint64 b) internal pure returns (uint64) {
-        return a < b ? a : b;
-    }
-
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
-    /// @param _requests number of requests to process
-    function cancelOutstandingDepositsForExodusMode(uint64 _requests) external nonReentrant {
+    /// @param _n number of requests to process
+    function cancelOutstandingDepositsForExodusMode(uint64 _n) external nonReentrant {
         require(exodusMode, "coe01"); // exodus mode not active
-        require(_requests > 0, "coe02"); // provided zero number of requests
-        require(totalOpenPriorityRequests > 0, "coe03"); // no priority requests left
-        uint64 toProcess = minU64(totalOpenPriorityRequests, _requests);
-        for (uint64 i = 0; i < toProcess; i++) {
-            uint64 id = firstPriorityRequestId + i;
+        uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
+        require(toProcess > 0, "coe02"); // no deposits to process
+        for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 Operations.Deposit memory op = Operations.readDepositPubdata(priorityRequests[id].pubData);
                 bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, op.tokenId);
@@ -181,7 +147,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
     /// @param _amount Ether amount to withdraw
     function withdrawETH(uint128 _amount) external nonReentrant {
-        registerSingleWithdrawal(0, _amount);
+        registerWithdrawal(0, _amount, msg.sender);
         (bool success,) = msg.sender.call.value(_amount)("");
         require(success, "fwe11"); // ETH withdraw failed
     }
@@ -209,7 +175,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _amount amount to withdraw
     function withdrawERC20(IERC20 _token, uint128 _amount) external nonReentrant {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
-        registerSingleWithdrawal(tokenId, _amount);
+        registerWithdrawal(tokenId, _amount, msg.sender);
         require(_token.transfer(msg.sender, _amount), "fw011"); // token transfer failed withdraw
     }
 
@@ -243,21 +209,19 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event
-    /// @param _token Token by id
+    /// @param _tokenId Token by id
     /// @param _amount Token amount
     /// @param _owner Receiver
     function registerDeposit(
-        uint16 _token,
+        uint16 _tokenId,
         uint128 _amount,
         address _owner
     ) internal {
-        require(governance.isValidTokenId(_token), "rgd11"); // invalid token id
-
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
             accountId:  0, // unknown at this point
             owner:      _owner,
-            tokenId:    _token,
+            tokenId:    _tokenId,
             amount:     _amount
         });
         bytes memory pubData = Operations.writeDepositPubdata(op);
@@ -265,21 +229,22 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         emit OnchainDeposit(
             msg.sender,
-            _token,
+            _tokenId,
             _amount,
             _owner
         );
     }
 
-    /// @notice Register withdrawal - update user balances and emit OnchainWithdrawal event
+    /// @notice Register withdrawal - update user balance and emit OnchainWithdrawal event
     /// @param _token - token by id
     /// @param _amount - token amount
-    function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
-        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _token);
+    /// @param _to - address to withdraw to
+    function registerWithdrawal(uint16 _token, uint128 _amount, address payable _to) internal {
+        bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
         balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
         emit OnchainWithdrawal(
-            msg.sender,
+            _to,
             _token,
             _amount
         );
@@ -292,8 +257,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _publicData Operations pubdata
     /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
-    ///
-    /// _blockNumber is not necessary but it may help to catch server-side errors.
     function commitBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -378,42 +341,37 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint256 pubDataPtr = 0;
         uint256 pubDataStartPtr = 0;
         uint256 pubDataEndPtr = 0;
-        assembly {
-            pubDataStartPtr := add(_publicData, 0x20)
-            pubDataPtr := pubDataStartPtr
-            pubDataEndPtr := add(pubDataStartPtr, mload(_publicData))
-        }
+
+        assembly { pubDataStartPtr := add(_publicData, 0x20) }
+        pubDataPtr = pubDataStartPtr;
+        pubDataEndPtr = pubDataStartPtr + _publicData.length;
 
         uint64 ethWitnessOffset = 0;
         uint16 processedOperationsRequiringEthWitness = 0;
 
         withdrawalsDataHash = keccak256("");
 
-        while (pubDataPtr<pubDataEndPtr) {
-            uint8 opType;
+        while (pubDataPtr < pubDataEndPtr) {
+            Operations.OpType opType;
             // read operation type from public data (the first byte per each operation)
             assembly {
                 opType := shr(0xf8, mload(pubDataPtr))
             }
 
-            // cheap transfer operation processing
-            if (opType == uint8(Operations.OpType.Transfer)) {
+            // cheap operations processing
+            if (opType == Operations.OpType.Transfer) {
                 pubDataPtr += TRANSFER_BYTES;
+            } else if (opType == Operations.OpType.Noop) {
+                pubDataPtr += NOOP_BYTES;
+            } else if (opType == Operations.OpType.TransferToNew) {
+                pubDataPtr += TRANSFER_TO_NEW_BYTES;
             } else {
                 // other operations processing
 
                 // calculation of public data offset
-                uint256 pubdataOffset;
-                assembly {
-                    // Number of pubdata bytes processed equal to current pubData memory pointer minus pubData memory start pointer
-                    pubdataOffset := sub(pubDataPtr, pubDataStartPtr)
-                }
+                uint256 pubdataOffset = pubDataPtr - pubDataStartPtr;
 
-                if (opType == uint8(Operations.OpType.Noop)) {
-                    pubDataPtr += NOOP_BYTES;
-                } else if (opType == uint8(Operations.OpType.TransferToNew)) {
-                    pubDataPtr += TRANSFER_TO_NEW_BYTES;
-                } else if (opType == uint8(Operations.OpType.Deposit)) {
+                if (opType == Operations.OpType.Deposit) {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
 
                     Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
@@ -427,14 +385,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     currentPriorityRequestId++;
 
                     pubDataPtr += DEPOSIT_BYTES;
-                } else if (opType == uint8(Operations.OpType.PartialExit)) {
+                } else if (opType == Operations.OpType.PartialExit) {
                     Operations.PartialExit memory data = Operations.readPartialExitPubdata(_publicData, pubdataOffset + 1);
 
                     bool addToPendingWithdrawalsQueue = true;
                     withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
 
                     pubDataPtr += PARTIAL_EXIT_BYTES;
-                } else if (opType == uint8(Operations.OpType.FullExit)) {
+                } else if (opType == Operations.OpType.FullExit) {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
 
                     Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
@@ -451,7 +409,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     currentPriorityRequestId++;
 
                     pubDataPtr += FULL_EXIT_BYTES;
-                } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
+                } else if (opType == Operations.OpType.ChangePubKey) {
                     require(processedOperationsRequiringEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
                     Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
 
@@ -482,25 +440,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalCommittedPriorityRequests = currentPriorityRequestId - firstPriorityRequestId;
     }
 
-    /// @notice Recovers signer's address from ethereum signature for given message
-    /// @param _signature 65 bytes concatenated. R (32) + S (32) + V (1)
-    /// @param _message signed message.
-    /// @return address of the signer
-    function recoverAddressFromEthSignature(bytes memory _signature, bytes memory _message) internal pure returns (address) {
-        require(_signature.length == 2*ETH_SIGN_RS_BYTES + 1, "ves10"); // incorrect signature length
-        require(ETH_SIGN_RS_BYTES == 32, "ves11");  // expected ETH_SIGN_RS_BYTES to be 32 bytes
-
-        bytes32 signR;
-        bytes32 signS;
-        uint offset = 0;
-
-        (offset, signR) = Bytes.readBytes32(_signature, offset);
-        (offset, signS) = Bytes.readBytes32(_signature, offset);
-        uint8 signV = uint8(_signature[offset]);
-
-        return ecrecover(keccak256(_message), signV, signR, signS);
-    }
-
+    /// @notice Checks that signature is valid for pubkey change message
+    /// @param _signature Signature
+    /// @param _newPkHash New pubkey hash
+    /// @param _nonce Nonce used for message
+    /// @param _ethAddress Account's ethereum address
+    /// @param _accountId Id of zkSync account
     function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) internal pure returns (bool) {
         bytes memory signedMessage = abi.encodePacked(
             "\x19Ethereum Signed Message:\n150",
@@ -511,7 +456,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             "\n\n",
             "Only sign this message for a trusted client!"
         );
-        address recoveredAddress = recoverAddressFromEthSignature(_signature, signedMessage);
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;
     }
 
@@ -567,7 +512,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
     }
 
-    function commitNextPriorityOperation(OnchainOperation memory _onchainOp, uint64 _priorityRequestId) internal {
+    /// @notice Checks that operation is same as operation in priority queue
+    /// @param _onchainOp The operation
+    /// @param _priorityRequestId Operation's id in priority queue
+    function commitNextPriorityOperation(OnchainOperation memory _onchainOp, uint64 _priorityRequestId) internal view {
         Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
         bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
@@ -594,6 +542,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes32 withdrawalsDataHash = keccak256("");
 
         uint offset = 0;
+        uint32 localNumberOfPendingWithdrawals = numberOfPendingWithdrawals;
         while (offset < withdrawalsData.length) {
             (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
             bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
@@ -602,13 +551,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
 
             if (addToPendingWithdrawalsQueue) {
-                pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
-                numberOfPendingWithdrawals++;
+                pendingWithdrawals[firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
+                localNumberOfPendingWithdrawals++;
             }
 
             withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, _to, _tokenId, _amount));
             offset += ONCHAIN_WITHDRAWAL_BYTES;
         }
+        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
         require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
     }
 
@@ -653,7 +603,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
 
         uint32 blocksCommited = totalBlocksCommitted;
-        uint32 blocksToRevert = minU32(_maxBlocksToRevert, blocksCommited - totalBlocksVerified);
+        uint32 blocksToRevert = Utils.minU32(_maxBlocksToRevert, blocksCommited - totalBlocksVerified);
         uint64 revertedPriorityRequests = 0;
 
         for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= blocksCommited; i++) {
