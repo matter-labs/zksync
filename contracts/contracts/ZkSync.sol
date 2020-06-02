@@ -22,6 +22,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMathUInt128 for uint128;
 
+    bytes32 public constant EMPTY_STRING_KECCAK = bytes32(0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470);
+
     // Upgrade functional
 
     /// @notice Notice period before activation preparation status of upgrade mode
@@ -461,7 +463,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint64 ethWitnessOffset = 0;
         uint16 processedOperationsRequiringEthWitness = 0;
 
-        withdrawalsDataHash = keccak256("");
+        withdrawalsDataHash = EMPTY_STRING_KECCAK;
 
         while (pubDataPtr < pubDataEndPtr) {
             Operations.OpType opType;
@@ -604,18 +606,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             let hashResult := mload(0x40)
             let pubDataLen := mload(_publicData)
             mstore(_publicData, hash)
-        // staticcall to the sha256 precompile at address 0x2
+            // staticcall to the sha256 precompile at address 0x2
             let success := staticcall(
-            gas,
-            0x2,
-            _publicData,
-            add(pubDataLen, 0x20),
-            hashResult,
-            0x20
+                gas,
+                0x2,
+                _publicData,
+                add(pubDataLen, 0x20),
+                hashResult,
+                0x20
             )
             mstore(_publicData, pubDataLen)
 
-        // Use "invalid" to make gas estimation work
+            // Use "invalid" to make gas estimation work
             switch success case 0 { invalid() }
 
             commitment := mload(hashResult)
@@ -644,12 +646,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev NOTICE: must process only withdrawals which hash matches with expectedWithdrawalsDataHash.
     /// @param withdrawalsData Withdrawals data
     /// @param expectedWithdrawalsDataHash Expected withdrawals data hash
-    function processOnchainWithdrawals(bytes memory withdrawalsData, bytes32 expectedWithdrawalsDataHash)
-    internal
-    {
+    function processOnchainWithdrawals(bytes memory withdrawalsData, bytes32 expectedWithdrawalsDataHash) internal {
         require(withdrawalsData.length % ONCHAIN_WITHDRAWAL_BYTES == 0, "pow11"); // pow11 - withdrawalData length is not multiple of ONCHAIN_WITHDRAWAL_BYTES
 
-        bytes32 withdrawalsDataHash = keccak256("");
+        bytes32 withdrawalsDataHash = EMPTY_STRING_KECCAK;
 
         uint offset = 0;
         uint32 localNumberOfPendingWithdrawals = numberOfPendingWithdrawals;
