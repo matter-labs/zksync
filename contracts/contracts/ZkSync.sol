@@ -208,48 +208,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         balancesToWithdraw[packedBalanceKey].gasReserveValue = 0xff;
     }
 
-    /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event
-    /// @param _tokenId Token by id
-    /// @param _amount Token amount
-    /// @param _owner Receiver
-    function registerDeposit(
-        uint16 _tokenId,
-        uint128 _amount,
-        address _owner
-    ) internal {
-        // Priority Queue request
-        Operations.Deposit memory op = Operations.Deposit({
-            accountId:  0, // unknown at this point
-            owner:      _owner,
-            tokenId:    _tokenId,
-            amount:     _amount
-        });
-        bytes memory pubData = Operations.writeDepositPubdata(op);
-        addPriorityRequest(Operations.OpType.Deposit, pubData);
-
-        emit OnchainDeposit(
-            msg.sender,
-            _tokenId,
-            _amount,
-            _owner
-        );
-    }
-
-    /// @notice Register withdrawal - update user balance and emit OnchainWithdrawal event
-    /// @param _token - token by id
-    /// @param _amount - token amount
-    /// @param _to - address to withdraw to
-    function registerWithdrawal(uint16 _token, uint128 _amount, address payable _to) internal {
-        bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
-        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
-        emit OnchainWithdrawal(
-            _to,
-            _token,
-            _amount
-        );
-    }
-
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
@@ -287,6 +245,147 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             emit BlockCommit(_blockNumber);
         }
+    }
+
+    /// @notice Block verification.
+    /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
+    /// @param _blockNumber Block number
+    /// @param _proof Block proof
+    /// @param _withdrawalsData Block withdrawals data
+    function verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
+        external nonReentrant
+    {
+        requireActive();
+        require(_blockNumber == totalBlocksVerified + 1, "fvk11"); // only verify next block
+        governance.requireActiveValidator(msg.sender);
+
+        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
+
+        processOnchainWithdrawals(_withdrawalsData, blocks[_blockNumber].withdrawalsDataHash);
+
+        deleteRequests(
+            blocks[_blockNumber].priorityOperations
+        );
+
+        totalBlocksVerified += 1;
+
+        emit BlockVerification(_blockNumber);
+    }
+
+
+    /// @notice Reverts unverified blocks
+    /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
+    function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
+        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+
+        uint32 blocksCommited = totalBlocksCommitted;
+        uint32 blocksToRevert = Utils.minU32(_maxBlocksToRevert, blocksCommited - totalBlocksVerified);
+        uint64 revertedPriorityRequests = 0;
+
+        for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= blocksCommited; i++) {
+            Block memory revertedBlock = blocks[i];
+            require(revertedBlock.committedAtBlock > 0, "frk11"); // block not found
+
+            revertedPriorityRequests += revertedBlock.priorityOperations;
+
+            delete blocks[i];
+        }
+
+        blocksCommited -= blocksToRevert;
+        totalBlocksCommitted -= blocksToRevert;
+        totalCommittedPriorityRequests -= revertedPriorityRequests;
+
+        emit BlocksRevert(totalBlocksVerified, blocksCommited);
+    }
+
+    /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
+    function upgradePreparationLockStatus() public returns (bool) {
+        return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
+    }
+
+    /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
+    /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
+    /// @dev of existed priority requests expiration block number.
+    /// @return bool flag that is true if the Exodus mode must be entered.
+    function triggerExodusIfNeeded() public returns (bool) {
+        bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
+        priorityRequests[firstPriorityRequestId].expirationBlock != 0;
+        if (trigger) {
+            if (!exodusMode) {
+                exodusMode = true;
+                emit ExodusMode();
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
+    /// @param _accountId Id of the account in the tree
+    /// @param _proof Proof
+    /// @param _tokenId Verified token id
+    /// @param _amount Amount for owner (must be total amount, not part of it)
+    function exit(uint24 _accountId, uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
+        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
+        require(exodusMode, "fet11"); // must be in exodus mode
+        require(!exited[_accountId][_tokenId], "fet12"); // already exited
+        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, _accountId, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
+
+        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
+        exited[_accountId][_tokenId] = true;
+    }
+
+    function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external nonReentrant {
+        require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "ahf10"); // PubKeyHash should be 20 bytes.
+        require(authFacts[msg.sender][_nonce] == bytes32(0), "ahf11"); // auth fact for nonce should be empty
+
+        authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
+
+        emit FactAuth(msg.sender, _nonce, _pubkey_hash);
+    }
+
+    /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event
+    /// @param _tokenId Token by id
+    /// @param _amount Token amount
+    /// @param _owner Receiver
+    function registerDeposit(
+        uint16 _tokenId,
+        uint128 _amount,
+        address _owner
+    ) internal {
+        // Priority Queue request
+        Operations.Deposit memory op = Operations.Deposit({
+            accountId:  0, // unknown at this point
+            owner:      _owner,
+            tokenId:    _tokenId,
+            amount:     _amount
+            });
+        bytes memory pubData = Operations.writeDepositPubdata(op);
+        addPriorityRequest(Operations.OpType.Deposit, pubData);
+
+        emit OnchainDeposit(
+            msg.sender,
+            _tokenId,
+            _amount,
+            _owner
+        );
+    }
+
+    /// @notice Register withdrawal - update user balance and emit OnchainWithdrawal event
+    /// @param _token - token by id
+    /// @param _amount - token amount
+    /// @param _to - address to withdraw to
+    function registerWithdrawal(uint16 _token, uint128 _amount, address payable _to) internal {
+        bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
+        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
+        emit OnchainWithdrawal(
+            _to,
+            _token,
+            _amount
+        );
     }
 
     /// @notice Store committed block structure to the storage.
@@ -333,7 +432,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     /// Priority operations must be committed in the same order as they are in the priority queue.
     function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
-        internal returns (bytes32 withdrawalsDataHash) {
+    internal returns (bytes32 withdrawalsDataHash) {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
         uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
@@ -494,18 +593,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             let hashResult := mload(0x40)
             let pubDataLen := mload(_publicData)
             mstore(_publicData, hash)
-            // staticcall to the sha256 precompile at address 0x2
+        // staticcall to the sha256 precompile at address 0x2
             let success := staticcall(
-                gas,
-                0x2,
-                _publicData,
-                add(pubDataLen, 0x20),
-                hashResult,
-                0x20
+            gas,
+            0x2,
+            _publicData,
+            add(pubDataLen, 0x20),
+            hashResult,
+            0x20
             )
             mstore(_publicData, pubDataLen)
 
-            // Use "invalid" to make gas estimation work
+        // Use "invalid" to make gas estimation work
             switch success case 0 { invalid() }
 
             commitment := mload(hashResult)
@@ -535,7 +634,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param withdrawalsData Withdrawals data
     /// @param expectedWithdrawalsDataHash Expected withdrawals data hash
     function processOnchainWithdrawals(bytes memory withdrawalsData, bytes32 expectedWithdrawalsDataHash)
-        internal
+    internal
     {
         require(withdrawalsData.length % ONCHAIN_WITHDRAWAL_BYTES == 0, "pow11"); // pow11 - withdrawalData length is not multiple of ONCHAIN_WITHDRAWAL_BYTES
 
@@ -562,31 +661,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
     }
 
-    /// @notice Block verification.
-    /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
-    /// @param _blockNumber Block number
-    /// @param _proof Block proof
-    /// @param _withdrawalsData Block withdrawals data
-    function verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
-        external nonReentrant
-    {
-        requireActive();
-        require(_blockNumber == totalBlocksVerified + 1, "fvk11"); // only verify next block
-        governance.requireActiveValidator(msg.sender);
-
-        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
-
-        processOnchainWithdrawals(_withdrawalsData, blocks[_blockNumber].withdrawalsDataHash);
-
-        deleteRequests(
-            blocks[_blockNumber].priorityOperations
-        );
-
-        totalBlocksVerified += 1;
-
-        emit BlockVerification(_blockNumber);
-    }
-
     /// @notice Checks whether oldest unverified block has expired
     /// @return bool flag that indicates whether oldest unverified block has expired
     function isBlockCommitmentExpired() internal view returns (bool) {
@@ -597,82 +671,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         );
     }
 
-    /// @notice Reverts unverified blocks
-    /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
-    function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
-
-        uint32 blocksCommited = totalBlocksCommitted;
-        uint32 blocksToRevert = Utils.minU32(_maxBlocksToRevert, blocksCommited - totalBlocksVerified);
-        uint64 revertedPriorityRequests = 0;
-
-        for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= blocksCommited; i++) {
-            Block memory revertedBlock = blocks[i];
-            require(revertedBlock.committedAtBlock > 0, "frk11"); // block not found
-
-            revertedPriorityRequests += revertedBlock.priorityOperations;
-
-            delete blocks[i];
-        }
-
-        blocksCommited -= blocksToRevert;
-        totalBlocksCommitted -= blocksToRevert;
-        totalCommittedPriorityRequests -= revertedPriorityRequests;
-
-        emit BlocksRevert(totalBlocksVerified, blocksCommited);
-    }
-
-    /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
-    function upgradePreparationLockStatus() public returns (bool) {
-        return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
-    }
-
     /// @notice Checks that current state not is exodus mode
     function requireActive() internal view {
         require(!exodusMode, "fre11"); // exodus mode activated
-    }
-
-    /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
-    /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
-    /// @dev of existed priority requests expiration block number.
-    /// @return bool flag that is true if the Exodus mode must be entered.
-    function triggerExodusIfNeeded() public returns (bool) {
-        bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
-            priorityRequests[firstPriorityRequestId].expirationBlock != 0;
-        if (trigger) {
-            if (!exodusMode) {
-                exodusMode = true;
-                emit ExodusMode();
-            }
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
-    /// @param _accountId Id of the account in the tree
-    /// @param _proof Proof
-    /// @param _tokenId Verified token id
-    /// @param _amount Amount for owner (must be total amount, not part of it)
-    function exit(uint24 _accountId, uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
-        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
-        require(exodusMode, "fet11"); // must be in exodus mode
-        require(!exited[_accountId][_tokenId], "fet12"); // already exited
-        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, _accountId, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
-
-        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
-        exited[_accountId][_tokenId] = true;
-    }
-
-    function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external nonReentrant {
-        require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "ahf10"); // PubKeyHash should be 20 bytes.
-        require(authFacts[msg.sender][_nonce] == bytes32(0), "ahf11"); // auth fact for nonce should be empty
-
-        authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
-
-        emit FactAuth(msg.sender, _nonce, _pubkey_hash);
     }
 
     // Priority queue
