@@ -92,12 +92,29 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return callSuccess && returnedSuccess;
     }
 
+    /// @notice Sends tokens
+    /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
+    /// @param _token Token address
+    /// @param _to Address of recipient
+    /// @param _amount Amount of tokens to transfer
+    /// @param _maxAmount Maximum possible amount of tokens to transfer to this account
+    function withdrawERC20Guarded(IERC20 _token, address _to, uint128 _amount, uint128 _maxAmount) external returns (uint128 withdrawnAmount) {
+        require(msg.sender == address(this), "wtg10"); // wtg10 - can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
+
+        uint256 balance_before = _token.balanceOf(address(this));
+        require(sendERC20NoRevert(address(_token), _to, _amount), "wtg11"); // wtg11 - ERC20 transfer fails
+        uint256 balance_after = _token.balanceOf(address(this));
+        require(balance_before.sub(balance_after) <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
+
+        return SafeCast.toUint128(balance_before.sub(balance_after));
+    }
+
     /// @notice Sends ETH
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @return bool flag indicating that transfer is successful
     function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
-        (bool callSuccess,) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
+        (bool callSuccess, ) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
         return callSuccess;
     }
 
@@ -131,8 +148,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     sent = sendETHNoRevert(toPayable, amount);
                 } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
-                    require(tokenAddr != address(0), "cwd11"); // unknown tokenId
-                    sent = sendERC20NoRevert(tokenAddr, to, amount);
+                    // we can just check that call not reverts because it wants to withdraw all amount
+                    (sent,) = address(this).call.gas(ETH_WITHDRAWAL_GAS_LIMIT)(
+                        abi.encodeWithSignature("withdrawERC20Guarded(address,address,uint128,uint128))", tokenAddr, to, amount, amount)
+                    );
                 }
                 if (!sent) {
                     balancesToWithdraw[packedBalanceKey].balanceToWithdraw += amount;
@@ -209,8 +228,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _amount amount to withdraw
     function withdrawERC20(IERC20 _token, uint128 _amount) external nonReentrant {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
-        registerSingleWithdrawal(tokenId, _amount);
-        require(_token.transfer(msg.sender, _amount), "fw011"); // token transfer failed withdraw
+        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, tokenId);
+        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+        (bool sent, bytes memory withdrawnAmountEncoded) = address(this).call(
+            abi.encodeWithSignature("withdrawERC20Guarded(address,address,uint128,uint128))", _token, msg.sender, _amount, balance)
+        );
+        require(sent, "wt20"); // wt20 - withdrawERC20Guarded call fails
+        registerSingleWithdrawal(tokenId, abi.decode(withdrawnAmountEncoded, (uint128)));
     }
 
     /// @notice Register full exit request - pack pubdata, add priority request
