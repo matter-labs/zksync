@@ -2,6 +2,7 @@ pragma solidity ^0.5.0;
 
 import "./Ownable.sol";
 import "./Upgradeable.sol";
+import "./UpgradeableMaster.sol";
 
 
 /// @title Proxy Contract
@@ -64,8 +65,6 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation
     /// This function will return whatever the implementation call returns
     function() external payable {
-        require(msg.data.length > 0, "pfb11"); // pfb11 - calldata must not be empty
-
         address _target = getTarget();
         assembly {
             // The pointer to the free memory slot
@@ -101,8 +100,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// UpgradeableMaster functions
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function upgradeNoticePeriod() external returns (uint) {
-        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("upgradeNoticePeriod()"));
+    function getNoticePeriod() external returns (uint) {
+        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("getNoticePeriod()"));
         require(success, "unp11"); // unp11 - upgradeNoticePeriod delegatecall failed
         return abi.decode(result, (uint));
     }
@@ -137,8 +136,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
-    function readyForUpgrade() external returns (bool) {
-        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("readyForUpgrade()"));
+    function isReadyForUpgrade() external returns (bool) {
+        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("isReadyForUpgrade()"));
         require(success, "rfu11"); // rfu11 - readyForUpgrade delegatecall failed
         return abi.decode(result, (bool));
     }

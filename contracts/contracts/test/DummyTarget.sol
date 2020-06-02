@@ -1,6 +1,7 @@
 pragma solidity ^0.5.0;
 
 import "../Upgradeable.sol";
+import "../UpgradeableMaster.sol";
 
 
 interface DummyTarget {
@@ -20,7 +21,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function upgradeNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -32,7 +33,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
 
     function upgradeFinishes() external {}
 
-    function readyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external returns (bool) {
         return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
@@ -73,7 +74,7 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function upgradeNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -85,7 +86,7 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
 
     function upgradeFinishes() external {}
 
-    function readyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external returns (bool) {
         return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
