@@ -28,7 +28,7 @@ use storage::{
 
 // Local uses
 use crate::{
-    eth_watch::EthWatchRequest,
+    eth_watch::{EthBlockId, EthWatchRequest},
     fee_ticker::{Fee, TickerRequest},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
@@ -409,7 +409,7 @@ impl RpcApp {
 pub(crate) async fn get_ongoing_priority_ops(
     eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
     address: Address,
-) -> Result<Vec<(u64, PriorityOp)>> {
+) -> Result<Vec<(EthBlockId, PriorityOp)>> {
     let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
 
     let eth_watcher_response = oneshot::channel();

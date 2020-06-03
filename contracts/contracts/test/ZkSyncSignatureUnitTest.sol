@@ -10,7 +10,7 @@ contract ZKSyncSignatureUnitTest is ZkSyncTest {
     }
 
     function testRecoverAddressFromEthSignature(bytes calldata _signature, bytes calldata _message) external pure returns (address) {
-        return recoverAddressFromEthSignature(_signature, _message);
+        return Utils.recoverAddressFromEthSignature(_signature, _message);
     }
 
 }
