@@ -349,8 +349,10 @@ describe("zkSync withdraw unit tests", function() {
 
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
+        const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
         const {revertReason} = await getCallRevertReason(async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1)));
-        expect(revertReason, "wrong revert reason").eq("wt20");
+        const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
+        expect(onchainBalAfter).eq(onchainBalBefore);
     });
 
     it("Withdraw ERC20 unsupported token", async () => {

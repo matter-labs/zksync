@@ -230,11 +230,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, tokenId);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        (bool sent, bytes memory withdrawnAmountEncoded) = address(this).call(
-            abi.encodeWithSignature("withdrawERC20Guarded(address,address,uint128,uint128)", _token, msg.sender, _amount, balance)
-        );
-        require(sent, "wt20"); // wt20 - withdrawERC20Guarded call fails
-        registerSingleWithdrawal(tokenId, abi.decode(withdrawnAmountEncoded, (uint128)));
+        uint128 withdrawnAmount = this.withdrawERC20Guarded(_token, msg.sender, _amount, balance);
+        registerSingleWithdrawal(tokenId, withdrawnAmount);
     }
 
     /// @notice Register full exit request - pack pubdata, add priority request
