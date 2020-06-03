@@ -35,7 +35,7 @@ pub async fn deposit_single(
         .eth_acc
         .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
         .await?;
-    wait_for_deposit_executed(priority_op.serial_id, &rpc_client).await
+    wait_for_deposit_executed(priority_op.1.serial_id, &rpc_client).await
 }
 
 /// Waits until the deposit priority operation is executed.

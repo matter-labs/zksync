@@ -13,7 +13,7 @@ const {deployContract} = require("ethereum-waffle");
 const {wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
 import * as zksync from "zksync";
 
-const TEST_PRIORITY_EXPIRATION = 16;
+const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 9;
 
 

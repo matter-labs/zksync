@@ -1,3 +1,4 @@
+use crate::external_commands::js_revert_reason;
 use eth_client::ETHClient;
 use ethabi::ParamType;
 use failure::{bail, ensure, format_err};
@@ -9,15 +10,12 @@ use models::prover_utils::EncodedProofPlonk;
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
-use std::time::Duration;
 use web3::api::Eth;
 use web3::contract::{Contract, Options};
 use web3::types::{
     BlockNumber, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
 };
 use web3::{Transport, Web3};
-
-const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 pub fn parse_ether(eth_value: &str) -> Result<BigUint, failure::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();
@@ -114,7 +112,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         account_id: AccountId,
         token_address: Address,
-    ) -> Result<PriorityOp, failure::Error> {
+    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -130,13 +128,16 @@ impl<T: Transport> EthereumAccount<T> {
             receipt.status == Some(U64::from(1)),
             "Full exit submit fail"
         );
-        Ok(receipt
-            .logs
-            .into_iter()
-            .map(PriorityOp::try_from)
-            .filter_map(|op| op.ok())
-            .next()
-            .expect("no priority op log in full exit"))
+        Ok((
+            receipt.clone(),
+            receipt
+                .logs
+                .into_iter()
+                .map(PriorityOp::try_from)
+                .filter_map(|op| op.ok())
+                .next()
+                .expect("no priority op log in full exit"),
+        ))
     }
 
     pub async fn exit(
@@ -220,7 +221,7 @@ impl<T: Transport> EthereumAccount<T> {
         amount: BigUint,
         to: &Address,
         nonce: Option<U256>,
-    ) -> Result<PriorityOp, failure::Error> {
+    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -236,13 +237,16 @@ impl<T: Transport> EthereumAccount<T> {
         let eth = self.main_contract_eth_client.web3.eth();
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         ensure!(receipt.status == Some(U64::from(1)), "eth deposit fail");
-        Ok(receipt
-            .logs
-            .into_iter()
-            .map(PriorityOp::try_from)
-            .filter_map(|op| op.ok())
-            .next()
-            .expect("no priority op log in deposit"))
+        Ok((
+            receipt.clone(),
+            receipt
+                .logs
+                .into_iter()
+                .map(PriorityOp::try_from)
+                .filter_map(|op| op.ok())
+                .next()
+                .expect("no priority op log in deposit"),
+        ))
     }
 
     pub async fn eth_balance(&self) -> Result<BigUint, failure::Error> {
@@ -330,7 +334,7 @@ impl<T: Transport> EthereumAccount<T> {
         token_contract: Address,
         amount: BigUint,
         to: &Address,
-    ) -> Result<PriorityOp, failure::Error> {
+    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
         self.approve_erc20(token_contract, amount.clone()).await?;
 
         let signed_tx = self
@@ -346,13 +350,16 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         let exec_result = ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await;
         let receipt = exec_result.success_result()?;
-        Ok(receipt
-            .logs
-            .into_iter()
-            .map(PriorityOp::try_from)
-            .filter_map(|op| op.ok())
-            .next()
-            .expect("no priority op log in deposit"))
+        Ok((
+            receipt.clone(),
+            receipt
+                .logs
+                .into_iter()
+                .map(PriorityOp::try_from)
+                .filter_map(|op| op.ok())
+                .next()
+                .expect("no priority op log in deposit"),
+        ))
     }
 
     pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, failure::Error> {
@@ -370,7 +377,7 @@ impl<T: Transport> EthereumAccount<T> {
                     witness_data.0,
                     witness_data.1,
                 ),
-                Options::default(),
+                Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await
             .map_err(|e| format_err!("Commit block send err: {}", e))?;
@@ -392,7 +399,7 @@ impl<T: Transport> EthereumAccount<T> {
                     vec![U256::default(); 10],
                     block.get_withdrawals_data(),
                 ),
-                Options::default(),
+                Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
             .await
             .map_err(|e| format_err!("Verify block send err: {}", e))?;
@@ -409,7 +416,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "completeWithdrawals",
                 max_withdrawals_to_complete,
-                Options::default(),
+                Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await
             .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
@@ -491,8 +498,13 @@ impl ETHExecResult {
         }
     }
 
-    pub fn expect_success(self) {
-        self.success_result().expect("Expected transaction success");
+    pub fn expect_success(self) -> TransactionReceipt {
+        let tx_hash = self.receipt.transaction_hash;
+        self.success_result()
+            .map_err(|_| {
+                println!("js revert reason:\n{}", js_revert_reason(&tx_hash));
+            })
+            .expect("Expected transaction success")
     }
 
     pub fn expect_revert(self, code: &str) {
@@ -582,9 +594,6 @@ async fn send_raw_tx_wait_confirmation<T: Transport>(
             .map_err(|e| format_err!("Failed to get receipt from eth node: {}", e))?
         {
             return Ok(receipt);
-        } else {
-            // Ok here, because we use single threaded executor from futures
-            std::thread::sleep(WEB3_POLL_INTERVAL);
         }
     }
 }
