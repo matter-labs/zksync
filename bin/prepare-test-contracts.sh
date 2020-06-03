@@ -45,7 +45,7 @@ create_constant_getter() {
 set_constant MAX_AMOUNT_OF_REGISTERED_TOKENS 4 $OUT_DIR/ConfigTest.sol
 set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/ConfigTest.sol
 set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/ConfigTest.sol
-set_constant PRIORITY_EXPIRATION 16 $OUT_DIR/ConfigTest.sol
+set_constant PRIORITY_EXPIRATION 101 $OUT_DIR/ConfigTest.sol
 set_constant UPGRADE_NOTICE_PERIOD 4 $OUT_DIR/ConfigTest.sol
 
 create_constant_getter MAX_AMOUNT_OF_REGISTERED_TOKENS $OUT_DIR/ConfigTest.sol

@@ -1,13 +1,3 @@
-//! Exodus mode test steps:
-//! + Create verified state with balances on the accounts.
-//! + Commit some deposits and wait for priority expiration.
-//! + Check exodus mode triggered.
-//! + Check canceling of the outstanding deposits.
-//! + Check exit with correct proof.
-//! + Check double exit with the correct proof.
-//! + Check exit with garbage proof.
-//! + Check exit with correct proof for other account, correct proof for this account but other token, correct proof but wrong amount.
-
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, run_upgrade_franklin};
 use crate::zksync_account::ZksyncAccount;
