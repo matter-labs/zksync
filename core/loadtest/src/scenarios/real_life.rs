@@ -250,7 +250,7 @@ impl ScenarioExecutor {
         // To be sure that we will have enough funds for all the transfers,
         // we will request 2x of the suggested fees. All the unspent funds
         // will be withdrawn later.
-        fee = fee * BigUint::from(2u32);
+        fee *= BigUint::from(2u32);
 
         // And after that we have to make the fee packable.
         fee = closest_packable_fee_amount(&fee);
