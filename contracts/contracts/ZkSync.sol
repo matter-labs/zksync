@@ -1,6 +1,5 @@
 pragma solidity ^0.5.0;
 
-import "./IERC20.sol";
 import "./ReentrancyGuard.sol";
 import "./SafeMath.sol";
 import "./SafeMathUInt128.sol";
@@ -97,7 +96,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(msg.sender == address(this), "wtg10"); // wtg10 - can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
 
         uint256 balance_before = _token.balanceOf(address(this));
-        require(Utils.sendERC20(address(_token), _to, _amount), "wtg11"); // wtg11 - ERC20 transfer fails
+        require(Utils.sendERC20(_token, _to, _amount), "wtg11"); // wtg11 - ERC20 transfer fails
         uint256 balance_after = _token.balanceOf(address(this));
         require(balance_before.sub(balance_after) <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
 
@@ -135,7 +134,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
                     // we can just check that call not reverts because it wants to withdraw all amount
-                    (sent,) = address(this).call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
+                    (sent, ) = address(this).call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
                         abi.encodeWithSignature("withdrawERC20Guarded(address,address,uint128,uint128)", tokenAddr, to, amount, amount)
                     );
                 }
@@ -177,7 +176,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _amount Ether amount to withdraw
     function withdrawETH(uint128 _amount) external nonReentrant {
         registerWithdrawal(0, _amount, msg.sender);
-        (bool success,) = msg.sender.call.value(_amount)("");
+        (bool success, ) = msg.sender.call.value(_amount)("");
         require(success, "fwe11"); // ETH withdraw failed
     }
 
