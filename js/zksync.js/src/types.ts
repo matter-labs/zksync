@@ -131,14 +131,16 @@ export interface Tokens {
 }
 
 export interface Fee {
+    // Operation type (amount of chunks in operation differs and impacts the total fee).
+    feeType: "Withdraw" | "Transfer" | "TransferToNew",
     // Amount of gas used by transaction
-    gas_tx_amount: utils.BigNumber,
+    gasTxAmount: utils.BigNumber,
     // Gas price (in wei)
-    gas_price_wei: utils.BigNumber,
+    gasPriceWei: utils.BigNumber,
     // Ethereum gas part of fee (in wei)
-    gas_fee: utils.BigNumber,
+    gasFee: utils.BigNumber,
     // Zero-knowledge proof part of fee (in wei)
-    zkp_fee: utils.BigNumber,
+    zkpFee: utils.BigNumber,
     // Total fee amount (in wei)
-    total_fee: utils.BigNumber,
+    totalFee: utils.BigNumber,
 }

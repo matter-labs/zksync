@@ -39,7 +39,7 @@ contract Storage {
         uint16 tokenId;
     }
     
-    /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
+    /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index in pending withdrawals queue)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
     uint32 public numberOfPendingWithdrawals;
@@ -66,7 +66,6 @@ contract Storage {
         bytes32 withdrawalsDataHash; /// can be restricted to 16 bytes to reduce number of required storage slots
         bytes32 commitment;
         bytes32 stateRoot;
-        bytes32 opTreeRootHash;
     }
 
     /// @notice Blocks by Franklin block id

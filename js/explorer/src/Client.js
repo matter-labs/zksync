@@ -1,9 +1,10 @@
 import config from './env-config';
 import * as constants from './constants';
-import { readableEther, formatToken } from './utils';
+import { formatToken } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
 const zksync_promise = import('zksync');
 import axios from 'axios';
+import * as ethers from 'ethers';
 
 async function fetch(req) {
     let r = await axios(req);
@@ -40,13 +41,25 @@ export class Client {
                     .sort((a, b) => a.id - b.id);
             });
         const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
+        const ethersProvider = config.ETH_NETWORK == 'localhost'
+            ? new ethers.providers.JsonRpcProvider('http://localhost:8545')
+            : ethers.getDefaultProvider();
 
         const props = {
             blockExplorerClient,
             tokensPromise,
+            ethersProvider,
+            syncProvider: window.syncProvider,
         };
 
         return new Client(props);
+    }
+
+    async getNumConfirmationsToWait(txEthBlock) {
+        const numConfirmations = await this.syncProvider.getConfirmationsForEthOpAmount();
+        const currBlock = await this.ethersProvider.getBlockNumber();
+
+        return numConfirmations - (currBlock - txEthBlock);
     }
 
     async testnetConfig() {
@@ -184,7 +197,7 @@ export class Client {
             switch (true) {
                 case type == 'Deposit': {
                     const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
-                    const amount = readableEther(tx.tx.priority_op.amount);
+                    const amount = formatToken(tx.tx.priority_op.amount, token);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -202,7 +215,7 @@ export class Client {
                 }
                 case type == 'FullExit': {
                     const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
-                    const amount = readableEther(tx.tx.withdraw_amount || 0);
+                    const amount = formatToken(tx.tx.withdraw_amount || 0, token);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -220,7 +233,7 @@ export class Client {
                 }
                 case type == 'Transfer': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
-                    const amount = readableEther(tx.tx.amount);
+                    const amount = formatToken(tx.tx.amount, token);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -238,7 +251,7 @@ export class Client {
                 }
                 case type == 'Withdraw': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
-                    const amount = readableEther(tx.tx.amount);
+                    const amount = formatToken(tx.tx.amount, token);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },

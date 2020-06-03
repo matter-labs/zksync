@@ -302,8 +302,9 @@ async function test() {
             amount: syncProvider.tokenSet.parseToken(token, "10"),
             approveDepositAmountForERC20: true,
         });
-        await deposit.awaitReceipt();
+
         console.log('deposit hash:', deposit.ethTx.hash);
+        await deposit.awaitReceipt();
 
         if (! await syncWallet.isSigningKeySet()) {
             const changePubKey = await syncWallet.setSigningKey();

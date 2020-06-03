@@ -41,3 +41,5 @@ Cargo.lock
 .ipynb_checkpoints
 
 loadtest_accounts_*
+
+go_to_env.sh
