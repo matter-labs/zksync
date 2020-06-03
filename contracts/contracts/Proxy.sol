@@ -55,7 +55,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Upgrades target
     /// @param newTarget New target
-    /// @param newTargetUpgradeParameters New target initialization parameters
+    /// @param newTargetUpgradeParameters New target upgrade parameters
     function upgradeTarget(address newTarget, bytes calldata newTargetUpgradeParameters) external {
         requireMaster(msg.sender);
 
@@ -63,7 +63,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
         (bool upgradeSuccess, ) = getTarget().delegatecall(
             abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters)
         );
-        require(upgradeSuccess, "ufu11"); // ufu11 - target initialization failed
+        require(upgradeSuccess, "ufu11"); // ufu11 - target upgrade failed
     }
 
     /// @notice Performs a delegatecall to the contract implementation

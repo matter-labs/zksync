@@ -723,7 +723,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
-        uint64 nextPriorityRequestId =  firstPriorityRequestId + totalOpenPriorityRequests;
+        uint64 nextPriorityRequestId = firstPriorityRequestId + totalOpenPriorityRequests;
 
         priorityRequests[nextPriorityRequestId] = PriorityOperation({
             opType: _opType,
