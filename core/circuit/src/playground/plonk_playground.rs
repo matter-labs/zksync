@@ -494,9 +494,9 @@ fn print_available_setup_powers() {
         setup_power
     };
 
-    let mut result_chunk_data = Vec::new();
-    for chunk_range in (600usize..720).collect::<Vec<_>>().chunks(32) {
-        let chunk_data = chunk_range
+    println!("chunks,setup_power");
+    for chunk_range in (6usize..8).collect::<Vec<_>>().chunks(32) {
+        let mut chunk_data = chunk_range
             .into_par_iter()
             .map(|chunk| (*chunk, calculate_setup_power(*chunk)))
             .collect::<Vec<_>>();
@@ -506,16 +506,13 @@ fn print_available_setup_powers() {
             .find(|(_, setup_power)| *setup_power > 26)
             .is_some();
 
-        result_chunk_data.extend(chunk_data);
-
+        chunk_data.retain(|&(_, chunks)| chunks <= 26);
+        for (chunks, setup_power) in chunk_data {
+            println!("{},{}", chunks, setup_power);
+        }
         if is_finished {
             break;
         }
-    }
-    result_chunk_data.retain(|&(_, chunks)| chunks <= 26);
-    println!("chunks,setup_power");
-    for (chunks, setup_power) in result_chunk_data {
-        println!("{},{}", chunks, setup_power);
     }
 }
 
