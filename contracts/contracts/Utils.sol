@@ -1,5 +1,6 @@
 pragma solidity ^0.5.0;
 
+import "./IERC20.sol";
 import "./Bytes.sol";
 
 library Utils {
@@ -14,15 +15,14 @@ library Utils {
     }
 
     /// @notice Sends tokens
+    /// @dev NOTE: this function handles tokens that have transfer function not strictly compatible with ERC20 standard
+    /// @dev NOTE: call `transfer` to this token may return (bool) or nothing
     /// @param _token Token address
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @return bool flag indicating that transfer is successful
-    function sendERC20NoRevert(address _token, address _to, uint256 _amount) internal returns (bool) {
-        // TODO: Use constant from Config
-        uint256 ERC20_WITHDRAWAL_GAS_LIMIT = 250000;
-
-        (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
+    function sendERC20(IERC20 _token, address _to, uint256 _amount) internal returns (bool) {
+        (bool callSuccess, bytes memory callReturnValueEncoded) = address(_token).call(
             abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
         );
         // `transfer` method may return (bool) or nothing.
@@ -38,7 +38,7 @@ library Utils {
         // TODO: Use constant from Config
         uint256 ETH_WITHDRAWAL_GAS_LIMIT = 10000;
 
-        (bool callSuccess,) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
+        (bool callSuccess, ) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
         return callSuccess;
     }
 
