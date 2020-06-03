@@ -113,6 +113,13 @@ pub async fn wait_for_verify(
     Ok(())
 }
 
+/// An iterator similar to `.iter().chunks(..)`, but supporting multiple
+/// different chunk sizes. Size of yielded batches is chosen one-by-one
+/// from the provided list of sizes (preserving their order).
+///
+/// For example, if chunk sizes array is `[10, 20]` and the iterator is
+/// created over an array of 43 elements, sizes of batches will be 10,
+/// 20, 10 again and then 3 (remaining elements).
 #[derive(Debug)]
 pub struct DynamicChunks<T> {
     iterable: Vec<T>,
