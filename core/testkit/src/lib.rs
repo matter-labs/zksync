@@ -31,6 +31,7 @@ pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
 use crypto_exports::rand::Rng;
+use itertools::Itertools;
 use models::prover_utils::EncodedProofPlonk;
 use web3::types::{TransactionReceipt, U64};
 
@@ -322,12 +323,16 @@ pub fn spawn_state_keeper(
     let (executed_tx_notify_sender, _executed_tx_notify_receiver) = mpsc::channel(256);
 
     let max_ops_in_block = 1000;
-    let mut block_chunks_sizes = (1..max_ops_in_block)
-        .map(|x| x * TransferToNewOp::CHUNKS)
-        .chain((0..max_ops_in_block).map(|x| x * TransferOp::CHUNKS))
-        .chain((0..max_ops_in_block).map(|x| x * DepositOp::CHUNKS))
-        .chain((0..max_ops_in_block).map(|x| x * FullExitOp::CHUNKS))
-        .chain((0..max_ops_in_block).map(|x| x * WithdrawOp::CHUNKS))
+    let ops_chunks = vec![
+        TransferToNewOp::CHUNKS,
+        TransferOp::CHUNKS,
+        DepositOp::CHUNKS,
+        FullExitOp::CHUNKS,
+        WithdrawOp::CHUNKS,
+    ];
+    let mut block_chunks_sizes = (0..max_ops_in_block)
+        .cartesian_product(ops_chunks)
+        .map(|(x, y)| x * y)
         .collect::<Vec<_>>();
     block_chunks_sizes.sort();
     block_chunks_sizes.dedup();

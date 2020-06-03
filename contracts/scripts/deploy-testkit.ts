@@ -24,7 +24,7 @@ import {parseEther} from "ethers/utils";
         {gasLimit: 5000000},
     );
     console.log(`TEST_ERC20=${erc20.address}`);
-    await (await governance.addToken(erc20.address));
+    await (await governance.addToken(erc20.address)).wait();
     if (await governance.tokenIds(erc20.address) !== 1) {
         console.error("Problem with testkit deployment, TEST_ERC20 token should have id 1");
         process.exit(1);

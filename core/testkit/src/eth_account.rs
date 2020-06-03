@@ -54,6 +54,13 @@ fn u256_to_big_dec(u256: U256) -> BigUint {
     BigUint::from_str(&u256.to_string()).unwrap()
 }
 
+fn priority_op_from_tx_logs(receipt: &TransactionReceipt) -> Option<PriorityOp> {
+    receipt
+        .logs
+        .iter()
+        .find_map(|op| PriorityOp::try_from(op.clone()).ok())
+}
+
 impl<T: Transport> EthereumAccount<T> {
     pub fn new(
         private_key: H256,
@@ -130,13 +137,7 @@ impl<T: Transport> EthereumAccount<T> {
         );
         Ok((
             receipt.clone(),
-            receipt
-                .logs
-                .into_iter()
-                .map(PriorityOp::try_from)
-                .filter_map(|op| op.ok())
-                .next()
-                .expect("no priority op log in full exit"),
+            priority_op_from_tx_logs(&receipt).expect("no priority op log in full exit"),
         ))
     }
 
@@ -207,13 +208,8 @@ impl<T: Transport> EthereumAccount<T> {
             receipt.status == Some(U64::from(1)),
             "ChangePubKeyHash transaction failed"
         );
-        Ok(receipt
-            .logs
-            .into_iter()
-            .map(PriorityOp::try_from)
-            .filter_map(|op| op.ok())
-            .next()
-            .expect("no priority op log in change pubkey hash"))
+
+        Ok(priority_op_from_tx_logs(&receipt).expect("no priority op log in change pubkey hash"))
     }
 
     pub async fn deposit_eth(
@@ -239,13 +235,7 @@ impl<T: Transport> EthereumAccount<T> {
         ensure!(receipt.status == Some(U64::from(1)), "eth deposit fail");
         Ok((
             receipt.clone(),
-            receipt
-                .logs
-                .into_iter()
-                .map(PriorityOp::try_from)
-                .filter_map(|op| op.ok())
-                .next()
-                .expect("no priority op log in deposit"),
+            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit"),
         ))
     }
 
@@ -352,13 +342,7 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = exec_result.success_result()?;
         Ok((
             receipt.clone(),
-            receipt
-                .logs
-                .into_iter()
-                .map(PriorityOp::try_from)
-                .filter_map(|op| op.ok())
-                .next()
-                .expect("no priority op log in deposit"),
+            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit erc20"),
         ))
     }
 
@@ -499,11 +483,10 @@ impl ETHExecResult {
 
     pub fn expect_success(self) -> TransactionReceipt {
         let tx_hash = self.receipt.transaction_hash;
-        self.success_result()
-            .map_err(|_| {
-                println!("js revert reason:\n{}", js_revert_reason(&tx_hash));
-            })
-            .expect("Expected transaction success")
+        self.success_result().unwrap_or_else(|e| {
+            eprintln!("js revert reason:\n{}", js_revert_reason(&tx_hash));
+            panic!("Expected transaction success: {}", e)
+        })
     }
 
     pub fn expect_revert(self, code: &str) {
