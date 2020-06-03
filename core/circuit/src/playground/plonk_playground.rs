@@ -7,6 +7,7 @@ use models::prover_utils::fs_utils::{
     get_universal_setup_lagrange_form, get_universal_setup_monomial_form,
 };
 use num::BigUint;
+use rayon::prelude::*;
 use std::time::Instant;
 
 #[test]
@@ -467,6 +468,55 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
     println!("Transpilation hist = {:?}", hints_hist);
 
     println!("Done transpiling");
+}
+
+#[test]
+fn print_available_setup_powers() {
+    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use crypto_exports::franklin_crypto::bellman::plonk::*;
+
+    let calculate_setup_power = |chunks: usize| -> u32 {
+        let circuit = {
+            let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&[]);
+            let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1);
+            witness_accum.extend_pubdata_with_noops(chunks);
+            witness_accum.collect_fees(&[]);
+            witness_accum.calculate_pubdata_commitment();
+            witness_accum.into_circuit_instance()
+        };
+        let setup_power = {
+            let (_, hints) = transpile_with_gates_count::<Bn256, _>(circuit.clone())
+                .expect("transpilation is successful");
+            let setup = setup(circuit.clone(), &hints).expect("must make setup");
+            let size = setup.n.next_power_of_two();
+            size.trailing_zeros()
+        };
+        setup_power
+    };
+
+    let mut result_chunk_data = Vec::new();
+    for chunk_range in (600usize..720).collect::<Vec<_>>().chunks(32) {
+        let chunk_data = chunk_range
+            .into_par_iter()
+            .map(|chunk| (*chunk, calculate_setup_power(*chunk)))
+            .collect::<Vec<_>>();
+
+        let is_finished = chunk_data
+            .iter()
+            .find(|(_, setup_power)| *setup_power > 26)
+            .is_some();
+
+        result_chunk_data.extend(chunk_data);
+
+        if is_finished {
+            break;
+        }
+    }
+    result_chunk_data.retain(|&(_, chunks)| chunks <= 26);
+    println!("chunks,setup_power");
+    for (chunks, setup_power) in result_chunk_data {
+        println!("{},{}", chunks, setup_power);
+    }
 }
 
 #[test]
