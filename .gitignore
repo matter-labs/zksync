@@ -40,4 +40,4 @@ Cargo.lock
 
 .ipynb_checkpoints
 
-emergency_output_*
+loadtest_accounts_*

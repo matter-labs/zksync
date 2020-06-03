@@ -104,9 +104,10 @@ struct ScenarioExecutor {
     /// Amount of time to wait for one zkSync block to be verified.
     verify_timeout: Duration,
 
-    /// Fee to be used in operations. It is assumed that dev-ticker is used
-    /// and fee amount is constant between calls.
-    operation_fee: BigUint,
+    /// Estimated fee amount for any zkSync operation. It is used to deposit
+    /// funds initially and transfer the funds for intermediate accounts to
+    /// operate.
+    estimated_fee_for_op: BigUint,
 
     /// Event loop handle so transport for Eth account won't be invalidated.
     _event_loop_handle: EventLoopHandle,
@@ -155,7 +156,7 @@ impl ScenarioExecutor {
 
             verify_timeout: Duration::from_secs(config.block_timeout),
 
-            operation_fee: 0u32.into(),
+            estimated_fee_for_op: 0u32.into(),
 
             _event_loop_handle,
         }
@@ -166,25 +167,23 @@ impl ScenarioExecutor {
     pub async fn run(&mut self) {
         if let Err(error) = self.run_test().await {
             log::error!("Loadtest erred with the following error: {}", error);
-            log::warn!("Performing the emergency exit");
-            self.emergency_exit().await;
         } else {
             log::info!("Loadtest completed successfully");
         }
     }
 
-    /// Method to be used if the scenario will fail on the any step.
+    /// Method to be used before the scenario.
     /// It stores all the zkSync account keys into a file named
-    /// like "emergency_output_2020_05_05_12_23_55.txt"
+    /// like "loadtest_accounts_2020_05_05_12_23_55.txt"
     /// so the funds left on accounts will not be lost.
     ///
     /// If saving the file fails, the accounts are printed to the log.
-    async fn emergency_exit(&self) {
+    async fn save_accounts(&self) {
         // Timestamp is used to generate unique file name postfix.
         let timestamp = Utc::now();
         let timestamp_str = timestamp.format("%Y_%m_%d_%H_%M_%S").to_string();
 
-        let output_file_name = format!("emergency_output_{}.txt", timestamp_str);
+        let output_file_name = format!("loadtest_accounts_{}.txt", timestamp_str);
 
         let mut account_list = String::new();
 
@@ -215,12 +214,22 @@ impl ScenarioExecutor {
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
     pub async fn run_test(&mut self) -> Result<(), failure::Error> {
+        self.save_accounts().await;
+
         self.initialize().await?;
         self.deposit().await?;
         self.initial_transfer().await?;
         self.funds_rotation().await?;
-        self.collect_funds().await?;
-        self.withdraw().await?;
+
+        // Collecting funds is currently disabled, as it should implement
+        // the withdrawing of all the funds, including unspent funds for
+        // fees.
+
+        log::warn!(
+            "Collecting funds is currently disabled, use the output file to collect funds manually"
+        );
+        // self.collect_funds().await?;
+        // self.withdraw().await?;
         self.finish().await?;
 
         Ok(())
@@ -236,20 +245,17 @@ impl ScenarioExecutor {
         // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
         // the fee in such a way that it will always be sufficient).
         // Withdraw operation has more chunks, so we estimate fee for it.
-        let mut fee: BigUint = self
-            .rpc_client
-            .get_tx_fee("Withdraw", self.main_account.zk_acc.address, "ETH")
-            .await
-            .expect("Can't get tx fee");
+        let mut fee = self.withdraw_fee(&self.main_account.zk_acc).await;
 
-        // The base USD price is randomized in 0.9..1.1 range of the constant value, so
-        // by dividing on the 0.9 we surely will obtain an appropriate value.
-        fee = fee * BigUint::from(100u32) / BigUint::from(90u32);
+        // To be sure that we will have enough funds for all the transfers,
+        // we will request 2x of the suggested fees. All the unspent funds
+        // will be withdrawn later.
+        fee = fee * BigUint::from(2u32);
 
         // And after that we have to make the fee packable.
         fee = closest_packable_fee_amount(&fee);
 
-        self.operation_fee = fee;
+        self.estimated_fee_for_op = fee;
 
         Ok(())
     }
@@ -267,12 +273,12 @@ impl ScenarioExecutor {
 
         // Sum of fees for one tx per every account.
         let fee_for_all_accounts =
-            self.operation_fee.clone() * BigUint::from(self.n_accounts as u64);
+            self.estimated_fee_for_op.clone() * BigUint::from(self.n_accounts as u64);
         // Total amount of cycles is amount of funds rotation cycles + one for initial transfers +
         // one for collecting funds back to the main account.
         amount_to_deposit += fee_for_all_accounts * (self.cycles_amount + 2);
         // Also the fee is required to perform a final withdraw
-        amount_to_deposit += self.operation_fee.clone();
+        amount_to_deposit += self.estimated_fee_for_op.clone();
 
         let account_balance = self.main_account.eth_acc.eth_balance().await?;
         log::info!("Main account ETH balance: {}", account_balance);
@@ -329,15 +335,18 @@ impl ScenarioExecutor {
         for to_idx in 0..self.n_accounts {
             let from_acc = &self.main_account.zk_acc;
             let to_acc = &self.accounts[to_idx];
+
             // Transfer size is (transfer_amount) + (fee for every tx to be sent) + (fee for final transfer
             // back to the main account).
-            let transfer_amount =
-                self.transfer_size.clone() + self.operation_fee.clone() * (self.cycles_amount + 1);
+            let transfer_amount = self.transfer_size.clone()
+                + self.estimated_fee_for_op.clone() * (self.cycles_amount + 1);
 
             // Make amount packable.
             let packable_transfer_amount = closest_packable_fee_amount(&transfer_amount);
 
-            let transfer = self.sign_transfer(from_acc, to_acc, packable_transfer_amount);
+            // Fee for the transfer itself differs from the estimated fee.
+            let fee = self.transfer_fee(&to_acc).await;
+            let transfer = self.sign_transfer(from_acc, to_acc, packable_transfer_amount, fee);
 
             signed_transfers.push(transfer);
         }
@@ -430,7 +439,9 @@ impl ScenarioExecutor {
             let from_acc = &self.main_account.zk_acc;
             let to_id = self.acc_for_transfer(from_id);
             let to_acc = &self.accounts[to_id];
-            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone());
+
+            let fee = self.transfer_fee(&to_acc).await;
+            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone(), fee);
 
             signed_transfers.push(transfer);
         }
@@ -442,7 +453,6 @@ impl ScenarioExecutor {
         let mut verified = 0;
         let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
         for tx_batch in txs_chunks {
-            log::info!("Batch size: {}", tx_batch.len());
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
@@ -473,6 +483,7 @@ impl ScenarioExecutor {
     }
 
     /// Transfers all the money from the intermediate accounts back to the main account.
+    #[allow(dead_code)] // Temporary, until the logic of withdrawing the balance with unspent fees is implemented.
     async fn collect_funds(&mut self) -> Result<(), failure::Error> {
         log::info!("Starting collecting funds back to the main account");
 
@@ -481,7 +492,9 @@ impl ScenarioExecutor {
         for from_id in 0..self.n_accounts {
             let from_acc = &self.accounts[from_id];
             let to_acc = &self.main_account.zk_acc;
-            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone());
+
+            let fee = self.transfer_fee(&to_acc).await;
+            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone(), fee);
 
             signed_transfers.push(transfer);
         }
@@ -522,6 +535,7 @@ impl ScenarioExecutor {
     }
 
     /// Withdraws the money from the main account back to the Ethereum.
+    #[allow(dead_code)] // Temporary, until the logic of withdrawing the balance with unspent fees is implemented.
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
         let mut sent_txs = SentTransactions::new();
 
@@ -534,9 +548,10 @@ impl ScenarioExecutor {
             amount_to_withdraw
         );
 
+        let fee = self.withdraw_fee(&self.main_account.zk_acc).await;
         let (tx, eth_sign) = self
             .main_account
-            .sign_withdraw(amount_to_withdraw.clone(), self.operation_fee.clone());
+            .sign_withdraw(amount_to_withdraw.clone(), fee);
         let tx_hash = self
             .rpc_client
             .send_tx(tx.clone(), eth_sign.clone())
@@ -593,6 +608,28 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Obtains a fee required for the transfer operation.
+    async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+        let fee = self
+            .rpc_client
+            .get_tx_fee("Transfer", to_acc.address, "ETH")
+            .await
+            .expect("Can't get tx fee");
+
+        closest_packable_fee_amount(&fee)
+    }
+
+    /// Obtains a fee required for the withdraw operation.
+    async fn withdraw_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+        let fee = self
+            .rpc_client
+            .get_tx_fee("Withdraw", to_acc.address, "ETH")
+            .await
+            .expect("Can't get tx fee");
+
+        closest_packable_fee_amount(&fee)
+    }
+
     /// Creates a signed transfer transaction.
     /// Sender and receiver are chosen from the generated
     /// accounts, determined by its indices.
@@ -601,12 +638,13 @@ impl ScenarioExecutor {
         from: &ZksyncAccount,
         to: &ZksyncAccount,
         amount: impl Into<BigUint>,
+        fee: impl Into<BigUint>,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
         let (tx, eth_signature) = from.sign_transfer(
             0, // ETH
             "ETH",
             amount.into(),
-            self.operation_fee.clone(),
+            fee.into(),
             &to.address,
             None,
             true,
