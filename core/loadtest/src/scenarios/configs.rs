@@ -60,6 +60,10 @@ pub struct RealLifeConfig {
     pub cycles_amount: u32,
     /// Timeout for awaiting a block to be verified.
     pub block_timeout: u64,
+    /// Whether loadtest will create blocks of different sizes.
+    /// If `false`, only the biggest size will be used.
+    /// Setting this value to `true` may increase the test run time.
+    pub use_all_block_sizes: bool,
     /// Main account to deposit ETH from.
     pub input_account: AccountInfo,
 }

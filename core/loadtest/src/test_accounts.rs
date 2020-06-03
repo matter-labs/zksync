@@ -122,6 +122,24 @@ impl TestAccount {
         (FranklinTx::Withdraw(Box::new(tx)), Some(eth_signature))
     }
 
+    // Creates a signed withdraw transaction with a fee provided.
+    pub fn sign_withdraw(
+        &self,
+        amount: BigUint,
+        fee: BigUint,
+    ) -> (FranklinTx, Option<PackedEthSignature>) {
+        let (tx, eth_signature) = self.zk_acc.sign_withdraw(
+            0, // ETH
+            "ETH",
+            amount,
+            fee,
+            &self.eth_acc.address,
+            None,
+            true,
+        );
+        (FranklinTx::Withdraw(Box::new(tx)), Some(eth_signature))
+    }
+
     // Creates a signed transfer tx to a random receiver.
     pub fn sign_transfer_to_random(
         &self,
