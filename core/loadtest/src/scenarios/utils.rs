@@ -1,7 +1,10 @@
 //! Common functions shared by different scenarios.
 
 // Built-in deps
-use std::time::{Duration, Instant};
+use std::{
+    iter::Iterator,
+    time::{Duration, Instant},
+};
 // External deps
 use num::BigUint;
 use rand::Rng;
@@ -108,4 +111,51 @@ pub async fn wait_for_verify(
     }
 
     Ok(())
+}
+
+/// An iterator similar to `.iter().chunks(..)`, but supporting multiple
+/// different chunk sizes. Size of yielded batches is chosen one-by-one
+/// from the provided list of sizes (preserving their order).
+///
+/// For example, if chunk sizes array is `[10, 20]` and the iterator is
+/// created over an array of 43 elements, sizes of batches will be 10,
+/// 20, 10 again and then 3 (remaining elements).
+#[derive(Debug)]
+pub struct DynamicChunks<T> {
+    iterable: Vec<T>,
+    chunk_sizes: Vec<usize>,
+    pos: usize,
+    chunk_size_id: usize,
+}
+
+impl<T> DynamicChunks<T> {
+    pub fn new(iterable: Vec<T>, chunk_sizes: &[usize]) -> Self {
+        assert!(!chunk_sizes.is_empty());
+
+        Self {
+            iterable,
+            chunk_sizes: chunk_sizes.to_vec(),
+            pos: 0,
+            chunk_size_id: 0,
+        }
+    }
+}
+
+impl<T: Clone> Iterator for DynamicChunks<T> {
+    type Item = Vec<T>;
+
+    fn next(&mut self) -> Option<Vec<T>> {
+        if self.pos >= self.iterable.len() {
+            return None;
+        }
+
+        let chunk_size = self.chunk_sizes[self.chunk_size_id];
+        self.chunk_size_id = (self.chunk_size_id + 1) % self.chunk_sizes.len();
+
+        let start_pos = self.pos;
+        let end_pos = std::cmp::min(start_pos + chunk_size, self.iterable.len());
+        self.pos = end_pos;
+
+        Some(self.iterable[start_pos..end_pos].to_vec())
+    }
 }
