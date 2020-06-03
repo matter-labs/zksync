@@ -371,8 +371,7 @@ impl<T: Transport> EthereumAccount<T> {
                 (
                     u64::from(block.block_number),
                     u64::from(block.fee_account),
-                    block.get_eth_encoded_root(),
-                    H256([0u8; 32]), // TODO: now equals to zero -> should be fixed in #570
+                    vec![block.get_eth_encoded_root()],
                     block.get_eth_public_data(),
                     witness_data.0,
                     witness_data.1,

@@ -1,24 +1,6 @@
 <template>
 <div>
-    <b-navbar toggleable="md" type="dark" variant="info">
-    <b-container>
-        <b-navbar-brand>zkSync Network</b-navbar-brand>
-        <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
-        <b-collapse id="nav-collapse" is-nav>
-        <b-navbar-nav>
-            <!-- <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">zkSync Wallet</b-nav-item> -->
-            <b-nav-item v-bind:href="`${blockchainExplorerAddress}/${contractAddress}`" target="_blank" rel="noopener noreferrer">
-                Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
-            </b-nav-item>
-        </b-navbar-nav>
-        <b-navbar-nav class="ml-auto">
-            <b-nav-form>
-                <SearchField :searchFieldInMenu="true" />
-            </b-nav-form>
-        </b-navbar-nav>
-        </b-collapse>
-    </b-container>
-    </b-navbar>
+    <Navbar />
     <br>
     <b-container>
         <b-alert v-if="updateError" variant="danger" show>
@@ -46,8 +28,12 @@
 
         <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
         <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable">
-            <template v-slot:cell(status)="data"><span v-html="data.item.status"></span></template>
-            <template v-slot:cell(new_state_root)="data"><span v-html="data.item.new_state_root"></span></template>
+            <template v-slot:cell(status)="data">
+                <ReadinessStatus :status="data.item.status == 'Pending' ? 1 : 2" />
+                {{ data.item.status }}
+                <Question :text=" data.item.status == 'Verified' ? 'Verified' : 'Pending'" />
+            </template>
+            <template v-slot:cell(new_state_root)="data"><CopyableAddress :address="data.item.new_state_root.slice(8)" :linkHtml="`${data.item.new_state_root.slice(8, 40)}... `" /></template>
         </b-table>
         <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
@@ -62,10 +48,18 @@ import store from './store';
 import { Client, clientPromise } from './Client';
 import ClosableJumbotron from './ClosableJumbotron.vue';
 import SearchField from './SearchField.vue';
+import CopyableAddress from './CopyableAddress.vue';
+import Question from './Question.vue';
+import Navbar from './Navbar.vue';
+import ReadinessStatus from './ReadinessStatus.vue';
 import { formatDate } from './utils';
 const components = { 
     ClosableJumbotron,
     SearchField,
+    CopyableAddress,
+    Question,
+    Navbar,
+    ReadinessStatus,
 };
 
 export default {
@@ -73,7 +67,7 @@ export default {
     async created() {
         const client = await clientPromise;
         const { contractAddress } = await client.testnetConfig();
-        this.contractAddress = contractAddress;
+        this.store.contractAddress = contractAddress;
         this.update();
     },
     timers: {
@@ -165,9 +159,9 @@ export default {
             if (blocks) {
                 this.blocks = blocks.map( b => ({
                     block_number:   b.block_number,
-                    status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
-                    new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
-                    committed_at:   formatDate(b.committed_at),
+                    status:         `${b.verified_at ? 'Verified' : 'Pending'}`,
+                    new_state_root: b.new_state_root,
+                    accepted_at:    formatDate(b.committed_at),
                     verified_at:    formatDate(b.verified_at),
                 }));
                 this.currentPage = this.page;

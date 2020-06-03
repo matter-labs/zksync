@@ -33,7 +33,7 @@ use models::{
 };
 use storage::ConnectionPool;
 
-type EthBlockId = u64;
+pub type EthBlockId = u64;
 pub enum EthWatchRequest {
     PollETHNode,
     IsPubkeyChangeAuthorized {
@@ -50,6 +50,10 @@ pub enum EthWatchRequest {
     GetUnconfirmedDeposits {
         address: Address,
         resp: oneshot::Sender<Vec<(EthBlockId, PriorityOp)>>,
+    },
+    GetUnconfirmedOpByHash {
+        eth_hash: Vec<u8>,
+        resp: oneshot::Sender<Option<(EthBlockId, PriorityOp)>>,
     },
     CheckEIP1271Signature {
         address: Address,
@@ -439,6 +443,14 @@ impl<T: Transport> EthWatch<T> {
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
+    fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<(EthBlockId, PriorityOp)> {
+        self.eth_state
+            .unconfirmed_queue
+            .iter()
+            .find(|(_block, op)| op.eth_hash.as_slice() == eth_hash)
+            .cloned()
+    }
+
     fn get_ongoing_deposits_for(&self, address: Address) -> Vec<(EthBlockId, PriorityOp)> {
         self.eth_state
             .unconfirmed_queue
@@ -496,6 +508,10 @@ impl<T: Transport> EthWatch<T> {
                 EthWatchRequest::GetUnconfirmedDeposits { address, resp } => {
                     let deposits_for_address = self.get_ongoing_deposits_for(address);
                     resp.send(deposits_for_address).unwrap_or_default();
+                }
+                EthWatchRequest::GetUnconfirmedOpByHash { eth_hash, resp } => {
+                    let unconfirmed_op = self.find_ongoing_op_by_hash(&eth_hash);
+                    resp.send(unconfirmed_op).unwrap_or_default();
                 }
                 EthWatchRequest::IsPubkeyChangeAuthorized {
                     address,

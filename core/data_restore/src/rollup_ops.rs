@@ -1,5 +1,6 @@
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
+use ethabi::ParamType;
 use models::node::operations::FranklinOp;
 use web3::{Transport, Web3};
 
@@ -30,16 +31,15 @@ impl RollupOpsBlock {
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
         let fee_account_argument_id = 1;
-        let public_data_argument_id = 4;
+        let public_data_argument_id = 3;
         let decoded_commitment_parameters = ethabi::decode(
             vec![
-                ethabi::ParamType::Uint(32),       // uint32 _blockNumber,
-                ethabi::ParamType::Uint(24),       // uint24 _feeAccount,
-                ethabi::ParamType::FixedBytes(32), // bytes32 _newRoot,
-                ethabi::ParamType::FixedBytes(32), // bytes32 _opTreeRootHash,
-                ethabi::ParamType::Bytes,          // bytes calldata _publicData,
-                ethabi::ParamType::Bytes,          // bytes calldata _ethWitness,
-                ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))), // uint32[] calldata _ethWitnessSizes
+                ParamType::Uint(32),                                   // uint32 _blockNumber,
+                ParamType::Uint(32),                                   // uint32 _feeAccount,
+                ParamType::Array(Box::new(ParamType::FixedBytes(32))), // bytes32[] _newRoots,
+                ParamType::Bytes, // bytes calldata _publicData,
+                ParamType::Bytes, // bytes calldata _ethWitness,
+                ParamType::Array(Box::new(ParamType::Uint(32))), // uint32[] calldata _ethWitnessSizes
             ]
             .as_slice(),
             input_data.as_slice(),

@@ -636,14 +636,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     &witness_data.1
                 );
 
-                // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
                 self.ethereum.encode_tx_data(
                     "commitBlock",
                     (
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
-                        root,
-                        H256([0u8; 32]), // TODO: now equals to zero -> should be fixed in #570
+                        vec![root],
                         public_data,
                         witness_data.0,
                         witness_data.1,
@@ -651,7 +649,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 )
             }
             Action::Verify { proof } => {
-                // function verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof, bytes calldata _withdrawalsData)
                 let block_number = op.block.block_number;
                 let withdrawals_data = op.block.get_withdrawals_data();
                 self.ethereum.encode_tx_data(

@@ -1,6 +1,7 @@
 pragma solidity ^0.5.0;
 
 import "../Upgradeable.sol";
+import "../UpgradeableMaster.sol";
 
 
 interface DummyTarget {
@@ -8,6 +9,8 @@ interface DummyTarget {
     function get_DUMMY_INDEX() external pure returns (uint256);
 
     function initialize(bytes calldata initializationParameters) external;
+
+    function upgrade(bytes calldata upgradeParameters) external;
 
     function verifyPriorityOperation() external;
 
@@ -20,7 +23,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function upgradeNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -32,7 +35,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
 
     function upgradeFinishes() external {}
 
-    function readyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external returns (bool) {
         return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
@@ -50,6 +53,10 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
             sstore(1, byte_0)
             sstore(2, byte_1)
         }
+    }
+
+    function upgrade(bytes calldata upgradeParameters) external {
+
     }
 
     function totalVerifiedPriorityOperations() internal returns (uint64) {
@@ -73,7 +80,7 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function upgradeNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -85,7 +92,7 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
 
     function upgradeFinishes() external {}
 
-    function readyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external returns (bool) {
         return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
@@ -97,8 +104,12 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
     uint64 _verifiedPriorityOperations;
 
     function initialize(bytes calldata initializationParameters) external {
-        bytes32 byte_0 = bytes32(uint256(uint8(initializationParameters[0])));
-        bytes32 byte_1 = bytes32(uint256(uint8(initializationParameters[1])));
+        revert("dsini");
+    }
+
+    function upgrade(bytes calldata upgradeParameters) external {
+        bytes32 byte_0 = bytes32(uint256(uint8(upgradeParameters[0])));
+        bytes32 byte_1 = bytes32(uint256(uint8(upgradeParameters[1])));
         assembly {
             sstore(2, byte_0)
             sstore(3, byte_1)

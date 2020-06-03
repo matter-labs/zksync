@@ -192,12 +192,22 @@ export class Provider {
             tokenLike
         ]);
         return {
-            gas_tx_amount: utils.bigNumberify(transactionFee.gas_tx_amount),
-            gas_price_wei: utils.bigNumberify(transactionFee.gas_price_wei),
-            gas_fee: utils.bigNumberify(transactionFee.gas_fee),
-            zkp_fee: utils.bigNumberify(transactionFee.zkp_fee),
-            total_fee: utils.bigNumberify(transactionFee.total_fee),
+            feeType: transactionFee.feeType,
+            gasTxAmount: utils.bigNumberify(transactionFee.gasTxAmount),
+            gasPriceWei: utils.bigNumberify(transactionFee.gasPriceWei),
+            gasFee: utils.bigNumberify(transactionFee.gasFee),
+            zkpFee: utils.bigNumberify(transactionFee.zkpFee),
+            totalFee: utils.bigNumberify(transactionFee.totalFee),
         };
+    }
+
+    async getTokenPrice(
+        tokenLike: TokenLike
+    ): Promise<number> {
+        const tokenPrice = await this.transport.request("get_token_price", [
+            tokenLike
+        ]);
+        return parseFloat(tokenPrice);
     }
 
     async disconnect() {
