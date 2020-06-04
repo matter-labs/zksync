@@ -4,7 +4,6 @@ use crate::node::{Engine, Fr};
 use crate::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethereum};
 use crate::prover_utils::fs_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
-    get_universal_setup_monomial_form,
 };
 use crypto_exports::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use crypto_exports::bellman::plonk::better_cs::{
@@ -16,6 +15,7 @@ use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile, verify};
 use std::fs::File;
 
 pub mod fs_utils;
+pub mod network_utils;
 
 pub const SETUP_MIN_POW2: u32 = 20;
 pub const SETUP_MAX_POW2: u32 = 26;
@@ -179,5 +179,17 @@ pub fn serialize_proof(
     EncodedProofPlonk {
         inputs,
         proof: serialized_proof,
+    }
+}
+
+pub fn get_universal_setup_monomial_form(
+    power_of_two: u32,
+) -> Result<Crs<Engine, CrsForMonomialForm>, failure::Error> {
+    let prover_download_setup = std::env::var("PROVER_DOWNLOAD_SETUP")?;
+
+    if prover_download_setup == "1" {
+        network_utils::get_universal_setup_monomial_form(power_of_two)
+    } else {
+        fs_utils::get_universal_setup_monomial_form(power_of_two)
     }
 }
