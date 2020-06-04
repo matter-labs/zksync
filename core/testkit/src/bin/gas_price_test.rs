@@ -22,6 +22,7 @@ use models::params::{
 };
 use models::primitives::UnsignedRatioSerializeAsDecimal;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
+use server::state_keeper::MAX_WITHDRAWALS_PER_BLOCK;
 use std::str::FromStr;
 use testkit::*;
 use web3::transports::Http;
@@ -272,14 +273,15 @@ fn gas_price_test() {
         true,
     );
 
-    commit_cost_of_withdrawals(&mut test_setup, 20, Token(0), rng).report(
+    let withdrawals_amount = MAX_WITHDRAWALS_PER_BLOCK as usize;
+    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(0), rng).report(
         &base_cost,
-        "withdrwals ETH",
+        "withdrawals ETH",
         false,
     );
-    commit_cost_of_withdrawals(&mut test_setup, 20, Token(1), rng).report(
+    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(1), rng).report(
         &base_cost,
-        "withdrwals ERC20",
+        "withdrawals ERC20",
         false,
     );
 
@@ -401,6 +403,13 @@ fn commit_cost_of_withdrawals(
     token: Token,
     rng: &mut impl Rng,
 ) -> CostsSample {
+    assert!(
+        n_withdrawals <= MAX_WITHDRAWALS_PER_BLOCK as usize,
+        "{} withdrawals would not fit in one block, max amount is {}",
+        n_withdrawals,
+        MAX_WITHDRAWALS_PER_BLOCK
+    );
+
     let mut withdraws_fee = Vec::new();
     let mut withdrawals_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);
