@@ -475,7 +475,7 @@ fn print_available_setup_powers() {
     use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
     use crypto_exports::franklin_crypto::bellman::plonk::*;
 
-    let calculate_setup_power = |chunks: usize| -> u32 {
+    let calculate_setup_power = |chunks: usize| -> (usize, u32) {
         let circuit = {
             let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&[]);
             let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1);
@@ -484,31 +484,33 @@ fn print_available_setup_powers() {
             witness_accum.calculate_pubdata_commitment();
             witness_accum.into_circuit_instance()
         };
-        let setup_power = {
-            let (_, hints) = transpile_with_gates_count::<Bn256, _>(circuit.clone())
+        let (gates, setup_power) = {
+            let (gates, hints) = transpile_with_gates_count::<Bn256, _>(circuit.clone())
                 .expect("transpilation is successful");
-            let setup = setup(circuit.clone(), &hints).expect("must make setup");
-            let size = setup.n.next_power_of_two();
-            size.trailing_zeros()
+            let size = gates.next_power_of_two();
+            (gates, size.trailing_zeros())
         };
-        setup_power
+        (gates, setup_power)
     };
 
-    println!("chunks,setup_power");
-    for chunk_range in (6usize..8).collect::<Vec<_>>().chunks(32) {
+    println!("chunks,gates,setup_power");
+    for chunk_range in (600..=720).step_by(2).collect::<Vec<_>>().chunks(4) {
         let mut chunk_data = chunk_range
             .into_par_iter()
-            .map(|chunk| (*chunk, calculate_setup_power(*chunk)))
+            .map(|chunk| {
+                let (gates, setup_power) = calculate_setup_power(*chunk);
+                (*chunk, gates, setup_power)
+            })
             .collect::<Vec<_>>();
 
         let is_finished = chunk_data
             .iter()
-            .find(|(_, setup_power)| *setup_power > 26)
+            .find(|(_, _, setup_power)| *setup_power > 26)
             .is_some();
 
-        chunk_data.retain(|&(_, chunks)| chunks <= 26);
-        for (chunks, setup_power) in chunk_data {
-            println!("{},{}", chunks, setup_power);
+        chunk_data.retain(|&(chunks, _, _)| chunks <= 26);
+        for (chunks, gates, setup_power) in chunk_data {
+            println!("{},{},{}", chunks, gates, setup_power);
         }
         if is_finished {
             break;
