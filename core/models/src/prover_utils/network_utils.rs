@@ -15,8 +15,7 @@ pub fn get_universal_setup_monomial_form(
     let setup_network_dir = std::env::var("PROVER_SETUP_NETWORK_DIR")?;
     let setup_dl_path = format!("{}/setup_2%5E{}.key", setup_network_dir, power_of_two);
 
-    println!("Downloading universal setup from {}", &setup_dl_path);
-    eprintln!("Downloading universal setup from {}", &setup_dl_path);
+    log::info!("Downloading universal setup from {}", &setup_dl_path);
 
     let mut response_reader = reqwest::blocking::get(&setup_dl_path)?;
 
