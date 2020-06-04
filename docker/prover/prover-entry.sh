@@ -14,13 +14,11 @@ echo BLOCK_CHUNK_SIZES=$BLOCK_CHUNK_SIZES
 source /bin/utils.sh
 REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`
 
-echo Downloading setup powers $REQUIRED_SETUP_POWS
+if [ "$PROVER_DOWNLOAD_SETUP" == "false" ]; then
+  echo Downloading setup powers $REQUIRED_SETUP_POWS
+  /bin/plonk-setup download monomial $REQUIRED_SETUP_POWS
+fi
 
-
-/bin/plonk-setup download monomial $REQUIRED_SETUP_POWS
-# key dir is mounted as volume on kubernetes, so we have to copy packed keys from somewhere else
-rm -rf $ZKSYNC_HOME/keys/packed
-mv /keys-packed $ZKSYNC_HOME/keys/packed
 /bin/verify-keys unpack
 
 echo key download complete, starting prover
