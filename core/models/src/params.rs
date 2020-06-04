@@ -7,7 +7,6 @@ use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 // Workspace deps
 use crate::config_options::parse_env;
-use crate::franklin_crypto::group_hash::BlakeHasher;
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
@@ -81,6 +80,20 @@ pub fn number_of_processable_tokens() -> usize {
     assert!(num.is_power_of_two());
 
     num
+}
+
+/// Number of accounts that are expected to be able to transact
+pub fn log_2_number_of_processable_accounts() -> usize {
+    let num = 20;
+
+    assert!(num <= balance_tree_depth());
+
+    num
+}
+
+/// Number of accounts that are expected to be able to transact
+pub fn number_of_processable_accounts() -> usize {
+    1 << log_2_number_of_processable_accounts()
 }
 
 pub const ETH_TOKEN_ID: TokenId = 0;
@@ -190,6 +203,6 @@ lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
     pub static ref RESCUE_PARAMS: Bn256RescueParams =
-        Bn256RescueParams::new_2_into_1::<BlakeHasher>();
+        Bn256RescueParams::new_checked_2_into_1();
     pub static ref RESCUE_HASHER: BabyRescueHasher = BabyRescueHasher::default();
 }
