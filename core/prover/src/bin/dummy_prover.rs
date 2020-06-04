@@ -1,9 +1,9 @@
 use models::config_options::get_env;
-use models::prover_utils::{get_universal_setup_monomial_form, EncodedProofPlonk};
+use models::prover_utils::EncodedProofPlonk;
 use prover::cli_utils::main_for_prover_impl;
 use prover::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct DummyProverConfig {
