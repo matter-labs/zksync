@@ -7,7 +7,7 @@
             {{updateError}}. Try again later.
         </b-alert>
         <b-card bg-variant="light" >
-            <h4>zkSync Devnet Block Explorer</h4> 
+            <h4>zkSync Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>
@@ -27,13 +27,21 @@
         <br>
 
         <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable">
+        <b-table responsive class="nowrap" hover outlined :items="items" :busy="loading">
+            <template v-slot:cell(block_number)="data">
+                <a :href="`/blocks/${data.item.block_number}`" class="block_number_link">
+                    {{ data.item.block_number }}
+                </a>
+            </template>
             <template v-slot:cell(status)="data">
                 <ReadinessStatus :status="data.item.status == 'Pending' ? 1 : 2" />
                 {{ data.item.status }}
-                <Question :text=" data.item.status == 'Verified' ? 'Verified' : 'Pending'" />
             </template>
-            <template v-slot:cell(new_state_root)="data"><CopyableAddress :address="data.item.new_state_root.slice(8)" :linkHtml="`${data.item.new_state_root.slice(8, 40)}... `" /></template>
+            <template v-slot:cell(new_state_root)="data">
+                <a :href="`/blocks/${data.item.block_number}`">
+                    {{ `${data.item.new_state_root.slice(8, 40)}...` }}
+                </a>
+            </template>
         </b-table>
         <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
@@ -65,6 +73,7 @@ const components = {
 export default {
     name: 'home',
     async created() {
+        window.wwwww = this;
         const client = await clientPromise;
         const { contractAddress } = await client.testnetConfig();
         this.store.contractAddress = contractAddress;
@@ -227,5 +236,15 @@ body {
 
 .btn {
     font-size: 0.8rem;
+}
+
+.block_number_link {
+    display: inline-block;
+    width: 8em;
+    margin-left: -1em;
+    padding-left: 1em;
+    /* box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1); */
+    cursor: pointer;
+    /* text-decoration: underline; */
 }
 </style>

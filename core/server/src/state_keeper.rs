@@ -24,6 +24,13 @@ use models::{
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 
+/// Since withdraw is an expensive operation, we have to limit amount of
+/// withdrawals in one block to not exceed the gas limit in prover.
+/// 10 is a safe value which won't cause any problems.
+/// If this threshold is reached, block will be immediately sealed and
+/// the remaining withdrawals will go to the next block.
+pub const MAX_WITHDRAWALS_PER_BLOCK: u32 = 10;
+
 pub enum ExecutedOpId {
     Transaction(TxHash),
     PriorityOp(u64),
@@ -42,8 +49,6 @@ pub struct ExecutedOpsNotify {
     pub block_number: BlockNumber,
 }
 
-const MAX_PENDING_BLOCK_ITERATIONS: usize = 5 * 10;
-
 #[derive(Debug)]
 struct PendingBlock {
     success_operations: Vec<ExecutedOperations>,
@@ -53,6 +58,7 @@ struct PendingBlock {
     pending_op_block_index: u32,
     unprocessed_priority_op_before: u64,
     pending_block_iteration: usize,
+    withdrawals_amount: u32,
 }
 
 impl PendingBlock {
@@ -65,6 +71,7 @@ impl PendingBlock {
             pending_op_block_index: 0,
             unprocessed_priority_op_before,
             pending_block_iteration: 0,
+            withdrawals_amount: 0,
         }
     }
 }
@@ -84,6 +91,7 @@ pub struct PlasmaStateKeeper {
     executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
 
     available_block_chunk_sizes: Vec<usize>,
+    max_miniblock_iterations: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -236,6 +244,7 @@ impl PlasmaStateKeeper {
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
+        max_miniblock_iterations: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -266,6 +275,7 @@ impl PlasmaStateKeeper {
             pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
             executed_tx_notify_sender,
             available_block_chunk_sizes,
+            max_miniblock_iterations,
         };
 
         let root = keeper.state.root_hash();
@@ -394,6 +404,9 @@ impl PlasmaStateKeeper {
                     executed_ops.push(exec_op);
                 }
                 Err(tx) => {
+                    // We could not execute the tx due to either of block size limit
+                    // or the withdraw operations limit, so we seal this block and
+                    // the last transaction will go to the next block instead.
                     self.seal_pending_block().await;
                     self.notify_executed_ops(&mut executed_ops).await;
 
@@ -404,7 +417,7 @@ impl PlasmaStateKeeper {
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
-            if self.pending_block.pending_block_iteration > MAX_PENDING_BLOCK_ITERATIONS {
+            if self.pending_block.pending_block_iteration > self.max_miniblock_iterations {
                 self.seal_pending_block().await;
                 self.notify_executed_ops(&mut executed_ops).await;
                 return;
@@ -457,7 +470,21 @@ impl PlasmaStateKeeper {
 
     fn apply_tx(&mut self, tx: FranklinTx) -> Result<ExecutedOperations, FranklinTx> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
+
+        // If we can't add the tx to the block due to the size limit, we return this tx,
+        // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
+            return Err(tx);
+        }
+
+        if matches!(tx, FranklinTx::Withdraw(_)) {
+            // Increase amount of the withdraw operations in this block.
+            self.pending_block.withdrawals_amount += 1;
+        }
+
+        // Check if we've reached the withdraw operations amount limit.
+        // If so, this block will be sealed and this tx will go to the next block.
+        if self.pending_block.withdrawals_amount > MAX_WITHDRAWALS_PER_BLOCK {
             return Err(tx);
         }
 

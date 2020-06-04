@@ -1,9 +1,6 @@
 import {ethers} from "ethers";
 import {Interface} from "ethers/utils";
 import {readContractCode, readProductionContracts} from "../src.ts/deploy";
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-
 const contracts = readProductionContracts();
 const franklinInterface = new Interface(contracts.zkSync.interface);
 const governanceInterface = new Interface(contracts.governance.interface);
@@ -22,8 +19,12 @@ function hex_to_ascii(str1) {
 async function reason() {
     const args = process.argv.slice(2);
     const hash = args[0];
+    const web3 = args[1] == null ? process.env.WEB3_URL : args[1];
     console.log("tx hash:", hash);
-    console.log("provider:", process.env.WEB3_URL);
+    console.log("provider:", web3);
+
+    const provider = new ethers.providers.JsonRpcProvider(web3);
+
 
     const tx = await provider.getTransaction(hash);
     if (!tx) {

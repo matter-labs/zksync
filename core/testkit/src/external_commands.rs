@@ -72,6 +72,13 @@ fn run_external_command(command: &str, args: &[&str]) -> String {
     stdout
 }
 
+pub fn js_revert_reason(tx_hash: &H256) -> String {
+    run_external_command(
+        "revert-reason",
+        &[&format!("0x{:x}", tx_hash), "http://localhost:7545"],
+    )
+}
+
 pub fn deploy_test_contracts() -> Contracts {
     let stdout = run_external_command("deploy-testkit.sh", &[]);
 

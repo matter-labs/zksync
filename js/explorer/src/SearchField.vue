@@ -92,8 +92,10 @@ export default {
     white-space: nowrap;
 }
 
-.container {
-    width: 40em;
+@media (min-width: 1000px) {
+    .container {
+        width: 40em;
+    }
 }
 </style>
  
