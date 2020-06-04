@@ -28,7 +28,7 @@ import "./SafeMath.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract MintableERC20FeeOnTransferFromTest is ContextTest, MintableIERC20Test {
+contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     using SafeMath for uint256;
 
     mapping (address => uint256) private _balances;
@@ -41,7 +41,18 @@ contract MintableERC20FeeOnTransferFromTest is ContextTest, MintableIERC20Test {
         _mint(to, amount);
     }
 
-    uint256 public constant FEE_AMOUNT = 12;
+    bool _shouldBeFeeTransfers;
+    bool _senderUnintuitiveProcess;
+
+    uint256 public FEE_AMOUNT_AS_VALUE = 15;
+    uint256 public DIVIDEND_AMOUNT_AS_VALUE = 7;
+
+    /// shouldBeFeeTransfers - true if there is should be taken fee, false if there should be dividends
+    /// senderUnintuitiveProcess - true if there is should be taken fee from sender (or dividends for him), false if this process works with recipient
+    constructor(bool shouldBeFeeTransfers, bool senderUnintuitiveProcess) public {
+        _shouldBeFeeTransfers = shouldBeFeeTransfers;
+        _senderUnintuitiveProcess = senderUnintuitiveProcess;
+    }
 
     /**
      * @dev See {IERC20-totalSupply}.
@@ -104,7 +115,6 @@ contract MintableERC20FeeOnTransferFromTest is ContextTest, MintableIERC20Test {
     function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
         _transfer(sender, recipient, amount);
         _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
-        _burn(_msgSender(), FEE_AMOUNT); // fee
         return true;
     }
 
@@ -165,6 +175,23 @@ contract MintableERC20FeeOnTransferFromTest is ContextTest, MintableIERC20Test {
         _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
         _balances[recipient] = _balances[recipient].add(amount);
         emit Transfer(sender, recipient, amount);
+
+        if (_shouldBeFeeTransfers) {
+            require(FEE_AMOUNT_AS_VALUE <= amount, "tet10"); // tet10 - fee is bigger than transfer amount
+            if (_senderUnintuitiveProcess) {
+                _burn(sender, FEE_AMOUNT_AS_VALUE);
+            }
+            else {
+                _burn(recipient, FEE_AMOUNT_AS_VALUE);
+            }
+        } else {
+            if (_senderUnintuitiveProcess) {
+                _mint(sender, DIVIDEND_AMOUNT_AS_VALUE);
+            }
+            else {
+                _mint(recipient, DIVIDEND_AMOUNT_AS_VALUE);
+            }
+        }
     }
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing

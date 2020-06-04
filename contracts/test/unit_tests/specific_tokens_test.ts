@@ -164,10 +164,10 @@ describe("zkSync process tokens which take fee from sender", function() {
 
         tokenContract = await deployContract(
             wallet,
-            readContractCode("MintableERC20FeeOnTransferTest"), [],
+            readContractCode("MintableERC20FeeAndDividendsTest"), [true, true],
             {gasLimit: 5000000},
         );
-        FEE_AMOUNT = bigNumberify((await tokenContract.FEE_AMOUNT()));
+        FEE_AMOUNT = bigNumberify((await tokenContract.FEE_AMOUNT_AS_VALUE()));
         await tokenContract.mint(wallet.address, parseEther("1000000"));
 
         const govContract = deployer.governanceContract(wallet);
@@ -276,10 +276,10 @@ describe("zkSync process tokens which take fee from recipient", function() {
 
         tokenContract = await deployContract(
             wallet,
-            readContractCode("MintableERC20FeeOnTransferFromTest"), [],
+            readContractCode("MintableERC20FeeAndDividendsTest"), [true, false],
             {gasLimit: 5000000},
         );
-        FEE_AMOUNT = bigNumberify((await tokenContract.FEE_AMOUNT()));
+        FEE_AMOUNT = bigNumberify((await tokenContract.FEE_AMOUNT_AS_VALUE()));
         await tokenContract.mint(wallet.address, parseEther("1000000"));
 
         const govContract = deployer.governanceContract(wallet);
@@ -300,5 +300,48 @@ describe("zkSync process tokens which take fee from recipient", function() {
         await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
             .to.emit(zksyncContract, "OnchainDeposit")
             .withArgs(wallet.address, tokenId, depositAmount.sub(FEE_AMOUNT), wallet.address);
+    });
+});
+
+describe("zkSync process tokens which adds dividends to recipient", function() {
+    this.timeout(50000);
+
+    let zksyncContract;
+    let tokenContract;
+    let ethProxy;
+    let DIVIDEND_AMOUNT;
+    before(async () => {
+        const contracts = readTestContracts();
+        contracts.zkSync = readContractCode("ZkSyncWithdrawalUnitTest");
+        const deployer = new Deployer({deployWallet: wallet, contracts});
+        await deployer.deployAll({gasLimit: 6500000});
+        zksyncContract = deployer.zkSyncContract(wallet);
+
+        tokenContract = await deployContract(
+            wallet,
+            readContractCode("MintableERC20FeeAndDividendsTest"), [false, false],
+            {gasLimit: 5000000},
+        );
+        DIVIDEND_AMOUNT = bigNumberify((await tokenContract.DIVIDEND_AMOUNT_AS_VALUE()));
+        await tokenContract.mint(wallet.address, parseEther("1000000"));
+
+        const govContract = deployer.governanceContract(wallet);
+        await govContract.addToken(tokenContract.address);
+
+        ethProxy = new ETHProxy(wallet.provider, {
+            mainContract: zksyncContract.address,
+            govContract: govContract.address,
+        });
+    });
+
+    it("Make a deposit of tokens that should adds dividends to the recipient", async () => {
+        zksyncContract.connect(wallet);
+        const depositAmount = parseEther("1.0");
+        await tokenContract.approve(zksyncContract.address, depositAmount);
+
+        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
+        await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
+            .to.emit(zksyncContract, "OnchainDeposit")
+            .withArgs(wallet.address, tokenId, depositAmount.add(DIVIDEND_AMOUNT), wallet.address);
     });
 });
