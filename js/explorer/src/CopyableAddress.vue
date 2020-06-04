@@ -1,6 +1,6 @@
 <template>
     <span v-if="address">
-        <span class="link-html-span" v-html="linkHtml" />
+        <span class="link-html-span mr-1" v-html="linkHtml" />
         <i v-if="tooltipRight===true"
             @click="clicked"
             class="far fa-copy" 

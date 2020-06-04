@@ -1,5 +1,5 @@
 <template>
-    <i v-b-tooltip="text" class="far fa-question-circle"></i>
+    <i v-b-tooltip="text" class="far fa-question-circle displaynone"></i>
 </template>
 
 <script>
