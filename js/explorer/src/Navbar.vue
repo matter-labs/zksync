@@ -6,7 +6,11 @@
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
             <!-- <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">zkSync Wallet</b-nav-item> -->
-            <b-nav-item v-bind:href="`${blockchainExplorerAddress}/${store.contractAddress}`" target="_blank" rel="noopener noreferrer">
+            <b-nav-item 
+                v-bind:href="`${blockchainExplorerAddress}/${store.contractAddress}`" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                class="nowrap">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
