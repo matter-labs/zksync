@@ -419,7 +419,7 @@ fn deposit_op_to_tx_by_hash(
                 tx_type: "Deposit".into(),
                 from: format!("{:?}", deposit.from),
                 to: format!("{:?}", deposit.to),
-                token: deposit.token,
+                token: deposit.token as i32,
                 amount: deposit.amount.to_string(),
                 fee: None,
                 block_number: -1,
