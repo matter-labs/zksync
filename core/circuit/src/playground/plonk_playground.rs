@@ -485,7 +485,7 @@ fn print_available_setup_powers() {
             witness_accum.into_circuit_instance()
         };
         let (gates, setup_power) = {
-            let (gates, hints) = transpile_with_gates_count::<Bn256, _>(circuit.clone())
+            let (gates, _) = transpile_with_gates_count::<Bn256, _>(circuit.clone())
                 .expect("transpilation is successful");
             let size = gates.next_power_of_two();
             (gates, size.trailing_zeros())
@@ -494,7 +494,7 @@ fn print_available_setup_powers() {
     };
 
     println!("chunks,gates,setup_power");
-    for chunk_range in (600..=720).step_by(2).collect::<Vec<_>>().chunks(4) {
+    for chunk_range in (420..=720).step_by(2).collect::<Vec<_>>().chunks(32) {
         let mut chunk_data = chunk_range
             .into_par_iter()
             .map(|chunk| {
