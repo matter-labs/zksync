@@ -5,3 +5,7 @@
 .displaynone {
     display: none;
 }
+
+.cursorpointer {
+    cursor: pointer;
+}
