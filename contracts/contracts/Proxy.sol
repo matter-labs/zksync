@@ -2,6 +2,7 @@ pragma solidity ^0.5.0;
 
 import "./Ownable.sol";
 import "./Upgradeable.sol";
+import "./UpgradeableMaster.sol";
 
 
 /// @title Proxy Contract
@@ -9,8 +10,8 @@ import "./Upgradeable.sol";
 /// @author Matter Labs
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
-    /// @notice Storage position of "target" (actual implementation address)
-    bytes32 private constant targetPosition = bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1);
+    /// @notice Storage position of "target" (actual implementation address: keccak256('eip1967.proxy.implementation') - 1)
+    bytes32 private constant targetPosition = bytes32(0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc);
 
     /// @notice Contract constructor
     /// @dev Calls Ownable contract constructor and initialize target
@@ -27,6 +28,11 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @notice Intercepts initialization calls
     function initialize(bytes calldata) external pure {
         revert("ini11"); // ini11 - interception of initialization call
+    }
+
+    /// @notice Intercepts upgrade calls
+    function upgrade(bytes calldata) external pure {
+        revert("upg11"); // upg11 - interception of upgrade call
     }
 
     /// @notice Returns target of contract
@@ -49,23 +55,21 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Upgrades target
     /// @param newTarget New target
-    /// @param newTargetInitializationParameters New target initialization parameters
-    function upgradeTarget(address newTarget, bytes calldata newTargetInitializationParameters) external {
+    /// @param newTargetUpgradeParameters New target upgrade parameters
+    function upgradeTarget(address newTarget, bytes calldata newTargetUpgradeParameters) external {
         requireMaster(msg.sender);
 
         setTarget(newTarget);
-        (bool initializationSuccess, ) = getTarget().delegatecall(
-            abi.encodeWithSignature("initialize(bytes)", newTargetInitializationParameters)
+        (bool upgradeSuccess, ) = getTarget().delegatecall(
+            abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters)
         );
-        require(initializationSuccess, "ufu11"); // ufu11 - target initialization failed
+        require(upgradeSuccess, "ufu11"); // ufu11 - target upgrade failed
     }
 
     /// @notice Performs a delegatecall to the contract implementation
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation
     /// This function will return whatever the implementation call returns
     function() external payable {
-        require(msg.data.length > 0, "pfb11"); // pfb11 - calldata must not be empty
-
         address _target = getTarget();
         assembly {
             // The pointer to the free memory slot
@@ -101,8 +105,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// UpgradeableMaster functions
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function upgradeNoticePeriod() external returns (uint) {
-        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("upgradeNoticePeriod()"));
+    function getNoticePeriod() external returns (uint) {
+        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("getNoticePeriod()"));
         require(success, "unp11"); // unp11 - upgradeNoticePeriod delegatecall failed
         return abi.decode(result, (uint));
     }
@@ -137,8 +141,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
-    function readyForUpgrade() external returns (bool) {
-        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("readyForUpgrade()"));
+    function isReadyForUpgrade() external returns (bool) {
+        (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("isReadyForUpgrade()"));
         require(success, "rfu11"); // rfu11 - readyForUpgrade delegatecall failed
         return abi.decode(result, (bool));
     }

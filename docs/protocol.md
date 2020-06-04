@@ -892,7 +892,7 @@ After this transaction succeeded transaction without signature can be sent to op
 function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
     const pubKeyHashHex = to_hex(new_pubkey_hash); // 20 bytes as a hex
     const msgNonce = to_hex(to_be_bytes(nonce)); // nonce (4 byte BE integer) as a hex
-    const msgAccId = to_hex(to_be_bytes(account_id)); // account id (3 byte BE integer) as a hex
+    const msgAccId = to_hex(to_be_bytes(account_id)); // account id (4 byte BE integer) as a hex
     return `Register zkSync pubkey:\n\n` +
            `${pubKeyHashHex}\n` +
            `nonce: 0x${msgNonce}\n` +

@@ -42,8 +42,6 @@ pub struct ExecutedOpsNotify {
     pub block_number: BlockNumber,
 }
 
-const MAX_PENDING_BLOCK_ITERATIONS: usize = 5 * 10;
-
 #[derive(Debug)]
 struct PendingBlock {
     success_operations: Vec<ExecutedOperations>,
@@ -84,6 +82,7 @@ pub struct PlasmaStateKeeper {
     executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
 
     available_block_chunk_sizes: Vec<usize>,
+    max_miniblock_iterations: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -236,6 +235,7 @@ impl PlasmaStateKeeper {
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
+        max_miniblock_iterations: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -266,6 +266,7 @@ impl PlasmaStateKeeper {
             pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
             executed_tx_notify_sender,
             available_block_chunk_sizes,
+            max_miniblock_iterations,
         };
 
         let root = keeper.state.root_hash();
@@ -404,7 +405,7 @@ impl PlasmaStateKeeper {
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
-            if self.pending_block.pending_block_iteration > MAX_PENDING_BLOCK_ITERATIONS {
+            if self.pending_block.pending_block_iteration > self.max_miniblock_iterations {
                 self.seal_pending_block().await;
                 self.notify_executed_ops(&mut executed_ops).await;
                 return;

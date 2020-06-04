@@ -11,7 +11,8 @@ use futures::{
 };
 use models::config_options::ConfigurationOptions;
 use models::node::{
-    Account, AccountId, AccountMap, Address, FranklinTx, Nonce, PriorityOp, TokenId,
+    Account, AccountId, AccountMap, Address, DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp,
+    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
@@ -29,10 +30,10 @@ use web3::Transport;
 pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
+use crypto_exports::rand::Rng;
+use itertools::Itertools;
 use models::prover_utils::EncodedProofPlonk;
-use web3::types::U64;
-
-pub const TESKIT_BLOCK_CHUNKS_SIZE: usize = 100;
+use web3::types::{TransactionReceipt, U64};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(pub usize);
@@ -40,6 +41,30 @@ pub struct ETHAccountId(pub usize);
 pub struct ZKSyncAccountId(pub usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Token(pub TokenId);
+
+#[derive(Debug, Clone)]
+pub struct BlockExecutionResult {
+    pub commit_result: TransactionReceipt,
+    pub verify_result: TransactionReceipt,
+    pub withdrawals_result: TransactionReceipt,
+    pub block_size_chunks: usize,
+}
+
+impl BlockExecutionResult {
+    pub fn new(
+        commit_result: TransactionReceipt,
+        verify_result: TransactionReceipt,
+        withdrawals_result: TransactionReceipt,
+        block_size_chunks: usize,
+    ) -> Self {
+        Self {
+            commit_result,
+            verify_result,
+            withdrawals_result,
+            block_size_chunks,
+        }
+    }
+}
 
 /// Account set is used to create transactions using stored account
 /// in a convenient way
@@ -56,7 +81,7 @@ impl<T: Transport> AccountSet<T> {
         to: ZKSyncAccountId,
         token: Option<Address>, // None for ETH
         amount: BigUint,
-    ) -> PriorityOp {
+    ) -> (TransactionReceipt, PriorityOp) {
         let from = &self.eth_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
 
@@ -65,6 +90,25 @@ impl<T: Transport> AccountSet<T> {
                 .expect("erc20 deposit should not fail")
         } else {
             block_on(from.deposit_eth(amount, &to.address, None))
+                .expect("eth deposit should not fail")
+        }
+    }
+
+    pub fn deposit_to_random(
+        &self,
+        from: ETHAccountId,
+        token: Option<Address>, // None for ETH
+        amount: BigUint,
+        rng: &mut impl Rng,
+    ) -> (TransactionReceipt, PriorityOp) {
+        let from = &self.eth_accounts[from.0];
+        let to_address = Address::from_slice(&rng.gen::<[u8; 20]>());
+
+        if let Some(address) = token {
+            block_on(from.deposit_erc20(address, amount, &to_address))
+                .expect("erc20 deposit should not fail")
+        } else {
+            block_on(from.deposit_eth(amount, &to_address, None))
                 .expect("eth deposit should not fail")
         }
     }
@@ -93,6 +137,38 @@ impl<T: Transport> AccountSet<T> {
                 amount,
                 fee,
                 &to.address,
+                nonce,
+                increment_nonce,
+            )
+            .0,
+        ))
+    }
+
+    /// Create signed transfer between zksync accounts
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
+    #[allow(clippy::too_many_arguments)]
+    pub fn transfer_to_new_random(
+        &self,
+        from: ZKSyncAccountId,
+        token_id: Token,
+        amount: BigUint,
+        fee: BigUint,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        rng: &mut impl Rng,
+    ) -> FranklinTx {
+        let from = &self.zksync_accounts[from.0];
+
+        let to_address = Address::from_slice(&rng.gen::<[u8; 20]>());
+
+        FranklinTx::Transfer(Box::new(
+            from.sign_transfer(
+                token_id.0,
+                "",
+                amount,
+                fee,
+                &to_address,
                 nonce,
                 increment_nonce,
             )
@@ -131,6 +207,37 @@ impl<T: Transport> AccountSet<T> {
         ))
     }
 
+    /// Create withdraw from zksync account to random eth account
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
+    #[allow(clippy::too_many_arguments)]
+    fn withdraw_to_random(
+        &self,
+        from: ZKSyncAccountId,
+        token_id: Token,
+        amount: BigUint,
+        fee: BigUint,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        rng: &mut impl Rng,
+    ) -> FranklinTx {
+        let from = &self.zksync_accounts[from.0];
+        let to_address = Address::from_slice(&rng.gen::<[u8; 20]>());
+
+        FranklinTx::Withdraw(Box::new(
+            from.sign_withdraw(
+                token_id.0,
+                "",
+                amount,
+                fee,
+                &to_address,
+                nonce,
+                increment_nonce,
+            )
+            .0,
+        ))
+    }
+
     /// Create full exit from zksync account to eth account
     /// `nonce` optional nonce override
     /// `increment_nonce` - flag for `from` account nonce increment
@@ -140,7 +247,7 @@ impl<T: Transport> AccountSet<T> {
         post_by: ETHAccountId,
         token_address: Address,
         account_id: AccountId,
-    ) -> PriorityOp {
+    ) -> (TransactionReceipt, PriorityOp) {
         block_on(self.eth_accounts[post_by.0].full_exit(account_id, token_address))
             .expect("FullExit eth call failed")
     }
@@ -215,13 +322,30 @@ pub fn spawn_state_keeper(
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
     let (executed_tx_notify_sender, _executed_tx_notify_receiver) = mpsc::channel(256);
 
+    let max_ops_in_block = 1000;
+    let ops_chunks = vec![
+        TransferToNewOp::CHUNKS,
+        TransferOp::CHUNKS,
+        DepositOp::CHUNKS,
+        FullExitOp::CHUNKS,
+        WithdrawOp::CHUNKS,
+    ];
+    let mut block_chunks_sizes = (0..max_ops_in_block)
+        .cartesian_product(ops_chunks)
+        .map(|(x, y)| x * y)
+        .collect::<Vec<_>>();
+    block_chunks_sizes.sort();
+    block_chunks_sizes.dedup();
+
+    let max_miniblock_iterations = *block_chunks_sizes.iter().max().unwrap();
     let state_keeper = PlasmaStateKeeper::new(
         genesis_state(fee_account),
         *fee_account,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
-        vec![TESKIT_BLOCK_CHUNKS_SIZE],
+        block_chunks_sizes,
+        max_miniblock_iterations,
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
@@ -519,7 +643,7 @@ impl TestSetup {
         to: ZKSyncAccountId,
         token: Token,
         amount: BigUint,
-    ) {
+    ) -> TransactionReceipt {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0);
         from_eth_balance.0 -= &amount;
 
@@ -554,9 +678,10 @@ impl TestSetup {
                     .expect("Token with token id does not exist"),
             )
         };
-        let deposit = self.accounts.deposit(from, to, token_address, amount);
+        let (receipt, deposit_op) = self.accounts.deposit(from, to, token_address, amount);
 
-        self.execute_priority_op(deposit);
+        self.execute_priority_op(deposit_op);
+        receipt
     }
 
     fn execute_tx(&mut self, tx: FranklinTx) {
@@ -575,6 +700,49 @@ impl TestSetup {
         block_on(block_sender);
         // Receive the pending block processing request from state keeper.
         block_on(self.await_for_pending_block_request());
+    }
+
+    pub fn deposit_to_random(
+        &mut self,
+        from: ETHAccountId,
+        token: Token,
+        amount: BigUint,
+        rng: &mut impl Rng,
+    ) -> TransactionReceipt {
+        let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0);
+        from_eth_balance.0 -= &amount;
+
+        self.expected_changes_for_current_block
+            .eth_accounts_state
+            .insert((from, token.0), from_eth_balance);
+
+        if let Some(mut eth_balance) = self
+            .expected_changes_for_current_block
+            .eth_accounts_state
+            .remove(&(from, 0))
+        {
+            eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
+            self.expected_changes_for_current_block
+                .eth_accounts_state
+                .insert((from, 0), eth_balance);
+        }
+
+        let token_address = if token.0 == 0 {
+            None
+        } else {
+            Some(
+                self.tokens
+                    .get(&token.0)
+                    .cloned()
+                    .expect("Token with token id does not exist"),
+            )
+        };
+        let (receipt, deposit_op) =
+            self.accounts
+                .deposit_to_random(from, token_address, amount, rng);
+
+        self.execute_priority_op(deposit_op);
+        receipt
     }
 
     fn execute_priority_op(&mut self, op: PriorityOp) {
@@ -610,7 +778,12 @@ impl TestSetup {
         .expect("Failed to post exit tx")
     }
 
-    pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {
+    pub fn full_exit(
+        &mut self,
+        post_by: ETHAccountId,
+        from: ZKSyncAccountId,
+        token: Token,
+    ) -> TransactionReceipt {
         let account_id = self
             .get_zksync_account_committed_state(from)
             .map(|(id, _)| id)
@@ -643,8 +816,9 @@ impl TestSetup {
                 .insert((post_by, 0), eth_balance);
         }
 
-        let full_exit = self.accounts.full_exit(post_by, token_address, account_id);
-        self.execute_priority_op(full_exit);
+        let (receipt, full_exit_op) = self.accounts.full_exit(post_by, token_address, account_id);
+        self.execute_priority_op(full_exit_op);
+        receipt
     }
 
     pub fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
@@ -714,6 +888,35 @@ impl TestSetup {
         self.execute_tx(transfer)
     }
 
+    pub fn transfer_to_new_random(
+        &mut self,
+        from: ZKSyncAccountId,
+        token: Token,
+        amount: BigUint,
+        fee: BigUint,
+        rng: &mut impl Rng,
+    ) {
+        let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
+        zksync0_old -= &amount;
+        zksync0_old -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((from, token.0), zksync0_old);
+
+        let mut zksync0_old =
+            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, token.0);
+        zksync0_old += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, token.0), zksync0_old);
+
+        let transfer = self
+            .accounts
+            .transfer_to_new_random(from, token, amount, fee, None, true, rng);
+
+        self.execute_tx(transfer)
+    }
+
     pub fn withdraw(
         &mut self,
         from: ZKSyncAccountId,
@@ -745,6 +948,35 @@ impl TestSetup {
         let withdraw = self
             .accounts
             .withdraw(from, to, token, amount, fee, None, true);
+
+        self.execute_tx(withdraw);
+    }
+
+    pub fn withdraw_to_random_account(
+        &mut self,
+        from: ZKSyncAccountId,
+        token: Token,
+        amount: BigUint,
+        fee: BigUint,
+        rng: &mut impl Rng,
+    ) {
+        let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
+        zksync0_old -= &amount;
+        zksync0_old -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((from, token.0), zksync0_old);
+
+        let mut zksync0_old =
+            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, token.0);
+        zksync0_old += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, token.0), zksync0_old);
+
+        let withdraw = self
+            .accounts
+            .withdraw_to_random(from, token, amount, fee, None, true, rng);
 
         self.execute_tx(withdraw);
     }
@@ -805,7 +1037,9 @@ impl TestSetup {
         block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
     }
 
-    pub fn execute_commit_and_verify_block(&mut self) -> Result<(), failure::Error> {
+    pub fn execute_commit_and_verify_block(
+        &mut self,
+    ) -> Result<BlockExecutionResult, failure::Error> {
         let block_sender = async {
             self.state_keeper_request_sender
                 .clone()
@@ -816,15 +1050,16 @@ impl TestSetup {
         block_on(block_sender);
         let new_block = block_on(self.await_for_block_commit_request());
 
-        block_on(self.commit_account.commit_block(&new_block.block))
+        let commit_result = block_on(self.commit_account.commit_block(&new_block.block))
             .expect("block commit send tx")
             .expect_success();
-        block_on(self.commit_account.verify_block(&new_block.block))
+        let verify_result = block_on(self.commit_account.verify_block(&new_block.block))
             .expect("block verify send tx")
             .expect_success();
-        block_on(self.commit_account.complete_withdrawals())
+        let withdrawals_result = block_on(self.commit_account.complete_withdrawals())
             .expect("complete withdrawal send tx")
             .expect_success();
+        let block_chunks = new_block.block.block_chunks_size;
 
         let mut block_checks_failed = false;
         for ((eth_account, token), (balance, allowed_margin)) in
@@ -873,7 +1108,12 @@ impl TestSetup {
                 .set_account_id(self.get_zksync_account_id(ZKSyncAccountId(zk_id)));
         }
 
-        Ok(())
+        Ok(BlockExecutionResult::new(
+            commit_result,
+            verify_result,
+            withdrawals_result,
+            block_chunks,
+        ))
     }
 
     pub fn get_zksync_account_committed_state(

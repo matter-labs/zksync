@@ -1,6 +1,8 @@
 import Vue from 'vue';
 import BootstrapVue from "bootstrap-vue";
 
+import "./style.css";
+
 import Clipboard from 'v-clipboard';
 
 import store from './store';
@@ -56,6 +58,19 @@ Vue.mixin({
                  : `https://${this.store.network}.etherscan.io/address`;
         },
     },
+    methods: {
+        blockchainExplorerToken(token, account) {
+            if (this.store.network === 'localhost') return `http://localhost:8000/${account}`;
+            const prefix = this.store.network === 'mainnet' ? '' : this.store.network;
+            const tokenAddress = window.syncProvider.tokenSet.resolveTokenAddress(token);
+            
+            if (tokenAddress != '0x0000000000000000000000000000000000000000') {
+                return `https://${prefix}.etherscan.io/token/${tokenAddress}?a=${account}`;
+            } else {
+                return `https://${prefix}.etherscan.io/address/${account}`;
+            }
+        }
+    }
 });
 
 window.app = new Vue({

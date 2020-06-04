@@ -1,21 +1,12 @@
 <template>
 <div>
-    <b-navbar toggleable="md" type="dark" variant="info">
-        <b-container>
-            <b-navbar-brand href="/">zkSync Network</b-navbar-brand>
-            <b-navbar-nav class="ml-auto">
-                <b-nav-form>
-                    <SearchField :searchFieldInMenu="true" />
-                </b-nav-form>
-            </b-navbar-nav>
-        </b-container>
-    </b-navbar>
+    <Navbar />
     <br>
     <b-container>
-        <b-breadcrumb class="" :items="breadcrumbs"></b-breadcrumb>
+        <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <h5 class="mt-3 mb-2">Account data</h5>
         <b-card no-body class="table-margin-hack">
-            <b-table responsive thead-class="hidden_header" :items="accountDataProps">
+            <b-table responsive thead-class="displaynone" class="nowrap" :items="accountDataProps">
                 <template v-slot:cell(value)="data">
                     <CopyableAddress
                         class="bigger-text"
@@ -32,11 +23,11 @@
             width="100" 
             height="100"
             v-if="loading">
-        <div v-else-if="balances.length == 0" style="font-size: 2em">
+        <div v-else-if="balances.length == 0">
             No balances yet.
         </div>
         <b-card v-else no-body class="table-margin-hack table-width-hack">
-            <b-table responsive thead-class="hidden_header" :items="balancesProps">
+            <b-table responsive thead-class="displaynone" class="nowrap" :items="balancesProps">
                 <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
             </b-table>
         </b-card>
@@ -46,32 +37,25 @@
             width="100" 
             height="100"
             v-if="loading">
-        <div v-else-if="transactions.length == 0" style="font-size: 2em">
+        <div v-else-if="transactions.length == 0">
             No transactions yet.
         </div>
         <div v-else>
             <b-card no-body class="table-margin-hack">
                 <b-table
                     responsive 
-                    class="clickable"
+                    class="nowrap"
                     :items="transactionProps" 
-                    :fields="transactionFields" 
-                    @row-clicked="onRowClicked">
-                    <template v-slot:cell(Type)   ="data"><span v-html="data.item['Type']"    /></template>
-                    <template v-slot:cell(TxnHash)   ="data">
-                        <CopyableAddress class="normalize-text" :address="data.item['hash']" :linkHtml="data.item['TxnHash'] "/>
-                    </template>
-                    <template v-slot:cell(Block)  ="data"><span v-html="data.item['Block']"   /></template>
-                    <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"   /></template>
-                    <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']"  /></template>
-                    <template v-slot:cell(Age)    ="data"><span v-html="data.item['Age']"     /></template>
-                    <template v-slot:cell(From)   ="data">
-                        <CopyableAddress class="normalize-text" :address="data.item['fromAddr']" :linkHtml="data.item['From'] "/>
-                    </template>
-                    <template v-slot:cell(To)   ="data">
-                        <CopyableAddress class="normalize-text" :address="data.item['toAddr']" :linkHtml="data.item['To'] "/>
-                    </template>
-                    <template v-slot:cell(Fee)    ="data"><span v-html="data.item['Fee']"     /></template>
+                    :fields="transactionFields">
+                    <template v-slot:cell(Type)   ="data"><span v-html="data.item['Type']"   /></template>
+                    <template v-slot:cell(TxHash) ="data"><span v-html="data.item['TxHash']" /></template>
+                    <template v-slot:cell(Block)  ="data"><span v-html="data.item['Block']"  /></template>
+                    <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"  /></template>
+                    <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']" /></template>
+                    <template v-slot:cell(Age)    ="data"><span v-html="data.item['Age']"    /></template>
+                    <template v-slot:cell(From)   ="data"><span v-html="data.item['From']"   /></template>
+                    <template v-slot:cell(To)     ="data"><span v-html="data.item['To']"     /></template>
+                    <template v-slot:cell(Fee)    ="data"><span v-html="data.item['Fee']"    /></template>
                 </b-table>
             </b-card>
             <b-pagination 
@@ -92,13 +76,15 @@
 import store from './store';
 import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
-import { readableEther, shortenHash, formatDate } from './utils';
+import { shortenHash, formatDate } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
+import Navbar from './Navbar.vue';
 
 const components = {
     SearchField,
     CopyableAddress,
+    Navbar,
 };
 
 export default {
@@ -193,7 +179,7 @@ export default {
         },
         accountDataProps() {
             return [
-                { name: 'Address',          value: `<a><code>${this.address}</code></a> ` },
+                { name: 'Address',          value: `<a>${this.address}</a> ` },
             ];
         },
         balancesProps() {
@@ -214,17 +200,24 @@ export default {
         transactionProps() {
             return this.transactions
                 .map(tx => {
-                    let TxnHash = `<code>
-                        <a href="${this.routerBase}transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
+                    if (tx.data.hash.startsWith('sync-tx:')) {
+                        tx.data.hash = tx.data.hash.slice('sync-tx:'.length);
+                    }
+
+                    if (tx.data.type == 'Withdraw') {
+                        tx.data.type = 'Withdrawal';
+                    }
+
+                    let TxHash = `
+                        <a href="${this.routerBase}transactions/${tx.data.hash}">
                             ${shortenHash(tx.data.hash, 'unknown! hash')}
-                        </a>
-                    </code>`;
+                        </a>`;
 
                     const link_from = tx.data.type == 'Deposit' 
                         ? `${this.blockchainExplorerAddress}/${tx.data.from}`
                         : `${this.routerBase}accounts/${tx.data.from}`;
 
-                    const link_to = tx.data.type == 'Withdraw' 
+                    const link_to = tx.data.type == 'Withdrawal' 
                         ? `${this.blockchainExplorerAddress}/${tx.data.to}`
                         : `${this.routerBase}accounts/${tx.data.to}`;
 
@@ -232,7 +225,7 @@ export default {
                         ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    const target_to = tx.data.type == 'Withdraw' 
+                    const target_to = tx.data.type == 'Withdrawal' 
                         ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
@@ -240,18 +233,17 @@ export default {
                         ? '<i class="fas fa-external-link-alt"></i> '
                         : '';
 
-                    const onchain_to = tx.data.type == 'Withdraw' 
+                    const onchain_to = tx.data.type == 'Withdrawal' 
                         ? '<i class="fas fa-external-link-alt"></i> '
                         : '';
 
-                    const From = `<code>
+                    const From = `
                         <a href="${link_from}" ${target_from}>
                             ${shortenHash(tx.data.from, 'unknown! from')}
                             ${onchain_from}
-                        </a>
-                    </code>`;
+                        </a>`;
 
-                    const To = `<code>
+                    const To = `
                         <a href="${link_to}" ${target_to}>
                             ${
                                 tx.data.type == "ChangePubKey" 
@@ -260,19 +252,18 @@ export default {
                             }
 
                             ${ tx.data.type == "ChangePubKey" ? '' : onchain_to }
-                        </a>
-                    </code>`;
+                        </a>`;
 
-                    const Type = `<b>${tx.data.type}</b>`;
+                    const Type = `${tx.data.type}`;
                     const Amount 
                         = tx.data.type == "ChangePubKey" ? ''
-                        : `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
+                        : `${tx.data.token} <span>${tx.data.amount}</span>`;
 
                     const CreatedAt = formatDate(tx.data.created_at);
 
                     return {
+                        TxHash,
                         Type,
-                        TxnHash,
                         Amount,
                         From, 
                         To,
@@ -309,9 +300,5 @@ export default {
 }
 .bigger-text {
     font-size: 1.05em;
-}
-
-.hidden_header {
-    display: none;
 }
 </style>

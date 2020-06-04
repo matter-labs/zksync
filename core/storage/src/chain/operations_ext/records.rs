@@ -70,10 +70,10 @@ pub struct PriorityOpReceiptResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxByHashResponse {
-    pub tx_type: String,     // all
-    pub from: String,        // transfer(from) | deposit(our contract) | withdraw(sender)
-    pub to: String,          // transfer(to) | deposit(sender) | withdraw(our contract)
-    pub token: i32,          // all
+    pub tx_type: String, // all
+    pub from: String,    // transfer(from) | deposit(our contract) | withdraw(sender)
+    pub to: String,      // transfer(to) | deposit(sender) | withdraw(our contract)
+    pub token: i32,
     pub amount: String,      // all
     pub fee: Option<String>, // means Sync fee, not eth. transfer(sync fee), deposit(none), withdraw(Sync fee)
     pub block_number: i64,   // all

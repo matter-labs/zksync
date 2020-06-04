@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div :class="{container: searchFieldInMenu}">
         <b-form @submit.stop.prevent="search">
             <b-input-group position="relative">
                 <b-form-input v-model="query" placeholder="block number, tx hash, state root hash, account address"></b-form-input>
@@ -90,6 +90,12 @@ export default {
     text-align: center;
     border-radius: 3px;
     white-space: nowrap;
+}
+
+@media (min-width: 1000px) {
+    .container {
+        width: 40em;
+    }
 }
 </style>
  

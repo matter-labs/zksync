@@ -5,11 +5,11 @@
 //! and response code.
 //!
 //! To enable all logs, add to RUST_LOG env variable:
-//! actix_web=info,server::api_server::loggers=info
+//! actix_web=info,server::api_server::loggers=trace
 //!
 //! You can also cherry-pick, e.g. print only logs for websocket handshake
 //! and not for http rpc or api_server:
-//! server::api_server::loggers::ws_rpc=info,
+//! server::api_server::loggers::ws_rpc=trace,
 
 /// Headers to be printed in every request
 const HEADERS: [&str; 5] = [
@@ -66,7 +66,7 @@ pub mod http_rpc {
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            info!("{}", headers_formatted,);
+            log::trace!("{}", headers_formatted,);
         }
 
         request.into()
@@ -96,7 +96,7 @@ pub mod ws_rpc {
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            info!("{}", headers_formatted,);
+            log::trace!("{}", headers_formatted,);
         }
 
         None

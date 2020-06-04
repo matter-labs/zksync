@@ -13,7 +13,7 @@ const {deployContract} = require("ethereum-waffle");
 const {wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
 import * as zksync from "zksync";
 
-const TEST_PRIORITY_EXPIRATION = 16;
+const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 9;
 
 
@@ -24,7 +24,7 @@ describe("zkSync signature verification unit tests", function() {
     const randomWallet = ethers.Wallet.createRandom();
     before(async () => {
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
+        contracts.zkSync = readContractCode("ZKSyncSignatureUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         testContract = deployer.zkSyncContract(wallet);
@@ -239,7 +239,7 @@ describe("zkSync withdraw unit tests", function() {
     let ethProxy;
     before(async () => {
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
+        contracts.zkSync = readContractCode("ZkSyncWithdrawalUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         zksyncContract = deployer.zkSyncContract(wallet);
@@ -349,8 +349,10 @@ describe("zkSync withdraw unit tests", function() {
 
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
+        const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
         const {revertReason} = await getCallRevertReason(async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1)));
-        expect(revertReason, "wrong revert reason").eq("SafeMath: subtraction overflow");
+        const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
+        expect(onchainBalAfter).eq(onchainBalBefore);
     });
 
     it("Withdraw ERC20 unsupported token", async () => {
@@ -399,7 +401,6 @@ describe("zkSync auth pubkey onchain unit tests", function() {
     let ethProxy;
     before(async () => {
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         zksyncContract = deployer.zkSyncContract(wallet);
@@ -476,7 +477,7 @@ describe("zkSync test process next operation", function() {
     let ethProxy;
     before(async () => {
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
+        contracts.zkSync = readContractCode("ZkSyncProcessOpUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         zksyncContract = deployer.zkSyncContract(wallet);

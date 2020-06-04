@@ -20,7 +20,9 @@ pragma solidity ^0.5.0;
  * metering changes introduced in the Istanbul hardfork.
  */
 contract ReentrancyGuard {
-    bool private _notEntered;
+    /// Address of lock flag variable.
+    /// Flag is placed at random memory location to not interfere with Storage contract.
+    uint constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4; // keccak256("ReentrancyGuard") - 1;
 
     function initializeReentrancyGuard () internal {
         // Storing an initial non-zero value makes deployment a bit more
@@ -29,7 +31,7 @@ contract ReentrancyGuard {
         // the total transaction's gas, it is best to keep them low in cases
         // like this one, to increase the likelihood of the full refund coming
         // into effect.
-        _notEntered = true;
+        assembly { sstore(LOCK_FLAG_ADDRESS, 1) }
     }
 
     /**
@@ -40,16 +42,19 @@ contract ReentrancyGuard {
      * `private` function that does the actual work.
      */
     modifier nonReentrant() {
+        bool notEntered;
+        assembly { notEntered := sload(LOCK_FLAG_ADDRESS) }
+
         // On the first call to nonReentrant, _notEntered will be true
-        require(_notEntered, "ReentrancyGuard: reentrant call");
+        require(notEntered, "ReentrancyGuard: reentrant call");
 
         // Any calls to nonReentrant after this point will fail
-        _notEntered = false;
+        assembly { sstore(LOCK_FLAG_ADDRESS, 0) }
 
         _;
 
         // By storing the original value once again, a refund is triggered (see
         // https://eips.ethereum.org/EIPS/eip-2200)
-        _notEntered = true;
+        assembly { sstore(LOCK_FLAG_ADDRESS, 1) }
     }
 }
