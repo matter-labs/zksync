@@ -19,6 +19,7 @@ use num::BigUint;
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
+    MAX_WITHDRAWALS_PER_BLOCK,
 };
 use std::collections::HashMap;
 use std::thread::JoinHandle;
@@ -563,6 +564,9 @@ pub struct ExpectedAccountState {
     // First number is balance, second one is allowed error in balance(used for ETH because eth is used for transaction fees).
     eth_accounts_state: HashMap<(ETHAccountId, TokenId), (BigUint, BigUint)>,
     sync_accounts_state: HashMap<(ZKSyncAccountId, TokenId), BigUint>,
+
+    // Amount of withdraw operations performed in block.
+    withdraw_ops: usize,
 }
 
 /// Used to create transactions between accounts and check for their validity.
@@ -917,6 +921,20 @@ impl TestSetup {
         self.execute_tx(transfer)
     }
 
+    fn increase_block_withdraws_amount(&mut self) {
+        self.expected_changes_for_current_block.withdraw_ops += 1;
+
+        if self.expected_changes_for_current_block.withdraw_ops > MAX_WITHDRAWALS_PER_BLOCK as usize
+        {
+            panic!(
+                "Attempt to perform too many withdraw operations in one block. \
+                Maximum amount of withdraw operations in one block: {}. \
+                You have to commit block if it has this amount of withdraws.",
+                MAX_WITHDRAWALS_PER_BLOCK
+            )
+        }
+    }
+
     pub fn withdraw(
         &mut self,
         from: ZKSyncAccountId,
@@ -925,6 +943,8 @@ impl TestSetup {
         amount: BigUint,
         fee: BigUint,
     ) {
+        self.increase_block_withdraws_amount();
+
         let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         zksync0_old -= &amount;
         zksync0_old -= &fee;
@@ -960,6 +980,8 @@ impl TestSetup {
         fee: BigUint,
         rng: &mut impl Rng,
     ) {
+        self.increase_block_withdraws_amount();
+
         let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         zksync0_old -= &amount;
         zksync0_old -= &fee;
