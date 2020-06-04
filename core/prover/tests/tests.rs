@@ -46,6 +46,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         let (tx, _) = mpsc::channel();
         let config = PlonkStepByStepProverConfig {
             block_sizes: vec![block_size_chunks],
+            download_setup_from_network: false,
         };
         let p = PlonkStepByStepProver::create_from_config(
             config,
@@ -91,6 +92,7 @@ fn prover_proves_a_block_and_publishes_result() {
         let (tx, _) = mpsc::channel();
         let config = PlonkStepByStepProverConfig {
             block_sizes: vec![block_size_chunks],
+            download_setup_from_network: false,
         };
         let p = PlonkStepByStepProver::create_from_config(
             config,

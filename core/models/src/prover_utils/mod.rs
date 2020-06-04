@@ -62,12 +62,13 @@ pub struct SetupForStepByStepProver {
 impl SetupForStepByStepProver {
     pub fn prepare_setup_for_step_by_step_prover<C: Circuit<Engine> + Clone>(
         circuit: C,
+        download_setup_file: bool,
     ) -> Result<Self, failure::Error> {
         let hints = transpile(circuit.clone())?;
         let setup_polynomials = setup(circuit, &hints)?;
         let size_log2 = setup_polynomials.n.next_power_of_two().trailing_zeros();
         let size_log2 = std::cmp::max(size_log2, SETUP_MIN_POW2); // for exit circuit
-        let key_monomial_form = get_universal_setup_monomial_form(size_log2)?;
+        let key_monomial_form = get_universal_setup_monomial_form(size_log2, download_setup_file)?;
         Ok(SetupForStepByStepProver {
             setup_polynomials,
             hints,
@@ -107,7 +108,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     let size_log2 = setup.n.next_power_of_two().trailing_zeros();
 
     let size_log2 = std::cmp::max(size_log2, SETUP_MIN_POW2); // for exit circuit
-    let key_monomial_form = get_universal_setup_monomial_form(size_log2)?;
+    let key_monomial_form = get_universal_setup_monomial_form(size_log2, false)?;
 
     let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
         circuit,
@@ -182,12 +183,12 @@ pub fn serialize_proof(
     }
 }
 
+/// Reads universal setup from disk or downloads from network.
 pub fn get_universal_setup_monomial_form(
     power_of_two: u32,
+    download_from_network: bool,
 ) -> Result<Crs<Engine, CrsForMonomialForm>, failure::Error> {
-    let prover_download_setup = std::env::var("PROVER_DOWNLOAD_SETUP")?;
-
-    if prover_download_setup == "1" {
+    if download_from_network {
         network_utils::get_universal_setup_monomial_form(power_of_two)
     } else {
         fs_utils::get_universal_setup_monomial_form(power_of_two)
