@@ -72,6 +72,17 @@ pub fn balance_tree_depth() -> usize {
 pub fn total_tokens() -> usize {
     2usize.pow(balance_tree_depth() as u32)
 }
+
+/// Number of tokens that are processed by this release
+pub fn number_of_processable_tokens() -> usize {
+    let num = 16;
+
+    assert!(num <= total_tokens());
+    assert!(num.is_power_of_two());
+
+    num
+}
+
 pub const ETH_TOKEN_ID: TokenId = 0;
 
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 32;

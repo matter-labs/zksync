@@ -301,14 +301,14 @@ where
 
 pub fn allocate_numbers_vec<E, CS>(
     mut cs: CS,
-    audit_path: &[Option<E::Fr>],
+    witness_vec: &[Option<E::Fr>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError>
 where
     E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];
-    for (i, e) in audit_path.iter().enumerate() {
+    for (i, e) in witness_vec.iter().enumerate() {
         let path_element =
             AllocatedNum::alloc(cs.namespace(|| format!("path element{}", i)), || {
                 Ok(*e.get()?)
