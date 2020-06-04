@@ -252,6 +252,8 @@ describe("zkSync process tokens which take fee from sender", function() {
 
             expect(onchainBalAfter).eq(onchainBalBefore);
 
+            expect(await zksyncContract.getBalanceToWithdraw(exitWallet.address, tokenId)).eq(withdrawAmount);
+
             // contract balance should not change
             expect(await onchainTokenBalanceOfContract(wallet, zksyncContract.address, tokenContract.address)).eq(withdrawAmount);
         }
