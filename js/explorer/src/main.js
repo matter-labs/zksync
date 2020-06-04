@@ -1,6 +1,8 @@
 import Vue from 'vue';
 import BootstrapVue from "bootstrap-vue";
 
+import "./style.css";
+
 import Clipboard from 'v-clipboard';
 
 import store from './store';

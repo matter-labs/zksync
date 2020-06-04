@@ -17,7 +17,7 @@
             <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
             <h5 class="mt-3">Transaction data</h5>
             <b-card no-body class="table-margin-hack">
-                <b-table responsive thead-class="hidden_header" :items="props">
+                <b-table responsive thead-class="displaynone" :items="props">
                     <template v-slot:cell(value)="data">
                         <CopyableAddress class="normalize-text"
                             v-if="data.item['name'] == 'From'" 
@@ -27,6 +27,11 @@
                         <CopyableAddress class="normalize-text" 
                             v-else-if="data.item['name'] == 'To'" 
                             :address="txData.to" 
+                            :linkHtml="`${data.item['value']} `"
+                        />
+                        <CopyableAddress class="normalize-text" 
+                            v-else-if="data.item['name'] == 'Account'" 
+                            :address="txData.from" 
                             :linkHtml="`${data.item['value']} `"
                         />
                         <CopyableAddress class="normalize-text" 
@@ -107,11 +112,11 @@ export default {
                 return;
             }
 
-            txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
+            txData.tokenName = (txData.token === -1 || txData.token == 65535) ? "" : tokens[txData.token].syncSymbol;
             if (txData.tx_type  == "Deposit" || txData.tx_type == "FullExit") {
                 txData.feeTokenName = "ETH";
             } else {
-                txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
+                txData.feeTokenName = txData.token === -1 || txData.token == 65535? "" : tokens[txData.token].syncSymbol;
             }
 
             txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;

@@ -100,18 +100,18 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     }
 
     /// @notice Finishes upgrade
-    /// @param targetsInitializationParameters New targets initialization parameters per each upgradeable contract
-    function finishUpgrade(bytes[] calldata targetsInitializationParameters) external {
+    /// @param targetsUpgradeParameters New targets upgrade parameters per each upgradeable contract
+    function finishUpgrade(bytes[] calldata targetsUpgradeParameters) external {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.Preparation, "fpu11"); // fpu11 - unable to finish upgrade without preparation status active
-        require(targetsInitializationParameters.length == managedContracts.length, "fpu12"); // fpu12 - number of new targets initialization parameters must be equal to the number of managed contracts
+        require(targetsUpgradeParameters.length == managedContracts.length, "fpu12"); // fpu12 - number of new targets upgrade parameters must be equal to the number of managed contracts
         require(mainContract.isReadyForUpgrade(), "fpu13"); // fpu13 - main contract is not ready for upgrade
         mainContract.upgradeFinishes();
 
         for (uint64 i = 0; i < managedContracts.length; i++) {
             address newTarget = nextTargets[i];
             if (newTarget != address(0)) {
-                managedContracts[i].upgradeTarget(newTarget, targetsInitializationParameters[i]);
+                managedContracts[i].upgradeTarget(newTarget, targetsUpgradeParameters[i]);
             }
         }
         versionId++;
