@@ -158,8 +158,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             )?;
 
             // let not_equal = AllocatedNum::equals(
-            //     cs.namespace(|| "operation branch equals validator account"), 
-            //     &current_branch.account_id.get_number(), 
+            //     cs.namespace(|| "operation branch equals validator account"),
+            //     &current_branch.account_id.get_number(),
             //     &validator_address_padded.get_number()
             // )?;
 
@@ -169,7 +169,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             //     &not_equal,
             //     &Boolean::constant(false),
             // )?;
-  
+
             // calculate root for given account data
             let (state_root, is_account_empty, _subtree_root) = check_account_data(
                 cs.namespace(|| "calculate account root"),
@@ -2080,7 +2080,6 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
 //     Ok(hash_vec[0].clone())
 // }
 
-
 fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     fees: &[AllocatedNum<E>],
@@ -2196,7 +2195,7 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     subroot: &AllocatedNum<E>,
     subroot_is_at_level: usize,
     tree_depth: usize,
-    params: &E::Params
+    params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     // manually calcualte empty subtree hashes
     let empty_account_packed = models::circuit::account::empty_account_as_field_elements::<E>();

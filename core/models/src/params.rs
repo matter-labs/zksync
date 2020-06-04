@@ -202,7 +202,6 @@ pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
-    pub static ref RESCUE_PARAMS: Bn256RescueParams =
-        Bn256RescueParams::new_checked_2_into_1();
+    pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();
     pub static ref RESCUE_HASHER: BabyRescueHasher = BabyRescueHasher::default();
 }
