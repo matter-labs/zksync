@@ -36,7 +36,7 @@ pub fn account_tree_depth() -> usize {
                 );
             }
         }
-        assert!(ACCOUNT_TREE_DEPTH_VALUE <= TOKEN_BIT_WIDTH);
+        assert!(ACCOUNT_TREE_DEPTH_VALUE <= ACCOUNT_ID_BIT_WIDTH);
 
         ACCOUNT_TREE_DEPTH_VALUE
     }
@@ -66,7 +66,7 @@ pub fn balance_tree_depth() -> usize {
                 );
             }
         }
-        assert!(BALANCE_TREE_DEPTH_VALUE <= ACCOUNT_ID_BIT_WIDTH);
+        assert!(BALANCE_TREE_DEPTH_VALUE <= TOKEN_BIT_WIDTH);
 
         BALANCE_TREE_DEPTH_VALUE
     }
@@ -78,7 +78,7 @@ pub fn total_tokens() -> usize {
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = 16;
+    let num = 128;
 
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());

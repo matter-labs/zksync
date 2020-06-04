@@ -174,6 +174,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let (state_root, is_account_empty, _subtree_root) = check_account_data(
                 cs.namespace(|| "calculate account root"),
                 &current_branch,
+                params::account_tree_depth(),
                 self.rescue_params,
             )?;
 
@@ -200,6 +201,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let (new_state_root, _, _) = check_account_data(
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
+                params::account_tree_depth(),
                 self.rescue_params,
             )?;
 
@@ -251,6 +253,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             cs.namespace(|| "validator_audit_path"),
             &self.validator_audit_path,
         )?;
+
         assert_eq!(validator_audit_path.len(), params::account_tree_depth());
 
         let validator_account = AccountContent::from_witness(
@@ -296,6 +299,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &operator_account_data,
             &validator_address_bits,
             &validator_audit_path,
+            params::account_tree_depth(),
             self.rescue_params,
         )?;
 
@@ -354,6 +358,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &operator_account_data,
             &validator_address_bits,
             &validator_audit_path,
+            params::account_tree_depth(),
             self.rescue_params,
         )?;
 
@@ -1784,6 +1789,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 pub fn check_account_data<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     cur: &AllocatedOperationBranch<E>,
+    length_to_root: usize,
     params: &E::Params,
 ) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
     //first we prove calculate root of the subtree to obtain account_leaf_data:
@@ -1798,6 +1804,7 @@ pub fn check_account_data<E: RescueEngine, CS: ConstraintSystem<E>>(
             &cur_account_leaf_bits,
             &cur.account_id.get_bits_le(),
             &cur.account_audit_path,
+            length_to_root,
             params,
         )?,
         is_account_empty,
@@ -1841,6 +1848,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
         balance_data,
         &branch.token.get_bits_le(),
         &branch.balance_audit_path,
+        params::balance_tree_depth(),
         params,
     )?;
 
@@ -1896,11 +1904,15 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     leaf_bits: &[Boolean],
     index: &[Boolean],
     audit_path: &[AllocatedNum<E>],
+    length_to_root: usize,
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     // only first bits of index are considered valuable
+    assert!(length_to_root <= index.len());
     assert!(index.len() >= audit_path.len());
-    let index = &index[0..audit_path.len()];
+
+    let index = &index[0..length_to_root];
+    let audit_path = &audit_path[0..length_to_root];
 
     let leaf_packed = multipack::pack_into_witness(
         cs.namespace(|| "pack leaf bits into field elements"),
