@@ -36,6 +36,8 @@ pub fn account_tree_depth() -> usize {
                 );
             }
         }
+        assert!(ACCOUNT_TREE_DEPTH_VALUE <= TOKEN_BIT_WIDTH);
+
         ACCOUNT_TREE_DEPTH_VALUE
     }
 }
@@ -64,6 +66,8 @@ pub fn balance_tree_depth() -> usize {
                 );
             }
         }
+        assert!(BALANCE_TREE_DEPTH_VALUE <= ACCOUNT_ID_BIT_WIDTH);
+
         BALANCE_TREE_DEPTH_VALUE
     }
 }
