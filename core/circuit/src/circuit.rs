@@ -113,7 +113,11 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         assert!(self.validator_balances.len() >= params::number_of_processable_tokens());
         assert_eq!(self.validator_balances.len(), params::total_tokens());
-        for v in self.validator_balances.iter().skip(params::number_of_processable_tokens()) {
+        for v in self
+            .validator_balances
+            .iter()
+            .skip(params::number_of_processable_tokens())
+        {
             if let Some(v) = v.as_ref() {
                 assert!(v.is_zero());
             }
@@ -123,7 +127,10 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             cs.namespace(|| "validator_balances"),
             &self.validator_balances[..params::number_of_processable_tokens()],
         )?;
-        assert_eq!(validator_balances.len(), params::number_of_processable_tokens());
+        assert_eq!(
+            validator_balances.len(),
+            params::number_of_processable_tokens()
+        );
 
         let validator_audit_path = allocate_numbers_vec(
             cs.namespace(|| "validator_audit_path"),
@@ -588,7 +595,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
     ) -> Result<(), SynthesisError> {
-        let max_token_id = Expression::<E>::u64::<CS>(params::number_of_processable_tokens() as u64);
+        let max_token_id =
+            Expression::<E>::u64::<CS>(params::number_of_processable_tokens() as u64);
         cs.enforce(
             || "left and right tokens are equal",
             |lc| lc + lhs.token.get_number().get_variable(),
@@ -796,7 +804,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &Boolean::constant(true),
         )?;
 
-        assert_eq!(fees.len(), params::number_of_processable_tokens(), "fees length is invalid");
+        assert_eq!(
+            fees.len(),
+            params::number_of_processable_tokens(),
+            "fees length is invalid"
+        );
 
         for (i, fee) in fees.iter_mut().enumerate() {
             let sum = Expression::from(&*fee) + Expression::from(&op_data.fee.get_number());
@@ -2054,7 +2066,6 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
 //     Ok(hash_vec[0].clone())
 // }
 
-
 //TODO: we can use fees: &[Expression<E>] if needed, though no real need
 fn calculate_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
@@ -2067,14 +2078,16 @@ fn calculate_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>
 
     // manually calcualte empty subtree hashes
     let empty_balance = E::Fr::zero();
-    let mut sponge_output: Vec<E::Fr> = crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &[empty_balance]);
+    let mut sponge_output: Vec<E::Fr> =
+        crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &[empty_balance]);
     assert_eq!(sponge_output.len(), 1);
     let empty_leaf_hash = sponge_output.pop().expect("must get a single element");
 
     let mut current = empty_leaf_hash;
     let mut empty_node_hashes = vec![];
     for _ in 0..tree_depth {
-        let mut sponge_output: Vec<E::Fr> = crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &[current, current]);
+        let mut sponge_output: Vec<E::Fr> =
+            crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &[current, current]);
         assert_eq!(sponge_output.len(), 1);
         let node_hash = sponge_output.pop().expect("must get a single element");
         empty_node_hashes.push(node_hash);
@@ -2137,13 +2150,11 @@ fn calculate_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>
     // will hash top of the tree where RHS is always an empty tree
     for i in to_process..params::balance_tree_depth() {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
-        let pair_value = empty_node_hashes[i-1]; // we need value from previous level
+        let pair_value = empty_node_hashes[i - 1]; // we need value from previous level
         println!("Using pair value {} for level {}", pair_value, i);
         let pair = AllocatedNum::alloc(
             cs.namespace(|| format!("allocate empty node as num for level {}", i)),
-            || {
-                Ok(pair_value)
-            }
+            || Ok(pair_value),
         )?;
 
         pair.assert_number(
@@ -2152,9 +2163,9 @@ fn calculate_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>
         )?;
 
         let mut sponge_output = rescue::rescue_hash(
-            cs.namespace(|| "perform smt hashing"), 
-            &[node_hash, pair], 
-            params
+            cs.namespace(|| "perform smt hashing"),
+            &[node_hash, pair],
+            params,
         )?;
 
         assert_eq!(sponge_output.len(), 1);
@@ -2162,7 +2173,6 @@ fn calculate_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>
         let tmp = sponge_output.pop().expect("must get a single element");
         node_hash = tmp;
     }
-
 
     Ok(node_hash)
 }
