@@ -2176,7 +2176,6 @@ fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: Constraint
     for i in to_process..params::balance_tree_depth() {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
         let pair_value = empty_node_hashes[i - 1]; // we need value from previous level
-        println!("Using pair value {} for level {}", pair_value, i);
         let pair = AllocatedNum::alloc(
             cs.namespace(|| format!("allocate empty node as num for level {}", i)),
             || Ok(pair_value),
@@ -2234,7 +2233,6 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     for i in subroot_is_at_level..params::balance_tree_depth() {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
         let pair_value = empty_node_hashes[i - 1]; // we need value from previous level
-        println!("Using pair value {} for level {}", pair_value, i);
         let pair = AllocatedNum::alloc(
             cs.namespace(|| format!("allocate empty node as num for level {}", i)),
             || Ok(pair_value),
