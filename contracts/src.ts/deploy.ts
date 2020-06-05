@@ -202,28 +202,28 @@ export class Deployer {
     }
 
     public async publishSourcesToEtherscan() {
-        console.log("Publishing sourcecode for UpgradeGatekeeper");
+        console.log("Publishing sourcecode for UpgradeGatekeeper", this.addresses.UpgradeGatekeeper);
         await publishSourceCodeToEtherscan(this.addresses.UpgradeGatekeeper, "UpgradeGatekeeper",
             encodeConstructorArgs(this.contracts.upgradeGatekeeper, [this.addresses.ZkSync]));
 
-        console.log("Publishing sourcecode for ZkSyncTarget");
+        console.log("Publishing sourcecode for ZkSyncTarget", this.addresses.ZkSyncTarget);
         await publishSourceCodeToEtherscan(this.addresses.ZkSyncTarget, "ZkSync", "");
-        console.log("Publishing sourcecode for GovernanceTarget");
+        console.log("Publishing sourcecode for GovernanceTarget", this.addresses.GovernanceTarget);
         await publishSourceCodeToEtherscan(this.addresses.GovernanceTarget, "Governance", "");
-        console.log("Publishing sourcecode for VerifierTarget");
+        console.log("Publishing sourcecode for VerifierTarget", this.addresses.VerifierTarget);
         await publishSourceCodeToEtherscan(this.addresses.VerifierTarget, "Verifier", "");
 
-        console.log("Publishing sourcecode for ZkSync (proxy)");
+        console.log("Publishing sourcecode for ZkSync (proxy)", this.addresses.ZkSync);
         await publishSourceCodeToEtherscan(this.addresses.ZkSync, "Proxy",
             encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.ZkSyncTarget,
                 [this.addresses.Governance, this.addresses.Verifier, process.env.GENESIS_ROOT],
                 ["address", "address", "bytes32"]));
 
-        console.log("Publishing sourcecode for Verifier (proxy)");
+        console.log("Publishing sourcecode for Verifier (proxy)", this.addresses.Verifier);
         await publishSourceCodeToEtherscan(this.addresses.Verifier, "Proxy",
             encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.VerifierTarget, [], []));
 
-        console.log("Publishing sourcecode for Governance (proxy)");
+        console.log("Publishing sourcecode for Governance (proxy)", this.addresses.Governance);
         await publishSourceCodeToEtherscan(this.addresses.Governance, "Proxy",
             encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.GovernanceTarget,
                 [this.addresses.DeployFactory], ["address"]));

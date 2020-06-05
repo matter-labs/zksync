@@ -31,5 +31,6 @@ export ETH_NETWORK="test"
 make build-contracts
 
 cargo run --bin testkit --release
+cargo run --bin gas_price_test --release
 cargo run --bin migration_test --release
 cargo run --bin exodus_test --release

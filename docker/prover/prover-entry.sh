@@ -10,17 +10,20 @@ echo SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS=$SUPPORTED_BLOCK_CHUNKS_SIZES_SET
 echo BLOCK_CHUNK_SIZES=$BLOCK_CHUNK_SIZES
 
 
+if [ "$DOCKER_DUMMY_PROVER" == "true" ]; then
+  echo "Starting dummy_prover"
+  exec dummy_prover "$POD_NAME" 2>&1
+fi
+
 # we download only keys used in node (defined by $BLOCK_CHUNK_SIZES)
 source /bin/utils.sh
 REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`
 
-echo Downloading setup powers $REQUIRED_SETUP_POWS
+if [ "$PROVER_DOWNLOAD_SETUP" == "false" ]; then
+  echo Downloading setup powers $REQUIRED_SETUP_POWS
+  /bin/plonk-setup download monomial $REQUIRED_SETUP_POWS
+fi
 
-
-/bin/plonk-setup download monomial $REQUIRED_SETUP_POWS
-# key dir is mounted as volume on kubernetes, so we have to copy packed keys from somewhere else
-rm -rf $ZKSYNC_HOME/keys/packed
-mv /keys-packed $ZKSYNC_HOME/keys/packed
 /bin/verify-keys unpack
 
 echo key download complete, starting prover

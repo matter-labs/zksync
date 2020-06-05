@@ -19,7 +19,7 @@ use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
 
-const PRIORITY_EXPIRATION: u64 = 16;
+const PRIORITY_EXPIRATION: u64 = 101;
 
 /// Using deposits from `deposit_accounts` creates initial state where each of the `zksync_account` have `deposit_amount`
 /// of the `tokens` tokens.

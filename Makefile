@@ -151,7 +151,7 @@ push-image-rust: image-rust push-image-server push-image-prover
 deploy-contracts: confirm_action build-contracts
 	@bin/deploy-contracts.sh
 
-publish-contracts: confirm_action
+publish-contracts:
 	@bin/publish-contracts.sh
 
 test-contracts: confirm_action build-contracts

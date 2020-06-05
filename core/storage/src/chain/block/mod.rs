@@ -179,7 +179,7 @@ impl<'a> BlockSchema<'a> {
                 select * from priority_ops \
             ) \
             select * from everything \
-            order by created_at \
+            order by created_at desc \
         ",
             block = block
         );

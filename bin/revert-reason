@@ -4,7 +4,7 @@
 
 if [ -z "$1" ]
 then
-    echo "Usage: revert-reason <TX_HASH>"
+    echo "Usage: revert-reason <TX_HASH> [WEB3_URL]"
     exit
 fi
 
@@ -15,4 +15,4 @@ fi
 
 ZKSYNC_HOME=`dirname $0`/../
 cd $ZKSYNC_HOME/contracts/
-f npx ts-node scripts/revert-reason.ts $1
+f npx ts-node scripts/revert-reason.ts $1 $2

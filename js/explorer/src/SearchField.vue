@@ -55,15 +55,13 @@ export default {
 
             let tx = await client.searchTx(query).catch(() => null);
             if (tx && tx.tx_type) {
-                const prefix = tx && tx.tx && tx.tx.priority_op
-                    ? '0x'
-                    : 'sync-tx:';
+                const prefix = '';
                 this.$router.push('/transactions/' + prefix + query);
                 this.searching = false;
                 return;
             }
 
-            let account = await client.searchAccount(query).catch(() => null);
+            let account = await client.getAccount('0x' + query).catch(() => null);
             if (account && account.id) {
                 this.$router.push('/accounts/0x' + query);
                 this.searching = false;
@@ -92,8 +90,10 @@ export default {
     white-space: nowrap;
 }
 
-.container {
-    width: 40em;
+@media (min-width: 1000px) {
+    .container {
+        width: 40em;
+    }
 }
 </style>
  
