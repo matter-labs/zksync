@@ -45,9 +45,9 @@ impl RpcClient {
         let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token_symbol);
 
         let ret = self.post(&msg).await?;
-        let fee_value = ret["total_fee"]
+        let fee_value = ret["totalFee"]
             .as_str()
-            .expect("Incorrect `total_fee` entry of response");
+            .expect("Incorrect `totalFee` entry of response");
         let fee = BigUint::from_str(&fee_value).expect("failed to parse `get_tx_fee` response");
 
         Ok(fee)
