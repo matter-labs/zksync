@@ -88,9 +88,9 @@ pub fn number_of_processable_tokens() -> usize {
 
 /// Number of accounts that are expected to be able to transact
 pub fn log_2_number_of_processable_accounts() -> usize {
-    let num = 20;
+    let num = 16;
 
-    assert!(num <= balance_tree_depth());
+    assert!(num <= account_tree_depth());
 
     num
 }
