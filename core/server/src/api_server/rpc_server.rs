@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -28,14 +31,16 @@ use storage::{
 
 // Local uses
 use crate::{
+    api_server::ops_counter::ChangePubKeyOpsCounter,
     eth_watch::{EthBlockId, EthWatchRequest},
     fee_ticker::{Fee, TickerRequest},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
-    utils::current_zksync_info::CurrentZksyncInfo,
-    utils::shared_lru_cache::SharedLruCache,
-    utils::token_db_cache::TokenDBCache,
+    utils::{
+        current_zksync_info::CurrentZksyncInfo, shared_lru_cache::SharedLruCache,
+        token_db_cache::TokenDBCache,
+    },
 };
 use bigdecimal::BigDecimal;
 
@@ -240,6 +245,7 @@ pub enum RpcErrorCodes {
 
     Other = 300,
     AccountCloseDisabled = 301,
+    OperationsLimitReached = 302,
 }
 
 impl From<TxAddError> for RpcErrorCodes {
@@ -327,6 +333,9 @@ pub struct RpcApp {
     pub confirmations_for_eth_event: u64,
     pub token_cache: TokenDBCache,
     pub current_zksync_info: CurrentZksyncInfo,
+
+    /// Counter for ChangePubKey operations to filter the spam.
+    ops_counter: Arc<RwLock<ChangePubKeyOpsCounter>>,
 }
 
 impl RpcApp {
@@ -362,6 +371,8 @@ impl RpcApp {
             confirmations_for_eth_event,
             token_cache,
             current_zksync_info,
+
+            ops_counter: Arc::new(RwLock::new(ChangePubKeyOpsCounter::new())),
         }
     }
 
@@ -802,6 +813,7 @@ impl Rpc for RpcApp {
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
         let ticker_request_sender = self.ticker_request_sender.clone();
+        let ops_counter = self.ops_counter.clone();
         let mempool_resp = async move {
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
                 let required_fee =
@@ -830,6 +842,21 @@ impl Rpc for RpcApp {
                 sign_verify_channel,
             )
             .await?;
+
+            // Check whether operations limit for this account was reached.
+            // We must do it after we've checked that transaction is correct to avoid the situation
+            // when somebody sends incorrect transactions to deny changing the pubkey for some account ID.
+            if let FranklinTx::ChangePubKey(tx) = tx.as_ref() {
+                let mut ops_counter_lock = ops_counter.write().expect("Write lock");
+
+                if let Err(error) = ops_counter_lock.check_allowanse(&tx) {
+                    return Err(Error {
+                        code: RpcErrorCodes::OperationsLimitReached.into(),
+                        message: error.to_string(),
+                        data: None,
+                    });
+                }
+            }
 
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
