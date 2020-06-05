@@ -28,14 +28,20 @@ pub struct ShutdownRequest {
     prover_id: Arc<AtomicI32>,
 }
 
-impl ShutdownRequest {
-    pub fn new() -> Self {
+impl Default for ShutdownRequest {
+    fn default() -> Self {
         let prover_id = Arc::new(AtomicI32::from(ABSENT_PROVER_ID));
 
         Self {
             shutdown_requested: Default::default(),
             prover_id,
         }
+    }
+}
+
+impl ShutdownRequest {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn set_prover_id(&self, id: i32) {
