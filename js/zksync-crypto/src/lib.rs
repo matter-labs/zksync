@@ -9,14 +9,13 @@ const PACKED_POINT_SIZE: usize = 32;
 const PACKED_SIGNATURE_SIZE: usize = 64;
 
 pub use crypto_exports::franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
-use crypto_exports::franklin_crypto::group_hash::BlakeHasher;
 use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
 
 pub type Fs = <Engine as JubjubEngine>::Fs;
 
 thread_local! {
     pub static JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
-    pub static RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_2_into_1::<BlakeHasher>();
+    pub static RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();
 }
 
 use wasm_bindgen::prelude::*;

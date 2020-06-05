@@ -6,7 +6,6 @@ use crypto_exports::franklin_crypto::{
         ff::{Field, PrimeField},
     },
     eddsa::{PrivateKey, PublicKey},
-    group_hash::BlakeHasher,
     jubjub::FixedGenerators,
     rescue::bn256::Bn256RescueParams,
 };
@@ -122,7 +121,7 @@ fn insert_sender(
 fn test_noop() {
     // Cryptographic utilities initialization.
     let jubjub_params = &AltJubjubBn256::new();
-    let rescue_params = &Bn256RescueParams::new_2_into_1::<BlakeHasher>();
+    let rescue_params = &Bn256RescueParams::new_checked_2_into_1();
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let phasher = RescueHasher::<Bn256>::default();
@@ -193,7 +192,7 @@ fn incorrect_circuit_pubdata() {
 
     // Cryptographic utilities initialization.
     let jubjub_params = &AltJubjubBn256::new();
-    let rescue_params = &Bn256RescueParams::new_2_into_1::<BlakeHasher>();
+    let rescue_params = &Bn256RescueParams::new_checked_2_into_1();
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let phasher = RescueHasher::<Bn256>::default();
