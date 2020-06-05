@@ -12,7 +12,10 @@ use crypto_exports::bellman::plonk::better_cs::{
 };
 use crypto_exports::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
 use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile, verify};
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::fs::File;
+use std::sync::{Arc, Mutex};
 
 pub mod fs_utils;
 pub mod network_utils;
@@ -56,7 +59,8 @@ impl Default for EncodedProofPlonk {
 pub struct SetupForStepByStepProver {
     setup_polynomials: SetupPolynomials<Engine, PlonkCsWidth4WithNextStepParams>,
     hints: Vec<(usize, TranspilationVariant)>,
-    key_monomial_form: Crs<Engine, CrsForMonomialForm>,
+    setup_power_of_two: u32,
+    key_monomial_form: Option<Crs<Engine, CrsForMonomialForm>>,
 }
 
 impl SetupForStepByStepProver {
@@ -66,10 +70,14 @@ impl SetupForStepByStepProver {
     ) -> Result<Self, failure::Error> {
         let hints = transpile(circuit.clone())?;
         let setup_polynomials = setup(circuit, &hints)?;
-        let size_log2 = setup_polynomials.n.next_power_of_two().trailing_zeros();
-        let size_log2 = std::cmp::max(size_log2, SETUP_MIN_POW2); // for exit circuit
-        let key_monomial_form = get_universal_setup_monomial_form(size_log2, download_setup_file)?;
+        let size = setup_polynomials.n.next_power_of_two().trailing_zeros();
+        let setup_power_of_two = std::cmp::max(size, SETUP_MIN_POW2); // for exit circuit
+        let key_monomial_form = Some(get_universal_setup_monomial_form(
+            setup_power_of_two,
+            download_setup_file,
+        )?);
         Ok(SetupForStepByStepProver {
+            setup_power_of_two,
             setup_polynomials,
             hints,
             key_monomial_form,
@@ -86,12 +94,24 @@ impl SetupForStepByStepProver {
             &self.hints,
             &self.setup_polynomials,
             None,
-            &self.key_monomial_form,
+            self.key_monomial_form
+                .as_ref()
+                .expect("Setup should have universal setup struct"),
         )?;
 
         let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk.0)?;
         failure::ensure!(valid, "proof for block is invalid");
         Ok(serialize_proof(&proof))
+    }
+}
+
+impl Drop for SetupForStepByStepProver {
+    fn drop(&mut self) {
+        let setup = self
+            .key_monomial_form
+            .take()
+            .expect("Setup should have universal setup struct");
+        UNIVERSAL_SETUP_CACHE.put_setup_struct(self.setup_power_of_two, setup);
     }
 }
 
@@ -188,9 +208,46 @@ pub fn get_universal_setup_monomial_form(
     power_of_two: u32,
     download_from_network: bool,
 ) -> Result<Crs<Engine, CrsForMonomialForm>, failure::Error> {
-    if download_from_network {
+    if let Some(cached_setup) = UNIVERSAL_SETUP_CACHE.take_setup_struct(power_of_two) {
+        Ok(cached_setup)
+    } else if download_from_network {
         network_utils::get_universal_setup_monomial_form(power_of_two)
     } else {
         fs_utils::get_universal_setup_monomial_form(power_of_two)
     }
+}
+
+/// Plonk prover may need to change keys on the fly to prove block of the smaller size
+/// cache is used to avoid downloading/loading from disk same files over and over again.
+///
+/// Note: Keeping all the key files at the same time in memory is not a huge overhead
+/// (around 4GB, compared to 135GB that are used to generate proof)
+struct UniversalSetupCache {
+    data: Arc<Mutex<HashMap<u32, Crs<Engine, CrsForMonomialForm>>>>,
+}
+
+impl UniversalSetupCache {
+    pub fn new() -> Self {
+        Self {
+            data: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub fn take_setup_struct(&self, setup_power: u32) -> Option<Crs<Engine, CrsForMonomialForm>> {
+        self.data
+            .lock()
+            .expect("SetupPolynomialsCache lock")
+            .remove(&setup_power)
+    }
+
+    pub fn put_setup_struct(&self, setup_power: u32, setup: Crs<Engine, CrsForMonomialForm>) {
+        self.data
+            .lock()
+            .expect("SetupPolynomialsCache lock")
+            .insert(setup_power, setup);
+    }
+}
+
+lazy_static! {
+    static ref UNIVERSAL_SETUP_CACHE: UniversalSetupCache = UniversalSetupCache::new();
 }

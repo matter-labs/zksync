@@ -10,6 +10,11 @@ echo SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS=$SUPPORTED_BLOCK_CHUNKS_SIZES_SET
 echo BLOCK_CHUNK_SIZES=$BLOCK_CHUNK_SIZES
 
 
+if [ "$DOCKER_DUMMY_PROVER" == "true" ]; then
+  echo "Starting dummy_prover"
+  exec dummy_prover "$POD_NAME" 2>&1
+fi
+
 # we download only keys used in node (defined by $BLOCK_CHUNK_SIZES)
 source /bin/utils.sh
 REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`

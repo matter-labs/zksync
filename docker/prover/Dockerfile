@@ -20,7 +20,9 @@ FROM alpine
 #ENV PROVER_HEARTBEAT_INTERVAL $PROVER_HEARTBEAT_INTERVAL
 #ENV PROVER_CYCLE_WAIT $PROVER_CYCLE_WAIT
 #ENV PROVER_GONE_TIMEOUT $PROVER_GONE_TIMEOUT
+#ENV DOCKER_DUMMY_PROVER $DOCKER_DUMMY_PROVER
 COPY target/x86_64-unknown-linux-musl/release/plonk_step_by_step_prover /bin/
+COPY target/x86_64-unknown-linux-musl/release/dummy_prover /bin/
 COPY docker/prover/prover-entry.sh /bin/
 COPY bin/plonk-setup /bin/
 COPY bin/verify-keys /bin/
