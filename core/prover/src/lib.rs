@@ -6,7 +6,10 @@ pub mod prover_data;
 pub mod serialization;
 
 // Built-in deps
-use std::sync::{mpsc, Arc};
+use std::sync::{
+    atomic::{AtomicBool, AtomicI32, Ordering},
+    mpsc, Arc,
+};
 use std::time::Duration;
 use std::{
     fmt::{self, Debug},
@@ -16,6 +19,41 @@ use std::{
 use log::*;
 // Workspace deps
 use models::{config_options::ProverOptions, node::Engine, prover_utils::EncodedProofPlonk};
+
+const ABSENT_PROVER_ID: i32 = -1;
+
+#[derive(Debug, Clone)]
+pub struct ShutdownRequest {
+    shutdown_requested: Arc<AtomicBool>,
+    prover_id: Arc<AtomicI32>,
+}
+
+impl ShutdownRequest {
+    pub fn new() -> Self {
+        let prover_id = Arc::new(AtomicI32::from(ABSENT_PROVER_ID));
+
+        Self {
+            shutdown_requested: Default::default(),
+            prover_id,
+        }
+    }
+
+    pub fn set_prover_id(&self, id: i32) {
+        self.prover_id.store(id, Ordering::SeqCst);
+    }
+
+    pub fn prover_id(&self) -> i32 {
+        self.prover_id.load(Ordering::SeqCst)
+    }
+
+    pub fn set(&self) {
+        self.shutdown_requested.store(true, Ordering::SeqCst);
+    }
+
+    pub fn get(&self) -> bool {
+        self.shutdown_requested.load(Ordering::SeqCst)
+    }
+}
 
 /// Trait that provides type needed by prover to initialize.
 pub trait ProverConfig {
@@ -47,6 +85,7 @@ pub trait ApiClient: Debug {
         block: i64,
     ) -> Result<circuit::circuit::FranklinCircuit<'_, Engine>, failure::Error>;
     fn publish(&self, block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error>;
+    fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error>;
 }
 
 #[derive(Debug)]
@@ -65,10 +104,13 @@ impl fmt::Display for BabyProverError {
     }
 }
 
-pub fn start<C, P>(prover: P, exit_err_tx: mpsc::Sender<BabyProverError>)
-where
-    C: 'static + Sync + Send + ApiClient,
-    P: ProverImpl<C> + Send + Sync + 'static,
+pub fn start<CLIENT, PROVER>(
+    prover: PROVER,
+    exit_err_tx: mpsc::Sender<BabyProverError>,
+    shutdown_requested: ShutdownRequest,
+) where
+    CLIENT: 'static + Sync + Send + ApiClient,
+    PROVER: ProverImpl<CLIENT> + Send + Sync + 'static,
 {
     let (tx_block_start, rx_block_start) = mpsc::channel();
     let prover = Arc::new(prover);
@@ -76,7 +118,11 @@ where
     let join_handle = thread::spawn(move || {
         let tx_block_start2 = tx_block_start.clone();
         exit_err_tx
-            .send(run_rounds(prover.as_ref(), tx_block_start))
+            .send(run_rounds(
+                prover.as_ref(),
+                tx_block_start,
+                shutdown_requested,
+            ))
             .expect("failed to send exit error");
         tx_block_start2
             .send((0, true))
@@ -88,27 +134,43 @@ where
         .expect("failed to join on running rounds thread");
 }
 
-fn run_rounds<P: ProverImpl<C>, C: ApiClient>(
-    p: &P,
+fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
+    prover: &PROVER,
     start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
+    shutdown_request: ShutdownRequest,
 ) -> BabyProverError {
-    info!("Running worker rounds");
+    log::info!("Running worker rounds");
     let cycle_wait_interval = ProverOptions::from_env().cycle_wait;
 
     loop {
-        trace!("Starting a next round");
-        let ret = p.next_round(start_heartbeats_tx.clone());
+        if shutdown_request.get() {
+            log::info!("Shutdown requested, ignoring the next round and finishing the job");
+
+            let prover_id = shutdown_request.prover_id();
+            if prover_id != ABSENT_PROVER_ID {
+                let (api_client, _) = prover.get_heartbeat_options();
+                match api_client.prover_stopped(prover_id) {
+                    Ok(_) => {}
+                    Err(e) => log::error!("failed to send prover stop request: {}", e),
+                }
+            }
+
+            std::process::exit(0);
+        }
+
+        log::trace!("Starting a next round");
+        let ret = prover.next_round(start_heartbeats_tx.clone());
         if let Err(err) = ret {
             match err {
                 BabyProverError::Api(text) => {
-                    error!("could not reach api server: {}", text);
+                    log::error!("could not reach api server: {}", text);
                 }
                 BabyProverError::Internal(_) => {
                     return err;
                 }
             };
         }
-        trace!("round completed.");
+        log::trace!("round completed.");
         thread::sleep(cycle_wait_interval);
     }
 }
