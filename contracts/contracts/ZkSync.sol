@@ -678,7 +678,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
 
             uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-            balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
+            // after this all writes to this slot will cost 5k gas
+            balancesToWithdraw[packedBalanceKey] = BalanceToWithdraw(balance.add(_amount), 0xff);
 
             if (addToPendingWithdrawalsQueue) {
                 pendingWithdrawals[firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
