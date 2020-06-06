@@ -48,6 +48,9 @@ fn main() {
         .expect("failed to construct tokio runtime");
 
     let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
+
+    log::info!("JSON RPC address: {}", rpc_addr);
+
     let env_config = ConfigurationOptions::from_env();
     let CliOptions {
         test_spec_path,
