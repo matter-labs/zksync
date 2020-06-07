@@ -12,6 +12,15 @@ use crate::primitives::{GetBits, GetBitsFixed};
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, RescueHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, RescueHasher<Bn256>>;
 
+pub fn empty_account_as_field_elements<E: Engine>() -> Vec<E::Fr> {
+    let acc = CircuitAccount::<Bn256>::default();
+    let bits = acc.get_bits_le();
+
+    use crate::franklin_crypto::circuit::multipack;
+
+    multipack::compute_multipacking::<E>(&bits)
+}
+
 #[derive(Clone)]
 pub struct CircuitAccount<E: RescueEngine> {
     pub subtree: SparseMerkleTree<Balance<E>, E::Fr, RescueHasher<E>>,
