@@ -17,9 +17,8 @@ pub fn empty_account_as_field_elements<E: Engine>() -> Vec<E::Fr> {
     let bits = acc.get_bits_le();
 
     use crate::franklin_crypto::circuit::multipack;
-    let packed = multipack::compute_multipacking::<E>(&bits);
 
-    packed
+    multipack::compute_multipacking::<E>(&bits)
 }
 
 #[derive(Clone)]

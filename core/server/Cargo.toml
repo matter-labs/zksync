@@ -41,7 +41,7 @@ actix-web = "1.0.8"
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
-ctrlc = "3.1"
+ctrlc = { version = "3.1", features = ["termination"] }
 failure = "0.1"
 # TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
 futures01 = { package = "futures", version = "0.1" }

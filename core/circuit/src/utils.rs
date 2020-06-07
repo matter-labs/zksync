@@ -14,7 +14,7 @@ use crypto_exports::franklin_crypto::{
     },
     eddsa::{PrivateKey, PublicKey, Seed, Signature},
     jubjub::{FixedGenerators, JubjubEngine},
-    rescue::RescueEngine,
+    rescue::{rescue_hash, RescueEngine},
 };
 // Workspace deps
 use models::{
@@ -384,4 +384,30 @@ pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
     .not();
 
     Ok(result)
+}
+
+pub fn calculate_empty_balance_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+) -> Vec<E::Fr> {
+    // tree depth = 2
+    //     root       - node at index 1
+    //  n       n     - nodes at index 0
+    // l  l   l   l   - leafs and leaf hashes
+    let empty_balance = E::Fr::zero();
+    let mut sponge_output = rescue_hash::<E>(rescue_params, &[empty_balance]);
+    assert_eq!(sponge_output.len(), 1);
+    let empty_leaf_hash = sponge_output.pop().expect("must get a single element");
+
+    let mut current = empty_leaf_hash;
+    let mut empty_node_hashes = vec![];
+    for _ in 0..tree_depth {
+        let mut sponge_output = rescue_hash::<E>(rescue_params, &[current, current]);
+        assert_eq!(sponge_output.len(), 1);
+        let node_hash = sponge_output.pop().expect("must get a single element");
+        empty_node_hashes.push(node_hash);
+
+        current = node_hash;
+    }
+    empty_node_hashes
 }

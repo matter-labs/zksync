@@ -3,14 +3,14 @@
         <span class="link-html-span mr-1" v-html="linkHtml" />
         <i v-if="tooltipRight===true"
             @click="clicked"
-            class="far fa-copy" 
+            class="far fa-copy cursorpointer" 
             v-b-tooltip.hover.right="hover_title"
             v-clipboard="address"
             @mouseenter="mouseEntered"
         ></i>
         <i v-else
             @click="clicked"
-            class="far fa-copy" 
+            class="far fa-copy cursorpointer" 
             v-b-tooltip="hover_title"
             v-clipboard="address"
             @mouseenter="mouseEntered"

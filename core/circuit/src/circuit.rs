@@ -35,8 +35,8 @@ use crate::{
         AllocatedSignerPubkey,
     },
     utils::{
-        allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element_strict,
-        resize_grow_only,
+        allocate_numbers_vec, allocate_sum, calculate_empty_balance_tree_hashes, multi_and,
+        pack_bits_to_element_strict, resize_grow_only,
     },
 };
 
@@ -211,19 +211,6 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &allocated_chunk_data,
             )?;
 
-            // let not_equal = AllocatedNum::equals(
-            //     cs.namespace(|| "operation branch equals validator account"),
-            //     &current_branch.account_id.get_number(),
-            //     &validator_address_padded.get_number()
-            // )?;
-
-            // let not_equal = Boolean::from(not_equal);
-            // Boolean::enforce_equal(
-            //     cs.namespace(|| "enforce operation branch does not open validator account"),
-            //     &not_equal,
-            //     &Boolean::constant(false),
-            // )?;
-
             // calculate root for given account data
             let (state_root, is_account_empty, _subtree_root) = check_account_data(
                 cs.namespace(|| "calculate account root"),
@@ -282,26 +269,23 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let validator_address_bits = validator_address_padded.get_bits_le();
         assert_eq!(validator_address_bits.len(), params::ACCOUNT_ID_BIT_WIDTH);
 
-        assert!(self.validator_balances.len() >= params::number_of_processable_tokens());
-        assert_eq!(self.validator_balances.len(), params::total_tokens());
-        for v in self
-            .validator_balances
-            .iter()
-            .skip(params::number_of_processable_tokens())
-        {
-            if let Some(v) = v.as_ref() {
-                assert!(v.is_zero());
+        let mut validator_balances_processable_tokens = {
+            assert_eq!(self.validator_balances.len(), params::total_tokens());
+            for balance in &self.validator_balances[params::number_of_processable_tokens()..] {
+                if let Some(ingored_tokens_balance) = balance {
+                    assert!(ingored_tokens_balance.is_zero());
+                }
             }
-        }
-
-        let mut validator_balances = allocate_numbers_vec(
-            cs.namespace(|| "validator_balances"),
-            &self.validator_balances[..params::number_of_processable_tokens()],
-        )?;
-        assert_eq!(
-            validator_balances.len(),
-            params::number_of_processable_tokens()
-        );
+            let allocated_validator_balances = allocate_numbers_vec(
+                cs.namespace(|| "validator_balances"),
+                &self.validator_balances[..params::number_of_processable_tokens()],
+            )?;
+            assert_eq!(
+                allocated_validator_balances.len(),
+                params::number_of_processable_tokens()
+            );
+            allocated_validator_balances
+        };
 
         let validator_audit_path = allocate_numbers_vec(
             cs.namespace(|| "validator_audit_path"),
@@ -318,17 +302,10 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &self.validator_account,
         )?;
 
-        // // calculate operator's balance_tree root hash from whole tree representation
-        // let old_operator_balance_root = calculate_root_from_full_representation_fees(
-        //     cs.namespace(|| "calculate_root_from_full_representation_fees before"),
-        //     &validator_balances,
-        //     self.rescue_params,
-        // )?;
-
-        // calculate operator's balance_tree root hash from whole tree representation
+        // calculate operator's balance_tree root hash from sub tree representation
         let old_operator_balance_root = calculate_balances_root_from_left_tree_values(
             cs.namespace(|| "calculate_root_from_full_representation_fees before"),
-            &validator_balances,
+            &validator_balances_processable_tokens,
             params::balance_tree_depth(),
             self.rescue_params,
         )?;
@@ -370,24 +347,17 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         //apply fees to operator balances
         for i in 0..fees_len {
-            validator_balances[i] = allocate_sum(
+            validator_balances_processable_tokens[i] = allocate_sum(
                 cs.namespace(|| format!("validator balance number i {}", i)),
-                &validator_balances[i],
+                &validator_balances_processable_tokens[i],
                 &fees[i],
             )?;
         }
 
-        // // calculate operator's balance_tree root from all leafs
-        // let new_operator_balance_root = calculate_root_from_full_representation_fees(
-        //     cs.namespace(|| "calculate_root_from_full_representation_fees after"),
-        //     &validator_balances,
-        //     self.rescue_params,
-        // )?;
-
         // calculate operator's balance_tree root hash from whole tree representation
         let new_operator_balance_root = calculate_balances_root_from_left_tree_values(
             cs.namespace(|| "calculate_root_from_full_representation_fees after"),
-            &validator_balances,
+            &validator_balances_processable_tokens,
             params::balance_tree_depth(),
             self.rescue_params,
         )?;
@@ -2115,110 +2085,52 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
-// fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintSystem<E>>(
-//     mut cs: CS,
-//     fees: &[AllocatedNum<E>],
-//     params: &E::Params,
-// ) -> Result<AllocatedNum<E>, SynthesisError> {
-//     assert_eq!(fees.len(), params::total_tokens());
-//     let mut fee_hashes = vec![];
-//     for (index, fee) in fees.iter().cloned().enumerate() {
-//         let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
-
-//         fee.limit_number_of_bits(
-//             cs.namespace(|| "ensure that fees are short enough"),
-//             params::BALANCE_BIT_WIDTH,
-//         )?;
-
-//         let mut sponge_output =
-//             rescue::rescue_hash(cs.namespace(|| "hash the fee leaf content"), &[fee], params)?;
-
-//         assert_eq!(sponge_output.len(), 1);
-
-//         let tmp = sponge_output.pop().expect("must get a single element");
-
-//         fee_hashes.push(tmp);
-//     }
-//     let mut hash_vec = fee_hashes;
-
-//     for i in 0..params::balance_tree_depth() {
-//         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
-//         let chunks = hash_vec.chunks(2);
-//         let mut new_hashes = vec![];
-//         for (chunk_number, x) in chunks.enumerate() {
-//             let cs = &mut cs.namespace(|| format!("chunk number {}", chunk_number));
-
-//             let mut sponge_output = rescue::rescue_hash(cs, &x, params)?;
-
-//             assert_eq!(sponge_output.len(), 1);
-
-//             let tmp = sponge_output.pop().expect("must get a single element");
-
-//             new_hashes.push(tmp);
-//         }
-//         hash_vec = new_hashes;
-//     }
-//     assert_eq!(hash_vec.len(), 1);
-//     Ok(hash_vec[0].clone())
-// }
-
 fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
-    fees: &[AllocatedNum<E>],
+    processable_fees: &[AllocatedNum<E>],
     tree_depth: usize,
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
-    assert_eq!(fees.len(), params::number_of_processable_tokens());
-    assert!(fees.len().is_power_of_two());
+    assert_eq!(
+        processable_fees.len(),
+        params::number_of_processable_tokens()
+    );
 
-    // manually calcualte empty subtree hashes
-    let empty_balance = E::Fr::zero();
-    let mut sponge_output: Vec<E::Fr> =
-        crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &[empty_balance]);
-    assert_eq!(sponge_output.len(), 1);
-    let empty_leaf_hash = sponge_output.pop().expect("must get a single element");
+    let processable_fee_hashes = processable_fees
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(index, fee)| {
+            let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
 
-    let mut current = empty_leaf_hash;
-    let mut empty_node_hashes = vec![];
-    for _ in 0..tree_depth {
-        let mut sponge_output: Vec<E::Fr> =
-            crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &[current, current]);
-        assert_eq!(sponge_output.len(), 1);
-        let node_hash = sponge_output.pop().expect("must get a single element");
-        empty_node_hashes.push(node_hash);
+            fee.limit_number_of_bits(
+                cs.namespace(|| "ensure that fees are short enough"),
+                params::BALANCE_BIT_WIDTH,
+            )?;
 
-        current = node_hash;
-    }
-    // tree depth = 2
-    //     root       - node at index 1
-    //  n       n     - nodes at index 0
-    // l  l   l   l   - leafs and leaf hashes
+            let fee_hash = {
+                let mut sponge_output = rescue::rescue_hash(
+                    cs.namespace(|| "hash the fee leaf content"),
+                    &[fee],
+                    params,
+                )?;
+                assert_eq!(sponge_output.len(), 1);
+                sponge_output.pop().expect("must get a single element")
+            };
 
-    let mut fee_hashes = vec![];
-    for (index, fee) in fees.iter().cloned().enumerate() {
-        let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
+            Ok(fee_hash)
+        })
+        .collect::<Result<Vec<_>, SynthesisError>>()?;
 
-        fee.limit_number_of_bits(
-            cs.namespace(|| "ensure that fees are short enough"),
-            params::BALANCE_BIT_WIDTH,
-        )?;
-
-        let mut sponge_output =
-            rescue::rescue_hash(cs.namespace(|| "hash the fee leaf content"), &[fee], params)?;
-
-        assert_eq!(sponge_output.len(), 1);
-
-        let tmp = sponge_output.pop().expect("must get a single element");
-
-        fee_hashes.push(tmp);
-    }
-    let mut hash_vec = fee_hashes;
-
-    let to_process = fees.len().trailing_zeros() as usize;
-    assert_eq!(1 << to_process, params::number_of_processable_tokens());
+    let processable_fees_tree_depth = processable_fees.len().trailing_zeros() as usize;
+    assert_eq!(
+        1 << processable_fees_tree_depth,
+        params::number_of_processable_tokens()
+    );
 
     // will hash non-empty part of the tree
-    for i in 0..to_process {
+    let mut hash_vec = processable_fee_hashes;
+    for i in 0..processable_fees_tree_depth {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
         assert!(hash_vec.len().is_power_of_two());
         let chunks = hash_vec.chunks(2);
@@ -2240,10 +2152,10 @@ fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: Constraint
 
     let last_level_node_hash = hash_vec[0].clone();
 
+    let empty_node_hashes = calculate_empty_balance_tree_hashes::<E>(params, tree_depth);
     let mut node_hash = last_level_node_hash;
-
     // will hash top of the tree where RHS is always an empty tree
-    for i in to_process..params::balance_tree_depth() {
+    for i in processable_fees_tree_depth..params::balance_tree_depth() {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
         let pair_value = empty_node_hashes[i - 1]; // we need value from previous level
         let pair = AllocatedNum::alloc(
@@ -2261,16 +2173,14 @@ fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: Constraint
             &[node_hash, pair],
             params,
         )?;
-
-        assert_eq!(sponge_output.len(), 1);
-
-        let tmp = sponge_output.pop().expect("must get a single element");
-        node_hash = tmp;
+        assert_eq!(sponge_output.len(), 1, "must get a single element");
+        node_hash = sponge_output.pop().unwrap();
     }
 
     Ok(node_hash)
 }
 
+#[allow(dead_code)]
 fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     subroot: &AllocatedNum<E>,
