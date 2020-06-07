@@ -105,13 +105,6 @@ export class Client {
             url:        `${baseUrl()}/search?query=${query}`,
         });
     }
-
-    searchAccount(address) {
-        return fetch({
-            method: 'get',
-            url: `${baseUrl()}/account/${address}`,
-        });
-    }
     
     searchTx(txHash) {
         return fetch({

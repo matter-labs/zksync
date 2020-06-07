@@ -62,7 +62,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         let jh = thread::spawn(move || {
             rx.recv().expect("on receive from exit error channel"); // mock receive exit error.
         });
-        prover::start(p, tx);
+        prover::start(p, tx, Default::default());
         jh.join().expect("failed to join recv");
         done_tx.send(()).expect("unexpected failure");
     });
@@ -109,7 +109,7 @@ fn prover_proves_a_block_and_publishes_result() {
         thread::spawn(move || {
             rx.recv().unwrap();
         });
-        prover::start(p, tx);
+        prover::start(p, tx, Default::default());
     });
 
     let timeout = time::Duration::from_secs(60 * 10);
@@ -212,6 +212,10 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         *block_to_prove = None;
 
         let _ = self.publishes_tx.lock().unwrap().send(p);
+        Ok(())
+    }
+
+    fn prover_stopped(&self, _: i32) -> Result<(), failure::Error> {
         Ok(())
     }
 }
