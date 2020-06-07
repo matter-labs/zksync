@@ -86,18 +86,13 @@ pub fn number_of_processable_tokens() -> usize {
     num
 }
 
-/// Number of accounts that are expected to be able to transact
-pub fn log_2_number_of_processable_accounts() -> usize {
-    let num = 12;
+/// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
+pub fn used_account_subtree_depth() -> usize {
+    let num = 20; // total accounts = 2.pow(num) ~ 1mil
 
     assert!(num <= account_tree_depth());
 
     num
-}
-
-/// Number of accounts that are expected to be able to transact
-pub fn number_of_processable_accounts() -> usize {
-    1 << log_2_number_of_processable_accounts()
 }
 
 pub const ETH_TOKEN_ID: TokenId = 0;

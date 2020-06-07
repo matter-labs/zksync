@@ -390,23 +390,39 @@ pub fn calculate_empty_balance_tree_hashes<E: RescueEngine>(
     rescue_params: &E::Params,
     tree_depth: usize,
 ) -> Vec<E::Fr> {
-    // tree depth = 2
-    //     root       - node at index 1
-    //  n       n     - nodes at index 0
-    // l  l   l   l   - leafs and leaf hashes
     let empty_balance = E::Fr::zero();
-    let mut sponge_output = rescue_hash::<E>(rescue_params, &[empty_balance]);
-    assert_eq!(sponge_output.len(), 1);
-    let empty_leaf_hash = sponge_output.pop().expect("must get a single element");
+    calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &[empty_balance])
+}
+
+pub fn calculate_empty_account_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+) -> Vec<E::Fr> {
+    // manually calcualte empty subtree hashes
+    let empty_account_packed = models::circuit::account::empty_account_as_field_elements::<E>();
+    calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &empty_account_packed)
+}
+
+fn calculate_empty_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+    packed_leaf: &[E::Fr],
+) -> Vec<E::Fr> {
+    let empty_leaf_hash = {
+        let mut sponge_output = rescue_hash::<E>(rescue_params, packed_leaf);
+        assert_eq!(sponge_output.len(), 1);
+        sponge_output.pop().unwrap()
+    };
 
     let mut current = empty_leaf_hash;
     let mut empty_node_hashes = vec![];
     for _ in 0..tree_depth {
-        let mut sponge_output = rescue_hash::<E>(rescue_params, &[current, current]);
-        assert_eq!(sponge_output.len(), 1);
-        let node_hash = sponge_output.pop().expect("must get a single element");
+        let node_hash = {
+            let mut sponge_output = rescue_hash::<E>(rescue_params, &[current, current]);
+            assert_eq!(sponge_output.len(), 1);
+            sponge_output.pop().unwrap()
+        };
         empty_node_hashes.push(node_hash);
-
         current = node_hash;
     }
     empty_node_hashes
