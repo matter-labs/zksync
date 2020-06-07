@@ -59,6 +59,7 @@ impl<'a, E: RescueEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
         let (state_root, _, _) = check_account_data(
             cs.namespace(|| "calculate account root"),
             &branch,
+            models::params::account_tree_depth(),
             self.params,
         )?;
 
