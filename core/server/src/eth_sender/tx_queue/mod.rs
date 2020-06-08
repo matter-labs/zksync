@@ -166,7 +166,7 @@ impl TxQueue {
         self.verify_operations.insert(block_idx, verify_operation);
 
         log::info!(
-            "Adding commit operation to the queue. \
+            "Adding verify operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
             size of verify queue: {}",
@@ -181,7 +181,7 @@ impl TxQueue {
         self.withdraw_operations.push_back(withdraw_operation);
 
         log::info!(
-            "Adding commit operation to the queue. \
+            "Adding withdraw operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
             size of withdraw queue: {}",
