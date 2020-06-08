@@ -149,20 +149,55 @@ impl TxQueue {
     /// Adds the `commit` operation to the queue.
     pub fn add_commit_operation(&mut self, commit_operation: TxData) {
         self.commit_operations.push_back(commit_operation);
+
+        log::info!(
+            "Adding commit operation to the queue. \
+            Sent pending txs count: {}, \
+            max pending txs count: {}, \
+            size of commit queue: {}",
+            self.sent_pending_txs,
+            self.max_pending_txs,
+            self.commit_operations.len()
+        );
     }
 
     /// Adds the `verify` operation to the queue.
     pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: TxData) {
         self.verify_operations.insert(block_idx, verify_operation);
+
+        log::info!(
+            "Adding commit operation to the queue. \
+            Sent pending txs count: {}, \
+            max pending txs count: {}, \
+            size of verify queue: {}",
+            self.sent_pending_txs,
+            self.max_pending_txs,
+            self.verify_operations.len()
+        );
     }
 
     /// Adds the `withdraw` operation to the queue.
     pub fn add_withdraw_operation(&mut self, withdraw_operation: TxData) {
         self.withdraw_operations.push_back(withdraw_operation);
+
+        log::info!(
+            "Adding commit operation to the queue. \
+            Sent pending txs count: {}, \
+            max pending txs count: {}, \
+            size of withdraw queue: {}",
+            self.sent_pending_txs,
+            self.max_pending_txs,
+            self.withdraw_operations.len()
+        );
     }
 
     /// Returns a previously popped element to the front of the queue.
     pub fn return_popped(&mut self, element: TxData) {
+        assert!(
+            self.sent_pending_txs > 0,
+            "No transactions are expected to be returned"
+        );
+
         match &element.op_type {
             OperationType::Commit => {
                 self.commit_operations.return_popped(element);
@@ -342,5 +377,19 @@ mod tests {
 
         // We've popped the tx once again, now pending count should be increased.
         assert_eq!(queue.sent_pending_txs, pending_count);
+    }
+
+    #[test]
+    #[should_panic(expected = "No transactions are expected to be returned")]
+    fn return_popped_empty() {
+        const MAX_IN_FLY: usize = 3;
+        const COMMIT_MARK: u8 = 0;
+
+        let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
+
+        queue.return_popped(TxData::from_raw(
+            OperationType::Commit,
+            vec![COMMIT_MARK, 0],
+        ));
     }
 }
