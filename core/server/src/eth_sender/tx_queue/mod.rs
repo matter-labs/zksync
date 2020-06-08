@@ -174,6 +174,10 @@ impl TxQueue {
                 self.withdraw_operations.return_popped(element);
             }
         }
+
+        // We've incremented the counter when transaction was popped.
+        // Now it's returned and counter should be decremented back.
+        self.sent_pending_txs -= 1;
     }
 
     /// Gets the next transaction to send, according to the transaction sending policy.
@@ -325,10 +329,18 @@ mod tests {
         // Though the limit is not met (2 txs in fly, and limit is 3), there should be no txs in the queue.
         assert_eq!(queue.pop_front(), None);
 
+        let pending_count = queue.sent_pending_txs;
+
         // Return the operation to the queue.
         queue.return_popped(op_6);
 
+        // Now, as we've returned tx to queue, pending count should be decremented.
+        assert_eq!(queue.sent_pending_txs, pending_count - 1);
+
         let op_6 = queue.pop_front().unwrap();
         assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
+
+        // We've popped the tx once again, now pending count should be increased.
+        assert_eq!(queue.sent_pending_txs, pending_count);
     }
 }
