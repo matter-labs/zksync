@@ -201,13 +201,12 @@ pub struct RequiredReplicasOutput {
 
 fn required_replicas(
     data: web::Data<AppState>,
-    input: web::Json<RequiredReplicasInput>,
+    _input: web::Json<RequiredReplicasInput>,
 ) -> actix_web::Result<HttpResponse> {
-    let input = input.into_inner();
     let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
 
     let needed_count = oracle
-        .provers_required(input.current_count)
+        .provers_required()
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
     let response = RequiredReplicasOutput { needed_count };
