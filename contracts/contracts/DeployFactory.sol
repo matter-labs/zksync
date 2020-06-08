@@ -63,6 +63,8 @@ contract DeployFactory is TokenDeployInit {
         zkSync.transferMastership(address(upgradeGatekeeper));
         upgradeGatekeeper.addUpgradeable(address(zkSync));
 
+        upgradeGatekeeper.transferMastership(_governor);
+
         emit Addresses(address(governance), address(zkSync), address(verifier), address(upgradeGatekeeper));
 
         finalizeGovernance(Governance(address(governance)), _validator, _governor);
