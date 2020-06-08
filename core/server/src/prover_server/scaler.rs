@@ -3,6 +3,7 @@
 // Built-in deps
 use std::time::{Duration, Instant};
 // Workspace deps
+use models::config_options::parse_env;
 use storage::ConnectionPool;
 
 /// Disable the prover service after 5 minutes with no blocks to generate.
@@ -52,25 +53,10 @@ impl ScalerOracle {
         // simplest possible solution is preferred.
 
         let storage = self.db.access_storage()?;
-        let jobs = storage.prover_schema().unstarted_jobs_count()?;
+        let pending_jobs = storage.prover_schema().pending_jobs_count()?;
+        let idle_provers: u64 = parse_env("IDLE_PROVERS");
+        let provers_required = pending_jobs + idle_provers;
 
-        if jobs != 0 {
-            self.last_time_with_blocks = Instant::now();
-        }
-
-        if working_provers_count == 0 && jobs == 0 {
-            // No provers active, no jobs as well => no need to start one.
-            return Ok(0);
-        }
-
-        let provers_required = if self.last_time_with_blocks.elapsed() >= PROVER_DISABLE_THRESHOLD {
-            // Long time no blocks => shutdown prover.
-            0
-        } else {
-            // Either a new block has appeared or not so long without blocks => start/retain prover.
-            1
-        };
-
-        Ok(provers_required)
+        Ok(provers_required as u32)
     }
 }

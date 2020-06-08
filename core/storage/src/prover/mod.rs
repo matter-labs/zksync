@@ -56,6 +56,15 @@ impl<'a> ProverSchema<'a> {
         })
     }
 
+    pub fn pending_jobs_count(&self) -> QueryResult<u64> {
+        self.0.conn().transaction(|| {
+            let last_committed_block = BlockSchema(&self.0).get_last_committed_block()? as u64;
+            let last_verified_block = BlockSchema(&self.0).get_last_verified_block()? as u64;
+
+            Ok(last_committed_block - last_verified_block)
+        })
+    }
+
     /// Given the block size, chooses the next block to prove for the certain prover.
     /// Returns `None` if either there are no blocks of given size to prove, or
     /// there is already an ongoing job for non-proved block.
