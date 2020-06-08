@@ -130,7 +130,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         };
 
         // first chunk of block should always have number 0
-        let mut next_chunk_number = zero;
+        let mut next_chunk_number = zero.clone();
 
         // declare vector of fees, that will be collected during block processing
         let mut fees = vec![];
@@ -147,6 +147,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             chunk_number: zero_circuit_element.get_number(),
             tx_type: zero_circuit_element,
         };
+
+        let mut last_token_id = zero.clone();
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
@@ -204,6 +206,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
                 // &subtree_root, // Close disable
+                &mut last_token_id,
                 &mut fees,
                 &mut prev,
             )?;
@@ -520,6 +523,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         ))
     }
 
+    // select a branch.
+    // If TX type == deposit then select first branch
+    // else if chunk number == 0 select first, else - select second
     fn select_branch<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -611,6 +617,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         is_account_empty: &Boolean,
         ext_pubdata_chunk: &AllocatedNum<E>,
         // subtree_root: &CircuitElement<E>, // Close disable
+        last_token_id: &mut AllocatedNum<E>,
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
     ) -> Result<(), SynthesisError> {
@@ -829,12 +836,30 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             "fees length is invalid"
         );
 
+        // ensure that fee token only changes if it's in a first chunk.
+        // First chunk is also always an LHS by "select-branch" function
+        // There is always a signature on "cur" in the corresponding operations on the first chunk
+
+        // if chunk_data.is_chunk_first we take value from the current chunk, else - we keep an
+        // old value
+        let new_last_token_id = AllocatedNum::conditionally_select(
+            cs.namespace(|| {
+                "ensure that token_id for token is only taken on the first
+            chunk"
+            }),
+            &cur.token.get_number(),
+            &last_token_id,
+            &chunk_data.is_chunk_first,
+        )?;
+
+        *last_token_id = new_last_token_id.clone();
+
         for (i, fee) in fees.iter_mut().enumerate() {
             let sum = Expression::from(&*fee) + Expression::from(&op_data.fee.get_number());
 
             let is_token_correct = Boolean::from(Expression::equals(
                 cs.namespace(|| format!("is token equal to number {}", i)),
-                &lhs.token.get_number(),
+                &new_last_token_id,
                 Expression::constant::<CS>(E::Fr::from_str(&i.to_string()).unwrap()),
             )?);
 
@@ -1436,6 +1461,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             || Ok(E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap()),
             8,
         )?; //we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
+        tx_code.get_number().assert_number(
+            cs.namespace(|| "tx code is constant TransferOp"),
+            &E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap(),
+        )?;
+
         serialized_tx_bits.extend(tx_code.get_bits_be());
         serialized_tx_bits.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
