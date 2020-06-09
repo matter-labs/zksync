@@ -56,12 +56,14 @@ use std::{
 };
 // External deps
 use chrono::Utc;
+use futures::future::try_join_all;
 use num::BigUint;
 use tokio::{fs, time};
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
     config_options::ConfigurationOptions,
+    misc::utils::format_ether,
     node::{
         closest_packable_fee_amount, closest_packable_token_amount, tx::PackedEthSignature,
         FranklinTx,
@@ -220,16 +222,8 @@ impl ScenarioExecutor {
         self.deposit().await?;
         self.initial_transfer().await?;
         self.funds_rotation().await?;
-
-        // Collecting funds is currently disabled, as it should implement
-        // the withdrawing of all the funds, including unspent funds for
-        // fees.
-
-        log::warn!(
-            "Collecting funds is currently disabled, use the output file to collect funds manually"
-        );
-        // self.collect_funds().await?;
-        // self.withdraw().await?;
+        self.collect_funds().await?;
+        self.withdraw().await?;
         self.finish().await?;
 
         Ok(())
@@ -248,9 +242,9 @@ impl ScenarioExecutor {
         let mut fee = self.withdraw_fee(&self.main_account.zk_acc).await;
 
         // To be sure that we will have enough funds for all the transfers,
-        // we will request 2x of the suggested fees. All the unspent funds
+        // we will request 1.2x of the suggested fees. All the unspent funds
         // will be withdrawn later.
-        fee *= BigUint::from(2u32);
+        fee = fee * BigUint::from(120u32) / BigUint::from(100u32);
 
         // And after that we have to make the fee packable.
         fee = closest_packable_fee_amount(&fee);
@@ -281,17 +275,20 @@ impl ScenarioExecutor {
         amount_to_deposit += self.estimated_fee_for_op.clone();
 
         let account_balance = self.main_account.eth_acc.eth_balance().await?;
-        log::info!("Main account ETH balance: {}", account_balance);
+        log::info!(
+            "Main account ETH balance: {} ETH",
+            format_ether(&account_balance)
+        );
+
+        log::info!(
+            "Starting depositing phase. Depositing {} ETH to the main account",
+            format_ether(&amount_to_deposit)
+        );
 
         // Ensure that account does have enough money.
         if amount_to_deposit > account_balance {
             panic!("Main ETH account does not have enough balance to run the test with the provided config");
         }
-
-        log::info!(
-            "Starting depositing phase. Depositing {} wei to the main account",
-            amount_to_deposit
-        );
 
         // Deposit funds and wait for operation to be executed.
         deposit_single(&self.main_account, amount_to_deposit, &self.rpc_client).await?;
@@ -325,8 +322,8 @@ impl ScenarioExecutor {
     /// with the `TransferToNew` operations.
     async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
         log::info!(
-            "Starting initial transfer. {} wei will be send to each of {} new accounts",
-            self.transfer_size,
+            "Starting initial transfer. {} ETH will be send to each of {} new accounts",
+            format_ether(&self.transfer_size),
             self.n_accounts
         );
 
@@ -360,6 +357,8 @@ impl ScenarioExecutor {
         for tx_batch in txs_chunks {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
+            // This has to be done synchronously, since we're sending from the same account
+            // and truly async sending will result in a nonce mismatch errors.
             for (tx, eth_sign) in tx_batch {
                 let tx_hash = self
                     .rpc_client
@@ -387,7 +386,7 @@ impl ScenarioExecutor {
 
         // After all the initial transfer completed, we have to update new account IDs
         // and change public keys of accounts (so we'll be able to send transfers from them).
-        let mut sent_txs = SentTransactions::new();
+        let mut tx_futures = vec![];
         for account in self.accounts.iter() {
             let resp = self
                 .rpc_client
@@ -401,9 +400,13 @@ impl ScenarioExecutor {
                 account.create_change_pubkey_tx(None, true, false),
             ));
 
-            let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
-            sent_txs.add_tx_hash(tx_hash);
+            let tx_future = self.rpc_client.send_tx(change_pubkey_tx, None);
+
+            tx_futures.push(tx_future);
         }
+        let mut sent_txs = SentTransactions::new();
+        sent_txs.tx_hashes = try_join_all(tx_futures).await?;
+
         // Calculate the estimated amount of blocks for all the txs to be processed.
         let max_block_size = *self.block_sizes.iter().max().unwrap();
         let n_blocks = (self.accounts.len() / max_block_size + 1) as u32;
@@ -436,7 +439,7 @@ impl ScenarioExecutor {
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
 
         for from_id in 0..self.n_accounts {
-            let from_acc = &self.main_account.zk_acc;
+            let from_acc = &self.accounts[from_id];
             let to_id = self.acc_for_transfer(from_id);
             let to_acc = &self.accounts[to_id];
 
@@ -453,15 +456,15 @@ impl ScenarioExecutor {
         let mut verified = 0;
         let txs_chunks = DynamicChunks::new(signed_transfers, &self.block_sizes);
         for tx_batch in txs_chunks {
-            let mut sent_txs = SentTransactions::new();
+            let mut tx_futures = vec![];
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
-                let tx_hash = self
-                    .rpc_client
-                    .send_tx(tx.clone(), eth_sign.clone())
-                    .await?;
-                sent_txs.add_tx_hash(tx_hash);
+                let tx_future = self.rpc_client.send_tx(tx.clone(), eth_sign.clone());
+
+                tx_futures.push(tx_future);
             }
+            let mut sent_txs = SentTransactions::new();
+            sent_txs.tx_hashes = try_join_all(tx_futures).await?;
 
             let sent_txs_amount = sent_txs.len();
             verified += sent_txs_amount;
@@ -483,7 +486,6 @@ impl ScenarioExecutor {
     }
 
     /// Transfers all the money from the intermediate accounts back to the main account.
-    #[allow(dead_code)] // Temporary, until the logic of withdrawing the balance with unspent fees is implemented.
     async fn collect_funds(&mut self) -> Result<(), failure::Error> {
         log::info!("Starting collecting funds back to the main account");
 
@@ -494,7 +496,16 @@ impl ScenarioExecutor {
             let to_acc = &self.main_account.zk_acc;
 
             let fee = self.transfer_fee(&to_acc).await;
-            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone(), fee);
+
+            let comitted_account_state = self
+                .rpc_client
+                .account_state_info(from_acc.address)
+                .await?
+                .committed;
+            let account_balance = comitted_account_state.balances["ETH"].0.clone();
+            let transfer_amount = &account_balance - &fee;
+            let transfer_amount = closest_packable_token_amount(&transfer_amount);
+            let transfer = self.sign_transfer(from_acc, to_acc, transfer_amount, fee);
 
             signed_transfers.push(transfer);
         }
@@ -535,23 +546,30 @@ impl ScenarioExecutor {
     }
 
     /// Withdraws the money from the main account back to the Ethereum.
-    #[allow(dead_code)] // Temporary, until the logic of withdrawing the balance with unspent fees is implemented.
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
         let mut sent_txs = SentTransactions::new();
 
-        let amount_to_withdraw = self.transfer_size.clone() * BigUint::from(self.n_accounts as u64);
-
         let current_balance = self.main_account.eth_acc.eth_balance().await?;
 
+        let fee = self.withdraw_fee(&self.main_account.zk_acc).await;
+
+        let comitted_account_state = self
+            .rpc_client
+            .account_state_info(self.main_account.zk_acc.address)
+            .await?
+            .committed;
+        let account_balance = comitted_account_state.balances["ETH"].0.clone();
+        let withdraw_amount = &account_balance - &fee;
+        let withdraw_amount = closest_packable_token_amount(&withdraw_amount);
+
         log::info!(
-            "Starting withdrawing phase. Withdrawing {} wei back to the Ethereum",
-            amount_to_withdraw
+            "Starting withdrawing phase. Withdrawing {} ETH back to the Ethereum",
+            format_ether(&withdraw_amount)
         );
 
-        let fee = self.withdraw_fee(&self.main_account.zk_acc).await;
         let (tx, eth_sign) = self
             .main_account
-            .sign_withdraw(amount_to_withdraw.clone(), fee);
+            .sign_withdraw(withdraw_amount.clone(), fee);
         let tx_hash = self
             .rpc_client
             .send_tx(tx.clone(), eth_sign.clone())
@@ -562,7 +580,7 @@ impl ScenarioExecutor {
 
         log::info!("Withdrawing funds completed");
 
-        self.wait_for_eth_balance(current_balance, amount_to_withdraw)
+        self.wait_for_eth_balance(current_balance, withdraw_amount)
             .await?;
 
         Ok(())
