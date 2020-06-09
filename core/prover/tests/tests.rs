@@ -155,6 +155,7 @@ fn new_test_data_for_prover() -> ProverData {
     ProverData {
         public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
         old_root: witness_accum.initial_root_hash,
+        initial_used_subtree_root: witness_accum.initial_used_subtree_root_hash,
         new_root: witness_accum.root_after_fees.unwrap(),
         validator_address: Fr::from_str(&witness_accum.fee_account_id.to_string())
             .expect("failed to parse"),
