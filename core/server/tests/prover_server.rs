@@ -15,6 +15,7 @@ use models::{
 use num::BigUint;
 use prover::{client, ApiClient};
 // Local deps
+use circuit::witness::utils::get_used_subtree_root_hash;
 use server::prover_server;
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
@@ -181,6 +182,7 @@ pub fn test_operation_and_wanted_prover_data(
     );
     let initial_root = circuit_tree.root_hash();
     let initial_root2 = circuit_tree.root_hash();
+    let initial_used_subtree_root = get_used_subtree_root_hash(&circuit_tree);
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
         from: validator_account.address,
         token: 0,
@@ -311,6 +313,7 @@ pub fn test_operation_and_wanted_prover_data(
         prover::prover_data::ProverData {
             public_data_commitment,
             old_root: initial_root2,
+            initial_used_subtree_root,
             new_root: block.new_root_hash,
             validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
             operations,

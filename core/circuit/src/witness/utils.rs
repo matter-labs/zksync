@@ -24,7 +24,10 @@ use models::{
         tx::PackedPublicKey,
         AccountId, BlockNumber, Engine,
     },
-    params::{total_tokens, CHUNK_BIT_WIDTH},
+    params::{
+        total_tokens, used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS,
+    },
+    primitives::GetBits,
 };
 use plasma::state::CollectedFee;
 // Local deps
@@ -34,7 +37,6 @@ use crate::{
     operation::{Operation, SignatureData},
     utils::sign_rescue,
 };
-use models::params::MAX_CIRCUIT_MSG_HASH_BITS;
 
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
@@ -44,6 +46,7 @@ pub struct WitnessBuilder<'a> {
     pub fee_account_id: AccountId,
     pub block_number: BlockNumber,
     pub initial_root_hash: Fr,
+    pub initial_used_subtree_root_hash: Fr,
     pub operations: Vec<Operation<Engine>>,
     pub pubdata: Vec<bool>,
     pub root_before_fees: Option<Fr>,
@@ -61,11 +64,13 @@ impl<'a> WitnessBuilder<'a> {
         block_number: BlockNumber,
     ) -> WitnessBuilder {
         let initial_root_hash = account_tree.root_hash();
+        let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
         WitnessBuilder {
             account_tree,
             fee_account_id,
             block_number,
             initial_root_hash,
+            initial_used_subtree_root_hash,
             operations: Vec::new(),
             pubdata: Vec::new(),
             root_before_fees: None,
@@ -159,6 +164,7 @@ impl<'a> WitnessBuilder<'a> {
             rescue_params: &models::params::RESCUE_PARAMS,
             jubjub_params: &models::params::JUBJUB_PARAMS,
             old_root: Some(self.initial_root_hash),
+            initial_used_subtree_root: Some(self.initial_used_subtree_root_hash),
             operations: self.operations,
             pub_data_commitment: Some(
                 self.pubdata_commitment
@@ -606,4 +612,25 @@ impl SigDataInput {
             },
         ]
     }
+}
+
+/// Get root hash of the used subtree.
+pub fn get_used_subtree_root_hash(account_tree: &CircuitAccountTree) -> Fr {
+    // We take account 0, and hash it with it's Merkle proof.
+    let account_index = 0;
+    let account_merkle_path = account_tree.merkle_path(account_index);
+    let account = account_tree
+        .get(account_index)
+        .cloned()
+        .unwrap_or_else(CircuitAccount::default);
+    let mut current_hash = account_tree.hasher.hash_bits(account.get_bits_le());
+    for merkle_path_item in account_merkle_path
+        .iter()
+        .take(used_account_subtree_depth())
+    {
+        current_hash = account_tree
+            .hasher
+            .compress(&current_hash, &merkle_path_item.0, 0);
+    }
+    current_hash
 }

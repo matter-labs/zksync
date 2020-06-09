@@ -12,6 +12,7 @@ use models::node::{
 };
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
+use models::params::max_account_id;
 use models::primitives::BigUintSerdeWrapper;
 use num::BigUint;
 use std::collections::HashMap;
@@ -140,6 +141,10 @@ impl PlasmaState {
     }
 
     fn create_deposit_op(&self, priority_op: Deposit) -> DepositOp {
+        assert!(
+            priority_op.token <= params::max_token_id(),
+            "Deposit token is out of range, this should be enforced by contract"
+        );
         let account_id = if let Some((account_id, _)) = self.get_account_by_address(&priority_op.to)
         {
             account_id
@@ -166,7 +171,7 @@ impl PlasmaState {
     fn create_full_exit_op(&self, priority_op: FullExit) -> FullExitOp {
         // NOTE: Authroization of the FullExit is verified on the contract.
         assert!(
-            priority_op.token < params::total_tokens() as TokenId,
+            priority_op.token <= params::max_token_id(),
             "Full exit token is out of range, this should be enforced by contract"
         );
         trace!("Processing {:?}", priority_op);
@@ -236,7 +241,7 @@ impl PlasmaState {
 
     fn create_transfer_op(&self, tx: Transfer) -> Result<TransferOutcome, Error> {
         ensure!(
-            tx.token < (params::total_tokens() as TokenId),
+            tx.token <= params::max_token_id(),
             "Token id is not supported"
         );
         let (from, from_account) = self
@@ -291,7 +296,7 @@ impl PlasmaState {
 
     fn create_withdraw_op(&self, tx: Withdraw) -> Result<WithdrawOp, Error> {
         ensure!(
-            tx.token < (params::total_tokens() as TokenId),
+            tx.token <= params::max_token_id(),
             "Token id is not supported"
         );
         let (account_id, account) = self
@@ -356,6 +361,10 @@ impl PlasmaState {
         ensure!(
             account_id == tx.account_id,
             "ChangePubKey account id is incorrect"
+        );
+        ensure!(
+            account_id <= params::max_account_id(),
+            "ChangePubKey account id is bigger than max supported"
         );
         let change_pk_op = ChangePubKeyOp { tx, account_id };
 
@@ -466,6 +475,15 @@ impl PlasmaState {
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
 
+        ensure!(
+            op.from <= max_account_id(),
+            "TransferToNew from account id is bigger than max supported"
+        );
+        ensure!(
+            op.to <= max_account_id(),
+            "TransferToNew to account id is bigger than max supported"
+        );
+
         assert!(
             self.get_account(op.to).is_none(),
             "Transfer to new account exists"
@@ -526,6 +544,11 @@ impl PlasmaState {
         &mut self,
         op: &WithdrawOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        ensure!(
+            op.account_id <= max_account_id(),
+            "Withdraw account id is bigger than max supported"
+        );
+
         let mut updates = Vec::new();
         let mut from_account = self.get_account(op.account_id).unwrap();
 
@@ -567,6 +590,11 @@ impl PlasmaState {
         &mut self,
         op: &CloseOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        ensure!(
+            op.account_id <= max_account_id(),
+            "Close account id is bigger than max supported"
+        );
+
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
 
@@ -637,6 +665,15 @@ impl PlasmaState {
         &mut self,
         op: &TransferOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        ensure!(
+            op.from <= max_account_id(),
+            "Transfer from account id is bigger than max supported"
+        );
+        ensure!(
+            op.to <= max_account_id(),
+            "Transfer to account id is bigger than max supported"
+        );
+
         if op.from == op.to {
             return self.apply_transfer_op_to_self(op);
         }
@@ -700,6 +737,10 @@ impl PlasmaState {
         &mut self,
         op: &TransferOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        ensure!(
+            op.from <= max_account_id(),
+            "Transfer to self from account id is bigger than max supported"
+        );
         ensure!(
             op.from == op.to,
             "Bug: transfer to self should not be called."
