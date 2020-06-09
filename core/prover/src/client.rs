@@ -89,8 +89,11 @@ impl ApiClient {
                     err, duration_secs,
                 )
             })
-            .map_err(|e| match e {
-                backoff::Error::Permanent(e) | backoff::Error::Transient(e) => e,
+            .map_err(|e| {
+                panic!(
+                    "Prover can't reach server, for the max elapsed time of the backoff: {}",
+                    e
+                )
             })
     }
 
@@ -100,6 +103,7 @@ impl ApiClient {
         backoff.initial_interval = Duration::from_secs(1);
         backoff.multiplier = 1.5f64;
         backoff.max_interval = Duration::from_secs(10);
+        backoff.max_elapsed_time = Some(Duration::from_secs(2 * 60));
         backoff
     }
 

@@ -8,7 +8,7 @@ use std::{
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
-use log::{error, info, trace};
+use log::{info, trace};
 // Workspace deps
 use models::{circuit::CircuitAccountTree, config_options::ThreadPanicNotify, node::BlockNumber};
 use prover::client;
@@ -47,9 +47,10 @@ impl AppState {
     }
 
     fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor> {
-        self.connection_pool
-            .access_storage_fragile()
-            .map_err(actix_web::error::ErrorInternalServerError)
+        self.connection_pool.access_storage_fragile().map_err(|e| {
+            vlog::warn!("Failed to access storage: {}", e);
+            actix_web::error::ErrorInternalServerError(e)
+        })
     }
 }
 
@@ -69,7 +70,10 @@ fn register(
     let id = storage
         .prover_schema()
         .register_prover(&r.name, r.block_size)
-        .map_err(actix_web::error::ErrorInternalServerError)?;
+        .map_err(|e| {
+            vlog::warn!("Failed to register prover in the db: {}", e);
+            actix_web::error::ErrorInternalServerError(e)
+        })?;
     Ok(id.to_string())
 }
 
@@ -86,7 +90,7 @@ fn block_to_prove(
         .prover_schema()
         .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
         .map_err(|e| {
-            error!("could not get next unverified commit operation: {}", e);
+            vlog::warn!("could not get next unverified commit operation: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
     if let Some(prover_run) = ret {
@@ -131,14 +135,13 @@ fn working_on(
         r.prover_run_id
     );
     let storage = data
-        .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     storage
         .prover_schema()
         .record_prover_is_working(r.prover_run_id)
         .map_err(|e| {
-            error!("failed to record prover work in progress request: {}", e);
+            vlog::warn!("failed to record prover work in progress request: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })
 }
@@ -146,7 +149,6 @@ fn working_on(
 fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix_web::Result<()> {
     info!("publish of a proof for block: {}", r.block);
     let storage = data
-        .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     match storage.prover_schema().store_proof(r.block, &r.proof) {
@@ -159,7 +161,7 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
             Ok(())
         }
         Err(e) => {
-            error!("failed to store received proof: {}", e);
+            vlog::error!("failed to store received proof: {}", e);
             let message = if e.to_string().contains("duplicate key") {
                 "duplicate key"
             } else {
@@ -176,14 +178,13 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
         prover_id
     );
     let storage = data
-        .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     storage
         .prover_schema()
         .record_prover_stop(*prover_id)
         .map_err(|e| {
-            error!("failed to record prover stop: {}", e);
+            vlog::warn!("failed to record prover stop: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })
 }
