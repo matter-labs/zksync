@@ -20,6 +20,42 @@ pub mod records;
 pub struct ProverSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> ProverSchema<'a> {
+    /// Returns the amount of blocks which await for proof, but have
+    /// no assigned prover run.
+    pub fn unstarted_jobs_count(&self) -> QueryResult<u64> {
+        use crate::schema::prover_runs::dsl::*;
+
+        self.0.conn().transaction(|| {
+            let mut last_committed_block = BlockSchema(&self.0).get_last_committed_block()? as u64;
+
+            if BlockSchema(&self.0).pending_block_exists()? {
+                // Existence of the pending block means that soon there will be one more block.
+                last_committed_block += 1;
+            }
+
+            let last_verified_block = BlockSchema(&self.0).get_last_verified_block()? as u64;
+
+            let num_ongoing_jobs = prover_runs
+                .filter(block_number.gt(last_verified_block as i64))
+                .count()
+                .first::<i64>(self.0.conn())? as u64;
+
+            assert!(
+                last_verified_block + num_ongoing_jobs <= last_committed_block,
+                "There are more ongoing prover jobs than blocks without proofs. \
+                Last verifier block: {}, last committed block: {}, amount of ongoing \
+                prover runs: {}",
+                last_verified_block,
+                last_committed_block,
+                num_ongoing_jobs,
+            );
+
+            let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
+
+            Ok(result)
+        })
+    }
+
     /// Returns the amount of blocks which await for proof (committed but not verified)
     pub fn pending_jobs_count(&self) -> QueryResult<u32> {
         self.0.conn().transaction(|| {
