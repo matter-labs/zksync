@@ -7,11 +7,10 @@ use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 // Workspace deps
 use crate::config_options::parse_env;
-use crate::franklin_crypto::group_hash::BlakeHasher;
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
-use crate::node::TokenId;
+use crate::node::{AccountId, TokenId};
 
 static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
 /// account_tree_depth.
@@ -37,6 +36,8 @@ pub fn account_tree_depth() -> usize {
                 );
             }
         }
+        assert!(ACCOUNT_TREE_DEPTH_VALUE <= ACCOUNT_ID_BIT_WIDTH);
+
         ACCOUNT_TREE_DEPTH_VALUE
     }
 }
@@ -65,6 +66,8 @@ pub fn balance_tree_depth() -> usize {
                 );
             }
         }
+        assert!(BALANCE_TREE_DEPTH_VALUE <= TOKEN_BIT_WIDTH);
+
         BALANCE_TREE_DEPTH_VALUE
     }
 }
@@ -72,6 +75,41 @@ pub fn balance_tree_depth() -> usize {
 pub fn total_tokens() -> usize {
     2usize.pow(balance_tree_depth() as u32)
 }
+
+/// Number of tokens that are processed by this release
+pub fn number_of_processable_tokens() -> usize {
+    let num = 128;
+
+    assert!(num <= total_tokens());
+    assert!(num.is_power_of_two());
+
+    num
+}
+
+/// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
+pub fn used_account_subtree_depth() -> usize {
+    let num = 24; // total accounts = 2.pow(num) ~ 16mil
+
+    assert!(num <= account_tree_depth());
+
+    num
+}
+
+/// Max token id, based on the depth of the used left subtree
+pub fn max_account_id() -> AccountId {
+    let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
+    if list_count == u32::max_value() {
+        list_count
+    } else {
+        list_count - 1
+    }
+}
+
+/// Max token id, based on the number of processable tokens
+pub fn max_token_id() -> TokenId {
+    number_of_processable_tokens() as u16 - 1
+}
+
 pub const ETH_TOKEN_ID: TokenId = 0;
 
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 32;
@@ -178,7 +216,6 @@ pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
-    pub static ref RESCUE_PARAMS: Bn256RescueParams =
-        Bn256RescueParams::new_2_into_1::<BlakeHasher>();
+    pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();
     pub static ref RESCUE_HASHER: BabyRescueHasher = BabyRescueHasher::default();
 }

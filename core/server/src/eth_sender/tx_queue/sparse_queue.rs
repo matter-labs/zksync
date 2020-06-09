@@ -71,6 +71,11 @@ impl<T: fmt::Debug> SparseQueue<T> {
     pub fn next_id(&self) -> usize {
         self.next_expected_idx
     }
+
+    /// Returns the current size of the queue.
+    pub fn len(&self) -> usize {
+        self.elements.len()
+    }
 }
 
 #[cfg(test)]

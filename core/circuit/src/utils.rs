@@ -14,7 +14,7 @@ use crypto_exports::franklin_crypto::{
     },
     eddsa::{PrivateKey, PublicKey, Seed, Signature},
     jubjub::{FixedGenerators, JubjubEngine},
-    rescue::RescueEngine,
+    rescue::{rescue_hash, RescueEngine},
 };
 // Workspace deps
 use models::{
@@ -301,14 +301,14 @@ where
 
 pub fn allocate_numbers_vec<E, CS>(
     mut cs: CS,
-    audit_path: &[Option<E::Fr>],
+    witness_vec: &[Option<E::Fr>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError>
 where
     E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];
-    for (i, e) in audit_path.iter().enumerate() {
+    for (i, e) in witness_vec.iter().enumerate() {
         let path_element =
             AllocatedNum::alloc(cs.namespace(|| format!("path element{}", i)), || {
                 Ok(*e.get()?)
@@ -384,4 +384,46 @@ pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
     .not();
 
     Ok(result)
+}
+
+pub fn calculate_empty_balance_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+) -> Vec<E::Fr> {
+    let empty_balance = E::Fr::zero();
+    calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &[empty_balance])
+}
+
+pub fn calculate_empty_account_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+) -> Vec<E::Fr> {
+    // manually calcualte empty subtree hashes
+    let empty_account_packed = models::circuit::account::empty_account_as_field_elements::<E>();
+    calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &empty_account_packed)
+}
+
+fn calculate_empty_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+    packed_leaf: &[E::Fr],
+) -> Vec<E::Fr> {
+    let empty_leaf_hash = {
+        let mut sponge_output = rescue_hash::<E>(rescue_params, packed_leaf);
+        assert_eq!(sponge_output.len(), 1);
+        sponge_output.pop().unwrap()
+    };
+
+    let mut current = empty_leaf_hash;
+    let mut empty_node_hashes = vec![];
+    for _ in 0..tree_depth {
+        let node_hash = {
+            let mut sponge_output = rescue_hash::<E>(rescue_params, &[current, current]);
+            assert_eq!(sponge_output.len(), 1);
+            sponge_output.pop().unwrap()
+        };
+        empty_node_hashes.push(node_hash);
+        current = node_hash;
+    }
+    empty_node_hashes
 }

@@ -22,22 +22,22 @@
                         <CopyableAddress class="normalize-text"
                             v-if="data.item['name'] == 'From'" 
                             :address="txData.from" 
-                            :linkHtml="`${data.item['value']} `"
+                            :linkHtml="data.item['value']"
                         />
                         <CopyableAddress class="normalize-text" 
                             v-else-if="data.item['name'] == 'To'" 
                             :address="txData.to" 
-                            :linkHtml="`${data.item['value']} `"
+                            :linkHtml="data.item['value']"
                         />
                         <CopyableAddress class="normalize-text" 
                             v-else-if="data.item['name'] == 'Account'" 
                             :address="txData.from" 
-                            :linkHtml="`${data.item['value']} `"
+                            :linkHtml="data.item['value']"
                         />
                         <CopyableAddress class="normalize-text" 
-                            v-else-if="['zkSync tx hash', 'Tx hash'].includes(data.item['name'])" 
+                            v-else-if="['zkSync tx hash', 'ETH Tx hash'].includes(data.item['name'])" 
                             :address="tx_hash" 
-                            :linkHtml="`${data.item['value']} `"
+                            :linkHtml="data.item['value']"
                         />
                         <span v-else-if="data.item.name == 'Status'">
                             <ReadinessStatus :status="readyStateFromString(data.item.value)" />
@@ -97,6 +97,7 @@ export default {
     methods: {
         readyStateFromString(s) {
             return {
+                "Failed": -1,
                 "Initiated": 0,
                 "Pending": 1,
                 "Complete": 2,
@@ -112,11 +113,11 @@ export default {
                 return;
             }
 
-            txData.tokenName = (txData.token === -1 || txData.token == 65535) ? "" : tokens[txData.token].syncSymbol;
+            txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
             if (txData.tx_type  == "Deposit" || txData.tx_type == "FullExit") {
                 txData.feeTokenName = "ETH";
             } else {
-                txData.feeTokenName = txData.token === -1 || txData.token == 65535? "" : tokens[txData.token].syncSymbol;
+                txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
             }
 
             txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;
@@ -182,11 +183,11 @@ export default {
                 : `${this.routerBase}accounts/${this.txData.to}`;
 
             const onchain_from
-                = this.txData.tx_type == 'Deposit' ? `<i class="fas fa-external-link-alt"></i>`
+                = this.txData.tx_type == 'Deposit' ? ` <i class="fas fa-external-link-alt"></i>`
                 : '';
 
             const onchain_to
-                = this.txData.tx_type == 'Withdrawal' ? `<i class="fas fa-external-link-alt"></i>`
+                = this.txData.tx_type == 'Withdrawal' ? ` <i class="fas fa-external-link-alt"></i>`
                 : '';
 
             const target_from
@@ -214,25 +215,25 @@ export default {
                     { name: 'zkSync tx hash',           value: tx_hash},
                     { name: "Type",                     value: `${this.txData.tx_type}`   },
                     { name: "Status",                   value: `${this.txData.status}` },
-                    { name: "Account",                  value: `<a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a>` },
+                    { name: "Account",                  value: `<a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
                     { name: "New signer key hash",      value: `${this.txData.to.replace('sync:', '')}`},
                     { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ]
                 : this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit"
                 ? [
-                    { name: 'Tx hash',        value: tx_hash},
+                    { name: 'ETH Tx hash',        value: tx_hash},
                     { name: "Type",           value: `${this.txData.tx_type}`   },
                     { name: "Status",         value: `${this.txData.status}` },
-                    { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}"> ${this.txData.from} ${onchain_from}</a>` },
-                    { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}"> ${this.txData.to} ${onchain_to}</a>`      },
+                    { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
+                    { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}">${this.txData.to}${onchain_to}</a>`      },
                     { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount, this.txData.tokenName)}`    },
                 ]
                 : [
                     { name: 'zkSync tx hash', value: tx_hash},
                     { name: "Type",           value: `${this.txData.tx_type}`   },
                     { name: "Status",         value: `${this.txData.status}` },
-                    { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a>` },
-                    { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}"> ${this.txData.to} ${onchain_to}</a>`      },
+                    { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
+                    { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}">${this.txData.to}${onchain_to}</a>`      },
                     { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount, this.txData.tokenName)}`    },
                     { name: "fee",            value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee, this.txData.tokenName)}` },
                     { name: "Created at",     value: formatDate(this.txData.created_at) },
@@ -248,6 +249,7 @@ export default {
 
             if (this.txData.fail_reason) {
                 rows.push({ name: "Fail reason:", value: `${this.txData.fail_reason}` });
+                rows.find(r => r.name == 'Status').value = 'Failed'
             }
 
             return rows;

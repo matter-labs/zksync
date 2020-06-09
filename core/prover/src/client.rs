@@ -126,15 +126,6 @@ impl ApiClient {
 
         Ok(self.with_retries(&op)?)
     }
-
-    pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
-        self.http_client
-            .post(self.stopped_url.as_str())
-            .json(&prover_run_id)
-            .send()
-            .map_err(|e| format_err!("prover stopped request failed: {}", e))?;
-        Ok(())
-    }
 }
 
 impl crate::ApiClient for ApiClient {
@@ -239,5 +230,14 @@ impl crate::ApiClient for ApiClient {
         };
 
         Ok(self.with_retries(&op)?)
+    }
+
+    fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
+        self.http_client
+            .post(self.stopped_url.as_str())
+            .json(&prover_run_id)
+            .send()
+            .map_err(|e| format_err!("prover stopped request failed: {}", e))?;
+        Ok(())
     }
 }
