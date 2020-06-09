@@ -447,7 +447,11 @@ impl PlasmaStateKeeper {
             executed_op,
         } = self.state.execute_priority_op(priority_op.data.clone());
 
+        // Check if adding this transaction to the block won't make the contract operations
+        // too expensive.
         if self.pending_block.gas_counter.add_op(&executed_op).is_err() {
+            // We've reached the gas limit, seal the block.
+            // This transaction will go into the next one.
             return Err(priority_op);
         }
 
@@ -503,7 +507,11 @@ impl PlasmaStateKeeper {
                 mut updates,
                 executed_op,
             }) => {
+                // Check if adding this transaction to the block won't make the contract operations
+                // too expensive.
                 if self.pending_block.gas_counter.add_op(&executed_op).is_err() {
+                    // We've reached the gas limit, seal the block.
+                    // This transaction will go into the next one.
                     return Err(tx);
                 }
 
