@@ -214,7 +214,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _token Token address, 0 address for ether
     function fullExit (uint32 _accountId, address _token) external nonReentrant {
         requireActive();
-        require(_accountId <= MAX_ACCOUNT_ID, "fee1");
+        require(_accountId <= MAX_ACCOUNT_ID, "fee11");
 
         uint16 tokenId;
         if (_token == address(0)) {
@@ -257,25 +257,23 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
-        require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
+//        require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
         require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
         bytes memory publicData = _publicData;
 
-        if(!triggerExodusIfNeeded()) {
-            // Unpack onchain operations and store them.
-            // Get priority operations number for this block.
-            uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
+        // Unpack onchain operations and store them.
+        // Get priority operations number for this block.
+        uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-            bytes32 withdrawalsDataHash = collectOnchainOps(_blockNumber, publicData, _ethWitness, _ethWitnessSizes);
+        bytes32 withdrawalsDataHash = collectOnchainOps(_blockNumber, publicData, _ethWitness, _ethWitnessSizes);
 
-            uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
+        uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
-            createCommittedBlock(_blockNumber, _feeAccount, _newBlockInfo[0], publicData, withdrawalsDataHash, nPriorityRequestProcessed);
-            totalBlocksCommitted++;
+        createCommittedBlock(_blockNumber, _feeAccount, _newBlockInfo[0], publicData, withdrawalsDataHash, nPriorityRequestProcessed);
+        totalBlocksCommitted++;
 
-            emit BlockCommit(_blockNumber);
-        }
+        emit BlockCommit(_blockNumber);
     }
 
     /// @notice Block verification.
@@ -307,7 +305,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Reverts unverified blocks
     /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
     function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+//        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+        governance.requireActiveValidator(msg.sender);
 
         uint32 blocksCommited = totalBlocksCommitted;
         uint32 blocksToRevert = Utils.minU32(_maxBlocksToRevert, blocksCommited - totalBlocksVerified);
@@ -338,7 +337,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
-    function triggerExodusIfNeeded() public returns (bool) {
+    function triggerExodusIfNeeded() external returns (bool) {
         bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
         priorityRequests[firstPriorityRequestId].expirationBlock != 0;
         if (trigger) {
