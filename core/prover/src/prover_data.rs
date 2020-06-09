@@ -22,6 +22,8 @@ pub struct ProverData {
     #[serde(with = "FrSerde")]
     pub old_root: Fr,
     #[serde(with = "FrSerde")]
+    pub initial_used_subtree_root: Fr,
+    #[serde(with = "FrSerde")]
     pub new_root: Fr,
     #[serde(with = "FrSerde")]
     pub validator_address: Fr,
@@ -41,6 +43,7 @@ impl ProverData {
             rescue_params: &models::params::RESCUE_PARAMS as &Bn256RescueParams,
             jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
             old_root: Some(self.old_root),
+            initial_used_subtree_root: Some(self.initial_used_subtree_root),
             block_number: Fr::from_str(&block.to_string()),
             validator_address: Some(self.validator_address),
             pub_data_commitment: Some(self.public_data_commitment),

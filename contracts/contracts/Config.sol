@@ -35,7 +35,10 @@ contract Config {
     uint8 constant SUCCESS_FLAG_BYTES = 1;
 
     /// @notice Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
-    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = (2 ** 16) - 1;
+    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = 128 - 1;
+
+    /// @notice Max account id that could be registered in the network
+    uint32 constant MAX_ACCOUNT_ID = (2 ** 24) - 1;
 
     /// @notice Expected average period of block creation
     uint256 constant BLOCK_PERIOD = 15 seconds;
