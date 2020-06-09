@@ -214,6 +214,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _token Token address, 0 address for ether
     function fullExit (uint32 _accountId, address _token) external nonReentrant {
         requireActive();
+        require(_accountId <= MAX_ACCOUNT_ID, "fee1");
 
         uint16 tokenId;
         if (_token == address(0)) {

@@ -18,7 +18,7 @@ use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::rescue::RescueEngine;
 use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
-use crate::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
+use crate::params::{max_account_id, max_token_id, JUBJUB_PARAMS, RESCUE_PARAMS};
 use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg, BigUintSerdeAsRadix10Str};
 use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
@@ -187,7 +187,9 @@ impl Transfer {
         let mut valid = self.amount <= BigUint::from(u128::max_value())
             && self.fee <= BigUint::from(u128::max_value())
             && is_token_amount_packable(&self.amount)
-            && is_fee_amount_packable(&self.fee);
+            && is_fee_amount_packable(&self.fee)
+            && self.account_id <= max_account_id()
+            && self.token <= max_token_id();
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
@@ -308,8 +310,10 @@ impl Withdraw {
     }
 
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid =
-            self.amount <= BigUint::from(u128::max_value()) && is_fee_amount_packable(&self.fee);
+        let mut valid = self.amount <= BigUint::from(u128::max_value())
+            && is_fee_amount_packable(&self.fee)
+            && self.account_id <= max_account_id()
+            && self.token <= max_token_id();
 
         if valid {
             let signer = self.verify_signature();
@@ -445,7 +449,8 @@ impl ChangePubKey {
     }
 
     pub fn check_correctness(&self) -> bool {
-        self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account)
+        (self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account))
+            && self.account_id <= max_account_id()
     }
 }
 

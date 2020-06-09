@@ -148,7 +148,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             tx_type: zero_circuit_element,
         };
 
-        let mut last_token_id = zero.clone();
+        let mut last_token_id = zero;
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
