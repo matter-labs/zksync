@@ -441,19 +441,27 @@ impl PlasmaStateKeeper {
             return Err(priority_op);
         }
 
+        // Check if adding this transaction to the block won't make the contract operations
+        // too expensive.
+        let non_executed_op = self
+            .state
+            .priority_op_to_franklin_op(priority_op.data.clone());
+        if self
+            .pending_block
+            .gas_counter
+            .add_op(&non_executed_op)
+            .is_err()
+        {
+            // We've reached the gas limit, seal the block.
+            // This transaction will go into the next one.
+            return Err(priority_op);
+        }
+
         let OpSuccess {
             fee,
             mut updates,
             executed_op,
         } = self.state.execute_priority_op(priority_op.data.clone());
-
-        // Check if adding this transaction to the block won't make the contract operations
-        // too expensive.
-        if self.pending_block.gas_counter.add_op(&executed_op).is_err() {
-            // We've reached the gas limit, seal the block.
-            // This transaction will go into the next one.
-            return Err(priority_op);
-        }
 
         self.pending_block.chunks_left -= chunks_needed;
         self.pending_block.account_updates.append(&mut updates);
@@ -488,6 +496,24 @@ impl PlasmaStateKeeper {
             return Err(tx);
         }
 
+        // Check if adding this transaction to the block won't make the contract operations
+        // too expensive.
+        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.clone());
+        if let Ok(non_executed_op) = non_executed_op {
+            // We only care about successful conversions, since if conversion failed,
+            // then transaction will fail as well (as it shares the same code base).
+            if self
+                .pending_block
+                .gas_counter
+                .add_op(&non_executed_op)
+                .is_err()
+            {
+                // We've reached the gas limit, seal the block.
+                // This transaction will go into the next one.
+                return Err(tx);
+            }
+        }
+
         if matches!(tx, FranklinTx::Withdraw(_)) {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
@@ -507,14 +533,6 @@ impl PlasmaStateKeeper {
                 mut updates,
                 executed_op,
             }) => {
-                // Check if adding this transaction to the block won't make the contract operations
-                // too expensive.
-                if self.pending_block.gas_counter.add_op(&executed_op).is_err() {
-                    // We've reached the gas limit, seal the block.
-                    // This transaction will go into the next one.
-                    return Err(tx);
-                }
-
                 self.pending_block.chunks_left -= chunks_needed;
                 self.pending_block.account_updates.append(&mut updates);
                 if let Some(fee) = fee {
