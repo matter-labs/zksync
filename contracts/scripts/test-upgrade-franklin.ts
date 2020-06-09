@@ -21,16 +21,8 @@ async function main() {
         parser.addArgument("contractAddress");
         parser.addArgument("upgradeGatekeeperAddress");
         const args = parser.parseArgs(process.argv.slice(2));
-        if (process.env.ETH_NETWORK !== "localhost") {
-            console.log("Upgrading test contract not on localhost is not allowed");
-            return;
-        }
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-        if (process.env.ETH_NETWORK == "localhost") {
-            // small polling interval for localhost network
-            provider.pollingInterval = 200;
-        }
 
         const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 

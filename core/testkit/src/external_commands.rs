@@ -105,6 +105,7 @@ pub fn deploy_test_contracts() -> Contracts {
         test_erc20_address: contracts.remove("TEST_ERC20").expect("TEST_ERC20 missing"),
     }
 }
+
 pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_address: Address) {
     run_external_command(
         "test-upgrade-franklin.sh",
@@ -112,6 +113,13 @@ pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_addres
             &format!("0x{:x}", franklin_address),
             &format!("0x{:x}", upgrade_gatekeeper_address),
         ],
+    );
+}
+
+pub fn revert_all_not_verified_blocks(franklin_address: Address) {
+    run_external_command(
+        "test-revert-not-verified-blocks.sh",
+        &[&format!("0x{:x}", franklin_address)],
     );
 }
 

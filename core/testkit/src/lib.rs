@@ -470,6 +470,97 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
     println!("Full exit test success, token_id: {}", token);
 }
 
+pub fn perform_some_operations_no_verify(
+    token: u16,
+    test_setup: &mut TestSetup,
+    deposit_amount: BigUint,
+) {
+    // test deposit to other account
+    test_setup.start_block();
+    test_setup.deposit(
+        ETHAccountId(0),
+        ZKSyncAccountId(2),
+        Token(token),
+        deposit_amount.clone(),
+    );
+    test_setup.execute_commit_block().expect_success();
+
+    // test two deposits
+    test_setup.start_block();
+    test_setup.deposit(
+        ETHAccountId(0),
+        ZKSyncAccountId(1),
+        Token(token),
+        deposit_amount.clone(),
+    );
+    test_setup.deposit(
+        ETHAccountId(0),
+        ZKSyncAccountId(1),
+        Token(token),
+        deposit_amount.clone(),
+    );
+    test_setup.execute_commit_block().expect_success();
+
+    // test transfers
+    test_setup.start_block();
+
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+
+    //transfer to self should work
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(1),
+        Token(token),
+        &deposit_amount / BigUint::from(8u32),
+        &deposit_amount / BigUint::from(8u32),
+    );
+
+    //should be executed as a transfer
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(2),
+        Token(token),
+        &deposit_amount / BigUint::from(8u32),
+        &deposit_amount / BigUint::from(8u32),
+    );
+
+    let nonce = test_setup.accounts.zksync_accounts[1].nonce();
+    let incorrect_nonce_transfer = test_setup.accounts.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(0),
+        Token(token),
+        deposit_amount.clone(),
+        BigUint::from(0u32),
+        Some(nonce + 1),
+        false,
+    );
+    test_setup.execute_incorrect_tx(incorrect_nonce_transfer);
+
+    //should be executed as a transfer to new
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(2),
+        Token(token),
+        &deposit_amount / BigUint::from(4u32),
+        &deposit_amount / BigUint::from(4u32),
+    );
+
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
+
+    test_setup.withdraw(
+        ZKSyncAccountId(2),
+        ETHAccountId(0),
+        Token(token),
+        &deposit_amount / BigUint::from(4u32),
+        &deposit_amount / BigUint::from(4u32),
+    );
+    test_setup.execute_commit_block().expect_success();
+
+    test_setup.start_block();
+    test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
+    test_setup.execute_commit_block().expect_success();
+}
+
 pub struct TestkitConfig {
     pub chain_id: u8,
     pub gas_price_factor: usize,
