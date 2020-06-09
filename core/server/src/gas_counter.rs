@@ -9,12 +9,19 @@ use web3::types::U256;
 use models::node::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
-pub const TX_GAS_LIMIT: u64 = 3_000_000;
+/// This value must be big enough to fit big blocks with expensive transactions,
+/// but at the same time it should not exceed the block gas limit.
+pub const TX_GAS_LIMIT: u64 = 4_000_000;
 
 #[derive(Debug)]
 pub struct CommitCost;
 
 impl CommitCost {
+    // Below are costs of processing every kind of operation
+    // in `commitBlock` contract call.
+    //
+    // These values are estimated using the `gas_price_test` in `testkit`.
+
     pub const BASE_COST: u64 = 146026;
     pub const DEPOSIT_COST: u64 = 10397;
     pub const CHANGE_PUBKEY_COST: u64 = 27449;
@@ -47,6 +54,11 @@ impl CommitCost {
 pub struct VerifyCost;
 
 impl VerifyCost {
+    // Below are costs of processing every kind of operation
+    // in `verifyBlock` contract call.
+    //
+    // These values are estimated using the `gas_price_test` in `testkit`.
+
     pub const BASE_COST: u64 = 527451;
     pub const DEPOSIT_COST: u64 = 10997;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
@@ -75,6 +87,17 @@ impl VerifyCost {
     }
 }
 
+/// `GasCounter` is an entity capable of counting the estimated gas cost of an
+/// upcoming transaction. It watches for the total gas cost of either commit
+/// or withdraw operation to not exceed the reasonable gas limit amount.
+/// It is used by `state_keeper` module to seal the block once we're not able
+/// to safely insert any more transactions.
+///
+/// The estimation process is based on the pre-calculated "base cost" of operation
+/// (basically, cost of processing an empty block), and the added cost of all the
+/// operations in that block.
+///
+/// These estimated costs were calculated using the `gas_price_test` from `testkit`.
 #[derive(Debug)]
 pub struct GasCounter {
     commit_cost: U256,
@@ -91,20 +114,25 @@ impl Default for GasCounter {
 }
 
 impl GasCounter {
+    /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
     const COMPLETE_WITHDRAWALS_COST: u64 = 27096;
 
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Adds the cost of the operation to the gas counter.
+    ///
+    /// Returns `Ok(())` if transaction fits, and returns `Err(())` if
+    /// the block must be sealed without this transaction.
     pub fn add_op(&mut self, op: &FranklinOp) -> Result<(), ()> {
         let new_commit_cost = self.commit_cost + CommitCost::op_cost(op);
-        if new_commit_cost > U256::from(TX_GAS_LIMIT) {
+        if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
             return Err(());
         }
 
         let new_verify_cost = self.verify_cost + VerifyCost::op_cost(op);
-        if new_verify_cost > U256::from(TX_GAS_LIMIT) {
+        if Self::scale_up(new_verify_cost) > U256::from(TX_GAS_LIMIT) {
             return Err(());
         }
 
@@ -129,7 +157,12 @@ impl GasCounter {
             * U256::from(Self::COMPLETE_WITHDRAWALS_COST);
 
         // We scale this value up nevertheless, just in case.
-        approx_limit * U256::from(130) / U256::from(100)
+        Self::scale_up(approx_limit)
+    }
+
+    /// Increases the value by 30%.
+    fn scale_up(value: U256) -> U256 {
+        value * U256::from(130) / U256::from(100)
     }
 }
 
