@@ -241,8 +241,9 @@ mod tests {
         assert_eq!(gas_counter.verify_cost, U256::from(VerifyCost::BASE_COST));
 
         // Verify cost is 0, thus amount of operations is determined by the commit cost.
-        let amount_ops_in_block = (U256::from(TX_GAS_LIMIT) - gas_counter.commit_cost)
-            / U256::from(CommitCost::CHANGE_PUBKEY_COST);
+        let amount_ops_in_block = (U256::from(TX_GAS_LIMIT)
+            - GasCounter::scale_up(gas_counter.commit_cost))
+            / GasCounter::scale_up(U256::from(CommitCost::CHANGE_PUBKEY_COST));
 
         for _ in 0..amount_ops_in_block.as_u64() {
             gas_counter
