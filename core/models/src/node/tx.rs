@@ -942,9 +942,11 @@ mod test {
     }
 
     fn gen_account_id<T: Rng>(rng: &mut T) -> AccountId {
-        let mut bytes = rng.gen::<u32>().to_be_bytes();
-        bytes[0] = 0;
-        u32::from_be_bytes(bytes)
+        rng.gen::<u32>().min(max_account_id())
+    }
+
+    fn gen_token_id<T: Rng>(rng: &mut T) -> TokenId {
+        rng.gen::<u16>().min(max_token_id())
     }
 
     #[test]
@@ -955,7 +957,7 @@ mod test {
             gen_account_id(&mut rng),
             Address::from(rng.gen::<[u8; 20]>()),
             Address::from(rng.gen::<[u8; 20]>()),
-            rng.gen(),
+            gen_token_id(&mut rng),
             BigUint::from(12_340_000_000_000u64),
             BigUint::from(56_700_000_000u64),
             rng.gen(),
@@ -1005,7 +1007,7 @@ mod test {
             gen_account_id(&mut rng),
             Address::from(rng.gen::<[u8; 20]>()),
             Address::from(rng.gen::<[u8; 20]>()),
-            rng.gen(),
+            gen_token_id(&mut rng),
             BigUint::from(12_340_000_000_000u64),
             BigUint::from(56_700_000_000u64),
             rng.gen(),
