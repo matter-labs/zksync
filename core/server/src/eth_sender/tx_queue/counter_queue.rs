@@ -56,6 +56,11 @@ impl<T: fmt::Debug> CounterQueue<T> {
     pub fn get_count(&self) -> usize {
         self.counter
     }
+
+    /// Returns the current size of the queue.
+    pub fn len(&self) -> usize {
+        self.elements.len()
+    }
 }
 
 #[cfg(test)]
