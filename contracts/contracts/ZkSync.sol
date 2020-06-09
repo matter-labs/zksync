@@ -678,7 +678,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
 
             uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-            balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
+            // after this all writes to this slot will cost 5k gas
+            balancesToWithdraw[packedBalanceKey] = BalanceToWithdraw({
+                balanceToWithdraw: balance.add(_amount),
+                gasReserveValue: 0xff
+            });
 
             if (addToPendingWithdrawalsQueue) {
                 pendingWithdrawals[firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
@@ -746,8 +750,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function deleteRequests(uint64 _number) internal {
         require(_number <= totalOpenPriorityRequests, "pcs21"); // number is higher than total priority requests number
 
+        uint64 numberOfRequestsToClear = Utils.minU64(_number, MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY);
         uint64 startIndex = firstPriorityRequestId;
-        for (uint64 i = startIndex; i < startIndex + _number; i++) {
+        for (uint64 i = startIndex; i < startIndex + numberOfRequestsToClear; i++) {
             delete priorityRequests[i];
         }
 

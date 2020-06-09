@@ -64,4 +64,10 @@ contract Config {
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     /// NOTE: Priority expiration should be > EXPECT_VERIFICATION_IN, otherwise incorrect block with priority op could not be reverted.
     uint256 constant PRIORITY_EXPIRATION = 3 days / BLOCK_PERIOD;
+
+    /// @notice Maximum number of priority request to clear during verifying the block
+    /// @dev Cause deleting storage slots cost 5k gas per each slot it's unprofitable to clear too many slots
+    /// @dev Value based on the assumption of ~750k gas cost of verifying and 5 used storage slots per PriorityOperation structure
+    uint64 constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
+
 }
