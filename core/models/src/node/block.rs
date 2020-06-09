@@ -7,7 +7,7 @@ use crate::params::CHUNK_BIT_WIDTH;
 use crate::serialization::*;
 use chrono::DateTime;
 use chrono::Utc;
-use web3::types::H256;
+use web3::types::{H256, U256};
 
 #[derive(Clone, Debug)]
 pub struct PendingBlock {
@@ -81,10 +81,16 @@ pub struct Block {
     pub processed_priority_ops: (u64, u64),
     // actual block chunks sizes that will be used on contract, `block_chunks_sizes >= block.chunks_used()`
     pub block_chunks_size: usize,
+
+    /// Gas limit to be set for the Commit Ethereum transaction.
+    pub commit_gas_limit: U256,
+    /// Gas limit to be set for the Verify Ethereum transaction.
+    pub verify_gas_limit: U256,
 }
 
 impl Block {
     // Constructor
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_number: BlockNumber,
         new_root_hash: Fr,
@@ -92,6 +98,8 @@ impl Block {
         block_transactions: Vec<ExecutedOperations>,
         processed_priority_ops: (u64, u64),
         block_chunks_size: usize,
+        commit_gas_limit: U256,
+        verify_gas_limit: U256,
     ) -> Self {
         Self {
             block_number,
@@ -100,10 +108,13 @@ impl Block {
             block_transactions,
             processed_priority_ops,
             block_chunks_size,
+            commit_gas_limit,
+            verify_gas_limit,
         }
     }
 
     /// Constructor that determines smallest block size for the given block
+    #[allow(clippy::too_many_arguments)]
     pub fn new_from_availabe_block_sizes(
         block_number: BlockNumber,
         new_root_hash: Fr,
@@ -111,6 +122,8 @@ impl Block {
         block_transactions: Vec<ExecutedOperations>,
         processed_priority_ops: (u64, u64),
         available_block_chunks_sizes: &[usize],
+        commit_gas_limit: U256,
+        verify_gas_limit: U256,
     ) -> Self {
         let mut block = Self {
             block_number,
@@ -119,6 +132,8 @@ impl Block {
             block_transactions,
             processed_priority_ops,
             block_chunks_size: 0,
+            commit_gas_limit,
+            verify_gas_limit,
         };
         block.block_chunks_size = block.smallest_block_size(available_block_chunks_sizes);
         block

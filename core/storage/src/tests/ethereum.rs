@@ -20,7 +20,16 @@ pub fn get_operation(block_number: BlockNumber) -> Operation {
     Operation {
         id: None,
         action: Action::Commit,
-        block: Block::new(block_number, Fr::default(), 0, Vec::new(), (0, 0), 100),
+        block: Block::new(
+            block_number,
+            Fr::default(),
+            0,
+            Vec::new(),
+            (0, 0),
+            100,
+            1_000_000.into(),
+            1_500_000.into(),
+        ),
         accounts_updated: Default::default(),
     }
 }

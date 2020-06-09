@@ -643,3 +643,51 @@ impl FranklinOp {
         }
     }
 }
+
+impl From<NoopOp> for FranklinOp {
+    fn from(op: NoopOp) -> Self {
+        Self::Noop(op)
+    }
+}
+
+impl From<DepositOp> for FranklinOp {
+    fn from(op: DepositOp) -> Self {
+        Self::Deposit(Box::new(op))
+    }
+}
+
+impl From<TransferToNewOp> for FranklinOp {
+    fn from(op: TransferToNewOp) -> Self {
+        Self::TransferToNew(Box::new(op))
+    }
+}
+
+impl From<WithdrawOp> for FranklinOp {
+    fn from(op: WithdrawOp) -> Self {
+        Self::Withdraw(Box::new(op))
+    }
+}
+
+impl From<CloseOp> for FranklinOp {
+    fn from(op: CloseOp) -> Self {
+        Self::Close(Box::new(op))
+    }
+}
+
+impl From<TransferOp> for FranklinOp {
+    fn from(op: TransferOp) -> Self {
+        Self::Transfer(Box::new(op))
+    }
+}
+
+impl From<FullExitOp> for FranklinOp {
+    fn from(op: FullExitOp) -> Self {
+        Self::FullExit(Box::new(op))
+    }
+}
+
+impl From<ChangePubKeyOp> for FranklinOp {
+    fn from(op: ChangePubKeyOp) -> Self {
+        Self::ChangePubKeyOffchain(Box::new(op))
+    }
+}
