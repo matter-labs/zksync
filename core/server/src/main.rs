@@ -208,6 +208,7 @@ fn main() {
         stop_signal_sender,
         observer_mode_final_state.circuit_acc_tree,
         observer_mode_final_state.circuit_tree_block,
+        config_opts.idle_provers,
     );
 
     let mempool_task = run_mempool_task(

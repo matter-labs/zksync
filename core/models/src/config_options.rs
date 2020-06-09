@@ -126,6 +126,7 @@ pub struct ConfigurationOptions {
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
     pub ticker_url: Url,
+    pub idle_provers: u32,
 }
 
 impl ConfigurationOptions {
@@ -161,6 +162,7 @@ impl ConfigurationOptions {
             )),
             eth_network: parse_env("ETH_NETWORK"),
             ticker_url: parse_env("TICKER_URL"),
+            idle_provers: parse_env("IDLE_PROVERS"),
         }
     }
 }

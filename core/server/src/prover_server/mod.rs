@@ -31,8 +31,12 @@ impl AppState {
         connection_pool: ConnectionPool,
         preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
         prover_timeout: Duration,
+        idle_provers: u32,
     ) -> Self {
-        let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(connection_pool.clone())));
+        let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(
+            connection_pool.clone(),
+            idle_provers,
+        )));
 
         Self {
             connection_pool,
@@ -222,6 +226,7 @@ pub fn start_prover_server(
     panic_notify: mpsc::Sender<bool>,
     account_tree: CircuitAccountTree,
     tree_block_number: BlockNumber,
+    idle_provers: u32,
 ) {
     thread::Builder::new()
         .name("prover_server".to_string())
@@ -250,6 +255,7 @@ pub fn start_prover_server(
                         connection_pool.clone(),
                         data_pool.clone(),
                         prover_timeout,
+                        idle_provers,
                     ))
                     .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))

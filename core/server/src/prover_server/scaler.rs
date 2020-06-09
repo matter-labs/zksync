@@ -1,7 +1,6 @@
 //! Module with utilities for prover scaler service.
 
 // Workspace deps
-use models::config_options::parse_env;
 use storage::ConnectionPool;
 
 /// Scaler oracle provides information for prover scaler
@@ -10,11 +9,14 @@ use storage::ConnectionPool;
 pub struct ScalerOracle {
     /// Database access to gather the information about amount of pending blocks.
     db: ConnectionPool,
+
+    /// Number of idle provers running for faster up-scaling
+    idle_provers: u32,
 }
 
 impl ScalerOracle {
-    pub fn new(db: ConnectionPool) -> Self {
-        Self { db }
+    pub fn new(db: ConnectionPool, idle_provers: u32) -> Self {
+        Self { db, idle_provers }
     }
 
     /// Decides how many prover entities should be created depending on the amount of pending blocks.
@@ -24,8 +26,7 @@ impl ScalerOracle {
 
         let storage = self.db.access_storage()?;
         let pending_jobs = storage.prover_schema().pending_jobs_count()?;
-        let idle_provers: u32 = parse_env("IDLE_PROVERS");
-        let provers_required = pending_jobs + idle_provers;
+        let provers_required = pending_jobs + self.idle_provers;
 
         Ok(provers_required)
     }
