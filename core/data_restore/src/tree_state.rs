@@ -263,6 +263,9 @@ impl TreeState {
 
         self.last_fee_account_address = fee_account_address;
 
+        // As we restoring an already executed block, this value isn't important.
+        let gas_limit = 0.into();
+
         let block = Block::new_from_availabe_block_sizes(
             ops_block.block_num,
             self.state.root_hash(),
@@ -273,6 +276,8 @@ impl TreeState {
                 self.current_unprocessed_priority_op,
             ),
             &self.available_block_chunk_sizes,
+            gas_limit,
+            gas_limit,
         );
 
         self.state.block_number += 1;
@@ -313,8 +318,10 @@ impl TreeState {
                 data: priority_op,
                 deadline_block: 0,
                 eth_hash: Vec::new(),
+                eth_block: 0,
             },
             block_index,
+            created_at: chrono::Utc::now(),
         };
         ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
         self.current_unprocessed_priority_op += 1;
@@ -390,17 +397,17 @@ impl TreeState {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
-    use bigdecimal::BigDecimal;
     use models::node::{
         Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
+    use num::BigUint;
 
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
         let tx1 = Deposit {
             from: [1u8; 20].into(),
             token: 1,
-            amount: BigDecimal::from(1000),
+            amount: BigUint::from(1000u32),
             to: [7u8; 20].into(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
@@ -421,8 +428,8 @@ mod test {
             [7u8; 20].into(),
             [7u8; 20].into(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(1),
+            BigUint::from(20u32),
+            BigUint::from(1u32),
             1,
             None,
         );
@@ -444,8 +451,8 @@ mod test {
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(1),
+            BigUint::from(20u32),
+            BigUint::from(1u32),
             3,
             None,
         );
@@ -468,8 +475,8 @@ mod test {
             [8u8; 20].into(),
             [7u8; 20].into(),
             1,
-            BigDecimal::from(19),
-            BigDecimal::from(1),
+            BigUint::from(19u32),
+            BigUint::from(1u32),
             1,
             None,
         );
@@ -522,11 +529,11 @@ mod test {
 
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(zero_acc.address, [7u8; 20].into());
-        assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(980u32));
 
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(first_acc.address, [8u8; 20].into());
-        assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(0u32));
     }
 
     #[test]
@@ -534,7 +541,7 @@ mod test {
         let tx1 = Deposit {
             from: [1u8; 20].into(),
             token: 1,
-            amount: BigDecimal::from(1000),
+            amount: BigUint::from(1000u32),
             to: [7u8; 20].into(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
@@ -548,8 +555,8 @@ mod test {
             [7u8; 20].into(),
             [9u8; 20].into(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(1),
+            BigUint::from(20u32),
+            BigUint::from(1u32),
             1,
             None,
         );
@@ -564,8 +571,8 @@ mod test {
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(1),
+            BigUint::from(20u32),
+            BigUint::from(1u32),
             3,
             None,
         );
@@ -581,8 +588,8 @@ mod test {
             [8u8; 20].into(),
             [7u8; 20].into(),
             1,
-            BigDecimal::from(19),
-            BigDecimal::from(1),
+            BigUint::from(19u32),
+            BigUint::from(1u32),
             1,
             None,
         );
@@ -615,10 +622,10 @@ mod test {
 
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(zero_acc.address, [7u8; 20].into());
-        assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(980u32));
 
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(first_acc.address, [8u8; 20].into());
-        assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(0u32));
     }
 }

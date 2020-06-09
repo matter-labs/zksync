@@ -13,11 +13,15 @@ use models::{
         utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
     node::operations::CloseOp,
-    params as franklin_constants,
+    params::{
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH,
+        NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+    },
 };
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
+    utils::resize_grow_only,
     witness::{
         utils::{apply_leaf_operation, get_audits, SigDataInput},
         Witness,
@@ -49,26 +53,22 @@ impl Witness for CloseAccountWitness<Bn256> {
 
     fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.tx_type.unwrap(),
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
+        append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.address.unwrap(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            ACCOUNT_ID_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(franklin_constants::CHUNK_BIT_WIDTH, false);
+        resize_grow_only(&mut pubdata_bits, CloseOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()
-            .chunks(64)
+            .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
             .collect();
         let operation_zero = Operation {
@@ -97,18 +97,18 @@ impl<E: RescueEngine> CloseAccountWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("4").unwrap(), //Corresponding tx_type
-            franklin_constants::TX_TYPE_BIT_WIDTH,
+            TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
             &self.before.witness.account_witness.pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            NEW_PUBKEY_HASH_WIDTH,
         );
 
         append_be_fixed_width(
             &mut sig_bits,
             &self.before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
+            NONCE_BIT_WIDTH,
         );
         sig_bits
     }
@@ -123,7 +123,7 @@ impl CloseAccountWitness<Bn256> {
             get_audits(tree, close_account.account_address, 0);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        assert_eq!(capacity, 1 << account_tree_depth());
         let account_address_fe = Fr::from_str(&close_account.account_address.to_string()).unwrap();
 
         //calculate a and b

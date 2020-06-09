@@ -1,10 +1,10 @@
 export default {
     "http://localhost": {
-        API_SERVER: "http://localhost:3000",
-        ETH_NETWORK: "localhost",
-        WS_API_ADDR: "ws://localhost:3031",
-        HTTP_RPC_API_ADDR: "http://localhost:3030",
-    },
+        API_SERVER: "https://stage-api.zksync.dev",
+        ETH_NETWORK: "rinkeby",
+        WS_API_ADDR: "wss://stage-api.zksync.dev/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://stage-api.zksync.dev/jsrpc",
+     },
     "https://stage.zksync.dev": {
        API_SERVER: "https://stage-api.zksync.dev",
        ETH_NETWORK: "rinkeby",
@@ -23,4 +23,10 @@ export default {
         WS_API_ADDR: "wss://ropsten-api.zksync.dev/jsrpc-ws",
         HTTP_RPC_API_ADDR: "https://ropsten-api.zksync.dev/jsrpc",
     },
+    "https://explorer.test.zksync.dev": {
+        API_SERVER: "https://api.test.zksync.dev",
+        ETH_NETWORK: "rinkeby",
+        WS_API_ADDR: "wss://api.test.zksync.dev/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://api.test.zksync.dev/jsrpc",
+     },
 }[`${location.protocol}//${location.hostname}`];

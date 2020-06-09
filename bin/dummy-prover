@@ -24,9 +24,8 @@ COMMAND=${1:-run}
 
 function perform_redeployment {
     # Reset the database and redeploy contracts.
-    zksync build-contracts   
-    zksync db-reset
-    zksync genesis
+    zksync build-contracts
+    zksync genesis # genesis step includes the db-reset
     zksync redeploy
 }
 

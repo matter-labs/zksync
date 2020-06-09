@@ -1,12 +1,6 @@
 {
   "interface": [
     {
-      "inputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
       "anonymous": false,
       "inputs": [
         {
@@ -55,16 +49,16 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint32",
           "name": "franklinBlockId",
           "type": "uint32"
         },
         {
-          "indexed": false,
-          "internalType": "uint24",
+          "indexed": true,
+          "internalType": "uint32",
           "name": "accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "indexed": false,
@@ -73,7 +67,7 @@
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint16",
           "name": "tokenId",
           "type": "uint16"
@@ -123,16 +117,16 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint32",
           "name": "franklinBlockId",
           "type": "uint32"
         },
         {
-          "indexed": false,
-          "internalType": "uint24",
+          "indexed": true,
+          "internalType": "uint32",
           "name": "accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "indexed": false,
@@ -141,7 +135,7 @@
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint16",
           "name": "tokenId",
           "type": "uint16"
@@ -197,13 +191,13 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "address",
           "name": "sender",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint16",
           "name": "tokenId",
           "type": "uint16"
@@ -234,20 +228,35 @@
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint16",
           "name": "tokenId",
           "type": "uint16"
         },
         {
           "indexed": false,
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "amount",
-          "type": "uint256"
+          "type": "uint128"
         }
       ],
       "name": "OnchainWithdrawal",
       "type": "event"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "EMPTY_STRING_KECCAK",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
     },
     {
       "constant": true,
@@ -287,9 +296,9 @@
       "name": "balancesToWithdraw",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "balanceToWithdraw",
-          "type": "uint256"
+          "type": "uint128"
         },
         {
           "internalType": "uint8",
@@ -352,7 +361,7 @@
       "inputs": [
         {
           "internalType": "uint64",
-          "name": "_requests",
+          "name": "_n",
           "type": "uint64"
         }
       ],
@@ -371,14 +380,14 @@
           "type": "uint32"
         },
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_feeAccount",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
-          "internalType": "bytes32",
-          "name": "_newRoot",
-          "type": "bytes32"
+          "internalType": "bytes32[]",
+          "name": "_newBlockInfo",
+          "type": "bytes32[]"
         },
         {
           "internalType": "bytes",
@@ -426,9 +435,9 @@
           "type": "address"
         },
         {
-          "internalType": "uint128",
+          "internalType": "uint104",
           "name": "_amount",
-          "type": "uint128"
+          "type": "uint104"
         },
         {
           "internalType": "address",
@@ -461,9 +470,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "uint16",
@@ -491,9 +500,9 @@
       "constant": true,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "uint16",
@@ -562,9 +571,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint24",
+          "internalType": "uint32",
           "name": "_accountId",
-          "type": "uint24"
+          "type": "uint32"
         },
         {
           "internalType": "address",
@@ -595,13 +604,28 @@
       "name": "getBalanceToWithdraw",
       "outputs": [
         {
+          "internalType": "uint128",
+          "name": "",
+          "type": "uint128"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "getNoticePeriod",
+      "outputs": [
+        {
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
         }
       ],
       "payable": false,
-      "stateMutability": "view",
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -615,6 +639,21 @@
       ],
       "name": "initialize",
       "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "isReadyForUpgrade",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
       "payable": false,
       "stateMutability": "nonpayable",
       "type": "function"
@@ -689,21 +728,6 @@
       ],
       "payable": false,
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [],
-      "name": "readyForUpgrade",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -818,6 +842,21 @@
     },
     {
       "constant": false,
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "upgradeParameters",
+          "type": "bytes"
+        }
+      ],
+      "name": "upgrade",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
       "inputs": [],
       "name": "upgradeCanceled",
       "outputs": [],
@@ -830,21 +869,6 @@
       "inputs": [],
       "name": "upgradeFinishes",
       "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [],
-      "name": "upgradeNoticePeriod",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
       "payable": false,
       "stateMutability": "nonpayable",
       "type": "function"
@@ -946,9 +970,9 @@
           "type": "address"
         },
         {
-          "internalType": "uint256",
+          "internalType": "uint128",
           "name": "_amount",
-          "type": "uint256"
+          "type": "uint128"
         }
       ],
       "name": "withdrawERC20",
@@ -961,9 +985,45 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "contract IERC20",
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint128",
           "name": "_amount",
-          "type": "uint256"
+          "type": "uint128"
+        },
+        {
+          "internalType": "uint128",
+          "name": "_maxAmount",
+          "type": "uint128"
+        }
+      ],
+      "name": "withdrawERC20Guarded",
+      "outputs": [
+        {
+          "internalType": "uint128",
+          "name": "withdrawnAmount",
+          "type": "uint128"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "uint128",
+          "name": "_amount",
+          "type": "uint128"
         }
       ],
       "name": "withdrawETH",

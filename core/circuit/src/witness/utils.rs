@@ -11,6 +11,7 @@ use crypto_exports::franklin_crypto::{
     rescue::bn256::Bn256RescueParams,
 };
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -23,9 +24,10 @@ use models::{
         tx::PackedPublicKey,
         AccountId, BlockNumber, Engine,
     },
-    params as franklin_constants,
-    params::total_tokens,
-    primitives::big_decimal_to_u128,
+    params::{
+        total_tokens, used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS,
+    },
+    primitives::GetBits,
 };
 use plasma::state::CollectedFee;
 // Local deps
@@ -44,6 +46,7 @@ pub struct WitnessBuilder<'a> {
     pub fee_account_id: AccountId,
     pub block_number: BlockNumber,
     pub initial_root_hash: Fr,
+    pub initial_used_subtree_root_hash: Fr,
     pub operations: Vec<Operation<Engine>>,
     pub pubdata: Vec<bool>,
     pub root_before_fees: Option<Fr>,
@@ -61,11 +64,13 @@ impl<'a> WitnessBuilder<'a> {
         block_number: BlockNumber,
     ) -> WitnessBuilder {
         let initial_root_hash = account_tree.root_hash();
+        let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
         WitnessBuilder {
             account_tree,
             fee_account_id,
             block_number,
             initial_root_hash,
+            initial_used_subtree_root_hash,
             operations: Vec::new(),
             pubdata: Vec::new(),
             root_before_fees: None,
@@ -94,7 +99,7 @@ impl<'a> WitnessBuilder<'a> {
                 &self.account_tree,
                 self.fee_account_id,
             ));
-            self.pubdata.extend(vec![false; 64]);
+            self.pubdata.extend(vec![false; CHUNK_BIT_WIDTH]);
         }
     }
 
@@ -124,7 +129,7 @@ impl<'a> WitnessBuilder<'a> {
                 &mut self.account_tree,
                 self.fee_account_id,
                 u32::from(*token),
-                big_decimal_to_u128(amount),
+                amount.to_u128().unwrap(),
             );
             root_after_fee = root;
             fee_account_witness = acc_witness;
@@ -159,6 +164,7 @@ impl<'a> WitnessBuilder<'a> {
             rescue_params: &models::params::RESCUE_PARAMS,
             jubjub_params: &models::params::JUBJUB_PARAMS,
             old_root: Some(self.initial_root_hash),
+            initial_used_subtree_root: Some(self.initial_used_subtree_root_hash),
             operations: self.operations,
             pub_data_commitment: Some(
                 self.pubdata_commitment
@@ -191,9 +197,9 @@ pub fn generate_dummy_sig_data(
     let sender_pk = PublicKey::from_private(&private_key, p_g, &jubjub_params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
+    sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -222,9 +228,9 @@ pub fn generate_sig_witness(
     _params: &AltJubjubBn256,
 ) -> (Fr, Fr, Fr) {
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
+    sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -243,9 +249,9 @@ pub fn generate_sig_data(
 ) -> (SignatureData, Fr, Fr, Fr) {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
+    assert!(sig_bits_to_hash.len() <= MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
+    sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
     debug!(
         "inside generation after resize: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits_to_hash))
@@ -606,4 +612,25 @@ impl SigDataInput {
             },
         ]
     }
+}
+
+/// Get root hash of the used subtree.
+pub fn get_used_subtree_root_hash(account_tree: &CircuitAccountTree) -> Fr {
+    // We take account 0, and hash it with it's Merkle proof.
+    let account_index = 0;
+    let account_merkle_path = account_tree.merkle_path(account_index);
+    let account = account_tree
+        .get(account_index)
+        .cloned()
+        .unwrap_or_else(CircuitAccount::default);
+    let mut current_hash = account_tree.hasher.hash_bits(account.get_bits_le());
+    for merkle_path_item in account_merkle_path
+        .iter()
+        .take(used_account_subtree_depth())
+    {
+        current_hash = account_tree
+            .hasher
+            .compress(&current_hash, &merkle_path_item.0, 0);
+    }
+    current_hash
 }

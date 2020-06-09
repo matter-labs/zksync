@@ -38,13 +38,16 @@ library Bytes {
         bts = toBytesFromUIntTruncated(uint(self), 20);
     }
 
+    // NOTE: theoretically possible overflow of (_start + 20)
     function bytesToAddress(bytes memory self, uint256 _start) internal pure returns (address addr) {
-        require(self.length >= (_start + 20), "bta11");
+        uint256 newOffset = _start + 20;
+        require(self.length >= newOffset, "bta11");
         assembly {
-            addr := mload(add(add(self, 20), _start))
+            addr := mload(add(self, newOffset))
         }
     }
 
+    // NOTE: theoretically possible overflow of (_start + 20)
     function bytesToBytes20(bytes memory self, uint256 _start) internal pure returns (bytes20 r) {
         require(self.length >= (_start + 20), "btb20");
         assembly {
@@ -53,51 +56,64 @@ library Bytes {
         }
     }
 
+    // NOTE: theoretically possible overflow of (_start + 0x2)
     function bytesToUInt16(bytes memory _bytes, uint256 _start) internal pure returns (uint16 r) {
-        require(_bytes.length >= (_start + 2), "btu02");
+        uint256 newOffset = _start + 0x2;
+        require(_bytes.length >= newOffset, "btu02");
         assembly {
-            r := mload(add(add(_bytes, 0x2), _start))
+            r := mload(add(_bytes, newOffset))
         }
     }
 
+    // NOTE: theoretically possible overflow of (_start + 0x3)
     function bytesToUInt24(bytes memory _bytes, uint256 _start) internal pure returns (uint24 r) {
-        require(_bytes.length >= (_start + 3), "btu03");
+        uint256 newOffset = _start + 0x3;
+        require(_bytes.length >= newOffset, "btu03");
         assembly {
-            r := mload(add(add(_bytes, 0x3), _start))
+            r := mload(add(_bytes, newOffset))
         }
     }
 
+    // NOTE: theoretically possible overflow of (_start + 0x4)
     function bytesToUInt32(bytes memory _bytes, uint256 _start) internal pure returns (uint32 r) {
-        require(_bytes.length >= (_start + 4), "btu04");
+        uint256 newOffset = _start + 0x4;
+        require(_bytes.length >= newOffset, "btu04");
         assembly {
-            r := mload(add(add(_bytes, 0x4), _start))
+            r := mload(add(_bytes, newOffset))
         }
     }
 
+    // NOTE: theoretically possible overflow of (_start + 0x10)
     function bytesToUInt128(bytes memory _bytes, uint256 _start) internal pure returns (uint128 r) {
-        require(_bytes.length >= (_start + 16), "btu16");
+        uint256 newOffset = _start + 0x10;
+        require(_bytes.length >= newOffset, "btu16");
         assembly {
-            r := mload(add(add(_bytes, 0x10), _start))
+            r := mload(add(_bytes, newOffset))
         }
     }
 
+    // NOTE: theoretically possible overflow of (_start + 0x14)
     function bytesToUInt160(bytes memory _bytes, uint256 _start) internal pure returns (uint160 r) {
-        require(_bytes.length >= (_start + 20), "btu20");
+        uint256 newOffset = _start + 0x14;
+        require(_bytes.length >= newOffset, "btu20");
         assembly {
-            r := mload(add(add(_bytes, 0x14), _start))
+            r := mload(add(_bytes, newOffset))
         }
     }
 
+    // NOTE: theoretically possible overflow of (_start + 0x20)
     function bytesToBytes32(bytes memory  _bytes, uint256 _start) internal pure returns (bytes32 r) {
-        require(_bytes.length >= 0x20, "btb32");
+        uint256 newOffset = _start + 0x20;
+        require(_bytes.length >= newOffset, "btb32");
         assembly {
-            r := mload(add(add(_bytes, 0x20), _start))
+            r := mload(add(_bytes, newOffset))
         }
     }
 
     // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L228
     // Get slice from bytes arrays
     // Returns the newly created 'bytes memory'
+    // NOTE: theoretically possible overflow of (_start + _length)
     function slice(
         bytes memory _bytes,
         uint _start,
@@ -118,8 +134,6 @@ library Bytes {
                 let slice_end := add(slice_curr, _length)
 
                 for {
-                    // The multiplication in the next line has the same exact purpose
-                    // as the one above.
                     let array_current := add(_bytes, add(_start, 0x20))
                 } lt(slice_curr, slice_end) {
                     slice_curr := add(slice_curr, 0x20)
@@ -136,56 +150,67 @@ library Bytes {
     /// Reads byte stream
     /// @return new_offset - offset + amount of bytes read
     /// @return data - actually read data
+    // NOTE: theoretically possible overflow of (_offset + _length)
     function read(bytes memory _data, uint _offset, uint _length) internal pure returns (uint new_offset, bytes memory data) {
         data = slice(_data, _offset, _length);
         new_offset = _offset + _length;
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 1)
     function readBool(bytes memory _data, uint _offset) internal pure returns (uint new_offset, bool r) {
         new_offset = _offset + 1;
         r = uint8(_data[_offset]) != 0;
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 1)
     function readUint8(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint8 r) {
         new_offset = _offset + 1;
         r = uint8(_data[_offset]);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 2)
     function readUInt16(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint16 r) {
         new_offset = _offset + 2;
         r = bytesToUInt16(_data, _offset);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 3)
     function readUInt24(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint24 r) {
         new_offset = _offset + 3;
         r = bytesToUInt24(_data, _offset);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 4)
     function readUInt32(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint32 r) {
         new_offset = _offset + 4;
         r = bytesToUInt32(_data, _offset);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 16)
     function readUInt128(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint128 r) {
         new_offset = _offset + 16;
         r = bytesToUInt128(_data, _offset);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 20)
     function readUInt160(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint160 r) {
         new_offset = _offset + 20;
         r = bytesToUInt160(_data, _offset);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 20)
     function readAddress(bytes memory _data, uint _offset) internal pure returns (uint new_offset, address r) {
         new_offset = _offset + 20;
         r = bytesToAddress(_data, _offset);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 20)
     function readBytes20(bytes memory _data, uint _offset) internal pure returns (uint new_offset, bytes20 r) {
         new_offset = _offset + 20;
         r = bytesToBytes20(_data, _offset);
     }
 
+    // NOTE: theoretically possible overflow of (_offset + 32)
     function readBytes32(bytes memory _data, uint _offset) internal pure returns (uint new_offset, bytes32 r) {
         new_offset = _offset + 32;
         r = bytesToBytes32(_data, _offset);
@@ -193,7 +218,7 @@ library Bytes {
 
     // Helper function for hex conversion.
     function halfByteToHex(byte _byte) internal pure returns (byte _hexByte) {
-        require(uint8(_byte) | 0xf == 0xf, "hbh11");  // half byte's value is out of 0..15 range.
+        require(uint8(_byte) < 0x10, "hbh11");  // half byte's value is out of 0..15 range.
 
         // "FEDCBA9876543210" ASCII-encoded, shifted and automatically truncated.
         return byte (uint8 (0x66656463626139383736353433323130 >> (uint8 (_byte) * 8)));

@@ -17,7 +17,7 @@ export function isReadablyPrintable(tokenName) {
  * '0.0000128748239817239486128' => '0.0000128'
  * '1.00232132738' => '1.002'
  */
-export function readableEther(wei) {
+function readableEther(wei) {
     let formatted = ethers.utils.formatUnits(wei, 18);
     if (formatted.startsWith('0.') == false) {
         return formatted.match(/\d+\.\d{1,3}/)[0];
@@ -28,7 +28,7 @@ export function readableEther(wei) {
 
 export function shortenHash(str, fallback) {
     try {
-        return `${str.slice(0, 8)}..${str.slice(-6)}`;
+        return `${str.slice(0, 14)}...`;
     } catch (e) {
         return fallback || 'unknown';
     }
@@ -36,5 +36,9 @@ export function shortenHash(str, fallback) {
 
 export function formatDate(timeStr) {
     if (timeStr == null) return '';
-    return timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].split('.')[0] + " UTC";
+    return timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].slice(0, 8) + " UTC";
+}
+
+export function formatToken(amount, token) {
+    return window.syncProvider.tokenSet.formatToken(token, amount);
 }

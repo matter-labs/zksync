@@ -53,21 +53,34 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
     }
 }
 
-pub fn deploy_test_contracts() -> Contracts {
-    let result = Command::new("sh")
-        .arg("deploy-testkit.sh")
+/// Runs external command and returns stdout output
+fn run_external_command(command: &str, args: &[&str]) -> String {
+    let result = Command::new(command)
+        .args(args)
         .output()
-        .expect("failed to execute contract deploy script");
+        .unwrap_or_else(|e| panic!("failed to execute command: {}, err: {}", command, e));
 
     let stdout = String::from_utf8(result.stdout).expect("stdout is not valid utf8");
     let stderr = String::from_utf8(result.stderr).expect("stderr is not valid utf8");
 
     if !result.status.success() {
         panic!(
-            "failed to run contract deploy script:\nstdout: {}\nstderr: {}",
-            stdout, stderr
+            "failed to run exetrnal command {}:\nstdout: {}\nstderr: {}",
+            command, stdout, stderr
         );
     }
+    stdout
+}
+
+pub fn js_revert_reason(tx_hash: &H256) -> String {
+    run_external_command(
+        "revert-reason",
+        &[&format!("0x{:x}", tx_hash), "http://localhost:7545"],
+    )
+}
+
+pub fn deploy_test_contracts() -> Contracts {
+    let stdout = run_external_command("deploy-testkit.sh", &[]);
 
     let mut contracts = HashMap::new();
     for std_out_line in stdout.split_whitespace().collect::<Vec<_>>() {
@@ -93,21 +106,13 @@ pub fn deploy_test_contracts() -> Contracts {
     }
 }
 pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_address: Address) {
-    let result = Command::new("sh")
-        .arg("test-upgrade-franklin.sh")
-        .arg(format!("0x{:x}", franklin_address))
-        .arg(format!("0x{:x}", upgrade_gatekeeper_address))
-        .output()
-        .expect("failed to execute test upgrade franklin script");
-    if !result.status.success() {
-        panic!("test upgrade franklin script failed")
-    }
-    if !result.stderr.is_empty() {
-        panic!(
-            "test upgrade franklin script failed with error: {}",
-            String::from_utf8_lossy(&result.stderr).to_string()
-        )
-    }
+    run_external_command(
+        "test-upgrade-franklin.sh",
+        &[
+            &format!("0x{:x}", franklin_address),
+            &format!("0x{:x}", upgrade_gatekeeper_address),
+        ],
+    );
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -119,14 +124,7 @@ pub struct ETHAccountInfo {
 
 /// First is vec of test acccounts, second is commit account
 pub fn get_test_accounts() -> (Vec<ETHAccountInfo>, ETHAccountInfo) {
-    let result = Command::new("sh")
-        .arg("print-test-accounts.sh")
-        .output()
-        .expect("failed to execute print test accounts script");
-    if !result.status.success() {
-        panic!("print test accounts script failed")
-    }
-    let stdout = String::from_utf8(result.stdout).expect("stdout is not valid utf8");
+    let stdout = run_external_command("print-test-accounts.sh", &[]);
 
     if let Ok(mut parsed) = serde_json::from_str::<Vec<ETHAccountInfo>>(&stdout) {
         let commit_account = parsed.remove(0);

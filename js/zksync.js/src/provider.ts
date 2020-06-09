@@ -13,7 +13,8 @@ import {
     ContractAddress,
     Tokens,
     TokenAddress,
-    TxEthSignature
+    TxEthSignature,
+    Fee
 } from "./types";
 import {
     isTokenETH,
@@ -182,15 +183,31 @@ export class Provider {
 
     async getTransactionFee(
         txType: "Withdraw" | "Transfer",
-        amount: utils.BigNumberish,
+        address: Address,
         tokenLike: TokenLike
-    ): Promise<utils.BigNumber> {
+    ): Promise<Fee> {
         const transactionFee = await this.transport.request("get_tx_fee", [
             txType,
-            amount.toString(),
+            address.toString(),
             tokenLike
         ]);
-        return utils.bigNumberify(transactionFee);
+        return {
+            feeType: transactionFee.feeType,
+            gasTxAmount: utils.bigNumberify(transactionFee.gasTxAmount),
+            gasPriceWei: utils.bigNumberify(transactionFee.gasPriceWei),
+            gasFee: utils.bigNumberify(transactionFee.gasFee),
+            zkpFee: utils.bigNumberify(transactionFee.zkpFee),
+            totalFee: utils.bigNumberify(transactionFee.totalFee),
+        };
+    }
+
+    async getTokenPrice(
+        tokenLike: TokenLike
+    ): Promise<number> {
+        const tokenPrice = await this.transport.request("get_token_price", [
+            tokenLike
+        ]);
+        return parseFloat(tokenPrice);
     }
 
     async disconnect() {

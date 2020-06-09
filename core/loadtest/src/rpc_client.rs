@@ -1,9 +1,13 @@
 // Built-in imports
+use std::str::FromStr;
 // External uses
 use jsonrpc_core::types::response::Output;
+use num::BigUint;
 // Workspace uses
-use models::node::tx::{FranklinTx, PackedEthSignature, TxHash};
-use models::node::Address;
+use models::node::{
+    tx::{FranklinTx, PackedEthSignature, TxHash},
+    Address,
+};
 use server::api_server::rpc_server::AccountInfoResp;
 // Local uses
 use self::messages::JsonRpcRequest;
@@ -30,6 +34,23 @@ impl RpcClient {
             rpc_addr: rpc_addr.into(),
             client: reqwest::Client::new(),
         }
+    }
+
+    pub async fn get_tx_fee(
+        &self,
+        tx_type: &str,
+        address: Address,
+        token_symbol: &str,
+    ) -> Result<BigUint, failure::Error> {
+        let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token_symbol);
+
+        let ret = self.post(&msg).await?;
+        let fee_value = ret["totalFee"]
+            .as_str()
+            .expect("Incorrect `totalFee` entry of response");
+        let fee = BigUint::from_str(&fee_value).expect("failed to parse `get_tx_fee` response");
+
+        Ok(fee)
     }
 
     /// Sends the transaction to the ZKSync server using the JSON RPC.
@@ -177,6 +198,14 @@ mod messages {
             let mut params = Vec::new();
             params.push(serde_json::to_value(tx_hash).expect("serialization fail"));
             Self::create("tx_info", params)
+        }
+
+        pub fn get_tx_fee(tx_type: &str, address: Address, token_symbol: &str) -> Self {
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(tx_type).expect("serialization fail"));
+            params.push(serde_json::to_value(address).expect("serialization fail"));
+            params.push(serde_json::to_value(token_symbol).expect("serialization fail"));
+            Self::create("get_tx_fee", params)
         }
     }
 }

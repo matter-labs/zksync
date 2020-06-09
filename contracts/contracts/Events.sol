@@ -6,7 +6,7 @@ import "./Operations.sol";
 
 /// @title zkSync events
 /// @author Matter Labs
-contract Events {
+interface Events {
 
     /// @notice Event emitted when a block is committed
     event BlockCommit(uint32 indexed blockNumber);
@@ -17,14 +17,14 @@ contract Events {
     /// @notice Event emitted when user send a transaction to withdraw her funds from onchain balance
     event OnchainWithdrawal(
         address indexed owner,
-        uint16 tokenId,
+        uint16 indexed tokenId,
         uint128 amount
     );
 
     /// @notice Event emitted when user send a transaction to deposit her funds
     event OnchainDeposit(
-        address sender,
-        uint16 tokenId,
+        address indexed sender,
+        uint16 indexed tokenId,
         uint128 amount,
         address indexed owner
     );
@@ -55,46 +55,53 @@ contract Events {
     );
 
     event DepositCommit(
-        uint32 franklinBlockId,
-        uint24 accountId,
+        uint32 indexed franklinBlockId,
+        uint32 indexed accountId,
         address owner,
-        uint16 tokenId,
+        uint16 indexed tokenId,
         uint128 amount
     );
 
     event FullExitCommit(
-        uint32 franklinBlockId,
-        uint24 accountId,
+        uint32 indexed franklinBlockId,
+        uint32 indexed accountId,
         address owner,
-        uint16 tokenId,
+        uint16 indexed tokenId,
         uint128 amount
     );
 }
 
 /// @title Upgrade events
 /// @author Matter Labs
-contract UpgradeEvents {
+interface UpgradeEvents {
 
     /// @notice Event emitted when new upgradeable contract is added to upgrade gatekeeper's list of managed contracts
-    event UpgradeableAdd(
-        Upgradeable upgradeable
+    event NewUpgradable(
+        uint versionId,
+        address upgradeable
     );
 
     /// @notice Upgrade mode enter event
     event NoticePeriodStart(
-        address[] newTargets
+        uint versionId,
+        address[] newTargets,
+        uint noticePeriod // notice period (in seconds)
     );
 
     /// @notice Upgrade mode cancel event
-    event UpgradeCancel();
+    event UpgradeCancel(
+        uint versionId
+    );
 
     /// @notice Upgrade mode preparation status event
-    event PreparationStart();
+    event PreparationStart(
+        uint versionId
+    );
 
     /// @notice Upgrade mode complete event
     event UpgradeComplete(
-        Upgradeable upgradeable,
-        address newTargetAddress
+        uint versionId,
+        address[] newTargets
     );
 
 }

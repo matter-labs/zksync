@@ -8,10 +8,14 @@
         :items="transactions" 
         :per-page="rowsPerPage" 
         :current-page="currentPage"
-        @row-clicked="onRowClicked" 
         :fields="fields" 
-        class="clickable"
+        class="nowrap"
     >
+        <template v-slot:cell(tx_hash)="data">
+            <a :href="`/transactions/${data.item['tx_hash']}`">
+                {{ shortenHash(data.item['tx_hash']) }}
+            </a>    
+        </template>
         <template v-slot:cell(type)="data"><span v-html="data.item['type']" /></template>
         <template v-slot:cell(from)="data"><span v-html="data.item['from']" /></template>
         <template v-slot:cell(to)="data"><span v-html="data.item['to']" /></template>
@@ -27,6 +31,13 @@
 </template>
 
 <script>
+import CopyableAddress from './CopyableAddress.vue';
+import { shortenHash } from './utils';
+
+const components = {
+    CopyableAddress,
+};
+
 export default {
     name: 'transaction-list',
     props: ['blockNumber', 'transactions'],
@@ -38,13 +49,15 @@ export default {
         onRowClicked(item) {
             this.$parent.$router.push('/transactions/' + item.tx_hash);
         },
+        shortenHash,
     },
     computed: {
         fields() {
             return this.transactions.length == 0 ? []
-                 : Object.keys(this.transactions[0]).filter(k => k != 'tx_hash');
+                 : Object.keys(this.transactions[0]).filter(k => ! ['fromAddr', 'toAddr'].includes(k));
         },
     },
+    components,
 };
 </script>
 

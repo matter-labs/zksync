@@ -127,6 +127,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         rescue_params: &params::RESCUE_PARAMS,
         jubjub_params: &params::JUBJUB_PARAMS,
         old_root: None,
+        initial_used_subtree_root: None,
         validator_address: None,
         block_number: None,
         pub_data_commitment: None,

@@ -1,22 +1,20 @@
 <template>
 <div>
-    <b-navbar toggleable="md" type="dark" variant="info">
-        <b-container>
-            <b-navbar-brand href="/">zkSync Network</b-navbar-brand>
-            <b-navbar-nav class="ml-auto">
-                <b-nav-form>
-                    <SearchField :searchFieldInMenu="true" />
-                </b-nav-form>
-            </b-navbar-nav>
-        </b-container>
-    </b-navbar>
+    <Navbar />
     <br>
     <b-container>
-        <b-breadcrumb class="" :items="breadcrumbs"></b-breadcrumb>
+        <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <h5 class="mt-3 mb-2">Account data</h5>
         <b-card no-body class="table-margin-hack">
-            <b-table responsive thead-class="hidden_header" class="my-0 py-0" :items="accountDataProps">
-                <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
+            <b-table responsive thead-class="displaynone" class="nowrap" :items="accountDataProps">
+                <template v-slot:cell(value)="data">
+                    <CopyableAddress
+                        class="bigger-text"
+                        :address="address" 
+                        :linkHtml="data.item['value']"
+                        :tooltipRight="true"
+                    />
+                </template>
             </b-table>
         </b-card>
         <h5 class="mt-3 mb-2">Account balances</h5>
@@ -25,11 +23,11 @@
             width="100" 
             height="100"
             v-if="loading">
-        <div v-else-if="balances.length == 0" style="font-size: 2em">
+        <div v-else-if="balances.length == 0">
             No balances yet.
         </div>
         <b-card v-else no-body class="table-margin-hack table-width-hack">
-            <b-table responsive thead-class="hidden_header" :items="balancesProps">
+            <b-table responsive thead-class="displaynone" class="nowrap" :items="balancesProps">
                 <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
             </b-table>
         </b-card>
@@ -39,26 +37,25 @@
             width="100" 
             height="100"
             v-if="loading">
-        <div v-else-if="transactions.length == 0" style="font-size: 2em">
+        <div v-else-if="transactions.length == 0">
             No transactions yet.
         </div>
         <div v-else>
             <b-card no-body class="table-margin-hack">
                 <b-table
                     responsive 
-                    class="clickable"
+                    class="nowrap"
                     :items="transactionProps" 
-                    :fields="transactionFields" 
-                    @row-clicked="onRowClicked">
-                    <template v-slot:cell(Type)   ="data"><span v-html="data.item['Type']"    /></template>
-                    <template v-slot:cell(TxnHash)="data"><span v-html="data.item['TxnHash']" /></template>
-                    <template v-slot:cell(Block)  ="data"><span v-html="data.item['Block']"   /></template>
-                    <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"   /></template>
-                    <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']"  /></template>
-                    <template v-slot:cell(Age)    ="data"><span v-html="data.item['Age']"     /></template>
-                    <template v-slot:cell(From)   ="data"><span v-html="data.item['From']"    /></template>
-                    <template v-slot:cell(To)     ="data"><span v-html="data.item['To']"      /></template>
-                    <template v-slot:cell(Fee)    ="data"><span v-html="data.item['Fee']"     /></template>
+                    :fields="transactionFields">
+                    <template v-slot:cell(Type)   ="data"><span v-html="data.item['Type']"   /></template>
+                    <template v-slot:cell(TxHash) ="data"><span v-html="data.item['TxHash']" /></template>
+                    <template v-slot:cell(Block)  ="data"><span v-html="data.item['Block']"  /></template>
+                    <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"  /></template>
+                    <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']" /></template>
+                    <template v-slot:cell(Age)    ="data"><span v-html="data.item['Age']"    /></template>
+                    <template v-slot:cell(From)   ="data"><span v-html="data.item['From']"   /></template>
+                    <template v-slot:cell(To)     ="data"><span v-html="data.item['To']"     /></template>
+                    <template v-slot:cell(Fee)    ="data"><span v-html="data.item['Fee']"    /></template>
                 </b-table>
             </b-card>
             <b-pagination 
@@ -74,24 +71,20 @@
 </div>
 </template>
 
-<style>
-.hidden_header {
-  display: none;
-}
-</style>
-
 <script>
 
 import store from './store';
 import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
-import { readableEther, shortenHash, formatDate } from './utils';
+import { shortenHash, formatDate } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
+import Navbar from './Navbar.vue';
 
 const components = {
     SearchField,
     CopyableAddress,
+    Navbar,
 };
 
 export default {
@@ -136,7 +129,7 @@ export default {
         async update() {
             const balances = await this.client.getCommitedBalances(this.address);
             this.balances = balances
-                .map(bal => ({ name: bal.tokenName, value: bal.balance }));
+                .map(bal => ({ name: bal.tokenSymbol, value: bal.balance }));
 
             const offset = (this.currentPage - 1) * this.rowsPerPage;
             const limit = this.rowsPerPage;
@@ -186,7 +179,7 @@ export default {
         },
         accountDataProps() {
             return [
-                { name: 'Address',          value: `<code>${this.address}</code>`},
+                { name: 'Address',          value: `<a>${this.address}</a> ` },
             ];
         },
         balancesProps() {
@@ -207,66 +200,85 @@ export default {
         transactionProps() {
             return this.transactions
                 .map(tx => {
-                    let TxnHash = `<code>
-                        <a href="${this.routerBase}transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
-                            ${shortenHash(tx.data.hash, 'unknown! hash')}
-                        </a>
-                    </code>`;                    
+                    if (tx.data.hash.startsWith('sync-tx:')) {
+                        tx.data.hash = tx.data.hash.slice('sync-tx:'.length);
+                    }
 
-                    const link_from
-                        = tx.data.type == 'Deposit' ? `${this.blockchainExplorerAddress}/${tx.data.from}`
+                    if (tx.data.type == 'Withdraw') {
+                        tx.data.type = 'Withdrawal';
+                    }
+
+                    let TxHash = `
+                        <a href="${this.routerBase}transactions/${tx.data.hash}">
+                            ${shortenHash(tx.data.hash, 'unknown! hash')}
+                        </a>`;
+
+                    const link_from = tx.data.type == 'Deposit' 
+                        ? `${this.blockchainExplorerAddress}/${tx.data.from}`
                         : `${this.routerBase}accounts/${tx.data.from}`;
 
-                    const link_to
-                        = tx.data.type == 'Withdraw' ? `${this.blockchainExplorerAddress}/${tx.data.to}`
+                    const link_to = tx.data.type == 'Withdrawal' 
+                        ? `${this.blockchainExplorerAddress}/${tx.data.to}`
                         : `${this.routerBase}accounts/${tx.data.to}`;
 
-                    const target_from
-                        = tx.data.type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
+                    const target_from = tx.data.type == 'Deposit' 
+                        ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    const target_to
-                        = tx.data.type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
+                    const target_to = tx.data.type == 'Withdrawal' 
+                        ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    const From = `<code>
+                    const onchain_from = tx.data.type == 'Deposit' 
+                        ? '<i class="fas fa-external-link-alt"></i> '
+                        : '';
+
+                    const onchain_to = tx.data.type == 'Withdrawal' 
+                        ? '<i class="fas fa-external-link-alt"></i> '
+                        : '';
+
+                    const From = `
                         <a href="${link_from}" ${target_from}>
                             ${shortenHash(tx.data.from, 'unknown! from')}
-                        </a>
-                    </code>`;
+                            ${onchain_from}
+                        </a>`;
 
-                    const To = `<code>
+                    const To = `
                         <a href="${link_to}" ${target_to}>
                             ${
                                 tx.data.type == "ChangePubKey" 
                                     ? ''
                                     : shortenHash(tx.data.to, 'unknown! to')
                             }
-                        </a>
-                    </code>`;
 
-                    const Type = `<b>${tx.data.type}</b>`;
+                            ${ tx.data.type == "ChangePubKey" ? '' : onchain_to }
+                        </a>`;
+
+                    const Type = `${tx.data.type}`;
                     const Amount 
                         = tx.data.type == "ChangePubKey" ? ''
-                        : `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
+                        : `${tx.data.token} <span>${tx.data.amount}</span>`;
 
                     const CreatedAt = formatDate(tx.data.created_at);
 
                     return {
+                        TxHash,
                         Type,
-                        TxnHash,
                         Amount,
                         From, 
                         To,
                         CreatedAt,
 
+                        fromAddr: tx.data.from,
+                        toAddr: tx.data.to,
                         hash: tx.data.hash,
                     };
                 });
         },
         transactionFields() {
             return this.transactionProps && this.transactionProps.length
-                 ? Object.keys(this.transactionProps[0]).filter(k => k != 'hash')
+                 ? Object.keys(this.transactionProps[0])
+                    .filter(k => ! ['hash', 'fromAddr', 'toAddr'].includes(k))
                  : [];
         }
     },
@@ -282,5 +294,11 @@ export default {
 
 .table-width-hack td:first-child {
     width: 10em;
+}
+.normalize-text {
+    font-size: 1.0em;
+}
+.bigger-text {
+    font-size: 1.05em;
 }
 </style>

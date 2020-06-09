@@ -1,9 +1,10 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
-export SERVER_SUPERVISOR_DOCKER_NAME ?=matterlabs/server_supervisor:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
+export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
+export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
 # Getting started
@@ -102,6 +103,12 @@ image-ci:
 push-image-ci: image-ci
 	docker push "${CI_DOCKER_IMAGE}"
 
+image-keybase:
+	@docker build -t "${KEYBASE_DOCKER_IMAGE}" -f ./docker/keybase-secrets/Dockerfile .
+
+push-image-keybase: image-keybase
+	docker push "${KEYBASE_DOCKER_IMAGE}"
+
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
@@ -117,7 +124,7 @@ sandbox:
 
 # See more more at https://github.com/emk/rust-musl-builder#caching-builds
 build-target: build-contracts
-	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
+	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/src /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
 
 clean-target:
@@ -126,13 +133,10 @@ clean-target:
 image-server: build-target
 	@docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
 
-image-server-supervisor: build-target
-	@docker build -t "${SERVER_SUPERVISOR_DOCKER_NAME}" -f ./docker/server_supervisor/Dockerfile .
-
 image-prover: build-target
 	@docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
-image-rust: image-server image-prover image-server-supervisor
+image-rust: image-server image-prover
 
 push-image-server:
 	docker push "${SERVER_DOCKER_IMAGE}"
@@ -140,17 +144,14 @@ push-image-server:
 push-image-prover:
 	docker push "${PROVER_DOCKER_IMAGE}"
 
-push-image-server-supervisor:
-	docker push "${SERVER_SUPERVISOR_DOCKER_NAME}"
-
-push-image-rust: image-rust push-image-server push-image-prover push-image-server-supervisor
+push-image-rust: image-rust push-image-server push-image-prover
 
 # Contracts
 
 deploy-contracts: confirm_action build-contracts
 	@bin/deploy-contracts.sh
 
-publish-contracts: confirm_action
+publish-contracts:
 	@bin/publish-contracts.sh
 
 test-contracts: confirm_action build-contracts
@@ -212,7 +213,7 @@ update-kubeconfig:
 ifeq (dev,$(ZKSYNC_ENV))
 start:
 else
-start: start-provers start-server-supervisor start-server start-nginx
+start: start-provers start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
@@ -220,7 +221,7 @@ stop:
 else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
-stop: confirm_action stop-provers stop-server stop-nginx stop-server-supervisor
+stop: confirm_action stop-provers stop-server stop-nginx
 endif
 
 restart: stop start
@@ -232,20 +233,13 @@ start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-server:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=2
-
-start-server-supervisor:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server-supervisor --namespace $(ZKSYNC_ENV) --replicas=1
-
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
 
 stop-provers:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=0
-
-stop-server-supervisor:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server-supervisor --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=0
@@ -273,12 +267,12 @@ nodes:
 # Dev environment
 
 dev-up:
-	@docker-compose up -d postgres geth
+	@docker-compose up -d postgres geth dev-ticker
 	@docker-compose up -d tesseracts
 
 dev-down:
 	@docker-compose stop tesseracts
-	@docker-compose stop postgres geth
+	@docker-compose stop postgres geth dev-ticker
 
 geth-up: geth
 	@docker-compose up geth
@@ -292,20 +286,11 @@ dev-build-geth:
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
 
-# Data Restore
+image-dev-ticker: build-target
+	@docker build -t "${DEV_TICKER_DOCKER_IMAGE}" -f ./docker/dev-ticker/Dockerfile .
 
-data-restore-setup-and-run: data-restore-build data-restore-restart
-
-data-restore-db-prepare: confirm_action db-reset
-
-data-restore-build:
-	@cargo build -p data_restore --release --bin data_restore
-
-data-restore-restart: confirm_action data-restore-db-prepare
-	@cargo run --bin data_restore --release -- --genesis
-
-data-restore-continue:
-	@cargo run --bin data_restore --release -- --continue
+push-image-dev-ticker: image-dev-ticker
+	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
 api-type-validate:
 	@cd js/tests && yarn && yarn api-type-validate --test

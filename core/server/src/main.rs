@@ -3,8 +3,8 @@ use std::cell::RefCell;
 use std::time::Duration;
 // External uses
 use clap::{App, Arg};
-use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
-use tokio::runtime::Runtime;
+use futures::{channel::mpsc, executor::block_on, future, SinkExt, StreamExt};
+use tokio::{runtime::Runtime, task::JoinHandle};
 use web3::types::H160;
 // Workspace uses
 use models::{
@@ -17,17 +17,20 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local uses
+use models::node::config::MAX_PENDING_BLOCK_ITERATIONS;
 use server::{
     api_server::start_api_server,
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_sender,
     eth_watch::start_eth_watch,
+    fee_ticker::run_ticker_task,
     leader_election,
     mempool::run_mempool_task,
     observer_mode,
     prover_server::start_prover_server,
     state_keeper::{start_state_keeper, PlasmaStateKeeper},
+    utils::current_zksync_info::CurrentZksyncInfo,
 };
 
 fn main() {
@@ -47,7 +50,7 @@ fn main() {
     if cli.is_present("genesis") {
         let pool = ConnectionPool::new(Some(1));
         log::info!("Generating genesis block.");
-        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_franklin_addr);
+        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_fee_eth_addr);
         log::info!("Adding initial tokens to db");
         let genesis_tokens =
             get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
@@ -68,11 +71,34 @@ fn main() {
                     address: token.address[2..]
                         .parse()
                         .expect("failed to parse token address"),
+                    decimals: token.decimals,
                 })
                 .expect("failed to store token");
         }
         return;
     }
+
+    // Start observing the state and try to become leader.
+    let observer_mode_final_state = {
+        let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
+        let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
+        let jh = std::thread::Builder::new()
+            .name("Observer mode".to_owned())
+            .spawn(move || {
+                let state = observer_mode::run(
+                    ConnectionPool::new(Some(1)),
+                    OBSERVER_MODE_PULL_INTERVAL,
+                    stop_observer_mode_rx,
+                );
+                observed_state_tx.send(state).expect("unexpected failure");
+            })
+            .expect("failed to start observer mode");
+        leader_election::block_until_leader().expect("voting for leader fail");
+        stop_observer_mode_tx.send(()).expect("unexpected failure");
+        let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
+        jh.join().unwrap();
+        observer_mode_final_state
+    };
 
     let connection_pool = ConnectionPool::new(None);
 
@@ -96,39 +122,14 @@ fn main() {
         );
     }
 
-    // Start observing the state and try to become leader.
-    let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
-    let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
-    let conn_pool_clone = connection_pool.clone();
-    let jh = std::thread::Builder::new()
-        .name("Observer mode".to_owned())
-        .spawn(move || {
-            let state = observer_mode::run(
-                conn_pool_clone.clone(),
-                OBSERVER_MODE_PULL_INTERVAL,
-                stop_observer_mode_rx,
-            );
-            observed_state_tx.send(state).expect("unexpected failure");
-        })
-        .expect("failed to start observer mode");
-    leader_election::keep_voting_to_be_leader(
-        config_opts.replica_name.clone(),
-        connection_pool.clone(),
-    )
-    .expect("voting for leader fail");
-    stop_observer_mode_tx.send(()).expect("unexpected failure");
-    let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
-    jh.join().unwrap();
-
-    // spawn threads for different processes
-    // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
+    let current_zksync_info = CurrentZksyncInfo::new(&connection_pool);
 
     log::info!("starting actors");
 
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
     // handle ctrl+c
-    let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
+    let (stop_signal_sender, stop_signal_receiver) = mpsc::channel(256);
     {
         let stop_signal_sender = RefCell::new(stop_signal_sender.clone());
         ctrlc::set_handler(move || {
@@ -139,7 +140,7 @@ fn main() {
     }
 
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(256);
-    start_eth_watch(
+    let eth_watch_task = start_eth_watch(
         connection_pool.clone(),
         config_opts.clone(),
         eth_watch_req_sender.clone(),
@@ -151,29 +152,35 @@ fn main() {
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
+    let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(512);
+    let proposed_block = observer_mode_final_state
+        .state_keeper_init
+        .get_proposed_block();
     let state_keeper = PlasmaStateKeeper::new(
         observer_mode_final_state.state_keeper_init,
-        config_opts.operator_franklin_addr,
+        config_opts.operator_fee_eth_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
         config_opts.available_block_chunk_sizes.clone(),
+        MAX_PENDING_BLOCK_ITERATIONS,
     );
-    start_state_keeper(state_keeper, &main_runtime);
+    let state_keeper_task = start_state_keeper(state_keeper, proposed_block, &main_runtime);
 
     let (eth_send_request_sender, eth_send_request_receiver) = mpsc::channel(256);
     let (zksync_commit_notify_sender, zksync_commit_notify_receiver) = mpsc::channel(256);
-    eth_sender::start_eth_sender(
+    let eth_sender_task = eth_sender::start_eth_sender(
+        &main_runtime,
         connection_pool.clone(),
-        stop_signal_sender.clone(),
         zksync_commit_notify_sender.clone(), // eth sender sends only verify blocks notifications
         eth_send_request_receiver,
         config_opts.clone(),
+        current_zksync_info.clone(),
     );
 
-    run_committer(
+    let committer_task = run_committer(
         proposed_blocks_receiver,
-        eth_send_request_sender,
+        eth_send_request_sender.clone(),
         zksync_commit_notify_sender, // commiter sends only commit block notifications
         mempool_request_sender.clone(),
         connection_pool.clone(),
@@ -187,7 +194,9 @@ fn main() {
         executed_tx_notify_receiver,
         state_keeper_req_sender.clone(),
         eth_watch_req_sender.clone(),
+        ticker_request_sender,
         config_opts.clone(),
+        current_zksync_info,
     );
 
     let prover_options = ProverOptions::from_env();
@@ -199,21 +208,81 @@ fn main() {
         stop_signal_sender,
         observer_mode_final_state.circuit_acc_tree,
         observer_mode_final_state.circuit_tree_block,
+        config_opts.idle_provers,
     );
 
-    run_mempool_task(
-        connection_pool,
+    let mempool_task = run_mempool_task(
+        connection_pool.clone(),
         mempool_request_receiver,
         eth_watch_req_sender,
         &config_opts,
         &main_runtime,
     );
-    run_block_proposer_task(
+    let proposer_task = run_block_proposer_task(
         mempool_request_sender,
-        state_keeper_req_sender,
+        state_keeper_req_sender.clone(),
         &main_runtime,
     );
 
-    main_runtime.block_on(async move { stop_signal_receiver.next().await });
+    let ticker_task = run_ticker_task(
+        config_opts.ticker_url,
+        connection_pool,
+        eth_send_request_sender,
+        state_keeper_req_sender,
+        ticker_request_receiver,
+        &main_runtime,
+    );
+
+    let task_futures = vec![
+        eth_watch_task,
+        state_keeper_task,
+        eth_sender_task,
+        committer_task,
+        mempool_task,
+        proposer_task,
+        ticker_task,
+    ];
+
+    main_runtime.block_on(async move {
+        /// Waits for *any* of the tokio tasks to be finished.
+        /// Since the main tokio tasks are used as actors which should live as long
+        /// as application runs, any possible outcome (either `Ok` or `Err`) is considered
+        /// as a reason to stop the server completely.
+        async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
+            match future::select_all(task_futures).await {
+                (Ok(_), _, _) => {
+                    panic!("One of the actors finished its run, while it wasn't expected to do it");
+                }
+                (Err(error), _, _) => {
+                    log::warn!("One of the tokio actors unexpectedly finished, shutting down");
+                    if error.is_panic() {
+                        // Resume the panic on the main task
+                        std::panic::resume_unwind(error.into_panic());
+                    }
+                }
+            }
+        }
+
+        /// Waits for a message on a `stop_signal_receiver`. This receiver exists
+        /// for threads that aren't using the tokio Runtime to run on, and thus
+        /// cannot be handled the same way as the tokio tasks.
+        async fn wait_for_stop_signal(mut stop_signal_receiver: mpsc::Receiver<bool>) {
+            stop_signal_receiver.next().await;
+        }
+
+        let task_future = wait_for_tasks(task_futures);
+        let signal_future = wait_for_stop_signal(stop_signal_receiver);
+
+        // Select either of futures: completion of the any will mean that
+        // server has to be stopped.
+        tokio::select! {
+            _ = task_future => {
+                // Do nothing, task future always panic upon finishing.
+            },
+            _ = signal_future => {
+                log::warn!("Stop signal received, shutting down");
+            },
+        }
+    });
     main_runtime.shutdown_timeout(Duration::from_secs(0));
 }

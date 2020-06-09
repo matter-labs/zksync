@@ -34,7 +34,11 @@ use crate::{
         unpack_point_if_possible, verify_circuit_signature, verify_signature_message_construction,
         AllocatedSignerPubkey,
     },
-    utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element},
+    utils::{
+        allocate_numbers_vec, allocate_sum, calculate_empty_account_tree_hashes,
+        calculate_empty_balance_tree_hashes, multi_and, pack_bits_to_element_strict,
+        resize_grow_only,
+    },
 };
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
@@ -43,6 +47,7 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
     /// The old root of the tree
     pub old_root: Option<E::Fr>,
+    pub initial_used_subtree_root: Option<E::Fr>,
 
     pub block_number: Option<E::Fr>,
     pub validator_address: Option<E::Fr>,
@@ -61,6 +66,7 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'
             rescue_params: self.rescue_params,
             jubjub_params: self.jubjub_params,
             old_root: self.old_root,
+            initial_used_subtree_root: self.initial_used_subtree_root,
             block_number: self.block_number,
             validator_address: self.validator_address,
             pub_data_commitment: self.pub_data_commitment,
@@ -99,43 +105,36 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             })?;
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
 
-        let validator_address_padded = CircuitElement::from_fe_with_known_length(
-            cs.namespace(|| "validator_address"),
-            || self.validator_address.grab(),
-            params::ACCOUNT_ID_BIT_WIDTH,
-        )?;
+        let old_root = AllocatedNum::alloc(cs.namespace(|| "old_root"), || self.old_root.grab())?;
+        let mut rolling_root = {
+            let initial_used_subtree_root =
+                AllocatedNum::alloc(cs.namespace(|| "initial_used_subtree_root"), || {
+                    self.initial_used_subtree_root.grab()
+                })?;
+            let old_root_from_subroot = continue_leftmost_subroot_to_root(
+                cs.namespace(|| "continue initial_used_subtree root to old_root"),
+                &initial_used_subtree_root,
+                params::used_account_subtree_depth(),
+                params::account_tree_depth(),
+                self.rescue_params,
+            )?;
+            // ensure that old root contains initial_root
+            cs.enforce(
+                || "old_root contains initial_used_subtree_root",
+                |lc| lc + old_root_from_subroot.get_variable(),
+                |lc| lc + CS::one(),
+                |lc| lc + old_root.get_variable(),
+            );
 
-        let validator_address_bits = validator_address_padded.get_bits_le();
-        assert_eq!(validator_address_bits.len(), params::ACCOUNT_ID_BIT_WIDTH);
+            initial_used_subtree_root
+        };
 
-        let mut validator_balances = allocate_numbers_vec(
-            cs.namespace(|| "validator_balances"),
-            &self.validator_balances,
-        )?;
-        assert_eq!(validator_balances.len(), params::total_tokens());
-
-        let validator_audit_path = allocate_numbers_vec(
-            cs.namespace(|| "validator_audit_path"),
-            &self.validator_audit_path,
-        )?;
-        assert_eq!(validator_audit_path.len(), params::account_tree_depth());
-
-        let validator_account = AccountContent::from_witness(
-            cs.namespace(|| "validator account"),
-            &self.validator_account,
-        )?;
-
-        let mut rolling_root =
-            AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
-
-        let old_root =
-            CircuitElement::from_number(cs.namespace(|| "old_root"), rolling_root.clone())?;
         // first chunk of block should always have number 0
-        let mut next_chunk_number = zero;
+        let mut next_chunk_number = zero.clone();
 
         // declare vector of fees, that will be collected during block processing
         let mut fees = vec![];
-        let fees_len = params::total_tokens();
+        let fees_len = params::number_of_processable_tokens();
         for _ in 0..fees_len {
             fees.push(zero_circuit_element.get_number());
         }
@@ -148,6 +147,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             chunk_number: zero_circuit_element.get_number(),
             tx_type: zero_circuit_element,
         };
+
+        let mut last_token_id = zero;
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
@@ -179,10 +180,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 operation,
                 &allocated_chunk_data,
             )?;
+
             // calculate root for given account data
             let (state_root, is_account_empty, _subtree_root) = check_account_data(
                 cs.namespace(|| "calculate account root"),
                 &current_branch,
+                params::used_account_subtree_depth(),
                 self.rescue_params,
             )?;
 
@@ -203,12 +206,14 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
                 // &subtree_root, // Close disable
+                &mut last_token_id,
                 &mut fees,
                 &mut prev,
             )?;
             let (new_state_root, _, _) = check_account_data(
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
+                params::used_account_subtree_depth(),
                 self.rescue_params,
             )?;
 
@@ -226,10 +231,52 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             |lc| lc + CS::one(),
         );
 
-        // calculate operator's balance_tree root hash from whole tree representation
-        let old_operator_balance_root = calculate_root_from_full_representation_fees(
+        let validator_address_padded = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "validator_address"),
+            || self.validator_address.grab(),
+            params::ACCOUNT_ID_BIT_WIDTH,
+        )?;
+
+        let validator_address_bits = validator_address_padded.get_bits_le();
+        assert_eq!(validator_address_bits.len(), params::ACCOUNT_ID_BIT_WIDTH);
+
+        let mut validator_balances_processable_tokens = {
+            assert_eq!(self.validator_balances.len(), params::total_tokens());
+            for balance in &self.validator_balances[params::number_of_processable_tokens()..] {
+                if let Some(ingored_tokens_balance) = balance {
+                    assert!(ingored_tokens_balance.is_zero());
+                }
+            }
+            let allocated_validator_balances = allocate_numbers_vec(
+                cs.namespace(|| "validator_balances"),
+                &self.validator_balances[..params::number_of_processable_tokens()],
+            )?;
+            assert_eq!(
+                allocated_validator_balances.len(),
+                params::number_of_processable_tokens()
+            );
+            allocated_validator_balances
+        };
+
+        let validator_audit_path = allocate_numbers_vec(
+            cs.namespace(|| "validator_audit_path"),
+            &self.validator_audit_path[..params::used_account_subtree_depth()],
+        )?;
+        assert_eq!(
+            validator_audit_path.len(),
+            params::used_account_subtree_depth()
+        );
+
+        let validator_account = AccountContent::from_witness(
+            cs.namespace(|| "validator account"),
+            &self.validator_account,
+        )?;
+
+        // calculate operator's balance_tree root hash from sub tree representation
+        let old_operator_balance_root = calculate_balances_root_from_left_tree_values(
             cs.namespace(|| "calculate_root_from_full_representation_fees before"),
-            &validator_balances,
+            &validator_balances_processable_tokens,
+            params::balance_tree_depth(),
             self.rescue_params,
         )?;
 
@@ -256,6 +303,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &operator_account_data,
             &validator_address_bits,
             &validator_audit_path,
+            params::used_account_subtree_depth(),
             self.rescue_params,
         )?;
 
@@ -269,17 +317,18 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         //apply fees to operator balances
         for i in 0..fees_len {
-            validator_balances[i] = allocate_sum(
+            validator_balances_processable_tokens[i] = allocate_sum(
                 cs.namespace(|| format!("validator balance number i {}", i)),
-                &validator_balances[i],
+                &validator_balances_processable_tokens[i],
                 &fees[i],
             )?;
         }
 
-        // calculate operator's balance_tree root from all leafs
-        let new_operator_balance_root = calculate_root_from_full_representation_fees(
+        // calculate operator's balance_tree root hash from whole tree representation
+        let new_operator_balance_root = calculate_balances_root_from_left_tree_values(
             cs.namespace(|| "calculate_root_from_full_representation_fees after"),
-            &validator_balances,
+            &validator_balances_processable_tokens,
+            params::balance_tree_depth(),
             self.rescue_params,
         )?;
 
@@ -306,12 +355,16 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &operator_account_data,
             &validator_address_bits,
             &validator_audit_path,
+            params::used_account_subtree_depth(),
             self.rescue_params,
         )?;
 
-        let final_root = CircuitElement::from_number(
-            cs.namespace(|| "final_root"),
-            root_from_operator_after_fees,
+        let final_root = continue_leftmost_subroot_to_root(
+            cs.namespace(|| "continue subroot to root"),
+            &root_from_operator_after_fees,
+            params::used_account_subtree_depth(),
+            params::account_tree_depth(),
+            self.rescue_params,
         )?;
 
         {
@@ -339,13 +392,39 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(old_root.into_padded_be_bits(256));
+
+            // Perform bit decomposition with an explicit in-field check
+            // and change to MSB first bit order
+            let old_root_be_bits = {
+                let mut old_root_le_bits = old_root
+                    .into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
+                assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+                resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
+                let mut old_root_be_bits = old_root_le_bits;
+                old_root_be_bits.reverse();
+                assert_eq!(old_root_be_bits.len(), 256);
+                old_root_be_bits
+            };
+            pack_bits.extend(old_root_be_bits);
 
             hash_block = sha256::sha256(cs.namespace(|| "hash old_root"), &pack_bits)?;
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(final_root.into_padded_be_bits(256));
+
+            // Perform bit decomposition with an explicit in-field check
+            // and change to MSB first bit order
+            let final_root_be_bits = {
+                let mut final_root_le_bits = final_root
+                    .into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
+                assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
+                resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
+                let mut final_root_be_bits = final_root_le_bits;
+                final_root_be_bits.reverse();
+                assert_eq!(final_root_be_bits.len(), 256);
+                final_root_be_bits
+            };
+            pack_bits.extend(final_root_be_bits);
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with new_root"), &pack_bits)?;
 
@@ -360,7 +439,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             hash_block.reverse();
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
-            let final_hash = pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
+            let final_hash =
+                pack_bits_to_element_strict(cs.namespace(|| "final_hash"), &hash_block)?;
             cs.enforce(
                 || "enforce external data hash equality",
                 |lc| lc + public_data_commitment.get_variable(),
@@ -443,6 +523,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         ))
     }
 
+    // select a branch.
+    // If TX type == deposit then select first branch
+    // else if chunk number == 0 select first, else - select second
     fn select_branch<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -534,15 +617,26 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         is_account_empty: &Boolean,
         ext_pubdata_chunk: &AllocatedNum<E>,
         // subtree_root: &CircuitElement<E>, // Close disable
+        last_token_id: &mut AllocatedNum<E>,
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
     ) -> Result<(), SynthesisError> {
+        let max_token_id =
+            Expression::<E>::u64::<CS>(params::number_of_processable_tokens() as u64);
         cs.enforce(
             || "left and right tokens are equal",
             |lc| lc + lhs.token.get_number().get_variable(),
             |lc| lc + CS::one(),
             |lc| lc + rhs.token.get_number().get_variable(),
         );
+
+        let diff_token_numbers = max_token_id - Expression::from(&lhs.token.get_number());
+
+        let _ = diff_token_numbers.into_bits_le_fixed(
+            cs.namespace(|| "token number is smaller than processable number"),
+            params::balance_tree_depth(),
+        )?;
+
         let public_generator = self
             .jubjub_params
             .generator(FixedGenerators::SpendingKeyGenerator)
@@ -550,8 +644,17 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let generator = ecc::EdwardsPoint::witness(
             cs.namespace(|| "allocate public generator"),
-            Some(public_generator),
+            Some(public_generator.clone()),
             self.jubjub_params,
+        )?;
+        let (public_generator_x, public_generator_y) = public_generator.into_xy();
+        generator.get_x().assert_number(
+            cs.namespace(|| "assert generator x is constant"),
+            &public_generator_x,
+        )?;
+        generator.get_y().assert_number(
+            cs.namespace(|| "assert generator y is constant"),
+            &public_generator_y,
         )?;
 
         let op_data =
@@ -726,12 +829,37 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &op_valid,
             &Boolean::constant(true),
         )?;
-        for (i, fee) in fees.iter_mut().enumerate().take(params::total_tokens()) {
+
+        assert_eq!(
+            fees.len(),
+            params::number_of_processable_tokens(),
+            "fees length is invalid"
+        );
+
+        // ensure that fee token only changes if it's in a first chunk.
+        // First chunk is also always an LHS by "select-branch" function
+        // There is always a signature on "cur" in the corresponding operations on the first chunk
+
+        // if chunk_data.is_chunk_first we take value from the current chunk, else - we keep an
+        // old value
+        let new_last_token_id = AllocatedNum::conditionally_select(
+            cs.namespace(|| {
+                "ensure that token_id for token is only taken on the first
+            chunk"
+            }),
+            &cur.token.get_number(),
+            &last_token_id,
+            &chunk_data.is_chunk_first,
+        )?;
+
+        *last_token_id = new_last_token_id.clone();
+
+        for (i, fee) in fees.iter_mut().enumerate() {
             let sum = Expression::from(&*fee) + Expression::from(&op_data.fee.get_number());
 
             let is_token_correct = Boolean::from(Expression::equals(
                 cs.namespace(|| format!("is token equal to number {}", i)),
-                &lhs.token.get_number(),
+                &new_last_token_id,
                 Expression::constant::<CS>(E::Fr::from_str(&i.to_string()).unwrap()),
             )?);
 
@@ -774,7 +902,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS=160
                                                                 //        assert_eq!(pubdata_bits.len(), 30 * 8);
-        pubdata_bits.resize(
+
+        resize_grow_only(
+            &mut pubdata_bits,
             WithdrawOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -941,10 +1071,13 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 pub_data.extend(op_data.eth_address.get_bits_be()); //20
                 pub_data.extend(cur.token.get_bits_be()); // 2
                 pub_data.extend(op_data.full_amount.get_bits_be());
-                pub_data.resize(
+
+                resize_grow_only(
+                    &mut pub_data,
                     FullExitOp::CHUNKS * params::CHUNK_BIT_WIDTH,
                     Boolean::constant(false),
                 );
+
                 pub_data
             };
 
@@ -1062,9 +1195,10 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
-        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
-        pubdata_bits.resize(
-            DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH, //TODO: move to constant
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS_BIT_WIDTH=160
+        resize_grow_only(
+            &mut pubdata_bits,
+            DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1107,12 +1241,13 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         //keys are same or account is empty
-        let is_pubkey_correct = Boolean::and(
-            cs.namespace(|| "acc not empty and keys are not the same"),
-            &is_pub_equal_to_previous.not(),
-            &is_account_empty.not(),
-        )?
-        .not();
+
+        let is_pubkey_correct = Boolean::xor(
+            cs.namespace(|| "keys are same or account is empty"),
+            &is_pub_equal_to_previous,
+            &is_account_empty,
+        )?;
+
         is_valid_flags.push(is_pubkey_correct);
 
         //verify correct amounts
@@ -1168,7 +1303,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
                                                                 // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
         pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
-        pubdata_bits.resize(
+        resize_grow_only(
+            &mut pubdata_bits,
             ChangePubKeyOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -1253,105 +1389,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         Ok(tx_valid)
     }
 
-    // Close disable
-    // fn close_account<CS: ConstraintSystem<E>>(
-    //     &self,
-    //     mut cs: CS,
-    //     cur: &mut AllocatedOperationBranch<E>,
-    //     chunk_data: &AllocatedChunkData<E>,
-    //     ext_pubdata_chunk: &AllocatedNum<E>,
-    //     op_data: &AllocatedOperationData<E>,
-    //     signer_key: &AllocatedSignerPubkey<E>,
-    //     subtree_root: &CircuitElement<E>,
-    //     is_sig_verified: &Boolean,
-    // ) -> Result<Boolean, SynthesisError> {
-    //     let mut is_valid_flags = vec![];
-    //     //construct pubdata
-    //     let mut pubdata_bits = vec![];
-    //     pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-    //     pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-    //     pubdata_bits.resize(
-    //         params::CHUNK_BIT_WIDTH,
-    //         Boolean::constant(false),
-    //     );
-
-    //     // construct signature message preimage (serialized_tx)
-    //     let mut serialized_tx_bits = vec![];
-    //     serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-    //     serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
-    //     serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-
-    //     let pubdata_chunk = select_pubdata_chunk(
-    //         cs.namespace(|| "select_pubdata_chunk"),
-    //         &pubdata_bits,
-    //         &chunk_data.chunk_number,
-    //         1,
-    //     )?;
-
-    //     let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
-    //         cs.namespace(|| "is_pubdata_equal"),
-    //         &pubdata_chunk,
-    //         ext_pubdata_chunk,
-    //     )?);
-    //     is_valid_flags.push(is_pubdata_chunk_correct);
-
-    //     let is_close_account = Boolean::from(Expression::equals(
-    //         cs.namespace(|| "is_deposit"),
-    //         &chunk_data.tx_type.get_number(),
-    //         Expression::u64::<CS>(4), //close_account tx_type
-    //     )?);
-    //     is_valid_flags.push(is_close_account.clone());
-
-    //     let tmp = CircuitAccount::<E>::empty_balances_root_hash();
-    //     let mut r_repr = E::Fr::zero().into_repr();
-    //     r_repr.read_be(&tmp[..]).unwrap();
-    //     let empty_root = E::Fr::from_repr(r_repr).unwrap();
-
-    //     let are_balances_empty = Boolean::from(Expression::equals(
-    //         cs.namespace(|| "are_balances_empty"),
-    //         &subtree_root.get_number(),
-    //         Expression::constant::<CS>(empty_root), //This is precalculated root_hash of subtree with empty balances
-    //     )?);
-    //     is_valid_flags.push(are_balances_empty);
-
-    //     let is_serialized_tx_correct = verify_signature_message_construction(
-    //         cs.namespace(|| "is_serialized_tx_correct"),
-    //         serialized_tx_bits,
-    //         &op_data,
-    //     )?;
-
-    //     is_valid_flags.push(is_serialized_tx_correct);
-    //     is_valid_flags.push(is_sig_verified.clone());
-    //     let is_signer_valid = CircuitElement::equals(
-    //         cs.namespace(|| "signer_key_correct"),
-    //         &signer_key.pubkey.get_hash(),
-    //         &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
-    //     )?;
-
-    //     is_valid_flags.push(is_signer_valid);
-
-    //     let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
-
-    //     // below we conditionally update state if it is valid operation
-
-    //     // update pub_key
-    //     cur.account.pub_key_hash = CircuitElement::conditionally_select_with_number_strict(
-    //         cs.namespace(|| "mutated_pubkey"),
-    //         Expression::constant::<CS>(E::Fr::zero()),
-    //         &cur.account.pub_key_hash,
-    //         &tx_valid,
-    //     )?;
-    //     // update nonce
-    //     cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-    //         cs.namespace(|| "update cur nonce"),
-    //         Expression::constant::<CS>(E::Fr::zero()),
-    //         &cur.account.nonce,
-    //         &tx_valid,
-    //     )?;
-
-    //     Ok(tx_valid)
-    // }
-
     fn noop<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1411,7 +1448,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //160
         pubdata_bits.extend(rhs.account_id.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
-        pubdata_bits.resize(
+        resize_grow_only(
+            &mut pubdata_bits,
             TransferToNewOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -1423,6 +1461,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             || Ok(E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap()),
             8,
         )?; //we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
+        tx_code.get_number().assert_number(
+            cs.namespace(|| "tx code is constant TransferOp"),
+            &E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap(),
+        )?;
+
         serialized_tx_bits.extend(tx_code.get_bits_be());
         serialized_tx_bits.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
@@ -1620,7 +1663,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
 
-        pubdata_bits.resize(
+        resize_grow_only(
+            &mut pubdata_bits,
             TransferOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
@@ -1701,7 +1745,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
-        // TODO: add flag for is account address is correct(!)
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
@@ -1762,18 +1805,21 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_rhs_valid,
         )?;
 
-        Ok(Boolean::and(
-            cs.namespace(|| "lhs_valid nand rhs_valid"),
-            &lhs_valid.not(),
-            &is_rhs_valid.not(),
-        )?
-        .not())
+        // Either LHS or RHS are correct (due to chunking at least)
+        let correct = Boolean::xor(
+            cs.namespace(|| "lhs_valid XOR rhs_valid"),
+            &lhs_valid,
+            &is_rhs_valid,
+        )?;
+
+        Ok(correct)
     }
 }
 
 pub fn check_account_data<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     cur: &AllocatedOperationBranch<E>,
+    length_to_root: usize,
     params: &E::Params,
 ) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
     //first we prove calculate root of the subtree to obtain account_leaf_data:
@@ -1788,6 +1834,7 @@ pub fn check_account_data<E: RescueEngine, CS: ConstraintSystem<E>>(
             &cur_account_leaf_bits,
             &cur.account_id.get_bits_le(),
             &cur.account_audit_path,
+            length_to_root,
             params,
         )?,
         is_account_empty,
@@ -1831,6 +1878,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
         balance_data,
         &branch.token.get_bits_le(),
         &branch.balance_audit_path,
+        params::balance_tree_depth(),
         params,
     )?;
 
@@ -1839,14 +1887,34 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     account_data.extend(branch.account.pub_key_hash.get_bits_le());
     account_data.extend(branch.account.address.get_bits_le());
 
-    let account_data_packed =
-        pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
-
-    let is_account_empty = Expression::equals(
-        cs.namespace(|| "is_account_empty"),
-        &account_data_packed,
-        Expression::constant::<CS>(E::Fr::zero()),
+    let account_data_packed_as_field_elements = multipack::pack_into_witness(
+        cs.namespace(|| "pack account data to check if empty"),
+        &account_data,
     )?;
+
+    assert_eq!(account_data_packed_as_field_elements.len(), 2);
+
+    let mut account_words_are_empty =
+        Vec::with_capacity(account_data_packed_as_field_elements.len());
+
+    for (i, el) in account_data_packed_as_field_elements
+        .into_iter()
+        .enumerate()
+    {
+        let is_word_empty = Expression::equals(
+            cs.namespace(|| format!("is account word {} empty", i)),
+            &el,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?;
+
+        account_words_are_empty.push(Boolean::from(is_word_empty));
+    }
+
+    let is_account_empty = multi_and(
+        cs.namespace(|| "check if all account words are empty"),
+        &account_words_are_empty,
+    )?;
+
     let balance_subtree_root =
         CircuitElement::from_number(cs.namespace(|| "balance_subtree_root_ce"), balance_root)?;
     let state_tree_root = calc_account_state_tree_root(
@@ -1858,11 +1926,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     // this is safe and just allows the convention. TODO: may be cut to Fr width only?
     account_data.extend(state_tree_root.into_padded_le_bits(params::FR_BIT_WIDTH_PADDED)); // !!!!!
 
-    Ok((
-        account_data,
-        Boolean::from(is_account_empty),
-        balance_subtree_root,
-    ))
+    Ok((account_data, is_account_empty, balance_subtree_root))
 }
 
 pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
@@ -1870,11 +1934,15 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     leaf_bits: &[Boolean],
     index: &[Boolean],
     audit_path: &[AllocatedNum<E>],
+    length_to_root: usize,
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     // only first bits of index are considered valuable
+    assert!(length_to_root <= index.len());
     assert!(index.len() >= audit_path.len());
-    let index = &index[0..audit_path.len()];
+
+    let index = &index[0..length_to_root];
+    let audit_path = &audit_path[0..length_to_root];
 
     let leaf_packed = multipack::pack_into_witness(
         cs.namespace(|| "pack leaf bits into field elements"),
@@ -1972,8 +2040,10 @@ fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
         let cs = &mut cs.namespace(|| format!("chunk number {}", i));
         let pub_chunk_bits =
             pubdata_bits[i * params::CHUNK_BIT_WIDTH..(i + 1) * params::CHUNK_BIT_WIDTH].to_vec();
-        let current_chunk =
-            pack_bits_to_element(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
+        let current_chunk = pack_bits_to_element_strict(
+            cs.namespace(|| "chunk as field element"),
+            &pub_chunk_bits,
+        )?;
 
         result = Expression::select_ifeq(
             cs.namespace(|| "select if correct chunk number"),
@@ -2005,35 +2075,54 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
-//TODO: we can use fees: &[Expression<E>] if needed, though no real need
-fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintSystem<E>>(
+fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
-    fees: &[AllocatedNum<E>],
+    processable_fees: &[AllocatedNum<E>],
+    tree_depth: usize,
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
-    assert_eq!(fees.len(), params::total_tokens());
-    let mut fee_hashes = vec![];
-    for (index, fee) in fees.iter().cloned().enumerate() {
-        let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
+    assert_eq!(
+        processable_fees.len(),
+        params::number_of_processable_tokens()
+    );
 
-        fee.limit_number_of_bits(
-            cs.namespace(|| "ensure that fees are short enough"),
-            params::BALANCE_BIT_WIDTH,
-        )?;
+    let processable_fee_hashes = processable_fees
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(index, fee)| {
+            let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
 
-        let mut sponge_output =
-            rescue::rescue_hash(cs.namespace(|| "hash the fee leaf content"), &[fee], params)?;
+            fee.limit_number_of_bits(
+                cs.namespace(|| "ensure that fees are short enough"),
+                params::BALANCE_BIT_WIDTH,
+            )?;
 
-        assert_eq!(sponge_output.len(), 1);
+            let fee_hash = {
+                let mut sponge_output = rescue::rescue_hash(
+                    cs.namespace(|| "hash the fee leaf content"),
+                    &[fee],
+                    params,
+                )?;
+                assert_eq!(sponge_output.len(), 1);
+                sponge_output.pop().expect("must get a single element")
+            };
 
-        let tmp = sponge_output.pop().expect("must get a single element");
+            Ok(fee_hash)
+        })
+        .collect::<Result<Vec<_>, SynthesisError>>()?;
 
-        fee_hashes.push(tmp);
-    }
-    let mut hash_vec = fee_hashes;
+    let processable_fees_tree_depth = processable_fees.len().trailing_zeros() as usize;
+    assert_eq!(
+        1 << processable_fees_tree_depth,
+        params::number_of_processable_tokens()
+    );
 
-    for i in 0..params::balance_tree_depth() {
+    // will hash non-empty part of the tree
+    let mut hash_vec = processable_fee_hashes;
+    for i in 0..processable_fees_tree_depth {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+        assert!(hash_vec.len().is_power_of_two());
         let chunks = hash_vec.chunks(2);
         let mut new_hashes = vec![];
         for (chunk_number, x) in chunks.enumerate() {
@@ -2050,7 +2139,74 @@ fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintS
         hash_vec = new_hashes;
     }
     assert_eq!(hash_vec.len(), 1);
-    Ok(hash_vec[0].clone())
+
+    let last_level_node_hash = hash_vec[0].clone();
+
+    let empty_node_hashes = calculate_empty_balance_tree_hashes::<E>(params, tree_depth);
+    let mut node_hash = last_level_node_hash;
+    // will hash top of the tree where RHS is always an empty tree
+    for i in processable_fees_tree_depth..params::balance_tree_depth() {
+        let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+        let pair_value = empty_node_hashes[i - 1]; // we need value from previous level
+        let pair = AllocatedNum::alloc(
+            cs.namespace(|| format!("allocate empty node as num for level {}", i)),
+            || Ok(pair_value),
+        )?;
+
+        pair.assert_number(
+            cs.namespace(|| format!("assert pair at level {} is constant", i)),
+            &pair_value,
+        )?;
+
+        let mut sponge_output = rescue::rescue_hash(
+            cs.namespace(|| "perform smt hashing"),
+            &[node_hash, pair],
+            params,
+        )?;
+        assert_eq!(sponge_output.len(), 1, "must get a single element");
+        node_hash = sponge_output.pop().unwrap();
+    }
+
+    Ok(node_hash)
+}
+
+fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    subroot: &AllocatedNum<E>,
+    subroot_is_at_level: usize,
+    tree_depth: usize,
+    params: &E::Params,
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    let empty_node_hashes = calculate_empty_account_tree_hashes::<E>(params, tree_depth);
+    let mut node_hash = subroot.clone();
+
+    // will hash top of the tree where RHS is always an empty tree
+    for i in subroot_is_at_level..tree_depth {
+        let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+        let pair_value = empty_node_hashes[i - 1]; // we need value from previous level
+        let pair = AllocatedNum::alloc(
+            cs.namespace(|| format!("allocate empty node as num for level {}", i)),
+            || Ok(pair_value),
+        )?;
+
+        pair.assert_number(
+            cs.namespace(|| format!("assert pair at level {} is constant", i)),
+            &pair_value,
+        )?;
+
+        let mut sponge_output = rescue::rescue_hash(
+            cs.namespace(|| "perform smt hashing"),
+            &[node_hash, pair],
+            params,
+        )?;
+
+        assert_eq!(sponge_output.len(), 1);
+
+        let tmp = sponge_output.pop().expect("must get a single element");
+        node_hash = tmp;
+    }
+
+    Ok(node_hash)
 }
 
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {

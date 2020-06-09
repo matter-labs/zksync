@@ -1,5 +1,6 @@
 const ethers = require('ethers');
 const zksync = require('zksync');
+const readline = require("readline");
 
 export function isPowerOfTwo(n: number): boolean {
     return (n & (n - 1)) === 0; 
@@ -74,3 +75,17 @@ export function rangearr(start, end?) {
 }
 
 export const flat = arr => Array.isArray(arr) ? [].concat(...arr.map(flat)) : arr;
+
+export function input(questionText) {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    return new Promise(resolve => {
+        rl.question(questionText, function(answer) {
+            rl.close();
+            resolve(answer);
+        });
+    });
+}

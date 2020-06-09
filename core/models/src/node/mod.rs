@@ -1,12 +1,12 @@
 use super::merkle_tree::{RescueHasher, SparseMerkleTree};
 use super::params;
-use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
+use super::primitives::{pack_as_float, unpack_float};
 use crate::franklin_crypto::bellman::pairing::bn256;
 use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
     jubjub::{FixedGenerators, JubjubEngine},
 };
-use bigdecimal::BigDecimal;
+use num::{BigUint, FromPrimitive};
 
 pub mod account;
 pub mod block;
@@ -21,10 +21,11 @@ pub use web3::types::{H256, U128, U256};
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{
-    CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
-pub use self::tokens::{Token, TokenGenesisListItem, TokenLike};
+pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
 pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
 
 pub type Engine = bn256::Bn256;
@@ -61,12 +62,11 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
 
 pub type TokenId = u16;
 
-/// 3 bytes used.
 pub type AccountId = u32;
 pub type BlockNumber = u32;
 pub type Nonce = u32;
 
-pub fn pack_token_amount(amount: &BigDecimal) -> Vec<u8> {
+pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {
     pack_as_float(
         amount,
         params::AMOUNT_EXPONENT_BIT_WIDTH,
@@ -74,7 +74,7 @@ pub fn pack_token_amount(amount: &BigDecimal) -> Vec<u8> {
     )
 }
 
-pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
+pub fn pack_fee_amount(amount: &BigUint) -> Vec<u8> {
     pack_as_float(
         amount,
         params::FEE_EXPONENT_BIT_WIDTH,
@@ -82,38 +82,38 @@ pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
     )
 }
 
-pub fn is_token_amount_packable(amount: &BigDecimal) -> bool {
+pub fn is_token_amount_packable(amount: &BigUint) -> bool {
     Some(amount.clone()) == unpack_token_amount(&pack_token_amount(amount))
 }
 
-pub fn is_fee_amount_packable(amount: &BigDecimal) -> bool {
+pub fn is_fee_amount_packable(amount: &BigUint) -> bool {
     Some(amount.clone()) == unpack_fee_amount(&pack_fee_amount(amount))
 }
 
-pub fn unpack_token_amount(data: &[u8]) -> Option<BigDecimal> {
+pub fn unpack_token_amount(data: &[u8]) -> Option<BigUint> {
     unpack_float(
         data,
         params::AMOUNT_EXPONENT_BIT_WIDTH,
         params::AMOUNT_MANTISSA_BIT_WIDTH,
     )
-    .map(u128_to_bigdecimal)
+    .and_then(BigUint::from_u128)
 }
 
-pub fn unpack_fee_amount(data: &[u8]) -> Option<BigDecimal> {
+pub fn unpack_fee_amount(data: &[u8]) -> Option<BigUint> {
     unpack_float(
         data,
         params::FEE_EXPONENT_BIT_WIDTH,
         params::FEE_MANTISSA_BIT_WIDTH,
     )
-    .map(u128_to_bigdecimal)
+    .and_then(BigUint::from_u128)
 }
 
-pub fn closest_packable_fee_amount(amount: &BigDecimal) -> BigDecimal {
+pub fn closest_packable_fee_amount(amount: &BigUint) -> BigUint {
     let fee_packed = pack_fee_amount(&amount);
     unpack_fee_amount(&fee_packed).expect("fee repacking")
 }
 
-pub fn closest_packable_token_amount(amount: &BigDecimal) -> BigDecimal {
+pub fn closest_packable_token_amount(amount: &BigUint) -> BigUint {
     let fee_packed = pack_token_amount(&amount);
     unpack_token_amount(&fee_packed).expect("token amount repacking")
 }
@@ -130,11 +130,10 @@ pub fn public_key_from_private(pk: &PrivateKey) -> PublicKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use bigdecimal::BigDecimal;
     #[test]
     fn test_roundtrip() {
-        let zero = BigDecimal::from(1);
-        let one = BigDecimal::from(1);
+        let zero = BigUint::from_u32(1).unwrap();
+        let one = BigUint::from_u32(1).unwrap();
         {
             let round_trip_zero = unpack_token_amount(&pack_token_amount(&zero));
             let round_trip_one = unpack_token_amount(&pack_token_amount(&one));
@@ -152,21 +151,22 @@ mod test {
     #[test]
     fn detect_unpackable() {
         let max_mantissa_token =
-            u128_to_bigdecimal((1u128 << params::AMOUNT_MANTISSA_BIT_WIDTH) - 1);
-        let max_mantissa_fee = u128_to_bigdecimal((1u128 << params::FEE_MANTISSA_BIT_WIDTH) - 1);
+            BigUint::from_u128((1u128 << params::AMOUNT_MANTISSA_BIT_WIDTH) - 1).unwrap();
+        let max_mantissa_fee =
+            BigUint::from_u128((1u128 << params::FEE_MANTISSA_BIT_WIDTH) - 1).unwrap();
         assert!(is_token_amount_packable(&max_mantissa_token));
         assert!(is_fee_amount_packable(&max_mantissa_fee));
         assert!(!is_token_amount_packable(
-            &(max_mantissa_token + BigDecimal::from(1))
+            &(max_mantissa_token + BigUint::from(1u32))
         ));
         assert!(!is_fee_amount_packable(
-            &(max_mantissa_fee + BigDecimal::from(1))
+            &(max_mantissa_fee + BigUint::from(1u32))
         ));
     }
 
     #[test]
     fn pack_to_closest_packable() {
-        let fee = BigDecimal::from(1_234_123_424);
+        let fee = BigUint::from(1_234_123_424u32);
         assert!(
             !is_fee_amount_packable(&fee),
             "fee should not be packable for this test"
@@ -178,7 +178,7 @@ mod test {
         );
         assert_ne!(
             closest_packable_fee,
-            BigDecimal::from(0),
+            BigUint::from(0u32),
             "repacked fee should not be 0"
         );
         assert!(
@@ -190,7 +190,7 @@ mod test {
             fee, closest_packable_fee
         );
 
-        let token = BigDecimal::from(123_456_789_123_456_789u64);
+        let token = BigUint::from(123_456_789_123_456_789u64);
         assert!(
             !is_token_amount_packable(&token),
             "token should not be packable for this test"
@@ -202,7 +202,7 @@ mod test {
         );
         assert_ne!(
             closest_packable_token,
-            BigDecimal::from(0),
+            BigUint::from(0u32),
             "repacked token should not be 0"
         );
         assert!(

@@ -12,7 +12,7 @@ use clap::{App, Arg};
 // Workspace deps
 use models::config_options::{parse_env, ProverOptions};
 // Local deps
-use crate::{client, start, ProverConfig, ProverImpl};
+use crate::{client, start, ApiClient, ProverConfig, ProverImpl, ShutdownRequest};
 
 fn api_client_from_env(worker_name: &str) -> client::ApiClient {
     let server_api_url = parse_env("PROVER_SERVER_URL");
@@ -47,36 +47,36 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
 
     let prover_id_arc = Arc::new(AtomicI32::new(ABSENT_PROVER_ID));
 
+    let shutdown_request = ShutdownRequest::new();
+
     // Handle termination requests.
     {
-        let prover_id_arc = prover_id_arc.clone();
-        let api_client = api_client.clone();
+        let shutdown_request = shutdown_request.clone();
         ctrlc::set_handler(move || {
-            log::info!("Termination signal received.");
-            let prover_id = prover_id_arc.load(Ordering::SeqCst);
-            if prover_id != ABSENT_PROVER_ID {
-                match api_client.prover_stopped(prover_id) {
-                    Ok(_) => {}
-                    Err(e) => log::error!("failed to send prover stop request: {}", e),
-                }
+            log::info!(
+                "Termination signal received. It will be handled after the currently working round"
+            );
+
+            if shutdown_request.prover_id() == ABSENT_PROVER_ID {
+                log::warn!("Prover is not registered, shutting down immediately");
+                std::process::exit(0);
             }
-            std::process::exit(0);
+
+            shutdown_request.set();
         })
         .expect("Failed to register ctrlc handler");
     }
 
     // Register prover
-    prover_id_arc.store(
-        api_client
-            .register_prover(0)
-            .expect("failed to register prover"),
-        Ordering::SeqCst,
-    );
+    let prover_id = api_client
+        .register_prover(0)
+        .expect("failed to register prover");
+    shutdown_request.set_prover_id(prover_id);
 
     // Start prover
     let (exit_err_tx, exit_err_rx) = mpsc::channel();
     let jh = thread::spawn(move || {
-        start(prover, exit_err_tx);
+        start(prover, exit_err_tx, shutdown_request);
     });
 
     // Handle prover exit errors.

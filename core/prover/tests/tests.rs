@@ -3,8 +3,8 @@ use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
-use bigdecimal::BigDecimal;
 use crypto_exports::pairing::ff::PrimeField;
+use num::BigUint;
 // Workspace deps
 use circuit::{
     circuit::FranklinCircuit,
@@ -46,6 +46,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         let (tx, _) = mpsc::channel();
         let config = PlonkStepByStepProverConfig {
             block_sizes: vec![block_size_chunks],
+            download_setup_from_network: false,
         };
         let p = PlonkStepByStepProver::create_from_config(
             config,
@@ -61,7 +62,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         let jh = thread::spawn(move || {
             rx.recv().expect("on receive from exit error channel"); // mock receive exit error.
         });
-        prover::start(p, tx);
+        prover::start(p, tx, Default::default());
         jh.join().expect("failed to join recv");
         done_tx.send(()).expect("unexpected failure");
     });
@@ -91,6 +92,7 @@ fn prover_proves_a_block_and_publishes_result() {
         let (tx, _) = mpsc::channel();
         let config = PlonkStepByStepProverConfig {
             block_sizes: vec![block_size_chunks],
+            download_setup_from_network: false,
         };
         let p = PlonkStepByStepProver::create_from_config(
             config,
@@ -107,7 +109,7 @@ fn prover_proves_a_block_and_publishes_result() {
         thread::spawn(move || {
             rx.recv().unwrap();
         });
-        prover::start(p, tx);
+        prover::start(p, tx, Default::default());
     });
 
     let timeout = time::Duration::from_secs(60 * 10);
@@ -132,7 +134,7 @@ fn new_test_data_for_prover() -> ProverData {
         priority_op: Deposit {
             from: empty_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: empty_account_address,
         },
         account_id: empty_account_id,
@@ -153,6 +155,7 @@ fn new_test_data_for_prover() -> ProverData {
     ProverData {
         public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
         old_root: witness_accum.initial_root_hash,
+        initial_used_subtree_root: witness_accum.initial_used_subtree_root_hash,
         new_root: witness_accum.root_after_fees.unwrap(),
         validator_address: Fr::from_str(&witness_accum.fee_account_id.to_string())
             .expect("failed to parse"),
@@ -210,6 +213,10 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         *block_to_prove = None;
 
         let _ = self.publishes_tx.lock().unwrap().send(p);
+        Ok(())
+    }
+
+    fn prover_stopped(&self, _: i32) -> Result<(), failure::Error> {
         Ok(())
     }
 }

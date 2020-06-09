@@ -1,0 +1,13 @@
+#!/bin/bash
+USAGE="Usage: zksync ciruit-tests-debug [test_name,def all] [threads,def=1] [other_features(e.g) --nocapture]"
+
+if [ "$1" == "-h" ]; then
+    echo "$USAGE"
+    exit 0
+fi
+
+TEST_NAME=$1
+TEST_THREADS=${2:-1}
+OTHER_ARGS=$3
+
+cargo test --no-fail-fast -p circuit $TEST_NAME -- --nocapture --ignored --test-threads $TEST_THREADS $3

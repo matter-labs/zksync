@@ -3,10 +3,13 @@ use web3::types::Address;
 // Workspace imports
 use crypto_exports::rand::Rng;
 use models::{
-    node::{block::Block, AccountUpdate, BlockNumber, Fr, PubKeyHash},
-    primitives::u128_to_bigdecimal,
+    node::{
+        block::{Block, ExecutedOperations},
+        AccountUpdate, BlockNumber, Fr, PubKeyHash,
+    },
     Action, Operation,
 };
+use num::BigUint;
 // Local imports
 
 pub fn acc_create_random_updates<R: Rng>(
@@ -24,7 +27,7 @@ pub fn acc_create_random_updates<R: Rng>(
     a.pub_key_hash = pub_key_hash;
 
     let old_balance = a.get_balance(0);
-    a.set_balance(0, u128_to_bigdecimal(balance));
+    a.set_balance(0, BigUint::from(balance));
     let new_balance = a.get_balance(0);
     vec![
         (
@@ -71,6 +74,32 @@ pub fn get_operation(
             Vec::new(),
             (0, 0),
             block_size,
+            1_000_000.into(),
+            1_500_000.into(),
+        ),
+        accounts_updated,
+    }
+}
+
+pub fn get_operation_with_txs(
+    block_number: BlockNumber,
+    action: Action,
+    accounts_updated: Vec<(u32, AccountUpdate)>,
+    block_size: usize,
+    txs: Vec<ExecutedOperations>,
+) -> Operation {
+    Operation {
+        id: None,
+        action,
+        block: Block::new(
+            block_number,
+            Fr::default(),
+            0,
+            txs,
+            (0, 0),
+            block_size,
+            1_000_000.into(),
+            1_500_000.into(),
         ),
         accounts_updated,
     }

@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 // External uses
-use bigdecimal::BigDecimal;
 use futures::{
     channel::{mpsc, oneshot},
     FutureExt, SinkExt, TryFutureExt,
@@ -8,16 +10,16 @@ use futures::{
 use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use num::{BigUint, ToPrimitive};
 // Workspace uses
 use models::{
     config_options::{ConfigurationOptions, ThreadPanicNotify},
     node::{
-        closest_packable_fee_amount,
         tx::{TxEthSignature, TxHash},
         Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
-        Token, TokenId, TokenLike,
+        Token, TokenId, TokenLike, TxFeeTypes,
     },
-    primitives::{big_decimal_to_u128, floor_big_decimal, u128_to_bigdecimal},
+    primitives::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper},
 };
 use storage::{
     chain::{
@@ -26,32 +28,42 @@ use storage::{
     },
     ConnectionPool, StorageProcessor,
 };
+
 // Local uses
 use crate::{
-    eth_watch::EthWatchRequest,
+    api_server::ops_counter::ChangePubKeyOpsCounter,
+    eth_watch::{EthBlockId, EthWatchRequest},
+    fee_ticker::{Fee, TickerRequest},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
-    utils::shared_lru_cache::SharedLruCache,
-    utils::token_db_cache::TokenDBCache,
+    utils::{
+        current_zksync_info::CurrentZksyncInfo, shared_lru_cache::SharedLruCache,
+        token_db_cache::TokenDBCache,
+    },
 };
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
-    pub balances: HashMap<String, BigDecimal>,
+    pub balances: HashMap<String, BigUintSerdeWrapper>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
 
 impl ResponseAccountState {
-    pub fn try_to_restore(account: Account, tokens: &HashMap<TokenId, Token>) -> Result<Self> {
+    pub fn try_restore(account: Account, tokens: &TokenDBCache) -> Result<Self> {
         let mut balances = HashMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
             if token_id == 0 {
                 balances.insert("ETH".to_string(), balance);
             } else {
-                let token = tokens.get(&token_id).ok_or_else(Error::internal_error)?;
+                let token = tokens
+                    .get_token(token_id)
+                    .ok()
+                    .flatten()
+                    .ok_or_else(Error::internal_error)?;
                 balances.insert(token.symbol.clone(), balance);
             }
         }
@@ -67,7 +79,8 @@ impl ResponseAccountState {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositingFunds {
-    amount: BigDecimal,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    amount: BigUint,
     expected_accept_block: u64,
 }
 
@@ -80,7 +93,7 @@ pub struct DepositingAccountBalances {
 impl DepositingAccountBalances {
     pub fn from_pending_ops(
         pending_ops: OngoingDepositsResp,
-        tokens: &HashMap<TokenId, Token>,
+        tokens: &TokenDBCache,
     ) -> Result<Self> {
         let mut balances = HashMap::new();
 
@@ -89,10 +102,10 @@ impl DepositingAccountBalances {
                 "ETH".to_string()
             } else {
                 tokens
-                    .get(&op.token_id)
+                    .get_token(op.token_id)
+                    .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?
                     .symbol
-                    .clone()
             };
 
             let expected_accept_block =
@@ -102,7 +115,7 @@ impl DepositingAccountBalances {
                 .entry(token_symbol)
                 .or_insert_with(DepositingFunds::default);
 
-            balance.amount += u128_to_bigdecimal(op.amount);
+            balance.amount += BigUint::from(op.amount);
 
             // `balance.expected_accept_block` should be the greatest block number among
             // all the deposits for a certain token.
@@ -170,9 +183,13 @@ pub struct OngoingDeposit {
 impl OngoingDeposit {
     pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
         let (token_id, amount) = match priority_op.data {
-            FranklinPriorityOp::Deposit(deposit) => {
-                (deposit.token, big_decimal_to_u128(&deposit.amount))
-            }
+            FranklinPriorityOp::Deposit(deposit) => (
+                deposit.token,
+                deposit
+                    .amount
+                    .to_u128()
+                    .expect("Deposit amount should be less then u128::max()"),
+            ),
             other => {
                 panic!("Incorrect input for OngoingDeposit: {:?}", other);
             }
@@ -215,16 +232,11 @@ pub struct OngoingDepositsResp {
     estimated_deposits_approval_block: Option<u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum TxFeeTypes {
-    Withdraw,
-    Transfer,
-}
-
 #[derive(Debug)]
 pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
+    FeeTooLow = 104,
 
     MissingEthSignature = 200,
     EIP1271SignatureVerificationFail = 201,
@@ -233,6 +245,7 @@ pub enum RpcErrorCodes {
 
     Other = 300,
     AccountCloseDisabled = 301,
+    OperationsLimitReached = 302,
 }
 
 impl From<TxAddError> for RpcErrorCodes {
@@ -240,11 +253,13 @@ impl From<TxAddError> for RpcErrorCodes {
         match error {
             TxAddError::NonceMismatch => Self::NonceMismatch,
             TxAddError::IncorrectTx => Self::IncorrectTx,
+            TxAddError::TxFeeTooLow => Self::FeeTooLow,
             TxAddError::MissingEthSignature => Self::MissingEthSignature,
             TxAddError::EIP1271SignatureVerificationFail => Self::EIP1271SignatureVerificationFail,
             TxAddError::IncorrectEthSignature => Self::IncorrectEthSignature,
             TxAddError::ChangePkNotAuthorized => Self::ChangePkNotAuthorized,
             TxAddError::Other => Self::Other,
+            TxAddError::DbError => Self::Other,
         }
     }
 }
@@ -283,13 +298,19 @@ pub trait Rpc {
     #[rpc(name = "tokens")]
     fn tokens(&self) -> Result<HashMap<String, Token>>;
 
-    #[rpc(name = "get_tx_fee")]
+    #[rpc(name = "get_tx_fee", returns = "Fee")]
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        amount: BigDecimal,
+        address: Address,
         token_like: TokenLike,
-    ) -> Result<BigDecimal>;
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send>;
+
+    #[rpc(name = "get_token_price", returns = "BigDecimal")]
+    fn get_token_price(
+        &self,
+        token_like: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = BigDecimal, Error = Error> + Send>;
 
     #[rpc(name = "get_confirmations_for_eth_op_amount", returns = "u64")]
     fn get_confirmations_for_eth_op_amount(&self) -> Result<u64>;
@@ -305,14 +326,20 @@ pub struct RpcApp {
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    pub ticker_request_sender: mpsc::Sender<TickerRequest>,
 
     pub connection_pool: ConnectionPool,
 
     pub confirmations_for_eth_event: u64,
     pub token_cache: TokenDBCache,
+    pub current_zksync_info: CurrentZksyncInfo,
+
+    /// Counter for ChangePubKey operations to filter the spam.
+    ops_counter: Arc<RwLock<ChangePubKeyOpsCounter>>,
 }
 
 impl RpcApp {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config_options: &ConfigurationOptions,
         connection_pool: ConnectionPool,
@@ -320,6 +347,8 @@ impl RpcApp {
         state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
@@ -337,9 +366,13 @@ impl RpcApp {
             state_keeper_request_sender,
             sign_verify_request_sender,
             eth_watcher_request_sender,
+            ticker_request_sender,
 
             confirmations_for_eth_event,
             token_cache,
+            current_zksync_info,
+
+            ops_counter: Arc::new(RwLock::new(ChangePubKeyOpsCounter::new())),
         }
     }
 
@@ -386,14 +419,16 @@ impl RpcApp {
 
 pub(crate) async fn get_ongoing_priority_ops(
     eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
-) -> Result<Vec<(u64, PriorityOp)>> {
+    address: Address,
+) -> Result<Vec<(EthBlockId, PriorityOp)>> {
     let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
 
     let eth_watcher_response = oneshot::channel();
 
     // Get all the ongoing priority ops from the `EthWatcher`.
     eth_watcher_request_sender
-        .send(EthWatchRequest::GetUnconfirmedQueueOps {
+        .send(EthWatchRequest::GetUnconfirmedDeposits {
+            address,
             resp: eth_watcher_response.0,
         })
         .await
@@ -425,23 +460,15 @@ impl RpcApp {
     async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
         let confirmations_for_eth_event = self.confirmations_for_eth_event;
 
-        let ongoing_ops = get_ongoing_priority_ops(&self.eth_watcher_request_sender).await?;
+        let ongoing_ops =
+            get_ongoing_priority_ops(&self.eth_watcher_request_sender, address).await?;
 
         let mut max_block_number = 0;
 
-        // Filter only deposits for the requested address.
-        // `map` is used after filter to find the max block number without an
-        // additional list pass.
+        // Transform operations into `OngoingDeposit` and find the maximum block number in a
+        // single pass.
         let deposits: Vec<_> = ongoing_ops
             .into_iter()
-            .filter(|(_block, op)| {
-                if let FranklinPriorityOp::Deposit(deposit) = &op.data {
-                    // Address may be set to either sender or recipient.
-                    deposit.from == address || deposit.to == address
-                } else {
-                    false
-                }
-            })
             .map(|(block, op)| {
                 if block > max_block_number {
                     max_block_number = block;
@@ -561,6 +588,80 @@ impl RpcApp {
         };
         Ok(res)
     }
+
+    async fn ticker_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: TokenLike,
+    ) -> Result<Fee> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetTxFee {
+                tx_type: tx_type.clone(),
+                address,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        let resp = req.1.await.expect("ticker answer sender dropped");
+        resp.map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                tx_type,
+                token,
+            );
+            Error::internal_error()
+        })
+    }
+
+    async fn ticker_price_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+    ) -> Result<BigDecimal> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetTokenPrice {
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        let resp = req.1.await.expect("ticker answer sender dropped");
+        resp.map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                token,
+            );
+            Error::internal_error()
+        })
+    }
+
+    fn get_verified_account_state(&self, address: &Address) -> Result<ResponseAccountState> {
+        let storage = self.access_storage()?;
+        let account = storage
+            .chain()
+            .account_schema()
+            .account_state_by_address(address)
+            .map_err(|_| Error::internal_error())?;
+
+        let verified_state = account
+            .verified
+            .map(|(_, account)| ResponseAccountState::try_restore(account, &self.token_cache))
+            .transpose()?
+            .unwrap_or_default();
+
+        Ok(verified_state)
+    }
 }
 
 impl Rpc for RpcApp {
@@ -568,40 +669,6 @@ impl Rpc for RpcApp {
         &self,
         address: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
-        let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
-            let storage = self.access_storage()?;
-            let account = storage
-                .chain()
-                .account_schema()
-                .account_state_by_address(&address)
-                .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                        file!(),
-                        line!(),
-                        column!(),
-                        err,
-                        address,
-                    );
-                    Error::internal_error()
-                })?;
-            let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                );
-                Error::internal_error()
-            })?;
-            Ok((account, tokens))
-        })() {
-            (account, tokens)
-        } else {
-            return Box::new(futures01::done(Err(Error::internal_error())));
-        };
-
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
         let self_ = self.clone();
         let account_state_resp = async move {
@@ -635,23 +702,20 @@ impl Rpc for RpcApp {
                 Error::internal_error()
             })?;
 
-            let (id, committed) = if let Some((id, account)) = committed_account_state {
-                (
-                    Some(id),
-                    ResponseAccountState::try_to_restore(account, &tokens)?,
-                )
-            } else {
-                (None, ResponseAccountState::default())
-            };
+            let (id, committed) = committed_account_state
+                .map(|(id, account)| {
+                    let restored_state =
+                        ResponseAccountState::try_restore(account, &self_.token_cache)?;
+                    Ok((Some(id), restored_state))
+                })
+                .transpose()?
+                .unwrap_or_default();
 
-            let verified = if let Some((_, account)) = account.verified {
-                ResponseAccountState::try_to_restore(account, &tokens)?
-            } else {
-                ResponseAccountState::default()
-            };
+            let verified = self_.get_verified_account_state(&address)?;
 
             let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
-            let depositing = DepositingAccountBalances::from_pending_ops(depositing_ops, &tokens)?;
+            let depositing =
+                DepositingAccountBalances::from_pending_ops(depositing_ops, &self_.token_cache)?;
 
             Ok(AccountInfoResp {
                 address,
@@ -730,9 +794,47 @@ impl Rpc for RpcApp {
             Err(e) => return Box::new(futures01::future::err(e)),
         };
 
+        let tx_fee_info = match tx.as_ref() {
+            FranklinTx::Withdraw(withdraw) => Some((
+                TxFeeTypes::Withdraw,
+                TokenLike::Id(withdraw.token),
+                withdraw.to,
+                withdraw.fee.clone(),
+            )),
+            FranklinTx::Transfer(transfer) => Some((
+                TxFeeTypes::Transfer,
+                TokenLike::Id(transfer.token),
+                transfer.to,
+                transfer.fee.clone(),
+            )),
+            _ => None,
+        };
+
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
+        let ticker_request_sender = self.ticker_request_sender.clone();
+        let ops_counter = self.ops_counter.clone();
         let mempool_resp = async move {
+            if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                let required_fee =
+                    Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
+                        .await?;
+                // We allow fee to be 5% off the required fee
+                let scaled_provided_fee =
+                    provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
+                if required_fee.total_fee >= scaled_provided_fee {
+                    warn!(
+                        "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
+                        required_fee, provided_fee, scaled_provided_fee, token
+                    );
+                    return Err(Error {
+                        code: RpcErrorCodes::from(TxAddError::TxFeeTooLow).into(),
+                        message: TxAddError::TxFeeTooLow.to_string(),
+                        data: None,
+                    });
+                }
+            }
+
             let verified_tx = verify_tx_info_message_signature(
                 &tx,
                 *signature.clone(),
@@ -740,6 +842,21 @@ impl Rpc for RpcApp {
                 sign_verify_channel,
             )
             .await?;
+
+            // Check whether operations limit for this account was reached.
+            // We must do it after we've checked that transaction is correct to avoid the situation
+            // when somebody sends incorrect transactions to deny changing the pubkey for some account ID.
+            if let FranklinTx::ChangePubKey(tx) = tx.as_ref() {
+                let mut ops_counter_lock = ops_counter.write().expect("Write lock");
+
+                if let Err(error) = ops_counter_lock.check_allowanse(&tx) {
+                    return Err(Error {
+                        code: RpcErrorCodes::OperationsLimitReached.into(),
+                        message: error.to_string(),
+                        data: None,
+                    });
+                }
+            }
 
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
@@ -823,14 +940,26 @@ impl Rpc for RpcApp {
 
     fn get_tx_fee(
         &self,
-        _tx_type: TxFeeTypes,
-        amount: BigDecimal,
-        _token_like: TokenLike,
-    ) -> Result<BigDecimal> {
-        // first approximation - just give 1 percent
-        Ok(closest_packable_fee_amount(&floor_big_decimal(
-            &(amount / BigDecimal::from(100)),
-        )))
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send> {
+        Box::new(
+            Self::ticker_request(self.ticker_request_sender.clone(), tx_type, address, token)
+                .boxed()
+                .compat(),
+        )
+    }
+
+    fn get_token_price(
+        &self,
+        token: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = BigDecimal, Error = Error> + Send> {
+        Box::new(
+            Self::ticker_price_request(self.ticker_request_sender.clone(), token)
+                .boxed()
+                .compat(),
+        )
     }
 }
 
@@ -842,7 +971,9 @@ pub fn start_rpc_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+    ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
+    current_zksync_info: CurrentZksyncInfo,
 ) {
     let addr = config_options.json_rpc_http_server_address;
     std::thread::Builder::new()
@@ -858,10 +989,16 @@ pub fn start_rpc_server(
                 state_keeper_request_sender,
                 sign_verify_request_sender,
                 eth_watcher_request_sender,
+                ticker_request_sender,
+                current_zksync_info,
             );
             rpc_app.extend(&mut io);
 
-            let server = ServerBuilder::new(io).threads(8).start_http(&addr).unwrap();
+            let server = ServerBuilder::new(io)
+                .request_middleware(super::loggers::http_rpc::request_middleware)
+                .threads(8)
+                .start_http(&addr)
+                .unwrap();
 
             server.wait();
         })

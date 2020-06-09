@@ -9,6 +9,7 @@
 *.bak
 node_modules
 yarn-error.log
+*.log
 target
 a.out 
 .gitconfig
@@ -39,4 +40,6 @@ Cargo.lock
 
 .ipynb_checkpoints
 
-emergency_output_*
+loadtest_accounts_*
+
+go_to_env.sh

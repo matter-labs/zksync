@@ -14,7 +14,7 @@ use crypto_exports::franklin_crypto::{
     },
     eddsa::{PrivateKey, PublicKey, Seed, Signature},
     jubjub::{FixedGenerators, JubjubEngine},
-    rescue::RescueEngine,
+    rescue::{rescue_hash, RescueEngine},
 };
 // Workspace deps
 use models::{
@@ -107,15 +107,27 @@ where
     let (sig_x, sig_y) = signature.clone().r.into_xy();
     let mut signature_s_be_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
     signature_s_be_bits.reverse();
-    signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    resize_grow_only(
+        &mut signature_s_be_bits,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+        false,
+    );
     signature_s_be_bits.reverse();
     let mut signature_r_x_be_bits: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
     signature_r_x_be_bits.reverse();
-    signature_r_x_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    resize_grow_only(
+        &mut signature_r_x_be_bits,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+        false,
+    );
     signature_r_x_be_bits.reverse();
     let mut signature_r_y_be_bits: Vec<bool> = BitIterator::new(sig_y.into_repr()).collect();
     signature_r_y_be_bits.reverse();
-    signature_r_y_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    resize_grow_only(
+        &mut signature_r_y_be_bits,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+        false,
+    );
     signature_r_y_be_bits.reverse();
     let mut sig_r_packed_bits = vec![];
     sig_r_packed_bits.push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]);
@@ -222,6 +234,10 @@ pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     bits: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert!(
+        bits.len() <= E::Fr::NUM_BITS as usize,
+        "can not pack bits into field element: number of bits is larger than number of bits in a field"
+    );
     let mut data_from_lc = Num::<E>::zero();
     let mut coeff = E::Fr::one();
     for bit in bits {
@@ -241,6 +257,18 @@ pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     );
 
     Ok(data_packed)
+}
+
+pub fn pack_bits_to_element_strict<E: Engine, CS: ConstraintSystem<E>>(
+    cs: CS,
+    bits: &[Boolean],
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert!(
+        bits.len() <= E::Fr::CAPACITY as usize,
+        "can not pack bits into field element over the precision"
+    );
+
+    pack_bits_to_element(cs, bits)
 }
 
 // count a number of non-zero bits in a bit decomposition
@@ -273,14 +301,14 @@ where
 
 pub fn allocate_numbers_vec<E, CS>(
     mut cs: CS,
-    audit_path: &[Option<E::Fr>],
+    witness_vec: &[Option<E::Fr>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError>
 where
     E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];
-    for (i, e) in audit_path.iter().enumerate() {
+    for (i, e) in witness_vec.iter().enumerate() {
         let path_element =
             AllocatedNum::alloc(cs.namespace(|| format!("path element{}", i)), || {
                 Ok(*e.get()?)
@@ -335,4 +363,67 @@ pub fn print_boolean_vec(bits: &[Boolean]) {
     }
 
     debug!("Hex: {}", hex::encode(&bytes));
+}
+
+pub fn resize_grow_only<T: Clone>(to_resize: &mut Vec<T>, new_size: usize, pad_with: T) {
+    assert!(to_resize.len() <= new_size);
+    to_resize.resize(new_size, pad_with);
+}
+
+pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    x: &Boolean,
+    y: &Boolean,
+) -> Result<Boolean, SynthesisError> {
+    // A OR B = ( A NAND A ) NAND ( B NAND B ) = (NOT(A)) NAND (NOT (B))
+    let result = Boolean::and(
+        cs.namespace(|| "lhs_valid nand rhs_valid"),
+        &x.not(),
+        &y.not(),
+    )?
+    .not();
+
+    Ok(result)
+}
+
+pub fn calculate_empty_balance_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+) -> Vec<E::Fr> {
+    let empty_balance = E::Fr::zero();
+    calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &[empty_balance])
+}
+
+pub fn calculate_empty_account_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+) -> Vec<E::Fr> {
+    // manually calcualte empty subtree hashes
+    let empty_account_packed = models::circuit::account::empty_account_as_field_elements::<E>();
+    calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &empty_account_packed)
+}
+
+fn calculate_empty_tree_hashes<E: RescueEngine>(
+    rescue_params: &E::Params,
+    tree_depth: usize,
+    packed_leaf: &[E::Fr],
+) -> Vec<E::Fr> {
+    let empty_leaf_hash = {
+        let mut sponge_output = rescue_hash::<E>(rescue_params, packed_leaf);
+        assert_eq!(sponge_output.len(), 1);
+        sponge_output.pop().unwrap()
+    };
+
+    let mut current = empty_leaf_hash;
+    let mut empty_node_hashes = vec![];
+    for _ in 0..tree_depth {
+        let node_hash = {
+            let mut sponge_output = rescue_hash::<E>(rescue_params, &[current, current]);
+            assert_eq!(sponge_output.len(), 1);
+            sponge_output.pop().unwrap()
+        };
+        empty_node_hashes.push(node_hash);
+        current = node_hash;
+    }
+    empty_node_hashes
 }

@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div :class="{container: searchFieldInMenu}">
         <b-form @submit.stop.prevent="search">
             <b-input-group position="relative">
                 <b-form-input v-model="query" placeholder="block number, tx hash, state root hash, account address"></b-form-input>
@@ -55,15 +55,13 @@ export default {
 
             let tx = await client.searchTx(query).catch(() => null);
             if (tx && tx.tx_type) {
-                const prefix = tx && tx.tx && tx.tx.priority_op
-                    ? '0x'
-                    : 'sync-tx:';
+                const prefix = '';
                 this.$router.push('/transactions/' + prefix + query);
                 this.searching = false;
                 return;
             }
 
-            let account = await client.searchAccount(query).catch(() => null);
+            let account = await client.getAccount('0x' + query).catch(() => null);
             if (account && account.id) {
                 this.$router.push('/accounts/0x' + query);
                 this.searching = false;
@@ -90,6 +88,12 @@ export default {
     text-align: center;
     border-radius: 3px;
     white-space: nowrap;
+}
+
+@media (min-width: 1000px) {
+    .container {
+        width: 40em;
+    }
 }
 </style>
  

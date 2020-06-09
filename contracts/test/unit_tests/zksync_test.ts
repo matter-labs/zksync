@@ -13,7 +13,9 @@ const {deployContract} = require("ethereum-waffle");
 const {wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
 import * as zksync from "zksync";
 
-const TEST_PRIORITY_EXPIRATION = 16;
+const TEST_PRIORITY_EXPIRATION = 101;
+const CHUNK_SIZE = 9;
+
 
 describe("zkSync signature verification unit tests", function() {
     this.timeout(50000);
@@ -21,9 +23,8 @@ describe("zkSync signature verification unit tests", function() {
     let testContract;
     const randomWallet = ethers.Wallet.createRandom();
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
+        contracts.zkSync = readContractCode("ZKSyncSignatureUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         testContract = deployer.zkSyncContract(wallet);
@@ -101,7 +102,6 @@ describe("ZK priority queue ops unit tests", function() {
     let ethProxy;
     let operationTestContract;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
@@ -238,9 +238,8 @@ describe("zkSync withdraw unit tests", function() {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
+        contracts.zkSync = readContractCode("ZkSyncWithdrawalUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         zksyncContract = deployer.zkSyncContract(wallet);
@@ -350,8 +349,10 @@ describe("zkSync withdraw unit tests", function() {
 
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
+        const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
         const {revertReason} = await getCallRevertReason(async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1)));
-        expect(revertReason, "wrong revert reason").eq("SafeMath: subtraction overflow");
+        const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
+        expect(onchainBalAfter).eq(onchainBalBefore);
     });
 
     it("Withdraw ERC20 unsupported token", async () => {
@@ -399,9 +400,7 @@ describe("zkSync auth pubkey onchain unit tests", function() {
     let tokenContract;
     let ethProxy;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         zksyncContract = deployer.zkSyncContract(wallet);
@@ -477,9 +476,8 @@ describe("zkSync test process next operation", function() {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         const contracts = readTestContracts();
-        contracts.zkSync = readContractCode("ZKSyncUnitTest");
+        contracts.zkSync = readContractCode("ZkSyncProcessOpUnitTest");
         const deployer = new Deployer({deployWallet: wallet, contracts});
         await deployer.deployAll({gasLimit: 6500000});
         zksyncContract = deployer.zkSyncContract(wallet);
@@ -512,7 +510,7 @@ describe("zkSync test process next operation", function() {
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
-        const pubdata = Buffer.alloc(8, 0);
+        const pubdata = Buffer.alloc(CHUNK_SIZE, 0);
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
@@ -524,7 +522,7 @@ describe("zkSync test process next operation", function() {
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
-        const pubdata = Buffer.alloc(8 * 2, 0xff);
+        const pubdata = Buffer.alloc(CHUNK_SIZE * 2, 0xff);
         pubdata[0] = 0x05;
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
@@ -536,7 +534,7 @@ describe("zkSync test process next operation", function() {
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
-        const pubdata = Buffer.alloc(8 * 5, 0xff);
+        const pubdata = Buffer.alloc(CHUNK_SIZE * 6, 0xff);
         pubdata[0] = 0x02;
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
@@ -546,18 +544,23 @@ describe("zkSync test process next operation", function() {
 
     it("Process deposit", async () => {
         zksyncContract.connect(wallet);
-        const depositAmount = parseEther("0.8");
+        const depositAmount = bigNumberify("2");
 
         await zksyncContract.depositETH(wallet.address, {value: depositAmount});
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
         // construct deposit pubdata
-        const pubdata = Buffer.alloc(8 * 6, 0);
+        const pubdata = Buffer.alloc(CHUNK_SIZE * 6, 0);
         pubdata[0] = 0x01;
-        pubdata.writeUIntBE(0xaabbff, 1, 3);
-        Buffer.from(depositAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, 6);
-        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 22);
+        let offset = 1;
+        pubdata.writeUInt32BE(0xccaabbff, offset);
+        offset += 4;
+        pubdata.writeUInt16BE(0, offset); // token
+        offset += 2;
+        Buffer.from(depositAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, offset);
+        offset += 16;
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, offset);
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
@@ -570,7 +573,7 @@ describe("zkSync test process next operation", function() {
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
         // construct deposit pubdata
-        const pubdata = Buffer.alloc(8 * 6, 0);
+        const pubdata = Buffer.alloc(CHUNK_SIZE * 6, 0);
         pubdata[0] = 0x03;
 
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
@@ -581,21 +584,25 @@ describe("zkSync test process next operation", function() {
 
     it("Process full exit", async () => {
         zksyncContract.connect(wallet);
-        const tokenId = 0x02;
+        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
         const fullExitAmount = parseEther("0.7");
-        const accountId = 0xaabbff;
+        const accountId = 0x00ffffff;
 
         await zksyncContract.fullExit(accountId, tokenContract.address);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
         // construct full exit pubdata
-        const pubdata = Buffer.alloc(8 * 6, 0);
+        const pubdata = Buffer.alloc(CHUNK_SIZE * 6, 0);
         pubdata[0] = 0x06;
-        pubdata.writeUIntBE(accountId, 1, 3);
-        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 4);
-        pubdata.writeUInt16BE(tokenId, 24);
-        Buffer.from(fullExitAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, 26);
+        let offset = 1;
+        pubdata.writeUInt32BE(accountId, offset);
+        offset += 4;
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, offset);
+        offset += 20;
+        pubdata.writeUInt16BE(tokenId, offset);
+        offset += 2;
+        Buffer.from(fullExitAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, offset);
 
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
@@ -610,17 +617,21 @@ describe("zkSync test process next operation", function() {
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
         await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce);
 
-        const accountId = 0xffee12;
+        const accountId = 0xffee12cc;
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
         // construct deposit pubdata
-        const pubdata = Buffer.alloc(8 * 6, 0);
+        const pubdata = Buffer.alloc(CHUNK_SIZE * 6, 0);
         pubdata[0] = 0x07;
-        pubdata.writeUIntBE(accountId, 1, 3);
-        Buffer.from(pubkeyHash.substr(2), "hex").copy(pubdata, 4);
-        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 24);
-        pubdata.writeUInt32BE(nonce, 44);
+        let offset = 1;
+        pubdata.writeUInt32BE(accountId, offset);
+        offset += 4;
+        Buffer.from(pubkeyHash.substr(2), "hex").copy(pubdata, offset);
+        offset += 20;
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, offset);
+        offset += 20;
+        pubdata.writeUInt32BE(nonce, offset);
 
         await zksyncContract.testProcessOperation(pubdata, "0x", [0]);
 
@@ -633,18 +644,22 @@ describe("zkSync test process next operation", function() {
 
         const nonce = 0x1234;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
-        const accountId = 0xffee12;
+        const accountId = 0x00ffee12;
         const ethWitness = await zksync.utils.signChangePubkeyMessage(wallet, pubkeyHash, nonce, accountId);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
         // construct deposit pubdata
-        const pubdata = Buffer.alloc(8 * 6, 0);
+        const pubdata = Buffer.alloc( CHUNK_SIZE * 6, 0);
         pubdata[0] = 0x07;
-        pubdata.writeUIntBE(accountId, 1, 3);
-        Buffer.from(pubkeyHash.substr(5), "hex").copy(pubdata, 4);
-        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 24);
-        pubdata.writeUInt32BE(nonce, 44);
+        let offset = 1;
+        pubdata.writeUInt32BE(accountId, offset);
+        offset += 4;
+        Buffer.from(pubkeyHash.substr(5), "hex").copy(pubdata, offset);
+        offset += 20;
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, offset);
+        offset += 20;
+        pubdata.writeUInt32BE(nonce, offset);
 
         await zksyncContract.testProcessOperation(pubdata, ethWitness, [(ethWitness.length - 2) / 2]); // (ethWitness.length - 2) / 2   ==   len of ethWitness in bytes
 

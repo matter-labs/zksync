@@ -10,6 +10,8 @@ pub mod block_proposer;
 pub mod committer;
 pub mod eth_sender;
 pub mod eth_watch;
+pub mod fee_ticker;
+pub mod gas_counter;
 pub mod leader_election;
 pub mod mempool;
 pub mod observer_mode;

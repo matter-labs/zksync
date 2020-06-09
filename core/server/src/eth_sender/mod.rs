@@ -5,16 +5,21 @@
 
 // Built-in deps
 use std::collections::VecDeque;
+use std::time::Duration;
 // External uses
-use futures::channel::mpsc;
-use tokio::runtime::Runtime;
-use tokio::time;
-use web3::contract::Options;
-use web3::types::{TransactionReceipt, H256};
+use futures::{
+    channel::{mpsc, oneshot},
+    StreamExt,
+};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
+use web3::{
+    contract::Options,
+    types::{TransactionReceipt, H256, U256},
+};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
-    config_options::{ConfigurationOptions, EthSenderOptions, ThreadPanicNotify},
+    config_options::{ConfigurationOptions, EthSenderOptions},
     ethereum::{ETHOperation, OperationType},
     node::config,
     Action, Operation,
@@ -28,6 +33,7 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
+use crate::{gas_counter::GasCounter, utils::current_zksync_info::CurrentZksyncInfo};
 
 mod database;
 mod ethereum_interface;
@@ -37,6 +43,17 @@ mod tx_queue;
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug)]
+pub enum ETHSenderRequest {
+    SendOperation(Operation),
+    GetAverageUsedGasPrice(oneshot::Sender<U256>),
+}
+
+/// Wait this amount of time if we hit rate limit on infura https://infura.io/docs/ethereum/json-rpc/ratelimits
+const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);
+/// Rate limit error will contain this response code
+const RATE_LIMIT_HTTP_CODE: &str = "429";
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -111,7 +128,7 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     /// Ethereum intermediator.
     ethereum: ETH,
     /// Channel for receiving operations to commit.
-    rx_for_eth: mpsc::Receiver<Operation>,
+    rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
     /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
     /// Queue for ordered transaction processing.
@@ -120,6 +137,8 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
+    /// struct to communicate current verified block number to api server
+    current_zksync_info: CurrentZksyncInfo,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
@@ -127,8 +146,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         options: EthSenderOptions,
         db: DB,
         ethereum: ETH,
-        rx_for_eth: mpsc::Receiver<Operation>,
+        rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
+        current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
         let (ongoing_ops, unprocessed_ops) = db.restore_state().expect("Can't restore state");
 
@@ -154,6 +174,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             tx_queue,
             gas_adjuster,
             options,
+            current_zksync_info,
         };
 
         // Add all the unprocessed operations to the queue.
@@ -172,15 +193,13 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
-        let mut timer = time::interval(self.options.tx_poll_period);
-
         loop {
-            // Update the incoming operations.
-            self.retrieve_operations();
-            timer.tick().await;
+            time::timeout(self.options.tx_poll_period, self.process_requests())
+                .await
+                .unwrap_or_default();
 
             // ...and proceed them.
-            self.proceed_next_operations();
+            self.proceed_next_operations().await;
 
             // Update the gas adjuster to maintain the up-to-date max gas price limit.
             self.gas_adjuster.keep_updated(&self.db);
@@ -189,15 +208,22 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Gets the incoming operations from the channel and adds them to the
     /// transactions queue.
-    fn retrieve_operations(&mut self) {
-        while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
-            info!(
-                "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
-                operation.id.expect("ID must be set"),
-                operation.action.to_string(),
-                operation.block.block_number
-            );
-            self.add_operation_to_queue(operation);
+    async fn process_requests(&mut self) {
+        while let Some(request) = self.rx_for_eth.next().await {
+            match request {
+                ETHSenderRequest::SendOperation(operation) => {
+                    info!(
+                        "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
+                        operation.id.expect("ID must be set"),
+                        operation.action.to_string(),
+                        operation.block.block_number
+                    );
+                    self.add_operation_to_queue(operation);
+                }
+                ETHSenderRequest::GetAverageUsedGasPrice(response_sender) => response_sender
+                    .send(self.gas_adjuster.get_average_gas_price())
+                    .unwrap_or_default(),
+            }
         }
     }
 
@@ -206,18 +232,31 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// 1. Pops all the available transactions from the `TxQueue` and sends them.
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
-    fn proceed_next_operations(&mut self) {
+    async fn proceed_next_operations(&mut self) {
         // Queue for storing all the operations that were not finished at this iteration.
         let mut new_ongoing_ops = VecDeque::new();
 
         while let Some(tx) = self.tx_queue.pop_front() {
-            self.initialize_operation(tx.clone()).unwrap_or_else(|e| {
-                warn!("Error while trying to complete uncommitted op: {}", e);
+            if let Err(e) = self.initialize_operation(tx.clone()) {
+                warn!(
+                    "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    e
+                );
+                if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
+                    warn!(
+                        "Received rate limit response, waiting for {}s",
+                        RATE_LIMIT_BACKOFF_PERIOD.as_secs()
+                    );
+                    time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
+                }
 
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
                 self.tx_queue.return_popped(tx);
-            });
+            }
         }
 
         // Commit the next operations (if any).
@@ -226,12 +265,26 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             // network issue which won't appear the next time, so we report the situation to the
             // log and consider the operation pending (meaning that we won't process it on this
             // step, but will try to do so on the next one).
-            let commitment = self
-                .perform_commitment_step(&mut current_op)
-                .map_err(|e| {
-                    warn!("Error while trying to complete uncommitted op: {}", e);
-                })
-                .unwrap_or(OperationCommitment::Pending);
+            let commitment = match self.perform_commitment_step(&mut current_op) {
+                Ok(commitment) => commitment,
+                Err(e) => {
+                    warn!(
+                        "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
+                        file!(),
+                        line!(),
+                        column!(),
+                        e
+                    );
+                    if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
+                        warn!(
+                            "Received rate limit response, waiting for {}s",
+                            RATE_LIMIT_BACKOFF_PERIOD.as_secs()
+                        );
+                        time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
+                    }
+                    OperationCommitment::Pending
+                }
+            };
 
             match commitment {
                 OperationCommitment::Committed => {
@@ -239,6 +292,15 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     self.tx_queue.report_commitment();
 
                     if current_op.is_verify() {
+                        self.current_zksync_info.set_new_verified_block(
+                            current_op
+                                .op
+                                .as_ref()
+                                .expect("Should be verify operation")
+                                .block
+                                .block_number,
+                        );
+
                         // We notify about verify only when it's confirmed on the Ethereum.
                         self.op_notify
                             .try_send(current_op.op.expect("Should be verify operation"))
@@ -499,12 +561,52 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
             options.gas_price = Some(op.last_used_gas_price);
+
+            // We set the gas limit for commit / verify operations as pre-calculated estimation.
+            // This estimation is a higher bound based on a pre-calculated cost of every operation in the block.
+            let gas_limit = Self::gas_limit_for_op(op);
+
+            assert!(
+                gas_limit > 0.into(),
+                "Proposed gas limit for operation is 0; operation: {:?}",
+                op
+            );
+
+            log::info!(
+                "Gas limit for <ETH Operation id: {}> is {}",
+                op.id,
+                gas_limit
+            );
+
+            options.gas = Some(gas_limit);
+
             options
         };
 
         let signed_tx = ethereum.sign_prepared_tx(op.encoded_tx_data.clone(), tx_options)?;
 
         Ok(signed_tx)
+    }
+
+    /// Calculates the gas limit for transaction to be send, depending on the type of operation.
+    fn gas_limit_for_op(op: &ETHOperation) -> U256 {
+        match op.op_type {
+            OperationType::Commit => {
+                op.op
+                    .as_ref()
+                    .expect("No zkSync operation for Commit")
+                    .block
+                    .commit_gas_limit
+            }
+            OperationType::Verify => {
+                op.op
+                    .as_ref()
+                    .expect("No zkSync operation for Verify")
+                    .block
+                    .verify_gas_limit
+            }
+            OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
+        }
     }
 
     /// Creates a new transaction for the existing Ethereum operation.
@@ -574,13 +676,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     &witness_data.1
                 );
 
-                // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
                 self.ethereum.encode_tx_data(
                     "commitBlock",
                     (
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
-                        root,
+                        vec![root],
                         public_data,
                         witness_data.0,
                         witness_data.1,
@@ -588,7 +689,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 )
             }
             Action::Verify { proof } => {
-                // function verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof, bytes calldata _withdrawalsData)
                 let block_number = op.block.block_number;
                 let withdrawals_data = op.block.get_withdrawals_data();
                 self.ethereum.encode_tx_data(
@@ -641,34 +741,29 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     }
 }
 
+#[must_use]
 pub fn start_eth_sender(
+    runtime: &Runtime,
     pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
     op_notify_sender: mpsc::Sender<Operation>,
-    send_requst_receiver: mpsc::Receiver<Operation>,
+    send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
     config_options: ConfigurationOptions,
-) {
-    std::thread::Builder::new()
-        .name("eth_sender".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+    current_zksync_info: CurrentZksyncInfo,
+) -> JoinHandle<()> {
+    let ethereum =
+        EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
 
-            let ethereum =
-                EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
+    let db = Database::new(pool);
 
-            let db = Database::new(pool);
+    let eth_sender_options = EthSenderOptions::from_env();
+    let eth_sender = ETHSender::new(
+        eth_sender_options,
+        db,
+        ethereum,
+        send_request_receiver,
+        op_notify_sender,
+        current_zksync_info,
+    );
 
-            let eth_sender_options = EthSenderOptions::from_env();
-
-            let mut runtime = Runtime::new().expect("eth-sender-runtime");
-            let eth_sender = ETHSender::new(
-                eth_sender_options,
-                db,
-                ethereum,
-                send_requst_receiver,
-                op_notify_sender,
-            );
-            runtime.block_on(eth_sender.run());
-        })
-        .expect("Eth sender thread");
+    runtime.spawn(eth_sender.run())
 }

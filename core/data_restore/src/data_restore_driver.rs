@@ -7,7 +7,7 @@ use web3::{
 // Workspace deps
 use models::{
     abi::{governance_contract, zksync_contract},
-    node::{AccountMap, AccountUpdate},
+    node::{AccountMap, AccountUpdate, Fr},
 };
 use storage::ConnectionPool;
 // Local deps
@@ -64,6 +64,13 @@ pub struct DataRestoreDriver<T: Transport> {
     pub end_eth_blocks_offset: u64,
     /// Available block chunk sizes
     pub available_block_chunk_sizes: Vec<usize>,
+    /// Finite mode flag. In finite mode, driver will only work until
+    /// amount of restored blocks will become equal to amount of known
+    /// verified blocks. After that, it will stop.
+    pub finite_mode: bool,
+    /// Expected root hash to be observed after restoring process. Only
+    /// available in finite mode, and intended for tests.
+    pub final_hash: Option<Fr>,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -78,6 +85,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         connection_pool: ConnectionPool,
         web3_transport: T,
@@ -86,6 +94,8 @@ impl<T: Transport> DataRestoreDriver<T> {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         available_block_chunk_sizes: Vec<usize>,
+        finite_mode: bool,
+        final_hash: Option<Fr>,
     ) -> Self {
         let web3 = Web3::new(web3_transport);
 
@@ -119,6 +129,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             eth_blocks_step,
             end_eth_blocks_offset,
             available_block_chunk_sizes,
+            finite_mode,
+            final_hash,
         }
     }
 
@@ -131,22 +143,14 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     /// * `franklin_contract_genesis_tx_hash` - Rollup contract creation tx hash
     ///
-    pub fn set_genesis_state(
-        &mut self,
-        governance_contract_genesis_tx_hash: H256,
-        franklin_contract_genesis_tx_hash: H256,
-    ) {
-        let genesis_franklin_transaction =
-            get_ethereum_transaction(&self.web3, &franklin_contract_genesis_tx_hash)
-                .expect("Cant get franklin genesis transaction");
-        let genesis_governance_transaction =
-            get_ethereum_transaction(&self.web3, &governance_contract_genesis_tx_hash)
-                .expect("Cant get governance genesis transaction");
+    pub fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
+        let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
+            .expect("Cant get franklin genesis transaction");
 
         // Setting genesis block number for events state
         let genesis_eth_block_number = self
             .events_state
-            .set_genesis_block_number(&genesis_governance_transaction)
+            .set_genesis_block_number(&genesis_transaction)
             .expect("Cant set genesis block number for events state");
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
@@ -157,16 +161,21 @@ impl<T: Transport> DataRestoreDriver<T> {
             genesis_eth_block_number,
         );
 
-        let genesis_account = get_genesis_account(&genesis_franklin_transaction)
-            .expect("Cant get genesis account address");
+        let genesis_fee_account =
+            get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
+
+        info!(
+            "genesis fee account address: 0x{}",
+            hex::encode(genesis_fee_account.address.as_ref())
+        );
 
         let account_update = AccountUpdate::Create {
-            address: genesis_account.address,
-            nonce: genesis_account.nonce,
+            address: genesis_fee_account.address,
+            nonce: genesis_fee_account.nonce,
         };
 
         let mut account_map = AccountMap::default();
-        account_map.insert(0, genesis_account);
+        account_map.insert(0, genesis_fee_account);
 
         let current_block = 0;
         let current_unprocessed_priority_op = 0;
@@ -258,6 +267,23 @@ impl<T: Transport> DataRestoreDriver<T> {
                         total_verified_blocks,
                         self.tree_state.root_hash()
                     );
+
+                    if self.finite_mode && last_verified_block == total_verified_blocks {
+                        // If there is an expected root hash, check that it matches the observed
+                        // one.
+                        if let Some(root_hash) = self.final_hash {
+                            assert_eq!(
+                                root_hash,
+                                self.tree_state.root_hash(),
+                                "Root hash after the tree restoring doesn't match expected one"
+                            );
+
+                            info!("Root hash is verified against expected one and it's correct");
+                        }
+
+                        // We've restored all the blocks, our job is done.
+                        break;
+                    }
                 }
             }
 

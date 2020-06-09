@@ -1,5 +1,6 @@
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
+use ethabi::ParamType;
 use models::node::operations::FranklinOp;
 use web3::{Transport, Web3};
 
@@ -29,14 +30,16 @@ impl RollupOpsBlock {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
+        let fee_account_argument_id = 1;
+        let public_data_argument_id = 3;
         let decoded_commitment_parameters = ethabi::decode(
             vec![
-                ethabi::ParamType::Uint(32),
-                ethabi::ParamType::Uint(24),
-                ethabi::ParamType::FixedBytes(32),
-                ethabi::ParamType::Bytes,
-                ethabi::ParamType::Bytes,
-                ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))),
+                ParamType::Uint(32),                                   // uint32 _blockNumber,
+                ParamType::Uint(32),                                   // uint32 _feeAccount,
+                ParamType::Array(Box::new(ParamType::FixedBytes(32))), // bytes32[] _newRoots,
+                ParamType::Bytes, // bytes calldata _publicData,
+                ParamType::Bytes, // bytes calldata _ethWitness,
+                ParamType::Array(Box::new(ParamType::Uint(32))), // uint32[] calldata _ethWitnessSizes
             ]
             .as_slice(),
             input_data.as_slice(),
@@ -49,8 +52,8 @@ impl RollupOpsBlock {
         })?;
 
         if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
-            &decoded_commitment_parameters[1],
-            &decoded_commitment_parameters[3],
+            &decoded_commitment_parameters[fee_account_argument_id],
+            &decoded_commitment_parameters[public_data_argument_id],
         ) {
             let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
             let fee_account = fee_acc.as_u32();
@@ -99,20 +102,20 @@ impl RollupOpsBlock {
 #[cfg(test)]
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
-    use bigdecimal::BigDecimal;
     use models::node::operations::ChangePubKeyOp;
     use models::node::tx::{ChangePubKey, TxSignature};
     use models::node::{
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
         TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
+    use num::BigUint;
 
     #[test]
     fn test_deposit() {
         let priority_op = Deposit {
             from: "1111111111111111111111111111111111111111".parse().unwrap(),
             token: 1,
-            amount: BigDecimal::from(10),
+            amount: 10u32.into(),
             to: "7777777777777777777777777777777777777777".parse().unwrap(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
@@ -135,8 +138,8 @@ mod test {
             "7777777777777777777777777777777777777777".parse().unwrap(),
             [9u8; 20].into(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(10),
+            20u32.into(),
+            10u32.into(),
             2,
             None,
         );
@@ -159,7 +162,7 @@ mod test {
         };
         let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
-            withdraw_amount: Some(BigDecimal::from(444)),
+            withdraw_amount: Some(BigUint::from(444u32).into()),
         }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
@@ -197,8 +200,8 @@ mod test {
             "7777777777777777777777777777777777777777".parse().unwrap(),
             "8888888888888888888888888888888888888888".parse().unwrap(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(10),
+            20u32.into(),
+            20u32.into(),
             3,
             None,
         );
@@ -223,8 +226,8 @@ mod test {
             "7777777777777777777777777777777777777777".parse().unwrap(),
             "8888888888888888888888888888888888888888".parse().unwrap(),
             1,
-            BigDecimal::from(20),
-            BigDecimal::from(10),
+            20u32.into(),
+            10u32.into(),
             3,
             None,
         );

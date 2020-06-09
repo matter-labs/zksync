@@ -7,7 +7,7 @@ import {readContractCode, readTestContracts} from "../src.ts/deploy";
 const {performance} = require("perf_hooks");
 const {expect} = require("chai");
 
-export const FranklinTestNoInitContractCode = require(`../build/ZkSyncTestNoInit`);
+export const FranklinTestUpgradeTargetContractCode = require(`../build/ZkSyncTestUpgradeTarget`);
 
 const testContracts = readTestContracts();
 
@@ -21,10 +21,6 @@ async function main() {
         parser.addArgument("contractAddress");
         parser.addArgument("upgradeGatekeeperAddress");
         const args = parser.parseArgs(process.argv.slice(2));
-        if (process.env.ETH_NETWORK !== "localhost") {
-            console.log("Upgrading test contract not on localhost is not allowed");
-            return;
-        }
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
         if (process.env.ETH_NETWORK == "localhost") {
@@ -48,7 +44,7 @@ async function main() {
 
         const newTargetFranklin = await deployContract(
             wallet,
-            FranklinTestNoInitContractCode,
+            FranklinTestUpgradeTargetContractCode,
             [],
             {gasLimit: 6500000},
         );
@@ -71,7 +67,7 @@ async function main() {
             .to.equal(newTargetFranklin.address, "upgrade was unsuccessful");
     } catch (e) {
         console.error(JSON.stringify(e));
-        process.exit(0);
+        process.exit(121);
     }
 }
 

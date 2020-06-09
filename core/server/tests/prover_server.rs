@@ -12,8 +12,10 @@ use models::{
     params::{account_tree_depth, total_tokens},
     prover_utils::EncodedProofPlonk,
 };
+use num::BigUint;
 use prover::{client, ApiClient};
 // Local deps
+use circuit::witness::utils::get_used_subtree_root_hash;
 use server::prover_server;
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
@@ -31,6 +33,7 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
             rounds_interval,
             tx,
             tree,
+            0,
             0,
         );
     });
@@ -180,10 +183,11 @@ pub fn test_operation_and_wanted_prover_data(
     );
     let initial_root = circuit_tree.root_hash();
     let initial_root2 = circuit_tree.root_hash();
+    let initial_used_subtree_root = get_used_subtree_root_hash(&circuit_tree);
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
         from: validator_account.address,
         token: 0,
-        amount: bigdecimal::BigDecimal::from(10),
+        amount: BigUint::from(10u32),
         to: validator_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
@@ -225,8 +229,10 @@ pub fn test_operation_and_wanted_prover_data(
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
                 eth_hash: vec![0; 8],
+                eth_block: 10,
             },
             block_index: 0,
+            created_at: chrono::Utc::now(),
         },
     )));
 
@@ -240,6 +246,8 @@ pub fn test_operation_and_wanted_prover_data(
         ops,
         (0, 1),
         &ConfigurationOptions::from_env().available_block_chunk_sizes,
+        1_000_000.into(),
+        1_500_000.into(),
     );
 
     let mut pub_data = vec![];
@@ -306,6 +314,7 @@ pub fn test_operation_and_wanted_prover_data(
         prover::prover_data::ProverData {
             public_data_commitment,
             old_root: initial_root2,
+            initial_used_subtree_root,
             new_root: block.new_root_hash,
             validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
             operations,
@@ -323,7 +332,7 @@ fn api_server_publish_dummy() {
     let rounds_interval = time::Duration::from_secs(10);
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::new();
     let res = client
         .post(&format!("http://{}/publish", &addr))
         .json(&client::PublishReq {

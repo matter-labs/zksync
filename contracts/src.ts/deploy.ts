@@ -144,7 +144,7 @@ export class Deployer {
         const zksContract = await deployContract(
             this.deployWallet,
             this.contracts.zkSync, [],
-            {gasLimit: 5000000, ...ethTxOptions},
+            {gasLimit: 6000000, ...ethTxOptions},
         );
         const zksRec = await zksContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
@@ -160,8 +160,8 @@ export class Deployer {
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode, [this.addresses.GovernanceTarget, this.addresses.VerifierTarget,
-                this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_ETH_ADDRESS,
-                this.governorAddress,
+                this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_COMMIT_ETH_ADDRESS,
+                this.governorAddress, process.env.OPERATOR_FEE_ETH_ADDRESS
             ],
             {gasLimit: 5000000, ...ethTxOptions},
         );
@@ -176,7 +176,8 @@ export class Deployer {
                 this.addresses.UpgradeGatekeeper = parsedLog.values.gatekeeper;
             }
         }
-        const govGasUsed = deployFactoryTx.gasUsed;
+        const txHash = deployFactoryTx.transactionHash;
+        const gasUsed = deployFactoryTx.gasUsed;
         const gasPrice = deployFactoryContract.deployTransaction.gasPrice;
         if (this.verbose) {
             console.log(`DEPLOY_FACTORY_ADDR=${deployFactoryContract.address}`);
@@ -184,7 +185,8 @@ export class Deployer {
             console.log(`CONTRACT_ADDR=${this.addresses.ZkSync}`);
             console.log(`VERIFIER_ADDR=${this.addresses.Verifier}`);
             console.log(`UPGRADE_GATEKEEPER_ADDR=${this.addresses.UpgradeGatekeeper}`);
-            console.log(`Deploy finished, gasUsed: ${govGasUsed.toString()}, eth spent: ${formatEther(govGasUsed.mul(gasPrice))}`);
+            console.log(`GENESIS_TX_HASH=${txHash}`);
+            console.log(`Deploy finished, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
         }
     }
 
@@ -200,28 +202,28 @@ export class Deployer {
     }
 
     public async publishSourcesToEtherscan() {
-        console.log("Publishing sourcecode for UpgradeGatekeeper");
+        console.log("Publishing sourcecode for UpgradeGatekeeper", this.addresses.UpgradeGatekeeper);
         await publishSourceCodeToEtherscan(this.addresses.UpgradeGatekeeper, "UpgradeGatekeeper",
             encodeConstructorArgs(this.contracts.upgradeGatekeeper, [this.addresses.ZkSync]));
 
-        console.log("Publishing sourcecode for ZkSyncTarget");
+        console.log("Publishing sourcecode for ZkSyncTarget", this.addresses.ZkSyncTarget);
         await publishSourceCodeToEtherscan(this.addresses.ZkSyncTarget, "ZkSync", "");
-        console.log("Publishing sourcecode for GovernanceTarget");
+        console.log("Publishing sourcecode for GovernanceTarget", this.addresses.GovernanceTarget);
         await publishSourceCodeToEtherscan(this.addresses.GovernanceTarget, "Governance", "");
-        console.log("Publishing sourcecode for VerifierTarget");
+        console.log("Publishing sourcecode for VerifierTarget", this.addresses.VerifierTarget);
         await publishSourceCodeToEtherscan(this.addresses.VerifierTarget, "Verifier", "");
 
-        console.log("Publishing sourcecode for ZkSync (proxy)");
+        console.log("Publishing sourcecode for ZkSync (proxy)", this.addresses.ZkSync);
         await publishSourceCodeToEtherscan(this.addresses.ZkSync, "Proxy",
             encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.ZkSyncTarget,
                 [this.addresses.Governance, this.addresses.Verifier, process.env.GENESIS_ROOT],
                 ["address", "address", "bytes32"]));
 
-        console.log("Publishing sourcecode for Verifier (proxy)");
+        console.log("Publishing sourcecode for Verifier (proxy)", this.addresses.Verifier);
         await publishSourceCodeToEtherscan(this.addresses.Verifier, "Proxy",
             encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.VerifierTarget, [], []));
 
-        console.log("Publishing sourcecode for Governance (proxy)");
+        console.log("Publishing sourcecode for Governance (proxy)", this.addresses.Governance);
         await publishSourceCodeToEtherscan(this.addresses.Governance, "Proxy",
             encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.GovernanceTarget,
                 [this.addresses.DeployFactory], ["address"]));

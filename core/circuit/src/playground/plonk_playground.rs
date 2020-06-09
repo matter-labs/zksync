@@ -2,11 +2,12 @@ use crate::playground::get_path_in_file_dump_dir;
 use crate::witness::tests::test_utils::{PlasmaStateGenerator, WitnessTestAccount};
 use crate::witness::utils::WitnessBuilder;
 use crate::witness::{deposit::DepositWitness, Witness};
-use bigdecimal::BigDecimal;
 use models::node::{Deposit, DepositOp, Fr};
 use models::prover_utils::fs_utils::{
     get_universal_setup_lagrange_form, get_universal_setup_monomial_form,
 };
+use num::BigUint;
+use rayon::prelude::*;
 use std::time::Instant;
 
 #[test]
@@ -25,7 +26,7 @@ fn test_transpile_deposit_franklin_existing_account() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,
@@ -106,7 +107,7 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,
@@ -215,7 +216,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,
@@ -390,7 +391,7 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,
@@ -467,6 +468,54 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
     println!("Transpilation hist = {:?}", hints_hist);
 
     println!("Done transpiling");
+}
+
+#[test]
+fn print_available_setup_powers() {
+    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use crypto_exports::franklin_crypto::bellman::plonk::*;
+
+    let calculate_setup_power = |chunks: usize| -> (usize, u32) {
+        let circuit = {
+            let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&[]);
+            let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1);
+            witness_accum.extend_pubdata_with_noops(chunks);
+            witness_accum.collect_fees(&[]);
+            witness_accum.calculate_pubdata_commitment();
+            witness_accum.into_circuit_instance()
+        };
+        let (gates, setup_power) = {
+            let (gates, _) = transpile_with_gates_count::<Bn256, _>(circuit.clone())
+                .expect("transpilation is successful");
+            let size = gates.next_power_of_two();
+            (gates, size.trailing_zeros())
+        };
+        (gates, setup_power)
+    };
+
+    println!("chunks,gates,setup_power");
+    for chunk_range in (2..=750).step_by(2).collect::<Vec<_>>().chunks(32) {
+        let mut chunk_data = chunk_range
+            .into_par_iter()
+            .map(|chunk| {
+                let (gates, setup_power) = calculate_setup_power(*chunk);
+                (*chunk, gates, setup_power)
+            })
+            .collect::<Vec<_>>();
+
+        let is_finished = chunk_data
+            .iter()
+            .find(|(_, _, setup_power)| *setup_power > 26)
+            .is_some();
+
+        chunk_data.retain(|&(_, _, setup_power)| setup_power <= 26);
+        for (chunks, gates, setup_power) in chunk_data {
+            println!("{},{},{}", chunks, gates, setup_power);
+        }
+        if is_finished {
+            break;
+        }
+    }
 }
 
 #[test]

@@ -7,8 +7,8 @@ use std::time::Duration;
 use futures::{channel::mpsc, executor::block_on, SinkExt};
 use web3::types::{H160, H256};
 // Local uses
-use crate::node::Address;
 use crate::params::block_chunk_sizes;
+use url::Url;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
 pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
@@ -110,14 +110,13 @@ pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
     pub json_rpc_http_server_address: SocketAddr,
     pub json_rpc_ws_server_address: SocketAddr,
-    pub contract_eth_addr: H160,
-    pub contract_genesis_tx_hash: H256,
     pub web3_url: String,
+    pub genesis_tx_hash: H256,
+    pub contract_eth_addr: H160,
     pub governance_eth_addr: H160,
-    pub governance_genesis_tx_hash: H256,
-    pub operator_franklin_addr: Address,
-    pub operator_eth_addr: H160,
-    pub operator_private_key: H256,
+    pub operator_fee_eth_addr: H160,
+    pub operator_commit_eth_addr: H160,
+    pub operator_private_key: Option<H256>,
     pub chain_id: u8,
     pub gas_price_factor: usize,
     pub prover_server_address: SocketAddr,
@@ -126,6 +125,8 @@ pub struct ConfigurationOptions {
     pub available_block_chunk_sizes: Vec<usize>,
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
+    pub ticker_url: Url,
+    pub idle_provers: u32,
 }
 
 impl ConfigurationOptions {
@@ -139,14 +140,17 @@ impl ConfigurationOptions {
             rest_api_server_address: parse_env("REST_API_BIND"),
             json_rpc_http_server_address: parse_env("HTTP_RPC_API_BIND"),
             json_rpc_ws_server_address: parse_env("WS_API_BIND"),
-            contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
-            contract_genesis_tx_hash: parse_env_with("CONTRACT_GENESIS_TX_HASH", |s| &s[2..]),
             web3_url: get_env("WEB3_URL"),
+            genesis_tx_hash: parse_env_with("GENESIS_TX_HASH", |s| &s[2..]),
+            contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
             governance_eth_addr: parse_env_with("GOVERNANCE_ADDR", |s| &s[2..]),
-            governance_genesis_tx_hash: parse_env_with("GOVERNANCE_GENESIS_TX_HASH", |s| &s[2..]),
-            operator_franklin_addr: parse_env_with("OPERATOR_FRANKLIN_ADDRESS", |s| &s[2..]),
-            operator_eth_addr: parse_env_with("OPERATOR_ETH_ADDRESS", |s| &s[2..]),
-            operator_private_key: parse_env("OPERATOR_PRIVATE_KEY"),
+            operator_commit_eth_addr: parse_env_with("OPERATOR_COMMIT_ETH_ADDRESS", |s| &s[2..]),
+            operator_fee_eth_addr: parse_env_with("OPERATOR_FEE_ETH_ADDRESS", |s| &s[2..]),
+            operator_private_key: if env::var("OPERATOR_PRIVATE_KEY").is_ok() {
+                Some(parse_env("OPERATOR_PRIVATE_KEY"))
+            } else {
+                None
+            },
             chain_id: parse_env("CHAIN_ID"),
             gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
@@ -157,6 +161,8 @@ impl ConfigurationOptions {
                 "ETH_WATCH_POLL_INTERVAL",
             )),
             eth_network: parse_env("ETH_NETWORK"),
+            ticker_url: parse_env("TICKER_URL"),
+            idle_provers: parse_env("IDLE_PROVERS"),
         }
     }
 }

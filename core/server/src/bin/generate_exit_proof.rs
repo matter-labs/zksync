@@ -1,11 +1,11 @@
 //! Generate exit proof for exodus mode given account and token
 //! correct verified state should be present in the db (could be restored using `data-restore` module)
 
-use bigdecimal::BigDecimal;
 use clap::{App, Arg};
 use log::info;
 use models::node::{AccountId, Address, TokenId, TokenLike};
 use models::prover_utils::EncodedProofPlonk;
+use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;
 use storage::ConnectionPool;
@@ -15,7 +15,7 @@ struct ExitProofData {
     token_id: TokenId,
     account_id: AccountId,
     account_address: Address,
-    amount: BigDecimal,
+    amount: BigUint,
     proof: EncodedProofPlonk,
 }
 

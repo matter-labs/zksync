@@ -111,7 +111,7 @@ This includes, in particular, the following claims:
 
 |Type|Byte len|Encoding|Comment|
 |--|--|--|--|
-|AccountId|3|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 16777215|
+|AccountId|4|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 2^32 - 1 = 4.294967295 × 10^9|
 |TokenId|2|BE integer|Incremented number of tokens in Rollup, max value is 65535|
 |PackedTxAmount|5|[Parameters](#amount-packing)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa * 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 * 10^31, providing 10 full decimal digit precision.|
 |PackedFee|2|[Parameters](#amount-packing)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|
@@ -219,7 +219,7 @@ Legend:
 - Onchain operation: what the operator can put into the rollup block pubdata (operation pubdata).
 - Node implementation: node model that describes an operation.
 - Circuit implementation: circuit model that describes the operation and its witness.
-- Chunk: the dimension of the operation. Each chunk has its own part of the public data (8 bytes) given through witnesses.
+- Chunk: the dimension of the operation. Each chunk has its own part of the public data (9 bytes) given through witnesses.
 - Significant bytes: how many bytes, of all bytes occupied by the operation, are significant (including operation number).
 - Hash: the result of SHA-256 function with operation's pubdata as input. Used for operation identification.
 
@@ -287,7 +287,7 @@ No effects.
 ##### Example
 
 ```
-0000000000000000
+000000000000000000
 ```
 
 #### User transaction
@@ -310,23 +310,23 @@ Transfers funds between Rollup accounts.
 
 |Chunks|Significant bytes|
 |--|--|
-|2|16|
+|2|18|
 
 ##### Structure
 
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x05`|Operation code|
-|from_account|3|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
+|from_account|4|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
 |token|2|TokenId|Unique token identifier in the rollup|
-|to_account|3|AccountId|Unique identifier of the rollup account that will receive the funds (recipient)|
+|to_account|4|AccountId|Unique identifier of the rollup account that will receive the funds (recipient)|
 |packed_amount|5|PackedTxAmount|Packed amount of funds sent|
 |packed_fee|2|PackedFee|Packed amount of fee paid|
 
 ##### Example
 
 ```
-0500000400020000030000001ad30012
+05000000040002000000030000001ad30012
 ```
 
 Reads as: transfer from account #4 token #2 to account #3 amount in packed representation 0x0000001ad3 for fee in packed representation 0x0012.
@@ -363,7 +363,7 @@ User transaction representation.
   "nonce": 784793056,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
-    "signature": "c16d3ea71a9c878dd49904cfe95fe1360864c43fdf7bb22f446941474d4e5686a71d837687b16caa564c7197d511517f26117def38f2a1dd3f7ccbef59628003"
+    "signature": "355b60e9fa06bb4755fde52001f32558f221aa8bbe974882abb5db2996ecb487086bcf51dbc3b8693dbad74f393278cce63d58e79e0a629e7cbb61c4aff7fb04"
   }
 }
 ```
@@ -376,7 +376,7 @@ Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
 type: 0x05
-accountId: 0x00080d
+accountId: 0x0000080d
 from: 0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb
 to: 0x05e3066450dfcd4ee9ca4f2039d58883631f0460
 token: 0xede0
@@ -384,7 +384,7 @@ amount: 0x5bf0aea003
 fee: 0x46e8
 nonce: 0x2ec6fde0
 
-Signed bytes: 0x0500080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f0460ede05bf0aea00346e82ec6fde0
+Signed bytes: 0x050000080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f0460ede05bf0aea00346e82ec6fde0
 ```
 
 
@@ -456,24 +456,24 @@ So, the "account creation" will be performed first, that is, the correspondence 
 
 |Chunks|Significant bytes|
 |--|--|
-|5|36|
+|6|38|
 
 ##### Structure
 
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x02`|Operation code|
-|from_account|3|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
+|from_account|4|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
 |token|2|TokenId|Unique token identifier in the rollup|
 |packed_amount|5|PackedTxAmount|Packed amount of funds sent|
 |to_address|20|ETHAddress|The address that will represent the rollup account that will receive the funds (recipient)|
-|to_account|3|AccountId|Unique identifier of the rollup account that will receive the funds (recipient)|
+|to_account|4|AccountId|Unique identifier of the rollup account that will receive the funds (recipient)|
 |packed_fee|2|PackedFee|Packed amount of fee paid|
 
 ##### Example
 
 ```
-0200000400020000001ad30809101112131415161718192021222334252628000003001200000000
+020000000400020000001ad3080910111213141516171819202122233425262800000003001200000000
 ```
 
 Reads as: transfer from account #4 token #2 amount in packed representation 0x0000001ad3 to account with address 0x0809101112131415161718192021222334252628 and id #3 for fee in packed representation 0x0012.
@@ -556,7 +556,7 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x03`|Operation code|
-|from_account|3|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
+|from_account|4|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
 |token|2|TokenId|Unique token identifier in the rollup|
 |full_amount|16|StateAmount|Full amount of funds sent|
 |packed_fee|2|PackedFee|Packed amount of fee paid|
@@ -565,7 +565,7 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 ##### Example
 
 ```
-030000040002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
+03000000040002000000000000000002c68af0bb1400000012080910111213141516171819202122233425262800000000
 ```
 
 Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb140000 for fee packed in representation 0x0012 to ethereum account with address 0x0809101112131415161718192021222334252628.
@@ -602,7 +602,7 @@ User transaction representation.
   "nonce": 352676723,
   "signature": {
     "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
-    "signature": "ff74636ba00f6c3724c247f55b26f3400de4ce5c3a70568cc8da67ae0baa11a5290895cd80e394983659e406641d188c24acf5b3435f1157fd866390ac597c05"
+    "signature": "ae94d3b349e9ed18753c307262f62bea5ec1cc748ce5e5123caa5f7eb1aa599bc6734c43a92dad5c00eab5e6443e3ae8217e9bde60b93c7e9739dc85b148ad02"
   }
 }
 ```
@@ -615,7 +615,7 @@ Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0
 Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
 type: 0x03
-account_id: 0x001016
+account_id: 0x00001016
 from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
 to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
 token: 0x26a0
@@ -623,7 +623,7 @@ amount: 0x000000000000000000000b3921510800
 fee: 0x46e8
 nonce: 0x15056b73
 
-Signed bytes: 0x03001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb051326a0000000000000000000000b392151080046e815056b73
+Signed bytes: 0x0300001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb051326a0000000000000000000000b392151080046e815056b73
 ```
 
 
@@ -686,14 +686,14 @@ After that operator includes this operation in a block. In the account tree, the
 
 |Chunks|Significant bytes|
 |--|--|
-|6|42|
+|6|43|
 
 ##### Structure
 
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x01`|Operation code|
-|to_account|3|AccountId|Unique identifier of the rollup account that will receive the funds (recipient)|
+|to_account|4|AccountId|Unique identifier of the rollup account that will receive the funds (recipient)|
 |token|2|TokenId|Unique token identifier in the rollup|
 |full_amount|16|StateAmount|Full amount of funds sent|
 |to_address|20|ETHAddress|The address that will represent the rollup account that will receive the funds (recipient)|
@@ -701,7 +701,7 @@ After that operator includes this operation in a block. In the account tree, the
 ##### Example
 
 ```
-010000040002000000000000000002c68af0bb1400000809101112131415161718192021222334252628000000000000
+01000000040002000000000000000002c68af0bb1400000809101112131415161718192021222334252628000000000000
 ```
 
 Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb140000, account will have address 0x0809101112131415161718192021222334252628.
@@ -774,14 +774,14 @@ It starts as a priority operation - user calls contract method `fullExit`. After
 
 |Chunks|Significant bytes|
 |--|--|
-|6|42|
+|6|43|
 
 ##### Structure
 
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x06`|Operation code|
-|account_id|3|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
+|account_id|4|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
 |owner|20|EthAddress|The address of the fund owner account. Also to the balance of this address the funds will be accrued(recipient)|
 |token|2|TokenId|Unique token identifier in the rollup|
 |full_amount|16|StateAmount|Full amount of funds that had been withdrawn|
@@ -800,7 +800,7 @@ Reads as: full exit from account #4 with with address 0x080910111213141516171819
 
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
-|account_id|3|AccountId|Unique identifier of the rollup account|
+|account_id|4|AccountId|Unique identifier of the rollup account|
 |eth_address|20|ETHAddress|The address of the account|
 |token|2|TokenId|Unique token identifier in the rollup|
 
@@ -861,14 +861,14 @@ with ethereum keys for which address is the same as account address.
 
 |Chunks|Significant bytes|
 |--|--|
-|6|48|
+|6|49|
 
 ##### Structure
 
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x07`|Operation code|
-|account_id|3|AccountId|Unique identifier of the rollup account|
+|account_id|4|AccountId|Unique identifier of the rollup account|
 |new_pubkey_hash|20|RollupPubkeyHash|Hash of the new rollup public key|
 |account_address|20|ETHAddress|Address of the account|
 |nonce|4|Nonce|Account nonce|
@@ -892,7 +892,7 @@ After this transaction succeeded transaction without signature can be sent to op
 function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
     const pubKeyHashHex = to_hex(new_pubkey_hash); // 20 bytes as a hex
     const msgNonce = to_hex(to_be_bytes(nonce)); // nonce (4 byte BE integer) as a hex
-    const msgAccId = to_hex(to_be_bytes(account_id)); // account id (3 byte BE integer) as a hex
+    const msgAccId = to_hex(to_be_bytes(account_id)); // account id (4 byte BE integer) as a hex
     return `Register zkSync pubkey:\n\n` +
            `${pubKeyHashHex}\n` +
            `nonce: 0x${msgNonce}\n` +
@@ -982,7 +982,7 @@ msg.value equals amount to deposit.
 #### Deposit ERC-20 token
 Deposit ERC-20 token to Rollup - transfer token from user L1 address into Rollup address
 ```solidity
-depositERC20(IERC20 _token, uint128 _amount, address _rollupAddr) payable
+depositERC20(IERC20 _token, uint104 _amount, address _rollupAddr) payable
 ```
 - _token: Token address in L1 chain
 - _amount: Amount to deposit 

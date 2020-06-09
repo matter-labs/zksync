@@ -3,10 +3,10 @@ use super::TokenId;
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
-use crate::primitives::{bytes_slice_to_uint32, u128_to_bigdecimal};
-use bigdecimal::BigDecimal;
+use crate::primitives::{bytes_slice_to_uint32, BigUintSerdeAsRadix10Str};
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
+use num::BigUint;
 use std::convert::{TryFrom, TryInto};
 use web3::types::{Address, Log, U256};
 
@@ -16,7 +16,8 @@ use super::operations::{DepositOp, FullExitOp};
 pub struct Deposit {
     pub from: Address,
     pub token: TokenId,
-    pub amount: BigDecimal,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub amount: BigUint,
     pub to: Address,
 }
 
@@ -66,7 +67,7 @@ impl FranklinPriorityOp {
                 let (amount, pub_data_left) = {
                     let (amount, left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
                     let amount = u128::from_be_bytes(amount.try_into().unwrap());
-                    (u128_to_bigdecimal(amount), left)
+                    (BigUint::from(amount), left)
                 };
 
                 // account
@@ -109,7 +110,8 @@ impl FranklinPriorityOp {
                 // amount
                 ensure!(
                     pub_data_left.len() == BALANCE_BIT_WIDTH / 8,
-                    "FullExitOp parse failed: input too big"
+                    "FullExitOp parse failed: input too big: {:?}",
+                    pub_data_left
                 );
 
                 Ok(Self::FullExit(FullExit {
@@ -138,6 +140,7 @@ pub struct PriorityOp {
     pub data: FranklinPriorityOp,
     pub deadline_block: u64,
     pub eth_hash: Vec<u8>,
+    pub eth_block: u64,
 }
 
 impl TryFrom<Log> for PriorityOp {
@@ -186,6 +189,10 @@ impl TryFrom<Log> for PriorityOp {
                 .expect("Event transaction hash is missing")
                 .as_bytes()
                 .to_vec(),
+            eth_block: event
+                .block_number
+                .expect("Event block number is missing")
+                .as_u64(),
         })
     }
 }

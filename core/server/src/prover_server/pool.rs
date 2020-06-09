@@ -12,6 +12,7 @@ use circuit::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
     TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
+use models::params::CHUNK_BIT_WIDTH;
 use models::{
     circuit::CircuitAccountTree,
     config_options::ThreadPanicNotify,
@@ -75,12 +76,8 @@ impl OperationsQueue {
     }
 
     /// Return block number of the next operation to take.
-    fn next_block_number(&self) -> Option<u32> {
-        if self.operations.is_empty() {
-            None
-        } else {
-            Some(self.operations[0].0.block.block_number)
-        }
+    fn next_block_number(&self) -> Option<BlockNumber> {
+        self.operations.front().map(|(op, _)| op.block.block_number)
     }
 
     // Whether queue is empty or not.
@@ -189,7 +186,7 @@ impl Maintainer {
 
         // Clone the required data to process it without holding the lock.
         let (mut queue, limit) = {
-            let pool = self.data.read().expect("failed to get write lock on data");
+            let pool = self.data.read().expect("failed to get read lock on data");
             (pool.op_queue.clone(), pool.limit)
         };
 
@@ -376,7 +373,7 @@ impl Maintainer {
 
         witness_accum.add_operation_with_pubdata(operations, pub_data);
         witness_accum.extend_pubdata_with_noops(block_size);
-        assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
+        assert_eq!(witness_accum.pubdata.len(), CHUNK_BIT_WIDTH * block_size);
         assert_eq!(witness_accum.operations.len(), block_size);
 
         witness_accum.collect_fees(&fees);
@@ -391,6 +388,7 @@ impl Maintainer {
         Ok(ProverData {
             public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
             old_root: witness_accum.initial_root_hash,
+            initial_used_subtree_root: witness_accum.initial_used_subtree_root_hash,
             new_root: commit_operation.block.new_root_hash,
             validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
                 .expect("failed to parse"),

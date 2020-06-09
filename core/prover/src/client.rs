@@ -81,11 +81,12 @@ impl ApiClient {
         };
 
         wrap_to_backoff_operation
-            .retry_notify(&mut Self::get_backoff(), |e, d: Duration| {
+            .retry_notify(&mut Self::get_backoff(), |err, next_after: Duration| {
+                let duration_secs = next_after.as_millis() as f32 / 1000.0f32;
+
                 warn!(
-                    "Failed to reach server err: <{}>, retrying after: {}s",
-                    e,
-                    d.as_secs(),
+                    "Failed to reach server err: <{}>, retrying after: {:.1}s",
+                    err, duration_secs,
                 )
             })
             .map_err(|e| match e {
@@ -95,9 +96,10 @@ impl ApiClient {
 
     fn get_backoff() -> backoff::ExponentialBackoff {
         let mut backoff = backoff::ExponentialBackoff::default();
-        backoff.current_interval = Duration::from_secs(5);
-        backoff.initial_interval = Duration::from_secs(5);
-        backoff.max_interval = Duration::from_secs(40);
+        backoff.current_interval = Duration::from_secs(1);
+        backoff.initial_interval = Duration::from_secs(1);
+        backoff.multiplier = 1.5f64;
+        backoff.max_interval = Duration::from_secs(10);
         backoff
     }
 
@@ -123,15 +125,6 @@ impl ApiClient {
         };
 
         Ok(self.with_retries(&op)?)
-    }
-
-    pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
-        self.http_client
-            .post(self.stopped_url.as_str())
-            .json(&prover_run_id)
-            .send()
-            .map_err(|e| format_err!("prover stopped request failed: {}", e))?;
-        Ok(())
     }
 }
 
@@ -237,5 +230,14 @@ impl crate::ApiClient for ApiClient {
         };
 
         Ok(self.with_retries(&op)?)
+    }
+
+    fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
+        self.http_client
+            .post(self.stopped_url.as_str())
+            .json(&prover_run_id)
+            .send()
+            .map_err(|e| format_err!("prover stopped request failed: {}", e))?;
+        Ok(())
     }
 }

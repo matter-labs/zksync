@@ -1,5 +1,5 @@
 use crate::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
-use models::config_options::get_env;
+use models::config_options::{get_env, parse_env};
 use models::prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use std::sync::{mpsc, Mutex};
 use std::time::Duration;
@@ -12,7 +12,7 @@ struct PreparedComputations {
 }
 
 pub struct PlonkStepByStepProver<C: ApiClient> {
-    block_sizes: Vec<usize>,
+    config: PlonkStepByStepProverConfig,
     prepared_computations: Mutex<Option<PreparedComputations>>,
     api_client: C,
     heartbeat_interval: Duration,
@@ -20,6 +20,7 @@ pub struct PlonkStepByStepProver<C: ApiClient> {
 
 pub struct PlonkStepByStepProverConfig {
     pub block_sizes: Vec<usize>,
+    pub download_setup_from_network: bool,
 }
 
 impl ProverConfig for PlonkStepByStepProverConfig {
@@ -29,6 +30,7 @@ impl ProverConfig for PlonkStepByStepProverConfig {
                 .split(',')
                 .map(|p| p.parse().unwrap())
                 .collect(),
+            download_setup_from_network: parse_env("PROVER_DOWNLOAD_SETUP"),
         }
     }
 }
@@ -43,7 +45,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
     ) -> Self {
         assert!(!config.block_sizes.is_empty());
         PlonkStepByStepProver {
-            block_sizes: config.block_sizes,
+            config,
             prepared_computations: Mutex::new(None),
             api_client,
             heartbeat_interval,
@@ -57,7 +59,8 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
         // first we try last proved block, since we have precomputations for it
         let block_size_idx_to_try_first =
             if let Some(precomp) = self.prepared_computations.lock().unwrap().as_ref() {
-                self.block_sizes
+                self.config
+                    .block_sizes
                     .iter()
                     .position(|size| *size == precomp.block_size)
                     .unwrap()
@@ -66,9 +69,9 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
             };
 
         let (mut block, mut job_id, mut block_size) = (0, 0, 0);
-        for offset_idx in 0..self.block_sizes.len() {
-            let idx = (block_size_idx_to_try_first + offset_idx) % self.block_sizes.len();
-            let current_block_size = self.block_sizes[idx];
+        for offset_idx in 0..self.config.block_sizes.len() {
+            let idx = (block_size_idx_to_try_first + offset_idx) % self.config.block_sizes.len();
+            let current_block_size = self.config.block_sizes[idx];
 
             let block_to_prove =
                 self.api_client
@@ -126,14 +129,16 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
         let precomp = if let Some(precomp) = valid_cached_precomp {
             precomp
         } else {
-            let setup =
-                SetupForStepByStepProver::prepare_setup_for_step_by_step_prover(instance.clone())
-                    .map_err(|e| {
-                    BabyProverError::Internal(format!(
-                        "Failed to prepare setup for block_size: {}, err: {}",
-                        block_size, e
-                    ))
-                })?;
+            let setup = SetupForStepByStepProver::prepare_setup_for_step_by_step_prover(
+                instance.clone(),
+                self.config.download_setup_from_network,
+            )
+            .map_err(|e| {
+                BabyProverError::Internal(format!(
+                    "Failed to prepare setup for block_size: {}, err: {}",
+                    block_size, e
+                ))
+            })?;
             PreparedComputations { block_size, setup }
         };
 
