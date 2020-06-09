@@ -34,6 +34,7 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
             tx,
             tree,
             0,
+            0,
         );
     });
     bind_to.to_string()

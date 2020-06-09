@@ -31,8 +31,12 @@ impl AppState {
         connection_pool: ConnectionPool,
         preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
         prover_timeout: Duration,
+        idle_provers: u32,
     ) -> Self {
-        let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(connection_pool.clone())));
+        let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(
+            connection_pool.clone(),
+            idle_provers,
+        )));
 
         Self {
             connection_pool,
@@ -201,13 +205,12 @@ pub struct RequiredReplicasOutput {
 
 fn required_replicas(
     data: web::Data<AppState>,
-    input: web::Json<RequiredReplicasInput>,
+    _input: web::Json<RequiredReplicasInput>,
 ) -> actix_web::Result<HttpResponse> {
-    let input = input.into_inner();
     let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
 
     let needed_count = oracle
-        .provers_required(input.current_count)
+        .provers_required()
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
     let response = RequiredReplicasOutput { needed_count };
@@ -215,6 +218,7 @@ fn required_replicas(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_prover_server(
     connection_pool: storage::ConnectionPool,
     bind_to: net::SocketAddr,
@@ -223,6 +227,7 @@ pub fn start_prover_server(
     panic_notify: mpsc::Sender<bool>,
     account_tree: CircuitAccountTree,
     tree_block_number: BlockNumber,
+    idle_provers: u32,
 ) {
     thread::Builder::new()
         .name("prover_server".to_string())
@@ -251,6 +256,7 @@ pub fn start_prover_server(
                         connection_pool.clone(),
                         data_pool.clone(),
                         prover_timeout,
+                        idle_provers,
                     ))
                     .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
