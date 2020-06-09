@@ -83,6 +83,8 @@ impl TransactionsHistoryTestSetup {
             operations,
             (0, 0), // Not important
             100,
+            1_000_000.into(), // Not important
+            1_500_000.into(), // Not important
         );
 
         self.blocks.push(block);

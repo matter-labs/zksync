@@ -263,6 +263,9 @@ impl TreeState {
 
         self.last_fee_account_address = fee_account_address;
 
+        // As we restoring an already executed block, this value isn't important.
+        let gas_limit = 0.into();
+
         let block = Block::new_from_availabe_block_sizes(
             ops_block.block_num,
             self.state.root_hash(),
@@ -273,6 +276,8 @@ impl TreeState {
                 self.current_unprocessed_priority_op,
             ),
             &self.available_block_chunk_sizes,
+            gas_limit,
+            gas_limit,
         );
 
         self.state.block_number += 1;

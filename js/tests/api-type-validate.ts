@@ -9,7 +9,6 @@ import { Interface as TxHistoryInterface } from './api-types/tx-history';
 import { Interface as TestnetConfigInterface } from './api-types/config';
 import { Interface as BlockTransactionsInterface } from './api-types/block-transactions';
 import { Interface as TransactionInterface } from './api-types/transaction';
-import { Interface as ProverUnstartedJobsInterface } from './api-types/prover';
 
 import * as zksync from 'zksync';
 import * as ethers from 'ethers';
@@ -230,16 +229,6 @@ export async function checkTestnetConfigResponseType(): Promise<TestnetConfigInt
     return data;
 }
 /**
- * Check `/prover/unstarted_jobs_count` method of our rest api
- */
-export async function checkProverUnstartedJobsCountResponseType(): Promise<ProverUnstartedJobsInterface> {
-    const url = `${process.env.REST_API_ADDR}/api/v0.1/prover/unstarted_jobs_count`;
-    const typeFilePath = `${apiTypesFolder}/prover.ts`;
-    const data: ProverUnstartedJobsInterface = await validateResponseFromUrl(typeFilePath, url);
-
-    return data;
-}
-/**
  * Check `/transactions_all/${txHash}` method of our rest api
  */
 export async function checkTransactionsResponseType(txHash: string): Promise<TransactionInterface> {
@@ -347,9 +336,6 @@ async function test() {
     console.log("Checking status and testnet config");
     await checkStatusResponseType();
     await checkTestnetConfigResponseType();
-
-    console.log("Checking prover unstarted jobs endpoint");
-    await checkProverUnstartedJobsCountResponseType();
 
     console.log("Checking tx history");
     await checkTxHistoryResponseType(syncWallet.address());

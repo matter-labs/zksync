@@ -35,13 +35,16 @@ contract Config {
     uint8 constant SUCCESS_FLAG_BYTES = 1;
 
     /// @notice Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
-    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = (2 ** 16) - 1;
+    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = 128 - 1;
+
+    /// @notice Max account id that could be registered in the network
+    uint32 constant MAX_ACCOUNT_ID = (2 ** 24) - 1;
 
     /// @notice Expected average period of block creation
     uint256 constant BLOCK_PERIOD = 15 seconds;
 
     /// @notice ETH blocks verification expectation
-    uint256 constant EXPECT_VERIFICATION_IN = 2 days / BLOCK_PERIOD;
+    uint256 constant EXPECT_VERIFICATION_IN = 3 hours / BLOCK_PERIOD;
 
     uint256 constant NOOP_BYTES = 1 * CHUNK_BYTES;
     uint256 constant DEPOSIT_BYTES = 6 * CHUNK_BYTES;
@@ -61,4 +64,10 @@ contract Config {
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     /// NOTE: Priority expiration should be > EXPECT_VERIFICATION_IN, otherwise incorrect block with priority op could not be reverted.
     uint256 constant PRIORITY_EXPIRATION = 3 days / BLOCK_PERIOD;
+
+    /// @notice Maximum number of priority request to clear during verifying the block
+    /// @dev Cause deleting storage slots cost 5k gas per each slot it's unprofitable to clear too many slots
+    /// @dev Value based on the assumption of ~750k gas cost of verifying and 5 used storage slots per PriorityOperation structure
+    uint64 constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
+
 }

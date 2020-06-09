@@ -10,7 +10,7 @@ use crate::config_options::parse_env;
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
-use crate::node::TokenId;
+use crate::node::{AccountId, TokenId};
 
 static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
 /// account_tree_depth.
@@ -86,18 +86,28 @@ pub fn number_of_processable_tokens() -> usize {
     num
 }
 
-/// Number of accounts that are expected to be able to transact
-pub fn log_2_number_of_processable_accounts() -> usize {
-    let num = 20;
+/// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
+pub fn used_account_subtree_depth() -> usize {
+    let num = 24; // total accounts = 2.pow(num) ~ 16mil
 
-    assert!(num <= balance_tree_depth());
+    assert!(num <= account_tree_depth());
 
     num
 }
 
-/// Number of accounts that are expected to be able to transact
-pub fn number_of_processable_accounts() -> usize {
-    1 << log_2_number_of_processable_accounts()
+/// Max token id, based on the depth of the used left subtree
+pub fn max_account_id() -> AccountId {
+    let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
+    if list_count == u32::max_value() {
+        list_count
+    } else {
+        list_count - 1
+    }
+}
+
+/// Max token id, based on the number of processable tokens
+pub fn max_token_id() -> TokenId {
+    number_of_processable_tokens() as u16 - 1
 }
 
 pub const ETH_TOKEN_ID: TokenId = 0;

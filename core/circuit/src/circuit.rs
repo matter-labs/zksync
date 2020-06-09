@@ -35,8 +35,9 @@ use crate::{
         AllocatedSignerPubkey,
     },
     utils::{
-        allocate_numbers_vec, allocate_sum, calculate_empty_balance_tree_hashes, multi_and,
-        pack_bits_to_element_strict, resize_grow_only,
+        allocate_numbers_vec, allocate_sum, calculate_empty_account_tree_hashes,
+        calculate_empty_balance_tree_hashes, multi_and, pack_bits_to_element_strict,
+        resize_grow_only,
     },
 };
 
@@ -46,6 +47,7 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
     /// The old root of the tree
     pub old_root: Option<E::Fr>,
+    pub initial_used_subtree_root: Option<E::Fr>,
 
     pub block_number: Option<E::Fr>,
     pub validator_address: Option<E::Fr>,
@@ -64,6 +66,7 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'
             rescue_params: self.rescue_params,
             jubjub_params: self.jubjub_params,
             old_root: self.old_root,
+            initial_used_subtree_root: self.initial_used_subtree_root,
             block_number: self.block_number,
             validator_address: self.validator_address,
             pub_data_commitment: self.pub_data_commitment,
@@ -102,13 +105,32 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             })?;
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
 
-        let mut rolling_root =
-            AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
+        let old_root = AllocatedNum::alloc(cs.namespace(|| "old_root"), || self.old_root.grab())?;
+        let mut rolling_root = {
+            let initial_used_subtree_root =
+                AllocatedNum::alloc(cs.namespace(|| "initial_used_subtree_root"), || {
+                    self.initial_used_subtree_root.grab()
+                })?;
+            let old_root_from_subroot = continue_leftmost_subroot_to_root(
+                cs.namespace(|| "continue initial_used_subtree root to old_root"),
+                &initial_used_subtree_root,
+                params::used_account_subtree_depth(),
+                params::account_tree_depth(),
+                self.rescue_params,
+            )?;
+            // ensure that old root contains initial_root
+            cs.enforce(
+                || "old_root contains initial_used_subtree_root",
+                |lc| lc + old_root_from_subroot.get_variable(),
+                |lc| lc + CS::one(),
+                |lc| lc + old_root.get_variable(),
+            );
 
-        let old_root = rolling_root.clone();
+            initial_used_subtree_root
+        };
 
         // first chunk of block should always have number 0
-        let mut next_chunk_number = zero;
+        let mut next_chunk_number = zero.clone();
 
         // declare vector of fees, that will be collected during block processing
         let mut fees = vec![];
@@ -125,6 +147,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             chunk_number: zero_circuit_element.get_number(),
             tx_type: zero_circuit_element,
         };
+
+        let mut last_token_id = zero;
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
@@ -161,7 +185,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let (state_root, is_account_empty, _subtree_root) = check_account_data(
                 cs.namespace(|| "calculate account root"),
                 &current_branch,
-                params::account_tree_depth(),
+                params::used_account_subtree_depth(),
                 self.rescue_params,
             )?;
 
@@ -182,13 +206,14 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
                 // &subtree_root, // Close disable
+                &mut last_token_id,
                 &mut fees,
                 &mut prev,
             )?;
             let (new_state_root, _, _) = check_account_data(
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
-                params::account_tree_depth(),
+                params::used_account_subtree_depth(),
                 self.rescue_params,
             )?;
 
@@ -235,10 +260,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let validator_audit_path = allocate_numbers_vec(
             cs.namespace(|| "validator_audit_path"),
-            &self.validator_audit_path,
+            &self.validator_audit_path[..params::used_account_subtree_depth()],
         )?;
-
-        assert_eq!(validator_audit_path.len(), params::account_tree_depth());
+        assert_eq!(
+            validator_audit_path.len(),
+            params::used_account_subtree_depth()
+        );
 
         let validator_account = AccountContent::from_witness(
             cs.namespace(|| "validator account"),
@@ -276,7 +303,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &operator_account_data,
             &validator_address_bits,
             &validator_audit_path,
-            params::account_tree_depth(),
+            params::used_account_subtree_depth(),
             self.rescue_params,
         )?;
 
@@ -328,11 +355,17 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &operator_account_data,
             &validator_address_bits,
             &validator_audit_path,
-            params::account_tree_depth(),
+            params::used_account_subtree_depth(),
             self.rescue_params,
         )?;
 
-        let final_root = root_from_operator_after_fees;
+        let final_root = continue_leftmost_subroot_to_root(
+            cs.namespace(|| "continue subroot to root"),
+            &root_from_operator_after_fees,
+            params::used_account_subtree_depth(),
+            params::account_tree_depth(),
+            self.rescue_params,
+        )?;
 
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
@@ -490,6 +523,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         ))
     }
 
+    // select a branch.
+    // If TX type == deposit then select first branch
+    // else if chunk number == 0 select first, else - select second
     fn select_branch<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -581,6 +617,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         is_account_empty: &Boolean,
         ext_pubdata_chunk: &AllocatedNum<E>,
         // subtree_root: &CircuitElement<E>, // Close disable
+        last_token_id: &mut AllocatedNum<E>,
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
     ) -> Result<(), SynthesisError> {
@@ -799,12 +836,30 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             "fees length is invalid"
         );
 
+        // ensure that fee token only changes if it's in a first chunk.
+        // First chunk is also always an LHS by "select-branch" function
+        // There is always a signature on "cur" in the corresponding operations on the first chunk
+
+        // if chunk_data.is_chunk_first we take value from the current chunk, else - we keep an
+        // old value
+        let new_last_token_id = AllocatedNum::conditionally_select(
+            cs.namespace(|| {
+                "ensure that token_id for token is only taken on the first
+            chunk"
+            }),
+            &cur.token.get_number(),
+            &last_token_id,
+            &chunk_data.is_chunk_first,
+        )?;
+
+        *last_token_id = new_last_token_id.clone();
+
         for (i, fee) in fees.iter_mut().enumerate() {
             let sum = Expression::from(&*fee) + Expression::from(&op_data.fee.get_number());
 
             let is_token_correct = Boolean::from(Expression::equals(
                 cs.namespace(|| format!("is token equal to number {}", i)),
-                &lhs.token.get_number(),
+                &new_last_token_id,
                 Expression::constant::<CS>(E::Fr::from_str(&i.to_string()).unwrap()),
             )?);
 
@@ -1406,6 +1461,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             || Ok(E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap()),
             8,
         )?; //we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
+        tx_code.get_number().assert_number(
+            cs.namespace(|| "tx code is constant TransferOp"),
+            &E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap(),
+        )?;
+
         serialized_tx_bits.extend(tx_code.get_bits_be());
         serialized_tx_bits.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
@@ -2110,7 +2170,6 @@ fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: Constraint
     Ok(node_hash)
 }
 
-#[allow(dead_code)]
 fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     subroot: &AllocatedNum<E>,
@@ -2118,29 +2177,11 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     tree_depth: usize,
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
-    // manually calcualte empty subtree hashes
-    let empty_account_packed = models::circuit::account::empty_account_as_field_elements::<E>();
-    let mut sponge_output: Vec<E::Fr> =
-        crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &empty_account_packed);
-    assert_eq!(sponge_output.len(), 1);
-    let empty_leaf_hash = sponge_output.pop().expect("must get a single element");
-
-    let mut current = empty_leaf_hash;
-    let mut empty_node_hashes = vec![];
-    for _ in 0..tree_depth {
-        let mut sponge_output: Vec<E::Fr> =
-            crypto_exports::franklin_crypto::rescue::rescue_hash::<E>(params, &[current, current]);
-        assert_eq!(sponge_output.len(), 1);
-        let node_hash = sponge_output.pop().expect("must get a single element");
-        empty_node_hashes.push(node_hash);
-
-        current = node_hash;
-    }
-
+    let empty_node_hashes = calculate_empty_account_tree_hashes::<E>(params, tree_depth);
     let mut node_hash = subroot.clone();
 
     // will hash top of the tree where RHS is always an empty tree
-    for i in subroot_is_at_level..params::balance_tree_depth() {
+    for i in subroot_is_at_level..tree_depth {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
         let pair_value = empty_node_hashes[i - 1]; // we need value from previous level
         let pair = AllocatedNum::alloc(

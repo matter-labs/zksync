@@ -264,7 +264,10 @@ pub fn start_prover_server(
                     .route("/prover_data", web::get().to(prover_data))
                     .route("/publish", web::post().to(publish))
                     .route("/stopped", web::post().to(stopped))
-                    .route("/scaler/replicas", web::post().to(required_replicas))
+                    .route(
+                        "/api/internal/prover/replicas",
+                        web::post().to(required_replicas),
+                    )
             })
             .bind(&bind_to)
             .expect("failed to bind")

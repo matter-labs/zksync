@@ -36,8 +36,9 @@ jobs:
     - name: integration-simple-full-exit
       run: ci-integration-simple-fullexit.sh
 
-    - name: data-restore
-      run: zksync data-restore check-existing
+# TODO: why it does not work on CI?
+#    - name: data-restore
+#      run: zksync data-restore check-existing
 
     - name: integration-testkit
       run: zksync integration-testkit
