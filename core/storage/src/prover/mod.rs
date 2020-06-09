@@ -76,7 +76,7 @@ impl<'a> ProverSchema<'a> {
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         // Select the block to prove.
-        let job: Option<BlockNumber> = self
+        self
             .0
             .conn()
             .transaction(|| {
@@ -106,24 +106,24 @@ impl<'a> ProverSchema<'a> {
                 );
 
                 // Return the index of such a block.
-                diesel::sql_query(query).get_result::<Option<IntegerNumber>>(self.0.conn())
-            })?
-            .map(|i| i.integer_value as BlockNumber);
+                let job = diesel::sql_query(query).get_result::<Option<IntegerNumber>>(self.0.conn())?
+                .map(|i| i.integer_value as BlockNumber);
 
-        // If there is a block to prove, create a job and store it
-        // in the `prover_runs` table; otherwise do nothing and return `None`.
-        if let Some(block_number_) = job {
-            use crate::schema::prover_runs::dsl::*;
-            let inserted: ProverRun = insert_into(prover_runs)
-                .values(&vec![(
-                    block_number.eq(i64::from(block_number_)),
-                    worker.eq(worker_.to_string()),
-                )])
-                .get_result(self.0.conn())?;
-            Ok(Some(inserted))
-        } else {
-            Ok(None)
-        }
+                // If there is a block to prove, create a job and store it
+                // in the `prover_runs` table; otherwise do nothing and return `None`.
+                if let Some(block_number_) = job {
+                    use crate::schema::prover_runs::dsl::*;
+                    let inserted: ProverRun = insert_into(prover_runs)
+                        .values(&vec![(
+                            block_number.eq(i64::from(block_number_)),
+                            worker.eq(worker_.to_string()),
+                        )])
+                        .get_result(self.0.conn())?;
+                    Ok(Some(inserted))
+                } else {
+                    Ok(None)
+                }
+            })
     }
 
     /// Updates the state of ongoing prover job.
