@@ -218,6 +218,7 @@ fn required_replicas(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_prover_server(
     connection_pool: storage::ConnectionPool,
     bind_to: net::SocketAddr,
