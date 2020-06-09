@@ -144,7 +144,7 @@ export class Deployer {
         const zksContract = await deployContract(
             this.deployWallet,
             this.contracts.zkSync, [],
-            {gasLimit: 5000000, ...ethTxOptions},
+            {gasLimit: 6000000, ...ethTxOptions},
         );
         const zksRec = await zksContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
