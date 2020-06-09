@@ -90,6 +90,7 @@ pub struct Block {
 
 impl Block {
     // Constructor
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_number: BlockNumber,
         new_root_hash: Fr,
@@ -113,6 +114,7 @@ impl Block {
     }
 
     /// Constructor that determines smallest block size for the given block
+    #[allow(clippy::too_many_arguments)]
     pub fn new_from_availabe_block_sizes(
         block_number: BlockNumber,
         new_root_hash: Fr,

@@ -22,13 +22,13 @@ impl CommitCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 146026;
-    pub const DEPOSIT_COST: u64 = 10397;
-    pub const CHANGE_PUBKEY_COST: u64 = 27449;
+    pub const BASE_COST: u64 = 146_026;
+    pub const DEPOSIT_COST: u64 = 10_397;
+    pub const CHANGE_PUBKEY_COST: u64 = 27_449;
     pub const TRANSFER_COST: u64 = 334;
     pub const TRANSFER_TO_NEW_COST: u64 = 862;
-    pub const FULL_EXIT_COST: u64 = 10165;
-    pub const WITHDRAW_COST: u64 = 2167;
+    pub const FULL_EXIT_COST: u64 = 10_165;
+    pub const WITHDRAW_COST: u64 = 2_167;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -59,13 +59,13 @@ impl VerifyCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 527451;
-    pub const DEPOSIT_COST: u64 = 10997;
+    pub const BASE_COST: u64 = 527_451;
+    pub const DEPOSIT_COST: u64 = 10_997;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
-    pub const FULL_EXIT_COST: u64 = 11151;
-    pub const WITHDRAW_COST: u64 = 45668;
+    pub const FULL_EXIT_COST: u64 = 11_151;
+    pub const WITHDRAW_COST: u64 = 45_668;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
