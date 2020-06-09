@@ -22,7 +22,7 @@ impl CommitCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 146_026;
+    pub const BASE_COST: u64 = 141_595;
     pub const DEPOSIT_COST: u64 = 10_397;
     pub const CHANGE_PUBKEY_COST: u64 = 27_449;
     pub const TRANSFER_COST: u64 = 334;
@@ -60,11 +60,11 @@ impl VerifyCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     pub const BASE_COST: u64 = 527_451;
-    pub const DEPOSIT_COST: u64 = 10_997;
+    pub const DEPOSIT_COST: u64 = 0;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
-    pub const FULL_EXIT_COST: u64 = 11_151;
+    pub const FULL_EXIT_COST: u64 = 2_499;
     pub const WITHDRAW_COST: u64 = 45_668;
 
     pub fn base_cost() -> U256 {
@@ -115,7 +115,8 @@ impl Default for GasCounter {
 
 impl GasCounter {
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
-    const COMPLETE_WITHDRAWALS_COST: u64 = 27096;
+    const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
+    const COMPLETE_WITHDRAWALS_COST: u64 = 27_096;
 
     pub fn new() -> Self {
         Self::default()
@@ -153,8 +154,9 @@ impl GasCounter {
     pub fn complete_withdrawals_gas_limit() -> U256 {
         // Currently we always complete a constant amount of withdrawals in the contract call, so the upper limit
         // is predictable.
-        let approx_limit = U256::from(MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL)
-            * U256::from(Self::COMPLETE_WITHDRAWALS_COST);
+        let approx_limit = U256::from(Self::COMPLETE_WITHDRAWALS_BASE_COST)
+            + U256::from(MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL)
+                * U256::from(Self::COMPLETE_WITHDRAWALS_COST);
 
         // We scale this value up nevertheless, just in case.
         Self::scale_up(approx_limit)
