@@ -494,7 +494,7 @@ fn print_available_setup_powers() {
     };
 
     println!("chunks,gates,setup_power");
-    for chunk_range in (400..=720).step_by(2).collect::<Vec<_>>().chunks(32) {
+    for chunk_range in (2..=750).step_by(2).collect::<Vec<_>>().chunks(32) {
         let mut chunk_data = chunk_range
             .into_par_iter()
             .map(|chunk| {
