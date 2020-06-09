@@ -13,8 +13,8 @@ use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 use models::node::{
-    pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, DepositOp,
-    FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, ChangePubKeyOp,
+    DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::params::{
     AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH,
@@ -255,6 +255,8 @@ fn gas_price_test() {
         "deposit ERC20",
         true,
     );
+
+    commit_cost_of_change_pubkey(&mut test_setup, 50).report(&base_cost, "change pubkey", false);
 
     commit_cost_of_transfers(&mut test_setup, 500, rng).report(&base_cost, "transfer", false);
     commit_cost_of_transfers_to_new(&mut test_setup, 500, rng).report(
@@ -538,6 +540,39 @@ fn commit_cost_of_empty_block(test_setup: &mut TestSetup) -> BaseCost {
             .map(u256_to_bigint)
             .expect("commit gas used empty"),
     }
+}
+
+fn commit_cost_of_change_pubkey(
+    test_setup: &mut TestSetup,
+    n_change_pubkeys: usize,
+) -> CostsSample {
+    let token = Token(0);
+    let deposit_amount = 10u32.into();
+
+    test_setup.start_block();
+    test_setup.deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount);
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    test_setup
+        .execute_commit_and_verify_block()
+        .expect("Block execution failed");
+
+    test_setup.start_block();
+    for _ in 0..n_change_pubkeys {
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    }
+    let change_pubkey_execute_result = test_setup
+        .execute_commit_and_verify_block()
+        .expect("Block execution failed");
+    assert_eq!(
+        change_pubkey_execute_result.block_size_chunks,
+        n_change_pubkeys * ChangePubKeyOp::CHUNKS,
+        "block size mismatch"
+    );
+    CostsSample::new(
+        n_change_pubkeys,
+        U256::from(0),
+        change_pubkey_execute_result,
+    )
 }
 
 fn main() {
