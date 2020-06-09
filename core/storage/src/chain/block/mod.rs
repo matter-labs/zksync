@@ -3,6 +3,7 @@
 use diesel::dsl::max;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
+use web3::types::U256;
 // Workspace imports
 use models::node::{
     block::{Block, ExecutedOperations},
@@ -135,6 +136,8 @@ impl<'a> BlockSchema<'a> {
                 stored_block.unprocessed_prior_op_after as u64,
             ),
             stored_block.block_size as usize,
+            U256::from(stored_block.commit_gas_limit as u64),
+            U256::from(stored_block.verify_gas_limit as u64),
         )))
     }
 
@@ -530,6 +533,8 @@ impl<'a> BlockSchema<'a> {
             let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
             let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
             let block_size = block.block_chunks_size as i64;
+            let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
+            let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
 
             self.save_block_transactions(block.block_number, block.block_transactions)?;
 
@@ -540,6 +545,8 @@ impl<'a> BlockSchema<'a> {
                 unprocessed_prior_op_before,
                 unprocessed_prior_op_after,
                 block_size,
+                commit_gas_limit,
+                verify_gas_limit,
             };
 
             // Remove pending block (as it's now completed).

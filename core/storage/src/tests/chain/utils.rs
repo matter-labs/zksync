@@ -74,6 +74,8 @@ pub fn get_operation(
             Vec::new(),
             (0, 0),
             block_size,
+            1_000_000.into(),
+            1_500_000.into(),
         ),
         accounts_updated,
     }
@@ -89,7 +91,16 @@ pub fn get_operation_with_txs(
     Operation {
         id: None,
         action,
-        block: Block::new(block_number, Fr::default(), 0, txs, (0, 0), block_size),
+        block: Block::new(
+            block_number,
+            Fr::default(),
+            0,
+            txs,
+            (0, 0),
+            block_size,
+            1_000_000.into(),
+            1_500_000.into(),
+        ),
         accounts_updated,
     }
 }

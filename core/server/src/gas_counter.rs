@@ -6,7 +6,7 @@
 // External deps
 use web3::types::U256;
 // Workspace deps
-use models::node::FranklinOp;
+use models::node::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 pub const TX_GAS_LIMIT: u64 = 3_000_000;
@@ -91,6 +91,8 @@ impl Default for GasCounter {
 }
 
 impl GasCounter {
+    const COMPLETE_WITHDRAWALS_COST: u64 = 27096;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -118,6 +120,16 @@ impl GasCounter {
 
     pub fn verify_gas_limit(&self) -> U256 {
         self.verify_cost * U256::from(130) / U256::from(100)
+    }
+
+    pub fn complete_withdrawals_gas_limit() -> U256 {
+        // Currently we always complete a constant amount of withdrawals in the contract call, so the upper limit
+        // is predictable.
+        let approx_limit = U256::from(MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL)
+            * U256::from(Self::COMPLETE_WITHDRAWALS_COST);
+
+        // We scale this value up nevertheless, just in case.
+        approx_limit * U256::from(130) / U256::from(100)
     }
 }
 

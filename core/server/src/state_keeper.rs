@@ -8,7 +8,6 @@ use futures::{
 use tokio::{runtime::Runtime, task::JoinHandle};
 use web3::types::Address;
 // Workspace uses
-use crate::mempool::ProposedBlock;
 use crypto_exports::ff;
 use models::{
     node::{
@@ -23,6 +22,8 @@ use models::{
 };
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
+// Local uses
+use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -59,6 +60,7 @@ struct PendingBlock {
     unprocessed_priority_op_before: u64,
     pending_block_iteration: usize,
     withdrawals_amount: u32,
+    gas_counter: GasCounter,
 }
 
 impl PendingBlock {
@@ -72,6 +74,7 @@ impl PendingBlock {
             unprocessed_priority_op_before,
             pending_block_iteration: 0,
             withdrawals_amount: 0,
+            gas_counter: GasCounter::new(),
         }
     }
 }
@@ -444,6 +447,10 @@ impl PlasmaStateKeeper {
             executed_op,
         } = self.state.execute_priority_op(priority_op.data.clone());
 
+        if self.pending_block.gas_counter.add_op(&executed_op).is_err() {
+            return Err(priority_op);
+        }
+
         self.pending_block.chunks_left -= chunks_needed;
         self.pending_block.account_updates.append(&mut updates);
         if let Some(fee) = fee {
@@ -496,6 +503,10 @@ impl PlasmaStateKeeper {
                 mut updates,
                 executed_op,
             }) => {
+                if self.pending_block.gas_counter.add_op(&executed_op).is_err() {
+                    return Err(tx);
+                }
+
                 self.pending_block.chunks_left -= chunks_needed;
                 self.pending_block.account_updates.append(&mut updates);
                 if let Some(fee) = fee {
@@ -559,6 +570,9 @@ impl PlasmaStateKeeper {
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 
+        let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
+        let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
+
         let block_commit_request = BlockCommitRequest {
             block: Block::new_from_availabe_block_sizes(
                 self.state.block_number,
@@ -570,6 +584,8 @@ impl PlasmaStateKeeper {
                     self.current_unprocessed_priority_op,
                 ),
                 &self.available_block_chunk_sizes,
+                commit_gas_limit,
+                verify_gas_limit,
             ),
             accounts_updated: pending_block.account_updates,
         };

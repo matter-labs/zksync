@@ -11,7 +11,16 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
     Operation {
         id: Some(id),
         action,
-        block: Block::new(block_number, Fr::default(), 0, Vec::new(), (0, 0), 50),
+        block: Block::new(
+            block_number,
+            Fr::default(),
+            0,
+            Vec::new(),
+            (0, 0),
+            50,
+            1_000_000.into(),
+            1_500_000.into(),
+        ),
         accounts_updated: Vec::new(),
     }
 }

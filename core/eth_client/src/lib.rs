@@ -14,6 +14,12 @@ use web3::{Error, Transport, Web3};
 
 pub mod signer;
 
+/// Gas limit value to be used in transaction if for some reason
+/// gas limit was not set for it.
+///
+/// This is an emergency value, which will not be used normally.
+const FALLBACK_GAS_LIMIT: u64 = 3_000_000;
+
 #[derive(Clone)]
 pub struct ETHClient<T: Transport> {
     private_key: H256,
@@ -132,6 +138,21 @@ impl<T: Transport> ETHClient<T> {
             None => self.pending_nonce().await?,
         };
 
+        let gas = match options.gas {
+            Some(gas) => gas,
+            None => {
+                // Verbosity level is set to `error`, since we expect all the transactions to have
+                // a set limit, but don't want to crush the application if for some reason in some
+                // place limit was not set.
+                log::error!(
+                    "No gas limit was set for transaction, using the default limit: {}",
+                    FALLBACK_GAS_LIMIT
+                );
+
+                U256::from(FALLBACK_GAS_LIMIT)
+            }
+        };
+
         // form and sign tx
         let tx = signer::RawTransaction {
             chain_id: self.chain_id,
@@ -139,7 +160,7 @@ impl<T: Transport> ETHClient<T> {
             to: Some(self.contract_addr),
             value: options.value.unwrap_or_default(),
             gas_price,
-            gas: options.gas.unwrap_or_else(|| U256::from(3_000_000)),
+            gas,
             data,
         };
 

@@ -72,6 +72,8 @@ table! {
         unprocessed_prior_op_before -> Int8,
         unprocessed_prior_op_after -> Int8,
         block_size -> Int8,
+        commit_gas_limit -> Int8,
+        verify_gas_limit -> Int8,
     }
 }
 

@@ -17,7 +17,6 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use crate::utils::current_zksync_info::CurrentZksyncInfo;
 use eth_client::SignedCallResult;
 use models::{
     config_options::{ConfigurationOptions, EthSenderOptions},
@@ -34,6 +33,7 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
+use crate::{gas_counter::GasCounter, utils::current_zksync_info::CurrentZksyncInfo};
 
 mod database;
 mod ethereum_interface;
@@ -561,12 +561,52 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
             options.gas_price = Some(op.last_used_gas_price);
+
+            // We set the gas limit for commit / verify operations as pre-calculated estimation.
+            // This estimation is a higher bound based on a pre-calculated cost of every operation in the block.
+            let gas_limit = Self::gas_limit_for_op(op);
+
+            assert!(
+                gas_limit > 0.into(),
+                "Proposed gas limit for operation is 0; operation: {:?}",
+                op
+            );
+
+            log::info!(
+                "Gas limit for <ETH Operation id: {}> is {}",
+                op.id,
+                gas_limit
+            );
+
+            options.gas = Some(gas_limit);
+
             options
         };
 
         let signed_tx = ethereum.sign_prepared_tx(op.encoded_tx_data.clone(), tx_options)?;
 
         Ok(signed_tx)
+    }
+
+    /// Calculates the gas limit for transaction to be send, depending on the type of operation.
+    fn gas_limit_for_op(op: &ETHOperation) -> U256 {
+        match op.op_type {
+            OperationType::Commit => {
+                op.op
+                    .as_ref()
+                    .expect("No zkSync operation for Commit")
+                    .block
+                    .commit_gas_limit
+            }
+            OperationType::Verify => {
+                op.op
+                    .as_ref()
+                    .expect("No zkSync operation for Verify")
+                    .block
+                    .verify_gas_limit
+            }
+            OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
+        }
     }
 
     /// Creates a new transaction for the existing Ethereum operation.
