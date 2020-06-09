@@ -89,11 +89,11 @@ impl ApiClient {
                     err, duration_secs,
                 )
             })
-            .map_err(|e| match e {
-                backoff::Error::Permanent(e) | backoff::Error::Transient(e) => panic!(
+            .map_err(|e| {
+                panic!(
                     "Prover can't reach server, for the max elapsed time of the backoff: {}",
                     e
-                ),
+                )
             })
     }
 
