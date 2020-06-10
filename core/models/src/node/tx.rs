@@ -18,7 +18,6 @@ use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::rescue::RescueEngine;
 use crate::misc::utils::format_units;
 use crate::node::operations::ChangePubKeyOp;
-use crate::node::Token;
 use crate::params::{max_account_id, max_token_id, JUBJUB_PARAMS, RESCUE_PARAMS};
 use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg, BigUintSerdeAsRadix10Str};
 use failure::{bail, ensure, format_err};
