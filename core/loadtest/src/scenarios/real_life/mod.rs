@@ -582,8 +582,6 @@ impl ScenarioExecutor {
 
     /// Withdraws the money from the main account back to the Ethereum.
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
-        let mut sent_txs = SentTransactions::new();
-
         let current_balance = self.main_account.eth_acc.eth_balance().await?;
 
         let fee = self.withdraw_fee(&self.main_account.zk_acc).await;
@@ -609,6 +607,7 @@ impl ScenarioExecutor {
             .rpc_client
             .send_tx(tx.clone(), eth_sign.clone())
             .await?;
+        let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
 
         wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
