@@ -705,3 +705,64 @@ fn pending_block_workflow() {
         Ok(())
     });
 }
+/// Here we create blocks and publish proofs for them in different order
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn test_unproven_block_query() {
+    let _ = env_logger::try_init();
+
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 0);
+
+        // Execute and commit these blocks.
+        BlockSchema(&conn).execute_operation(get_operation(
+            1,
+            Action::Commit,
+            Vec::new(),
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 1);
+        BlockSchema(&conn).execute_operation(get_operation(
+            2,
+            Action::Commit,
+            Vec::new(),
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 2);
+        BlockSchema(&conn).execute_operation(get_operation(
+            3,
+            Action::Commit,
+            Vec::new(),
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 3);
+
+        // Add proofs for the first two blocks.
+        ProverSchema(&conn).store_proof(3, &Default::default())?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 2);
+        ProverSchema(&conn).store_proof(1, &Default::default())?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 1);
+        BlockSchema(&conn).execute_operation(get_operation(
+            1,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 1);
+        ProverSchema(&conn).store_proof(2, &Default::default())?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 0);
+        BlockSchema(&conn).execute_operation(get_operation(
+            2,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 0);
+        Ok(())
+    });
+}
