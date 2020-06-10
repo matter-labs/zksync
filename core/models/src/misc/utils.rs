@@ -4,15 +4,14 @@ use std::string::ToString;
 // External deps
 // Workspace deps
 
-/// Formats amount in wei to tokens.
-/// Behaves just like js ethers.utils.formatEther
-pub fn format_ether(wei: &impl ToString) -> String {
-    const N_DECIMAL: usize = 18;
+/// Formats amount in wei to tokens with precision.
+/// Behaves just like ethers.utils.formatUnits
+pub fn format_units(wei: &impl ToString, units: u8) -> String {
     let mut chars = wei.to_string().drain(..).collect::<VecDeque<char>>();
-    while chars.len() < N_DECIMAL {
+    while chars.len() < units as usize {
         chars.push_front('0');
     }
-    chars.insert(chars.len() - N_DECIMAL, '.');
+    chars.insert(chars.len() - units as usize, '.');
     if *chars.front().unwrap() == '.' {
         chars.push_front('0');
     }
@@ -23,6 +22,12 @@ pub fn format_ether(wei: &impl ToString) -> String {
         chars.push_back('0');
     }
     chars.iter().collect()
+}
+
+/// Formats amount in wei to tokens.
+/// Behaves just like js ethers.utils.formatEther
+pub fn format_ether(wei: &impl ToString) -> String {
+    format_units(wei, 18)
 }
 
 #[cfg(test)]
