@@ -364,14 +364,16 @@ impl<'a> BlockSchema<'a> {
         let sql_query = format!(
             " \
             with eth_ops as ( \
-                select \
+                select distinct on (block_number, action_type) \
                     operations.block_number, \
                     eth_tx_hashes.tx_hash, \
                     operations.action_type, \
-                    operations.created_at \
+                    operations.created_at, \
+                    confirmed \
                 from operations \
                     left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
                     left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
+                order by block_number desc, action_type, confirmed \
             ) \
             select \
                 blocks.number as block_number, \
@@ -385,7 +387,7 @@ impl<'a> BlockSchema<'a> {
             inner join eth_ops committed on \
                 committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
             left join eth_ops verified on \
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
+                verified.block_number = blocks.number and verified.action_type = 'VERIFY' and verified.confirmed = true \
             where false \
                 {where_condition} \
             order by blocks.number desc \

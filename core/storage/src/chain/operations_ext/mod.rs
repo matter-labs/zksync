@@ -301,8 +301,6 @@ impl<'a> OperationsExtSchema<'a> {
                     operations.action_type,
                     confirmed
                 from operations
-                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
                 order by block_number desc, action_type, confirmed
             ), transactions as (
                 select
@@ -363,7 +361,7 @@ impl<'a> OperationsExtSchema<'a> {
                 coalesce(verified.confirmed, false) as verified,
                 created_at
             from transactions
-            inner join eth_ops committed on
+            left join eth_ops committed on
                 committed.block_number = transactions.block_number and committed.action_type = 'COMMIT'
             left join eth_ops verified on
                 verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
@@ -452,8 +450,6 @@ impl<'a> OperationsExtSchema<'a> {
                     operations.action_type,
                     confirmed
                 from operations
-                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
                 order by block_number desc, action_type, confirmed
             ), transactions as (
                 select
@@ -521,7 +517,7 @@ impl<'a> OperationsExtSchema<'a> {
                 coalesce(verified.confirmed, false) as verified,
                 created_at
             from transactions
-            inner join eth_ops committed on
+            left join eth_ops committed on
                 committed.block_number = transactions.block_number and committed.action_type = 'COMMIT'
             left join eth_ops verified on
                 verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
