@@ -282,9 +282,9 @@ impl ScenarioExecutor {
 
         self.estimated_fee_for_op = fee.clone();
 
-        self.satellite_scenario
-            .as_mut()
-            .map(|scenario| scenario.set_estimated_fee(fee));
+        if let Some(scenario) = self.satellite_scenario.as_mut() {
+            scenario.set_estimated_fee(fee);
+        };
 
         Ok(())
     }
