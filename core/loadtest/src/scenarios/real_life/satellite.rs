@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 // External deps
 use num::BigUint;
 use tokio::time;
+use web3::types::Address;
 // Workspace deps
 use models::node::{closest_packable_fee_amount, closest_packable_token_amount};
 // Local deps
@@ -55,8 +56,14 @@ impl SatelliteScenario {
     pub async fn run(&mut self) -> Result<(), failure::Error> {
         self.initialize().await?;
 
+        // Deposit & withdraw phase.
         for account_id in 0..self.accounts.len() {
             self.deposit_withdraw(account_id).await?;
+        }
+
+        // Deposit & full exit phase.
+        for account_id in 0..self.accounts.len() {
+            self.deposit_full_exit(account_id).await?;
         }
 
         Ok(())
@@ -81,6 +88,21 @@ impl SatelliteScenario {
 
         self.withdraw(account_id).await?;
         log::info!("Satellite withdraw iteration {} completed", account_id);
+
+        Ok(())
+    }
+
+    async fn deposit_full_exit(&mut self, account_id: usize) -> Result<(), failure::Error> {
+        log::info!(
+            "Satellite deposit/full exit iteration {} started",
+            account_id
+        );
+
+        self.deposit(account_id).await?;
+        log::info!("Satellite deposit iteration {} completed", account_id);
+
+        self.full_exit(account_id).await?;
+        log::info!("Satellite full exit iteration {} completed", account_id);
 
         Ok(())
     }
@@ -168,6 +190,20 @@ impl SatelliteScenario {
             }
             timer.tick().await;
         }
+
+        Ok(())
+    }
+
+    async fn full_exit(&mut self, account_id: usize) -> Result<(), failure::Error> {
+        let account = &mut self.accounts[account_id];
+
+        let eth_token_address = Address::zero();
+        let zksync_account_id = account.zk_acc.get_account_id().expect("No account ID set");
+
+        account
+            .eth_acc
+            .full_exit(zksync_account_id, eth_token_address)
+            .await?;
 
         Ok(())
     }
