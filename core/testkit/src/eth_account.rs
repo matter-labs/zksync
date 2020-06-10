@@ -148,6 +148,9 @@ impl<T: Transport> EthereumAccount<T> {
         amount: &BigUint,
         proof: EncodedProofPlonk,
     ) -> Result<ETHExecResult, failure::Error> {
+        let mut options = Options::default();
+        options.gas = Some(3_000_000.into()); // `exit` function requires more gas to operate.
+
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -158,7 +161,7 @@ impl<T: Transport> EthereumAccount<T> {
                     U128::from(amount.to_u128().unwrap()),
                     proof.proof,
                 ),
-                default_tx_options(),
+                options,
             )
             .await
             .map_err(|e| format_err!("Exit send err: {}", e))?;
