@@ -66,7 +66,6 @@ fn test_full_exit_failure_no_account_in_tree() {
     );
 }
 
-
 #[test]
 #[ignore]
 fn test_full_exit_initialted_from_wrong_account_owner() {
