@@ -59,10 +59,16 @@ impl<'a> ProverSchema<'a> {
     /// Returns the amount of blocks which await for proof (committed but not verified)
     pub fn pending_jobs_count(&self) -> QueryResult<u32> {
         self.0.conn().transaction(|| {
-            let last_committed_block = BlockSchema(&self.0).get_last_committed_block()?;
-            let last_verified_block = BlockSchema(&self.0).get_last_verified_block()?;
+            let query = "\
+            SELECT COUNT(*) as integer_value FROM operations o \
+               WHERE action_type = 'COMMIT' \
+                   AND block_number > \
+                       (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
+                   AND NOT EXISTS \
+                       (SELECT * FROM proofs WHERE block_number = o.block_number);";
 
-            Ok(last_committed_block - last_verified_block)
+            let block_without_proofs = diesel::sql_query(query).get_result::<IntegerNumber>(self.0.conn())?;
+            Ok(block_without_proofs.integer_value as u32)
         })
     }
 
