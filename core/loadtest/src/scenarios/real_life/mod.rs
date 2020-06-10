@@ -82,6 +82,8 @@ use crate::{
     test_accounts::TestAccount,
 };
 
+mod satellite;
+
 #[derive(Debug)]
 struct ScenarioExecutor {
     rpc_client: RpcClient,
