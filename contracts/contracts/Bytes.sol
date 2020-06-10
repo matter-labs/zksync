@@ -227,9 +227,26 @@ library Bytes {
     // Convert bytes to ASCII hex representation
     function bytesToHexASCIIBytes(bytes memory  _input) internal pure returns (bytes memory _output) {
         bytes memory outStringBytes = new bytes(_input.length * 2);
-        for (uint i = 0; i < _input.length; ++i) {
-            outStringBytes[i*2] = halfByteToHex(_input[i] >> 4);
-            outStringBytes[i*2+1] = halfByteToHex(_input[i] & 0x0f);
+
+        // code in `assembly` construction is equivalent of the next code:
+        // for (uint i = 0; i < _input.length; ++i) {
+        //     outStringBytes[i*2] = halfByteToHex(_input[i] >> 4);
+        //     outStringBytes[i*2+1] = halfByteToHex(_input[i] & 0x0f);
+        // }
+        assembly {
+            let input_curr := add(_input, 0x20)
+            let input_end := add(input_curr, mload(_input))
+
+            for {
+                let out_curr := add(outStringBytes, 0x20)
+            } lt(input_curr, input_end) {
+                input_curr := add(input_curr, 0x01)
+                out_curr := add(out_curr, 0x02)
+            } {
+                let curr_input_byte := shr(0xf8, mload(input_curr))
+                mstore(out_curr,            shl(0xf8, shr(mul(shr(0x04, curr_input_byte), 0x08), 0x66656463626139383736353433323130)))
+                mstore(add(out_curr, 0x01), shl(0xf8, shr(mul(and(0x0f, curr_input_byte), 0x08), 0x66656463626139383736353433323130)))
+            }
         }
         return outStringBytes;
     }
