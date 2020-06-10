@@ -62,6 +62,11 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
                 std::process::exit(0);
             }
 
+            if shutdown_request.get() {
+                log::warn!("Second shutdown request received, shutting down without waiting for round to be completed");
+                std::process::exit(0);
+            }
+
             shutdown_request.set();
         })
         .expect("Failed to register ctrlc handler");
