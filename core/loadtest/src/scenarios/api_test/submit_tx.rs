@@ -18,6 +18,7 @@ impl<'a> SubmitTxTester<'a> {
     pub async fn run(self) -> Result<(), failure::Error> {
         self.no_eth_signature().await?;
         self.incorrect_eth_signature().await?;
+        self.low_fee().await?;
 
         Ok(())
     }
@@ -34,10 +35,10 @@ impl<'a> SubmitTxTester<'a> {
             transfer_fee,
         );
 
+        // Discard ETH signature.
         let no_eth_sign = None;
 
         let reply = self.0.rpc_client.send_tx_raw(transfer, no_eth_sign).await?;
-
         match reply {
             Output::Success(v) => {
                 panic!("Got successful response for tx with no signature: {:?}", v);
@@ -62,12 +63,12 @@ impl<'a> SubmitTxTester<'a> {
             transfer_fee,
         );
 
+        // Replace ETH signature with an incorrect one.
         let fake_signature =
             PackedEthSignature::deserialize_packed(&[0; 65]).expect("Can't deserialize signature");
         let eth_sign = Some(fake_signature);
 
         let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
-
         match reply {
             Output::Success(v) => {
                 panic!(
@@ -77,6 +78,32 @@ impl<'a> SubmitTxTester<'a> {
             }
             Output::Failure(v) => {
                 assert_eq!(v.error.code, RpcErrorCodes::IncorrectEthSignature.into());
+            }
+        };
+
+        Ok(())
+    }
+
+    pub async fn low_fee(&self) -> Result<(), failure::Error> {
+        let main_account = &self.0.main_account;
+
+        // Set fee to 0.
+        let transfer_fee = 0u32;
+
+        let (transfer, eth_sign) = self.0.sign_transfer(
+            &main_account.zk_acc,
+            &main_account.zk_acc,
+            1u32,
+            transfer_fee,
+        );
+
+        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
+        match reply {
+            Output::Success(v) => {
+                panic!("Got successful response for tx with too low fee: {:?}", v);
+            }
+            Output::Failure(v) => {
+                assert_eq!(v.error.code, RpcErrorCodes::FeeTooLow.into());
             }
         };
 
