@@ -244,6 +244,10 @@ library Bytes {
                 out_curr := add(out_curr, 0x02)
             } {
                 let curr_input_byte := shr(0xf8, mload(input_curr))
+                // here outStringByte from each half of input byte calculates by the next:
+                //
+                // "FEDCBA9876543210" ASCII-encoded, shifted and automatically truncated.
+                // outStringByte = byte (uint8 (0x66656463626139383736353433323130 >> (uint8 (_byteHalf) * 8)))
                 mstore(out_curr,            shl(0xf8, shr(mul(shr(0x04, curr_input_byte), 0x08), 0x66656463626139383736353433323130)))
                 mstore(add(out_curr, 0x01), shl(0xf8, shr(mul(and(0x0f, curr_input_byte), 0x08), 0x66656463626139383736353433323130)))
             }
