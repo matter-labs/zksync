@@ -148,18 +148,34 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             tx_type: zero_circuit_element,
         };
 
+        // we create a memory value for a token ID that is used to collect fees.
+        // It is overwritten when we enter the first chunk of the op (that exposes sender
+        // and defined a token in which transaction is valued). Later one (at the last chunk)
+        // we use this value to give fee to the operator
         let mut last_token_id = zero.clone();
 
-        // allocate per every operation
-        let mut pubdata_holder = vec![
-            vec![zero.clone(); 2], // deposit
-            vec![zero.clone(); 1], // transfer
-            vec![zero.clone(); 2], // transfer to new
-            vec![zero.clone(); 2], // withdraw
-            vec![zero.clone(); 2], // full exit
-            vec![zero.clone(); 2], // change pubkey
-            vec![zero.clone(); 1], // noop
-        ];
+        // allocate some memory for every operation
+        // when operation allocated pubdata from witness (that happens every chunk!)
+        // we check that this pubdata is equal to pubdata if the previous chunk in the same
+        // operation. So, we only allow these values to change if it's a first chunk in the operation
+        let mut pubdata_holder = {
+            let mut data = vec![vec![]; DIFFERENT_TRANSACTIONS_TYPE_NUMBER];
+
+            data[NoopOp::OP_CODE as usize] = vec![]; // No-op allocated constant pubdata
+            data[DepositOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[TransferOp::OP_CODE as usize] = vec![zero.clone(); 1];
+            data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
+
+            // this operation is disabled for now
+            // data[CloseOp::OP_CODE as usize] = vec![];
+
+            data
+        };
+
+        assert_eq!(pubdata_holder.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
@@ -634,7 +650,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         last_token_id: &mut AllocatedNum<E>,
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
-        previous_pubdatas: &mut Vec<Vec<AllocatedNum<E>>>,
+        previous_pubdatas: &mut [Vec<AllocatedNum<E>>],
         explicit_zero: &AllocatedNum<E>,
     ) -> Result<(), SynthesisError> {
         let max_token_id =
@@ -767,10 +783,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         let mut op_flags = vec![];
-        const NUM_OPS: usize = 7;
-        assert_eq!(NUM_OPS, previous_pubdatas.len());
-        let mut pubdata_accs_idx = 0;
-        let pubdata_holder = &mut previous_pubdatas[pubdata_accs_idx];
         op_flags.push(self.deposit(
             cs.namespace(|| "deposit"),
             &mut cur,
@@ -778,11 +790,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
-            pubdata_holder,
+            &mut previous_pubdatas[DepositOp::OP_CODE as usize],
             &explicit_zero,
         )?);
-        pubdata_accs_idx += 1;
-        let pubdata_holder = &mut previous_pubdatas[pubdata_accs_idx];
         op_flags.push(self.transfer(
             cs.namespace(|| "transfer"),
             &mut cur,
@@ -795,10 +805,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
-            pubdata_holder,
+            &mut previous_pubdatas[TransferOp::OP_CODE as usize],
         )?);
-        pubdata_accs_idx += 1;
-        let pubdata_holder = &mut previous_pubdatas[pubdata_accs_idx];
         op_flags.push(self.transfer_to_new(
             cs.namespace(|| "transfer_to_new"),
             &mut cur,
@@ -811,10 +819,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
-            pubdata_holder,
+            &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
         )?);
-        pubdata_accs_idx += 1;
-        let pubdata_holder = &mut previous_pubdatas[pubdata_accs_idx];
         op_flags.push(self.withdraw(
             cs.namespace(|| "withdraw"),
             &mut cur,
@@ -824,7 +830,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
-            pubdata_holder,
+            &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
         )?);
         // Close disable.
         //  op_flags.push(self.close_account(
@@ -837,40 +843,34 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         //      &subtree_root,
         //      &signature_data.is_verified,
         //  )?);
-        pubdata_accs_idx += 1;
-        let pubdata_holder = &mut previous_pubdatas[pubdata_accs_idx];
         op_flags.push(self.full_exit(
             cs.namespace(|| "full_exit"),
             &mut cur,
             &chunk_data,
             &op_data,
             &ext_pubdata_chunk,
-            pubdata_holder,
+            &mut previous_pubdatas[FullExitOp::OP_CODE as usize],
             &explicit_zero,
         )?);
-        pubdata_accs_idx += 1;
-        let pubdata_holder = &mut previous_pubdatas[pubdata_accs_idx];
         op_flags.push(self.change_pubkey_offchain(
             cs.namespace(|| "change_pubkey_offchain"),
             &mut cur,
             &chunk_data,
             &op_data,
             &ext_pubdata_chunk,
-            pubdata_holder,
+            &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
             explicit_zero,
         )?);
-        pubdata_accs_idx += 1;
-        let pubdata_holder = &mut previous_pubdatas[pubdata_accs_idx];
         op_flags.push(self.noop(
             cs.namespace(|| "noop"),
             &chunk_data,
             &ext_pubdata_chunk,
             &op_data,
-            pubdata_holder,
+            &mut previous_pubdatas[NoopOp::OP_CODE as usize],
             &explicit_zero,
         )?);
 
-        assert_eq!(NUM_OPS, op_flags.len());
+        assert_eq!(DIFFERENT_TRANSACTIONS_TYPE_NUMBER - 1, op_flags.len());
 
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
 
@@ -1175,13 +1175,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 &is_equal_pubdata,
             )?;
 
-            // println!("Pubdata is properly copied = {:?}", pubdata_properly_copied.get_value());
-
             (pubdata_chunk_correct, pubdata_properly_copied)
         };
 
         let fee_is_zero = AllocatedNum::equals(
-            cs.namespace(|| "fee is zero for deposit"),
+            cs.namespace(|| "fee is zero for full exit"),
             &op_data.fee.get_number(),
             &explicit_zero,
         )?;
@@ -1286,6 +1284,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            pubdata_holder.len() > 0,
+            "pubdata holder has to be preallocated"
+        );
+
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
@@ -1418,6 +1421,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            pubdata_holder.len() > 0,
+            "pubdata holder has to be preallocated"
+        );
+
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
@@ -1458,7 +1466,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         is_valid_flags.push(pubdata_properly_copied);
 
         let fee_is_zero = AllocatedNum::equals(
-            cs.namespace(|| "fee is zero for no-op"),
+            cs.namespace(|| "fee is zero for change pubkey op"),
             &op_data.fee.get_number(),
             &explicit_zero,
         )?;
@@ -1545,18 +1553,24 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
+        assert_eq!(
+            pubdata_holder.len(),
+            0,
+            "pubdata holder should be empty for no-op"
+        );
+
         let mut is_valid_flags = vec![];
         //construct pubdata (it's all 0 for noop)
         let mut pubdata_bits = vec![];
         pubdata_bits.resize(params::CHUNK_BIT_WIDTH, Boolean::constant(false));
 
-        let (_, packed_pubdata) = vectorized_compare(
-            cs.namespace(|| "compare pubdata"),
-            &*pubdata_holder,
-            &pubdata_bits,
-        )?;
+        // here pubdata is constant, so there is no check for a copy
 
-        *pubdata_holder = packed_pubdata;
+        assert_eq!(
+            NoopOp::CHUNKS,
+            1,
+            "no-op always takes one chunk as a padding op"
+        );
 
         // don't need to check for proper copy cause it's always a first chunk
 
@@ -1609,6 +1623,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            pubdata_holder.len() > 0,
+            "pubdata holder has to be preallocated"
+        );
+
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //8
         pubdata_bits.extend(lhs.account_id.get_bits_be()); //24
@@ -1792,7 +1811,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         rhs_valid_flags.push(is_second_chunk.clone());
         rhs_valid_flags.push(is_transfer.clone());
         rhs_valid_flags.push(is_account_empty.clone());
-        lhs_valid_flags.push(pubdata_properly_copied);
+        rhs_valid_flags.push(pubdata_properly_copied);
 
         let rhs_valid = multi_and(cs.namespace(|| "rhs_valid"), &rhs_valid_flags)?;
 
@@ -1842,6 +1861,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            pubdata_holder.len() > 0,
+            "pubdata holder has to be preallocated"
+        );
+
         // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
@@ -1985,7 +2009,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         // rhs
         let mut rhs_valid_flags = vec![];
-        lhs_valid_flags.push(pubdata_properly_copied);
+        rhs_valid_flags.push(pubdata_properly_copied);
         rhs_valid_flags.push(is_transfer);
 
         let is_chunk_second = Boolean::from(Expression::equals(
