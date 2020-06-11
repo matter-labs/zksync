@@ -16,9 +16,12 @@ impl<'a> SubmitTxTester<'a> {
     }
 
     pub async fn run(self) -> Result<(), failure::Error> {
-        self.no_eth_signature().await?;
-        self.incorrect_eth_signature().await?;
-        self.low_fee().await?;
+        TestExecutor::execute_test("No ethereum signature", || self.no_eth_signature()).await;
+        TestExecutor::execute_test("Incorrect ethereum signature", || {
+            self.incorrect_eth_signature()
+        })
+        .await;
+        TestExecutor::execute_test("Too low fee", || self.low_fee()).await;
 
         Ok(())
     }

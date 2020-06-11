@@ -76,6 +76,35 @@ impl TestExecutor {
         }
     }
 
+    /// Runs the test closure surrounding it with the log entries.
+    ///
+    /// Sample usage:
+    ///
+    /// ```rust, ignore
+    /// TestExecutor::execute_test("Test name", || some_async_fn()).await;
+    /// ```
+    ///
+    /// This will result in the following lines in the log:
+    ///
+    /// ```text
+    /// Running test: "Test name"
+    /// Test "Test name": OK
+    /// ```
+    pub async fn execute_test<F, O>(test_name: &str, test: F)
+    where
+        F: FnOnce() -> O,
+        O: std::future::Future<Output = Result<(), failure::Error>>,
+    {
+        log::info!("Running test: \"{}\"", test_name);
+
+        test().await.unwrap_or_else(|err| {
+            log::error!("Test \"{}\" failed: {}", test_name, err);
+            panic!("Test \"{}\" failed", test_name);
+        });
+
+        log::info!("Test \"{}\": OK", test_name);
+    }
+
     /// Infallible test runner.
     pub async fn run(&mut self) {
         if let Err(error) = self.run_test().await {
