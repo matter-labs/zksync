@@ -28,6 +28,9 @@ impl<'a> SubmitTxTester<'a> {
         .await;
         TestExecutor::execute_test("Too low fee", || self.low_fee()).await;
         TestExecutor::execute_test("Incorrect account ID", || self.incorrect_account_id()).await;
+        TestExecutor::execute_test("Unpackable token amount", || self.unpackable_token_amount())
+            .await;
+        TestExecutor::execute_test("Unpackable fee amount", || self.unpackable_fee_amount()).await;
 
         Ok(())
     }
@@ -148,6 +151,63 @@ impl<'a> SubmitTxTester<'a> {
             Output::Success(v) => {
                 panic!(
                     "Got successful response for tx with too big account ID: {:?}",
+                    v
+                );
+            }
+            Output::Failure(v) => {
+                self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
+            }
+        };
+
+        Ok(())
+    }
+
+    pub async fn unpackable_token_amount(&self) -> Result<(), failure::Error> {
+        let main_account = &self.0.main_account;
+        let transfer_fee = self.0.transfer_fee(&main_account.zk_acc).await;
+
+        let unpackable_token_amount = 1_000_000_000_000_000_001u64.into();
+
+        let (transfer, eth_sign) = Self::sign_transfer(
+            &main_account.zk_acc,
+            main_account.zk_acc.address,
+            unpackable_token_amount,
+            transfer_fee,
+        );
+
+        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
+        match reply {
+            Output::Success(v) => {
+                panic!(
+                    "Got successful response for tx with unpackable token amount: {:?}",
+                    v
+                );
+            }
+            Output::Failure(v) => {
+                self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
+            }
+        };
+
+        Ok(())
+    }
+
+    pub async fn unpackable_fee_amount(&self) -> Result<(), failure::Error> {
+        let main_account = &self.0.main_account;
+
+        let unpackable_fee_amount = 1_000_000_000_000_000_001u64.into();
+
+        let (transfer, eth_sign) = Self::sign_transfer(
+            &main_account.zk_acc,
+            main_account.zk_acc.address,
+            10u32.into(),
+            unpackable_fee_amount,
+        );
+
+        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
+        match reply {
+            Output::Success(v) => {
+                panic!(
+                    "Got successful response for tx with unpackable token amount: {:?}",
                     v
                 );
             }
