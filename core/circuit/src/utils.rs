@@ -9,6 +9,7 @@ use crypto_exports::franklin_crypto::{
     },
     circuit::{
         boolean::{AllocatedBit, Boolean},
+        multipack,
         num::{AllocatedNum, Num},
         Assignment,
     },
@@ -426,4 +427,33 @@ fn calculate_empty_tree_hashes<E: RescueEngine>(
         current = node_hash;
     }
     empty_node_hashes
+}
+
+pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    old_data: &Vec<AllocatedNum<E>>,
+    new_bits: &[Boolean],
+) -> Result<(Boolean, Vec<AllocatedNum<E>>), SynthesisError> {
+    let packed = multipack::pack_into_witness(cs.namespace(|| "pack claimed data"), &new_bits)?;
+
+    assert_eq!(packed.len(), old_data.len());
+
+    // compare
+
+    let mut equality_bits = vec![];
+
+    for (i, (old, new)) in old_data.iter().zip(packed.iter()).enumerate() {
+        let is_equal_bit = AllocatedNum::<E>::equals(
+            cs.namespace(|| format!("equality for chunk {}", i)),
+            &old,
+            &new,
+        )?;
+
+        let equal_bool = Boolean::from(is_equal_bit);
+        equality_bits.push(equal_bool);
+    }
+
+    let is_equal = multi_and(cs.namespace(|| "all data is equal"), &equality_bits)?;
+
+    Ok((is_equal, packed))
 }
