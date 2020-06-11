@@ -16,7 +16,7 @@ use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::rescue::RescueEngine;
-use crate::misc::utils::format_ether;
+use crate::misc::utils::format_units;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::{max_account_id, max_token_id, JUBJUB_PARAMS, RESCUE_PARAMS};
 use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg, BigUintSerdeAsRadix10Str};
@@ -209,18 +209,18 @@ impl Transfer {
     }
 
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
-    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
         format!(
             "Transfer {amount} {token}\n\
             To: {to:?}\n\
             Nonce: {nonce}\n\
             Fee: {fee} {token}\n\
             Account Id: {account_id}",
-            amount = format_ether(&self.amount),
+            amount = format_units(&self.amount, decimals),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
-            fee = format_ether(&self.fee),
+            fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
         )
     }
@@ -334,18 +334,18 @@ impl Withdraw {
     }
 
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
-    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
         format!(
             "Withdraw {amount} {token}\n\
             To: {to:?}\n\
             Nonce: {nonce}\n\
             Fee: {fee} {token}\n\
             Account Id: {account_id}",
-            amount = format_ether(&self.amount),
+            amount = format_units(&self.amount, decimals),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
-            fee = format_ether(&self.fee),
+            fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
         )
     }
