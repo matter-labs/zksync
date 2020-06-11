@@ -11,10 +11,9 @@
 //! creating an integration test will be more fluent.
 
 // Built-in deps
-use std::time::{Duration, Instant};
+use std::time::Duration;
 // External deps
 use num::BigUint;
-use tokio::time;
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
@@ -23,6 +22,7 @@ use models::{
 };
 use testkit::zksync_account::ZksyncAccount;
 // Local deps
+use self::submit_tx::SubmitTxTester;
 use crate::{
     rpc_client::RpcClient,
     scenarios::{
@@ -34,8 +34,10 @@ use crate::{
     test_accounts::TestAccount,
 };
 
+mod submit_tx;
+
 #[derive(Debug)]
-struct TestExecutor {
+pub struct TestExecutor {
     rpc_client: RpcClient,
 
     /// Main account to be used in test.
@@ -87,10 +89,10 @@ impl TestExecutor {
     pub async fn run_test(&mut self) -> Result<(), failure::Error> {
         self.initialize().await?;
         self.deposit().await?;
-        // self.initial_transfer().await?;
-        // self.funds_rotation().await?;
-        // self.collect_funds().await?;
-        // self.withdraw().await?;
+
+        // Actual test runners.
+        SubmitTxTester::new(self).run().await?;
+
         self.finish().await?;
 
         Ok(())
@@ -174,16 +176,16 @@ impl TestExecutor {
         Ok(())
     }
 
-    // /// Obtains a fee required for the transfer operation.
-    // async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
-    //     let fee = self
-    //         .rpc_client
-    //         .get_tx_fee("Transfer", to_acc.address, "ETH")
-    //         .await
-    //         .expect("Can't get tx fee");
+    /// Obtains a fee required for the transfer operation.
+    async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+        let fee = self
+            .rpc_client
+            .get_tx_fee("Transfer", to_acc.address, "ETH")
+            .await
+            .expect("Can't get tx fee");
 
-    //     closest_packable_fee_amount(&fee)
-    // }
+        closest_packable_fee_amount(&fee)
+    }
 
     /// Obtains a fee required for the withdraw operation.
     async fn withdraw_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
@@ -196,28 +198,28 @@ impl TestExecutor {
         closest_packable_fee_amount(&fee)
     }
 
-    // /// Creates a signed transfer transaction.
-    // /// Sender and receiver are chosen from the generated
-    // /// accounts, determined by its indices.
-    // fn sign_transfer(
-    //     &self,
-    //     from: &ZksyncAccount,
-    //     to: &ZksyncAccount,
-    //     amount: impl Into<BigUint>,
-    //     fee: impl Into<BigUint>,
-    // ) -> (FranklinTx, Option<PackedEthSignature>) {
-    //     let (tx, eth_signature) = from.sign_transfer(
-    //         0, // ETH
-    //         "ETH",
-    //         amount.into(),
-    //         fee.into(),
-    //         &to.address,
-    //         None,
-    //         true,
-    //     );
+    /// Creates a signed transfer transaction.
+    /// Sender and receiver are chosen from the generated
+    /// accounts, determined by its indices.
+    fn sign_transfer(
+        &self,
+        from: &ZksyncAccount,
+        to: &ZksyncAccount,
+        amount: impl Into<BigUint>,
+        fee: impl Into<BigUint>,
+    ) -> (FranklinTx, Option<PackedEthSignature>) {
+        let (tx, eth_signature) = from.sign_transfer(
+            0, // ETH
+            "ETH",
+            amount.into(),
+            fee.into(),
+            &to.address,
+            None,
+            true,
+        );
 
-    //     (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
-    // }
+        (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
+    }
 }
 
 /// Runs the real-life test scenario.
