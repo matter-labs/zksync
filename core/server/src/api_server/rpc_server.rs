@@ -232,7 +232,7 @@ pub struct OngoingDepositsResp {
     estimated_deposits_approval_block: Option<u64>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,

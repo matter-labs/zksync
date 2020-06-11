@@ -1,10 +1,15 @@
 //! Tests for `submit_tx` RPC method.
 
 // External deps
-use jsonrpc_core::types::response::Output;
+use jsonrpc_core::types::{Failure, Output};
+use num::BigUint;
 // Workspace deps
-use models::node::tx::PackedEthSignature;
+use models::node::{
+    tx::{PackedEthSignature, Transfer, TxSignature},
+    Address, FranklinTx, TokenId,
+};
 use server::api_server::rpc_server::RpcErrorCodes;
+use testkit::zksync_account::ZksyncAccount;
 // Local deps
 use super::TestExecutor;
 
@@ -22,8 +27,18 @@ impl<'a> SubmitTxTester<'a> {
         })
         .await;
         TestExecutor::execute_test("Too low fee", || self.low_fee()).await;
+        TestExecutor::execute_test("Incorrect account ID", || self.incorrect_account_id()).await;
 
         Ok(())
+    }
+
+    fn check_rpc_code(&self, output: Failure, expected_code: RpcErrorCodes) {
+        if output.error.code != expected_code.into() {
+            panic!(
+                "Expected RPC response: {:?}; Actual RPC response: {:?}",
+                expected_code, output
+            );
+        }
     }
 
     pub async fn no_eth_signature(&self) -> Result<(), failure::Error> {
@@ -47,7 +62,7 @@ impl<'a> SubmitTxTester<'a> {
                 panic!("Got successful response for tx with no signature: {:?}", v);
             }
             Output::Failure(v) => {
-                assert_eq!(v.error.code, RpcErrorCodes::MissingEthSignature.into());
+                self.check_rpc_code(v, RpcErrorCodes::MissingEthSignature.into());
             }
         };
 
@@ -80,7 +95,7 @@ impl<'a> SubmitTxTester<'a> {
                 );
             }
             Output::Failure(v) => {
-                assert_eq!(v.error.code, RpcErrorCodes::IncorrectEthSignature.into());
+                self.check_rpc_code(v, RpcErrorCodes::IncorrectEthSignature.into());
             }
         };
 
@@ -106,10 +121,71 @@ impl<'a> SubmitTxTester<'a> {
                 panic!("Got successful response for tx with too low fee: {:?}", v);
             }
             Output::Failure(v) => {
-                assert_eq!(v.error.code, RpcErrorCodes::FeeTooLow.into());
+                self.check_rpc_code(v, RpcErrorCodes::FeeTooLow.into());
             }
         };
 
         Ok(())
+    }
+
+    pub async fn incorrect_account_id(&self) -> Result<(), failure::Error> {
+        // Make random sender with incorrect account ID.
+        let incorrect_account_id = u32::max_value();
+        let random_account = ZksyncAccount::rand();
+        random_account.set_account_id(Some(incorrect_account_id));
+
+        let transfer_fee = self.0.transfer_fee(&random_account).await;
+
+        let (transfer, eth_sign) = Self::sign_transfer(
+            &random_account,
+            random_account.address,
+            10_u32.into(),
+            transfer_fee,
+        );
+
+        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
+        match reply {
+            Output::Success(v) => {
+                panic!(
+                    "Got successful response for tx with too big account ID: {:?}",
+                    v
+                );
+            }
+            Output::Failure(v) => {
+                self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
+            }
+        };
+
+        Ok(())
+    }
+
+    /// Creates signed transfer without any checks for correctness.
+    fn sign_transfer(
+        from: &ZksyncAccount,
+        to: Address,
+        amount: BigUint,
+        fee: BigUint,
+    ) -> (FranklinTx, Option<PackedEthSignature>) {
+        let token: TokenId = 0; // ETH token
+        let account_id = from.get_account_id().expect("Account ID must be set");
+        let mut tx = Transfer::new(
+            account_id,
+            from.address,
+            to,
+            token,
+            amount,
+            fee,
+            from.nonce(),
+            None,
+        );
+        tx.signature = TxSignature::sign_musig(&from.private_key, &tx.get_bytes());
+
+        let eth_signature = PackedEthSignature::sign(
+            &from.eth_private_key,
+            tx.get_ethereum_sign_message("ETH").as_bytes(),
+        )
+        .expect("Signing the transfer unexpectedly failed");
+
+        (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
     }
 }
