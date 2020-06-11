@@ -431,7 +431,7 @@ fn calculate_empty_tree_hashes<E: RescueEngine>(
 
 pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
-    old_data: &Vec<AllocatedNum<E>>,
+    old_data: &[AllocatedNum<E>],
     new_bits: &[Boolean],
 ) -> Result<(Boolean, Vec<AllocatedNum<E>>), SynthesisError> {
     let packed = multipack::pack_into_witness(cs.namespace(|| "pack claimed data"), &new_bits)?;

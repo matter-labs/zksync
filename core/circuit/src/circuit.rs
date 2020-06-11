@@ -636,6 +636,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_op<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1001,7 +1002,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_equal_pubdata,
         )?;
 
-        base_valid_flags.push(pubdata_properly_copied.clone());
+        base_valid_flags.push(pubdata_properly_copied);
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_pubdata_equal"),
@@ -1285,7 +1286,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
-            pubdata_holder.len() > 0,
+            !pubdata_holder.is_empty(),
             "pubdata holder has to be preallocated"
         );
 
@@ -1422,7 +1423,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
-            pubdata_holder.len() > 0,
+            !pubdata_holder.is_empty(),
             "pubdata holder has to be preallocated"
         );
 
@@ -1608,6 +1609,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         Ok(tx_valid)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn transfer_to_new<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1624,7 +1626,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
-            pubdata_holder.len() > 0,
+            !pubdata_holder.is_empty(),
             "pubdata holder has to be preallocated"
         );
 
@@ -1846,6 +1848,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         Ok(is_op_valid)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn transfer<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1862,7 +1865,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
-            pubdata_holder.len() > 0,
+            !pubdata_holder.is_empty(),
             "pubdata holder has to be preallocated"
         );
 
