@@ -66,6 +66,36 @@ fn test_full_exit_failure_no_account_in_tree() {
     );
 }
 
+#[test]
+#[ignore]
+fn test_full_exit_initialted_from_wrong_account_owner() {
+    // Input data.
+    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let invalid_account = WitnessTestAccount::new(2, 10);
+    let account = &accounts[0];
+    let invalid_account_eth_address = invalid_account.account.address;
+    assert!(invalid_account_eth_address != account.account.address);
+    let full_exit_op = FullExitOp {
+        priority_op: FullExit {
+            account_id: account.id,
+            eth_address: invalid_account_eth_address,
+            token: 0,
+        },
+        withdraw_amount: Some(BigUint::from(0u32).into()),
+    };
+    let success = false;
+
+    generic_test_scenario::<FullExitWitness<Bn256>, _>(
+        &accounts,
+        (full_exit_op, success),
+        (),
+        |_plasma_state, _op| {
+            // this operation should change nothing
+            vec![]
+        },
+    );
+}
+
 /// Checks that executing a withdraw operation with incorrect
 /// withdraw amount results in an error.
 #[test]
