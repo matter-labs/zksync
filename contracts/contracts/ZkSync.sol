@@ -21,7 +21,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMathUInt128 for uint128;
 
-    bytes32 public constant EMPTY_STRING_KECCAK = bytes32(0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470);
+    bytes32 public constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     // Upgrade functional
 
@@ -98,9 +98,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint256 balance_before = _token.balanceOf(address(this));
         require(Utils.sendERC20(_token, _to, _amount), "wtg11"); // wtg11 - ERC20 transfer fails
         uint256 balance_after = _token.balanceOf(address(this));
-        require(balance_before.sub(balance_after) <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
+        uint256 balance_diff = balance_before.sub(balance_after);
+        require(balance_diff <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
 
-        return SafeCast.toUint128(balance_before.sub(balance_after));
+        return SafeCast.toUint128(balance_diff);
     }
 
     /// @notice executes pending withdrawals
@@ -187,7 +188,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
 
         uint256 balance_before = _token.balanceOf(address(this));
-        require(_token.transferFrom(msg.sender, address(this), uint128(_amount)), "fd012"); // token transfer failed deposit
+        require(_token.transferFrom(msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit
         uint256 balance_after = _token.balanceOf(address(this));
         uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 

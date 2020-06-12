@@ -1,5 +1,9 @@
 pragma solidity ^0.5.0;
 
+// Functions named bytesTo(***) (!except bytes to bytesN) works because if we use `mload` to load word (32 bytes) from memory
+// into datatype which holds N bytes, we will fill value of this type with last N bytes of the word (works for numbers because
+// all numeric datatypes are BE in Ethereum). To do that we compute offset for this word using following formula:
+// bytes + 32 (skip length of bytes array) + _start (skip user defined offset) - (32 - N) = bytes + _start + N
 
 library Bytes {
 
@@ -38,75 +42,80 @@ library Bytes {
         bts = toBytesFromUIntTruncated(uint(self), 20);
     }
 
+    // See comment at the top of this file for explanation of how this function works.
     // NOTE: theoretically possible overflow of (_start + 20)
     function bytesToAddress(bytes memory self, uint256 _start) internal pure returns (address addr) {
-        uint256 newOffset = _start + 20;
-        require(self.length >= newOffset, "bta11");
+        uint256 offset = _start + 20;
+        require(self.length >= offset, "bta11");
         assembly {
-            addr := mload(add(self, newOffset))
+            addr := mload(add(self, offset))
         }
     }
 
+    // Reasoning about why this function works is similar to that of other similar functions, except NOTE below.
+    // NOTE: that bytes1..32 is stored in the beginning of the word unlike other primitive types
     // NOTE: theoretically possible overflow of (_start + 20)
     function bytesToBytes20(bytes memory self, uint256 _start) internal pure returns (bytes20 r) {
         require(self.length >= (_start + 20), "btb20");
         assembly {
-            // Note that bytes1..32 is stored in the beginning of the word unlike other primitive types
             r := mload(add(add(self, 0x20), _start))
         }
     }
 
+    // See comment at the top of this file for explanation of how this function works.
     // NOTE: theoretically possible overflow of (_start + 0x2)
     function bytesToUInt16(bytes memory _bytes, uint256 _start) internal pure returns (uint16 r) {
-        uint256 newOffset = _start + 0x2;
-        require(_bytes.length >= newOffset, "btu02");
+        uint256 offset = _start + 0x2;
+        require(_bytes.length >= offset, "btu02");
         assembly {
-            r := mload(add(_bytes, newOffset))
+            r := mload(add(_bytes, offset))
         }
     }
 
+    // See comment at the top of this file for explanation of how this function works.
     // NOTE: theoretically possible overflow of (_start + 0x3)
     function bytesToUInt24(bytes memory _bytes, uint256 _start) internal pure returns (uint24 r) {
-        uint256 newOffset = _start + 0x3;
-        require(_bytes.length >= newOffset, "btu03");
+        uint256 offset = _start + 0x3;
+        require(_bytes.length >= offset, "btu03");
         assembly {
-            r := mload(add(_bytes, newOffset))
+            r := mload(add(_bytes, offset))
         }
     }
 
     // NOTE: theoretically possible overflow of (_start + 0x4)
     function bytesToUInt32(bytes memory _bytes, uint256 _start) internal pure returns (uint32 r) {
-        uint256 newOffset = _start + 0x4;
-        require(_bytes.length >= newOffset, "btu04");
+        uint256 offset = _start + 0x4;
+        require(_bytes.length >= offset, "btu04");
         assembly {
-            r := mload(add(_bytes, newOffset))
+            r := mload(add(_bytes, offset))
         }
     }
 
     // NOTE: theoretically possible overflow of (_start + 0x10)
     function bytesToUInt128(bytes memory _bytes, uint256 _start) internal pure returns (uint128 r) {
-        uint256 newOffset = _start + 0x10;
-        require(_bytes.length >= newOffset, "btu16");
+        uint256 offset = _start + 0x10;
+        require(_bytes.length >= offset, "btu16");
         assembly {
-            r := mload(add(_bytes, newOffset))
+            r := mload(add(_bytes, offset))
         }
     }
 
+    // See comment at the top of this file for explanation of how this function works.
     // NOTE: theoretically possible overflow of (_start + 0x14)
     function bytesToUInt160(bytes memory _bytes, uint256 _start) internal pure returns (uint160 r) {
-        uint256 newOffset = _start + 0x14;
-        require(_bytes.length >= newOffset, "btu20");
+        uint256 offset = _start + 0x14;
+        require(_bytes.length >= offset, "btu20");
         assembly {
-            r := mload(add(_bytes, newOffset))
+            r := mload(add(_bytes, offset))
         }
     }
 
     // NOTE: theoretically possible overflow of (_start + 0x20)
     function bytesToBytes32(bytes memory  _bytes, uint256 _start) internal pure returns (bytes32 r) {
-        uint256 newOffset = _start + 0x20;
-        require(_bytes.length >= newOffset, "btb32");
+        uint256 offset = _start + 0x20;
+        require(_bytes.length >= offset, "btb32");
         assembly {
-            r := mload(add(_bytes, newOffset))
+            r := mload(add(_bytes, offset))
         }
     }
 
