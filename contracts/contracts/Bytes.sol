@@ -1,9 +1,12 @@
 pragma solidity ^0.5.0;
 
-// Functions named bytesTo(***) (!except bytes to bytesN) works because if we use `mload` to load word (32 bytes) from memory
-// into datatype which holds N bytes, we will fill value of this type with last N bytes of the word (works for numbers because
-// all numeric datatypes are BE in Ethereum). To do that we compute offset for this word using following formula:
-// bytes + 32 (skip length of bytes array) + _start (skip user defined offset) - (32 - N) = bytes + _start + N
+// Functions named bytesToX, except bytesToBytes20, where X is some type of size N < 32 (size of one word)
+// implements the following algorithm:
+// f(bytes memory input, uint offset) -> X out
+// where byte representation of out is N bytes from input at the given offset
+// 1) We compute memory location of the word W such that last N bytes of W is input[offset..offset+N]
+// W_address = input + 32 (skip stored length of bytes) + offset - (32 - N) == input + offset + N
+// 2) We load W from memory into out, last N bytes of W are placed into out
 
 library Bytes {
 
