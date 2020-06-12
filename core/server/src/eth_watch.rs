@@ -6,11 +6,7 @@
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
 
 // Built-in deps
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, convert::TryFrom, time::Duration};
 // External uses
 use failure::format_err;
 use futures::{
@@ -503,18 +499,9 @@ impl<T: Transport> EthWatch<T> {
         self.restore_state_from_eth(block.saturating_sub(self.number_of_confirmations_for_event))
             .await;
 
-        // If we are reaching the rate limit threshold on infura, we must go quiet for a while
-        // before we'll be able to poll the node again.
-        let mut polling_disabled_until = Instant::now();
-
         while let Some(request) = self.eth_watch_req.next().await {
             match request {
                 EthWatchRequest::PollETHNode => {
-                    if Instant::now() < polling_disabled_until {
-                        // Polling is currently forbidden, skip this round.
-                        continue;
-                    }
-
                     let last_block_number = self.web3.eth().block_number().compat().await;
                     let block = if let Ok(block) = last_block_number {
                         block.as_u64()
@@ -523,19 +510,10 @@ impl<T: Transport> EthWatch<T> {
                     };
 
                     if block > self.last_ethereum_block {
-                        if let Err(error) = self.process_new_blocks(block).await {
-                            log::warn!(
-                                "Failed to process new blocks: {}. \
-                                Stopping polling of Ethereum node for {} seconds.",
-                                error,
-                                RATE_LIMIT_DELAY.as_secs()
-                            );
-
-                            // We will not poll the node for a while, but we want to respond
-                            // to the incoming queries. Thus, we only set the variable to be
-                            // checked before polling attempt.
-                            polling_disabled_until = Instant::now() + RATE_LIMIT_DELAY;
-                        }
+                        self.process_new_blocks(block)
+                            .await
+                            .map_err(|e| warn!("Failed to process new blocks {}", e))
+                            .unwrap_or_default();
                         self.commit_state();
                     }
                 }
