@@ -1,37 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ${ZKSYNC_ENV}-prover
+  name: prover
   namespace: ${ZKSYNC_ENV}
   labels:
-    app: ${ZKSYNC_ENV}-prover
+    app: prover
 spec:
   strategy:
     type: Recreate
   replicas: 1
   selector:
     matchLabels:
-      app: ${ZKSYNC_ENV}-prover
+      app: prover
   template:
     metadata:
       labels:
-        app: ${ZKSYNC_ENV}-prover
+        app: prover
     spec:
       containers:
-      - name: ${ZKSYNC_ENV}-prover
+      - name: prover
         image: matterlabs/prover:${IMAGE_TAG}
         imagePullPolicy: Always
         resources: ${PROVER_MIN_RESOURCES}
         envFrom:
           - configMapRef:
-              name: ${ZKSYNC_ENV}-configmap
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
+              name: configmap
       terminationGracePeriodSeconds: 20
