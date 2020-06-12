@@ -66,6 +66,8 @@ pub struct RealLifeConfig {
     pub use_all_block_sizes: bool,
     /// Main account to deposit ETH from.
     pub input_account: AccountInfo,
+    /// Additional accounts to deposit ETH from for the satellite scenario.
+    pub additional_accounts: Vec<AccountInfo>,
 }
 
 impl RealLifeConfig {
