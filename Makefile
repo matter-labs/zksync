@@ -1,7 +1,10 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
+export SERVER_DOCKER_IMAGE_LATEST ?=matterlabs/server:latest
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
+export PROVER_DOCKER_IMAGE_LATEST ?=matterlabs/prover:latest
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
+export NGINX_DOCKER_IMAGE_LATEST ?= matterlabs/nginx:latest
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
@@ -92,10 +95,11 @@ dist-explorer: yarn build-contracts
 	@cd js/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
-	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
+	@docker build -t "${NGINX_DOCKER_IMAGE}" -t "${NGINX_DOCKER_IMAGE_LATEST}" -f ./docker/nginx/Dockerfile .
 
 push-image-nginx: image-nginx
 	docker push "${NGINX_DOCKER_IMAGE}"
+	docker push "${NGINX_DOCKER_IMAGE_LATEST}"
 
 image-ci:
 	@docker build -t "${CI_DOCKER_IMAGE}" -f ./docker/ci/Dockerfile .
@@ -131,18 +135,20 @@ clean-target:
 	$(rust-musl-builder) cargo clean
 
 image-server: build-target
-	@docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
+	@docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
 
 image-prover: build-target
-	@docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
+	@docker build -t "${PROVER_DOCKER_IMAGE}" -t "${PROVER_DOCKER_IMAGE_LATEST}"  -f ./docker/prover/Dockerfile .
 
 image-rust: image-server image-prover
 
 push-image-server:
 	docker push "${SERVER_DOCKER_IMAGE}"
+	docker push "${SERVER_DOCKER_IMAGE_LATEST}"
 
 push-image-prover:
 	docker push "${PROVER_DOCKER_IMAGE}"
+	docker push "${PROVER_DOCKER_IMAGE_LATEST}"
 
 push-image-rust: image-rust push-image-server push-image-prover
 

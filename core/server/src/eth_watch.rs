@@ -256,8 +256,11 @@ impl<T: Transport> EthWatch<T> {
     ) -> Result<(), failure::Error> {
         // We want to scan the interval of blocks from the latest one up to the oldest one which may
         // have unconfirmed priority ops.
+        // `+ 1` is added because if we subtract number of confirmations, we'll obtain the last block
+        // which has operations that must be processed. So, for the unconfirmed operations, we must
+        // start from the block next to it.
         let block_from_number =
-            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
+            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event) + 1;
         let block_from = BlockNumber::Number(block_from_number.into());
         let block_to = BlockNumber::Latest;
 

@@ -19,6 +19,7 @@ use crate::prover_server::scaler::ScalerOracle;
 mod pool;
 mod scaler;
 
+#[derive(Debug)]
 struct AppState {
     connection_pool: storage::ConnectionPool,
     preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
@@ -114,7 +115,7 @@ fn prover_data(
     data: web::Data<AppState>,
     block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    trace!("requesting prover_data for block {}", *block);
+    trace!("Got request for prover_data for block {}", *block);
     let data_pool = data
         .preparing_data_pool
         .read()
@@ -130,8 +131,10 @@ fn working_on(
     data: web::Data<AppState>,
     r: web::Json<client::WorkingOnReq>,
 ) -> actix_web::Result<()> {
-    info!(
-        "working on request for prover_run with id: {}",
+    // These heartbeats aren't really important, as they're sent
+    // continuously while prover is performing computations.
+    trace!(
+        "Received heartbeat for prover_run with id: {}",
         r.prover_run_id
     );
     let storage = data
@@ -147,7 +150,7 @@ fn working_on(
 }
 
 fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix_web::Result<()> {
-    info!("publish of a proof for block: {}", r.block);
+    info!("Received a proof for block: {}", r.block);
     let storage = data
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
@@ -173,16 +176,31 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
 }
 
 fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::Result<()> {
-    info!(
-        "prover sent stopped request with prover_run id: {}",
-        prover_id
-    );
+    let prover_id = prover_id.into_inner();
+
     let storage = data
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    let prover_description = storage
+        .prover_schema()
+        .prover_by_id(prover_id)
+        .map_err(|_| {
+            vlog::warn!(
+                "Received stop notification from an unknown prover with ID {}",
+                prover_id
+            );
+            actix_web::error::ErrorBadRequest("unknown prover ID")
+        })?;
+
+    info!(
+        "Prover instance '{}' with ID {} send a stopping notification",
+        prover_description.worker, prover_id
+    );
+
     storage
         .prover_schema()
-        .record_prover_stop(*prover_id)
+        .record_prover_stop(prover_id)
         .map_err(|e| {
             vlog::warn!("failed to record prover stop: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
@@ -251,14 +269,18 @@ pub fn start_prover_server(
 
             // Start HTTP server.
             HttpServer::new(move || {
+                let app_state = AppState::new(
+                    connection_pool.clone(),
+                    data_pool.clone(),
+                    prover_timeout,
+                    idle_provers,
+                );
+
+                // By calling `register_data` instead of `data` we're avoiding double
+                // `Arc` wrapping of the object.
                 App::new()
                     .wrap(actix_web::middleware::Logger::default())
-                    .data(AppState::new(
-                        connection_pool.clone(),
-                        data_pool.clone(),
-                        prover_timeout,
-                        idle_provers,
-                    ))
+                    .register_data(web::Data::new(app_state))
                     .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
                     .route("/block_to_prove", web::get().to(block_to_prove))

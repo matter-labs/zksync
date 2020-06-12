@@ -232,7 +232,7 @@ pub struct OngoingDepositsResp {
     estimated_deposits_approval_block: Option<u64>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
@@ -380,7 +380,7 @@ impl RpcApp {
         io.extend_with(self.to_delegate())
     }
 
-    fn token_symbol_from_id(&self, token_id: TokenId) -> Result<String> {
+    fn token_info_from_id(&self, token_id: TokenId) -> Result<Token> {
         fn rpc_message(error: impl ToString) -> Error {
             Error {
                 code: RpcErrorCodes::Other.into(),
@@ -389,16 +389,10 @@ impl RpcApp {
             }
         }
 
-        let symbol = self
-            .token_cache
+        self.token_cache
             .get_token(token_id)
             .map_err(rpc_message)?
-            .map(|t| t.symbol);
-
-        match symbol {
-            Some(symbol) => Ok(symbol),
-            None => Err(rpc_message("Token not found in the DB")),
-        }
+            .ok_or_else(|| rpc_message("Token not found in the DB"))
     }
 
     /// Returns a message that user has to sign to send the transaction.
@@ -406,12 +400,18 @@ impl RpcApp {
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
     fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
         match tx {
-            FranklinTx::Transfer(tx) => Ok(Some(
-                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
-            )),
-            FranklinTx::Withdraw(tx) => Ok(Some(
-                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
-            )),
+            FranklinTx::Transfer(tx) => {
+                let token = self.token_info_from_id(tx.token)?;
+                Ok(Some(
+                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+                ))
+            }
+            FranklinTx::Withdraw(tx) => {
+                let token = self.token_info_from_id(tx.token)?;
+                Ok(Some(
+                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+                ))
+            }
             _ => Ok(None),
         }
     }

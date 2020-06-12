@@ -43,13 +43,18 @@ use crate::{
 mod ticker_api;
 mod ticker_info;
 
+// Base operation costs estimated via `gas_price` test.
+const BASE_TRANSFER_COST: u32 = 350;
+const BASE_TRANSFER_TO_NEW_COST: u32 = 850;
+const BASE_WITHDRAW_COST: u32 = 75_000;
+
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
 /// from the point of zkSync view, rather than from the users
 /// point of view.
 /// Users do not divide transfers into `Transfer` and
 /// `TransferToNew`, while in zkSync it's two different operations.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OutputFeeType {
     Transfer,
     TransferToNew,
@@ -101,7 +106,7 @@ impl Fee {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TickerConfig {
     zkp_cost_chunk_usd: Ratio<BigUint>,
-    gas_cost_tx: HashMap<TxFeeTypes, BigUint>, //wei
+    gas_cost_tx: HashMap<OutputFeeType, BigUint>, //wei
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
 }
 
@@ -137,8 +142,12 @@ pub fn run_ticker_task(
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: vec![
-            (TxFeeTypes::Transfer, 350u32.into()),
-            (TxFeeTypes::Withdraw, 3000u32.into()),
+            (OutputFeeType::Transfer, BASE_TRANSFER_COST.into()),
+            (
+                OutputFeeType::TransferToNew,
+                BASE_TRANSFER_TO_NEW_COST.into(),
+            ),
+            (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
         ]
         .into_iter()
         .collect(),
@@ -223,7 +232,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
-        let gas_tx_amount = self.config.gas_cost_tx.get(&tx_type).cloned().unwrap();
+        let gas_tx_amount = self.config.gas_cost_tx.get(&fee_type).cloned().unwrap();
         let gas_price_wei = self.api.get_gas_price_wei().await?;
         let wei_price_usd = self.api.get_last_quote(TokenLike::Id(0)).await?.usd_price
             / BigUint::from(10u32).pow(18u32);
@@ -317,8 +326,12 @@ mod test {
             )
             .unwrap(),
             gas_cost_tx: vec![
-                (TxFeeTypes::Transfer, BigUint::from(350u32)),
-                (TxFeeTypes::Withdraw, BigUint::from(10000u32)),
+                (OutputFeeType::Transfer, BigUint::from(BASE_TRANSFER_COST)),
+                (
+                    OutputFeeType::TransferToNew,
+                    BigUint::from(BASE_TRANSFER_TO_NEW_COST),
+                ),
+                (OutputFeeType::Withdraw, BigUint::from(BASE_WITHDRAW_COST)),
             ]
             .into_iter()
             .collect(),

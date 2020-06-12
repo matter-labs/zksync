@@ -66,6 +66,17 @@ impl RpcClient {
         Ok(tx_hash)
     }
 
+    /// Sends the transaction to the ZKSync server and returns raw response.
+    pub async fn send_tx_raw(
+        &self,
+        tx: FranklinTx,
+        eth_signature: Option<PackedEthSignature>,
+    ) -> Result<Output, failure::Error> {
+        let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
+
+        self.post_raw(&msg).await
+    }
+
     /// Requests and returns information about a ZKSync account given its address.
     pub async fn account_state_info(
         &self,
@@ -123,6 +134,22 @@ impl RpcClient {
         &self,
         message: impl serde::Serialize,
     ) -> Result<serde_json::Value, failure::Error> {
+        let reply: Output = self.post_raw(message).await?;
+
+        let ret = match reply {
+            Output::Success(v) => v.result,
+            Output::Failure(v) => failure::bail!("RPC error: {}", v.error),
+        };
+
+        Ok(ret)
+    }
+
+    /// Performs a POST query to the JSON RPC endpoint,
+    /// and decodes the response, returning the decoded `serde_json::Value`.
+    /// `Ok` is returned only for successful calls, for any kind of error
+    /// the `Err` variant is returned (including the failed RPC method
+    /// execution response).
+    async fn post_raw(&self, message: impl serde::Serialize) -> Result<Output, failure::Error> {
         let res = self
             .client
             .post(&self.rpc_addr)
@@ -137,12 +164,7 @@ impl RpcClient {
         }
         let reply: Output = res.json().await.unwrap();
 
-        let ret = match reply {
-            Output::Success(v) => v.result,
-            Output::Failure(v) => failure::bail!("RPC error: {}", v.error),
-        };
-
-        Ok(ret)
+        Ok(reply)
     }
 }
 
