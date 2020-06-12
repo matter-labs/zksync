@@ -110,11 +110,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 toProcess = Utils.minU32(_n, numberOfPendingWithdrawals);
         uint32 startIndex = firstPendingWithdrawalIndex;
         numberOfPendingWithdrawals -= toProcess;
-        if (numberOfPendingWithdrawals == 0) {
-            firstPendingWithdrawalIndex = 0;
-        } else {
-            firstPendingWithdrawalIndex += toProcess;
-        }
+        firstPendingWithdrawalIndex += toProcess;
 
         for (uint32 i = startIndex; i < startIndex + toProcess; ++i) {
             uint16 tokenId = pendingWithdrawals[i].tokenId;
