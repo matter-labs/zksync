@@ -254,7 +254,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
-//        require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
         require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
         bytes memory publicData = _publicData;
@@ -302,7 +301,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Reverts unverified blocks
     /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
     function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-//        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
         governance.requireActiveValidator(msg.sender);
 
         uint32 blocksCommited = totalBlocksCommitted;
