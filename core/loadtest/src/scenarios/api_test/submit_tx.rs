@@ -217,7 +217,7 @@ impl<'a> SubmitTxTester<'a> {
 
         let eth_signature = PackedEthSignature::sign(
             &main_account.zk_acc.eth_private_key,
-            tx.get_ethereum_sign_message("ETH").as_bytes(),
+            tx.get_ethereum_sign_message("ETH", 18).as_bytes(),
         )
         .expect("Signing the transfer unexpectedly failed");
 
@@ -261,7 +261,7 @@ impl<'a> SubmitTxTester<'a> {
 
         let eth_signature = PackedEthSignature::sign(
             &main_account.zk_acc.eth_private_key,
-            tx.get_ethereum_sign_message("ETH").as_bytes(),
+            tx.get_ethereum_sign_message("ETH", 18).as_bytes(),
         )
         .expect("Signing the transfer unexpectedly failed");
 
@@ -302,7 +302,7 @@ impl<'a> SubmitTxTester<'a> {
 
         let eth_signature = PackedEthSignature::sign(
             &main_account.zk_acc.eth_private_key,
-            tx.get_ethereum_sign_message("ETH").as_bytes(),
+            tx.get_ethereum_sign_message("ETH", 18).as_bytes(),
         )
         .expect("Signing the transfer unexpectedly failed");
 
@@ -331,7 +331,7 @@ impl<'a> SubmitTxTester<'a> {
                 panic!("Got successful response for incorrect tx: {:?}", v);
             }
             Output::Failure(v) => {
-                self.check_rpc_code(v, expected_error.into());
+                self.check_rpc_code(v, expected_error);
             }
         };
     }
@@ -376,7 +376,7 @@ impl<'a> SubmitTxTester<'a> {
 
         let eth_signature = PackedEthSignature::sign(
             &from.eth_private_key,
-            tx.get_ethereum_sign_message("ETH").as_bytes(),
+            tx.get_ethereum_sign_message("ETH", 18).as_bytes(),
         )
         .expect("Signing the transfer unexpectedly failed");
 
