@@ -22,7 +22,7 @@ BLOCK_HASH_ERR="Error: Unable to load the latest block hash"
 
 function fetch_root_hash {
   # Select the latest verified block and find its hash
-  QUERY="WITH last_block (number) AS (SELECT max(block_number) FROM operations WHERE action_type = 'VERIFY')
+  QUERY="WITH last_block (number) AS (SELECT max(block_number) FROM operations WHERE action_type = 'VERIFY' and confirmed = true)
        SELECT encode(root_hash, 'hex') FROM blocks, last_block WHERE blocks.number = last_block.number;"
   # By piping we make `psql` simply return value instead of drawing the table.
   # `xargs` is used to trim spaces around the value.
