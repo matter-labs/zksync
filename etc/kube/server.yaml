@@ -1,38 +1,38 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: ${ZKSYNC_ENV}-server
+  name: server
   namespace: ${ZKSYNC_ENV}
   annotations:
     qoqo.dev/service-mode: active-standby
   labels:
-    app: ${ZKSYNC_ENV}-server
+    app: server
 spec:
   type: ClusterIP
   ports:
     - port: 3000
       targetPort: 3000
       protocol: TCP
-      name: ${ZKSYNC_ENV}-server-rest
+      name: server-rest
     - port: 3030
       targetPort: 3030
       protocol: TCP
-      name: ${ZKSYNC_ENV}-server-jsrpc
+      name: server-jsrpc
     - port: 3031
       targetPort: 3031
       protocol: TCP
-      name: ${ZKSYNC_ENV}-server-jsrpc-ws
+      name: server-jsrpc-ws
     - port: 8088
       targetPort: 8088
       protocol: TCP
-      name: ${ZKSYNC_ENV}-prover-server-port
+      name: prover-server-port
   selector:
-    app: ${ZKSYNC_ENV}-server
+    app: server
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ${ZKSYNC_ENV}-server
+  name: server
   namespace: ${ZKSYNC_ENV}
 spec:
   strategy:
@@ -40,11 +40,11 @@ spec:
   replicas: 2
   selector:
     matchLabels:
-      app: ${ZKSYNC_ENV}-server
+      app: server
   template:
     metadata:
       labels:
-        app: ${ZKSYNC_ENV}-server
+        app: server
     spec:
       containers:
         - name: server
@@ -58,15 +58,10 @@ spec:
             - containerPort: 8088
           envFrom:
             - configMapRef:
-                name: ${ZKSYNC_ENV}-configmap
+                name: configmap
           env:
             - name: ZKSYNC_ENV
               value: "${ZKSYNC_ENV}"
-            - name: SERVER_REPLICA_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
             - name: OPERATOR_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
