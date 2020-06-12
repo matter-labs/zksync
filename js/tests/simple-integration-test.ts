@@ -305,13 +305,16 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         );
     }
 
+    const fullFee = await syncProvider.getTransactionFee("Withdraw", syncWallet1.address(), "ETH");
+    const fee = fullFee.totalFee;
+
     const signedWithdraw = syncWallet1.signer.signSyncWithdraw({
         accountId: await syncWallet1.getAccountId(),
         from: syncWallet1.address(),
         ethAddress: syncWallet1.address(),
         tokenId: 0,
         amount: utils.parseEther('0.001'),
-        fee: utils.parseEther('0.001'),
+        fee: fee,
         nonce: await syncWallet1.getNonce(),
     })
 
@@ -321,7 +324,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
     } catch (e) {
         assert(
             e.jrpcError.message == 'Eth signature is incorrect',
-            "sending tx with incorrect eth signature must fail"
+            `sending tx with incorrect eth signature must fail, got message: ${e.jrpcError.message}`
         );
     }
 }
@@ -382,7 +385,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "2.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "2.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.1");
 
         await syncProvider.disconnect();
     } catch (e) {
