@@ -31,6 +31,8 @@ impl<'a> SubmitTxTester<'a> {
         TestExecutor::execute_test("Unpackable token amount", || self.unpackable_token_amount())
             .await;
         TestExecutor::execute_test("Unpackable fee amount", || self.unpackable_fee_amount()).await;
+
+        TestExecutor::execute_test("Malformed tx signature", || self.malformed_signature()).await;
         // TestExecutor::execute_test("Too big token amount", || self.too_big_token_amount()).await;
         // TestExecutor::execute_test("Too big fee amount", || self.too_big_fee_amount()).await;
 
@@ -161,9 +163,46 @@ impl<'a> SubmitTxTester<'a> {
             .await;
     }
 
-    // pub async fn incorrect_signature(&self) -> Result<(), failure::Error> {
+    pub async fn malformed_signature(&self) {
+        let main_account = &self.0.main_account;
+        let transfer_fee = self.0.transfer_fee(&main_account.zk_acc).await;
 
-    // }
+        let token_amount = 10u64.into();
+
+        // Manually create the transfer and provide an incorrect signature.
+        let token: TokenId = 0; // ETH token
+        let account_id = main_account
+            .zk_acc
+            .get_account_id()
+            .expect("Account ID must be set");
+        let mut tx = Transfer::new(
+            account_id,
+            main_account.zk_acc.address,
+            main_account.zk_acc.address,
+            token,
+            token_amount,
+            transfer_fee,
+            main_account.zk_acc.nonce(),
+            None,
+        );
+
+        // Set incorrect signature.
+        let incorrect_signature = TxSignature::default();
+
+        tx.signature = incorrect_signature;
+
+        let eth_signature = PackedEthSignature::sign(
+            &main_account.zk_acc.eth_private_key,
+            tx.get_ethereum_sign_message("ETH").as_bytes(),
+        )
+        .expect("Signing the transfer unexpectedly failed");
+
+        let (transfer, eth_sign) = (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature));
+
+        let expected_error = RpcErrorCodes::IncorrectTx;
+        self.check_incorrect_transfer_response(transfer, eth_sign, expected_error)
+            .await;
+    }
 
     // pub async fn too_big_token_amount(&self) -> Result<(), failure::Error> {
     //     let main_account = &self.0.main_account;
