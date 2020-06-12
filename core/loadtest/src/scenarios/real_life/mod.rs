@@ -71,6 +71,7 @@ use models::{
 };
 use testkit::zksync_account::ZksyncAccount;
 // Local deps
+use self::satellite::SatelliteScenario;
 use crate::{
     rpc_client::RpcClient,
     scenarios::{
@@ -81,6 +82,8 @@ use crate::{
     sent_transactions::SentTransactions,
     test_accounts::TestAccount,
 };
+
+mod satellite;
 
 #[derive(Debug)]
 struct ScenarioExecutor {
@@ -111,6 +114,9 @@ struct ScenarioExecutor {
     /// operate.
     estimated_fee_for_op: BigUint,
 
+    /// Satellite scenario to run alongside with the funds rotation cycles.
+    satellite_scenario: Option<SatelliteScenario>,
+
     /// Event loop handle so transport for Eth account won't be invalidated.
     _event_loop_handle: EventLoopHandle,
 }
@@ -133,6 +139,13 @@ impl ScenarioExecutor {
         // Create main account to deposit money from and to return money back later.
         let main_account = TestAccount::from_info(&config.input_account, &transport, &ctx.options);
 
+        // Load additional accounts for the satellite scenario.
+        let additional_accounts: Vec<_> = config
+            .additional_accounts
+            .iter()
+            .map(|acc| TestAccount::from_info(acc, &transport, &ctx.options))
+            .collect();
+
         let block_sizes = Self::get_block_sizes(config.use_all_block_sizes);
 
         if config.use_all_block_sizes {
@@ -143,6 +156,14 @@ impl ScenarioExecutor {
         }
 
         let transfer_size = closest_packable_token_amount(&BigUint::from(config.transfer_size));
+        let verify_timeout = Duration::from_secs(config.block_timeout);
+
+        let satellite_scenario = Some(SatelliteScenario::new(
+            rpc_client.clone(),
+            additional_accounts,
+            transfer_size.clone(),
+            verify_timeout,
+        ));
 
         Self {
             rpc_client,
@@ -156,9 +177,11 @@ impl ScenarioExecutor {
 
             block_sizes,
 
-            verify_timeout: Duration::from_secs(config.block_timeout),
+            verify_timeout,
 
             estimated_fee_for_op: 0u32.into(),
+
+            satellite_scenario,
 
             _event_loop_handle,
         }
@@ -221,7 +244,15 @@ impl ScenarioExecutor {
         self.initialize().await?;
         self.deposit().await?;
         self.initial_transfer().await?;
-        self.funds_rotation().await?;
+
+        // Take the satellite scenario, as we have to borrow it mutably.
+        let mut satellite_scenario = self.satellite_scenario.take().unwrap();
+
+        // Run funds rotation phase and the satellite scenario in parallel.
+        let funds_rotation_future = self.funds_rotation();
+        let satellite_scenario_future = satellite_scenario.run();
+        futures::try_join!(funds_rotation_future, satellite_scenario_future)?;
+
         self.collect_funds().await?;
         self.withdraw().await?;
         self.finish().await?;
@@ -249,7 +280,11 @@ impl ScenarioExecutor {
         // And after that we have to make the fee packable.
         fee = closest_packable_fee_amount(&fee);
 
-        self.estimated_fee_for_op = fee;
+        self.estimated_fee_for_op = fee.clone();
+
+        if let Some(scenario) = self.satellite_scenario.as_mut() {
+            scenario.set_estimated_fee(fee);
+        };
 
         Ok(())
     }
@@ -547,8 +582,6 @@ impl ScenarioExecutor {
 
     /// Withdraws the money from the main account back to the Ethereum.
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
-        let mut sent_txs = SentTransactions::new();
-
         let current_balance = self.main_account.eth_acc.eth_balance().await?;
 
         let fee = self.withdraw_fee(&self.main_account.zk_acc).await;
@@ -574,6 +607,7 @@ impl ScenarioExecutor {
             .rpc_client
             .send_tx(tx.clone(), eth_sign.clone())
             .await?;
+        let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
 
         wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;

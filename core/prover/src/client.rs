@@ -190,7 +190,7 @@ impl crate::ApiClient for ApiClient {
                 .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
                 .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
-            Ok(res.ok_or_else(|| format_err!("couldn't get ProverData for block {}", block))?)
+            Ok(res.ok_or_else(|| format_err!("ProverData for block {} is not ready yet", block))?)
         };
 
         let prover_data = self.with_retries(&op)?;

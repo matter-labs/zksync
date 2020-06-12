@@ -32,3 +32,4 @@ failure = "0.1"
 backoff = "0.1.6"
 clap = "2.33.0"
 ctrlc = { version = "3.1", features = ["termination"] }
+rand = "0.7"
