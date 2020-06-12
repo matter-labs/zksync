@@ -1813,7 +1813,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         rhs_valid_flags.push(is_second_chunk.clone());
         rhs_valid_flags.push(is_transfer.clone());
         rhs_valid_flags.push(is_account_empty.clone());
-        rhs_valid_flags.push(pubdata_properly_copied);
+        rhs_valid_flags.push(pubdata_properly_copied.clone());
 
         let rhs_valid = multi_and(cs.namespace(|| "rhs_valid"), &rhs_valid_flags)?;
 
@@ -1838,6 +1838,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         ohs_valid_flags.push(is_first_chunk.not());
         ohs_valid_flags.push(is_second_chunk.not());
         ohs_valid_flags.push(is_transfer);
+        ohs_valid_flags.push(pubdata_properly_copied);
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
 
