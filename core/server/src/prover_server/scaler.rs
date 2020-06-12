@@ -6,6 +6,7 @@ use storage::ConnectionPool;
 /// Scaler oracle provides information for prover scaler
 /// service about required amount of provers for server
 /// to operate optimally.
+#[derive(Debug)]
 pub struct ScalerOracle {
     /// Database access to gather the information about amount of pending blocks.
     db: ConnectionPool,
