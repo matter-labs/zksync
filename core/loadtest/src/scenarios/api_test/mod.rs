@@ -93,14 +93,11 @@ impl TestExecutor {
     pub async fn execute_test<F, O>(test_name: &str, test: F)
     where
         F: FnOnce() -> O,
-        O: std::future::Future<Output = Result<(), failure::Error>>,
+        O: std::future::Future<Output = ()>,
     {
         log::info!("Running test: \"{}\"", test_name);
 
-        test().await.unwrap_or_else(|err| {
-            log::error!("Test \"{}\" failed: {}", test_name, err);
-            panic!("Test \"{}\" failed", test_name);
-        });
+        test().await;
 
         log::info!("Test \"{}\": OK", test_name);
     }

@@ -31,6 +31,8 @@ impl<'a> SubmitTxTester<'a> {
         TestExecutor::execute_test("Unpackable token amount", || self.unpackable_token_amount())
             .await;
         TestExecutor::execute_test("Unpackable fee amount", || self.unpackable_fee_amount()).await;
+        // TestExecutor::execute_test("Too big token amount", || self.too_big_token_amount()).await;
+        // TestExecutor::execute_test("Too big fee amount", || self.too_big_fee_amount()).await;
 
         Ok(())
     }
@@ -44,7 +46,7 @@ impl<'a> SubmitTxTester<'a> {
         }
     }
 
-    pub async fn no_eth_signature(&self) -> Result<(), failure::Error> {
+    pub async fn no_eth_signature(&self) {
         let main_account = &self.0.main_account;
 
         let transfer_fee = self.0.transfer_fee(&main_account.zk_acc).await;
@@ -59,20 +61,12 @@ impl<'a> SubmitTxTester<'a> {
         // Discard ETH signature.
         let no_eth_sign = None;
 
-        let reply = self.0.rpc_client.send_tx_raw(transfer, no_eth_sign).await?;
-        match reply {
-            Output::Success(v) => {
-                panic!("Got successful response for tx with no signature: {:?}", v);
-            }
-            Output::Failure(v) => {
-                self.check_rpc_code(v, RpcErrorCodes::MissingEthSignature.into());
-            }
-        };
-
-        Ok(())
+        let expected_error = RpcErrorCodes::MissingEthSignature;
+        self.check_incorrect_transfer_response(transfer, no_eth_sign, expected_error)
+            .await;
     }
 
-    pub async fn incorrect_eth_signature(&self) -> Result<(), failure::Error> {
+    pub async fn incorrect_eth_signature(&self) {
         let main_account = &self.0.main_account;
 
         let transfer_fee = self.0.transfer_fee(&main_account.zk_acc).await;
@@ -89,23 +83,12 @@ impl<'a> SubmitTxTester<'a> {
             PackedEthSignature::deserialize_packed(&[0; 65]).expect("Can't deserialize signature");
         let eth_sign = Some(fake_signature);
 
-        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
-        match reply {
-            Output::Success(v) => {
-                panic!(
-                    "Got successful response for an incorrect signature: {:?}",
-                    v
-                );
-            }
-            Output::Failure(v) => {
-                self.check_rpc_code(v, RpcErrorCodes::IncorrectEthSignature.into());
-            }
-        };
-
-        Ok(())
+        let expected_error = RpcErrorCodes::IncorrectEthSignature;
+        self.check_incorrect_transfer_response(transfer, eth_sign, expected_error)
+            .await;
     }
 
-    pub async fn low_fee(&self) -> Result<(), failure::Error> {
+    pub async fn low_fee(&self) {
         let main_account = &self.0.main_account;
 
         // Set fee to 0.
@@ -118,20 +101,12 @@ impl<'a> SubmitTxTester<'a> {
             transfer_fee,
         );
 
-        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
-        match reply {
-            Output::Success(v) => {
-                panic!("Got successful response for tx with too low fee: {:?}", v);
-            }
-            Output::Failure(v) => {
-                self.check_rpc_code(v, RpcErrorCodes::FeeTooLow.into());
-            }
-        };
-
-        Ok(())
+        let expected_error = RpcErrorCodes::FeeTooLow;
+        self.check_incorrect_transfer_response(transfer, eth_sign, expected_error)
+            .await;
     }
 
-    pub async fn incorrect_account_id(&self) -> Result<(), failure::Error> {
+    pub async fn incorrect_account_id(&self) {
         // Make random sender with incorrect account ID.
         let incorrect_account_id = u32::max_value();
         let random_account = ZksyncAccount::rand();
@@ -146,23 +121,12 @@ impl<'a> SubmitTxTester<'a> {
             transfer_fee,
         );
 
-        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
-        match reply {
-            Output::Success(v) => {
-                panic!(
-                    "Got successful response for tx with too big account ID: {:?}",
-                    v
-                );
-            }
-            Output::Failure(v) => {
-                self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
-            }
-        };
-
-        Ok(())
+        let expected_error = RpcErrorCodes::IncorrectTx;
+        self.check_incorrect_transfer_response(transfer, eth_sign, expected_error)
+            .await;
     }
 
-    pub async fn unpackable_token_amount(&self) -> Result<(), failure::Error> {
+    pub async fn unpackable_token_amount(&self) {
         let main_account = &self.0.main_account;
         let transfer_fee = self.0.transfer_fee(&main_account.zk_acc).await;
 
@@ -175,23 +139,12 @@ impl<'a> SubmitTxTester<'a> {
             transfer_fee,
         );
 
-        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
-        match reply {
-            Output::Success(v) => {
-                panic!(
-                    "Got successful response for tx with unpackable token amount: {:?}",
-                    v
-                );
-            }
-            Output::Failure(v) => {
-                self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
-            }
-        };
-
-        Ok(())
+        let expected_error = RpcErrorCodes::IncorrectTx;
+        self.check_incorrect_transfer_response(transfer, eth_sign, expected_error)
+            .await;
     }
 
-    pub async fn unpackable_fee_amount(&self) -> Result<(), failure::Error> {
+    pub async fn unpackable_fee_amount(&self) {
         let main_account = &self.0.main_account;
 
         let unpackable_fee_amount = 1_000_000_000_000_000_001u64.into();
@@ -203,20 +156,93 @@ impl<'a> SubmitTxTester<'a> {
             unpackable_fee_amount,
         );
 
-        let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
+        let expected_error = RpcErrorCodes::IncorrectTx;
+        self.check_incorrect_transfer_response(transfer, eth_sign, expected_error)
+            .await;
+    }
+
+    // pub async fn incorrect_signature(&self) -> Result<(), failure::Error> {
+
+    // }
+
+    // pub async fn too_big_token_amount(&self) -> Result<(), failure::Error> {
+    //     let main_account = &self.0.main_account;
+    //     let transfer_fee = self.0.transfer_fee(&main_account.zk_acc).await;
+
+    //     let too_big_transfer_amount = BigUint::from(u128::max_value()) + BigUint::from(1u32);
+
+    //     let (transfer, eth_sign) = Self::sign_transfer(
+    //         &main_account.zk_acc,
+    //         main_account.zk_acc.address,
+    //         too_big_transfer_amount,
+    //         transfer_fee,
+    //     );
+
+    //     let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
+    //     match reply {
+    //         Output::Success(v) => {
+    //             panic!(
+    //                 "Got successful response for tx with too big token amount: {:?}",
+    //                 v
+    //             );
+    //         }
+    //         Output::Failure(v) => {
+    //             self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
+    //         }
+    //     };
+
+    //     Ok(())
+    // }
+
+    // pub async fn too_big_fee_amount(&self) -> Result<(), failure::Error> {
+    //     let main_account = &self.0.main_account;
+
+    //     let too_big_fee_amount = BigUint::from(u128::max_value()) + BigUint::from(1u32);
+
+    //     let (transfer, eth_sign) = Self::sign_transfer(
+    //         &main_account.zk_acc,
+    //         main_account.zk_acc.address,
+    //         0u32.into(),
+    //         too_big_fee_amount,
+    //     );
+
+    //     let reply = self.0.rpc_client.send_tx_raw(transfer, eth_sign).await?;
+    //     match reply {
+    //         Output::Success(v) => {
+    //             panic!(
+    //                 "Got successful response for tx with too big fee amount: {:?}",
+    //                 v
+    //             );
+    //         }
+    //         Output::Failure(v) => {
+    //             self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
+    //         }
+    //     };
+
+    //     Ok(())
+    // }
+
+    /// Sends the transaction and expects it to fail with a provided RPC error code.
+    async fn check_incorrect_transfer_response(
+        &self,
+        transfer: FranklinTx,
+        eth_sign: Option<PackedEthSignature>,
+        expected_error: RpcErrorCodes,
+    ) {
+        let reply = self
+            .0
+            .rpc_client
+            .send_tx_raw(transfer, eth_sign)
+            .await
+            .expect("Can't send the transaction");
         match reply {
             Output::Success(v) => {
-                panic!(
-                    "Got successful response for tx with unpackable token amount: {:?}",
-                    v
-                );
+                panic!("Got successful response for incorrect tx: {:?}", v);
             }
             Output::Failure(v) => {
-                self.check_rpc_code(v, RpcErrorCodes::IncorrectTx.into());
+                self.check_rpc_code(v, expected_error.into());
             }
         };
-
-        Ok(())
     }
 
     /// Creates signed transfer without any checks for correctness.
