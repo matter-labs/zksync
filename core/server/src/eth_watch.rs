@@ -6,7 +6,11 @@
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
 
 // Built-in deps
-use std::{collections::HashMap, convert::TryFrom};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    time::{Duration, Instant},
+};
 // External uses
 use failure::format_err;
 use futures::{
@@ -32,6 +36,10 @@ use models::{
     NewTokenEvent,
 };
 use storage::ConnectionPool;
+
+/// As infura may limit the requests, upon error we need to wait for a while
+/// before repeating the request.
+const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
 
 pub type EthBlockId = u64;
 pub enum EthWatchRequest {
@@ -470,21 +478,43 @@ impl<T: Transport> EthWatch<T> {
     }
 
     pub async fn run(mut self) {
-        let block = self
-            .web3
-            .eth()
-            .block_number()
-            .compat()
-            .await
-            .expect("Block number")
-            .as_u64();
+        // As infura may be not responsive, we want to retry the query until we've actually got the
+        // block number.
+        // Normally, however, this loop is not expected to last more than one iteration.
+        let block = loop {
+            let block = self.web3.eth().block_number().compat().await;
+
+            match block {
+                Ok(block) => {
+                    break block.as_u64();
+                }
+                Err(error) => {
+                    log::warn!(
+                        "Unable to fetch last block number: '{}'. Retrying again in {} seconds",
+                        error,
+                        RATE_LIMIT_DELAY.as_secs()
+                    );
+
+                    time::delay_for(RATE_LIMIT_DELAY).await;
+                }
+            }
+        };
         self.last_ethereum_block = block;
         self.restore_state_from_eth(block.saturating_sub(self.number_of_confirmations_for_event))
             .await;
 
+        // If we are reaching the rate limit threshold on infura, we must go quiet for a while
+        // before we'll be able to poll the node again.
+        let mut polling_disabled_until = Instant::now();
+
         while let Some(request) = self.eth_watch_req.next().await {
             match request {
                 EthWatchRequest::PollETHNode => {
+                    if Instant::now() < polling_disabled_until {
+                        // Polling is currently forbidden, skip this round.
+                        continue;
+                    }
+
                     let last_block_number = self.web3.eth().block_number().compat().await;
                     let block = if let Ok(block) = last_block_number {
                         block.as_u64()
@@ -493,10 +523,19 @@ impl<T: Transport> EthWatch<T> {
                     };
 
                     if block > self.last_ethereum_block {
-                        self.process_new_blocks(block)
-                            .await
-                            .map_err(|e| warn!("Failed to process new blocks {}", e))
-                            .unwrap_or_default();
+                        if let Err(error) = self.process_new_blocks(block).await {
+                            log::warn!(
+                                "Failed to process new blocks: {}. \
+                                Stopping polling of Ethereum node for {} seconds.",
+                                error,
+                                RATE_LIMIT_DELAY.as_secs()
+                            );
+
+                            // We will not poll the node for a while, but we want to respond
+                            // to the incoming queries. Thus, we only set the variable to be
+                            // checked before polling attempt.
+                            polling_disabled_until = Instant::now() + RATE_LIMIT_DELAY;
+                        }
                         self.commit_state();
                     }
                 }
