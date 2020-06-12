@@ -153,9 +153,11 @@ fn main() {
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(512);
+
+    // Load the most recent proposed block from the database.
     let proposed_block = observer_mode_final_state
         .state_keeper_init
-        .get_proposed_block();
+        .get_proposed_block(&storage);
     let state_keeper = PlasmaStateKeeper::new(
         observer_mode_final_state.state_keeper_init,
         config_opts.operator_fee_eth_addr,

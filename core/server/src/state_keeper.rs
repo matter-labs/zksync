@@ -102,7 +102,6 @@ pub struct PlasmaStateInitParams {
     pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
-    pub proposed_block: Option<ProposedBlock>,
 }
 
 impl Default for PlasmaStateInitParams {
@@ -118,45 +117,54 @@ impl PlasmaStateInitParams {
             acc_id_by_addr: HashMap::new(),
             last_block_number: 0,
             unprocessed_priority_op: 0,
-            proposed_block: None,
         }
     }
 
-    pub fn get_proposed_block(&self) -> Option<ProposedBlock> {
-        self.proposed_block.clone()
+    pub fn get_proposed_block(&self, storage: &storage::StorageProcessor) -> Option<ProposedBlock> {
+        let pending_block = storage
+            .chain()
+            .block_schema()
+            .load_pending_block()
+            .unwrap_or_default()?;
+
+        if pending_block.number <= self.last_block_number {
+            // If after generating several pending block node generated
+            // full blocks, they may be sealed on the first iteration
+            // and stored pending block will be outdated.
+            // Thus, if the stored pending block has the lower number than
+            // last committed one, we just ignore it.
+            return None;
+        }
+
+        // We've checked that pending block is greater than the last committed block,
+        // but it must be greater exactly by 1.
+        assert_eq!(pending_block.number, self.last_block_number + 1);
+
+        let mut proposed_block = ProposedBlock {
+            priority_ops: Vec::new(),
+            txs: Vec::new(),
+        };
+
+        // Transform executed operations into non-executed, so they will be executed again.
+        // Since it's a pending block, the state updates were not actually applied in the
+        // database (as it happens only when full block is committed).
+        for operation in pending_block.success_operations {
+            match operation {
+                ExecutedOperations::Tx(tx) => {
+                    proposed_block.txs.push(tx.tx);
+                }
+                ExecutedOperations::PriorityOp(op) => {
+                    proposed_block.priority_ops.push(op.priority_op);
+                }
+            }
+        }
+
+        Some(proposed_block)
     }
 
     pub fn restore_from_db(storage: &storage::StorageProcessor) -> Result<Self, failure::Error> {
         let mut init_params = Self::new();
         init_params.load_from_db(&storage)?;
-
-        let pending_block = storage.chain().block_schema().load_pending_block()?;
-
-        if let Some(pending_block) = pending_block {
-            // Check that stored block matches loaded state.
-            assert_eq!(pending_block.number, init_params.last_block_number + 1);
-
-            let mut proposed_block = ProposedBlock {
-                priority_ops: Vec::new(),
-                txs: Vec::new(),
-            };
-
-            // Transform executed operations into non-executed, so they will be executed again.
-            // Since it's a pending block, the state updates were not actually applied in the
-            // database (as it happens only when full block is committed).
-            for operation in pending_block.success_operations {
-                match operation {
-                    ExecutedOperations::Tx(tx) => {
-                        proposed_block.txs.push(tx.tx);
-                    }
-                    ExecutedOperations::PriorityOp(op) => {
-                        proposed_block.priority_ops.push(op.priority_op);
-                    }
-                }
-            }
-
-            init_params.proposed_block = Some(proposed_block);
-        }
 
         Ok(init_params)
     }
