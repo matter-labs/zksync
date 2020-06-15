@@ -17,6 +17,7 @@ jobs:
 
     - name: setup-env
       run: |
+        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         echo "::set-env name=ZKSYNC_HOME::$(pwd)"
         echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
         echo "::set-env name=CI::1"
