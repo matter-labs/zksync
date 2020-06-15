@@ -12,9 +12,7 @@ contract Verifier is KeysWithPlonkVerifier {
 
     /// @notice Verifier contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external {
-        revert("upgvf"); // it is the first version, upgrade is not supported, use initialize
-    }
+    function upgrade(bytes calldata upgradeParameters) external {}
 
     function isBlockSizeSupported(uint32 _size) public pure returns (bool) {
         if (DUMMY_VERIFIER) {

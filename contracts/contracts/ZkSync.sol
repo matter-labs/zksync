@@ -82,9 +82,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external {
-        revert("upgzk"); // it is the first version, upgrade is not supported, use initialize
-    }
+    function upgrade(bytes calldata upgradeParameters) external {}
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
