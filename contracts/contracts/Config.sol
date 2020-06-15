@@ -6,10 +6,10 @@ pragma solidity ^0.5.0;
 contract Config {
 
     /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
-    uint constant UPGRADE_NOTICE_PERIOD = 1 days;
+    uint constant UPGRADE_NOTICE_PERIOD = 30 minutes;
 
     /// @notice Period after the start of preparation upgrade when contract wouldn't register new priority operations (in seconds)
-    uint constant UPGRADE_PREPARATION_LOCK_PERIOD = 1 days;
+    uint constant UPGRADE_PREPARATION_LOCK_PERIOD = 30 minutes;
 
     /// @notice ERC20 token withdrawal gas limit, used only for complete withdrawals
     uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 250000;
@@ -63,7 +63,7 @@ contract Config {
 
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     /// NOTE: Priority expiration should be > EXPECT_VERIFICATION_IN, otherwise incorrect block with priority op could not be reverted.
-    uint256 constant PRIORITY_EXPIRATION = 3 days / BLOCK_PERIOD;
+    uint256 constant PRIORITY_EXPIRATION = 6 days / BLOCK_PERIOD;
 
     /// @notice Maximum number of priority request to clear during verifying the block
     /// @dev Cause deleting storage slots cost 5k gas per each slot it's unprofitable to clear too many slots
