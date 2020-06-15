@@ -6,7 +6,11 @@
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
 
 // Built-in deps
-use std::{collections::HashMap, convert::TryFrom, time::Duration};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    time::{Duration, Instant},
+};
 // External uses
 use failure::format_err;
 use futures::{
@@ -42,6 +46,22 @@ mod eth_state;
 const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
 
 pub type EthBlockId = u64;
+
+/// Ethereum Watcher operating mode.
+///
+/// Normally Ethereum watcher will always poll the Ethereum node upon request,
+/// but unfortunately `infura` may decline requests if they are produced too
+/// often. Thus, upon receiving the order to limit amount of request, Ethereum
+/// watcher goes into "backoff" mode in which polling is disabled for a
+/// certain amount of time.
+#[derive(Debug)]
+enum WatcherMode {
+    /// ETHWatcher operates normally.
+    Working,
+    /// Polling is currently disabled.
+    Backoff(Instant),
+}
+
 pub enum EthWatchRequest {
     PollETHNode,
     IsPubkeyChangeAuthorized {
@@ -81,6 +101,8 @@ pub struct EthWatch<T: Transport> {
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
 
+    mode: WatcherMode,
+
     eth_watch_req: mpsc::Receiver<EthWatchRequest>,
 }
 
@@ -116,6 +138,8 @@ impl<T: Transport> EthWatch<T> {
             _web3_event_loop_handle: web3_event_loop_handle,
             db_pool,
             eth_watch_req,
+
+            mode: WatcherMode::Working,
             number_of_confirmations_for_event,
         }
     }
@@ -246,8 +270,7 @@ impl<T: Transport> EthWatch<T> {
 
         let pending_events = self
             .get_priority_op_events_with_blocks(block_from, block_to)
-            .await
-            .expect("Failed to restore priority queue events from ETH");
+            .await?;
 
         // Collect the unconfirmed operations.
         let mut unconfirmed_ops = Vec::new();
@@ -259,7 +282,10 @@ impl<T: Transport> EthWatch<T> {
         Ok(unconfirmed_ops)
     }
 
-    async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) {
+    async fn restore_state_from_eth(
+        &mut self,
+        last_ethereum_block: u64,
+    ) -> Result<(), failure::Error> {
         let current_ethereum_block =
             last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
 
@@ -269,10 +295,7 @@ impl<T: Transport> EthWatch<T> {
             new_block_with_accepted_events.saturating_sub(PRIORITY_EXPIRATION);
 
         // restore pending queue
-        let unconfirmed_queue = self
-            .get_unconfirmed_ops(current_ethereum_block)
-            .await
-            .expect("Failed to restore pending queue events from ETH");
+        let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
 
         // restore priority queue
         let prior_queue_events = self
@@ -280,8 +303,7 @@ impl<T: Transport> EthWatch<T> {
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
-            .await
-            .expect("Failed to restore priority queue events from ETH");
+            .await?;
         let mut priority_queue = HashMap::new();
         for priority_op in prior_queue_events.into_iter() {
             priority_queue.insert(priority_op.serial_id, priority_op);
@@ -293,8 +315,7 @@ impl<T: Transport> EthWatch<T> {
                 BlockNumber::Earliest,
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
-            .await
-            .expect("Failed to restore token list from ETH");
+            .await?;
 
         let mut tokens = HashMap::new();
         for token in new_tokens.into_iter() {
@@ -311,6 +332,8 @@ impl<T: Transport> EthWatch<T> {
         self.set_new_state(new_state);
 
         trace!("ETH state: {:#?}", self.eth_state);
+
+        Ok(())
     }
 
     async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> Result<(), failure::Error> {
@@ -473,6 +496,42 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
+    async fn poll_eth_node(&mut self) -> Result<(), failure::Error> {
+        let last_block_number = self.web3.eth().block_number().compat().await?.as_u64();
+
+        if last_block_number > self.eth_state.last_ethereum_block() {
+            self.process_new_blocks(last_block_number).await?;
+            self.commit_state();
+        }
+
+        Ok(())
+    }
+
+    fn is_backoff_requested(&self, error: &failure::Error) -> bool {
+        error.to_string().contains("429 Too Many Requests")
+    }
+
+    fn enter_backoff_mode(&mut self) {
+        let backoff_until = Instant::now() + RATE_LIMIT_DELAY;
+        self.mode = WatcherMode::Backoff(backoff_until);
+    }
+
+    fn polling_allowed(&mut self) -> bool {
+        match self.mode {
+            WatcherMode::Working => true,
+            WatcherMode::Backoff(delay_until) => {
+                if Instant::now() >= delay_until {
+                    log::info!("Exiting the backoff mode");
+                    self.mode = WatcherMode::Working;
+                    true
+                } else {
+                    // We have to wait more until backoff is disabled.
+                    false
+                }
+            }
+        }
+    }
+
     pub async fn run(mut self) {
         // As infura may be not responsive, we want to retry the query until we've actually got the
         // block number.
@@ -495,24 +554,37 @@ impl<T: Transport> EthWatch<T> {
                 }
             }
         };
-        self.restore_state_from_eth(block).await;
+
+        // Code above is prepared for the possible rate limiting by `infura`, and will wait until we
+        // can interact with the node again. We're not expecting the rate limiting to be applied
+        // immediately after that, thus any error on this stage is considered critical and
+        // irrecoverable.
+        self.restore_state_from_eth(block)
+            .await
+            .expect("Unable to restore ETHWatcher state");
 
         while let Some(request) = self.eth_watch_req.next().await {
             match request {
                 EthWatchRequest::PollETHNode => {
-                    let last_block_number = self.web3.eth().block_number().compat().await;
-                    let block = if let Ok(block) = last_block_number {
-                        block.as_u64()
-                    } else {
+                    if !self.polling_allowed() {
+                        // Polling is currently disabled, skip it.
                         continue;
-                    };
+                    }
 
-                    if block > self.eth_state.last_ethereum_block() {
-                        self.process_new_blocks(block)
-                            .await
-                            .map_err(|e| warn!("Failed to process new blocks {}", e))
-                            .unwrap_or_default();
-                        self.commit_state();
+                    let poll_result = self.poll_eth_node().await;
+
+                    if let Err(error) = poll_result {
+                        if self.is_backoff_requested(&error) {
+                            log::warn!(
+                                "Rate limit was reached, as reported by Ethereum node. \
+                                Entering the backoff mode"
+                            );
+                            self.enter_backoff_mode();
+                        } else {
+                            // Some unexpected kind of error, we won't shutdown the node because of it,
+                            // but rather expect node administrators to handle the situation.
+                            log::error!("Failed to process new blocks {}", error);
+                        }
                     }
                 }
                 EthWatchRequest::GetPriorityQueueOps {
