@@ -32,6 +32,10 @@ use models::{
     NewTokenEvent,
 };
 use storage::ConnectionPool;
+// Local deps
+use self::eth_state::ETHState;
+
+mod eth_state;
 
 /// As infura may limit the requests, upon error we need to wait for a while
 /// before repeating the request.
@@ -70,8 +74,6 @@ pub enum EthWatchRequest {
 pub struct EthWatch<T: Transport> {
     gov_contract: (ethabi::Contract, Contract<T>),
     zksync_contract: (ethabi::Contract, Contract<T>),
-    /// The last block of the Ethereum network known to the Ethereum watcher.
-    last_ethereum_block: u64,
     eth_state: ETHState,
     web3: Web3<T>,
     _web3_event_loop_handle: EventLoopHandle,
@@ -80,32 +82,6 @@ pub struct EthWatch<T: Transport> {
     number_of_confirmations_for_event: u64,
 
     eth_watch_req: mpsc::Receiver<EthWatchRequest>,
-}
-
-/// Gathered state of the Ethereum network.
-/// Contains information about the known token types and incoming
-/// priority operations (such as `Deposit` and `FullExit`).
-#[derive(Debug)]
-pub struct ETHState {
-    /// Tokens known to zkSync.
-    pub tokens: HashMap<TokenId, Address>,
-    /// Queue of priority operations that are accepted by Ethereum network,
-    /// but not yet have enough confirmations to be processed by zkSync.
-    ///
-    /// Note that since these operations do not have enough confirmations,
-    /// they may be not executed in the future, so this list is approximate.
-    ///
-    /// Keys in this HashMap are numbers of blocks with `PriorityOp`.
-    pub unconfirmed_queue: Vec<(EthBlockId, PriorityOp)>,
-    /// Queue of priority operations that passed the confirmation
-    /// threshold and are waiting to be executed.
-    pub priority_queue: HashMap<u64, PriorityOp>,
-}
-
-impl ETHState {
-    fn add_new_token(&mut self, id: TokenId, address: Address) {
-        self.tokens.insert(id, address);
-    }
 }
 
 impl<T: Transport> EthWatch<T> {
@@ -135,18 +111,18 @@ impl<T: Transport> EthWatch<T> {
         Self {
             gov_contract,
             zksync_contract,
-            last_ethereum_block: 0,
-            eth_state: ETHState {
-                tokens: HashMap::new(),
-                unconfirmed_queue: Vec::new(),
-                priority_queue: HashMap::new(),
-            },
+            eth_state: ETHState::default(),
             web3,
             _web3_event_loop_handle: web3_event_loop_handle,
             db_pool,
             eth_watch_req,
             number_of_confirmations_for_event,
         }
+    }
+
+    /// Atomically replaces the stored Ethereum state.
+    fn set_new_state(&mut self, new_state: ETHState) {
+        self.eth_state = new_state;
     }
 
     fn get_eip1271_contract(&self, address: Address) -> Contract<T> {
@@ -254,10 +230,10 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
-    async fn update_unconfirmed_queue(
+    async fn get_unconfirmed_ops(
         &mut self,
         current_ethereum_block: u64,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<Vec<(EthBlockId, PriorityOp)>, failure::Error> {
         // We want to scan the interval of blocks from the latest one up to the oldest one which may
         // have unconfirmed priority ops.
         // `+ 1` is added because if we subtract number of confirmations, we'll obtain the last block
@@ -273,26 +249,28 @@ impl<T: Transport> EthWatch<T> {
             .await
             .expect("Failed to restore priority queue events from ETH");
 
-        // Replace the old queue state with the new one.
-        self.eth_state.unconfirmed_queue.clear();
+        // Collect the unconfirmed operations.
+        let mut unconfirmed_ops = Vec::new();
 
         for (block_number, priority_op) in pending_events.into_iter() {
-            self.eth_state
-                .unconfirmed_queue
-                .push((block_number, priority_op));
+            unconfirmed_ops.push((block_number, priority_op));
         }
 
-        Ok(())
+        Ok(unconfirmed_ops)
     }
 
-    async fn restore_state_from_eth(&mut self, current_ethereum_block: u64) {
+    async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) {
+        let current_ethereum_block =
+            last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
+
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
             new_block_with_accepted_events.saturating_sub(PRIORITY_EXPIRATION);
 
         // restore pending queue
-        self.update_unconfirmed_queue(current_ethereum_block)
+        let unconfirmed_queue = self
+            .get_unconfirmed_ops(current_ethereum_block)
             .await
             .expect("Failed to restore pending queue events from ETH");
 
@@ -304,10 +282,9 @@ impl<T: Transport> EthWatch<T> {
             )
             .await
             .expect("Failed to restore priority queue events from ETH");
+        let mut priority_queue = HashMap::new();
         for priority_op in prior_queue_events.into_iter() {
-            self.eth_state
-                .priority_queue
-                .insert(priority_op.serial_id, priority_op);
+            priority_queue.insert(priority_op.serial_id, priority_op);
         }
 
         // restore token list from governance contract
@@ -318,21 +295,31 @@ impl<T: Transport> EthWatch<T> {
             )
             .await
             .expect("Failed to restore token list from ETH");
+
+        let mut tokens = HashMap::new();
         for token in new_tokens.into_iter() {
-            self.eth_state
-                .add_new_token(token.id as TokenId, token.address)
+            tokens.insert(token.id as TokenId, token.address);
         }
+
+        let new_state = ETHState::new(
+            last_ethereum_block,
+            tokens,
+            unconfirmed_queue,
+            priority_queue,
+        );
+
+        self.set_new_state(new_state);
 
         trace!("ETH state: {:#?}", self.eth_state);
     }
 
-    async fn process_new_blocks(&mut self, current_eth_block: u64) -> Result<(), failure::Error> {
-        debug_assert!(self.last_ethereum_block < current_eth_block);
+    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> Result<(), failure::Error> {
+        debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
-        let previous_block_with_accepted_events =
-            (self.last_ethereum_block + 1).saturating_sub(self.number_of_confirmations_for_event);
+        let previous_block_with_accepted_events = (self.eth_state.last_ethereum_block() + 1)
+            .saturating_sub(self.number_of_confirmations_for_event);
         let new_block_with_accepted_events =
-            current_eth_block.saturating_sub(self.number_of_confirmations_for_event);
+            last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
 
         // Get new tokens
         let new_tokens = self
@@ -342,10 +329,11 @@ impl<T: Transport> EthWatch<T> {
             )
             .await?;
 
+        // Extend the existing token list with the new tokens.
+        let mut tokens = self.eth_state.tokens().clone();
         for token in new_tokens.into_iter() {
             debug!("New token added: {:?}", token);
-            self.eth_state
-                .add_new_token(token.id as TokenId, token.address);
+            tokens.insert(token.id as TokenId, token.address);
         }
 
         // Get new priority ops
@@ -356,18 +344,30 @@ impl<T: Transport> EthWatch<T> {
             )
             .await?;
 
+        // Extend the existing priority operations with the new ones.
+        let mut priority_queue = self.eth_state.priority_queue().clone();
         for priority_op in priority_op_events.into_iter() {
             debug!("New priority op: {:?}", priority_op);
-            self.eth_state
-                .priority_queue
-                .insert(priority_op.serial_id, priority_op);
+            priority_queue.insert(priority_op.serial_id, priority_op);
         }
 
         // Get new pending ops
-        self.update_unconfirmed_queue(current_eth_block).await?;
+        let unconfirmed_queue = self
+            .get_unconfirmed_ops(last_ethereum_block)
+            .await
+            .expect("Failed to restore pending queue events from ETH");
 
-        // Update the last seen block
-        self.last_ethereum_block = current_eth_block;
+        // Now, after we've received all the data from the Ethereum, we can safely
+        // update the state. This is done atomically to avoid the situation when
+        // due to error occurred mid-update the overall `ETHWatcher` state become
+        // messed up.
+        let new_state = ETHState::new(
+            last_ethereum_block,
+            tokens,
+            unconfirmed_queue,
+            priority_queue,
+        );
+        self.set_new_state(new_state);
 
         Ok(())
     }
@@ -376,7 +376,7 @@ impl<T: Transport> EthWatch<T> {
         self.db_pool
             .access_storage()
             .map(|storage| {
-                for (&id, &address) in &self.eth_state.tokens {
+                for (&id, &address) in self.eth_state.tokens() {
                     let decimals = 18;
                     let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
                     if let Err(e) = storage.tokens_schema().store_token(token) {
@@ -393,7 +393,7 @@ impl<T: Transport> EthWatch<T> {
         let mut used_chunks = 0;
         let mut current_priority_op = first_serial_id;
 
-        while let Some(op) = self.eth_state.priority_queue.get(&current_priority_op) {
+        while let Some(op) = self.eth_state.priority_queue().get(&current_priority_op) {
             if used_chunks + op.data.chunks() <= max_chunks {
                 res.push(op.clone());
                 used_chunks += op.data.chunks();
@@ -452,7 +452,7 @@ impl<T: Transport> EthWatch<T> {
 
     fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<(EthBlockId, PriorityOp)> {
         self.eth_state
-            .unconfirmed_queue
+            .unconfirmed_queue()
             .iter()
             .find(|(_block, op)| op.eth_hash.as_slice() == eth_hash)
             .cloned()
@@ -460,7 +460,7 @@ impl<T: Transport> EthWatch<T> {
 
     fn get_ongoing_deposits_for(&self, address: Address) -> Vec<(EthBlockId, PriorityOp)> {
         self.eth_state
-            .unconfirmed_queue
+            .unconfirmed_queue()
             .iter()
             .filter(|(_block, op)| match &op.data {
                 FranklinPriorityOp::Deposit(deposit) => {
@@ -495,9 +495,7 @@ impl<T: Transport> EthWatch<T> {
                 }
             }
         };
-        self.last_ethereum_block = block;
-        self.restore_state_from_eth(block.saturating_sub(self.number_of_confirmations_for_event))
-            .await;
+        self.restore_state_from_eth(block).await;
 
         while let Some(request) = self.eth_watch_req.next().await {
             match request {
@@ -509,7 +507,7 @@ impl<T: Transport> EthWatch<T> {
                         continue;
                     };
 
-                    if block > self.last_ethereum_block {
+                    if block > self.eth_state.last_ethereum_block() {
                         self.process_new_blocks(block)
                             .await
                             .map_err(|e| warn!("Failed to process new blocks {}", e))
