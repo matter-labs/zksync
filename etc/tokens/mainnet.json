@@ -1,12 +1,12 @@
 [
   {
-    "address": "0x6b175474e89094c44da98b954eedeac495271d0f",
+    "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
     "decimals": 18,
     "symbol": "DAI",
     "name": "Dai Stablecoin"
   },
   {
-    "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     "decimals": 6,
     "symbol": "USDC",
     "name": "USD Coin"
@@ -18,55 +18,55 @@
     "name": "TrueUSD"
   },
   {
-    "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
     "decimals": 6,
     "symbol": "USDT",
     "name": "Tether USD"
   },
   {
-    "address": "0x57ab1ec28d129707052df4df418d58a2d46d5f51",
+    "address": "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
     "decimals": 18,
     "symbol": "SUSD",
     "name": "Synth sUSD"
   },
   {
-    "address": "0x4fabb145d64652a948d72533023f6e7a623c7c53",
+    "address": "0x4Fabb145d64652a948d72533023f6E7A623C7C53",
     "decimals": 18,
     "symbol": "BUSD",
     "name": "Binance USD"
   },
   {
-    "address": "0x80fB784B7eD66730e8b1DBd9820aFD29931aab03",
+    "address": "0x0D8775F648430679A709E98d2b0Cb6250d2887EF",
     "decimals": 18,
     "symbol": "LEND",
     "name": "EthLend"
   },
   {
-    "address": "0x0d8775f648430679a709e98d2b0cb6250d2887ef",
+    "address": "0x0D8775F648430679A709E98d2b0Cb6250d2887EF",
     "decimals": 18,
     "symbol": "BAT",
     "name": "Basic Attention Token"
   },
   {
-    "address": "0xdd974d5c2e2928dea5f71b9825b8b646686bd200",
+    "address": "0xdd974D5C2e2928deA5F71b9825b8b646686BD200",
     "decimals": 18,
     "symbol": "KNC",
     "name": "KyberNetwork"
   },
   {
-    "address": "0x514910771af9ca656af840dff83e8264ecf986ca",
+    "address": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
     "decimals": 18,
     "symbol": "LINK",
     "name": "ChainLink Token"
   },
   {
-    "address": "0x0f5d2fb29fb7d3cfee444a200298f468908cc942",
+    "address": "0x0F5D2fB29fb7d3CFeE444a200298f468908cC942",
     "decimals": 18,
     "symbol": "MANA",
     "name": "Decentraland"
   },
   {
-    "address": "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2",
+    "address": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
     "decimals": 18,
     "symbol": "MKR",
     "name": "Maker"
@@ -78,19 +78,19 @@
     "name": "Augur"
   },
   {
-    "address": "0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f",
+    "address": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
     "decimals": 18,
     "symbol": "SNX",
     "name": "Synthetix Network Token"
   },
   {
-    "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+    "address": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
     "decimals": 8,
     "symbol": "WBTC",
     "name": "Wrapped BTC"
   },
   {
-    "address": "0xe41d2489571d322189246dafa5ebde1f4699f498",
+    "address": "0xE41d2489571d322189246DaFA5ebDe1F4699F498",
     "decimals": 18,
     "symbol": "ZRX",
     "name": "0x Protocol Token"
