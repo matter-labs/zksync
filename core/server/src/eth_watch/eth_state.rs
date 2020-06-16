@@ -5,7 +5,7 @@ use web3::types::Address;
 // Workspace deps
 use models::node::{PriorityOp, TokenId};
 // Local deps
-use super::EthBlockId;
+use super::{received_ops::ReceivedPriorityOp, EthBlockId};
 
 /// Gathered state of the Ethereum network.
 /// Contains information about the known token types and incoming
@@ -31,7 +31,7 @@ pub struct ETHState {
     unconfirmed_queue: Vec<(EthBlockId, PriorityOp)>,
     /// Queue of priority operations that passed the confirmation
     /// threshold and are waiting to be executed.
-    priority_queue: HashMap<u64, PriorityOp>,
+    priority_queue: HashMap<u64, ReceivedPriorityOp>,
 }
 
 impl ETHState {
@@ -39,7 +39,7 @@ impl ETHState {
         last_ethereum_block: u64,
         tokens: HashMap<TokenId, Address>,
         unconfirmed_queue: Vec<(EthBlockId, PriorityOp)>,
-        priority_queue: HashMap<u64, PriorityOp>,
+        priority_queue: HashMap<u64, ReceivedPriorityOp>,
     ) -> Self {
         Self {
             last_ethereum_block,
@@ -57,7 +57,7 @@ impl ETHState {
         &self.tokens
     }
 
-    pub fn priority_queue(&self) -> &HashMap<u64, PriorityOp> {
+    pub fn priority_queue(&self) -> &HashMap<u64, ReceivedPriorityOp> {
         &self.priority_queue
     }
 

@@ -37,11 +37,12 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local deps
-use self::eth_state::ETHState;
+use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
 
 mod eth_state;
+mod received_ops;
 
-/// As infura may limit the requests, upon error we need to wait for a while
+/// As `infura` may limit the requests, upon error we need to wait for a while
 /// before repeating the request.
 const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
 
@@ -306,7 +307,7 @@ impl<T: Transport> EthWatch<T> {
             .await?;
         let mut priority_queue = HashMap::new();
         for priority_op in prior_queue_events.into_iter() {
-            priority_queue.insert(priority_op.serial_id, priority_op);
+            priority_queue.insert(priority_op.serial_id, priority_op.into());
         }
 
         // restore token list from governance contract
@@ -368,10 +369,10 @@ impl<T: Transport> EthWatch<T> {
             .await?;
 
         // Extend the existing priority operations with the new ones.
-        let mut priority_queue = self.eth_state.priority_queue().clone();
+        let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
         for priority_op in priority_op_events.into_iter() {
             debug!("New priority op: {:?}", priority_op);
-            priority_queue.insert(priority_op.serial_id, priority_op);
+            priority_queue.insert(priority_op.serial_id, priority_op.into());
         }
 
         // Get new pending ops
@@ -417,9 +418,9 @@ impl<T: Transport> EthWatch<T> {
         let mut current_priority_op = first_serial_id;
 
         while let Some(op) = self.eth_state.priority_queue().get(&current_priority_op) {
-            if used_chunks + op.data.chunks() <= max_chunks {
-                res.push(op.clone());
-                used_chunks += op.data.chunks();
+            if used_chunks + op.as_ref().data.chunks() <= max_chunks {
+                res.push(op.as_ref().clone());
+                used_chunks += op.as_ref().data.chunks();
                 current_priority_op += 1;
             } else {
                 break;
