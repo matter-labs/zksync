@@ -244,6 +244,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
         loop {
             debug!("Last watched ethereum block: {:?}", last_wached_block);
+            let mut final_hash_was_found = false;
 
             // Update events
             if self.update_events_state() {
@@ -268,17 +269,25 @@ impl<T: Transport> DataRestoreDriver<T> {
                         self.tree_state.root_hash()
                     );
 
-                    if self.finite_mode && last_verified_block == total_verified_blocks {
-                        // If there is an expected root hash, check that it matches the observed
-                        // one.
-                        if let Some(root_hash) = self.final_hash {
-                            assert_eq!(
-                                root_hash,
-                                self.tree_state.root_hash(),
-                                "Root hash after the tree restoring doesn't match expected one"
-                            );
+                    // If there is an expected root hash, check if current root hash matches the observed
+                    // one.
+                    // We check it after every block, since provided final hash may be not the latest hash
+                    // by the time when it was processed.
+                    if let Some(root_hash) = self.final_hash {
+                        if root_hash == self.tree_state.root_hash() {
+                            final_hash_was_found = true;
 
-                            info!("Root hash is verified against expected one and it's correct");
+                            info!(
+                                "Correct expected root hash was met on the block {} out of {}",
+                                last_verified_block, total_verified_blocks
+                            );
+                        }
+                    }
+
+                    if self.finite_mode && last_verified_block == total_verified_blocks {
+                        // Check if the final hash was found and panic otherwise.
+                        if self.final_hash.is_some() && !final_hash_was_found {
+                            panic!("Final hash was not met during the state restoring process");
                         }
 
                         // We've restored all the blocks, our job is done.
