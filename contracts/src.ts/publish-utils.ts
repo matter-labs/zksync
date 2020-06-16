@@ -29,8 +29,8 @@ export async function publishSourceCodeToEtherscan(address: string, contractName
 
     const r = await Axios.post(etherscanApiUrl, qs.stringify(data));
     const response = r.data;
-    if (response.status !== 1 && response.result !== "Contract source code already verified") {
-        throw new Error(`Failed to publish contract code, try again later, ${r.data.result}`);
+    if (response.message !== "OK" && response.result !== "Contract source code already verified") {
+        throw new Error(`Failed to publish contract code, try again later, ${response}`);
     }
 }
 

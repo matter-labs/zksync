@@ -233,33 +233,30 @@ endif
 restart: stop start
 
 start-provers:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=1
+	@bin/kube scale deployments/prover --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-nginx:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
+	@bin/kube scale deployments/nginx --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-server:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
+	@bin/kube scale deployments/server --namespace $(ZKSYNC_ENV) --replicas=1
 
 stop-provers:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=0
+	@bin/kube scale deployments/prover --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-server:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=0
+	@bin/kube scale deployments/server --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-nginx:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=0
+	@bin/kube scale deployments/nginx --namespace $(ZKSYNC_ENV) --replicas=0
 
 # Monitoring
 
-status:
-	@curl $(API_SERVER)/api/v0.1/status; echo
-
 log-server:
-	kubectl logs -f deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV)
+	kubectl logs -f deployments/server --namespace $(ZKSYNC_ENV)
 
 log-prover:
-	kubectl logs --tail 300 -f deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV)
+	kubectl logs --tail 300 -f deployments/prover --namespace $(ZKSYNC_ENV)
 
 # Kubernetes: monitoring shortcuts
 

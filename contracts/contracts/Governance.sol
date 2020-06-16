@@ -52,9 +52,7 @@ contract Governance is Config {
 
     /// @notice Governance contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external {
-        revert("upggv"); // it is the first version, upgrade is not supported, use initialize
-    }
+    function upgrade(bytes calldata upgradeParameters) external {}
 
     /// @notice Change current governor
     /// @param _newGovernor Address of the new governor

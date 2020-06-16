@@ -243,4 +243,12 @@ export class Deployer {
     public zkSyncContract(signerOrProvider: Signer | Provider): Contract {
         return new ethers.Contract(this.addresses.ZkSync, this.contracts.zkSync.abi, signerOrProvider);
     }
+
+    public verifierContract(signerOrProvider: Signer | Provider): Contract {
+        return new ethers.Contract(this.addresses.Verifier, this.contracts.verifier.abi, signerOrProvider);
+    }
+
+    public upgradeGatekeeperContract(signerOrProvider: Signer | Provider): Contract {
+        return new ethers.Contract(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper.abi, signerOrProvider);
+    }
 }

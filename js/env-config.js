@@ -29,4 +29,10 @@ export default {
         WS_API_ADDR: "wss://api.test.zksync.dev/jsrpc-ws",
         HTTP_RPC_API_ADDR: "https://api.test.zksync.dev/jsrpc",
      },
+    "https://zkscan.io": {
+        API_SERVER: "https://api.zksync.io",
+        ETH_NETWORK: "mainnet",
+        WS_API_ADDR: "wss://api.zksync.io/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://api.zksync.io/jsrpc",
+    },
 }[`${location.protocol}//${location.hostname}`];

@@ -95,7 +95,7 @@ impl<T: Transport> EthereumAccount<T> {
         );
 
         contract
-            .query("totalBlocksCommitted", (), None, Options::default(), None)
+            .query("totalBlocksCommitted", (), None, default_tx_options(), None)
             .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
@@ -109,7 +109,7 @@ impl<T: Transport> EthereumAccount<T> {
         );
 
         contract
-            .query("exodusMode", (), None, Options::default(), None)
+            .query("exodusMode", (), None, default_tx_options(), None)
             .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
@@ -125,7 +125,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "fullExit",
                 (u64::from(account_id), token_address),
-                Options::default(),
+                default_tx_options(),
             )
             .await
             .map_err(|e| format_err!("Full exit send err: {}", e))?;
@@ -148,6 +148,9 @@ impl<T: Transport> EthereumAccount<T> {
         amount: &BigUint,
         proof: EncodedProofPlonk,
     ) -> Result<ETHExecResult, failure::Error> {
+        let mut options = Options::default();
+        options.gas = Some(3_000_000.into()); // `exit` function requires more gas to operate.
+
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -158,7 +161,7 @@ impl<T: Transport> EthereumAccount<T> {
                     U128::from(amount.to_u128().unwrap()),
                     proof.proof,
                 ),
-                Options::default(),
+                options,
             )
             .await
             .map_err(|e| format_err!("Exit send err: {}", e))?;
@@ -178,7 +181,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "cancelOutstandingDepositsForExodusMode",
                 number,
-                Options::default(),
+                default_tx_options(),
             )
             .await
             .map_err(|e| format_err!("cancelOutstandingDepositsForExodusMode send err: {}", e))?;
@@ -198,7 +201,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "changePubKeyHash",
                 (new_pubkey_hash.data.to_vec(),),
-                Options::default(),
+                default_tx_options(),
             )
             .await
             .map_err(|e| format_err!("ChangePubKeyHash send err: {}", e))?;
@@ -226,6 +229,7 @@ impl<T: Transport> EthereumAccount<T> {
                 Options::with(|opt| {
                     opt.value = Some(big_dec_to_u256(amount.clone()));
                     opt.nonce = nonce;
+                    opt.gas = Some(500_000.into());
                 }),
             )
             .await
@@ -257,7 +261,7 @@ impl<T: Transport> EthereumAccount<T> {
             erc20_contract(),
         );
         contract
-            .query("balanceOf", self.address, None, Options::default(), None)
+            .query("balanceOf", self.address, None, default_tx_options(), None)
             .compat()
             .await
             .map(u256_to_big_dec)
@@ -276,7 +280,7 @@ impl<T: Transport> EthereumAccount<T> {
                 "getBalanceToWithdraw",
                 (self.address, u64::from(token)),
                 None,
-                Options::default(),
+                default_tx_options(),
                 None,
             )
             .compat()
@@ -307,7 +311,7 @@ impl<T: Transport> EthereumAccount<T> {
                     self.main_contract_eth_client.contract_addr,
                     big_dec_to_u256(amount.clone()),
                 ),
-                Options::default(),
+                default_tx_options(),
             )
             .await
             .map_err(|e| format_err!("Approve send err: {}", e))?;
@@ -332,7 +336,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "depositERC20",
                 (token_contract, big_dec_to_u256(amount.clone()), *to),
-                Options::default(),
+                default_tx_options(),
             )
             .await
             .map_err(|e| format_err!("Deposit erc20 send err: {}", e))?;
@@ -412,7 +416,7 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn trigger_exodus_if_needed(&self) -> Result<ETHExecResult, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
-            .sign_call_tx("triggerExodusIfNeeded", (), Options::default())
+            .sign_call_tx("triggerExodusIfNeeded", (), default_tx_options())
             .await
             .map_err(|e| format_err!("Trigger exodus if needed send err: {}", e))?;
         let eth = self.main_contract_eth_client.web3.eth();
@@ -435,7 +439,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "setAuthPubkeyHash",
                 (fact.to_vec(), u64::from(nonce)),
-                Options::default(),
+                default_tx_options(),
             )
             .await
             .map_err(|e| format_err!("AuthFact send err: {}", e))?;
@@ -578,4 +582,12 @@ async fn send_raw_tx_wait_confirmation<T: Transport>(
             return Ok(receipt);
         }
     }
+}
+
+fn default_tx_options() -> Options {
+    let mut options = Options::default();
+    // Set the gas limit, so `eth_client` won't complain about it.
+    options.gas = Some(500_000.into());
+
+    options
 }
