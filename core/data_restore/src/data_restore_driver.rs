@@ -242,9 +242,9 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// Activates states updates
     pub fn run_state_update(&mut self) {
         let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
+        let mut final_hash_was_found = false;
         loop {
             debug!("Last watched ethereum block: {:?}", last_wached_block);
-            let mut final_hash_was_found = false;
 
             // Update events
             if self.update_events_state() {
