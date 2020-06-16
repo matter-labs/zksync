@@ -13,6 +13,7 @@ import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
+const VERIFY_TIMEOUT = 120000; // 2 minutes in ms.
 
 const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
 console.log("Running integration test on the ", network, " network");
@@ -167,7 +168,9 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
         fee
     });
     console.log(`Withdraw posted: ${(new Date().getTime()) - startTime} ms`);
-    await withdrawHandle.awaitVerifyReceipt();
+
+    // Await for verification with a timeout set.
+    await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
     console.log(`Withdraw verified: ${(new Date().getTime()) - startTime} ms`);
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const operatorAfterWithdraw = await getOperatorBalance(token);
@@ -329,6 +332,22 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
     }
 }
 
+function promiseTimeout(ms, promise) {
+  // Create a promise that rejects in <ms> milliseconds
+  let timeout = new Promise((resolve, reject) => {
+    let id = setTimeout(() => {
+      clearTimeout(id);
+      reject('Timed out in '+ ms + 'ms.')
+    }, ms)
+  })
+
+  // Returns a race between our timeout and the passed in promise
+  return Promise.race([
+    promise,
+    timeout
+  ])
+}
+
 (async () => {
     try {
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
@@ -385,7 +404,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.1");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
 
         await syncProvider.disconnect();
     } catch (e) {
