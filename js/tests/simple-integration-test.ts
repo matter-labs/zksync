@@ -347,7 +347,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         );
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("6.0")})).wait();
-        await (await erc20.transfer(syncDepositorWallet.address, parseEther("6.0"))).wait();
+        await (await erc20.transfer(syncDepositorWallet.address, parseEther("110.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -383,8 +383,8 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         await apitype.checkStatusResponseType();
         await apitype.checkTestnetConfigResponseType();
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "2.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "2.0");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.1");
 
         await syncProvider.disconnect();
