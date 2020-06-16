@@ -8,6 +8,9 @@ use models::node::PriorityOp;
 
 pub const SECS_IN_HOUR: u64 = 3600;
 
+/// Duplicate of the `PRIORITY_EXPIRATION` constant value from `Config.sol`.
+pub const PRIORITY_EXPIRATION_DAYS: u64 = 6;
+
 /// Interval for assuming that stored priority operation is outdated and should
 /// be removed from the queue.
 ///
@@ -15,7 +18,7 @@ pub const SECS_IN_HOUR: u64 = 3600;
 /// `Config.sol` contract. Currently the value is 3 days (value from contract)
 /// + 2 hours (just for the safety).
 pub const PRIORITY_OP_EXPIRATION: Duration =
-    Duration::from_secs(3 * 24 * SECS_IN_HOUR + 2 * SECS_IN_HOUR);
+    Duration::from_secs(PRIORITY_EXPIRATION_DAYS * 24 * SECS_IN_HOUR + 2 * SECS_IN_HOUR);
 
 /// Received `PriorityOp` with additional metainformation required
 /// for efficient management of the operations queue.
