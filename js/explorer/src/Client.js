@@ -28,17 +28,17 @@ export class Client {
         window.syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
         const tokensPromise = window.syncProvider.getTokens()
             .then(tokens => {
-                return Object.values(tokens)
-                    .map(token => {
-                        const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
-                        const syncSymbol = `${symbol}`;
-                        return {
-                            ...token,
-                            symbol,
-                            syncSymbol,
-                        };
-                    })
-                    .sort((a, b) => a.id - b.id);
+                const res = {};
+                for (const token of Object.values(tokens)) {
+                    const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
+                    const syncSymbol = `${symbol}`;
+                    res[token.id] = {
+                        ...token,
+                        symbol,
+                        syncSymbol,
+                    };
+                }
+                return res;
             });
         const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
         const ethersProvider = config.ETH_NETWORK == 'localhost'
