@@ -1,9 +1,8 @@
 // Built-in deps
 use std::collections::HashMap;
 // External uses
-use web3::types::Address;
 // Workspace deps
-use models::node::{PriorityOp, TokenId};
+use models::node::PriorityOp;
 // Local deps
 use super::{received_ops::ReceivedPriorityOp, EthBlockId};
 
@@ -19,8 +18,6 @@ use super::{received_ops::ReceivedPriorityOp, EthBlockId};
 pub struct ETHState {
     /// The last block of the Ethereum network known to the Ethereum watcher.
     last_ethereum_block: u64,
-    /// Tokens known to zkSync.
-    tokens: HashMap<TokenId, Address>,
     /// Queue of priority operations that are accepted by Ethereum network,
     /// but not yet have enough confirmations to be processed by zkSync.
     ///
@@ -37,13 +34,11 @@ pub struct ETHState {
 impl ETHState {
     pub fn new(
         last_ethereum_block: u64,
-        tokens: HashMap<TokenId, Address>,
         unconfirmed_queue: Vec<(EthBlockId, PriorityOp)>,
         priority_queue: HashMap<u64, ReceivedPriorityOp>,
     ) -> Self {
         Self {
             last_ethereum_block,
-            tokens,
             unconfirmed_queue,
             priority_queue,
         }
@@ -51,10 +46,6 @@ impl ETHState {
 
     pub fn last_ethereum_block(&self) -> u64 {
         self.last_ethereum_block
-    }
-
-    pub fn tokens(&self) -> &HashMap<TokenId, Address> {
-        &self.tokens
     }
 
     pub fn priority_queue(&self) -> &HashMap<u64, ReceivedPriorityOp> {

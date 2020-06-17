@@ -27,15 +27,13 @@ use web3::{
 };
 // Workspace deps
 use models::{
-    abi::{eip1271_contract, governance_contract, zksync_contract},
+    abi::{eip1271_contract, zksync_contract},
     config_options::ConfigurationOptions,
     misc::constants::EIP1271_SUCCESS_RETURN_VALUE,
     node::tx::EIP1271Signature,
-    node::{FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash, Token, TokenId},
+    node::{FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
     params::PRIORITY_EXPIRATION,
-    NewTokenEvent,
 };
-use storage::ConnectionPool;
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
 
@@ -93,12 +91,10 @@ pub enum EthWatchRequest {
 }
 
 pub struct EthWatch<T: Transport> {
-    gov_contract: (ethabi::Contract, Contract<T>),
     zksync_contract: (ethabi::Contract, Contract<T>),
     eth_state: ETHState,
     web3: Web3<T>,
     _web3_event_loop_handle: EventLoopHandle,
-    db_pool: ConnectionPool,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
 
@@ -111,19 +107,10 @@ impl<T: Transport> EthWatch<T> {
     pub fn new(
         web3: Web3<T>,
         web3_event_loop_handle: EventLoopHandle,
-        db_pool: ConnectionPool,
-        governance_addr: H160,
         zksync_contract_addr: H160,
         number_of_confirmations_for_event: u64,
         eth_watch_req: mpsc::Receiver<EthWatchRequest>,
     ) -> Self {
-        let gov_contract = {
-            (
-                governance_contract(),
-                Contract::new(web3.eth(), governance_addr, governance_contract()),
-            )
-        };
-
         let zksync_contract = {
             (
                 zksync_contract(),
@@ -132,12 +119,10 @@ impl<T: Transport> EthWatch<T> {
         };
 
         Self {
-            gov_contract,
             zksync_contract,
             eth_state: ETHState::default(),
             web3,
             _web3_event_loop_handle: web3_event_loop_handle,
-            db_pool,
             eth_watch_req,
 
             mode: WatcherMode::Working,
@@ -152,41 +137,6 @@ impl<T: Transport> EthWatch<T> {
 
     fn get_eip1271_contract(&self, address: Address) -> Contract<T> {
         Contract::new(self.web3.eth(), address, eip1271_contract())
-    }
-
-    fn get_new_token_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
-        let new_token_event_topic = self
-            .gov_contract
-            .0
-            .event("NewToken")
-            .expect("gov contract abi error")
-            .signature();
-        FilterBuilder::default()
-            .address(vec![self.gov_contract.1.address()])
-            .from_block(from)
-            .to_block(to)
-            .topics(Some(vec![new_token_event_topic]), None, None, None)
-            .build()
-    }
-
-    async fn get_new_token_events(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Result<Vec<NewTokenEvent>, failure::Error> {
-        let filter = self.get_new_token_event_filter(from, to);
-
-        self.web3
-            .eth()
-            .logs(filter)
-            .compat()
-            .await?
-            .into_iter()
-            .map(|event| {
-                NewTokenEvent::try_from(event)
-                    .map_err(|e| format_err!("Failed to parse NewToken event log from ETH: {}", e))
-            })
-            .collect()
     }
 
     fn get_priority_op_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
@@ -310,25 +260,7 @@ impl<T: Transport> EthWatch<T> {
             priority_queue.insert(priority_op.serial_id, priority_op.into());
         }
 
-        // restore token list from governance contract
-        let new_tokens = self
-            .get_new_token_events(
-                BlockNumber::Earliest,
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-
-        let mut tokens = HashMap::new();
-        for token in new_tokens.into_iter() {
-            tokens.insert(token.id as TokenId, token.address);
-        }
-
-        let new_state = ETHState::new(
-            last_ethereum_block,
-            tokens,
-            unconfirmed_queue,
-            priority_queue,
-        );
+        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
 
         self.set_new_state(new_state);
 
@@ -344,21 +276,6 @@ impl<T: Transport> EthWatch<T> {
             .saturating_sub(self.number_of_confirmations_for_event);
         let new_block_with_accepted_events =
             last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-
-        // Get new tokens
-        let new_tokens = self
-            .get_new_token_events(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-
-        // Extend the existing token list with the new tokens.
-        let mut tokens = self.eth_state.tokens().clone();
-        for token in new_tokens.into_iter() {
-            debug!("New token added: {:?}", token);
-            tokens.insert(token.id as TokenId, token.address);
-        }
 
         // Get new priority ops
         let priority_op_events = self
@@ -382,30 +299,10 @@ impl<T: Transport> EthWatch<T> {
         // update the state. This is done atomically to avoid the situation when
         // due to error occurred mid-update the overall `ETHWatcher` state become
         // messed up.
-        let new_state = ETHState::new(
-            last_ethereum_block,
-            tokens,
-            unconfirmed_queue,
-            priority_queue,
-        );
+        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
         self.set_new_state(new_state);
 
         Ok(())
-    }
-
-    fn commit_state(&self) {
-        self.db_pool
-            .access_storage()
-            .map(|storage| {
-                for (&id, &address) in self.eth_state.tokens() {
-                    let decimals = 18;
-                    let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
-                    if let Err(e) = storage.tokens_schema().store_token(token) {
-                        warn!("Failed to add token to db: {:?}", e);
-                    }
-                }
-            })
-            .unwrap_or_default();
     }
 
     fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
@@ -499,7 +396,6 @@ impl<T: Transport> EthWatch<T> {
 
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
-            self.commit_state();
         }
 
         Ok(())
@@ -632,7 +528,6 @@ impl<T: Transport> EthWatch<T> {
 
 #[must_use]
 pub fn start_eth_watch(
-    pool: ConnectionPool,
     config_options: ConfigurationOptions,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
@@ -645,8 +540,6 @@ pub fn start_eth_watch(
     let eth_watch = EthWatch::new(
         web3,
         web3_event_loop_handle,
-        pool,
-        config_options.governance_eth_addr,
         config_options.contract_eth_addr,
         config_options.confirmations_for_eth_event,
         eth_req_receiver,
