@@ -376,10 +376,7 @@ impl<T: Transport> EthWatch<T> {
         }
 
         // Get new pending ops
-        let unconfirmed_queue = self
-            .get_unconfirmed_ops(last_ethereum_block)
-            .await
-            .expect("Failed to restore pending queue events from ETH");
+        let unconfirmed_queue = self.get_unconfirmed_ops(last_ethereum_block).await?;
 
         // Now, after we've received all the data from the Ethereum, we can safely
         // update the state. This is done atomically to avoid the situation when
