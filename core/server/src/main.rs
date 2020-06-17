@@ -140,7 +140,6 @@ fn main() {
 
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(256);
     let eth_watch_task = start_eth_watch(
-        connection_pool.clone(),
         config_opts.clone(),
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
