@@ -126,6 +126,8 @@ pub struct ConfigurationOptions {
     pub eth_network: String,
     pub ticker_url: Url,
     pub idle_provers: u32,
+    /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
+    pub max_miniblock_iterations: usize,
 }
 
 impl ConfigurationOptions {
@@ -161,6 +163,7 @@ impl ConfigurationOptions {
             eth_network: parse_env("ETH_NETWORK"),
             ticker_url: parse_env("TICKER_URL"),
             idle_provers: parse_env("IDLE_PROVERS"),
+            max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
         }
     }
 }

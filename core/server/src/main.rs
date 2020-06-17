@@ -17,7 +17,6 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local uses
-use models::node::config::MAX_PENDING_BLOCK_ITERATIONS;
 use server::{
     api_server::start_api_server,
     block_proposer::run_block_proposer_task,
@@ -165,7 +164,7 @@ fn main() {
         proposed_blocks_sender,
         executed_tx_notify_sender,
         config_opts.available_block_chunk_sizes.clone(),
-        MAX_PENDING_BLOCK_ITERATIONS,
+        config_opts.max_miniblock_iterations,
     );
     let state_keeper_task = start_state_keeper(state_keeper, proposed_block, &main_runtime);
 
