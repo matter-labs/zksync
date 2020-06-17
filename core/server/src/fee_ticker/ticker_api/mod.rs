@@ -9,6 +9,7 @@ use futures::{
     SinkExt,
 };
 use models::node::{Token, TokenId, TokenLike, TokenPrice};
+use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
 use std::collections::HashMap;
@@ -157,6 +158,14 @@ impl FeeTickerAPI for TickerApi {
             .token_db_cache
             .get_token(token.clone())?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
+
+        // TODO: remove hardcode for Matter Labs Trial Token (issue #738)
+        if token.symbol == "MLTT" {
+            return Ok(TokenPrice {
+                usd_price: Ratio::from_integer(1u32.into()),
+                last_updated: Utc::now(),
+            });
+        }
 
         if let Some(cached_value) = self.get_stored_value(token.id).await {
             return Ok(cached_value);
