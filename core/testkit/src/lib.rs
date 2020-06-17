@@ -472,7 +472,7 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
 
 pub struct TestkitConfig {
     pub chain_id: u8,
-    pub gas_price_factor: usize,
+    pub gas_price_factor: f64,
     pub web3_url: String,
 }
 

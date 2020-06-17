@@ -117,7 +117,7 @@ pub struct ConfigurationOptions {
     pub operator_commit_eth_addr: H160,
     pub operator_private_key: Option<H256>,
     pub chain_id: u8,
-    pub gas_price_factor: usize,
+    pub gas_price_factor: f64,
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
     pub api_requests_caches_size: usize,
