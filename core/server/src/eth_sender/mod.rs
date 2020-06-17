@@ -640,18 +640,27 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .gas_adjuster
             .get_gas_price(&self.ethereum, Some(old_tx_gas_price))?;
         let nonce = stuck_tx.nonce;
+        let gas_limit = Self::gas_limit_for_op(stuck_tx);
+
+        assert!(
+            gas_limit > 0.into(),
+            "Proposed gas limit for (stuck) operation is 0; operation: {:?}",
+            stuck_tx
+        );
 
         info!(
-            "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, used nonce: {}",
+            "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, used nonce: {}, gas limit: {}",
             stuck_tx.used_tx_hashes.last().unwrap(),
             old_tx_gas_price,
             new_gas_price,
-            nonce
+            nonce,
+            gas_limit,
         );
 
         Ok(Options::with(move |opt| {
             opt.gas_price = Some(new_gas_price);
             opt.nonce = Some(nonce);
+            opt.gas = Some(gas_limit);
         }))
     }
 
