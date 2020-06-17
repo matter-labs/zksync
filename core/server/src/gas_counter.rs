@@ -24,7 +24,7 @@ impl CommitCost {
 
     pub const BASE_COST: u64 = 141_595;
     pub const DEPOSIT_COST: u64 = 10_397;
-    pub const CHANGE_PUBKEY_COST: u64 = 27_449;
+    pub const CHANGE_PUBKEY_COST: u64 = 15_866;
     pub const TRANSFER_COST: u64 = 334;
     pub const TRANSFER_TO_NEW_COST: u64 = 862;
     pub const FULL_EXIT_COST: u64 = 10_165;
@@ -116,7 +116,7 @@ impl Default for GasCounter {
 impl GasCounter {
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
     const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
-    const COMPLETE_WITHDRAWALS_COST: u64 = 27_096;
+    const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
 
     pub fn new() -> Self {
         Self::default()

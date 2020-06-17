@@ -68,7 +68,7 @@ impl<T: Transport> EthereumAccount<T> {
         transport: T,
         contract_address: Address,
         chain_id: u8,
-        gas_price_factor: usize,
+        gas_price_factor: f64,
     ) -> Self {
         let main_contract_eth_client = ETHClient::new(
             transport,

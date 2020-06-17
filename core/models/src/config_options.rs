@@ -117,7 +117,7 @@ pub struct ConfigurationOptions {
     pub operator_commit_eth_addr: H160,
     pub operator_private_key: Option<H256>,
     pub chain_id: u8,
-    pub gas_price_factor: usize,
+    pub gas_price_factor: f64,
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
     pub api_requests_caches_size: usize,
@@ -126,6 +126,8 @@ pub struct ConfigurationOptions {
     pub eth_network: String,
     pub ticker_url: Url,
     pub idle_provers: u32,
+    /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
+    pub max_miniblock_iterations: usize,
 }
 
 impl ConfigurationOptions {
@@ -161,6 +163,7 @@ impl ConfigurationOptions {
             eth_network: parse_env("ETH_NETWORK"),
             ticker_url: parse_env("TICKER_URL"),
             idle_provers: parse_env("IDLE_PROVERS"),
+            max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
         }
     }
 }
