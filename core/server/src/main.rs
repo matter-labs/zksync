@@ -154,10 +154,10 @@ fn main() {
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(512);
 
-    // Load the most recent proposed block from the database.
-    let proposed_block = observer_mode_final_state
+    // Load the most recent pending block from the database.
+    let pending_block = observer_mode_final_state
         .state_keeper_init
-        .get_proposed_block(&storage);
+        .get_pending_block(&storage);
     let state_keeper = PlasmaStateKeeper::new(
         observer_mode_final_state.state_keeper_init,
         config_opts.operator_fee_eth_addr,
@@ -167,7 +167,7 @@ fn main() {
         config_opts.available_block_chunk_sizes.clone(),
         MAX_PENDING_BLOCK_ITERATIONS,
     );
-    let state_keeper_task = start_state_keeper(state_keeper, proposed_block, &main_runtime);
+    let state_keeper_task = start_state_keeper(state_keeper, pending_block, &main_runtime);
 
     let (eth_send_request_sender, eth_send_request_receiver) = mpsc::channel(256);
     let (zksync_commit_notify_sender, zksync_commit_notify_receiver) = mpsc::channel(256);
