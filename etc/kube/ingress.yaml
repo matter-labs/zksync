@@ -20,21 +20,21 @@ spec:
         paths:
           - path: /
             backend:
-              serviceName: ${ZKSYNC_ENV}-server
+              serviceName: server
               servicePort: 3000
           - path: /jsrpc
             backend:
-              serviceName: ${ZKSYNC_ENV}-server
+              serviceName: server
               servicePort: 3030
           - path: /jsrpc-ws
             backend:
-              serviceName: ${ZKSYNC_ENV}-server
+              serviceName: server
               servicePort: 3031
     - host: ${EXPLORER_HOST}
       http:
         paths:
           - path: /
             backend:
-              serviceName: ${ZKSYNC_ENV}-nginx
+              serviceName: nginx
               servicePort: 80
 

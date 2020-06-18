@@ -13,6 +13,7 @@ import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
+const VERIFY_TIMEOUT = 120000; // 2 minutes in ms.
 
 const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
 console.log("Running integration test on the ", network, " network");
@@ -167,7 +168,9 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
         fee
     });
     console.log(`Withdraw posted: ${(new Date().getTime()) - startTime} ms`);
-    await withdrawHandle.awaitVerifyReceipt();
+
+    // Await for verification with a timeout set.
+    await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
     console.log(`Withdraw verified: ${(new Date().getTime()) - startTime} ms`);
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const operatorAfterWithdraw = await getOperatorBalance(token);
@@ -305,13 +308,16 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         );
     }
 
+    const fullFee = await syncProvider.getTransactionFee("Withdraw", syncWallet1.address(), "ETH");
+    const fee = fullFee.totalFee;
+
     const signedWithdraw = syncWallet1.signer.signSyncWithdraw({
         accountId: await syncWallet1.getAccountId(),
         from: syncWallet1.address(),
         ethAddress: syncWallet1.address(),
         tokenId: 0,
         amount: utils.parseEther('0.001'),
-        fee: utils.parseEther('0.001'),
+        fee: fee,
         nonce: await syncWallet1.getNonce(),
     })
 
@@ -321,9 +327,25 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
     } catch (e) {
         assert(
             e.jrpcError.message == 'Eth signature is incorrect',
-            "sending tx with incorrect eth signature must fail"
+            `sending tx with incorrect eth signature must fail, got message: ${e.jrpcError.message}`
         );
     }
+}
+
+function promiseTimeout(ms, promise) {
+  // Create a promise that rejects in <ms> milliseconds
+  let timeout = new Promise((resolve, reject) => {
+    let id = setTimeout(() => {
+      clearTimeout(id);
+      reject('Timed out in '+ ms + 'ms.')
+    }, ms)
+  })
+
+  // Returns a race between our timeout and the passed in promise
+  return Promise.race([
+    promise,
+    timeout
+  ])
 }
 
 (async () => {
@@ -344,7 +366,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         );
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("6.0")})).wait();
-        await (await erc20.transfer(syncDepositorWallet.address, parseEther("6.0"))).wait();
+        await (await erc20.transfer(syncDepositorWallet.address, parseEther("110.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -380,9 +402,9 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         await apitype.checkStatusResponseType();
         await apitype.checkTestnetConfigResponseType();
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "2.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "2.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
 
         await syncProvider.disconnect();
     } catch (e) {

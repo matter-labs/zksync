@@ -293,20 +293,22 @@ impl<'a> OperationsExtSchema<'a> {
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
         // - returns the obtained results.
+        //
+        // Additional note:
+        // - previously for "committed" flag we've checked the operation "confirmed" field the
+        //   same way as it done for "verified" flag. Later we've decided that if tx was added
+        //   to the `executed_*` table, it actually **is** committed, thus now we just add
+        //   `true`.
         let query = format!(
             "
-            select
-                tx_id,
-                hash,
-                eth_block,
-                pq_id,
-                tx,
-                success,
-                fail_reason,
-                coalesce(commited, false) as commited,
-                coalesce(verified, false) as verified,
-                created_at
-            from (
+            with eth_ops as (
+                select distinct on (block_number, action_type)
+                    operations.block_number,
+                    operations.action_type,
+                    confirmed
+                from operations
+                order by block_number desc, action_type, confirmed
+            ), transactions as (
                 select
                     *
                 from (
@@ -352,24 +354,22 @@ impl<'a> OperationsExtSchema<'a> {
                     {offset}
                 limit 
                     {limit}
-            ) t
-            left join
-                crosstab($$
-                    select 
-                        block_number as rowid, 
-                        action_type as category, 
-                        true as values 
-                    from 
-                        operations
-                    order by
-                        block_number desc
-                    $$) t3 (
-                        block_number bigint, 
-                        commited boolean, 
-                        verified boolean)
-            using 
-                (block_number)
-            order by block_number desc, created_at desc
+            )
+            select
+                tx_id,
+                hash,
+                eth_block,
+                pq_id,
+                tx,
+                success,
+                fail_reason,
+                true as commited,
+                coalesce(verified.confirmed, false) as verified,
+                created_at
+            from transactions
+            left join eth_ops verified on
+                verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
+            order by transactions.block_number desc, created_at desc
             ",
             address = hex::encode(address.as_ref().to_vec()),
             offset = offset,
@@ -446,20 +446,22 @@ impl<'a> OperationsExtSchema<'a> {
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
         // - returns the obtained results.
+        //
+        // Additional note:
+        // - previously for "committed" flag we've checked the operation "confirmed" field the
+        //   same way as it done for "verified" flag. Later we've decided that if tx was added
+        //   to the `executed_*` table, it actually **is** committed, thus now we just add
+        //   `true`.
         let query = format!(
             "
-            select
-                tx_id,
-                hash,
-                eth_block,
-                pq_id,
-                tx,
-                success,
-                fail_reason,
-                coalesce(commited, false) as commited,
-                coalesce(verified, false) as verified,
-                created_at
-            from (
+            with eth_ops as (
+                select distinct on (block_number, action_type)
+                    operations.block_number,
+                    operations.action_type,
+                    confirmed
+                from operations
+                order by block_number desc, action_type, confirmed
+            ), transactions as (
                 select
                     *
                 from (
@@ -512,25 +514,24 @@ impl<'a> OperationsExtSchema<'a> {
                     block_number desc, created_at desc
                 limit 
                     {limit}
-            ) t
-            left join
-                crosstab($$
-                    select 
-                        block_number as rowid, 
-                        action_type as category, 
-                        true as values 
-                    from 
-                        operations
-                    order by
-                        block_number
-                    $$) t3 (
-                        block_number bigint, 
-                        commited boolean, 
-                        verified boolean)
-            using 
-                (block_number)
-            order by
-                block_number desc, created_at desc
+            )
+            select
+                tx_id,
+                hash,
+                eth_block,
+                pq_id,
+                tx,
+                success,
+                fail_reason,
+                true as commited,
+                coalesce(verified.confirmed, false) as verified,
+                created_at
+            from transactions
+            left join eth_ops committed on
+                committed.block_number = transactions.block_number and committed.action_type = 'COMMIT'
+            left join eth_ops verified on
+                verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
+            order by transactions.block_number desc, created_at desc
             ",
             address = hex::encode(address.as_ref().to_vec()),
             ordered_filter = ordered_filter,

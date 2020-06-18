@@ -152,8 +152,8 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = utils.formatEther(transfer.amount);
-        const stringFee = utils.formatEther(transfer.fee);
+        const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
+        const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             transfer.token
         );
@@ -220,8 +220,8 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = utils.formatEther(withdraw.amount);
-        const stringFee = utils.formatEther(withdraw.fee);
+        const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
+        const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             withdraw.token
         );
@@ -494,9 +494,6 @@ export class Wallet {
                     }
                 );
             } else {
-                if (!(await this.isERC20DepositsApproved(deposit.token))) {
-                    throw Error("ERC20 deposit should be approved.");
-                }
                 ethTransaction = await mainZkSyncContract.depositERC20(
                     tokenAddress,
                     deposit.amount,

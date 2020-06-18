@@ -86,6 +86,7 @@ impl OperationsQueue {
     }
 }
 
+#[derive(Debug)]
 pub struct ProversDataPool {
     limit: i64,
     op_queue: OperationsQueue,

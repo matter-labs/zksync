@@ -102,7 +102,6 @@ pub struct PlasmaStateInitParams {
     pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
-    pub proposed_block: Option<ProposedBlock>,
 }
 
 impl Default for PlasmaStateInitParams {
@@ -118,45 +117,38 @@ impl PlasmaStateInitParams {
             acc_id_by_addr: HashMap::new(),
             last_block_number: 0,
             unprocessed_priority_op: 0,
-            proposed_block: None,
         }
     }
 
-    pub fn get_proposed_block(&self) -> Option<ProposedBlock> {
-        self.proposed_block.clone()
+    pub fn get_pending_block(
+        &self,
+        storage: &storage::StorageProcessor,
+    ) -> Option<SendablePendingBlock> {
+        let pending_block = storage
+            .chain()
+            .block_schema()
+            .load_pending_block()
+            .unwrap_or_default()?;
+
+        if pending_block.number <= self.last_block_number {
+            // If after generating several pending block node generated
+            // full blocks, they may be sealed on the first iteration
+            // and stored pending block will be outdated.
+            // Thus, if the stored pending block has the lower number than
+            // last committed one, we just ignore it.
+            return None;
+        }
+
+        // We've checked that pending block is greater than the last committed block,
+        // but it must be greater exactly by 1.
+        assert_eq!(pending_block.number, self.last_block_number + 1);
+
+        Some(pending_block)
     }
 
     pub fn restore_from_db(storage: &storage::StorageProcessor) -> Result<Self, failure::Error> {
         let mut init_params = Self::new();
         init_params.load_from_db(&storage)?;
-
-        let pending_block = storage.chain().block_schema().load_pending_block()?;
-
-        if let Some(pending_block) = pending_block {
-            // Check that stored block matches loaded state.
-            assert_eq!(pending_block.number, init_params.last_block_number + 1);
-
-            let mut proposed_block = ProposedBlock {
-                priority_ops: Vec::new(),
-                txs: Vec::new(),
-            };
-
-            // Transform executed operations into non-executed, so they will be executed again.
-            // Since it's a pending block, the state updates were not actually applied in the
-            // database (as it happens only when full block is committed).
-            for operation in pending_block.success_operations {
-                match operation {
-                    ExecutedOperations::Tx(tx) => {
-                        proposed_block.txs.push(tx.tx);
-                    }
-                    ExecutedOperations::PriorityOp(op) => {
-                        proposed_block.priority_ops.push(op.priority_op);
-                    }
-                }
-            }
-
-            init_params.proposed_block = Some(proposed_block);
-        }
 
         Ok(init_params)
     }
@@ -287,15 +279,38 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub async fn initialize(&mut self, proposed_block: Option<ProposedBlock>) {
-        if let Some(proposed_block) = proposed_block {
+    pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
+        if let Some(pending_block) = pending_block {
+            // Transform executed operations into non-executed, so they will be executed again.
+            // Since it's a pending block, the state updates were not actually applied in the
+            // database (as it happens only when full block is committed).
+            //
+            // We use `apply_tx` and `apply_priority_op` methods directly instead of
+            // `apply_txs_batch` to preserve the original execution order. Otherwise there may
+            // be a state corruption, if e.g. `Deposit` will be executed before `TransferToNew`
+            // and account IDs will change.
+            let mut txs_count = 0;
+            let mut priority_op_count = 0;
+            for operation in pending_block.success_operations {
+                match operation {
+                    ExecutedOperations::Tx(tx) => {
+                        self.apply_tx(tx.tx)
+                            .expect("Tx from the pending block failed");
+                        txs_count += 1;
+                    }
+                    ExecutedOperations::PriorityOp(op) => {
+                        self.apply_priority_op(op.priority_op)
+                            .expect("Priority op from the pending block failed");
+                        priority_op_count += 1;
+                    }
+                }
+            }
+
             log::info!(
-                "Restored non-finished block from the database: {} transactions, {} priority operations",
-                proposed_block.txs.len(),
-                proposed_block.priority_ops.len()
+                "Executed restored proposed block: {} transactions, {} priority operations",
+                txs_count,
+                priority_op_count
             );
-            self.execute_tx_batch(proposed_block).await;
-            log::info!("Executed restored proposed block");
         } else {
             log::info!("There is no pending block to restore");
         }
@@ -339,8 +354,8 @@ impl PlasmaStateKeeper {
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }
 
-    async fn run(mut self, proposed_block: Option<ProposedBlock>) {
-        self.initialize(proposed_block).await;
+    async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
+        self.initialize(pending_block).await;
 
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
@@ -712,8 +727,8 @@ impl PlasmaStateKeeper {
 #[must_use]
 pub fn start_state_keeper(
     sk: PlasmaStateKeeper,
-    proposed_block: Option<ProposedBlock>,
+    pending_block: Option<SendablePendingBlock>,
     runtime: &Runtime,
 ) -> JoinHandle<()> {
-    runtime.spawn(sk.run(proposed_block))
+    runtime.spawn(sk.run(pending_block))
 }

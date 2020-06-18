@@ -276,8 +276,13 @@ impl AppState {
                 HttpResponse::InternalServerError().finish()
             })?;
 
-        if !blocks.is_empty() && block_verified(&blocks[0]) {
-            self.caches.blocks_info.insert(block_id, blocks[0].clone());
+        if !blocks.is_empty()
+            && block_verified(&blocks[0])
+            && blocks[0].block_number == block_id as i64
+        {
+            self.caches
+                .blocks_info
+                .insert(block_id as u32, blocks[0].clone());
         }
 
         Ok(blocks.pop())

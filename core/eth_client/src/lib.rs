@@ -27,7 +27,7 @@ pub struct ETHClient<T: Transport> {
     pub contract_addr: H160,
     pub contract: ethabi::Contract,
     pub chain_id: u8,
-    pub gas_price_factor: usize,
+    pub gas_price_factor: f64,
     pub web3: Web3<T>,
 }
 
@@ -60,7 +60,7 @@ impl<T: Transport> ETHClient<T> {
         operator_pk: H256,
         contract_eth_addr: H160,
         chain_id: u8,
-        gas_price_factor: usize,
+        gas_price_factor: f64,
     ) -> Self {
         Self {
             sender_account: operator_eth_addr,
@@ -105,7 +105,8 @@ impl<T: Transport> ETHClient<T> {
 
     pub async fn get_gas_price(&self) -> Result<U256, failure::Error> {
         let mut network_gas_price = self.web3.eth().gas_price().compat().await?;
-        network_gas_price *= U256::from(self.gas_price_factor);
+        let percent_gas_price_factor = U256::from((self.gas_price_factor * 100.0).round() as u64);
+        network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
         Ok(network_gas_price)
     }
 

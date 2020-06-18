@@ -89,8 +89,11 @@ impl ApiClient {
                     err, duration_secs,
                 )
             })
-            .map_err(|e| match e {
-                backoff::Error::Permanent(e) | backoff::Error::Transient(e) => e,
+            .map_err(|e| {
+                panic!(
+                    "Prover can't reach server, for the max elapsed time of the backoff: {}",
+                    e
+                )
             })
     }
 
@@ -100,6 +103,7 @@ impl ApiClient {
         backoff.initial_interval = Duration::from_secs(1);
         backoff.multiplier = 1.5f64;
         backoff.max_interval = Duration::from_secs(10);
+        backoff.max_elapsed_time = Some(Duration::from_secs(2 * 60));
         backoff
     }
 
@@ -186,7 +190,7 @@ impl crate::ApiClient for ApiClient {
                 .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
                 .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
-            Ok(res.ok_or_else(|| format_err!("couldn't get ProverData for block {}", block))?)
+            Ok(res.ok_or_else(|| format_err!("ProverData for block {} is not ready yet", block))?)
         };
 
         let prover_data = self.with_retries(&op)?;

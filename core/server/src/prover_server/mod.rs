@@ -8,7 +8,7 @@ use std::{
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
-use log::{error, info, trace};
+use log::{info, trace};
 // Workspace deps
 use models::{circuit::CircuitAccountTree, config_options::ThreadPanicNotify, node::BlockNumber};
 use prover::client;
@@ -19,6 +19,7 @@ use crate::prover_server::scaler::ScalerOracle;
 mod pool;
 mod scaler;
 
+#[derive(Debug)]
 struct AppState {
     connection_pool: storage::ConnectionPool,
     preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
@@ -47,9 +48,10 @@ impl AppState {
     }
 
     fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor> {
-        self.connection_pool
-            .access_storage_fragile()
-            .map_err(actix_web::error::ErrorInternalServerError)
+        self.connection_pool.access_storage_fragile().map_err(|e| {
+            vlog::warn!("Failed to access storage: {}", e);
+            actix_web::error::ErrorInternalServerError(e)
+        })
     }
 }
 
@@ -69,7 +71,10 @@ fn register(
     let id = storage
         .prover_schema()
         .register_prover(&r.name, r.block_size)
-        .map_err(actix_web::error::ErrorInternalServerError)?;
+        .map_err(|e| {
+            vlog::warn!("Failed to register prover in the db: {}", e);
+            actix_web::error::ErrorInternalServerError(e)
+        })?;
     Ok(id.to_string())
 }
 
@@ -86,7 +91,7 @@ fn block_to_prove(
         .prover_schema()
         .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
         .map_err(|e| {
-            error!("could not get next unverified commit operation: {}", e);
+            vlog::warn!("could not get next unverified commit operation: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
     if let Some(prover_run) = ret {
@@ -110,7 +115,7 @@ fn prover_data(
     data: web::Data<AppState>,
     block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    trace!("requesting prover_data for block {}", *block);
+    trace!("Got request for prover_data for block {}", *block);
     let data_pool = data
         .preparing_data_pool
         .read()
@@ -126,27 +131,27 @@ fn working_on(
     data: web::Data<AppState>,
     r: web::Json<client::WorkingOnReq>,
 ) -> actix_web::Result<()> {
-    info!(
-        "working on request for prover_run with id: {}",
+    // These heartbeats aren't really important, as they're sent
+    // continuously while prover is performing computations.
+    trace!(
+        "Received heartbeat for prover_run with id: {}",
         r.prover_run_id
     );
     let storage = data
-        .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     storage
         .prover_schema()
         .record_prover_is_working(r.prover_run_id)
         .map_err(|e| {
-            error!("failed to record prover work in progress request: {}", e);
+            vlog::warn!("failed to record prover work in progress request: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })
 }
 
 fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix_web::Result<()> {
-    info!("publish of a proof for block: {}", r.block);
+    info!("Received a proof for block: {}", r.block);
     let storage = data
-        .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     match storage.prover_schema().store_proof(r.block, &r.proof) {
@@ -159,7 +164,7 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
             Ok(())
         }
         Err(e) => {
-            error!("failed to store received proof: {}", e);
+            vlog::error!("failed to store received proof: {}", e);
             let message = if e.to_string().contains("duplicate key") {
                 "duplicate key"
             } else {
@@ -171,19 +176,33 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
 }
 
 fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::Result<()> {
-    info!(
-        "prover sent stopped request with prover_run id: {}",
-        prover_id
-    );
+    let prover_id = prover_id.into_inner();
+
     let storage = data
-        .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    let prover_description = storage
+        .prover_schema()
+        .prover_by_id(prover_id)
+        .map_err(|_| {
+            vlog::warn!(
+                "Received stop notification from an unknown prover with ID {}",
+                prover_id
+            );
+            actix_web::error::ErrorBadRequest("unknown prover ID")
+        })?;
+
+    info!(
+        "Prover instance '{}' with ID {} send a stopping notification",
+        prover_description.worker, prover_id
+    );
+
     storage
         .prover_schema()
-        .record_prover_stop(*prover_id)
+        .record_prover_stop(prover_id)
         .map_err(|e| {
-            error!("failed to record prover stop: {}", e);
+            vlog::warn!("failed to record prover stop: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })
 }
@@ -250,14 +269,18 @@ pub fn start_prover_server(
 
             // Start HTTP server.
             HttpServer::new(move || {
+                let app_state = AppState::new(
+                    connection_pool.clone(),
+                    data_pool.clone(),
+                    prover_timeout,
+                    idle_provers,
+                );
+
+                // By calling `register_data` instead of `data` we're avoiding double
+                // `Arc` wrapping of the object.
                 App::new()
                     .wrap(actix_web::middleware::Logger::default())
-                    .data(AppState::new(
-                        connection_pool.clone(),
-                        data_pool.clone(),
-                        prover_timeout,
-                        idle_provers,
-                    ))
+                    .register_data(web::Data::new(app_state))
                     .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
                     .route("/block_to_prove", web::get().to(block_to_prove))

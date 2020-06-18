@@ -21,7 +21,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMathUInt128 for uint128;
 
-    bytes32 public constant EMPTY_STRING_KECCAK = bytes32(0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470);
+    bytes32 public constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     // Upgrade functional
 
@@ -82,9 +82,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external {
-        revert("upgzk"); // it is the first version, upgrade is not supported, use initialize
-    }
+    function upgrade(bytes calldata upgradeParameters) external {}
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
@@ -98,9 +96,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint256 balance_before = _token.balanceOf(address(this));
         require(Utils.sendERC20(_token, _to, _amount), "wtg11"); // wtg11 - ERC20 transfer fails
         uint256 balance_after = _token.balanceOf(address(this));
-        require(balance_before.sub(balance_after) <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
+        uint256 balance_diff = balance_before.sub(balance_after);
+        require(balance_diff <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
 
-        return SafeCast.toUint128(balance_before.sub(balance_after));
+        return SafeCast.toUint128(balance_diff);
     }
 
     /// @notice executes pending withdrawals
@@ -110,11 +109,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 toProcess = Utils.minU32(_n, numberOfPendingWithdrawals);
         uint32 startIndex = firstPendingWithdrawalIndex;
         numberOfPendingWithdrawals -= toProcess;
-        if (numberOfPendingWithdrawals == 0) {
-            firstPendingWithdrawalIndex = 0;
-        } else {
-            firstPendingWithdrawalIndex += toProcess;
-        }
+        firstPendingWithdrawalIndex += toProcess;
 
         for (uint32 i = startIndex; i < startIndex + toProcess; ++i) {
             uint16 tokenId = pendingWithdrawals[i].tokenId;
@@ -191,7 +186,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
 
         uint256 balance_before = _token.balanceOf(address(this));
-        require(_token.transferFrom(msg.sender, address(this), uint128(_amount)), "fd012"); // token transfer failed deposit
+        require(_token.transferFrom(msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit
         uint256 balance_after = _token.balanceOf(address(this));
         uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 
@@ -257,7 +252,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
-//        require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
         require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
         bytes memory publicData = _publicData;
@@ -305,7 +299,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Reverts unverified blocks
     /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
     function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-//        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
         governance.requireActiveValidator(msg.sender);
 
         uint32 blocksCommited = totalBlocksCommitted;

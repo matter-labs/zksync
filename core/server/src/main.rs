@@ -17,7 +17,6 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local uses
-use models::node::config::MAX_PENDING_BLOCK_ITERATIONS;
 use server::{
     api_server::start_api_server,
     block_proposer::run_block_proposer_task,
@@ -141,7 +140,6 @@ fn main() {
 
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(256);
     let eth_watch_task = start_eth_watch(
-        connection_pool.clone(),
         config_opts.clone(),
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
@@ -153,9 +151,11 @@ fn main() {
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(512);
-    let proposed_block = observer_mode_final_state
+
+    // Load the most recent pending block from the database.
+    let pending_block = observer_mode_final_state
         .state_keeper_init
-        .get_proposed_block();
+        .get_pending_block(&storage);
     let state_keeper = PlasmaStateKeeper::new(
         observer_mode_final_state.state_keeper_init,
         config_opts.operator_fee_eth_addr,
@@ -163,9 +163,9 @@ fn main() {
         proposed_blocks_sender,
         executed_tx_notify_sender,
         config_opts.available_block_chunk_sizes.clone(),
-        MAX_PENDING_BLOCK_ITERATIONS,
+        config_opts.max_miniblock_iterations,
     );
-    let state_keeper_task = start_state_keeper(state_keeper, proposed_block, &main_runtime);
+    let state_keeper_task = start_state_keeper(state_keeper, pending_block, &main_runtime);
 
     let (eth_send_request_sender, eth_send_request_receiver) = mpsc::channel(256);
     let (zksync_commit_notify_sender, zksync_commit_notify_receiver) = mpsc::channel(256);
