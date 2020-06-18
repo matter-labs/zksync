@@ -604,12 +604,12 @@ impl PlasmaStateKeeper {
         );
 
         let mut block_transactions = pending_block.success_operations;
-        // block_transactions.extend(
-        //     pending_block
-        //         .failed_txs
-        //         .into_iter()
-        //         .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
-        // );
+        block_transactions.extend(
+            pending_block
+                .failed_txs
+                .into_iter()
+                .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
+        );
 
         let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
         let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
