@@ -60,6 +60,7 @@ pub struct EthSenderOptions {
     pub tx_poll_period: Duration,
     pub wait_confirmations: u64,
     pub max_txs_in_flight: u64,
+    pub is_enabled: bool,
 }
 
 impl EthSenderOptions {
@@ -73,6 +74,7 @@ impl EthSenderOptions {
             tx_poll_period: Duration::new(tx_poll_period_secs, 0),
             wait_confirmations: parse_env("ETH_WAIT_CONFIRMATIONS"),
             max_txs_in_flight: parse_env("ETH_MAX_TXS_IN_FLIGHT"),
+            is_enabled: parse_env("ETH_IS_ENABLED"),
         }
     }
 }
