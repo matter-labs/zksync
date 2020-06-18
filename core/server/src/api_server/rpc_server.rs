@@ -543,7 +543,7 @@ impl RpcApp {
 
             if let Some(block) = block.clone() {
                 // Unverified blocks can still change, so we can't cache them.
-                if block.verified_at.is_some() {
+                if block.verified_at.is_some() && block.block_number == block_number {
                     self.cache_of_blocks_info.insert(block_number, block);
                 }
             }
