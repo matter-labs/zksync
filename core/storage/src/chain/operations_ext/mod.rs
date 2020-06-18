@@ -293,6 +293,12 @@ impl<'a> OperationsExtSchema<'a> {
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
         // - returns the obtained results.
+        //
+        // Additional note:
+        // - previously for "committed" flag we've checked the operation "confirmed" field the
+        //   same way as it done for "verified" flag. Later we've decided that if tx was added
+        //   to the `executed_*` table, it actually **is** committed, thus now we just add
+        //   `true`.
         let query = format!(
             "
             with eth_ops as (
@@ -357,12 +363,10 @@ impl<'a> OperationsExtSchema<'a> {
                 tx,
                 success,
                 fail_reason,
-                coalesce(committed.confirmed, false) as commited,
+                true as commited,
                 coalesce(verified.confirmed, false) as verified,
                 created_at
             from transactions
-            left join eth_ops committed on
-                committed.block_number = transactions.block_number and committed.action_type = 'COMMIT'
             left join eth_ops verified on
                 verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
             order by transactions.block_number desc, created_at desc
@@ -442,6 +446,12 @@ impl<'a> OperationsExtSchema<'a> {
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
         // - returns the obtained results.
+        //
+        // Additional note:
+        // - previously for "committed" flag we've checked the operation "confirmed" field the
+        //   same way as it done for "verified" flag. Later we've decided that if tx was added
+        //   to the `executed_*` table, it actually **is** committed, thus now we just add
+        //   `true`.
         let query = format!(
             "
             with eth_ops as (
@@ -513,7 +523,7 @@ impl<'a> OperationsExtSchema<'a> {
                 tx,
                 success,
                 fail_reason,
-                coalesce(committed.confirmed, false) as commited,
+                true as commited,
                 coalesce(verified.confirmed, false) as verified,
                 created_at
             from transactions
