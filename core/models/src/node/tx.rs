@@ -189,7 +189,8 @@ impl Transfer {
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
-            && self.token <= max_token_id();
+            && self.token <= max_token_id()
+            && self.to != Address::zero();
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
