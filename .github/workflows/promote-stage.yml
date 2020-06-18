@@ -40,8 +40,8 @@ jobs:
         zksync update-images
         echo "::set-env name=IMAGE_TAG::$(f sh -c 'echo $IMAGE_TAG')"
 
-#    - name: update-selfhosted-cache
-#      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
+    - name: update-selfhosted-cache
+      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
 
     - name: update-stage
       run: |
