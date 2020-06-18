@@ -7,7 +7,7 @@
             {{updateError}}. Try again later.
         </b-alert>
         <b-card bg-variant="light" >
-            <h4>zkSync Block Explorer</h4> 
+            <h4>zkSync {{store.capitalizedNetwork}} Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>
