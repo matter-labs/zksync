@@ -187,7 +187,7 @@ pub(crate) fn block_chunk_sizes() -> &'static [usize] {
 }
 
 /// Priority op should be executed for this number of eth blocks.
-pub const PRIORITY_EXPIRATION: u64 = 250;
+pub const PRIORITY_EXPIRATION: u64 = 35000;
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
