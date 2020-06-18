@@ -1007,8 +1007,8 @@ pub fn start_rpc_server(
 
 async fn verify_tx_info_message_signature(
     tx: &FranklinTx,
-    signature: Option<TxEthSignature>,
-    msg_to_sign: Option<String>,
+    _signature: Option<TxEthSignature>,
+    _msg_to_sign: Option<String>,
     mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
     fn rpc_message(error: TxAddError) -> Error {
@@ -1019,21 +1019,21 @@ async fn verify_tx_info_message_signature(
         }
     }
 
-    let eth_sign_data = match msg_to_sign {
-        Some(message_to_sign) => {
-            let signature =
-                signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
-
-            Some((signature, message_to_sign))
-        }
-        None => None,
-    };
+    // let eth_sign_data = match msg_to_sign {
+    //     Some(message_to_sign) => {
+    //         let signature =
+    //             signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
+    //
+    //         Some((signature, message_to_sign))
+    //     }
+    //     None => None,
+    // };
 
     let resp = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
         tx: tx.clone(),
-        eth_sign_data,
+        eth_sign_data: None,
         response: resp.0,
     };
 
