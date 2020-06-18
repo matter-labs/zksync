@@ -244,6 +244,10 @@ impl PlasmaState {
             tx.token <= params::max_token_id(),
             "Token id is not supported"
         );
+        ensure!(
+            tx.to != Address::zero(),
+            "Transfer to Account with address 0 is not allowed"
+        );
         let (from, from_account) = self
             .get_account_by_address(&tx.from)
             .ok_or_else(|| format_err!("From account does not exist"))?;
