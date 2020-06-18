@@ -494,9 +494,6 @@ export class Wallet {
                     }
                 );
             } else {
-                if (!(await this.isERC20DepositsApproved(deposit.token))) {
-                    throw Error("ERC20 deposit should be approved.");
-                }
                 ethTransaction = await mainZkSyncContract.depositERC20(
                     tokenAddress,
                     deposit.amount,
