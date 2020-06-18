@@ -138,7 +138,11 @@ export class Wallet {
                 : await this.getNonce();
 
         if (transfer.fee == null) {
-            const fullFee = await this.provider.getTransactionFee("Transfer", transfer.to, transfer.token);
+            const fullFee = await this.provider.getTransactionFee(
+                "Transfer",
+                transfer.to,
+                transfer.token
+            );
             transfer.fee = fullFee.totalFee;
         }
 
@@ -152,8 +156,14 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
-        const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
+        const stringAmount = this.provider.tokenSet.formatToken(
+            transfer.token,
+            transfer.amount
+        );
+        const stringFee = this.provider.tokenSet.formatToken(
+            transfer.token,
+            transfer.fee
+        );
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             transfer.token
         );
@@ -204,9 +214,13 @@ export class Wallet {
             withdraw.nonce != null
                 ? await this.getNonce(withdraw.nonce)
                 : await this.getNonce();
-            
+
         if (withdraw.fee == null) {
-            const fullFee = await this.provider.getTransactionFee("Withdraw", withdraw.ethAddress, withdraw.token);
+            const fullFee = await this.provider.getTransactionFee(
+                "Withdraw",
+                withdraw.ethAddress,
+                withdraw.token
+            );
             withdraw.fee = fullFee.totalFee;
         }
 
@@ -220,8 +234,14 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
-        const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
+        const stringAmount = this.provider.tokenSet.formatToken(
+            withdraw.token,
+            withdraw.amount
+        );
+        const stringFee = this.provider.tokenSet.formatToken(
+            withdraw.token,
+            withdraw.fee
+        );
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             withdraw.token
         );

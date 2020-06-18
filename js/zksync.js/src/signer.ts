@@ -1,4 +1,3 @@
-import { curve } from "elliptic";
 import {
     privateKeyFromSeed,
     signTransactionBytes,
@@ -11,10 +10,10 @@ import {
     getEthSignatureType
 } from "./utils";
 import BN = require("bn.js");
-import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
+import { Address, PubKeyHash, Transfer, Withdraw } from "./types";
 
-const MAX_NUMBER_OF_TOKENS = 4096;
-const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
+const MAX_NUMBER_OF_TOKENS = 128;
+const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export class Signer {
     readonly privateKey: Uint8Array;
