@@ -399,6 +399,7 @@ fn build_eth_sender(
         expected_wait_time_block: super::EXPECTED_WAIT_TIME_BLOCKS,
         wait_confirmations: super::WAIT_CONFIRMATIONS,
         tx_poll_period: Default::default(),
+        is_enabled: true,
     };
 
     let current_zksync_info = CurrentZksyncInfo::with_block_number(0);
