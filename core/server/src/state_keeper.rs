@@ -431,6 +431,10 @@ impl PlasmaStateKeeper {
     }
 
     async fn execute_tx_batch(&mut self, proposed_block: ProposedBlock) {
+        log::info!("Proposed block: {:?}", proposed_block);
+        let start = std::time::Instant::now();
+        let mut current_step = std::time::Instant::now();
+
         let mut executed_ops = Vec::new();
 
         let mut priority_op_queue = proposed_block
@@ -451,6 +455,12 @@ impl PlasmaStateKeeper {
             }
         }
 
+        log::info!(
+            "Priority ops processed in {}ms",
+            current_step.elapsed().as_millis()
+        );
+        current_step = std::time::Instant::now();
+
         let mut tx_queue = proposed_block.txs.into_iter().collect::<VecDeque<_>>();
         while let Some(tx) = tx_queue.pop_front() {
             match self.apply_tx(tx) {
@@ -469,6 +479,9 @@ impl PlasmaStateKeeper {
             }
         }
 
+        log::info!("Txs processed in {}ms", current_step.elapsed().as_millis());
+        current_step = std::time::Instant::now();
+
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
             if self.pending_block.pending_block_iteration > self.max_miniblock_iterations {
@@ -480,6 +493,16 @@ impl PlasmaStateKeeper {
                 self.notify_executed_ops(&mut executed_ops).await;
             }
         }
+
+        log::info!(
+            "Last part processed in {}ms",
+            current_step.elapsed().as_millis()
+        );
+
+        log::info!(
+            "Total `execute_tx_batch` execution time is {}ms",
+            start.elapsed().as_millis()
+        );
     }
 
     // Err if there is no space in current block
