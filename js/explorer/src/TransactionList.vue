@@ -43,7 +43,7 @@ export default {
     props: ['blockNumber', 'transactions'],
     data: () => ({
         currentPage: 1,
-        rowsPerPage: 10,
+        rowsPerPage: 1000,
     }),
     methods: {
         onRowClicked(item) {

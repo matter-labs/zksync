@@ -73,10 +73,6 @@ const components = {
 export default {
     name: 'home',
     async created() {
-        window.wwwww = this;
-        const client = await clientPromise;
-        const { contractAddress } = await client.testnetConfig();
-        this.store.contractAddress = contractAddress;
         this.update();
     },
     timers: {
