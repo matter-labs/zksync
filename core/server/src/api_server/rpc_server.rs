@@ -669,7 +669,29 @@ impl Rpc for RpcApp {
         &self,
         address: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
+        // TODO: this method now has a lot debug output, to be removed as soon as problem is detected.
+        use rand::Rng;
+        use std::time::Instant;
+
+        let request_id: u64 = rand::thread_rng().gen_range(0, 10000);
+        let started = Instant::now();
+        let mut current_step = Instant::now();
+
+        log::info!(
+            "account_info [request ID {}]: address {}, start processing",
+            request_id,
+            &address
+        );
+
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
+
+        log::info!(
+            "account_info [request ID {}]: address {}, cloned self in {}ms",
+            request_id,
+            &address,
+            current_step.elapsed().as_millis()
+        );
+        current_step = Instant::now();
         let self_ = self.clone();
         let account_state_resp = async move {
             let state_keeper_response = oneshot::channel();
@@ -690,6 +712,14 @@ impl Rpc for RpcApp {
                     );
                     Error::internal_error()
                 })?;
+
+            log::info!(
+                "account_info [request ID {}]: address {}, sent GetAccount request to state keeper in {}ms",
+                request_id,
+                &address,
+                current_step.elapsed().as_millis()
+            );
+            current_step = Instant::now();
             let committed_account_state = state_keeper_response.1.await.map_err(|err| {
                 log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
@@ -702,6 +732,14 @@ impl Rpc for RpcApp {
                 Error::internal_error()
             })?;
 
+            log::info!(
+                "account_info [request ID {}]: address {}, received GetAccount response to state keeper in {}ms",
+                request_id,
+                &address,
+                current_step.elapsed().as_millis()
+            );
+            current_step = Instant::now();
+
             let (id, committed) = committed_account_state
                 .map(|(id, account)| {
                     let restored_state =
@@ -711,11 +749,42 @@ impl Rpc for RpcApp {
                 .transpose()?
                 .unwrap_or_default();
 
+            log::info!(
+                "account_info [request ID {}]: address {}, restored committed state in {}ms",
+                request_id,
+                &address,
+                current_step.elapsed().as_millis()
+            );
+            current_step = Instant::now();
+
             let verified = self_.get_verified_account_state(&address)?;
+
+            log::info!(
+                "account_info [request ID {}]: address {}, got verified account state in {}ms",
+                request_id,
+                &address,
+                current_step.elapsed().as_millis()
+            );
+            current_step = Instant::now();
 
             let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
             let depositing =
                 DepositingAccountBalances::from_pending_ops(depositing_ops, &self_.token_cache)?;
+
+            log::info!(
+                "account_info [request ID {}]: address {}, got ongoing deposits in {}ms",
+                request_id,
+                &address,
+                current_step.elapsed().as_millis()
+            );
+            current_step = Instant::now();
+
+            log::info!(
+                "account_info [request ID {}]: address {}, total request processing {}ms",
+                request_id,
+                &address,
+                started.elapsed().as_millis()
+            );
 
             Ok(AccountInfoResp {
                 address,
