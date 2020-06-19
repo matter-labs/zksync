@@ -102,7 +102,17 @@ impl PlasmaState {
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
-        self.balance_tree.get(account_id).cloned()
+        let start = std::time::Instant::now();
+
+        let account = self.balance_tree.get(account_id).cloned();
+
+        log::info!(
+            "Get account (id {}) execution time: {}ms",
+            account_id,
+            start.elapsed().as_millis()
+        );
+
+        account
     }
 
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {

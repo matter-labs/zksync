@@ -357,27 +357,63 @@ impl PlasmaStateKeeper {
     async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
         self.initialize(pending_block).await;
 
+        let mut last_request_processed = std::time::Instant::now();
+
         while let Some(req) = self.rx_for_blocks.next().await {
+            let start = std::time::Instant::now();
+
+            log::info!(
+                "Received new request. Last request was processed {}ms ago",
+                (start - last_request_processed).as_millis()
+            );
+
             match req {
                 StateKeeperRequest::GetAccount(addr, sender) => {
                     sender.send(self.account(&addr)).unwrap_or_default();
+
+                    log::info!(
+                        "GetAccount request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
+
+                    log::info!(
+                        "GetLastUnprocessedPriorityOp request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_tx_batch(proposed_block).await;
+
+                    log::info!(
+                        "ExecuteMiniBlock request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::GetExecutedInPendingBlock(op_id, sender) => {
                     let result = self.check_executed_in_pending_block(op_id);
                     sender.send(result).unwrap_or_default();
+
+                    log::info!(
+                        "GetExecutedInPendingBlock request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
+
+                    log::info!(
+                        "SealBlock request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
             }
+
+            last_request_processed = std::time::Instant::now();
         }
     }
 
