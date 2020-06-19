@@ -4,8 +4,11 @@
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <div v-if="loading">
+        <div v-if="loadingStatus == 'loading'">
             <img style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
+        </div>
+        <div v-else-if="loadingStatus == 'not committed'">
+            This block is not committed yet.
         </div>
         <div v-else>
             <h5>Block data</h5>
@@ -67,7 +70,7 @@ export default {
         verified_at:    null,
         status:         null,
         transactions:   [  ],
-        loading:        true,
+        loadingStatus:  'loading',
     }),
     computed: {
         isBusy: () => false,
@@ -110,9 +113,18 @@ export default {
     methods: {
         async update() {
             const client = await clientPromise;
-            
-            const block = await client.getBlock(this.blockNumber);
-            if (!block) return;
+
+            const block = await client.getBlock(this.blockNumber).catch(() => null);
+            console.log({block});
+            if (!block) {
+                this.loadingStatus = 'not committed'
+                return;
+            }
+
+            if (block.block_number != this.blockNumber) {
+                this.loadingStatus = 'not committed'
+                return;
+            }
 
             this.new_state_root  = block.new_state_root.slice(8);
             this.commit_tx_hash  = block.commit_tx_hash || '';
@@ -242,7 +254,7 @@ export default {
                 };
             });
 
-            this.loading = false;
+            this.loadingStatus = 'ready';
         },
     },
     components,

@@ -26,6 +26,7 @@
 
 <script>
 import SearchField from './SearchField.vue';
+import { clientPromise } from './Client';
 const components = {
     SearchField,
 };
@@ -33,5 +34,10 @@ const components = {
 export default {
     name: 'Navbar',
     components,
+    async created() {
+        const client = await clientPromise;
+        const { contractAddress } = await client.testnetConfig();
+        this.store.contractAddress = contractAddress;
+    }
 }
 </script>
