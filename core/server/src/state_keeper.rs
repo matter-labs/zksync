@@ -431,11 +431,6 @@ impl PlasmaStateKeeper {
     }
 
     async fn execute_tx_batch(&mut self, proposed_block: ProposedBlock) {
-        if proposed_block.is_empty() {
-            // Nothing to do.
-            return;
-        }
-
         let mut executed_ops = Vec::new();
 
         let mut priority_op_queue = proposed_block
