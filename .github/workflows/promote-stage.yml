@@ -18,9 +18,9 @@ jobs:
       env:
         KEYBASE_PAPERKEY: ${{ secrets.KEYBASE_PAPERKEY }}
         KEYBASE_USERNAME: ${{ secrets.KEYBASE_USERNAME }}
-
-    - name: restore-selfhosted-runner-cache
-      run: tar xf ~/runner-cache.tar
+#
+#    - name: restore-selfhosted-runner-cache
+#      run: tar xf ~/runner-cache.tar
 
     - name: setup-env
       run: |
