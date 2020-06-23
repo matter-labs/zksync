@@ -164,6 +164,7 @@ fn main() {
         executed_tx_notify_sender,
         config_opts.available_block_chunk_sizes.clone(),
         config_opts.max_miniblock_iterations,
+        config_opts.max_miniblock_iterations_withdraw_block,
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block, &main_runtime);
 

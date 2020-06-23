@@ -95,6 +95,7 @@ pub struct PlasmaStateKeeper {
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
+    max_miniblock_iterations_withdraw_block: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -232,6 +233,7 @@ impl PlasmaStateInitParams {
 }
 
 impl PlasmaStateKeeper {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         initial_state: PlasmaStateInitParams,
         fee_account_address: Address,
@@ -240,6 +242,7 @@ impl PlasmaStateKeeper {
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
+        max_miniblock_iterations_withdraw_block: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -271,6 +274,7 @@ impl PlasmaStateKeeper {
             executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
+            max_miniblock_iterations_withdraw_block,
         };
 
         let root = keeper.state.root_hash();
@@ -471,7 +475,14 @@ impl PlasmaStateKeeper {
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
-            if self.pending_block.pending_block_iteration > self.max_miniblock_iterations {
+
+            // If pending block contains withdrawals we seal it faster
+            let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
+                self.max_miniblock_iterations_withdraw_block
+            } else {
+                self.max_miniblock_iterations
+            };
+            if self.pending_block.pending_block_iteration > max_miniblock_iterations {
                 self.seal_pending_block().await;
                 self.notify_executed_ops(&mut executed_ops).await;
                 return;
