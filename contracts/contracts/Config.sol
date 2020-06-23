@@ -44,6 +44,8 @@ contract Config {
     uint256 constant BLOCK_PERIOD = 15 seconds;
 
     /// @notice ETH blocks verification expectation
+    /// Blocks can be reverted if they are not verified for at least EXPECT_VERIFICATION_IN.
+    /// If set to 0 validator can revert blocks at any time.
     uint256 constant EXPECT_VERIFICATION_IN = 0 hours / BLOCK_PERIOD;
 
     uint256 constant NOOP_BYTES = 1 * CHUNK_BYTES;
