@@ -1,13 +1,15 @@
 version: '3.2'
 services:
   postgres:
-    image: "postgres:10.4"
+    image: "postgres:12"
     ports:
       - "5432:5432"
     volumes:
     - type: bind
       source: ./volumes/postgres
       target: /var/lib/postgresql/data
+    environment:
+        - POSTGRES_HOST_AUTH_METHOD=trust
   geth:
     image: "matterlabs/geth:latest"
     ports:
