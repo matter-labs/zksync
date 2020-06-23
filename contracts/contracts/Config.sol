@@ -44,7 +44,7 @@ contract Config {
     uint256 constant BLOCK_PERIOD = 15 seconds;
 
     /// @notice ETH blocks verification expectation
-    uint256 constant EXPECT_VERIFICATION_IN = 3 hours / BLOCK_PERIOD;
+    uint256 constant EXPECT_VERIFICATION_IN = 0 hours / BLOCK_PERIOD;
 
     uint256 constant NOOP_BYTES = 1 * CHUNK_BYTES;
     uint256 constant DEPOSIT_BYTES = 6 * CHUNK_BYTES;
