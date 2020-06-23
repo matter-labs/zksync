@@ -35,7 +35,7 @@ async function onchainBalance(ethWallet: ethers.Wallet, token: Address): Promise
     }
 }
 
-describe("zkSync process tokens which have no return value in `transfer` call", function() {
+describe("zkSync process tokens which have no return value in `transfer` and `transferFrom` calls", function() {
     this.timeout(50000);
 
     let zksyncContract;
@@ -84,6 +84,28 @@ describe("zkSync process tokens which have no return value in `transfer` call", 
         const expectedContractBalance = contractBalanceBefore.sub(amount);
         expect(contractBalanceAfter.toString(), "withdraw contract balance mismatch").eq(expectedContractBalance.toString());
     }
+
+    it("Deposit ERC20 success", async () => {
+        zksyncContract.connect(wallet);
+        const depositAmount = parseEther("1.0");
+        await tokenContract.approve(zksyncContract.address, depositAmount);
+
+        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
+        await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
+            .to.emit(zksyncContract, "OnchainDeposit")
+            .withArgs(wallet.address, tokenId, depositAmount, wallet.address);
+    });
+
+    it("Deposit ERC20 fail", async () => {
+        zksyncContract.connect(wallet);
+        const depositAmount = parseEther("1.0");
+        await tokenContract.approve(zksyncContract.address, depositAmount.div(2));
+
+        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
+        await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
+            .to.emit(zksyncContract, "OnchainDeposit")
+            .withArgs(wallet.address, tokenId, depositAmount, wallet.address);
+    });
 
     it("Withdraw ERC20 success", async () => {
         zksyncContract.connect(wallet);
