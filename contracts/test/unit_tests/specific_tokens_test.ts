@@ -101,10 +101,10 @@ describe("zkSync process tokens which have no return value in `transfer` and `tr
         const depositAmount = parseEther("1.0");
         await tokenContract.approve(zksyncContract.address, depositAmount.div(2));
 
-        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
-        await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
-            .to.emit(zksyncContract, "OnchainDeposit")
-            .withArgs(wallet.address, tokenId, depositAmount, wallet.address);
+        const balanceBefore = await tokenContract.balanceOf(wallet.address);
+        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address));
+        const balanceAfter = await tokenContract.balanceOf(wallet.address);
+        expect(balanceBefore).eq(balanceAfter);
     });
 
     it("Withdraw ERC20 success", async () => {
