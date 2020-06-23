@@ -130,6 +130,8 @@ pub struct ConfigurationOptions {
     pub idle_provers: u32,
     /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
     pub max_miniblock_iterations: usize,
+    /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
+    pub max_miniblock_iterations_withdraw_block: usize,
 }
 
 impl ConfigurationOptions {
@@ -166,6 +168,15 @@ impl ConfigurationOptions {
             ticker_url: parse_env("TICKER_URL"),
             idle_provers: parse_env("IDLE_PROVERS"),
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
+            max_miniblock_iterations_withdraw_block: if env::var(
+                "WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS",
+            )
+            .is_ok()
+            {
+                parse_env("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS")
+            } else {
+                parse_env("MINIBLOCKS_ITERATIONS")
+            },
         }
     }
 }

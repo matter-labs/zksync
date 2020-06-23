@@ -347,6 +347,7 @@ pub fn spawn_state_keeper(
         executed_tx_notify_sender,
         block_chunks_sizes,
         max_miniblock_iterations,
+        max_miniblock_iterations,
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
