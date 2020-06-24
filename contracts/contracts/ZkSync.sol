@@ -138,6 +138,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 }
             }
         }
+        emit PendingWithdrawalsComplete(startIndex, startIndex + toProcess);
     }
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
@@ -686,8 +687,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, _to, _tokenId, _amount));
             offset += ONCHAIN_WITHDRAWAL_BYTES;
         }
-        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
         require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
+        emit PendingWithdrawalsAdd(firstPendingWithdrawalIndex + numberOfPendingWithdrawals, firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals);
+        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
     }
 
     /// @notice Checks whether oldest unverified block has expired

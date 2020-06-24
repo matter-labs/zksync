@@ -69,6 +69,16 @@ interface Events {
         uint16 indexed tokenId,
         uint128 amount
     );
+
+    event PendingWithdrawalsAdd(
+        uint32 queueStartIndex,
+        uint32 queueEndIndex
+    );
+
+    event PendingWithdrawalsComplete(
+        uint32 queueStartIndex,
+        uint32 queueEndIndex
+    );
 }
 
 /// @title Upgrade events
