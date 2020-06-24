@@ -10,14 +10,15 @@ import {
     TransactionReceipt,
     PubKeyHash,
     TxEthSignature,
-    ChangePubKey
+    ChangePubKey,
+    EthSignatureType
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
-    signChangePubkeyMessage,
+    getChangePubkeyMessage,
     getEthSignatureType,
     SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
@@ -44,7 +45,7 @@ export class Wallet {
         public cachedAddress: Address,
         public signer?: Signer,
         public accountId?: number,
-        public ethSignatureType?: "EthereumSignature" | "EIP1271Signature"
+        public ethSignatureType?: EthSignatureType
     ) {}
 
     connect(provider: Provider) {
@@ -57,7 +58,7 @@ export class Wallet {
         provider: Provider,
         signer?: Signer,
         accountId?: number,
-        ethSignatureType?: "EthereumSignature" | "EIP1271Signature"
+        ethSignatureType?: EthSignatureType
     ): Promise<Wallet> {
         if (signer == undefined) {
             const signerResult = await Signer.fromETHSignature(ethWallet);
@@ -86,7 +87,7 @@ export class Wallet {
         ethWallet: ethers.Signer,
         provider: Provider,
         accountId?: number,
-        ethSignatureType?: "EthereumSignature" | "EIP1271Signature"
+        ethSignatureType?: EthSignatureType
     ): Promise<Wallet> {
         const wallet = new Wallet(
             ethWallet,
@@ -100,18 +101,17 @@ export class Wallet {
     }
 
     async getEthMessageSignature(message: string): Promise<TxEthSignature> {
-        const signature = await this.ethSigner.signMessage(message);
-
         if (this.ethSignatureType == undefined) {
-            const address = await this.ethSigner.getAddress();
-            this.ethSignatureType = getEthSignatureType(
-                message,
-                signature,
-                address
-            );
+            throw new Error("ethSignatureType is unknown.");
         }
 
-        return { type: this.ethSignatureType, signature };
+        if (!this.ethSignatureType.prefixed) {
+            message = `\x19Ethereum Signed Message:\n${message.length}${message}`;
+        }
+
+        const signature = await this.ethSigner.signMessage(message);
+
+        return { type: this.ethSignatureType.type, signature };
     }
 
     async syncTransfer(transfer: {
@@ -282,14 +282,15 @@ export class Wallet {
         await this.setRequiredAccountIdFromServer("Set Signing Key");
 
         const numNonce = await this.getNonce(nonce);
+        
+        const changePubKeyMessage = getChangePubkeyMessage(
+            newPubKeyHash,
+            numNonce,
+            this.accountId,
+        );
         const ethSignature = onchainAuth
             ? null
-            : await signChangePubkeyMessage(
-                  this.ethSigner,
-                  newPubKeyHash,
-                  numNonce,
-                  this.accountId
-              );
+            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
         const txData: ChangePubKey = {
             type: "ChangePubKey",

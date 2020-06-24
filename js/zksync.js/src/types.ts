@@ -47,6 +47,11 @@ export interface AccountState {
     };
 }
 
+export type EthSignatureType = {
+    type: "EthereumSignature" | "EIP1271Signature";
+    prefixed: boolean;
+};
+
 export interface TxEthSignature {
     type: "EthereumSignature" | "EIP1271Signature";
     signature: string;

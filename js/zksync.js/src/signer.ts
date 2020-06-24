@@ -11,7 +11,7 @@ import {
     getEthSignatureType
 } from "./utils";
 import BN = require("bn.js");
-import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
+import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw, EthSignatureType } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 4096;
 const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
@@ -123,7 +123,7 @@ export class Signer {
         ethSigner: ethers.Signer
     ): Promise<{
         signer: Signer;
-        ethSignatureType: "EthereumSignature" | "EIP1271Signature";
+        ethSignatureType: EthSignatureType;
     }> {
         const message =
             "Access zkSync account.\n" +
@@ -131,7 +131,8 @@ export class Signer {
             "Only sign this message for a trusted client!";
         const signature = await ethSigner.signMessage(message);
         const address = await ethSigner.getAddress();
-        const ethSignatureType = getEthSignatureType(
+        const ethSignatureType = await getEthSignatureType(
+            ethSigner.provider,
             message,
             signature,
             address
