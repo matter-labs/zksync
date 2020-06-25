@@ -11,7 +11,7 @@ import {
     PubKeyHash,
     TxEthSignature,
     ChangePubKey,
-    EthSignatureType
+    EthSignerType
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -19,14 +19,10 @@ import {
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
     getChangePubkeyMessage,
-    getEthSignatureType,
-    SYNC_MAIN_CONTRACT_INTERFACE
+    SYNC_MAIN_CONTRACT_INTERFACE,
+    getSignedBytesFromMessage,
+    signMessagePersonalAPI
 } from "./utils";
-
-// Our MetaMask users sometimes use custom gas price values,
-// which we can't know. We use this constant to assure that
-// gasprice from our calculations isn't smaller than actually used one.
-const metamaskIncreaseGasPriceFactor = 10;
 
 class ZKSyncTxError extends Error {
     constructor(
@@ -45,7 +41,7 @@ export class Wallet {
         public cachedAddress: Address,
         public signer?: Signer,
         public accountId?: number,
-        public ethSignatureType?: EthSignatureType
+        public ethSignerType?: EthSignerType
     ) {}
 
     connect(provider: Provider) {
@@ -58,16 +54,15 @@ export class Wallet {
         provider: Provider,
         signer?: Signer,
         accountId?: number,
-        ethSignatureType?: EthSignatureType
+        ethSignerType?: EthSignerType
     ): Promise<Wallet> {
-        if (signer == undefined) {
+        if (signer == null) {
             const signerResult = await Signer.fromETHSignature(ethWallet);
             signer = signerResult.signer;
-            ethSignatureType =
-                ethSignatureType || signerResult.ethSignatureType;
-        } else if (ethSignatureType == undefined) {
+            ethSignerType = ethSignerType || signerResult.ethSignatureType;
+        } else if (ethSignerType == null) {
             throw new Error(
-                "If you passed signer, you must also pass ethSignatureType."
+                "If you passed signer, you must also pass ethSignerType."
             );
         }
 
@@ -76,7 +71,7 @@ export class Wallet {
             await ethWallet.getAddress(),
             signer,
             accountId,
-            ethSignatureType
+            ethSignerType
         );
 
         wallet.connect(provider);
@@ -87,31 +82,41 @@ export class Wallet {
         ethWallet: ethers.Signer,
         provider: Provider,
         accountId?: number,
-        ethSignatureType?: EthSignatureType
+        ethSignerType?: EthSignerType
     ): Promise<Wallet> {
         const wallet = new Wallet(
             ethWallet,
             await ethWallet.getAddress(),
             undefined,
             accountId,
-            ethSignatureType
+            ethSignerType
         );
         wallet.connect(provider);
         return wallet;
     }
 
     async getEthMessageSignature(message: string): Promise<TxEthSignature> {
-        if (this.ethSignatureType == undefined) {
-            throw new Error("ethSignatureType is unknown.");
+        if (this.ethSignerType == null) {
+            throw new Error("ethSignerType is unknown");
         }
 
-        if (!this.ethSignatureType.prefixed) {
-            message = `\x19Ethereum Signed Message:\n${message.length}${message}`;
-        }
+        const signedBytes = getSignedBytesFromMessage(
+            message,
+            !this.ethSignerType.isSignedMsgPrefixed
+        );
 
-        const signature = await this.ethSigner.signMessage(message);
+        const signature = await signMessagePersonalAPI(
+            this.ethSigner,
+            signedBytes
+        );
 
-        return { type: this.ethSignatureType.type, signature };
+        return {
+            type:
+                this.ethSignerType.verificationMethod === "ECDSA"
+                    ? "EthereumSignature"
+                    : "EIP1271Signature",
+            signature
+        };
     }
 
     async syncTransfer(transfer: {
@@ -138,7 +143,11 @@ export class Wallet {
                 : await this.getNonce();
 
         if (transfer.fee == null) {
-            const fullFee = await this.provider.getTransactionFee("Transfer", transfer.to, transfer.token);
+            const fullFee = await this.provider.getTransactionFee(
+                "Transfer",
+                transfer.to,
+                transfer.token
+            );
             transfer.fee = fullFee.totalFee;
         }
 
@@ -152,8 +161,14 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
-        const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
+        const stringAmount = this.provider.tokenSet.formatToken(
+            transfer.token,
+            transfer.amount
+        );
+        const stringFee = this.provider.tokenSet.formatToken(
+            transfer.token,
+            transfer.fee
+        );
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             transfer.token
         );
@@ -204,9 +219,13 @@ export class Wallet {
             withdraw.nonce != null
                 ? await this.getNonce(withdraw.nonce)
                 : await this.getNonce();
-            
+
         if (withdraw.fee == null) {
-            const fullFee = await this.provider.getTransactionFee("Withdraw", withdraw.ethAddress, withdraw.token);
+            const fullFee = await this.provider.getTransactionFee(
+                "Withdraw",
+                withdraw.ethAddress,
+                withdraw.token
+            );
             withdraw.fee = fullFee.totalFee;
         }
 
@@ -220,8 +239,14 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
-        const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
+        const stringAmount = this.provider.tokenSet.formatToken(
+            withdraw.token,
+            withdraw.amount
+        );
+        const stringFee = this.provider.tokenSet.formatToken(
+            withdraw.token,
+            withdraw.fee
+        );
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             withdraw.token
         );
@@ -282,15 +307,16 @@ export class Wallet {
         await this.setRequiredAccountIdFromServer("Set Signing Key");
 
         const numNonce = await this.getNonce(nonce);
-        
+
         const changePubKeyMessage = getChangePubkeyMessage(
             newPubKeyHash,
             numNonce,
-            this.accountId,
+            this.accountId
         );
         const ethSignature = onchainAuth
             ? null
-            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+            : (await this.getEthMessageSignature(changePubKeyMessage))
+                  .signature;
 
         const txData: ChangePubKey = {
             type: "ChangePubKey",
@@ -303,6 +329,26 @@ export class Wallet {
 
         const transactionHash = await this.provider.submitTx(txData);
         return new Transaction(txData, transactionHash, this.provider);
+    }
+
+    async isOnchainAuthSigningKeySet(
+        nonce: Nonce = "committed"
+    ): Promise<boolean> {
+        const mainZkSyncContract = new Contract(
+            this.provider.contractAddress.mainContract,
+            SYNC_MAIN_CONTRACT_INTERFACE,
+            this.ethSigner
+        );
+
+        const numNonce = await this.getNonce(nonce);
+        const onchainAuthFact = await mainZkSyncContract.authFacts(
+            this.address(),
+            numNonce
+        );
+        return (
+            onchainAuthFact !==
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+        );
     }
 
     async onchainAuthSigningKey(

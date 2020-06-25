@@ -6,10 +6,9 @@ import {
     TokenLike,
     Tokens,
     TokenSymbol,
-    EthSignatureType
+    EthSignerType
 } from "./types";
 import { serializeAccountId, serializeNonce } from "./signer";
-import { BigNumberish, BigNumber } from "ethers/utils";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -333,12 +332,15 @@ export class TokenSet {
         return isTransactionFeePackable(parsedAmount);
     }
 
-    public formatToken(tokenLike: TokenLike, amount: BigNumberish): string {
+    public formatToken(
+        tokenLike: TokenLike,
+        amount: utils.BigNumberish
+    ): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.formatUnits(amount, decimals);
     }
 
-    public parseToken(tokenLike: TokenLike, amount: string): BigNumber {
+    public parseToken(tokenLike: TokenLike, amount: string): utils.BigNumber {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.parseUnits(amount, decimals);
     }
@@ -381,10 +383,66 @@ export function getChangePubkeyMessage(
     return message;
 }
 
-export function hashMessagePrefixless(message: ethers.utils.Arrayish | string): string {
-    return ethers.utils.keccak256(ethers.utils.concat([
-        ((typeof(message) === 'string') ? ethers.utils.toUtf8Bytes(message): message)
-    ]));
+export function getSignedBytesFromMessage(
+    message: ethers.utils.Arrayish | string,
+    addPrefix: boolean
+): Uint8Array {
+    let messageBytes =
+        typeof message === "string"
+            ? ethers.utils.toUtf8Bytes(message)
+            : ethers.utils.arrayify(message);
+    if (addPrefix) {
+        messageBytes = ethers.utils.concat([
+            ethers.utils.toUtf8Bytes(
+                `\x19Ethereum Signed Message:\n${messageBytes.length}`
+            ),
+            messageBytes
+        ]);
+    }
+    return messageBytes;
+}
+
+export async function signMessagePersonalAPI(
+    signer: ethers.Signer,
+    message: Uint8Array
+): Promise<string> {
+    if (signer instanceof ethers.providers.JsonRpcSigner) {
+        return signer.provider
+            .send("personal_sign", [
+                utils.hexlify(message),
+                await signer.getAddress()
+            ])
+            .then(
+                sign => sign,
+                err => {
+                    if (err.message.includes("personal_sign")) {
+                        return signer.signMessage(message);
+                    }
+                    throw err;
+                }
+            );
+    } else {
+        return signer.signMessage(message);
+    }
+}
+
+export async function verifyERC1271Signature(
+    address: string,
+    message: Uint8Array,
+    signature: string,
+    signerOrProvider: ethers.Signer | ethers.providers.Provider
+): Promise<boolean> {
+    const EIP1271_SUCCESS_VALUE = "0x20c13b0b";
+    const eip1271 = new ethers.Contract(
+        address,
+        IEIP1271_INTERFACE,
+        signerOrProvider
+    );
+    const eipRetVal = await eip1271.isValidSignature(
+        utils.hexlify(message),
+        signature
+    );
+    return eipRetVal === EIP1271_SUCCESS_VALUE;
 }
 
 export async function getEthSignatureType(
@@ -392,42 +450,34 @@ export async function getEthSignatureType(
     message: string,
     signature: string,
     address: string
-): Promise<EthSignatureType> {
-    const prefixedRecovered = ethers.utils.verifyMessage(message, signature);
-    if (prefixedRecovered.toLowerCase() === address.toLowerCase()) {
+): Promise<EthSignerType> {
+    const messageNoPrefix = getSignedBytesFromMessage(message, false);
+    const messageWithPrefix = getSignedBytesFromMessage(message, true);
+
+    const prefixedECDSASigner = ethers.utils.recoverAddress(
+        ethers.utils.keccak256(messageWithPrefix),
+        signature
+    );
+    if (prefixedECDSASigner.toLowerCase() === address.toLowerCase()) {
         return {
-            type: "EthereumSignature",
-            prefixed: true,
+            verificationMethod: "ECDSA",
+            isSignedMsgPrefixed: true
         };
     }
 
-    const recovered = ethers.utils.recoverAddress(hashMessagePrefixless(message), signature);
-    if (recovered.toLowerCase() === address.toLowerCase()) {
+    const notPrefixedMsgECDSASigner = ethers.utils.recoverAddress(
+        ethers.utils.keccak256(messageNoPrefix),
+        signature
+    );
+    if (notPrefixedMsgECDSASigner.toLowerCase() === address.toLowerCase()) {
         return {
-            type: "EthereumSignature",
-            prefixed: false,
+            verificationMethod: "ECDSA",
+            isSignedMsgPrefixed: false
         };
     }
 
-    const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, provider);
-    const EIP1271_SUCCESS_VALUE = 0x20c13b0b;
-
-    const eipRetVal = await eip1271.isValidSignature(ethers.utils.toUtf8Bytes(message), signature);
-    if (eipRetVal == EIP1271_SUCCESS_VALUE) {
-        return {
-            type: "EIP1271Signature",
-            prefixed: true,
-        };
-    }
-
-    const prefixedMessage = message = `\x19Ethereum Signed Message:\n${message.length}${message}`;
-    const prefixedEipRetVal = await eip1271.isValidSignature(ethers.utils.toUtf8Bytes(prefixedMessage), signature);
-    if (prefixedEipRetVal == EIP1271_SUCCESS_VALUE) {
-        return {
-            type: "EIP1271Signature",
-            prefixed: false,
-        };
-    }
-
-    throw new Error("Unknown Ethereum signature type!");
+    return {
+        verificationMethod: "ERC-1271",
+        isSignedMsgPrefixed: true
+    };
 }

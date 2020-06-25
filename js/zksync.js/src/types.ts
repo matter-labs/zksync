@@ -47,9 +47,11 @@ export interface AccountState {
     };
 }
 
-export type EthSignatureType = {
-    type: "EthereumSignature" | "EIP1271Signature";
-    prefixed: boolean;
+export type EthSignerType = {
+    verificationMethod: "ECDSA" | "ERC-1271";
+    // Indicates if signer adds `\x19Ethereum Signed Message\n${msg.length}` prefix before signing message.
+    // i.e. if false, we should add this prefix manually before asking to sign message
+    isSignedMsgPrefixed: boolean;
 };
 
 export interface TxEthSignature {
@@ -137,15 +139,15 @@ export interface Tokens {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: "Withdraw" | "Transfer" | "TransferToNew",
+    feeType: "Withdraw" | "Transfer" | "TransferToNew";
     // Amount of gas used by transaction
-    gasTxAmount: utils.BigNumber,
+    gasTxAmount: utils.BigNumber;
     // Gas price (in wei)
-    gasPriceWei: utils.BigNumber,
+    gasPriceWei: utils.BigNumber;
     // Ethereum gas part of fee (in wei)
-    gasFee: utils.BigNumber,
+    gasFee: utils.BigNumber;
     // Zero-knowledge proof part of fee (in wei)
-    zkpFee: utils.BigNumber,
+    zkpFee: utils.BigNumber;
     // Total fee amount (in wei)
-    totalFee: utils.BigNumber,
+    totalFee: utils.BigNumber;
 }
