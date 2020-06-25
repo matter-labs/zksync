@@ -3,7 +3,7 @@
     <b-container>
         <b-navbar-brand href="/">
             <a href="https://zksync.io" target="_blank">
-                <img class="navbar-hero-img" src="./assets/logo_text_dark.svg">
+                <img class="navbar-hero-img" src="./assets/ZK_dark.svg">
             </a>
             <b-badge variant="primary" class="hero-network-name">{{store.capitalizedNetwork}}</b-badge>
         </b-navbar-brand>
@@ -59,7 +59,7 @@ export default {
 <style scoped>
 .navbar-hero-img {
     margin-bottom: 1px;
-    width: 60%;
+    width: 6em;
 }
 .hero-network-name {
     margin-left: 0.6em;
