@@ -18,6 +18,11 @@ async function main() {
         });
         parser.addArgument("contractAddress");
         const args = parser.parseArgs(process.argv.slice(2));
+        if (process.env.ETH_NETWORK !== "test") {
+            console.log("Reverting test contract blocks not on test network is not allowed");
+            process.exit(48);
+            return;
+        }
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
@@ -29,9 +34,13 @@ async function main() {
             wallet,
         );
 
+        console.log("Waiting expiration time");
+        let expiration_time = parseInt(await ZkSyncContract.get_EXPECT_VERIFICATION_IN());
+        await new Promise((r) => setTimeout(r, (expiration_time + 2) * 1000));
+
         console.log("Starting reverts");
         while (parseInt(await ZkSyncContract.totalBlocksCommitted()) != parseInt(await ZkSyncContract.totalBlocksVerified())) {
-            await (await ZkSyncContract.revertBlocks(3)).wait();
+            await (await ZkSyncContract.revertBlocks(1)).wait();
         }
     } catch (e) {
         console.error(JSON.stringify(e));

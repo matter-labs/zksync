@@ -3,7 +3,6 @@ use crate::external_commands::{
     deploy_test_contracts, get_test_accounts, revert_all_not_verified_blocks, Contracts,
 };
 use crate::zksync_account::ZksyncAccount;
-use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
 
