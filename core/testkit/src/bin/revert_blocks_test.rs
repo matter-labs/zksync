@@ -7,7 +7,9 @@ use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
 
-fn run_some_operations(contracts: Contracts, verify_blocks: bool) {
+/// Executes blocks with some basic operations with new state keeper
+/// if verify_blocks is false then committed blocks should not be verified
+fn executes_blocks_with_new_state_keeper(contracts: Contracts, verify_blocks: bool) {
     let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
@@ -64,11 +66,12 @@ fn run_some_operations(contracts: Contracts, verify_blocks: bool) {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
-        if verify_blocks {
-            perform_basic_operations(token, &mut test_setup, deposit_amount.clone());
-        } else {
-            perform_some_operations_no_verify(token, &mut test_setup, deposit_amount.clone());
-        }
+        perform_basic_operations(
+            token,
+            &mut test_setup,
+            deposit_amount.clone(),
+            verify_blocks,
+        );
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
@@ -76,22 +79,17 @@ fn run_some_operations(contracts: Contracts, verify_blocks: bool) {
 }
 
 fn revert_blocks_test() {
-    let deploy_timer = Instant::now();
     println!("deploying contracts");
     let contracts = deploy_test_contracts();
-    println!(
-        "contracts deployed {:#?}, {} secs",
-        contracts,
-        deploy_timer.elapsed().as_secs()
-    );
+    println!("contracts deployed");
 
-    run_some_operations(contracts.clone(), false);
+    executes_blocks_with_new_state_keeper(contracts.clone(), false);
     println!("some blocks are committed");
 
     revert_all_not_verified_blocks(contracts.contract);
     println!("blocks reverted");
 
-    run_some_operations(contracts, true);
+    executes_blocks_with_new_state_keeper(contracts, true);
 }
 
 fn main() {

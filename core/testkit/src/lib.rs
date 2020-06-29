@@ -371,109 +371,11 @@ pub fn spawn_state_keeper(
     )
 }
 
-pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_amount: BigUint) {
-    // test deposit to other account
-    test_setup.start_block();
-    test_setup.deposit(
-        ETHAccountId(0),
-        ZKSyncAccountId(2),
-        Token(token),
-        deposit_amount.clone(),
-    );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Deposit to other account test success, token_id: {}", token);
-
-    // test two deposits
-    test_setup.start_block();
-    test_setup.deposit(
-        ETHAccountId(0),
-        ZKSyncAccountId(1),
-        Token(token),
-        deposit_amount.clone(),
-    );
-    test_setup.deposit(
-        ETHAccountId(0),
-        ZKSyncAccountId(1),
-        Token(token),
-        deposit_amount.clone(),
-    );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Deposit test success, token_id: {}", token);
-
-    // test transfers
-    test_setup.start_block();
-
-    test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
-
-    //transfer to self should work
-    test_setup.transfer(
-        ZKSyncAccountId(1),
-        ZKSyncAccountId(1),
-        Token(token),
-        &deposit_amount / BigUint::from(8u32),
-        &deposit_amount / BigUint::from(8u32),
-    );
-
-    //should be executed as a transfer
-    test_setup.transfer(
-        ZKSyncAccountId(1),
-        ZKSyncAccountId(2),
-        Token(token),
-        &deposit_amount / BigUint::from(8u32),
-        &deposit_amount / BigUint::from(8u32),
-    );
-
-    let nonce = test_setup.accounts.zksync_accounts[1].nonce();
-    let incorrect_nonce_transfer = test_setup.accounts.transfer(
-        ZKSyncAccountId(1),
-        ZKSyncAccountId(0),
-        Token(token),
-        deposit_amount.clone(),
-        BigUint::from(0u32),
-        Some(nonce + 1),
-        false,
-    );
-    test_setup.execute_incorrect_tx(incorrect_nonce_transfer);
-
-    //should be executed as a transfer to new
-    test_setup.transfer(
-        ZKSyncAccountId(1),
-        ZKSyncAccountId(2),
-        Token(token),
-        &deposit_amount / BigUint::from(4u32),
-        &deposit_amount / BigUint::from(4u32),
-    );
-
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
-
-    test_setup.withdraw(
-        ZKSyncAccountId(2),
-        ETHAccountId(0),
-        Token(token),
-        &deposit_amount / BigUint::from(4u32),
-        &deposit_amount / BigUint::from(4u32),
-    );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Transfer test success, token_id: {}", token);
-
-    test_setup.start_block();
-    test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Full exit test success, token_id: {}", token);
-}
-
-pub fn perform_some_operations_no_verify(
+pub fn perform_basic_operations(
     token: u16,
     test_setup: &mut TestSetup,
     deposit_amount: BigUint,
+    block_should_be_verified: bool,
 ) {
     // test deposit to other account
     test_setup.start_block();
@@ -483,7 +385,14 @@ pub fn perform_some_operations_no_verify(
         Token(token),
         deposit_amount.clone(),
     );
-    test_setup.execute_commit_block().expect_success();
+    if block_should_be_verified {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit to other account test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     // test two deposits
     test_setup.start_block();
@@ -499,12 +408,23 @@ pub fn perform_some_operations_no_verify(
         Token(token),
         deposit_amount.clone(),
     );
-    test_setup.execute_commit_block().expect_success();
+    if block_should_be_verified {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     // test transfers
     test_setup.start_block();
 
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    if block_should_be_verified {
+        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+    } else {
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    }
 
     //transfer to self should work
     test_setup.transfer(
@@ -554,11 +474,25 @@ pub fn perform_some_operations_no_verify(
         &deposit_amount / BigUint::from(4u32),
         &deposit_amount / BigUint::from(4u32),
     );
-    test_setup.execute_commit_block().expect_success();
+    if block_should_be_verified {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Transfer test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     test_setup.start_block();
     test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
-    test_setup.execute_commit_block().expect_success();
+    if block_should_be_verified {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Full exit test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 }
 
 pub struct TestkitConfig {
@@ -642,7 +576,7 @@ pub fn perform_basic_tests() {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
-        perform_basic_operations(token, &mut test_setup, deposit_amount.clone());
+        perform_basic_operations(token, &mut test_setup, deposit_amount.clone(), true);
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");

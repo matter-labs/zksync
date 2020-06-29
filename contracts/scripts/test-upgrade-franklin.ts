@@ -21,6 +21,11 @@ async function main() {
         parser.addArgument("contractAddress");
         parser.addArgument("upgradeGatekeeperAddress");
         const args = parser.parseArgs(process.argv.slice(2));
+        if (process.env.ETH_NETWORK !== "test") {
+            console.log("Upgrading test contract not on test network is not allowed");
+            process.exit(163);
+            return;
+        }
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
