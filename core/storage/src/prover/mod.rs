@@ -56,6 +56,22 @@ impl<'a> ProverSchema<'a> {
         })
     }
 
+    /// Returns the amount of blocks which await for proof (committed but not verified)
+    pub fn pending_jobs_count(&self) -> QueryResult<u32> {
+        self.0.conn().transaction(|| {
+            let query = "\
+            SELECT COUNT(*) as integer_value FROM operations o \
+               WHERE action_type = 'COMMIT' \
+                   AND block_number > \
+                       (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
+                   AND NOT EXISTS \
+                       (SELECT * FROM proofs WHERE block_number = o.block_number);";
+
+            let block_without_proofs = diesel::sql_query(query).get_result::<IntegerNumber>(self.0.conn())?;
+            Ok(block_without_proofs.integer_value as u32)
+        })
+    }
+
     /// Given the block size, chooses the next block to prove for the certain prover.
     /// Returns `None` if either there are no blocks of given size to prove, or
     /// there is already an ongoing job for non-proved block.
@@ -66,7 +82,7 @@ impl<'a> ProverSchema<'a> {
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         // Select the block to prove.
-        let job: Option<BlockNumber> = self
+        self
             .0
             .conn()
             .transaction(|| {
@@ -96,24 +112,24 @@ impl<'a> ProverSchema<'a> {
                 );
 
                 // Return the index of such a block.
-                diesel::sql_query(query).get_result::<Option<IntegerNumber>>(self.0.conn())
-            })?
-            .map(|i| i.integer_value as BlockNumber);
+                let job = diesel::sql_query(query).get_result::<Option<IntegerNumber>>(self.0.conn())?
+                .map(|i| i.integer_value as BlockNumber);
 
-        // If there is a block to prove, create a job and store it
-        // in the `prover_runs` table; otherwise do nothing and return `None`.
-        if let Some(block_number_) = job {
-            use crate::schema::prover_runs::dsl::*;
-            let inserted: ProverRun = insert_into(prover_runs)
-                .values(&vec![(
-                    block_number.eq(i64::from(block_number_)),
-                    worker.eq(worker_.to_string()),
-                )])
-                .get_result(self.0.conn())?;
-            Ok(Some(inserted))
-        } else {
-            Ok(None)
-        }
+                // If there is a block to prove, create a job and store it
+                // in the `prover_runs` table; otherwise do nothing and return `None`.
+                if let Some(block_number_) = job {
+                    use crate::schema::prover_runs::dsl::*;
+                    let inserted: ProverRun = insert_into(prover_runs)
+                        .values(&vec![(
+                            block_number.eq(i64::from(block_number_)),
+                            worker.eq(worker_.to_string()),
+                        )])
+                        .get_result(self.0.conn())?;
+                    Ok(Some(inserted))
+                } else {
+                    Ok(None)
+                }
+            })
     }
 
     /// Updates the state of ongoing prover job.

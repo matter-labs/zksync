@@ -16,7 +16,7 @@ use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::rescue::RescueEngine;
-use crate::misc::utils::format_ether;
+use crate::misc::utils::format_units;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::{max_account_id, max_token_id, JUBJUB_PARAMS, RESCUE_PARAMS};
 use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg, BigUintSerdeAsRadix10Str};
@@ -189,7 +189,8 @@ impl Transfer {
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
-            && self.token <= max_token_id();
+            && self.token <= max_token_id()
+            && self.to != Address::zero();
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
@@ -209,18 +210,18 @@ impl Transfer {
     }
 
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
-    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
         format!(
             "Transfer {amount} {token}\n\
             To: {to:?}\n\
             Nonce: {nonce}\n\
             Fee: {fee} {token}\n\
             Account Id: {account_id}",
-            amount = format_ether(&self.amount),
+            amount = format_units(&self.amount, decimals),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
-            fee = format_ether(&self.fee),
+            fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
         )
     }
@@ -334,18 +335,18 @@ impl Withdraw {
     }
 
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
-    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
         format!(
             "Withdraw {amount} {token}\n\
             To: {to:?}\n\
             Nonce: {nonce}\n\
             Fee: {fee} {token}\n\
             Account Id: {account_id}",
-            amount = format_ether(&self.amount),
+            amount = format_units(&self.amount, decimals),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
-            fee = format_ether(&self.fee),
+            fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
         )
     }
@@ -840,12 +841,13 @@ impl Serialize for EIP1271Signature {
 ///
 /// Some notes on implementation of methods of this structure:
 ///
-/// Ethereum signed messages expect v parameter to be 27 + recovery_id(0,1,2,3)
+/// Ethereum signed message produced by most clients contains v where v = 27 + recovery_id(0,1,2,3),
+/// but for some clients v = recovery_id(0,1,2,3).
 /// Library that we use for signature verification (written for bitcoin) expects v = recovery_id
 ///
 /// That is why:
 /// 1) when we create this structure by deserialization of message produced by user
-/// we subtract 27 from v in `ETHSignature` and store it in ETHSignature structure this way.
+/// we subtract 27 from v in `ETHSignature` if necessary and store it in the `ETHSignature` structure this way.
 /// 2) When we serialize/create this structure we add 27 to v in `ETHSignature`.
 ///
 /// This way when we have methods that consumes &self we can be sure that ETHSignature::recover_signer works
@@ -862,8 +864,14 @@ impl PackedEthSignature {
 
     pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(bytes.len() == 65, "eth signature length should be 65 bytes");
-        // assumes v = recover + 27
-        Ok(PackedEthSignature(ETHSignature::from_electrum(&bytes)))
+        let mut bytes_array = [0u8; 65];
+        bytes_array.copy_from_slice(&bytes);
+
+        if bytes_array[64] >= 27 {
+            bytes_array[64] -= 27;
+        }
+
+        Ok(PackedEthSignature(ETHSignature::from(bytes_array)))
     }
 
     /// Signs message using ethereum private key, results are identical to signature created
@@ -1167,6 +1175,8 @@ mod test {
             ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0x", "0xd98f51c2ee0fd589e421348002dffec5d1b38e5bef9a41a699030456dc39298d12698158dc2a814b5f9ac6d433009dec87484a4579107be3f8f33907e92938291b"),
             // this example has v = 28, unlike others
             ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0x14", "0xd288b623af654c9d805e132812edf09ce244040376ca49112e91d437ecceed7c518690d4ae14149cd533f1ca4f081e6d2252c980fccc63de4d6bb818f1b668921c"),
+            // same as first, but v is just recovery id
+            ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0xdead", "0x13c34c76ffb42d97da67ddc5d275e92d758d1b48b5ee4b3bacd800cbeec3baff043a5ee63fea55485e1ee5d6f8b088daabd095f2ebbdc80a33806528b44bfccc01"),
         ];
 
         for (address, msg, signature) in examples {

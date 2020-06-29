@@ -42,3 +42,9 @@ export function formatDate(timeStr) {
 export function formatToken(amount, token) {
     return window.syncProvider.tokenSet.formatToken(token, amount);
 }
+
+export function capitalize(s) {
+    if (typeof s !== 'string') return '';
+    if (!s) return;
+    return s[0].toUpperCase() + s.slice(1);
+}

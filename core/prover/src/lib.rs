@@ -16,7 +16,7 @@ use std::{
     thread,
 };
 // External deps
-use log::*;
+use rand::Rng;
 // Workspace deps
 use models::{config_options::ProverOptions, node::Engine, prover_utils::EncodedProofPlonk};
 
@@ -134,7 +134,8 @@ pub fn start<CLIENT, PROVER>(
             .send((0, true))
             .expect("failed to send heartbeat exit request"); // exit heartbeat routine request.
     });
-    keep_sending_work_heartbeats(prover_rc.get_heartbeat_options(), rx_block_start);
+    let (client, heartbeat_interval) = prover_rc.get_heartbeat_options();
+    keep_sending_work_heartbeats(client, heartbeat_interval, rx_block_start);
     join_handle
         .join()
         .expect("failed to join on running rounds thread");
@@ -177,33 +178,45 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
             };
         }
         log::trace!("round completed.");
-        thread::sleep(cycle_wait_interval);
+
+        // Randomly generated shift to desynchronize multiple provers started at the same time.
+        let mut rng = rand::thread_rng();
+        let sleep_shift_ms = rng.gen_range(0, 300);
+        let sleep_duration = cycle_wait_interval + Duration::from_millis(sleep_shift_ms);
+        thread::sleep(sleep_duration);
     }
 }
 
 fn keep_sending_work_heartbeats<C: ApiClient>(
-    heartbeat_opts: (&C, Duration),
+    client: &C,
+    heartbeat_interval: Duration,
     start_heartbeats_rx: mpsc::Receiver<(i32, bool)>,
 ) {
     let mut job_id = 0;
     loop {
-        thread::sleep(heartbeat_opts.1);
-        let (j, quit) = match start_heartbeats_rx.try_recv() {
-            Ok(v) => v,
+        let mut rng = rand::thread_rng();
+
+        // Randomly generated shift, so multiple provers won't spam the server at the same time.
+        let sleep_shift_ms = rng.gen_range(0, 500);
+        let sleep_duration = heartbeat_interval + Duration::from_millis(sleep_shift_ms);
+        thread::sleep(sleep_duration);
+
+        let (new_job_id, quit_now) = match start_heartbeats_rx.try_recv() {
+            Ok((new_job_id, quit_now)) => (new_job_id, quit_now),
             Err(mpsc::TryRecvError::Empty) => (job_id, false),
             Err(e) => {
-                panic!("error receiving from hearbeat channel: {}", e);
+                panic!("error receiving from heartbeat channel: {}", e);
             }
         };
-        if quit {
+        if quit_now {
             return;
         }
-        job_id = j;
+        job_id = new_job_id;
         if job_id != 0 {
-            trace!("sending working_on request for job_id: {}", job_id);
-            let ret = heartbeat_opts.0.working_on(job_id);
+            log::trace!("sending working_on request for job_id: {}", job_id);
+            let ret = client.working_on(job_id);
             if let Err(e) = ret {
-                error!("working_on request errored: {}", e);
+                log::error!("working_on request erred: {}", e);
             }
         }
     }

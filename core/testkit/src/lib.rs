@@ -347,6 +347,7 @@ pub fn spawn_state_keeper(
         executed_tx_notify_sender,
         block_chunks_sizes,
         max_miniblock_iterations,
+        max_miniblock_iterations,
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
@@ -497,7 +498,7 @@ pub fn perform_basic_operations(
 
 pub struct TestkitConfig {
     pub chain_id: u8,
-    pub gas_price_factor: usize,
+    pub gas_price_factor: f64,
     pub web3_url: String,
 }
 
@@ -680,17 +681,6 @@ impl TestSetup {
             .eth_accounts_state
             .insert((from, token.0), from_eth_balance);
 
-        if let Some(mut eth_balance) = self
-            .expected_changes_for_current_block
-            .eth_accounts_state
-            .remove(&(from, 0))
-        {
-            eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((from, 0), eth_balance);
-        }
-
         let mut zksync0_old = self.get_expected_zksync_account_balance(to, token.0);
         zksync0_old += &amount;
         self.expected_changes_for_current_block
@@ -708,6 +698,23 @@ impl TestSetup {
             )
         };
         let (receipt, deposit_op) = self.accounts.deposit(from, to, token_address, amount);
+
+        if let Some(mut eth_balance) = self
+            .expected_changes_for_current_block
+            .eth_accounts_state
+            .remove(&(from, 0))
+        {
+            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
+                .expect("Failed to get gas price");
+            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
+            eth_balance.1 += (gas_used * gas_price)
+                .to_string()
+                .parse::<BigUint>()
+                .unwrap();
+            self.expected_changes_for_current_block
+                .eth_accounts_state
+                .insert((from, 0), eth_balance);
+        }
 
         self.execute_priority_op(deposit_op);
         receipt
@@ -745,17 +752,6 @@ impl TestSetup {
             .eth_accounts_state
             .insert((from, token.0), from_eth_balance);
 
-        if let Some(mut eth_balance) = self
-            .expected_changes_for_current_block
-            .eth_accounts_state
-            .remove(&(from, 0))
-        {
-            eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((from, 0), eth_balance);
-        }
-
         let token_address = if token.0 == 0 {
             None
         } else {
@@ -769,6 +765,24 @@ impl TestSetup {
         let (receipt, deposit_op) =
             self.accounts
                 .deposit_to_random(from, token_address, amount, rng);
+
+        if let Some(mut eth_balance) = self
+            .expected_changes_for_current_block
+            .eth_accounts_state
+            .remove(&(from, 0))
+        {
+            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
+                .expect("Failed to get gas price");
+            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
+
+            eth_balance.1 += (gas_used * gas_price)
+                .to_string()
+                .parse::<BigUint>()
+                .unwrap();
+            self.expected_changes_for_current_block
+                .eth_accounts_state
+                .insert((from, 0), eth_balance);
+        }
 
         self.execute_priority_op(deposit_op);
         receipt
@@ -834,18 +848,25 @@ impl TestSetup {
             .eth_accounts_state
             .insert((post_by, token.0), post_by_eth_balance);
 
+        let (receipt, full_exit_op) = self.accounts.full_exit(post_by, token_address, account_id);
+
         if let Some(mut eth_balance) = self
             .expected_changes_for_current_block
             .eth_accounts_state
             .remove(&(post_by, 0))
         {
-            eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
+            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
+                .expect("Failed to get gas price");
+            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
+            eth_balance.1 += (gas_used * gas_price)
+                .to_string()
+                .parse::<BigUint>()
+                .unwrap();
             self.expected_changes_for_current_block
                 .eth_accounts_state
                 .insert((post_by, 0), eth_balance);
         }
 
-        let (receipt, full_exit_op) = self.accounts.full_exit(post_by, token_address, account_id);
         self.execute_priority_op(full_exit_op);
         receipt
     }

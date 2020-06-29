@@ -8,7 +8,6 @@ use futures::{
 use tokio::{runtime::Runtime, task::JoinHandle};
 use web3::types::Address;
 // Workspace uses
-use crate::mempool::ProposedBlock;
 use crypto_exports::ff;
 use models::{
     node::{
@@ -23,6 +22,8 @@ use models::{
 };
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
+// Local uses
+use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -59,6 +60,7 @@ struct PendingBlock {
     unprocessed_priority_op_before: u64,
     pending_block_iteration: usize,
     withdrawals_amount: u32,
+    gas_counter: GasCounter,
 }
 
 impl PendingBlock {
@@ -72,6 +74,7 @@ impl PendingBlock {
             unprocessed_priority_op_before,
             pending_block_iteration: 0,
             withdrawals_amount: 0,
+            gas_counter: GasCounter::new(),
         }
     }
 }
@@ -92,6 +95,7 @@ pub struct PlasmaStateKeeper {
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
+    max_miniblock_iterations_withdraw_block: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -99,7 +103,6 @@ pub struct PlasmaStateInitParams {
     pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
-    pub proposed_block: Option<ProposedBlock>,
 }
 
 impl Default for PlasmaStateInitParams {
@@ -115,45 +118,38 @@ impl PlasmaStateInitParams {
             acc_id_by_addr: HashMap::new(),
             last_block_number: 0,
             unprocessed_priority_op: 0,
-            proposed_block: None,
         }
     }
 
-    pub fn get_proposed_block(&self) -> Option<ProposedBlock> {
-        self.proposed_block.clone()
+    pub fn get_pending_block(
+        &self,
+        storage: &storage::StorageProcessor,
+    ) -> Option<SendablePendingBlock> {
+        let pending_block = storage
+            .chain()
+            .block_schema()
+            .load_pending_block()
+            .unwrap_or_default()?;
+
+        if pending_block.number <= self.last_block_number {
+            // If after generating several pending block node generated
+            // full blocks, they may be sealed on the first iteration
+            // and stored pending block will be outdated.
+            // Thus, if the stored pending block has the lower number than
+            // last committed one, we just ignore it.
+            return None;
+        }
+
+        // We've checked that pending block is greater than the last committed block,
+        // but it must be greater exactly by 1.
+        assert_eq!(pending_block.number, self.last_block_number + 1);
+
+        Some(pending_block)
     }
 
     pub fn restore_from_db(storage: &storage::StorageProcessor) -> Result<Self, failure::Error> {
         let mut init_params = Self::new();
         init_params.load_from_db(&storage)?;
-
-        let pending_block = storage.chain().block_schema().load_pending_block()?;
-
-        if let Some(pending_block) = pending_block {
-            // Check that stored block matches loaded state.
-            assert_eq!(pending_block.number, init_params.last_block_number + 1);
-
-            let mut proposed_block = ProposedBlock {
-                priority_ops: Vec::new(),
-                txs: Vec::new(),
-            };
-
-            // Transform executed operations into non-executed, so they will be executed again.
-            // Since it's a pending block, the state updates were not actually applied in the
-            // database (as it happens only when full block is committed).
-            for operation in pending_block.success_operations {
-                match operation {
-                    ExecutedOperations::Tx(tx) => {
-                        proposed_block.txs.push(tx.tx);
-                    }
-                    ExecutedOperations::PriorityOp(op) => {
-                        proposed_block.priority_ops.push(op.priority_op);
-                    }
-                }
-            }
-
-            init_params.proposed_block = Some(proposed_block);
-        }
 
         Ok(init_params)
     }
@@ -237,6 +233,7 @@ impl PlasmaStateInitParams {
 }
 
 impl PlasmaStateKeeper {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         initial_state: PlasmaStateInitParams,
         fee_account_address: Address,
@@ -245,6 +242,7 @@ impl PlasmaStateKeeper {
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
+        max_miniblock_iterations_withdraw_block: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -276,6 +274,7 @@ impl PlasmaStateKeeper {
             executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
+            max_miniblock_iterations_withdraw_block,
         };
 
         let root = keeper.state.root_hash();
@@ -284,15 +283,38 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub async fn initialize(&mut self, proposed_block: Option<ProposedBlock>) {
-        if let Some(proposed_block) = proposed_block {
+    pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
+        if let Some(pending_block) = pending_block {
+            // Transform executed operations into non-executed, so they will be executed again.
+            // Since it's a pending block, the state updates were not actually applied in the
+            // database (as it happens only when full block is committed).
+            //
+            // We use `apply_tx` and `apply_priority_op` methods directly instead of
+            // `apply_txs_batch` to preserve the original execution order. Otherwise there may
+            // be a state corruption, if e.g. `Deposit` will be executed before `TransferToNew`
+            // and account IDs will change.
+            let mut txs_count = 0;
+            let mut priority_op_count = 0;
+            for operation in pending_block.success_operations {
+                match operation {
+                    ExecutedOperations::Tx(tx) => {
+                        self.apply_tx(tx.tx)
+                            .expect("Tx from the pending block failed");
+                        txs_count += 1;
+                    }
+                    ExecutedOperations::PriorityOp(op) => {
+                        self.apply_priority_op(op.priority_op)
+                            .expect("Priority op from the pending block failed");
+                        priority_op_count += 1;
+                    }
+                }
+            }
+
             log::info!(
-                "Restored non-finished block from the database: {} transactions, {} priority operations",
-                proposed_block.txs.len(),
-                proposed_block.priority_ops.len()
+                "Executed restored proposed block: {} transactions, {} priority operations",
+                txs_count,
+                priority_op_count
             );
-            self.execute_tx_batch(proposed_block).await;
-            log::info!("Executed restored proposed block");
         } else {
             log::info!("There is no pending block to restore");
         }
@@ -336,30 +358,66 @@ impl PlasmaStateKeeper {
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }
 
-    async fn run(mut self, proposed_block: Option<ProposedBlock>) {
-        self.initialize(proposed_block).await;
+    async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
+        self.initialize(pending_block).await;
+
+        let mut last_request_processed = std::time::Instant::now();
 
         while let Some(req) = self.rx_for_blocks.next().await {
+            let start = std::time::Instant::now();
+
+            log::info!(
+                "Received new request. Last request was processed {}ms ago",
+                (start - last_request_processed).as_millis()
+            );
+
             match req {
                 StateKeeperRequest::GetAccount(addr, sender) => {
                     sender.send(self.account(&addr)).unwrap_or_default();
+
+                    log::info!(
+                        "GetAccount request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
+
+                    log::info!(
+                        "GetLastUnprocessedPriorityOp request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_tx_batch(proposed_block).await;
+
+                    log::info!(
+                        "ExecuteMiniBlock request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::GetExecutedInPendingBlock(op_id, sender) => {
                     let result = self.check_executed_in_pending_block(op_id);
                     sender.send(result).unwrap_or_default();
+
+                    log::info!(
+                        "GetExecutedInPendingBlock request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
+
+                    log::info!(
+                        "SealBlock request processed in {}ms",
+                        start.elapsed().as_millis()
+                    );
                 }
             }
+
+            last_request_processed = std::time::Instant::now();
         }
     }
 
@@ -417,7 +475,14 @@ impl PlasmaStateKeeper {
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
-            if self.pending_block.pending_block_iteration > self.max_miniblock_iterations {
+
+            // If pending block contains withdrawals we seal it faster
+            let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
+                self.max_miniblock_iterations_withdraw_block
+            } else {
+                self.max_miniblock_iterations
+            };
+            if self.pending_block.pending_block_iteration > max_miniblock_iterations {
                 self.seal_pending_block().await;
                 self.notify_executed_ops(&mut executed_ops).await;
                 return;
@@ -435,6 +500,22 @@ impl PlasmaStateKeeper {
     ) -> Result<ExecutedOperations, PriorityOp> {
         let chunks_needed = priority_op.data.chunks();
         if self.pending_block.chunks_left < chunks_needed {
+            return Err(priority_op);
+        }
+
+        // Check if adding this transaction to the block won't make the contract operations
+        // too expensive.
+        let non_executed_op = self
+            .state
+            .priority_op_to_franklin_op(priority_op.data.clone());
+        if self
+            .pending_block
+            .gas_counter
+            .add_op(&non_executed_op)
+            .is_err()
+        {
+            // We've reached the gas limit, seal the block.
+            // This transaction will go into the next one.
             return Err(priority_op);
         }
 
@@ -475,6 +556,24 @@ impl PlasmaStateKeeper {
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
             return Err(tx);
+        }
+
+        // Check if adding this transaction to the block won't make the contract operations
+        // too expensive.
+        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.clone());
+        if let Ok(non_executed_op) = non_executed_op {
+            // We only care about successful conversions, since if conversion failed,
+            // then transaction will fail as well (as it shares the same code base).
+            if self
+                .pending_block
+                .gas_counter
+                .add_op(&non_executed_op)
+                .is_err()
+            {
+                // We've reached the gas limit, seal the block.
+                // This transaction will go into the next one.
+                return Err(tx);
+            }
         }
 
         if matches!(tx, FranklinTx::Withdraw(_)) {
@@ -559,6 +658,9 @@ impl PlasmaStateKeeper {
                 .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
         );
 
+        let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
+        let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
+
         let block_commit_request = BlockCommitRequest {
             block: Block::new_from_availabe_block_sizes(
                 self.state.block_number,
@@ -570,6 +672,8 @@ impl PlasmaStateKeeper {
                     self.current_unprocessed_priority_op,
                 ),
                 &self.available_block_chunk_sizes,
+                commit_gas_limit,
+                verify_gas_limit,
             ),
             accounts_updated: pending_block.account_updates,
         };
@@ -670,8 +774,8 @@ impl PlasmaStateKeeper {
 #[must_use]
 pub fn start_state_keeper(
     sk: PlasmaStateKeeper,
-    proposed_block: Option<ProposedBlock>,
+    pending_block: Option<SendablePendingBlock>,
     runtime: &Runtime,
 ) -> JoinHandle<()> {
-    runtime.spawn(sk.run(proposed_block))
+    runtime.spawn(sk.run(pending_block))
 }

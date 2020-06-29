@@ -234,6 +234,7 @@ pub fn start_ws_server(
 
             let task_executor = tokio_old::runtime::Builder::new()
                 .name_prefix("ws-executor")
+                .core_threads(100)
                 .build()
                 .expect("failed to build ws executor");
 

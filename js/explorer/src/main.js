@@ -16,6 +16,7 @@ import Account from './Account.vue';
 
 import config from './env-config';
 import VueTimers from 'vue-timers';
+import { capitalize, sleep } from './utils';
 
 const ethers = require('ethers');
 
@@ -25,7 +26,7 @@ Vue.use(BootstrapVue);
 Vue.use(Clipboard);
 
 const routes = [
-    { path: '/',                    component: Home  },
+    { path: '/',                    component: Home },
     { path: '/blocks/:blockNumber', component: Block },
     { path: '/transactions/:id',    component: Transaction },
     { path: '/accounts/:address',   component: Account, props: true },
@@ -80,6 +81,14 @@ window.app = new Vue({
         this.store.config = config;
         let regex = /(?:api-)*(\w*)(?:\..*)*/;
         this.store.network = this.store.config.ETH_NETWORK;
+        this.store.capitalizedNetwork = capitalize(this.store.network);
+        const walletLinkPrefix = this.store.network == 'mainnet' ? 'wallet' : this.store.network;
+        this.store.walletLink = `https://${walletLinkPrefix}.zksync.io`;
+
+        (async () => {
+            while (!this.store.capitalizedNetwork) await sleep(100);
+            document.title = `zkSync ${this.store.capitalizedNetwork} Explorer — trustless scalable payments`;    
+        })();
     },
     render: h => h(App)
 });

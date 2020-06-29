@@ -7,7 +7,7 @@
             {{updateError}}. Try again later.
         </b-alert>
         <b-card bg-variant="light" >
-            <h4>zkSync Block Explorer</h4> 
+            <h4>zkSync {{store.capitalizedNetwork}} Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>
@@ -73,10 +73,6 @@ const components = {
 export default {
     name: 'home',
     async created() {
-        window.wwwww = this;
-        const client = await clientPromise;
-        const { contractAddress } = await client.testnetConfig();
-        this.store.contractAddress = contractAddress;
         this.update();
     },
     timers: {

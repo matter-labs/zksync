@@ -41,6 +41,22 @@ pub struct CollectedFee {
     pub amount: BigUint,
 }
 
+/// Helper enum to unify Transfer / TransferToNew operations.
+#[derive(Debug)]
+enum TransferOutcome {
+    Transfer(TransferOp),
+    TransferToNew(TransferToNewOp),
+}
+
+impl TransferOutcome {
+    pub fn into_franklin_op(self) -> FranklinOp {
+        match self {
+            Self::Transfer(transfer) => transfer.into(),
+            Self::TransferToNew(transfer) => transfer.into(),
+        }
+    }
+}
+
 impl PlasmaState {
     pub fn empty() -> Self {
         let tree_depth = params::account_tree_depth();
@@ -86,7 +102,17 @@ impl PlasmaState {
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
-        self.balance_tree.get(account_id).cloned()
+        let start = std::time::Instant::now();
+
+        let account = self.balance_tree.get(account_id).cloned();
+
+        log::info!(
+            "Get account (id {}) execution time: {}ms",
+            account_id,
+            start.elapsed().as_millis()
+        );
+
+        account
     }
 
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
@@ -124,7 +150,7 @@ impl PlasmaState {
         self.balance_tree.items.len() as u32
     }
 
-    fn apply_deposit(&mut self, priority_op: Deposit) -> OpSuccess {
+    fn create_deposit_op(&self, priority_op: Deposit) -> DepositOp {
         assert!(
             priority_op.token <= params::max_token_id(),
             "Deposit token is out of range, this should be enforced by contract"
@@ -135,10 +161,14 @@ impl PlasmaState {
         } else {
             self.get_free_account_id()
         };
-        let deposit_op = DepositOp {
+        DepositOp {
             priority_op,
             account_id,
-        };
+        }
+    }
+
+    fn apply_deposit(&mut self, priority_op: Deposit) -> OpSuccess {
+        let deposit_op = self.create_deposit_op(priority_op);
 
         let updates = self.apply_deposit_op(&deposit_op);
         OpSuccess {
@@ -148,7 +178,7 @@ impl PlasmaState {
         }
     }
 
-    fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
+    fn create_full_exit_op(&self, priority_op: FullExit) -> FullExitOp {
         // NOTE: Authroization of the FullExit is verified on the contract.
         assert!(
             priority_op.token <= params::max_token_id(),
@@ -162,10 +192,14 @@ impl PlasmaState {
             .map(BigUintSerdeWrapper);
 
         trace!("Balance: {:?}", account_balance);
-        let op = FullExitOp {
+        FullExitOp {
             priority_op,
             withdraw_amount: account_balance,
-        };
+        }
+    }
+
+    fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
+        let op = self.create_full_exit_op(priority_op);
 
         OpSuccess {
             fee: None,
@@ -215,10 +249,14 @@ impl PlasmaState {
         updates
     }
 
-    fn apply_transfer(&mut self, tx: Transfer) -> Result<OpSuccess, Error> {
+    fn create_transfer_op(&self, tx: Transfer) -> Result<TransferOutcome, Error> {
         ensure!(
             tx.token <= params::max_token_id(),
             "Token id is not supported"
+        );
+        ensure!(
+            tx.to != Address::zero(),
+            "Transfer to Account with address 0 is not allowed"
         );
         let (from, from_account) = self
             .get_account_by_address(&tx.from)
@@ -233,29 +271,44 @@ impl PlasmaState {
         );
         ensure!(from == tx.account_id, "Transfer account id is incorrect");
 
-        if let Some((to, _)) = self.get_account_by_address(&tx.to) {
+        let outcome = if let Some((to, _)) = self.get_account_by_address(&tx.to) {
             let transfer_op = TransferOp { tx, from, to };
 
-            let (fee, updates) = self.apply_transfer_op(&transfer_op)?;
-            Ok(OpSuccess {
-                fee: Some(fee),
-                updates,
-                executed_op: FranklinOp::Transfer(Box::new(transfer_op)),
-            })
+            TransferOutcome::Transfer(transfer_op)
         } else {
             let to = self.get_free_account_id();
             let transfer_to_new_op = TransferToNewOp { tx, from, to };
 
-            let (fee, updates) = self.apply_transfer_to_new_op(&transfer_to_new_op)?;
-            Ok(OpSuccess {
-                fee: Some(fee),
-                updates,
-                executed_op: FranklinOp::TransferToNew(Box::new(transfer_to_new_op)),
-            })
+            TransferOutcome::TransferToNew(transfer_to_new_op)
+        };
+
+        Ok(outcome)
+    }
+
+    fn apply_transfer(&mut self, tx: Transfer) -> Result<OpSuccess, Error> {
+        let transfer = self.create_transfer_op(tx)?;
+
+        match transfer {
+            TransferOutcome::Transfer(transfer_op) => {
+                let (fee, updates) = self.apply_transfer_op(&transfer_op)?;
+                Ok(OpSuccess {
+                    fee: Some(fee),
+                    updates,
+                    executed_op: FranklinOp::Transfer(Box::new(transfer_op)),
+                })
+            }
+            TransferOutcome::TransferToNew(transfer_to_new_op) => {
+                let (fee, updates) = self.apply_transfer_to_new_op(&transfer_to_new_op)?;
+                Ok(OpSuccess {
+                    fee: Some(fee),
+                    updates,
+                    executed_op: FranklinOp::TransferToNew(Box::new(transfer_to_new_op)),
+                })
+            }
         }
     }
 
-    fn apply_withdraw(&mut self, tx: Withdraw) -> Result<OpSuccess, Error> {
+    fn create_withdraw_op(&self, tx: Withdraw) -> Result<WithdrawOp, Error> {
         ensure!(
             tx.token <= params::max_token_id(),
             "Token id is not supported"
@@ -276,6 +329,12 @@ impl PlasmaState {
             "Withdraw account id is incorrect"
         );
         let withdraw_op = WithdrawOp { tx, account_id };
+
+        Ok(withdraw_op)
+    }
+
+    fn apply_withdraw(&mut self, tx: Withdraw) -> Result<OpSuccess, Error> {
+        let withdraw_op = self.create_withdraw_op(tx)?;
 
         let (fee, updates) = self.apply_withdraw_op(&withdraw_op)?;
         Ok(OpSuccess {
@@ -305,7 +364,7 @@ impl PlasmaState {
         // })
     }
 
-    fn apply_change_pubkey(&mut self, tx: ChangePubKey) -> Result<OpSuccess, Error> {
+    fn create_change_pubkey_op(&self, tx: ChangePubKey) -> Result<ChangePubKeyOp, Error> {
         let (account_id, account) = self
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
@@ -322,6 +381,12 @@ impl PlasmaState {
             "ChangePubKey account id is bigger than max supported"
         );
         let change_pk_op = ChangePubKeyOp { tx, account_id };
+
+        Ok(change_pk_op)
+    }
+
+    fn apply_change_pubkey(&mut self, tx: ChangePubKey) -> Result<OpSuccess, Error> {
+        let change_pk_op = self.create_change_pubkey_op(tx)?;
 
         let (fee, updates) = self.apply_change_pubkey_op(&change_pk_op)?;
         Ok(OpSuccess {
@@ -730,5 +795,25 @@ impl PlasmaState {
         };
 
         Ok((fee, updates))
+    }
+
+    /// Converts the `FranklinTx` object to a `FranklinOp`, without applying it.
+    pub fn franklin_tx_to_franklin_op(&self, tx: FranklinTx) -> Result<FranklinOp, Error> {
+        match tx {
+            FranklinTx::Transfer(tx) => self
+                .create_transfer_op(*tx)
+                .map(TransferOutcome::into_franklin_op),
+            FranklinTx::Withdraw(tx) => self.create_withdraw_op(*tx).map(Into::into),
+            FranklinTx::ChangePubKey(tx) => self.create_change_pubkey_op(*tx).map(Into::into),
+            FranklinTx::Close(_) => failure::bail!("Close op is disabled"),
+        }
+    }
+
+    /// Converts the `PriorityOp` object to a `FranklinOp`, without applying it.
+    pub fn priority_op_to_franklin_op(&self, op: FranklinPriorityOp) -> FranklinOp {
+        match op {
+            FranklinPriorityOp::Deposit(op) => self.create_deposit_op(op).into(),
+            FranklinPriorityOp::FullExit(op) => self.create_full_exit_op(op).into(),
+        }
     }
 }

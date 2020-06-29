@@ -7,7 +7,7 @@ import {readContractCode, readTestContracts} from "../src.ts/deploy";
 const {performance} = require("perf_hooks");
 const {expect} = require("chai");
 
-export const FranklinTestNoInitContractCode = require(`../build/ZkSyncTestNoInit`);
+export const FranklinTestUpgradeTargetContractCode = require(`../build/ZkSyncTestUpgradeTarget`);
 
 const testContracts = readTestContracts();
 
@@ -45,7 +45,7 @@ async function main() {
 
         const newTargetFranklin = await deployContract(
             wallet,
-            FranklinTestNoInitContractCode,
+            FranklinTestUpgradeTargetContractCode,
             [],
             {gasLimit: 6500000},
         );
@@ -68,7 +68,7 @@ async function main() {
             .to.equal(newTargetFranklin.address, "upgrade was unsuccessful");
     } catch (e) {
         console.error(JSON.stringify(e));
-        process.exit(0);
+        process.exit(121);
     }
 }
 

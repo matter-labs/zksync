@@ -232,7 +232,7 @@ pub struct OngoingDepositsResp {
     estimated_deposits_approval_block: Option<u64>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
@@ -380,7 +380,7 @@ impl RpcApp {
         io.extend_with(self.to_delegate())
     }
 
-    fn token_symbol_from_id(&self, token_id: TokenId) -> Result<String> {
+    fn token_info_from_id(&self, token_id: TokenId) -> Result<Token> {
         fn rpc_message(error: impl ToString) -> Error {
             Error {
                 code: RpcErrorCodes::Other.into(),
@@ -389,16 +389,10 @@ impl RpcApp {
             }
         }
 
-        let symbol = self
-            .token_cache
+        self.token_cache
             .get_token(token_id)
             .map_err(rpc_message)?
-            .map(|t| t.symbol);
-
-        match symbol {
-            Some(symbol) => Ok(symbol),
-            None => Err(rpc_message("Token not found in the DB")),
-        }
+            .ok_or_else(|| rpc_message("Token not found in the DB"))
     }
 
     /// Returns a message that user has to sign to send the transaction.
@@ -406,12 +400,18 @@ impl RpcApp {
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
     fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
         match tx {
-            FranklinTx::Transfer(tx) => Ok(Some(
-                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
-            )),
-            FranklinTx::Withdraw(tx) => Ok(Some(
-                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
-            )),
+            FranklinTx::Transfer(tx) => {
+                let token = self.token_info_from_id(tx.token)?;
+                Ok(Some(
+                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+                ))
+            }
+            FranklinTx::Withdraw(tx) => {
+                let token = self.token_info_from_id(tx.token)?;
+                Ok(Some(
+                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+                ))
+            }
             _ => Ok(None),
         }
     }
@@ -543,7 +543,7 @@ impl RpcApp {
 
             if let Some(block) = block.clone() {
                 // Unverified blocks can still change, so we can't cache them.
-                if block.verified_at.is_some() {
+                if block.verified_at.is_some() && block.block_number == block_number {
                     self.cache_of_blocks_info.insert(block_number, block);
                 }
             }
@@ -669,7 +669,12 @@ impl Rpc for RpcApp {
         &self,
         address: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
+        // TODO: this method now has a lot debug output, to be removed as soon as problem is detected.
+        use std::time::Instant;
+
+        let started = Instant::now();
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
+
         let self_ = self.clone();
         let account_state_resp = async move {
             let state_keeper_response = oneshot::channel();
@@ -690,6 +695,7 @@ impl Rpc for RpcApp {
                     );
                     Error::internal_error()
                 })?;
+
             let committed_account_state = state_keeper_response.1.await.map_err(|err| {
                 log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
@@ -716,6 +722,12 @@ impl Rpc for RpcApp {
             let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
             let depositing =
                 DepositingAccountBalances::from_pending_ops(depositing_ops, &self_.token_cache)?;
+
+            log::info!(
+                "account_info: address {}, total request processing {}ms",
+                &address,
+                started.elapsed().as_millis()
+            );
 
             Ok(AccountInfoResp {
                 address,

@@ -2,8 +2,6 @@ FROM alpine
 # Docs of env variables used for this image
 # to test this locally just run
 # docker build -t tmp_prover -f =(f envsubst < ./docker/prover/Dockerfile) .; docker run --rm  tmp_prover:latest
-#ENV NODE_NAME nodename
-#ENV POD_NAME podname
 #ENV SUPPORTED_BLOCK_CHUNKS_SIZES $SUPPORTED_BLOCK_CHUNKS_SIZES
 #ENV SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS $SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS
 #ENV BLOCK_CHUNK_SIZES $BLOCK_CHUNK_SIZES

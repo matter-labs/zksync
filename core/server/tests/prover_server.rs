@@ -34,6 +34,7 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
             tx,
             tree,
             0,
+            0,
         );
     });
     bind_to.to_string()
@@ -245,6 +246,8 @@ pub fn test_operation_and_wanted_prover_data(
         ops,
         (0, 1),
         &ConfigurationOptions::from_env().available_block_chunk_sizes,
+        1_000_000.into(),
+        1_500_000.into(),
     );
 
     let mut pub_data = vec![];

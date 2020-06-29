@@ -38,9 +38,10 @@ jobs:
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zksync update-images
+        echo "::set-env name=IMAGE_TAG::$(f sh -c 'echo $IMAGE_TAG')"
 
-    - name: update-selfhosted-cache
-      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
+#    - name: update-selfhosted-cache
+#      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
 
     - name: update-stage
       run: |
@@ -48,3 +49,13 @@ jobs:
         zksync env stage
         zksync db-migrate
         zksync update-kubeconfig
+
+    - name: promote-to-gitlab
+      run: |
+        curl -X POST \
+         -F token=${{ secrets.GITLAB_TOKEN }} \
+         -F "ref=gitlab-deploy" \
+         -F "variables[SERVER_TAG]=$IMAGE_TAG" \
+         -F "variables[PROVER_TAG]=$IMAGE_TAG" \
+         -F "variables[EXPLORER_TAG]=$IMAGE_TAG" \
+         https://gitlab.com/api/v4/projects/19165314/trigger/pipeline

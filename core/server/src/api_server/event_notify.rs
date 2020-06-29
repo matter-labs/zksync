@@ -229,9 +229,11 @@ impl OperationNotifier {
             };
 
             // Unverified blocks can still change, so we can't cache them.
-            if block_info.verified {
+            // Since request for non-existing block will return the last committed block,
+            // we must also check that block number matches the requested one.
+            if block_info.verified && block_info.block_number == block_number as i64 {
                 self.cache_of_blocks_info
-                    .insert(block_number, block_info.clone());
+                    .insert(block_info.block_number as u32, block_info.clone());
             }
 
             block_info

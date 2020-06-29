@@ -2,7 +2,6 @@ use futures::{channel::mpsc, SinkExt};
 use log::*;
 use server::eth_watch::{EthWatch, EthWatchRequest};
 use std::time::Duration;
-use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 
 fn main() {
@@ -11,14 +10,6 @@ fn main() {
     env_logger::init();
     info!("ETH watcher started");
     let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
-    let governance_addr = std::env::var("GOVERNANCE_ADDR").expect("GOVERNANCE_ADDR env not found")
-        [2..]
-        .parse()
-        .expect("Failed to parse GOVERNANCE_ADDR");
-    // let priority_queue_address = std::env::var("PRIORITY_QUEUE_ADDR")
-    //     .expect("PRIORITY_QUEUE_ADDR env var not found")[2..]
-    //     .parse()
-    //     .expect("Failed to parse PRIORITY_QUEUE_ADDR");
     let contract_address = std::env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env var not found")
         [2..]
         .parse()
@@ -31,9 +22,6 @@ fn main() {
     let watcher = EthWatch::new(
         web3,
         web3_event_loop_handle,
-        ConnectionPool::new(Some(1)),
-        governance_addr,
-        //priority_queue_address,
         contract_address,
         0,
         eth_req_receiver,

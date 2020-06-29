@@ -144,7 +144,7 @@ export class Deployer {
         const zksContract = await deployContract(
             this.deployWallet,
             this.contracts.zkSync, [],
-            {gasLimit: 5000000, ...ethTxOptions},
+            {gasLimit: 6000000, ...ethTxOptions},
         );
         const zksRec = await zksContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
@@ -242,5 +242,13 @@ export class Deployer {
 
     public zkSyncContract(signerOrProvider: Signer | Provider): Contract {
         return new ethers.Contract(this.addresses.ZkSync, this.contracts.zkSync.abi, signerOrProvider);
+    }
+
+    public verifierContract(signerOrProvider: Signer | Provider): Contract {
+        return new ethers.Contract(this.addresses.Verifier, this.contracts.verifier.abi, signerOrProvider);
+    }
+
+    public upgradeGatekeeperContract(signerOrProvider: Signer | Provider): Contract {
+        return new ethers.Contract(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper.abi, signerOrProvider);
     }
 }

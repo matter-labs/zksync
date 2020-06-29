@@ -54,20 +54,36 @@ interface Events {
         uint256 expirationBlock
     );
 
+    /// @notice Deposit committed event.
     event DepositCommit(
-        uint32 indexed franklinBlockId,
+        uint32 indexed zkSyncBlockId,
         uint32 indexed accountId,
         address owner,
         uint16 indexed tokenId,
         uint128 amount
     );
 
+    /// @notice Full exit committed event.
     event FullExitCommit(
-        uint32 indexed franklinBlockId,
+        uint32 indexed zkSyncBlockId,
         uint32 indexed accountId,
         address owner,
         uint16 indexed tokenId,
         uint128 amount
+    );
+
+    /// @notice Pending withdrawals index range that were added in the verifyBlock operation.
+    /// NOTE: processed indexes in the queue map are [queueStartIndex, queueEndIndex)
+    event PendingWithdrawalsAdd(
+        uint32 queueStartIndex,
+        uint32 queueEndIndex
+    );
+
+    /// @notice Pending withdrawals index range that were executed in the completeWithdrawals operation.
+    /// NOTE: processed indexes in the queue map are [queueStartIndex, queueEndIndex)
+    event PendingWithdrawalsComplete(
+        uint32 queueStartIndex,
+        uint32 queueEndIndex
     );
 }
 
@@ -77,30 +93,30 @@ interface UpgradeEvents {
 
     /// @notice Event emitted when new upgradeable contract is added to upgrade gatekeeper's list of managed contracts
     event NewUpgradable(
-        uint versionId,
-        address upgradeable
+        uint indexed versionId,
+        address indexed upgradeable
     );
 
     /// @notice Upgrade mode enter event
     event NoticePeriodStart(
-        uint versionId,
+        uint indexed versionId,
         address[] newTargets,
         uint noticePeriod // notice period (in seconds)
     );
 
     /// @notice Upgrade mode cancel event
     event UpgradeCancel(
-        uint versionId
+        uint indexed versionId
     );
 
     /// @notice Upgrade mode preparation status event
     event PreparationStart(
-        uint versionId
+        uint indexed versionId
     );
 
     /// @notice Upgrade mode complete event
     event UpgradeComplete(
-        uint versionId,
+        uint indexed versionId,
         address[] newTargets
     );
 

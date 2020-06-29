@@ -3,6 +3,7 @@
 use diesel::dsl::max;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
+use web3::types::U256;
 // Workspace imports
 use models::node::{
     block::{Block, ExecutedOperations},
@@ -135,6 +136,8 @@ impl<'a> BlockSchema<'a> {
                 stored_block.unprocessed_prior_op_after as u64,
             ),
             stored_block.block_size as usize,
+            U256::from(stored_block.commit_gas_limit as u64),
+            U256::from(stored_block.verify_gas_limit as u64),
         )))
     }
 
@@ -257,16 +260,18 @@ impl<'a> BlockSchema<'a> {
         let query = format!(
             " \
             with eth_ops as ( \
-                select \
+                select distinct on (block_number, action_type) \
                     operations.block_number, \
                     eth_tx_hashes.tx_hash, \
                     operations.action_type, \
-                    operations.created_at \
+                    operations.created_at, \
+                    confirmed \
                 from operations \
                     left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
                     left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
+                order by block_number desc, action_type, confirmed \
             ) \
-            select distinct on (block_number) \
+            select \
                 blocks.number as block_number, \
                 blocks.root_hash as new_state_root, \
                 blocks.block_size as block_size, \
@@ -278,7 +283,7 @@ impl<'a> BlockSchema<'a> {
             inner join eth_ops committed on \
                 committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
             left join eth_ops verified on \
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
+                verified.block_number = blocks.number and verified.action_type = 'VERIFY' and verified.confirmed = true \
             where \
                 blocks.number <= {max_block} \
             order by blocks.number desc \
@@ -359,14 +364,16 @@ impl<'a> BlockSchema<'a> {
         let sql_query = format!(
             " \
             with eth_ops as ( \
-                select \
+                select distinct on (block_number, action_type) \
                     operations.block_number, \
                     eth_tx_hashes.tx_hash, \
                     operations.action_type, \
-                    operations.created_at \
+                    operations.created_at, \
+                    confirmed \
                 from operations \
                     left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
                     left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
+                order by block_number desc, action_type, confirmed \
             ) \
             select \
                 blocks.number as block_number, \
@@ -380,7 +387,7 @@ impl<'a> BlockSchema<'a> {
             inner join eth_ops committed on \
                 committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
             left join eth_ops verified on \
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
+                verified.block_number = blocks.number and verified.action_type = 'VERIFY' and verified.confirmed = true \
             where false \
                 {where_condition} \
             order by blocks.number desc \
@@ -530,6 +537,8 @@ impl<'a> BlockSchema<'a> {
             let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
             let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
             let block_size = block.block_chunks_size as i64;
+            let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
+            let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
 
             self.save_block_transactions(block.block_number, block.block_transactions)?;
 
@@ -540,6 +549,8 @@ impl<'a> BlockSchema<'a> {
                 unprocessed_prior_op_before,
                 unprocessed_prior_op_after,
                 block_size,
+                commit_gas_limit,
+                verify_gas_limit,
             };
 
             // Remove pending block (as it's now completed).
