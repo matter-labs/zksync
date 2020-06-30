@@ -201,17 +201,35 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
         let sleep_duration = heartbeat_interval + Duration::from_millis(sleep_shift_ms);
         thread::sleep(sleep_duration);
 
-        let (new_job_id, quit_now) = match start_heartbeats_rx.try_recv() {
-            Ok((new_job_id, quit_now)) => (new_job_id, quit_now),
-            Err(mpsc::TryRecvError::Empty) => (job_id, false),
-            Err(e) => {
-                panic!("error receiving from heartbeat channel: {}", e);
-            }
-        };
-        if quit_now {
-            return;
+        // Loop is required to empty queue: prover may send multiple messages while heartbeat
+        // thread was asleep, and we must process only the last one.
+        // This loop exists as soon as message queue is empty.
+        loop {
+            match start_heartbeats_rx.try_recv() {
+                Ok((new_job_id, quit_now)) => {
+                    // Check if we should stop this thread immediately.
+                    if quit_now {
+                        return;
+                    }
+                    // Update the current job ID.
+                    if new_job_id != 0 {
+                        // Message with non-zero job ID is sent once per job, so it won't be spammed all over the log.
+                        log::info!(
+                            "Starting sending heartbeats for job with ID: {}",
+                            new_job_id
+                        );
+                    }
+                    job_id = new_job_id;
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    // No messages in queue, use the last received value.
+                    break;
+                }
+                Err(e) => {
+                    panic!("error receiving from heartbeat channel: {}", e);
+                }
+            };
         }
-        job_id = new_job_id;
         if job_id != 0 {
             log::trace!("sending working_on request for job_id: {}", job_id);
             let ret = client.working_on(job_id);
