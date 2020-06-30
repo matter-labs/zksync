@@ -149,7 +149,7 @@ fn gas_price_limit_scaling() {
         }
 
         // Update the limit.
-        gas_adjuster.keep_updated(&db);
+        gas_adjuster.keep_updated(&ethereum, &db);
 
         // Check that new limit is scaled old limit (and also check that it's stored in the DB).
         let new_limit = db.load_gas_price_limit().unwrap();
@@ -213,7 +213,7 @@ fn gas_price_limit_average_basis() {
         }
 
         // Keep the limit updated (it should become (avg of prices) * (scale factor).
-        gas_adjuster.keep_updated(&db);
+        gas_adjuster.keep_updated(&ethereum, &db);
 
         // Check that new limit is based on the average of previous N samples.
         let new_limit = db.load_gas_price_limit().unwrap();
@@ -254,7 +254,7 @@ fn gas_price_limit_preservation() {
         }
 
         // Keep the limit updated (it should not change).
-        gas_adjuster.keep_updated(&db);
+        gas_adjuster.keep_updated(&ethereum, &db);
         let new_limit = db.load_gas_price_limit().unwrap();
         assert_eq!(new_limit, price_limit.into());
     }
