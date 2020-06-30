@@ -186,6 +186,7 @@ table! {
         id -> Int8,
         tx_hash -> Text,
         tx -> Jsonb,
+        created_at -> Timestamptz,
     }
 }
 

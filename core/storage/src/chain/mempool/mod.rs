@@ -31,7 +31,11 @@ impl<'a> MempoolSchema<'a> {
         let tx_hash = hex::encode(tx_data.hash().as_ref());
         let tx = serde_json::to_value(tx_data)?;
 
-        let db_entry = NewMempoolTx { tx_hash, tx };
+        let db_entry = NewMempoolTx {
+            tx_hash,
+            tx,
+            created_at: chrono::Utc::now(),
+        };
 
         diesel::insert_into(mempool_txs::table)
             .values(db_entry)
