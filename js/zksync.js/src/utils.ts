@@ -305,7 +305,7 @@ export class TokenSet {
             return this.tokensBySymbol[tokenLike];
         }
 
-        for (let token of Object.values(this.tokensBySymbol)) {
+        for (const token of Object.values(this.tokensBySymbol)) {
             if (
                 token.address.toLocaleLowerCase() ==
                 tokenLike.toLocaleLowerCase()
@@ -415,7 +415,10 @@ export async function signMessagePersonalAPI(
             .then(
                 sign => sign,
                 err => {
+                    // We check for method name in the error string because error messages about invalid method name
+                    // often contain method name.
                     if (err.message.includes("personal_sign")) {
+                        // If no "personal_sign", use "eth_sign"
                         return signer.signMessage(message);
                     }
                     throw err;

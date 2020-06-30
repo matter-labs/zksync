@@ -134,12 +134,12 @@ export class Provider {
     ): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
-                const sub = this.transport.subscribe(
+                const subscribe = this.transport.subscribe(
                     "ethop_subscribe",
                     [serialId, action],
                     "ethop_unsubscribe",
                     resp => {
-                        sub.then(sub => sub.unsubscribe());
+                        subscribe.then(sub => sub.unsubscribe());
                         resolve(resp);
                     }
                 );
@@ -148,7 +148,7 @@ export class Provider {
             while (true) {
                 const priorOpStatus = await this.getPriorityOpStatus(serialId);
                 const notifyDone =
-                    action == "COMMIT"
+                   action === "COMMIT"
                         ? priorOpStatus.block && priorOpStatus.block.committed
                         : priorOpStatus.block && priorOpStatus.block.verified;
                 if (notifyDone) {
@@ -166,12 +166,12 @@ export class Provider {
     ): Promise<TransactionReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
-                const sub = this.transport.subscribe(
+                const subscribe = this.transport.subscribe(
                     "tx_subscribe",
                     [hash, action],
                     "tx_unsubscribe",
                     resp => {
-                        sub.then(sub => sub.unsubscribe());
+                        subscribe.then(sub => sub.unsubscribe());
                         resolve(resp);
                     }
                 );
