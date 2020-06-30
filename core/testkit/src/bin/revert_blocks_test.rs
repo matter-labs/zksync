@@ -1,14 +1,12 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{
-    deploy_test_contracts, get_test_accounts, revert_all_not_verified_blocks, Contracts,
-};
+use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use testkit::*;
 use web3::transports::Http;
 
 /// Executes blocks with some basic operations with new state keeper
-/// if verify_blocks is false then committed blocks should not be verified
-fn executes_blocks_with_new_state_keeper(contracts: Contracts, verify_blocks: bool) {
+/// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
+fn execute_blocks_with_new_state_keeper(contracts: Contracts, block_processing: BlockProcessing) {
     let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
@@ -69,8 +67,21 @@ fn executes_blocks_with_new_state_keeper(contracts: Contracts, verify_blocks: bo
             token,
             &mut test_setup,
             deposit_amount.clone(),
-            verify_blocks,
+            block_processing,
         );
+    }
+
+    if block_processing == BlockProcessing::NoVerify {
+        let blocks_committed = test_setup
+            .total_blocks_committed()
+            .expect("total_blocks_committed call fails");
+        let blocks_verified = test_setup
+            .total_blocks_verified()
+            .expect("total_blocks_verified call fails");
+        assert_ne!(blocks_committed, blocks_verified, "no blocks to revert");
+        test_setup
+            .revert_blocks(blocks_committed - blocks_verified)
+            .expect("revert_blocks call fails");
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
@@ -82,13 +93,10 @@ fn revert_blocks_test() {
     let contracts = deploy_test_contracts();
     println!("contracts deployed");
 
-    executes_blocks_with_new_state_keeper(contracts.clone(), false);
-    println!("some blocks are committed");
+    execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify);
+    println!("some blocks are committed and reverted");
 
-    revert_all_not_verified_blocks(contracts.contract);
-    println!("blocks reverted");
-
-    executes_blocks_with_new_state_keeper(contracts, true);
+    execute_blocks_with_new_state_keeper(contracts, BlockProcessing::CommitAndVerify);
 }
 
 fn main() {

@@ -71,7 +71,12 @@ fn migration_test() {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
-        perform_basic_operations(token, &mut test_setup, deposit_amount.clone(), true);
+        perform_basic_operations(
+            token,
+            &mut test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::CommitAndVerify,
+        );
     }
 
     let start_upgrade = Instant::now();
@@ -79,7 +84,12 @@ fn migration_test() {
     println!("Upgrade done in {:?}", start_upgrade.elapsed());
 
     for token in 0..=1 {
-        perform_basic_operations(token, &mut test_setup, deposit_amount.clone(), true);
+        perform_basic_operations(
+            token,
+            &mut test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::CommitAndVerify,
+        );
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");

@@ -116,13 +116,6 @@ pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_addres
     );
 }
 
-pub fn revert_all_not_verified_blocks(franklin_address: Address) {
-    run_external_command(
-        "test-revert-not-verified-blocks.sh",
-        &[&format!("0x{:x}", franklin_address)],
-    );
-}
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ETHAccountInfo {
