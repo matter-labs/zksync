@@ -366,7 +366,7 @@ impl PlasmaStateKeeper {
         while let Some(req) = self.rx_for_blocks.next().await {
             let start = std::time::Instant::now();
 
-            log::info!(
+            log::trace!(
                 "Received new request. Last request was processed {}ms ago",
                 (start - last_request_processed).as_millis()
             );
@@ -375,7 +375,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::GetAccount(addr, sender) => {
                     sender.send(self.account(&addr)).unwrap_or_default();
 
-                    log::info!(
+                    log::trace!(
                         "GetAccount request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -385,7 +385,7 @@ impl PlasmaStateKeeper {
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
 
-                    log::info!(
+                    log::trace!(
                         "GetLastUnprocessedPriorityOp request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -393,7 +393,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_tx_batch(proposed_block).await;
 
-                    log::info!(
+                    log::trace!(
                         "ExecuteMiniBlock request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -402,7 +402,7 @@ impl PlasmaStateKeeper {
                     let result = self.check_executed_in_pending_block(op_id);
                     sender.send(result).unwrap_or_default();
 
-                    log::info!(
+                    log::trace!(
                         "GetExecutedInPendingBlock request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -410,7 +410,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
 
-                    log::info!(
+                    log::trace!(
                         "SealBlock request processed in {}ms",
                         start.elapsed().as_millis()
                     );
