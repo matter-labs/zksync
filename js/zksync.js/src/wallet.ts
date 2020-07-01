@@ -21,7 +21,8 @@ import {
     getChangePubkeyMessage,
     SYNC_MAIN_CONTRACT_INTERFACE,
     getSignedBytesFromMessage,
-    signMessagePersonalAPI
+    signMessagePersonalAPI,
+    ERC20_DEPOSIT_GAS_LIMIT
 } from "./utils";
 
 class ZKSyncTxError extends Error {
@@ -524,32 +525,43 @@ export class Wallet {
                 IERC20_INTERFACE,
                 this.ethSigner
             );
+            let nonce;
             if (deposit.approveDepositAmountForERC20) {
                 const approveTx = await erc20contract.approve(
                     this.provider.contractAddress.mainContract,
                     deposit.amount
                 );
-                ethTransaction = await mainZkSyncContract.depositERC20(
-                    tokenAddress,
-                    deposit.amount,
-                    deposit.depositTo,
-                    {
-                        nonce: approveTx.nonce + 1,
-                        gasPrice,
-                        ...deposit.ethTxOptions
-                    }
-                );
-            } else {
-                ethTransaction = await mainZkSyncContract.depositERC20(
-                    tokenAddress,
-                    deposit.amount,
-                    deposit.depositTo,
-                    {
-                        gasPrice,
-                        ...deposit.ethTxOptions
-                    }
-                );
+                nonce = approveTx.nonce + 1;
             }
+            const args = [
+                tokenAddress,
+                deposit.amount,
+                deposit.depositTo,
+                {
+                    nonce,
+                    gasPrice,
+                    ...deposit.ethTxOptions
+                } as ethers.providers.TransactionRequest
+            ];
+
+            // We set gas limit only if user does not set it using ethTxOptions.
+            const txRequest = args[
+                args.length - 1
+            ] as ethers.providers.TransactionRequest;
+            if (txRequest.gasLimit == null) {
+                const gasEstimate = await mainZkSyncContract.estimate
+                    .depositERC20(...args)
+                    .then(
+                        estimate => estimate,
+                        _err => utils.bigNumberify("0")
+                    );
+                txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT)
+                    ? gasEstimate
+                    : ERC20_DEPOSIT_GAS_LIMIT;
+                args[args.length - 1] = txRequest;
+            }
+
+            ethTransaction = await mainZkSyncContract.depositERC20(...args);
         }
 
         return new ETHOperation(ethTransaction, this.provider);

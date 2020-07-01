@@ -13,10 +13,11 @@ import {
 } from "./utils";
 import BN = require("bn.js");
 import {
-    Address, EthSignerType,
+    Address,
+    EthSignerType,
     PubKeyHash,
     Transfer,
-    Withdraw,
+    Withdraw
 } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 128;

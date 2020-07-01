@@ -148,7 +148,7 @@ export class Provider {
             while (true) {
                 const priorOpStatus = await this.getPriorityOpStatus(serialId);
                 const notifyDone =
-                   action === "COMMIT"
+                    action === "COMMIT"
                         ? priorOpStatus.block && priorOpStatus.block.committed
                         : priorOpStatus.block && priorOpStatus.block.verified;
                 if (notifyDone) {
