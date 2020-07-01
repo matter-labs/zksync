@@ -591,3 +591,24 @@ fn default_tx_options() -> Options {
 
     options
 }
+
+/// Get fee paid in wei for tx execution
+pub async fn get_executed_tx_fee<T: Transport>(
+    eth: Eth<T>,
+    receipt: &TransactionReceipt,
+) -> Result<BigUint, failure::Error> {
+    let gas_used = receipt.gas_used.ok_or_else(|| {
+        format_err!(
+            "Not used gas in the receipt: 0x{:x?}",
+            receipt.transaction_hash
+        )
+    })?;
+
+    let tx = eth
+        .transaction(TransactionId::Hash(receipt.transaction_hash))
+        .compat()
+        .await?
+        .ok_or_else(|| format_err!("Transaction not found: 0x{:x?}", receipt.transaction_hash))?;
+
+    Ok((gas_used * tx.gas_price).to_string().parse().unwrap())
+}
