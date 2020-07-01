@@ -1,6 +1,6 @@
 //use log::*;
 
-use crate::eth_account::{parse_ether, ETHExecResult, EthereumAccount};
+use crate::eth_account::{get_executed_tx_fee, parse_ether, ETHExecResult, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use failure::bail;
@@ -715,13 +715,12 @@ impl TestSetup {
             .eth_accounts_state
             .remove(&(from, 0))
         {
-            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
-                .expect("Failed to get gas price");
-            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
-            eth_balance.1 += (gas_used * gas_price)
-                .to_string()
-                .parse::<BigUint>()
-                .unwrap();
+            let gas_used = block_on(get_executed_tx_fee(
+                self.commit_account.main_contract_eth_client.web3.eth(),
+                &receipt,
+            ))
+            .expect("Failed to get transaction fee");
+            eth_balance.1 += gas_used;
             self.expected_changes_for_current_block
                 .eth_accounts_state
                 .insert((from, 0), eth_balance);
@@ -782,14 +781,12 @@ impl TestSetup {
             .eth_accounts_state
             .remove(&(from, 0))
         {
-            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
-                .expect("Failed to get gas price");
-            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
-
-            eth_balance.1 += (gas_used * gas_price)
-                .to_string()
-                .parse::<BigUint>()
-                .unwrap();
+            let gas_used = block_on(get_executed_tx_fee(
+                self.commit_account.main_contract_eth_client.web3.eth(),
+                &receipt,
+            ))
+            .expect("Failed to get transaction fee");
+            eth_balance.1 += gas_used;
             self.expected_changes_for_current_block
                 .eth_accounts_state
                 .insert((from, 0), eth_balance);
@@ -866,13 +863,12 @@ impl TestSetup {
             .eth_accounts_state
             .remove(&(post_by, 0))
         {
-            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
-                .expect("Failed to get gas price");
-            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
-            eth_balance.1 += (gas_used * gas_price)
-                .to_string()
-                .parse::<BigUint>()
-                .unwrap();
+            let gas_used = block_on(get_executed_tx_fee(
+                self.commit_account.main_contract_eth_client.web3.eth(),
+                &receipt,
+            ))
+            .expect("Failed to get transaction fee");
+            eth_balance.1 += gas_used;
             self.expected_changes_for_current_block
                 .eth_accounts_state
                 .insert((post_by, 0), eth_balance);
@@ -1146,7 +1142,7 @@ impl TestSetup {
         {
             let real_balance = self.get_eth_balance(*eth_account, *token);
             let diff = balance - &real_balance;
-            let is_diff_valid = diff >= BigUint::from(0u32) && diff <= *allowed_margin;
+            let is_diff_valid = diff == *allowed_margin;
             if !is_diff_valid {
                 println!(
                     "eth acc: {}, token: {}, diff: {}, within bounds: {}",
