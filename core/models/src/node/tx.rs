@@ -464,6 +464,27 @@ pub enum FranklinTx {
     ChangePubKey(Box<ChangePubKey>),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EthSignData {
+    pub signature: TxEthSignature,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedFranklinTx {
+    pub tx: FranklinTx,
+    pub sign_data: Option<EthSignData>,
+}
+
+impl From<FranklinTx> for SignedFranklinTx {
+    fn from(tx: FranklinTx) -> Self {
+        Self {
+            tx,
+            sign_data: None,
+        }
+    }
+}
+
 impl FranklinTx {
     pub fn hash(&self) -> TxHash {
         let bytes = match self {

@@ -43,6 +43,7 @@ use crate::{
     },
 };
 use bigdecimal::BigDecimal;
+use models::node::tx::EthSignData;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -1036,7 +1037,10 @@ async fn verify_tx_info_message_signature(
             let signature =
                 signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
 
-            Some((signature, message_to_sign))
+            Some(EthSignData {
+                signature,
+                message: message_to_sign,
+            })
         }
         None => None,
     };

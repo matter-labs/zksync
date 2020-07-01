@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 // External imports
 use diesel::prelude::*;
 // Workspace imports
-use models::node::{tx::TxHash, FranklinTx};
+use models::node::{tx::TxHash, FranklinTx, SignedFranklinTx};
 // Local imports
 use self::records::{MempoolTx, NewMempoolTx};
 use crate::{schema::*, StorageProcessor};
@@ -27,14 +27,18 @@ impl<'a> MempoolSchema<'a> {
     }
 
     /// Adds a new transaction to the mempool schema.
-    pub fn insert_tx(&self, tx_data: &FranklinTx) -> Result<(), failure::Error> {
-        let tx_hash = hex::encode(tx_data.hash().as_ref());
+    pub fn insert_tx(&self, tx_data: &SignedFranklinTx) -> Result<(), failure::Error> {
+        let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
         let tx = serde_json::to_value(tx_data)?;
 
         let db_entry = NewMempoolTx {
             tx_hash,
             tx,
             created_at: chrono::Utc::now(),
+            eth_signature: tx_data
+                .sign_data
+                .as_ref()
+                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData")),
         };
 
         diesel::insert_into(mempool_txs::table)

@@ -182,7 +182,7 @@ struct Mempool {
 }
 
 impl Mempool {
-    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: VerifiedTx) -> Result<(), TxAddError> {
         let storage = self.db_pool.access_storage().map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -191,20 +191,20 @@ impl Mempool {
         storage
             .chain()
             .mempool_schema()
-            .insert_tx(&tx)
+            .insert_tx(tx.inner())
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
 
-        self.mempool_state.add_tx(tx)
+        self.mempool_state.add_tx(tx.into_inner().tx)
     }
 
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(tx.into_inner());
+                    let tx_add_result = self.add_tx(*tx);
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {

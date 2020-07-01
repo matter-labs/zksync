@@ -13,11 +13,12 @@ use tokio::runtime::{Builder, Handle};
 // Workspace uses
 use models::{
     config_options::ThreadPanicNotify,
-    node::{tx::TxEthSignature, FranklinTx},
+    node::{tx::TxEthSignature, FranklinTx, SignedFranklinTx},
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 use crate::mempool::TxAddError;
+use models::node::tx::EthSignData;
 
 /// Wrapper on a `FranklinTx` which guarantees that
 /// transaction was checked and signatures associated with
@@ -26,7 +27,7 @@ use crate::mempool::TxAddError;
 /// Underlying `FranklinTx` is a private field, thus no such
 /// object can be created without verification.
 #[derive(Debug)]
-pub struct VerifiedTx(FranklinTx);
+pub struct VerifiedTx(SignedFranklinTx);
 
 impl VerifiedTx {
     /// Checks the transaction correctness by verifying its
@@ -38,12 +39,22 @@ impl VerifiedTx {
         verify_eth_signature(&request, eth_watch_req)
             .await
             .and_then(|_| verify_tx_correctness(request.tx.clone()))
-            .map(Self)
+            .map(|tx| {
+                Self(SignedFranklinTx {
+                    tx,
+                    sign_data: request.eth_sign_data.clone(),
+                })
+            })
     }
 
     /// Takes the `FranklinTx` out of the wrapper.
-    pub fn into_inner(self) -> FranklinTx {
+    pub fn into_inner(self) -> SignedFranklinTx {
         self.0
+    }
+
+    /// Takes reference to the inner `FranklinTx`.
+    pub fn inner(&self) -> &SignedFranklinTx {
+        &self.0
     }
 }
 
@@ -76,11 +87,11 @@ async fn verify_eth_signature(
     }
 
     // Check the signature.
-    if let Some((signature, message)) = &request.eth_sign_data {
-        match &signature {
+    if let Some(sign_data) = &request.eth_sign_data {
+        match &sign_data.signature {
             TxEthSignature::EthereumSignature(packed_signature) => {
                 let signer_account = packed_signature
-                    .signature_recover_signer(message.as_bytes())
+                    .signature_recover_signer(sign_data.message.as_bytes())
                     .or(Err(TxAddError::IncorrectEthSignature))?;
 
                 if signer_account != request.tx.account() {
@@ -88,7 +99,11 @@ async fn verify_eth_signature(
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
-                let message = format!("\x19Ethereum Signed Message:\n{}{}", message.len(), message);
+                let message = format!(
+                    "\x19Ethereum Signed Message:\n{}{}",
+                    sign_data.message.len(),
+                    &sign_data.message
+                );
 
                 let eth_watch_resp = oneshot::channel();
                 eth_watch_req
@@ -136,7 +151,7 @@ pub struct VerifyTxSignatureRequest {
     /// `eth_sign_data` is a tuple of the Ethereum signature and the message
     /// which user should have signed with their private key.
     /// Can be `None` if the Ethereum signature is not required.
-    pub eth_sign_data: Option<(TxEthSignature, String)>,
+    pub eth_sign_data: Option<EthSignData>,
     /// Channel for sending the check response.
     pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
 }
