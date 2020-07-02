@@ -422,15 +422,17 @@ impl PlasmaStateKeeper {
     }
 
     async fn notify_executed_ops(&self, executed_ops: &mut Vec<ExecutedOperations>) {
-        self.executed_tx_notify_sender
-            .clone()
-            .send(ExecutedOpsNotify {
-                operations: executed_ops.clone(),
-                block_number: self.state.block_number,
-            })
-            .await
-            .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
-            .unwrap_or_default();
+        if !executed_ops.is_empty() {
+            self.executed_tx_notify_sender
+                .clone()
+                .send(ExecutedOpsNotify {
+                    operations: executed_ops.clone(),
+                    block_number: self.state.block_number,
+                })
+                .await
+                .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+                .unwrap_or_default();
+        }
         executed_ops.clear();
     }
 
@@ -473,18 +475,20 @@ impl PlasmaStateKeeper {
             }
         }
 
-        self.pending_block.pending_block_iteration += 1;
+        if !self.pending_block.success_operations.is_empty() {
+            self.pending_block.pending_block_iteration += 1;
 
-        // If pending block contains withdrawals we seal it faster
-        let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
-            self.max_miniblock_iterations_withdraw_block
-        } else {
-            self.max_miniblock_iterations
-        };
-        if self.pending_block.pending_block_iteration > max_miniblock_iterations {
-            self.seal_pending_block().await;
-        } else {
-            self.store_pending_block().await;
+            // If pending block contains withdrawals we seal it faster
+            let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
+                self.max_miniblock_iterations_withdraw_block
+            } else {
+                self.max_miniblock_iterations
+            };
+            if self.pending_block.pending_block_iteration > max_miniblock_iterations {
+                self.seal_pending_block().await;
+            } else {
+                self.store_pending_block().await;
+            }
         }
         self.notify_executed_ops(&mut executed_ops).await;
     }
