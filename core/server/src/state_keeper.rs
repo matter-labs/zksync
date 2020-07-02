@@ -483,12 +483,10 @@ impl PlasmaStateKeeper {
         };
         if self.pending_block.pending_block_iteration > max_miniblock_iterations {
             self.seal_pending_block().await;
-            self.notify_executed_ops(&mut executed_ops).await;
-            return;
         } else {
             self.store_pending_block().await;
-            self.notify_executed_ops(&mut executed_ops).await;
         }
+        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // Err if there is no space in current block
