@@ -473,23 +473,21 @@ impl PlasmaStateKeeper {
             }
         }
 
-        if !self.pending_block.success_operations.is_empty() {
-            self.pending_block.pending_block_iteration += 1;
+        self.pending_block.pending_block_iteration += 1;
 
-            // If pending block contains withdrawals we seal it faster
-            let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
-                self.max_miniblock_iterations_withdraw_block
-            } else {
-                self.max_miniblock_iterations
-            };
-            if self.pending_block.pending_block_iteration > max_miniblock_iterations {
-                self.seal_pending_block().await;
-                self.notify_executed_ops(&mut executed_ops).await;
-                return;
-            } else {
-                self.store_pending_block().await;
-                self.notify_executed_ops(&mut executed_ops).await;
-            }
+        // If pending block contains withdrawals we seal it faster
+        let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
+            self.max_miniblock_iterations_withdraw_block
+        } else {
+            self.max_miniblock_iterations
+        };
+        if self.pending_block.pending_block_iteration > max_miniblock_iterations {
+            self.seal_pending_block().await;
+            self.notify_executed_ops(&mut executed_ops).await;
+            return;
+        } else {
+            self.store_pending_block().await;
+            self.notify_executed_ops(&mut executed_ops).await;
         }
     }
 
