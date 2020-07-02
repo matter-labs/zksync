@@ -5,10 +5,10 @@ import {
     TokenAddress,
     TokenLike,
     Tokens,
-    TokenSymbol
+    TokenSymbol,
+    EthSignerType
 } from "./types";
 import { serializeAccountId, serializeNonce } from "./signer";
-import { BigNumberish, BigNumber } from "ethers/utils";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -21,11 +21,17 @@ export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
     require("../abi/SyncGov.json").interface
 );
 
+export const IEIP1271_INTERFACE = new utils.Interface(
+    require("../abi/IEIP1271.json").interface
+);
+
 export const MAX_ERC20_APPROVE_AMOUNT =
     "115792089237316195423570985008687907853269984665640564039457584007913129639935"; // 2^256 - 1
 
 export const ERC20_APPROVE_TRESHOLD =
     "57896044618658097711785492504343953926634992332820282019728792003956564819968"; // 2^255
+
+export const ERC20_DEPOSIT_GAS_LIMIT = utils.bigNumberify("300000"); // 300k
 
 const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
@@ -301,7 +307,7 @@ export class TokenSet {
             return this.tokensBySymbol[tokenLike];
         }
 
-        for (let token of Object.values(this.tokensBySymbol)) {
+        for (const token of Object.values(this.tokensBySymbol)) {
             if (
                 token.address.toLocaleLowerCase() ==
                 tokenLike.toLocaleLowerCase()
@@ -328,12 +334,15 @@ export class TokenSet {
         return isTransactionFeePackable(parsedAmount);
     }
 
-    public formatToken(tokenLike: TokenLike, amount: BigNumberish): string {
+    public formatToken(
+        tokenLike: TokenLike,
+        amount: utils.BigNumberish
+    ): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.formatUnits(amount, decimals);
     }
 
-    public parseToken(tokenLike: TokenLike, amount: string): BigNumber {
+    public parseToken(tokenLike: TokenLike, amount: string): utils.BigNumber {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.parseUnits(amount, decimals);
     }
@@ -355,12 +364,11 @@ export class TokenSet {
     }
 }
 
-export async function signChangePubkeyMessage(
-    signer: ethers.Signer,
+export function getChangePubkeyMessage(
     pubKeyHash: PubKeyHash,
     nonce: number,
     accountId: number
-): Promise<string> {
+): string {
     const msgNonce = serializeNonce(nonce)
         .toString("hex")
         .toLowerCase();
@@ -374,16 +382,107 @@ export async function signChangePubkeyMessage(
         `nonce: 0x${msgNonce}\n` +
         `account id: 0x${msgAccId}\n\n` +
         `Only sign this message for a trusted client!`;
-    return signer.signMessage(message);
+    return message;
 }
 
-export function getEthSignatureType(
+export function getSignedBytesFromMessage(
+    message: ethers.utils.Arrayish | string,
+    addPrefix: boolean
+): Uint8Array {
+    let messageBytes =
+        typeof message === "string"
+            ? ethers.utils.toUtf8Bytes(message)
+            : ethers.utils.arrayify(message);
+    if (addPrefix) {
+        messageBytes = ethers.utils.concat([
+            ethers.utils.toUtf8Bytes(
+                `\x19Ethereum Signed Message:\n${messageBytes.length}`
+            ),
+            messageBytes
+        ]);
+    }
+    return messageBytes;
+}
+
+export async function signMessagePersonalAPI(
+    signer: ethers.Signer,
+    message: Uint8Array
+): Promise<string> {
+    if (signer instanceof ethers.providers.JsonRpcSigner) {
+        return signer.provider
+            .send("personal_sign", [
+                utils.hexlify(message),
+                await signer.getAddress()
+            ])
+            .then(
+                sign => sign,
+                err => {
+                    // We check for method name in the error string because error messages about invalid method name
+                    // often contain method name.
+                    if (err.message.includes("personal_sign")) {
+                        // If no "personal_sign", use "eth_sign"
+                        return signer.signMessage(message);
+                    }
+                    throw err;
+                }
+            );
+    } else {
+        return signer.signMessage(message);
+    }
+}
+
+export async function verifyERC1271Signature(
+    address: string,
+    message: Uint8Array,
+    signature: string,
+    signerOrProvider: ethers.Signer | ethers.providers.Provider
+): Promise<boolean> {
+    const EIP1271_SUCCESS_VALUE = "0x20c13b0b";
+    const eip1271 = new ethers.Contract(
+        address,
+        IEIP1271_INTERFACE,
+        signerOrProvider
+    );
+    const eipRetVal = await eip1271.isValidSignature(
+        utils.hexlify(message),
+        signature
+    );
+    return eipRetVal === EIP1271_SUCCESS_VALUE;
+}
+
+export async function getEthSignatureType(
+    provider: ethers.providers.Provider,
     message: string,
     signature: string,
     address: string
-): "EthereumSignature" | "EIP1271Signature" {
-    const recovered = ethers.utils.verifyMessage(message, signature);
-    return recovered.toLowerCase() === address.toLowerCase()
-        ? "EthereumSignature"
-        : "EIP1271Signature";
+): Promise<EthSignerType> {
+    const messageNoPrefix = getSignedBytesFromMessage(message, false);
+    const messageWithPrefix = getSignedBytesFromMessage(message, true);
+
+    const prefixedECDSASigner = ethers.utils.recoverAddress(
+        ethers.utils.keccak256(messageWithPrefix),
+        signature
+    );
+    if (prefixedECDSASigner.toLowerCase() === address.toLowerCase()) {
+        return {
+            verificationMethod: "ECDSA",
+            isSignedMsgPrefixed: true
+        };
+    }
+
+    const notPrefixedMsgECDSASigner = ethers.utils.recoverAddress(
+        ethers.utils.keccak256(messageNoPrefix),
+        signature
+    );
+    if (notPrefixedMsgECDSASigner.toLowerCase() === address.toLowerCase()) {
+        return {
+            verificationMethod: "ECDSA",
+            isSignedMsgPrefixed: false
+        };
+    }
+
+    return {
+        verificationMethod: "ERC-1271",
+        isSignedMsgPrefixed: true
+    };
 }
