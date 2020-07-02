@@ -34,7 +34,7 @@ describe("zkSync signature verification unit tests", function() {
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
+        const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const {revertReason, result} = await getCallRevertReason(() =>
             testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId));
         expect(result).eq(true);
@@ -45,7 +45,7 @@ describe("zkSync signature verification unit tests", function() {
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
+        const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const {result} = await getCallRevertReason(() =>
             testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), incorrectNonce, randomWallet.address, accountId));
         expect(result).eq(false);
@@ -56,7 +56,7 @@ describe("zkSync signature verification unit tests", function() {
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
+        const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const {result} = await getCallRevertReason(() =>
             testContract.changePubkeySignatureCheck(signature, incorrectPubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId));
         expect(result).eq(false);
@@ -67,7 +67,7 @@ describe("zkSync signature verification unit tests", function() {
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
+        const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const {result} = await getCallRevertReason(() =>
             testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, incorrectSignerAddress, accountId));
         expect(result).eq(false);
@@ -78,7 +78,7 @@ describe("zkSync signature verification unit tests", function() {
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
+        const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
         const {result} = await getCallRevertReason(() =>
             testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, incorrectAccountId));
         expect(result).eq(false);
@@ -645,7 +645,7 @@ describe("zkSync test process next operation", function() {
         const nonce = 0x1234;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const accountId = 0x00ffee12;
-        const ethWitness = await zksync.utils.signChangePubkeyMessage(wallet, pubkeyHash, nonce, accountId);
+        const ethWitness = await wallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId))
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
