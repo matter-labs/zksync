@@ -729,7 +729,7 @@ class Transaction {
         if (!receipt.success) {
             this.setErrorState(
                 new ZKSyncTxError(
-                    `ZKSync transaction failed: ${receipt.failReason}`,
+                    `zkSync transaction failed: ${receipt.failReason}`,
                     receipt
                 )
             );
