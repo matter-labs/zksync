@@ -29,7 +29,7 @@ impl<'a> MempoolSchema<'a> {
     /// Adds a new transaction to the mempool schema.
     pub fn insert_tx(&self, tx_data: &SignedFranklinTx) -> Result<(), failure::Error> {
         let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
-        let tx = serde_json::to_value(tx_data)?;
+        let tx = serde_json::to_value(&tx_data.tx)?;
 
         let db_entry = NewMempoolTx {
             tx_hash,
