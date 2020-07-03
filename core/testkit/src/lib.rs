@@ -674,21 +674,20 @@ impl TestSetup {
         };
         let (receipt, deposit_op) = self.accounts.deposit(from, to, token_address, amount);
 
-        if let Some(mut eth_balance) = self
+        let mut eth_balance = self
             .expected_changes_for_current_block
             .eth_accounts_state
             .remove(&(from, 0))
-        {
-            let gas_used = block_on(get_executed_tx_fee(
-                self.commit_account.main_contract_eth_client.web3.eth(),
-                &receipt,
-            ))
-            .expect("Failed to get transaction fee");
-            eth_balance.1 += gas_used;
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((from, 0), eth_balance);
-        }
+            .unwrap_or_else(|| self.get_expected_eth_account_balance(from, 0));
+        let gas_fee = block_on(get_executed_tx_fee(
+            self.commit_account.main_contract_eth_client.web3.eth(),
+            &receipt,
+        ))
+        .expect("Failed to get transaction fee");
+        eth_balance.1 += gas_fee;
+        self.expected_changes_for_current_block
+            .eth_accounts_state
+            .insert((from, 0), eth_balance);
 
         self.execute_priority_op(deposit_op);
         receipt
@@ -740,21 +739,20 @@ impl TestSetup {
             self.accounts
                 .deposit_to_random(from, token_address, amount, rng);
 
-        if let Some(mut eth_balance) = self
+        let mut eth_balance = self
             .expected_changes_for_current_block
             .eth_accounts_state
             .remove(&(from, 0))
-        {
-            let gas_used = block_on(get_executed_tx_fee(
-                self.commit_account.main_contract_eth_client.web3.eth(),
-                &receipt,
-            ))
-            .expect("Failed to get transaction fee");
-            eth_balance.1 += gas_used;
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((from, 0), eth_balance);
-        }
+            .unwrap_or_else(|| self.get_expected_eth_account_balance(from, 0));
+        let gas_fee = block_on(get_executed_tx_fee(
+            self.commit_account.main_contract_eth_client.web3.eth(),
+            &receipt,
+        ))
+        .expect("Failed to get transaction fee");
+        eth_balance.1 += gas_fee;
+        self.expected_changes_for_current_block
+            .eth_accounts_state
+            .insert((from, 0), eth_balance);
 
         self.execute_priority_op(deposit_op);
         receipt
@@ -822,21 +820,20 @@ impl TestSetup {
 
         let (receipt, full_exit_op) = self.accounts.full_exit(post_by, token_address, account_id);
 
-        if let Some(mut eth_balance) = self
+        let mut eth_balance = self
             .expected_changes_for_current_block
             .eth_accounts_state
             .remove(&(post_by, 0))
-        {
-            let gas_used = block_on(get_executed_tx_fee(
-                self.commit_account.main_contract_eth_client.web3.eth(),
-                &receipt,
-            ))
-            .expect("Failed to get transaction fee");
-            eth_balance.1 += gas_used;
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((post_by, 0), eth_balance);
-        }
+            .unwrap_or_else(|| self.get_expected_eth_account_balance(post_by, 0));
+        let gas_fee = block_on(get_executed_tx_fee(
+            self.commit_account.main_contract_eth_client.web3.eth(),
+            &receipt,
+        ))
+        .expect("Failed to get transaction fee");
+        eth_balance.1 += gas_fee;
+        self.expected_changes_for_current_block
+            .eth_accounts_state
+            .insert((post_by, 0), eth_balance);
 
         self.execute_priority_op(full_exit_op);
         receipt
