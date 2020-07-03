@@ -372,7 +372,18 @@ pub fn spawn_state_keeper(
     )
 }
 
-pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_amount: BigUint) {
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum BlockProcessing {
+    CommitAndVerify,
+    NoVerify,
+}
+
+pub fn perform_basic_operations(
+    token: u16,
+    test_setup: &mut TestSetup,
+    deposit_amount: BigUint,
+    blocks_processing: BlockProcessing,
+) {
     // test deposit to other account
     test_setup.start_block();
     test_setup.deposit(
@@ -381,10 +392,14 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
         Token(token),
         deposit_amount.clone(),
     );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Deposit to other account test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit to other account test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     // test two deposits
     test_setup.start_block();
@@ -400,15 +415,23 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
         Token(token),
         deposit_amount.clone(),
     );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Deposit test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     // test transfers
     test_setup.start_block();
 
-    test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+    } else {
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    }
 
     //transfer to self should work
     test_setup.transfer(
@@ -458,17 +481,25 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
         &deposit_amount / BigUint::from(4u32),
         &deposit_amount / BigUint::from(4u32),
     );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Transfer test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Transfer test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     test_setup.start_block();
     test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Full exit test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Full exit test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 }
 
 pub struct TestkitConfig {
@@ -552,7 +583,12 @@ pub fn perform_basic_tests() {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
-        perform_basic_operations(token, &mut test_setup, deposit_amount.clone());
+        perform_basic_operations(
+            token,
+            &mut test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::CommitAndVerify,
+        );
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
@@ -1191,6 +1227,15 @@ impl TestSetup {
 
     pub fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
         block_on(self.accounts.eth_accounts[0].total_blocks_committed())
+    }
+
+    pub fn total_blocks_verified(&self) -> Result<u64, failure::Error> {
+        block_on(self.accounts.eth_accounts[0].total_blocks_verified())
+    }
+
+    pub fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), failure::Error> {
+        block_on(self.commit_account.revert_blocks(blocks_to_revert))?;
+        Ok(())
     }
 
     pub fn eth_block_number(&self) -> u64 {
