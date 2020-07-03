@@ -56,6 +56,11 @@ mod parameters_impl {
     /// Name of the environment variable responsible for the interval between adding gas prices to the `gas_adjuster`.
     const GAS_PRICE_LIMIT_SAMPLE_INTERVAL: &str = "ETH_GAS_PRICE_LIMIT_SAMPLE_INTERVAL";
 
+    /// Interval between adding the Ethereum node gas price to the GasAdjuster (in seconds).
+    /// This value will be used if no `ETH_GAS_PRICE_LIMIT_SAMPLE_INTERVAL` is set in env.
+    /// Defaults to 15 seconds (1 Ethereum block)
+    const DEFAULT_GAS_PRICE_LIMIT_SAMPLE_INTERVAL: Duration = Duration::from_secs(15);
+
     /// Obtains the interval for renewing the maximum gas price.
     ///
     /// This value is not cached internally, as it may be changed for the already running
@@ -82,6 +87,15 @@ mod parameters_impl {
     /// server by an administrator. This may be required if existing settings aren't flexible
     /// enough to match the current network price.
     pub fn sample_adding_interval() -> Duration {
+        if !std::env::var(GAS_PRICE_LIMIT_SAMPLE_INTERVAL).is_ok() {
+            log::warn!(
+                "No value provided for `ETH_GAS_PRICE_LIMIT_SAMPLE_INTERVAL` env variable, \
+                 using the default: {} seconds",
+                DEFAULT_GAS_PRICE_LIMIT_SAMPLE_INTERVAL.as_secs()
+            );
+            return DEFAULT_GAS_PRICE_LIMIT_SAMPLE_INTERVAL;
+        }
+
         let renew_interval: u64 = parse_env(GAS_PRICE_LIMIT_SAMPLE_INTERVAL);
 
         Duration::from_secs(renew_interval)
