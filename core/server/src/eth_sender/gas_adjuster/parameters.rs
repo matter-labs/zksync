@@ -87,7 +87,7 @@ mod parameters_impl {
     /// server by an administrator. This may be required if existing settings aren't flexible
     /// enough to match the current network price.
     pub fn sample_adding_interval() -> Duration {
-        if !std::env::var(GAS_PRICE_LIMIT_SAMPLE_INTERVAL).is_ok() {
+        if std::env::var(GAS_PRICE_LIMIT_SAMPLE_INTERVAL).is_err() {
             log::warn!(
                 "No value provided for `ETH_GAS_PRICE_LIMIT_SAMPLE_INTERVAL` env variable, \
                  using the default: {} seconds",
