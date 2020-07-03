@@ -101,6 +101,20 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
+    pub async fn total_blocks_verified(&self) -> Result<u64, failure::Error> {
+        let contract = Contract::new(
+            self.main_contract_eth_client.web3.eth(),
+            self.main_contract_eth_client.contract_addr,
+            self.main_contract_eth_client.contract.clone(),
+        );
+
+        contract
+            .query("totalBlocksVerified", (), None, default_tx_options(), None)
+            .compat()
+            .await
+            .map_err(|e| format_err!("Contract query fail: {}", e))
+    }
+
     pub async fn is_exodus(&self) -> Result<bool, failure::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
@@ -407,6 +421,25 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .await
             .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
+
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
+    }
+
+    pub async fn revert_blocks(
+        &self,
+        blocks_to_revert: u64,
+    ) -> Result<ETHExecResult, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "revertBlocks",
+                blocks_to_revert,
+                Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
+            )
+            .await
+            .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
         let eth = self.main_contract_eth_client.web3.eth();
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
