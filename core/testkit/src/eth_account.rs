@@ -215,12 +215,13 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(priority_op_from_tx_logs(&receipt).expect("no priority op log in change pubkey hash"))
     }
 
+    /// Returns only one tx receipt. Return type is `Vec` for compatibility with deposit erc20
     pub async fn deposit_eth(
         &self,
         amount: BigUint,
         to: &Address,
         nonce: Option<U256>,
-    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
+    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -237,10 +238,9 @@ impl<T: Transport> EthereumAccount<T> {
         let eth = self.main_contract_eth_client.web3.eth();
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         ensure!(receipt.status == Some(U64::from(1)), "eth deposit fail");
-        Ok((
-            receipt.clone(),
-            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit"),
-        ))
+        let priority_op =
+            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit");
+        Ok((vec![receipt], priority_op))
     }
 
     pub async fn eth_balance(&self) -> Result<BigUint, failure::Error> {
@@ -293,7 +293,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         token_contract: Address,
         amount: BigUint,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<TransactionReceipt, failure::Error> {
         let erc20_client = ETHClient::new(
             self.main_contract_eth_client.web3.transport().clone(),
             erc20_contract(),
@@ -320,16 +320,17 @@ impl<T: Transport> EthereumAccount<T> {
 
         ensure!(receipt.status == Some(U64::from(1)), "erc20 approve fail");
 
-        Ok(())
+        Ok(receipt)
     }
 
+    /// Returns TransactionReceipt of erc20 approve and erc20 deposit
     pub async fn deposit_erc20(
         &self,
         token_contract: Address,
         amount: BigUint,
         to: &Address,
-    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
-        self.approve_erc20(token_contract, amount.clone()).await?;
+    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), failure::Error> {
+        let approve_receipt = self.approve_erc20(token_contract, amount.clone()).await?;
 
         let signed_tx = self
             .main_contract_eth_client
@@ -344,10 +345,9 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         let exec_result = ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await;
         let receipt = exec_result.success_result()?;
-        Ok((
-            receipt.clone(),
-            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit erc20"),
-        ))
+        let priority_op =
+            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit erc20");
+        Ok((vec![approve_receipt, receipt], priority_op))
     }
 
     pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, failure::Error> {
