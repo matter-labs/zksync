@@ -229,6 +229,14 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
         syncProvider,
     );
 
+    // Create account so transfer would fail while tx is being executed
+    const initialDeposit = await zksyncDepositorWallet.depositToSyncFromEthereum({
+        depositTo: ethWallet.address,
+        token: "ETH",
+        amount: "1"
+    });
+    await initialDeposit.awaitReceipt();
+
     try {
         const tx = await syncWallet.syncTransfer({
             to: zksyncDepositorWallet.address(),
@@ -359,7 +367,7 @@ function promiseTimeout(ms, promise) {
         const ethWallet = ethers.Wallet.fromMnemonic(
             process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0"
         ).connect(ethersProvider);
-        const erc20= new Contract(
+        const erc20 = new Contract(
             ERC20_ADDRESS,
             IERC20_INTERFACE,
             ethWallet,
