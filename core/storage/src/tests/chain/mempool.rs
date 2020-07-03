@@ -75,7 +75,7 @@ fn store_load() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone().into())
                 .expect("Can't insert txs");
         }
 
@@ -104,7 +104,7 @@ fn remove_txs() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone().into())
                 .expect("Can't insert txs");
         }
 
@@ -142,7 +142,7 @@ fn collect_garbage() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone().into())
                 .expect("Can't insert txs");
         }
 

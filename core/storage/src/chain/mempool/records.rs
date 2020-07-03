@@ -11,7 +11,7 @@ pub struct MempoolTx {
     pub tx_hash: String,
     pub tx: serde_json::Value,
     pub created_at: DateTime<Utc>,
-    pub eth_signature: Option<serde_json::Value>,
+    pub eth_sign_data: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Insertable)]
@@ -20,5 +20,5 @@ pub struct NewMempoolTx {
     pub tx_hash: String,
     pub tx: serde_json::Value,
     pub created_at: DateTime<Utc>,
-    pub eth_signature: Option<serde_json::Value>,
+    pub eth_sign_data: Option<serde_json::Value>,
 }

@@ -35,7 +35,7 @@ impl<'a> MempoolSchema<'a> {
             tx_hash,
             tx,
             created_at: chrono::Utc::now(),
-            eth_signature: tx_data
+            eth_sign_data: tx_data
                 .sign_data
                 .as_ref()
                 .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData")),
