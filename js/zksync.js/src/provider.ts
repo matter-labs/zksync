@@ -3,7 +3,7 @@ import {
     HTTPTransport,
     WSTransport
 } from "./transport";
-import {utils, ethers, Contract} from "ethers";
+import { utils, ethers, Contract } from "ethers";
 import {
     AccountState,
     Address,
@@ -73,8 +73,7 @@ export class Provider {
     contractAddress: ContractAddress;
     public tokenSet: TokenSet;
 
-    private constructor(public transport: AbstractJSONRPCTransport) {
-    }
+    private constructor(public transport: AbstractJSONRPCTransport) {}
 
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
@@ -135,12 +134,12 @@ export class Provider {
     ): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
-                const sub = this.transport.subscribe(
+                const subscribe = this.transport.subscribe(
                     "ethop_subscribe",
                     [serialId, action],
                     "ethop_unsubscribe",
                     resp => {
-                        sub.then(sub => sub.unsubscribe());
+                        subscribe.then(sub => sub.unsubscribe());
                         resolve(resp);
                     }
                 );
@@ -149,7 +148,7 @@ export class Provider {
             while (true) {
                 const priorOpStatus = await this.getPriorityOpStatus(serialId);
                 const notifyDone =
-                    action == "COMMIT"
+                    action === "COMMIT"
                         ? priorOpStatus.block && priorOpStatus.block.committed
                         : priorOpStatus.block && priorOpStatus.block.verified;
                 if (notifyDone) {
@@ -167,12 +166,12 @@ export class Provider {
     ): Promise<TransactionReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
-                const sub = this.transport.subscribe(
+                const subscribe = this.transport.subscribe(
                     "tx_subscribe",
                     [hash, action],
                     "tx_unsubscribe",
                     resp => {
-                        sub.then(sub => sub.unsubscribe());
+                        subscribe.then(sub => sub.unsubscribe());
                         resolve(resp);
                     }
                 );
@@ -183,9 +182,9 @@ export class Provider {
                 const notifyDone =
                     action == "COMMIT"
                         ? transactionStatus.block &&
-                        transactionStatus.block.committed
+                          transactionStatus.block.committed
                         : transactionStatus.block &&
-                        transactionStatus.block.verified;
+                          transactionStatus.block.verified;
                 if (notifyDone) {
                     return transactionStatus;
                 } else {
@@ -211,13 +210,11 @@ export class Provider {
             gasPriceWei: utils.bigNumberify(transactionFee.gasPriceWei),
             gasFee: utils.bigNumberify(transactionFee.gasFee),
             zkpFee: utils.bigNumberify(transactionFee.zkpFee),
-            totalFee: utils.bigNumberify(transactionFee.totalFee),
+            totalFee: utils.bigNumberify(transactionFee.totalFee)
         };
     }
 
-    async getTokenPrice(
-        tokenLike: TokenLike
-    ): Promise<number> {
+    async getTokenPrice(tokenLike: TokenLike): Promise<number> {
         const tokenPrice = await this.transport.request("get_token_price", [
             tokenLike
         ]);

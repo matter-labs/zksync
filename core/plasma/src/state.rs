@@ -106,7 +106,7 @@ impl PlasmaState {
 
         let account = self.balance_tree.get(account_id).cloned();
 
-        log::info!(
+        log::trace!(
             "Get account (id {}) execution time: {}ms",
             account_id,
             start.elapsed().as_millis()
