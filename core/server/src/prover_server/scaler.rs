@@ -23,11 +23,12 @@ impl ScalerOracle {
     /// Decides how many prover entities should be created depending on the amount of pending blocks.
     pub fn provers_required(&mut self) -> Result<u32, failure::Error> {
         // Currently the logic of this method is very simple:
-        // We require a prover for each pending block plus IDLE_RROVERS for faster upscaling.
+        // We require a prover for each pending block or IDLE_RROVERS amount if there are not so many
+        // pending jobs.
 
         let storage = self.db.access_storage()?;
         let pending_jobs = storage.prover_schema().pending_jobs_count()?;
-        let provers_required = pending_jobs + self.idle_provers;
+        let provers_required = std::cmp::max(pending_jobs, self.idle_provers);
 
         Ok(provers_required)
     }

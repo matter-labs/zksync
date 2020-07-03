@@ -1,6 +1,6 @@
 //use log::*;
 
-use crate::eth_account::{parse_ether, ETHExecResult, EthereumAccount};
+use crate::eth_account::{get_executed_tx_fee, parse_ether, ETHExecResult, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use failure::bail;
@@ -82,7 +82,7 @@ impl<T: Transport> AccountSet<T> {
         to: ZKSyncAccountId,
         token: Option<Address>, // None for ETH
         amount: BigUint,
-    ) -> (TransactionReceipt, PriorityOp) {
+    ) -> (Vec<TransactionReceipt>, PriorityOp) {
         let from = &self.eth_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
 
@@ -101,7 +101,7 @@ impl<T: Transport> AccountSet<T> {
         token: Option<Address>, // None for ETH
         amount: BigUint,
         rng: &mut impl Rng,
-    ) -> (TransactionReceipt, PriorityOp) {
+    ) -> (Vec<TransactionReceipt>, PriorityOp) {
         let from = &self.eth_accounts[from.0];
         let to_address = Address::from_slice(&rng.gen::<[u8; 20]>());
 
@@ -372,7 +372,18 @@ pub fn spawn_state_keeper(
     )
 }
 
-pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_amount: BigUint) {
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum BlockProcessing {
+    CommitAndVerify,
+    NoVerify,
+}
+
+pub fn perform_basic_operations(
+    token: u16,
+    test_setup: &mut TestSetup,
+    deposit_amount: BigUint,
+    blocks_processing: BlockProcessing,
+) {
     // test deposit to other account
     test_setup.start_block();
     test_setup.deposit(
@@ -381,10 +392,14 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
         Token(token),
         deposit_amount.clone(),
     );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Deposit to other account test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit to other account test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     // test two deposits
     test_setup.start_block();
@@ -400,15 +415,23 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
         Token(token),
         deposit_amount.clone(),
     );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Deposit test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     // test transfers
     test_setup.start_block();
 
-    test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+    } else {
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    }
 
     //transfer to self should work
     test_setup.transfer(
@@ -458,17 +481,25 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
         &deposit_amount / BigUint::from(4u32),
         &deposit_amount / BigUint::from(4u32),
     );
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Transfer test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Transfer test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 
     test_setup.start_block();
     test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    println!("Full exit test success, token_id: {}", token);
+    if blocks_processing == BlockProcessing::CommitAndVerify {
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Full exit test success, token_id: {}", token);
+    } else {
+        test_setup.execute_commit_block().expect_success();
+    }
 }
 
 pub struct TestkitConfig {
@@ -552,7 +583,12 @@ pub fn perform_basic_tests() {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
-        perform_basic_operations(token, &mut test_setup, deposit_amount.clone());
+        perform_basic_operations(
+            token,
+            &mut test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::CommitAndVerify,
+        );
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
@@ -562,8 +598,7 @@ pub fn perform_basic_tests() {
 // Struct used to keep expected balance changes after transactions execution.
 #[derive(Default)]
 pub struct ExpectedAccountState {
-    // First number is balance, second one is allowed error in balance(used for ETH because eth is used for transaction fees).
-    eth_accounts_state: HashMap<(ETHAccountId, TokenId), (BigUint, BigUint)>,
+    eth_accounts_state: HashMap<(ETHAccountId, TokenId), BigUint>,
     sync_accounts_state: HashMap<(ZKSyncAccountId, TokenId), BigUint>,
 
     // Amount of withdraw operations performed in block.
@@ -614,12 +649,12 @@ impl TestSetup {
         &self,
         account: ETHAccountId,
         token: TokenId,
-    ) -> (BigUint, BigUint) {
+    ) -> BigUint {
         self.expected_changes_for_current_block
             .eth_accounts_state
             .get(&(account, token))
             .cloned()
-            .unwrap_or_else(|| (self.get_eth_balance(account, token), BigUint::from(0u32)))
+            .unwrap_or_else(|| self.get_eth_balance(account, token))
     }
 
     pub fn get_expected_zksync_account_balance(
@@ -648,9 +683,9 @@ impl TestSetup {
         to: ZKSyncAccountId,
         token: Token,
         amount: BigUint,
-    ) -> TransactionReceipt {
+    ) -> Vec<TransactionReceipt> {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0);
-        from_eth_balance.0 -= &amount;
+        from_eth_balance -= &amount;
 
         self.expected_changes_for_current_block
             .eth_accounts_state
@@ -672,27 +707,27 @@ impl TestSetup {
                     .expect("Token with token id does not exist"),
             )
         };
-        let (receipt, deposit_op) = self.accounts.deposit(from, to, token_address, amount);
+        let mut eth_balance = self.get_expected_eth_account_balance(from, 0);
 
-        if let Some(mut eth_balance) = self
-            .expected_changes_for_current_block
+        let (receipts, deposit_op) = self.accounts.deposit(from, to, token_address, amount);
+
+        let gas_fee = receipts
+            .iter()
+            .map(|r| {
+                block_on(get_executed_tx_fee(
+                    self.commit_account.main_contract_eth_client.web3.eth(),
+                    &r,
+                ))
+                .expect("Failed to get transaction fee")
+            })
+            .sum::<BigUint>();
+        eth_balance -= gas_fee;
+        self.expected_changes_for_current_block
             .eth_accounts_state
-            .remove(&(from, 0))
-        {
-            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
-                .expect("Failed to get gas price");
-            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
-            eth_balance.1 += (gas_used * gas_price)
-                .to_string()
-                .parse::<BigUint>()
-                .unwrap();
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((from, 0), eth_balance);
-        }
+            .insert((from, 0), eth_balance);
 
         self.execute_priority_op(deposit_op);
-        receipt
+        receipts
     }
 
     fn execute_tx(&mut self, tx: FranklinTx) {
@@ -719,9 +754,9 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         rng: &mut impl Rng,
-    ) -> TransactionReceipt {
+    ) -> Vec<TransactionReceipt> {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0);
-        from_eth_balance.0 -= &amount;
+        from_eth_balance -= &amount;
 
         self.expected_changes_for_current_block
             .eth_accounts_state
@@ -737,30 +772,29 @@ impl TestSetup {
                     .expect("Token with token id does not exist"),
             )
         };
-        let (receipt, deposit_op) =
+        let mut eth_balance = self.get_expected_eth_account_balance(from, 0);
+
+        let (receipts, deposit_op) =
             self.accounts
                 .deposit_to_random(from, token_address, amount, rng);
 
-        if let Some(mut eth_balance) = self
-            .expected_changes_for_current_block
+        let gas_fee = receipts
+            .iter()
+            .map(|r| {
+                block_on(get_executed_tx_fee(
+                    self.commit_account.main_contract_eth_client.web3.eth(),
+                    &r,
+                ))
+                .expect("Failed to get transaction fee")
+            })
+            .sum::<BigUint>();
+        eth_balance -= gas_fee;
+        self.expected_changes_for_current_block
             .eth_accounts_state
-            .remove(&(from, 0))
-        {
-            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
-                .expect("Failed to get gas price");
-            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
-
-            eth_balance.1 += (gas_used * gas_price)
-                .to_string()
-                .parse::<BigUint>()
-                .unwrap();
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((from, 0), eth_balance);
-        }
+            .insert((from, 0), eth_balance);
 
         self.execute_priority_op(deposit_op);
-        receipt
+        receipts
     }
 
     fn execute_priority_op(&mut self, op: PriorityOp) {
@@ -818,29 +852,24 @@ impl TestSetup {
             .insert((from, token.0), BigUint::from(0u32));
 
         let mut post_by_eth_balance = self.get_expected_eth_account_balance(post_by, token.0);
-        post_by_eth_balance.0 += zksync0_old;
+        post_by_eth_balance += zksync0_old;
         self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((post_by, token.0), post_by_eth_balance);
 
+        let mut eth_balance = self.get_expected_eth_account_balance(post_by, 0);
+
         let (receipt, full_exit_op) = self.accounts.full_exit(post_by, token_address, account_id);
 
-        if let Some(mut eth_balance) = self
-            .expected_changes_for_current_block
+        let gas_fee = block_on(get_executed_tx_fee(
+            self.commit_account.main_contract_eth_client.web3.eth(),
+            &receipt,
+        ))
+        .expect("Failed to get transaction fee");
+        eth_balance -= gas_fee;
+        self.expected_changes_for_current_block
             .eth_accounts_state
-            .remove(&(post_by, 0))
-        {
-            let gas_price = block_on(self.commit_account.main_contract_eth_client.get_gas_price())
-                .expect("Failed to get gas price");
-            let gas_used = receipt.gas_used.expect("receipt must contain gas used");
-            eth_balance.1 += (gas_used * gas_price)
-                .to_string()
-                .parse::<BigUint>()
-                .unwrap();
-            self.expected_changes_for_current_block
-                .eth_accounts_state
-                .insert((post_by, 0), eth_balance);
-        }
+            .insert((post_by, 0), eth_balance);
 
         self.execute_priority_op(full_exit_op);
         receipt
@@ -974,7 +1003,7 @@ impl TestSetup {
             .insert((from, token.0), zksync0_old);
 
         let mut to_eth_balance = self.get_expected_eth_account_balance(to, token.0);
-        to_eth_balance.0 += &amount;
+        to_eth_balance += &amount;
         self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((to, token.0), to_eth_balance);
@@ -1105,19 +1134,14 @@ impl TestSetup {
         let block_chunks = new_block.block.block_chunks_size;
 
         let mut block_checks_failed = false;
-        for ((eth_account, token), (balance, allowed_margin)) in
+        for ((eth_account, token), expeted_balance) in
             &self.expected_changes_for_current_block.eth_accounts_state
         {
             let real_balance = self.get_eth_balance(*eth_account, *token);
-            let diff = balance - &real_balance;
-            let is_diff_valid = diff >= BigUint::from(0u32) && diff <= *allowed_margin;
-            if !is_diff_valid {
-                println!(
-                    "eth acc: {}, token: {}, diff: {}, within bounds: {}",
-                    eth_account.0, token, diff, is_diff_valid
-                );
-                println!("expected: {}", balance);
-                println!("real: {}", real_balance);
+            if expeted_balance != &real_balance {
+                println!("eth acc: {}, token: {}", eth_account.0, token);
+                println!("expected: {}", expeted_balance);
+                println!("real:     {}", real_balance);
                 block_checks_failed = true;
             }
         }
@@ -1203,6 +1227,15 @@ impl TestSetup {
 
     pub fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
         block_on(self.accounts.eth_accounts[0].total_blocks_committed())
+    }
+
+    pub fn total_blocks_verified(&self) -> Result<u64, failure::Error> {
+        block_on(self.accounts.eth_accounts[0].total_blocks_verified())
+    }
+
+    pub fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), failure::Error> {
+        block_on(self.commit_account.revert_blocks(blocks_to_revert))?;
+        Ok(())
     }
 
     pub fn eth_block_number(&self) -> u64 {

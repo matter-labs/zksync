@@ -137,7 +137,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
                     unsubRep.error
                 );
             }
-            if (unsubRep.result != true) {
+            if (unsubRep.result !== true) {
                 throw new Error(
                     `Unsubscription failed, returned false: ${subId}`
                 );

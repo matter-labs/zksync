@@ -465,8 +465,11 @@ fn commit_cost_of_deposits(
     let mut user_gas_cost = U256::from(0);
     test_setup.start_block();
     for amount in amounts.into_iter() {
-        let deposit_tx_receipt =
-            test_setup.deposit_to_random(ETHAccountId(4), token, amount.clone(), rng);
+        let deposit_tx_receipt = test_setup
+            .deposit_to_random(ETHAccountId(4), token, amount.clone(), rng)
+            .last()
+            .cloned()
+            .expect("At least one receipt is expected for deposit");
         user_gas_cost += deposit_tx_receipt.gas_used.expect("deposit gas used");
     }
     let deposits_execute_result = test_setup

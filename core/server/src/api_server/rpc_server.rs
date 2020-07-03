@@ -723,7 +723,7 @@ impl Rpc for RpcApp {
             let depositing =
                 DepositingAccountBalances::from_pending_ops(depositing_ops, &self_.token_cache)?;
 
-            log::info!(
+            log::trace!(
                 "account_info: address {}, total request processing {}ms",
                 &address,
                 started.elapsed().as_millis()

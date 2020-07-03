@@ -1,4 +1,3 @@
-import { curve } from "elliptic";
 import {
     privateKeyFromSeed,
     signTransactionBytes,
@@ -8,13 +7,21 @@ import { ethers, utils } from "ethers";
 import {
     packAmountChecked,
     packFeeChecked,
-    getEthSignatureType
+    getEthSignatureType,
+    signMessagePersonalAPI,
+    getSignedBytesFromMessage
 } from "./utils";
 import BN = require("bn.js");
-import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
+import {
+    Address,
+    EthSignerType,
+    PubKeyHash,
+    Transfer,
+    Withdraw
+} from "./types";
 
-const MAX_NUMBER_OF_TOKENS = 4096;
-const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
+const MAX_NUMBER_OF_TOKENS = 128;
+const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export class Signer {
     readonly privateKey: Uint8Array;
@@ -123,15 +130,17 @@ export class Signer {
         ethSigner: ethers.Signer
     ): Promise<{
         signer: Signer;
-        ethSignatureType: "EthereumSignature" | "EIP1271Signature";
+        ethSignatureType: EthSignerType;
     }> {
         const message =
             "Access zkSync account.\n" +
             "\n" +
             "Only sign this message for a trusted client!";
-        const signature = await ethSigner.signMessage(message);
+        const signedBytes = getSignedBytesFromMessage(message, false);
+        const signature = await signMessagePersonalAPI(ethSigner, signedBytes);
         const address = await ethSigner.getAddress();
-        const ethSignatureType = getEthSignatureType(
+        const ethSignatureType = await getEthSignatureType(
+            ethSigner.provider,
             message,
             signature,
             address

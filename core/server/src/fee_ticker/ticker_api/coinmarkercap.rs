@@ -1,12 +1,19 @@
+// Built-in deps
+use std::{collections::HashMap, time::Duration};
+// External deps
 use chrono::{DateTime, Utc};
 use failure::format_err;
-use models::node::{TokenLike, TokenPrice};
-use models::primitives::UnsignedRatioSerializeAsDecimal;
-use num::rational::Ratio;
-use num::BigUint;
+use num::{rational::Ratio, BigUint};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+// Workspace deps
+use models::{
+    node::{TokenLike, TokenPrice},
+    primitives::UnsignedRatioSerializeAsDecimal,
+};
+
+/// The limit of time we are willing to wait for response.
+const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub(super) async fn fetch_coimarketcap_data(
     client: &reqwest::Client,
@@ -19,10 +26,13 @@ pub(super) async fn fetch_coimarketcap_data(
             token_symbol
         ))
         .expect("failed to join url path");
-    let mut api_response = client
-        .get(request_url)
-        .send()
-        .await?
+
+    let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, client.get(request_url).send());
+
+    let mut api_response = api_request_future
+        .await
+        .map_err(|_| failure::format_err!("Coinmarketcap API request timeout"))?
+        .map_err(|err| failure::format_err!("Coinmarketcap API request failed: {}", err))?
         .json::<CoinmarketCapResponse>()
         .await?;
     let mut token_info = api_response
