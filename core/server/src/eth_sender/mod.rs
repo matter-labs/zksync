@@ -202,7 +202,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 // ...and proceed them.
                 self.proceed_next_operations().await;
                 // Update the gas adjuster to maintain the up-to-date max gas price limit.
-                self.gas_adjuster.keep_updated(&self.db);
+                self.gas_adjuster.keep_updated(&self.ethereum, &self.db);
             }
         }
     }
