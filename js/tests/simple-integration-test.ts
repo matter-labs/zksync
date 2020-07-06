@@ -6,7 +6,7 @@ import {
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/ZkSync.json');
 import {ethers, utils, Contract} from "ethers";
-import {bigNumberify, parseEther} from "ethers/utils";
+import {BigNumber, bigNumberify, parseEther} from "ethers/utils";
 import {IERC20_INTERFACE} from "zksync/src/utils";
 import {TokenLike} from "zksync/build/types";
 import * as apitype from "./api-type-validate";
@@ -256,6 +256,7 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
 }
 
 async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, depositAmountETH: string) {
+    console.log('Move funds');
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
@@ -356,6 +357,35 @@ function promiseTimeout(ms, promise) {
   ])
 }
 
+async function checkInvalidTransactionResending(contract: Contract, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amountETH: string) {
+    console.log('Checking invalid transaction resending');
+    const amount = utils.parseEther(amountETH);
+
+    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
+    const fee = fullFee.totalFee;
+
+    await testAutoApprovedDeposit(depositWallet, syncWallet1, token, amount.div(2).add(fee));
+    console.log(`  amount/2 + fee <- deposited`);
+
+    try {
+        await testTransferToSelf(syncWallet1, token, amount);
+    } catch (e) {
+        console.log('to remove : ', e);
+        console.log('  a transaction that should be invalid not passed, all is ok');
+    }
+
+    // await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
+    // console.log(`  depositAmount/2 <- deposited`);
+    // const transferToNewHandleAttempt2 = await syncWallet1.syncTransfer({
+    //     to: syncWallet2.address(),
+    //     token,
+    //     amount: depositAmount,
+    //     fee
+    // });
+    // await transferToNewHandleAttempt2.awaitVerifyReceipt();
+    // console.log('  a transaction that should be valid passed, all is ok');
+}
+
 (async () => {
     try {
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
@@ -410,9 +440,24 @@ function promiseTimeout(ms, promise) {
         await apitype.checkStatusResponseType();
         await apitype.checkTestnetConfigResponseType();
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
+
+        // checking success invalid transaction resending
+        const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({to: ethWallet4.address, value: parseEther("6.0")}));
+        const syncWallet4 = await Wallet.fromEthSigner(
+            ethWallet4,
+            syncProvider,
+        );
+        const ethWallet5 = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({to: ethWallet5.address, value: parseEther("6.0")}));
+        const syncWallet5 = await Wallet.fromEthSigner(
+            ethWallet5,
+            syncProvider,
+        );
+        await checkInvalidTransactionResending(contract, zksyncDepositorWallet, syncWallet, syncWallet5, "ETH", "0.1");
 
         await syncProvider.disconnect();
     } catch (e) {
