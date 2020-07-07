@@ -160,6 +160,7 @@ fn collect_garbage() {
             primary_account_address: Default::default(),
             nonce: Default::default(),
             created_at: chrono::Utc::now(),
+            eth_sign_data: None,
         };
         OperationsSchema(&conn).store_executed_operation(executed_tx)?;
 

@@ -25,8 +25,8 @@ use futures::{
 use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace uses
 use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
-    TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
+    SignedFranklinTx, TransferOp, TransferToNewOp,
 };
 use storage::ConnectionPool;
 // Local uses
@@ -66,7 +66,7 @@ pub enum TxAddError {
 #[derive(Clone, Debug, Default)]
 pub struct ProposedBlock {
     pub priority_ops: Vec<PriorityOp>,
-    pub txs: Vec<FranklinTx>,
+    pub txs: Vec<SignedFranklinTx>,
 }
 
 impl ProposedBlock {
@@ -95,7 +95,7 @@ struct MempoolState {
     // account and last committed nonce
     account_nonces: HashMap<Address, Nonce>,
     account_ids: HashMap<AccountId, Address>,
-    ready_txs: VecDeque<FranklinTx>,
+    ready_txs: VecDeque<SignedFranklinTx>,
 }
 
 impl MempoolState {
@@ -160,7 +160,7 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
-    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: SignedFranklinTx) -> Result<(), TxAddError> {
         // Correctness should be checked by `signature_checker`, thus
         // `tx.check_correctness()` is not invoked here.
 
@@ -197,7 +197,7 @@ impl Mempool {
                 TxAddError::DbError
             })?;
 
-        self.mempool_state.add_tx(tx.into_inner().tx)
+        self.mempool_state.add_tx(tx.into_inner())
     }
 
     async fn run(mut self) {
@@ -293,7 +293,7 @@ impl Mempool {
         )
     }
 
-    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
+    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<SignedFranklinTx>) {
         let mut txs_for_commit = Vec::new();
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {

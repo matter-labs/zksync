@@ -42,7 +42,7 @@ impl VerifiedTx {
             .map(|tx| {
                 Self(SignedFranklinTx {
                     tx,
-                    sign_data: request.eth_sign_data.clone(),
+                    eth_sign_data: request.eth_sign_data.clone(),
                 })
             })
     }

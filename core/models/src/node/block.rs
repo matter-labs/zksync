@@ -1,8 +1,8 @@
 use super::FranklinOp;
-use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use crate::node::SignedFranklinTx;
 use crate::params::CHUNK_BIT_WIDTH;
 use crate::serialization::*;
 use chrono::DateTime;
@@ -20,7 +20,7 @@ pub struct PendingBlock {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
-    pub tx: FranklinTx,
+    pub tx: SignedFranklinTx,
     pub success: bool,
     pub op: Option<FranklinOp>,
     pub fail_reason: Option<String>,

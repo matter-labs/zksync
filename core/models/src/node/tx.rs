@@ -473,15 +473,23 @@ pub struct EthSignData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedFranklinTx {
     pub tx: FranklinTx,
-    pub sign_data: Option<EthSignData>,
+    pub eth_sign_data: Option<EthSignData>,
 }
 
 impl From<FranklinTx> for SignedFranklinTx {
     fn from(tx: FranklinTx) -> Self {
         Self {
             tx,
-            sign_data: None,
+            eth_sign_data: None,
         }
+    }
+}
+
+impl std::ops::Deref for SignedFranklinTx {
+    type Target = FranklinTx;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tx
     }
 }
 

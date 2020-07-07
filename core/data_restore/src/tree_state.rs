@@ -361,7 +361,7 @@ impl TreeState {
         }
         let block_index = current_op_block_index;
         let exec_result = ExecutedTx {
-            tx,
+            tx: tx.into(),
             success: true,
             op: Some(executed_op),
             fail_reason: None,

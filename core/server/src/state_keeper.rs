@@ -24,6 +24,7 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
+use models::node::SignedFranklinTx;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -538,7 +539,7 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
-    fn apply_tx(&mut self, tx: FranklinTx) -> Result<ExecutedOperations, FranklinTx> {
+    fn apply_tx(&mut self, tx: SignedFranklinTx) -> Result<ExecutedOperations, SignedFranklinTx> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -549,7 +550,7 @@ impl PlasmaStateKeeper {
 
         // Check if adding this transaction to the block won't make the contract operations
         // too expensive.
-        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.clone());
+        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.tx.clone());
         if let Ok(non_executed_op) = non_executed_op {
             // We only care about successful conversions, since if conversion failed,
             // then transaction will fail as well (as it shares the same code base).
@@ -565,7 +566,7 @@ impl PlasmaStateKeeper {
             }
         }
 
-        if matches!(tx, FranklinTx::Withdraw(_)) {
+        if matches!(tx.tx, FranklinTx::Withdraw(_)) {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
         }
@@ -576,7 +577,7 @@ impl PlasmaStateKeeper {
             return Err(tx);
         }
 
-        let tx_updates = self.state.execute_tx(tx.clone());
+        let tx_updates = self.state.execute_tx(tx.tx.clone());
 
         let exec_result = match tx_updates {
             Ok(OpSuccess {

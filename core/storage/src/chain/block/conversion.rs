@@ -28,6 +28,7 @@ use crate::{
     prover::ProverSchema,
     StorageProcessor,
 };
+use models::node::SignedFranklinTx;
 
 impl StoredOperation {
     pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
@@ -59,12 +60,14 @@ impl StoredOperation {
 
 impl StoredExecutedTransaction {
     pub fn into_executed_tx(self) -> Result<ExecutedTx, failure::Error> {
-        let franklin_tx: FranklinTx =
-            serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
+        let tx: FranklinTx = serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
         let franklin_op: Option<FranklinOp> =
             serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");
+        let eth_sign_data = self
+            .eth_sign_data
+            .map(|value| serde_json::from_value(value).expect("Unparsable EthSignData"));
         Ok(ExecutedTx {
-            tx: franklin_tx,
+            tx: SignedFranklinTx { tx, eth_sign_data },
             success: self.success,
             op: franklin_op,
             fail_reason: self.fail_reason,
@@ -143,10 +146,10 @@ impl NewExecutedTransaction {
             }
         }
 
-        let tx = serde_json::to_value(&exec_tx.tx).expect("Cannot serialize tx");
+        let tx = serde_json::to_value(&exec_tx.tx.tx).expect("Cannot serialize tx");
         let operation = serde_json::to_value(&exec_tx.op).expect("Cannot serialize operation");
 
-        let (from_account_hex, to_account_hex): (String, Option<String>) = match exec_tx.tx {
+        let (from_account_hex, to_account_hex): (String, Option<String>) = match exec_tx.tx.tx {
             FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
                 serde_json::from_value(tx["from"].clone()).unwrap(),
                 serde_json::from_value(tx["to"].clone()).unwrap(),
@@ -165,6 +168,10 @@ impl NewExecutedTransaction {
         let to_account: Option<Vec<u8>> =
             to_account_hex.map(|value| hex::decode(cut_prefix(&value)).unwrap());
 
+        let eth_sign_data = exec_tx.tx.eth_sign_data.as_ref().map(|sign_data| {
+            serde_json::to_value(sign_data).expect("Failed to encode EthSignData")
+        });
+
         Self {
             block_number: i64::from(block),
             tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
@@ -178,6 +185,7 @@ impl NewExecutedTransaction {
             primary_account_address: exec_tx.tx.account().as_bytes().to_vec(),
             nonce: exec_tx.tx.nonce() as i64,
             created_at: exec_tx.created_at,
+            eth_sign_data,
         }
     }
 }
