@@ -365,25 +365,16 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
     const fee = fullFee.totalFee;
 
     await testAutoApprovedDeposit(depositWallet, syncWallet1, token, amount.div(2).add(fee));
-    console.log(`  amount/2 + fee <- deposited`);
-
+    await testChangePubkeyOnchain(syncWallet1);
     try {
-        await testTransferToSelf(syncWallet1, token, amount);
+        await testTransfer(syncWallet1, syncWallet2, token, amount);
     } catch (e) {
-        console.log('to remove : ', e);
-        console.log('  a transaction that should be invalid not passed, all is ok');
+        assert(e.value.failReason == `Not enough balance`);
+        console.log('Transfer failed (expected)');
     }
 
-    // await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
-    // console.log(`  depositAmount/2 <- deposited`);
-    // const transferToNewHandleAttempt2 = await syncWallet1.syncTransfer({
-    //     to: syncWallet2.address(),
-    //     token,
-    //     amount: depositAmount,
-    //     fee
-    // });
-    // await transferToNewHandleAttempt2.awaitVerifyReceipt();
-    // console.log('  a transaction that should be valid passed, all is ok');
+    await testDeposit(depositWallet, syncWallet1, token, amount.div(2));
+    await testTransfer(syncWallet1, syncWallet2, token, amount);
 }
 
 (async () => {
@@ -434,15 +425,11 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
             syncProvider,
         );
 
-        await testThrowingErrorOnTxFail(zksyncDepositorWallet);
+        // await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
         apitype.deleteUnusedGenFiles();
         await apitype.checkStatusResponseType();
         await apitype.checkTestnetConfigResponseType();
-
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
 
         // checking success invalid transaction resending
         const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -457,7 +444,11 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
             ethWallet5,
             syncProvider,
         );
-        await checkInvalidTransactionResending(contract, zksyncDepositorWallet, syncWallet, syncWallet5, "ETH", "0.1");
+        await checkInvalidTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5, "ETH", "0.1");
+
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
 
         await syncProvider.disconnect();
     } catch (e) {

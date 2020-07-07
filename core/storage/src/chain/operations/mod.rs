@@ -69,6 +69,16 @@ impl<'a> OperationsSchema<'a> {
         self.0.conn().transaction(|| {
             MempoolSchema(&self.0).remove_tx(&operation.tx_hash)?;
 
+            // if the operation is success we should delete from the database
+            // stored one with an equal hash (of course this can be only failed transaction)
+            if operation.success {
+                diesel::delete(
+                    executed_transactions::table
+                        .filter(executed_transactions::tx_hash.eq(&operation.tx_hash)),
+                )
+                .execute(self.0.conn())?;
+            }
+
             diesel::insert_into(executed_transactions::table)
                 .values(&operation)
                 .on_conflict_do_nothing()

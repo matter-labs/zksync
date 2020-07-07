@@ -188,6 +188,8 @@ impl Mempool {
             TxAddError::DbError
         })?;
 
+        println!("barik all is ok 1");
+
         storage
             .chain()
             .mempool_schema()

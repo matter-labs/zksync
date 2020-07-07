@@ -855,6 +855,8 @@ impl Rpc for RpcApp {
             )
             .await?;
 
+            println!("barik hehe 1");
+
             // Check whether operations limit for this account was reached.
             // We must do it after we've checked that transaction is correct to avoid the situation
             // when somebody sends incorrect transactions to deny changing the pubkey for some account ID.
@@ -869,6 +871,7 @@ impl Rpc for RpcApp {
                     });
                 }
             }
+            println!("barik hehe 2");
 
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
@@ -888,8 +891,11 @@ impl Rpc for RpcApp {
                     Error::internal_error()
                 })?;
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
+            println!("barik hehe 3");
 
-            tx_add_result.map(|_| hash).map_err(|e| Error {
+            let res = tx_add_result.map(|_| hash);
+            println!("barik here always :: {:?}", res);
+            res.map_err(|e| Error {
                 code: RpcErrorCodes::from(e).into(),
                 message: e.to_string(),
                 data: None,
