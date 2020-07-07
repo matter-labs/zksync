@@ -124,5 +124,11 @@
     "decimals": 18,
     "symbol": "LAMB",
     "name": "Lambda"
+  },
+  {
+    "address": "0xd94e3DC39d4Cad1DAd634e7eb585A57A19dC7EFE",
+    "decimals": 18,
+    "symbol": "GNT",
+    "name": "New Golem Network Token"
   }
 ]
