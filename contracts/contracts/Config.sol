@@ -58,7 +58,7 @@ contract Config {
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 
     /// @notice Expiration delta for priority request to be satisfied (in seconds)
-    /// NOTE: Priority expiration should be > EXPECT_VERIFICATION_IN, otherwise incorrect block with priority op could not be reverted.
+    /// NOTE: Priority expiration should be > (EXPECT_VERIFICATION_IN * BLOCK_PERIOD), otherwise incorrect block with priority op could not be reverted.
     uint256 constant PRIORITY_EXPIRATION_PERIOD = 3 days;
 
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
