@@ -7,7 +7,7 @@ import {
 const franklin_abi = require('../../contracts/build/ZkSync.json');
 import {ethers, utils, Contract} from "ethers";
 import {BigNumber, bigNumberify, parseEther} from "ethers/utils";
-import {IERC20_INTERFACE} from "zksync/src/utils";
+import {IERC20_INTERFACE, sleep} from "zksync/src/utils";
 import {TokenLike} from "zksync/build/types";
 import * as apitype from "./api-type-validate";
 import * as assert from "assert";
@@ -123,7 +123,7 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
     }
 }
 
-async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber, timeoutBeforeReceipt = 0) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
     const fee = fullFee.totalFee;
 
@@ -138,6 +138,7 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
         fee
     });
     console.log(`Transfer posted: ${(new Date().getTime()) - startTime} ms`);
+    await sleep(timeoutBeforeReceipt);
     await transferToNewHandle.awaitReceipt();
     console.log(`Transfer committed: ${(new Date().getTime()) - startTime} ms`);
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
@@ -256,7 +257,6 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
 }
 
 async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, depositAmountETH: string) {
-    console.log('Move funds');
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
@@ -374,7 +374,9 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
     }
 
     await testDeposit(depositWallet, syncWallet1, token, amount.div(2));
-    await testTransfer(syncWallet1, syncWallet2, token, amount);
+    // we should wait some `timeoutBeforeReceipt` to give server enough time
+    // to move our transaction with success flag from mempool to statekeeper
+    await testTransfer(syncWallet1, syncWallet2, token, amount, 3000);
 }
 
 (async () => {
@@ -425,7 +427,7 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
             syncProvider,
         );
 
-        // await testThrowingErrorOnTxFail(zksyncDepositorWallet);
+        await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
         apitype.deleteUnusedGenFiles();
         await apitype.checkStatusResponseType();
@@ -444,11 +446,11 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
             ethWallet5,
             syncProvider,
         );
-        await checkInvalidTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5, "ETH", "0.1");
+        await checkInvalidTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5, "ETH", "0.3");
 
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
 
         await syncProvider.disconnect();
     } catch (e) {

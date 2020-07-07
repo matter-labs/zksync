@@ -263,7 +263,7 @@ impl PlasmaState {
             .ok_or_else(|| format_err!("From account does not exist"))?;
         ensure!(
             from_account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked111"
+            "Account is locked"
         );
         ensure!(
             tx.verify_signature() == Some(from_account.pub_key_hash),
@@ -318,7 +318,7 @@ impl PlasmaState {
             .ok_or_else(|| format_err!("Account does not exist"))?;
         ensure!(
             account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked222"
+            "Account is locked"
         );
         ensure!(
             tx.verify_signature() == Some(account.pub_key_hash),
