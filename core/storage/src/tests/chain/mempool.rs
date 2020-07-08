@@ -1,8 +1,9 @@
 // External imports
+use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
 use models::node::{
     tx::{ChangePubKey, Transfer, Withdraw},
-    Address, FranklinTx,
+    Address, FranklinTx, SignedFranklinTx,
 };
 // Local imports
 use crate::tests::db_test;
@@ -14,8 +15,10 @@ use crate::{
     StorageProcessor,
 };
 
-/// Generates several different `FranlinTx` objects.
-fn franklin_txs() -> Vec<FranklinTx> {
+use crate::tests::chain::utils::get_eth_sing_data;
+
+/// Generates several different `SignedFranlinTx` objects.
+fn franklin_txs() -> Vec<SignedFranklinTx> {
     let transfer_1 = Transfer::new(
         42,
         Address::random(),
@@ -57,12 +60,25 @@ fn franklin_txs() -> Vec<FranklinTx> {
         eth_signature: None,
     };
 
-    vec![
+    let txs = [
         FranklinTx::Transfer(Box::new(transfer_1)),
         FranklinTx::Transfer(Box::new(transfer_2)),
         FranklinTx::Withdraw(Box::new(withdraw)),
         FranklinTx::ChangePubKey(Box::new(change_pubkey)),
-    ]
+    ];
+
+    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+    txs.iter()
+        .map(|tx| {
+            let test_message = format!("test message {}", rng.gen::<u32>());
+
+            SignedFranklinTx {
+                tx: tx.clone(),
+                eth_sign_data: Some(get_eth_sing_data(test_message)),
+            }
+        })
+        .collect()
 }
 
 /// Checks the save&load routine for mempool schema.
@@ -84,7 +100,11 @@ fn store_load() {
         assert_eq!(txs_from_db.len(), txs.len());
 
         for (tx, tx_from_db) in txs.iter().zip(txs_from_db) {
-            assert_eq!(tx_from_db.hash(), tx.hash());
+            assert_eq!(tx_from_db.hash(), tx.hash(), "transaction changed");
+            assert_eq!(
+                tx_from_db.eth_sign_data, tx.eth_sign_data,
+                "sign data changed"
+            );
         }
 
         Ok(())

@@ -464,7 +464,7 @@ pub enum FranklinTx {
     ChangePubKey(Box<ChangePubKey>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
     pub signature: TxEthSignature,
     pub message: String,
@@ -823,14 +823,14 @@ impl<'de> Deserialize<'de> for PackedSignature {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "signature")]
 pub enum TxEthSignature {
     EthereumSignature(PackedEthSignature),
     EIP1271Signature(EIP1271Signature),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EIP1271Signature(pub Vec<u8>);
 
 impl fmt::Display for EIP1271Signature {
