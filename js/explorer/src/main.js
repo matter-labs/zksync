@@ -82,6 +82,8 @@ window.app = new Vue({
         let regex = /(?:api-)*(\w*)(?:\..*)*/;
         this.store.network = this.store.config.ETH_NETWORK;
         this.store.capitalizedNetwork = capitalize(this.store.network);
+        const walletLinkPrefix = this.store.network == 'mainnet' ? 'wallet' : this.store.network;
+        this.store.walletLink = `https://${walletLinkPrefix}.zksync.io`;
 
         (async () => {
             while (!this.store.capitalizedNetwork) await sleep(100);

@@ -1,25 +1,17 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, run_upgrade_franklin};
+use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
-use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
 
-fn migration_test() {
+/// Executes blocks with some basic operations with new state keeper
+/// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
+fn execute_blocks_with_new_state_keeper(contracts: Contracts, block_processing: BlockProcessing) {
     let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
-
-    let deploy_timer = Instant::now();
-    println!("deploying contracts");
-    let contracts = deploy_test_contracts();
-    println!(
-        "contracts deployed {:#?}, {} secs",
-        contracts,
-        deploy_timer.elapsed().as_secs()
-    );
 
     let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
@@ -75,27 +67,38 @@ fn migration_test() {
             token,
             &mut test_setup,
             deposit_amount.clone(),
-            BlockProcessing::CommitAndVerify,
+            block_processing,
         );
     }
 
-    let start_upgrade = Instant::now();
-    run_upgrade_franklin(contracts.contract, contracts.upgrade_gatekeeper);
-    println!("Upgrade done in {:?}", start_upgrade.elapsed());
-
-    for token in 0..=1 {
-        perform_basic_operations(
-            token,
-            &mut test_setup,
-            deposit_amount.clone(),
-            BlockProcessing::CommitAndVerify,
-        );
+    if block_processing == BlockProcessing::NoVerify {
+        let blocks_committed = test_setup
+            .total_blocks_committed()
+            .expect("total_blocks_committed call fails");
+        let blocks_verified = test_setup
+            .total_blocks_verified()
+            .expect("total_blocks_verified call fails");
+        assert_ne!(blocks_committed, blocks_verified, "no blocks to revert");
+        test_setup
+            .revert_blocks(blocks_committed - blocks_verified)
+            .expect("revert_blocks call fails");
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
 }
 
+fn revert_blocks_test() {
+    println!("deploying contracts");
+    let contracts = deploy_test_contracts();
+    println!("contracts deployed");
+
+    execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify);
+    println!("some blocks are committed and reverted");
+
+    execute_blocks_with_new_state_keeper(contracts, BlockProcessing::CommitAndVerify);
+}
+
 fn main() {
-    migration_test();
+    revert_blocks_test();
 }

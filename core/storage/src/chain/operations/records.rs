@@ -52,7 +52,7 @@ pub struct StoredExecutedPriorityOperation {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Debug, Clone, Insertable)]
+#[derive(Debug, Clone, Insertable, AsChangeset)]
 #[table_name = "executed_transactions"]
 pub struct NewExecutedTransaction {
     pub block_number: i64,

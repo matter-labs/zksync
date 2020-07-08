@@ -138,6 +138,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 }
             }
         }
+        if (toProcess > 0) {
+            emit PendingWithdrawalsComplete(startIndex, startIndex + toProcess);
+        }
     }
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
@@ -186,7 +189,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
 
         uint256 balance_before = _token.balanceOf(address(this));
-        require(_token.transferFrom(msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit
+        require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit
         uint256 balance_after = _token.balanceOf(address(this));
         uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 
@@ -686,8 +689,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, _to, _tokenId, _amount));
             offset += ONCHAIN_WITHDRAWAL_BYTES;
         }
-        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
         require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
+        if (numberOfPendingWithdrawals != localNumberOfPendingWithdrawals) {
+            emit PendingWithdrawalsAdd(firstPendingWithdrawalIndex + numberOfPendingWithdrawals, firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals);
+        }
+        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
     }
 
     /// @notice Checks whether oldest unverified block has expired

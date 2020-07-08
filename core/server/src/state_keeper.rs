@@ -96,6 +96,7 @@ pub struct PlasmaStateKeeper {
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
+    max_miniblock_iterations_withdraw_block: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -233,6 +234,7 @@ impl PlasmaStateInitParams {
 }
 
 impl PlasmaStateKeeper {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         initial_state: PlasmaStateInitParams,
         fee_account_address: Address,
@@ -241,6 +243,7 @@ impl PlasmaStateKeeper {
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
+        max_miniblock_iterations_withdraw_block: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -272,6 +275,7 @@ impl PlasmaStateKeeper {
             executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
+            max_miniblock_iterations_withdraw_block,
         };
 
         let root = keeper.state.root_hash();
@@ -363,7 +367,7 @@ impl PlasmaStateKeeper {
         while let Some(req) = self.rx_for_blocks.next().await {
             let start = std::time::Instant::now();
 
-            log::info!(
+            log::trace!(
                 "Received new request. Last request was processed {}ms ago",
                 (start - last_request_processed).as_millis()
             );
@@ -372,7 +376,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::GetAccount(addr, sender) => {
                     sender.send(self.account(&addr)).unwrap_or_default();
 
-                    log::info!(
+                    log::trace!(
                         "GetAccount request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -382,7 +386,7 @@ impl PlasmaStateKeeper {
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
 
-                    log::info!(
+                    log::trace!(
                         "GetLastUnprocessedPriorityOp request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -390,7 +394,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_tx_batch(proposed_block).await;
 
-                    log::info!(
+                    log::trace!(
                         "ExecuteMiniBlock request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -399,7 +403,7 @@ impl PlasmaStateKeeper {
                     let result = self.check_executed_in_pending_block(op_id);
                     sender.send(result).unwrap_or_default();
 
-                    log::info!(
+                    log::trace!(
                         "GetExecutedInPendingBlock request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -407,7 +411,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
 
-                    log::info!(
+                    log::trace!(
                         "SealBlock request processed in {}ms",
                         start.elapsed().as_millis()
                     );
@@ -419,15 +423,17 @@ impl PlasmaStateKeeper {
     }
 
     async fn notify_executed_ops(&self, executed_ops: &mut Vec<ExecutedOperations>) {
-        self.executed_tx_notify_sender
-            .clone()
-            .send(ExecutedOpsNotify {
-                operations: executed_ops.clone(),
-                block_number: self.state.block_number,
-            })
-            .await
-            .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
-            .unwrap_or_default();
+        if !executed_ops.is_empty() {
+            self.executed_tx_notify_sender
+                .clone()
+                .send(ExecutedOpsNotify {
+                    operations: executed_ops.clone(),
+                    block_number: self.state.block_number,
+                })
+                .await
+                .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+                .unwrap_or_default();
+        }
         executed_ops.clear();
     }
 
@@ -472,15 +478,20 @@ impl PlasmaStateKeeper {
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
-            if self.pending_block.pending_block_iteration > self.max_miniblock_iterations {
+
+            // If pending block contains withdrawals we seal it faster
+            let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
+                self.max_miniblock_iterations_withdraw_block
+            } else {
+                self.max_miniblock_iterations
+            };
+            if self.pending_block.pending_block_iteration > max_miniblock_iterations {
                 self.seal_pending_block().await;
-                self.notify_executed_ops(&mut executed_ops).await;
-                return;
             } else {
                 self.store_pending_block().await;
-                self.notify_executed_ops(&mut executed_ops).await;
             }
         }
+        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // Err if there is no space in current block
