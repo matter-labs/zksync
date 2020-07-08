@@ -357,26 +357,30 @@ function promiseTimeout(ms, promise) {
   ])
 }
 
-async function checkInvalidTransactionResending(contract: Contract, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amountETH: string) {
+async function checkFailedTransactionResending(contract: Contract, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
     console.log('Checking invalid transaction resending');
-    const amount = utils.parseEther(amountETH);
+    const amount = utils.parseEther("0.2");
 
-    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
+    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
     const fee = fullFee.totalFee;
 
-    await testAutoApprovedDeposit(depositWallet, syncWallet1, token, amount.div(2).add(fee));
+    await testAutoApprovedDeposit(depositWallet, syncWallet1, "ETH", amount.div(2).add(fee));
     await testChangePubkeyOnchain(syncWallet1);
     try {
-        await testTransfer(syncWallet1, syncWallet2, token, amount);
+        await testTransfer(syncWallet1, syncWallet2, "ETH", amount);
     } catch (e) {
         assert(e.value.failReason == `Not enough balance`);
         console.log('Transfer failed (expected)');
     }
 
-    await testDeposit(depositWallet, syncWallet1, token, amount.div(2));
-    // we should wait some `timeoutBeforeReceipt` to give server enough time
+    await testDeposit(depositWallet, syncWallet1, "ETH", amount.div(2));
+    // We should wait some `timeoutBeforeReceipt` to give server enough time
     // to move our transaction with success flag from mempool to statekeeper
-    await testTransfer(syncWallet1, syncWallet2, token, amount, 3000);
+    //
+    // If we won't wait enough, then we'll get the receipt for the previous, failed tx,
+    // which has the same hash. The new (successful) receipt will be available only
+    // when tx will be executed again in state keeper, so we must wait for it.
+    await testTransfer(syncWallet1, syncWallet2, "ETH", amount, 3000);
 }
 
 (async () => {
@@ -433,7 +437,7 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
         await apitype.checkStatusResponseType();
         await apitype.checkTestnetConfigResponseType();
 
-        // checking success invalid transaction resending
+        // Check that transaction can be successfully executed after previous failure.
         const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: ethWallet4.address, value: parseEther("6.0")}));
         const syncWallet4 = await Wallet.fromEthSigner(
@@ -446,7 +450,7 @@ async function checkInvalidTransactionResending(contract: Contract, depositWalle
             ethWallet5,
             syncProvider,
         );
-        await checkInvalidTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5, "ETH", "0.3");
+        await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
