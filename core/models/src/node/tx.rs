@@ -464,6 +464,35 @@ pub enum FranklinTx {
     ChangePubKey(Box<ChangePubKey>),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EthSignData {
+    pub signature: TxEthSignature,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedFranklinTx {
+    pub tx: FranklinTx,
+    pub eth_sign_data: Option<EthSignData>,
+}
+
+impl From<FranklinTx> for SignedFranklinTx {
+    fn from(tx: FranklinTx) -> Self {
+        Self {
+            tx,
+            eth_sign_data: None,
+        }
+    }
+}
+
+impl std::ops::Deref for SignedFranklinTx {
+    type Target = FranklinTx;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tx
+    }
+}
+
 impl FranklinTx {
     pub fn hash(&self) -> TxHash {
         let bytes = match self {
@@ -794,14 +823,14 @@ impl<'de> Deserialize<'de> for PackedSignature {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "signature")]
 pub enum TxEthSignature {
     EthereumSignature(PackedEthSignature),
     EIP1271Signature(EIP1271Signature),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EIP1271Signature(pub Vec<u8>);
 
 impl fmt::Display for EIP1271Signature {

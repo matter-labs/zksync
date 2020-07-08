@@ -633,7 +633,7 @@ impl TestSetup {
         commit_account: EthereumAccount<Http>,
     ) -> Self {
         let mut tokens = HashMap::new();
-        tokens.insert(1, deployed_contracts.test_erc20_address.clone());
+        tokens.insert(1, deployed_contracts.test_erc20_address);
         tokens.insert(0, Address::default());
         Self {
             state_keeper_request_sender: sk_channels.requests,
@@ -733,7 +733,7 @@ impl TestSetup {
     fn execute_tx(&mut self, tx: FranklinTx) {
         let block = ProposedBlock {
             priority_ops: Vec::new(),
-            txs: vec![tx],
+            txs: vec![tx.into()],
         };
         let block_sender = async {
             self.state_keeper_request_sender

@@ -25,8 +25,8 @@ use futures::{
 use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace uses
 use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
-    TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
+    SignedFranklinTx, TransferOp, TransferToNewOp,
 };
 use storage::ConnectionPool;
 // Local uses
@@ -66,7 +66,7 @@ pub enum TxAddError {
 #[derive(Clone, Debug, Default)]
 pub struct ProposedBlock {
     pub priority_ops: Vec<PriorityOp>,
-    pub txs: Vec<FranklinTx>,
+    pub txs: Vec<SignedFranklinTx>,
 }
 
 impl ProposedBlock {
@@ -95,7 +95,7 @@ struct MempoolState {
     // account and last committed nonce
     account_nonces: HashMap<Address, Nonce>,
     account_ids: HashMap<AccountId, Address>,
-    ready_txs: VecDeque<FranklinTx>,
+    ready_txs: VecDeque<SignedFranklinTx>,
 }
 
 impl MempoolState {
@@ -124,7 +124,7 @@ impl MempoolState {
         let mut account_nonces = HashMap::new();
 
         for (id, account) in accounts {
-            account_ids.insert(id, account.address.clone());
+            account_ids.insert(id, account.address);
             account_nonces.insert(account.address, account.nonce);
         }
 
@@ -160,7 +160,7 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
-    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: SignedFranklinTx) -> Result<(), TxAddError> {
         // Correctness should be checked by `signature_checker`, thus
         // `tx.check_correctness()` is not invoked here.
 
@@ -182,7 +182,7 @@ struct Mempool {
 }
 
 impl Mempool {
-    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: VerifiedTx) -> Result<(), TxAddError> {
         let storage = self.db_pool.access_storage().map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -191,20 +191,20 @@ impl Mempool {
         storage
             .chain()
             .mempool_schema()
-            .insert_tx(&tx)
+            .insert_tx(tx.inner())
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
 
-        self.mempool_state.add_tx(tx)
+        self.mempool_state.add_tx(tx.into_inner())
     }
 
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(tx.into_inner());
+                    let tx_add_result = self.add_tx(*tx);
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
@@ -222,7 +222,7 @@ impl Mempool {
                     for (id, update) in updates {
                         match update {
                             AccountUpdate::Create { address, nonce } => {
-                                self.mempool_state.account_ids.insert(id, address.clone());
+                                self.mempool_state.account_ids.insert(id, address);
                                 self.mempool_state.account_nonces.insert(address, nonce);
                             }
                             AccountUpdate::Delete { address, .. } => {
@@ -293,7 +293,7 @@ impl Mempool {
         )
     }
 
-    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
+    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<SignedFranklinTx>) {
         let mut txs_for_commit = Vec::new();
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
