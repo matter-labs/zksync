@@ -124,7 +124,7 @@ impl MempoolState {
         let mut account_nonces = HashMap::new();
 
         for (id, account) in accounts {
-            account_ids.insert(id, account.address.clone());
+            account_ids.insert(id, account.address);
             account_nonces.insert(account.address, account.nonce);
         }
 
@@ -222,7 +222,7 @@ impl Mempool {
                     for (id, update) in updates {
                         match update {
                             AccountUpdate::Create { address, nonce } => {
-                                self.mempool_state.account_ids.insert(id, address.clone());
+                                self.mempool_state.account_ids.insert(id, address);
                                 self.mempool_state.account_nonces.insert(address, nonce);
                             }
                             AccountUpdate::Delete { address, .. } => {

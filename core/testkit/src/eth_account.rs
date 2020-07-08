@@ -248,7 +248,7 @@ impl<T: Transport> EthereumAccount<T> {
             self.main_contract_eth_client
                 .web3
                 .eth()
-                .balance(self.address.clone(), None)
+                .balance(self.address, None)
                 .compat()
                 .await?,
         ))
