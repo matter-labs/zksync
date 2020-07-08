@@ -67,7 +67,7 @@ impl StoredExecutedTransaction {
             .eth_sign_data
             .map(|value| serde_json::from_value(value).expect("Unparsable EthSignData"));
         Ok(ExecutedTx {
-            tx: SignedFranklinTx { tx, eth_sign_data },
+            signed_tx: SignedFranklinTx { tx, eth_sign_data },
             success: self.success,
             op: franklin_op,
             fail_reason: self.fail_reason,
@@ -146,35 +146,36 @@ impl NewExecutedTransaction {
             }
         }
 
-        let tx = serde_json::to_value(&exec_tx.tx.tx).expect("Cannot serialize tx");
+        let tx = serde_json::to_value(&exec_tx.signed_tx.tx).expect("Cannot serialize tx");
         let operation = serde_json::to_value(&exec_tx.op).expect("Cannot serialize operation");
 
-        let (from_account_hex, to_account_hex): (String, Option<String>) = match exec_tx.tx.tx {
-            FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
-                serde_json::from_value(tx["from"].clone()).unwrap(),
-                serde_json::from_value(tx["to"].clone()).unwrap(),
-            ),
-            FranklinTx::ChangePubKey(_) => (
-                serde_json::from_value(tx["account"].clone()).unwrap(),
-                serde_json::from_value(tx["newPkHash"].clone()).unwrap(),
-            ),
-            FranklinTx::Close(_) => (
-                serde_json::from_value(tx["account"].clone()).unwrap(),
-                serde_json::from_value(tx["account"].clone()).unwrap(),
-            ),
-        };
+        let (from_account_hex, to_account_hex): (String, Option<String>) =
+            match exec_tx.signed_tx.tx {
+                FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
+                    serde_json::from_value(tx["from"].clone()).unwrap(),
+                    serde_json::from_value(tx["to"].clone()).unwrap(),
+                ),
+                FranklinTx::ChangePubKey(_) => (
+                    serde_json::from_value(tx["account"].clone()).unwrap(),
+                    serde_json::from_value(tx["newPkHash"].clone()).unwrap(),
+                ),
+                FranklinTx::Close(_) => (
+                    serde_json::from_value(tx["account"].clone()).unwrap(),
+                    serde_json::from_value(tx["account"].clone()).unwrap(),
+                ),
+            };
 
         let from_account: Vec<u8> = hex::decode(cut_prefix(&from_account_hex)).unwrap();
         let to_account: Option<Vec<u8>> =
             to_account_hex.map(|value| hex::decode(cut_prefix(&value)).unwrap());
 
-        let eth_sign_data = exec_tx.tx.eth_sign_data.as_ref().map(|sign_data| {
+        let eth_sign_data = exec_tx.signed_tx.eth_sign_data.as_ref().map(|sign_data| {
             serde_json::to_value(sign_data).expect("Failed to encode EthSignData")
         });
 
         Self {
             block_number: i64::from(block),
-            tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
+            tx_hash: exec_tx.signed_tx.hash().as_ref().to_vec(),
             from_account,
             to_account,
             tx,
@@ -182,8 +183,8 @@ impl NewExecutedTransaction {
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason,
             block_index: exec_tx.block_index.map(|idx| idx as i32),
-            primary_account_address: exec_tx.tx.account().as_bytes().to_vec(),
-            nonce: exec_tx.tx.nonce() as i64,
+            primary_account_address: exec_tx.signed_tx.account().as_bytes().to_vec(),
+            nonce: exec_tx.signed_tx.nonce() as i64,
             created_at: exec_tx.created_at,
             eth_sign_data,
         }

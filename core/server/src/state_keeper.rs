@@ -295,7 +295,7 @@ impl PlasmaStateKeeper {
             for operation in pending_block.success_operations {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
-                        self.apply_tx(tx.tx)
+                        self.apply_tx(tx.signed_tx)
                             .expect("Tx from the pending block failed");
                         txs_count += 1;
                     }
@@ -597,7 +597,7 @@ impl PlasmaStateKeeper {
                 self.pending_block.pending_op_block_index += 1;
 
                 let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
-                    tx,
+                    signed_tx: tx,
                     success: true,
                     op: Some(executed_op),
                     fail_reason: None,
@@ -612,7 +612,7 @@ impl PlasmaStateKeeper {
             Err(e) => {
                 warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
-                    tx,
+                    signed_tx: tx,
                     success: false,
                     op: None,
                     fail_reason: Some(e.to_string()),
@@ -731,14 +731,14 @@ impl PlasmaStateKeeper {
             ExecutedOpId::Transaction(hash) => {
                 for op in &self.pending_block.success_operations {
                     if let ExecutedOperations::Tx(exec_tx) = op {
-                        if exec_tx.tx.hash() == hash {
+                        if exec_tx.signed_tx.hash() == hash {
                             return Some((current_block_number, true));
                         }
                     }
                 }
 
                 for failed_tx in &self.pending_block.failed_txs {
-                    if failed_tx.tx.hash() == hash {
+                    if failed_tx.signed_tx.hash() == hash {
                         return Some((current_block_number, false));
                     }
                 }

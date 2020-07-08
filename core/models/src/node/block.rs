@@ -20,7 +20,7 @@ pub struct PendingBlock {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
-    pub tx: SignedFranklinTx,
+    pub signed_tx: SignedFranklinTx,
     pub success: bool,
     pub op: Option<FranklinOp>,
     pub fail_reason: Option<String>,
