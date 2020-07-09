@@ -51,6 +51,7 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
 
     pub block_number: Option<E::Fr>,
     pub validator_address: Option<E::Fr>,
+    pub block_timestamp: Option<E::Fr>,
 
     pub pub_data_commitment: Option<E::Fr>,
     pub operations: Vec<Operation<E>>,
@@ -58,6 +59,49 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_balances: Vec<Option<E::Fr>>,
     pub validator_audit_path: Vec<Option<E::Fr>>,
     pub validator_account: AccountWitness<E>,
+
+    /// Global variables of circuit
+    /// This values should be Some only during the synthesis process
+    allocated_block_timestamp: Option<CircuitElement<E>>,
+}
+
+impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        rescue_params: &'a <E as RescueEngine>::Params,
+        jubjub_params: &'a <E as JubjubEngine>::Params,
+        old_root: Option<E::Fr>,
+        initial_used_subtree_root: Option<E::Fr>,
+        block_number: Option<E::Fr>,
+        validator_address: Option<E::Fr>,
+        block_timestamp: Option<E::Fr>,
+        pub_data_commitment: Option<E::Fr>,
+        operations: Vec<Operation<E>>,
+        validator_balances: Vec<Option<E::Fr>>,
+        validator_audit_path: Vec<Option<E::Fr>>,
+        validator_account: AccountWitness<E>,
+    ) -> Self {
+        Self {
+            rescue_params,
+            jubjub_params,
+            old_root,
+            initial_used_subtree_root,
+            block_number,
+            validator_address,
+            block_timestamp,
+            pub_data_commitment,
+            operations,
+            validator_balances,
+            validator_audit_path,
+            validator_account,
+            allocated_block_timestamp: None,
+        }
+    }
+
+    /// Getters for global variables
+    fn get_block_timestamp(&self) -> Result<CircuitElement<E>, SynthesisError> {
+        self.allocated_block_timestamp.clone().grab()
+    }
 }
 
 impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'a, E> {
@@ -69,12 +113,15 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'
             initial_used_subtree_root: self.initial_used_subtree_root,
             block_number: self.block_number,
             validator_address: self.validator_address,
+            block_timestamp: self.block_timestamp,
             pub_data_commitment: self.pub_data_commitment,
             operations: self.operations.clone(),
 
             validator_balances: self.validator_balances.clone(),
             validator_audit_path: self.validator_audit_path.clone(),
             validator_account: self.validator_account.clone(),
+
+            allocated_block_timestamp: self.allocated_block_timestamp.clone(),
         }
     }
 }
@@ -83,9 +130,30 @@ struct PreviousData<E: RescueEngine> {
     op_data: AllocatedOperationData<E>,
 }
 
-// Implementation of our circuit:
 impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
-    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+    fn synthesize<CS: ConstraintSystem<E>>(mut self, cs: &mut CS) -> Result<(), SynthesisError> {
+        // Allocating global variables of circuit
+        self.allocated_block_timestamp = Some(CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "allocated_block_timestamp"),
+            || self.block_timestamp.grab(),
+            E::Fr::NUM_BITS as usize,
+        )?);
+
+        let result = self.synthesize_with_global_variables(cs);
+
+        // Remove allocated global variables
+        self.allocated_block_timestamp = None;
+
+        result
+    }
+}
+
+// Implementation of our circuit:
+impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
+    fn synthesize_with_global_variables<CS: ConstraintSystem<E>>(
+        &self,
+        cs: &mut CS,
+    ) -> Result<(), SynthesisError> {
         let zero = AllocatedNum::alloc(cs.namespace(|| "allocate element equal to zero"), || {
             Ok(E::Fr::zero())
         })?;
@@ -423,6 +491,13 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
 
+            pack_bits.extend(self.get_block_timestamp()?.into_padded_be_bits(256));
+
+            hash_block = sha256::sha256(cs.namespace(|| "hash with block timestamp"), &pack_bits)?;
+
+            let mut pack_bits = vec![];
+            pack_bits.extend(hash_block);
+
             // Perform bit decomposition with an explicit in-field check
             // and change to MSB first bit order
             let old_root_be_bits = {
@@ -480,8 +555,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         }
         Ok(())
     }
-}
-impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
+
     fn verify_correct_chunking<CS: ConstraintSystem<E>>(
         &self,
         op: &Operation<E>,

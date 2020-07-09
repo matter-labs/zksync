@@ -666,6 +666,7 @@ impl PlasmaStateKeeper {
                 self.state.block_number,
                 self.state.root_hash(),
                 self.fee_account_id,
+                None, // the timestamp not known at this moment of processing
                 block_transactions,
                 (
                     pending_block.unprocessed_priority_op_before,

@@ -149,6 +149,7 @@ fn get_unique_operation(
             block_number,
             root_hash_for_block(block_number),
             0,
+            Some(0),
             Vec::new(),
             (0, 0),
             100,

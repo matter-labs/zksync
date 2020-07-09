@@ -131,7 +131,7 @@ pub fn generic_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -176,7 +176,7 @@ pub fn corrupted_input_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -230,7 +230,7 @@ pub fn incorrect_op_test_scenario<W, F>(
 {
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
 
     // Collect fees without actually applying the tx on plasma
     let fees = collect_fees();

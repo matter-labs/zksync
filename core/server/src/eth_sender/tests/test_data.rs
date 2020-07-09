@@ -15,6 +15,7 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
             block_number,
             Fr::default(),
             0,
+            Some(0),
             Vec::new(),
             (0, 0),
             50,

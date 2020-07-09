@@ -16,6 +16,7 @@ use self::records::{
     StorageETHOperation,
 };
 use crate::chain::operations::records::StoredOperation;
+use crate::ethereum::records::ETHLastTimestamp;
 use crate::schema::*;
 use crate::utils::StoredBigUint;
 use crate::StorageProcessor;
@@ -373,6 +374,25 @@ impl<'a> EthereumSchema<'a> {
 
             Ok(())
         })
+    }
+
+    pub fn store_last_known_eth_timestamp(&self, timestamp: u64) -> QueryResult<()> {
+        diesel::delete(eth_last_known_timestamp::table).execute(self.0.conn())?;
+        diesel::insert_into(eth_last_known_timestamp::table)
+            .values(ETHLastTimestamp {
+                unix_timestamp: timestamp as i64,
+            })
+            .execute(self.0.conn())?;
+        Ok(())
+    }
+
+    pub fn get_last_known_eth_timestamp(&self) -> QueryResult<Option<u64>> {
+        let res = eth_last_known_timestamp::table
+            .first::<ETHLastTimestamp>(self.0.conn())
+            .optional()?
+            .map(|eth_last_timestamp| eth_last_timestamp.unix_timestamp as u64);
+
+        Ok(res)
     }
 
     /// Obtains the next nonce to use and updates the corresponding entry in the database

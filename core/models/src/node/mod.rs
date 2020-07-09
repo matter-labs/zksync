@@ -64,6 +64,7 @@ pub type TokenId = u16;
 
 pub type AccountId = u32;
 pub type BlockNumber = u32;
+pub type BlockTimestamp = u64;
 pub type Nonce = u32;
 
 pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {

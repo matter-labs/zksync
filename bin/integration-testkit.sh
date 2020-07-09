@@ -34,4 +34,5 @@ cargo run --bin testkit --release
 cargo run --bin gas_price_test --release
 cargo run --bin migration_test --release
 cargo run --bin revert_blocks_test --release
+cargo run --bin block_timestamp_test --release
 cargo run --bin exodus_test --release

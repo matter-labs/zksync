@@ -150,7 +150,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
 
     // Fees to be collected.
     let mut fees = vec![];

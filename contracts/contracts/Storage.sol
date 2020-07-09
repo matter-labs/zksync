@@ -66,6 +66,7 @@ contract Storage {
         bytes32 withdrawalsDataHash; /// can be restricted to 16 bytes to reduce number of required storage slots
         bytes32 commitment;
         bytes32 stateRoot;
+        uint blockTimestamp;
     }
 
     /// @notice Blocks by Franklin block id

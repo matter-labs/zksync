@@ -5,7 +5,7 @@ use diesel::prelude::*;
 use itertools::Itertools;
 // Workspace imports
 use models::node::block::Block;
-use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
+use models::node::{AccountId, AccountUpdate, BlockNumber, BlockTimestamp, FranklinOp, Token};
 use models::{NewTokenEvent, Operation};
 // Local imports
 use self::records::{
@@ -80,10 +80,12 @@ impl<'a> DataRestoreSchema<'a> {
                 // let mut ops: Vec<FranklinOp> = vec![];
                 let mut block_num: i64 = 0;
                 let mut fee_account: i64 = 0;
+                let mut block_timestamp: i64 = 0;
                 let ops: Vec<FranklinOp> = stored_ops
                     .map(|stored_op| {
                         block_num = stored_op.block_num;
                         fee_account = stored_op.fee_account;
+                        block_timestamp = stored_op.block_timestamp;
                         stored_op.into_franklin_op()
                     })
                     .collect();
@@ -91,6 +93,7 @@ impl<'a> DataRestoreSchema<'a> {
                     block_num: block_num as u32,
                     ops,
                     fee_account: fee_account as u32,
+                    block_timestamp: block_timestamp as u64,
                 }
             })
             .collect();
@@ -148,12 +151,12 @@ impl<'a> DataRestoreSchema<'a> {
 
     pub fn save_rollup_ops(
         &self,
-        ops: &[(BlockNumber, &FranklinOp, AccountId)],
+        ops: &[(BlockNumber, &FranklinOp, AccountId, BlockTimestamp)],
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             diesel::delete(data_restore_rollup_ops::table).execute(self.0.conn())?;
             for op in ops.iter() {
-                let stored_op = NewFranklinOp::prepare_stored_op(&op.1, op.0, op.2);
+                let stored_op = NewFranklinOp::prepare_stored_op(&op.1, op.0, op.2, op.3);
                 diesel::insert_into(data_restore_rollup_ops::table)
                     .values(&stored_op)
                     .execute(self.0.conn())?;

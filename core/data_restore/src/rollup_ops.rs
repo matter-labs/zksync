@@ -13,6 +13,8 @@ pub struct RollupOpsBlock {
     pub ops: Vec<FranklinOp>,
     /// Fee account
     pub fee_account: u32,
+    /// Block timestamp
+    pub block_timestamp: u64,
 }
 
 impl RollupOpsBlock {
@@ -31,11 +33,13 @@ impl RollupOpsBlock {
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
         let fee_account_argument_id = 1;
-        let public_data_argument_id = 3;
+        let block_timestamp_argument_id = 2;
+        let public_data_argument_id = 4;
         let decoded_commitment_parameters = ethabi::decode(
             vec![
                 ParamType::Uint(32),                                   // uint32 _blockNumber,
                 ParamType::Uint(32),                                   // uint32 _feeAccount,
+                ParamType::Uint(256),                                  // uint _blockTimestamp,
                 ParamType::Array(Box::new(ParamType::FixedBytes(32))), // bytes32[] _newRoots,
                 ParamType::Bytes, // bytes calldata _publicData,
                 ParamType::Bytes, // bytes calldata _ethWitness,
@@ -51,17 +55,24 @@ impl RollupOpsBlock {
             )))
         })?;
 
-        if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
+        if let (
+            ethabi::Token::Uint(fee_acc),
+            ethabi::Token::Uint(timestamp),
+            ethabi::Token::Bytes(public_data),
+        ) = (
             &decoded_commitment_parameters[fee_account_argument_id],
+            &decoded_commitment_parameters[block_timestamp_argument_id],
             &decoded_commitment_parameters[public_data_argument_id],
         ) {
             let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
             let fee_account = fee_acc.as_u32();
+            let block_timestamp = timestamp.as_u64();
 
             let block = RollupOpsBlock {
                 block_num: event_data.block_num,
                 ops,
                 fee_account,
+                block_timestamp,
             };
             Ok(block)
         } else {

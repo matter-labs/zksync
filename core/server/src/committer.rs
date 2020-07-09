@@ -8,6 +8,7 @@ use tokio::{runtime::Runtime, task::JoinHandle, time};
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
 use models::{node::block::PendingBlock, Action, BlockCommitRequest, CommitRequest, Operation};
+use storage::ethereum::EthereumSchema;
 use storage::ConnectionPool;
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -64,13 +65,24 @@ async fn commit_block(
     mempool_req_sender: &mut Sender<MempoolRequest>,
 ) {
     let BlockCommitRequest {
-        block,
+        mut block,
         accounts_updated,
     } = request;
 
     let storage = pool
         .access_storage()
         .expect("db connection fail for committer");
+
+    assert!(
+        block.block_timestamp.is_none(),
+        "block timestamp should be unknown before this moment"
+    );
+    block.block_timestamp = Some(
+        EthereumSchema(&storage)
+            .get_last_known_eth_timestamp()
+            .expect("get_last_known_eth_timestamp request failed")
+            .expect("we must know some eth timestamp in database"),
+    );
 
     // handle empty block case (only failed txs)
     if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {

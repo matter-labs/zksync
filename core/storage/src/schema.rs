@@ -74,6 +74,7 @@ table! {
         block_size -> Int8,
         commit_gas_limit -> Int8,
         verify_gas_limit -> Int8,
+        block_timestamp -> Int8,
     }
 }
 
@@ -99,6 +100,7 @@ table! {
         block_num -> Int8,
         operation -> Jsonb,
         fee_account -> Int8,
+        block_timestamp -> Int8,
     }
 }
 
@@ -106,6 +108,12 @@ table! {
     data_restore_storage_state_update (id) {
         id -> Int4,
         storage_state -> Text,
+    }
+}
+
+table! {
+    eth_last_known_timestamp (unix_timestamp) {
+        unix_timestamp -> Int8,
     }
 }
 
@@ -271,6 +279,7 @@ allow_tables_to_appear_in_same_query!(
     data_restore_last_watched_eth_block,
     data_restore_rollup_ops,
     data_restore_storage_state_update,
+    eth_last_known_timestamp,
     eth_operations,
     eth_ops_binding,
     eth_parameters,

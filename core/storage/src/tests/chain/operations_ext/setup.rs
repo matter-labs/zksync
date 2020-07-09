@@ -80,6 +80,7 @@ impl TransactionsHistoryTestSetup {
             block_id,
             Fr::zero(),
             0,
+            Some(0), // Not important
             operations,
             (0, 0), // Not important
             100,

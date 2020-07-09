@@ -24,6 +24,7 @@ pub fn get_operation(block_number: BlockNumber) -> Operation {
             block_number,
             Fr::default(),
             0,
+            Some(0),
             Vec::new(),
             (0, 0),
             100,

@@ -122,7 +122,7 @@ fn test_noop() {
     let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
     circuit_account_tree.insert(0, CircuitAccount::default());
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1, 0);
     witness_accum.extend_pubdata_with_noops(1);
     witness_accum.collect_fees(&[]);
     witness_accum.calculate_pubdata_commitment();
@@ -223,19 +223,20 @@ fn incorrect_circuit_pubdata() {
             Some(block_number),
         );
 
-        let circuit_instance = FranklinCircuit {
+        let circuit_instance = FranklinCircuit::new(
             rescue_params,
             jubjub_params,
-            old_root: Some(circuit_old_hash),
-            initial_used_subtree_root: Some(get_used_subtree_root_hash(&tree)),
-            operations: vec![operation.clone()],
-            pub_data_commitment: Some(public_data_commitment),
-            block_number: Some(block_number),
-            validator_account: validator_account_witness.clone(),
-            validator_address: Some(validator_address),
-            validator_balances: validator_balances.clone(),
-            validator_audit_path: validator_audit_path.clone(),
-        };
+            Some(circuit_old_hash),
+            Some(get_used_subtree_root_hash(&tree)),
+            Some(block_number),
+            Some(validator_address),
+            Some(Fr::zero()),
+            Some(public_data_commitment),
+            vec![operation.clone()],
+            validator_balances.clone(),
+            validator_audit_path.clone(),
+            validator_account_witness.clone(),
+        );
 
         let error = check_circuit_non_panicking(circuit_instance)
             .expect_err("Hash check: Incorrect pubdata values should lead to an error");
@@ -260,19 +261,20 @@ fn incorrect_circuit_pubdata() {
         Some(block_number),
     );
 
-    let circuit_instance = FranklinCircuit {
+    let circuit_instance = FranklinCircuit::new(
         rescue_params,
         jubjub_params,
-        old_root: Some(tree.root_hash()),
-        initial_used_subtree_root: Some(get_used_subtree_root_hash(&tree)),
-        operations: vec![operation.clone()],
-        pub_data_commitment: Some(pub_data_commitment),
-        block_number: Some(block_number),
-        validator_account: validator_account_witness.clone(),
-        validator_address: Some(validator_address),
-        validator_balances: validator_balances.clone(),
-        validator_audit_path: validator_audit_path.clone(),
-    };
+        Some(tree.root_hash()),
+        Some(get_used_subtree_root_hash(&tree)),
+        Some(block_number),
+        Some(validator_address),
+        Some(Fr::zero()),
+        Some(pub_data_commitment),
+        vec![operation.clone()],
+        validator_balances.clone(),
+        validator_audit_path.clone(),
+        validator_account_witness.clone(),
+    );
 
     // Validator address is a part of pubdata, which is used to calculate the new root hash,
     // so the hash value will not match expected one.
@@ -302,19 +304,20 @@ fn incorrect_circuit_pubdata() {
         Some(incorrect_block_number),
     );
 
-    let circuit_instance = FranklinCircuit {
+    let circuit_instance = FranklinCircuit::new(
         rescue_params,
         jubjub_params,
-        old_root: Some(tree.root_hash()),
-        initial_used_subtree_root: Some(get_used_subtree_root_hash(&tree)),
-        operations: vec![operation],
-        pub_data_commitment: Some(pub_data_commitment),
-        block_number: Some(block_number),
-        validator_account: validator_account_witness,
-        validator_address: Some(validator_address),
+        Some(tree.root_hash()),
+        Some(get_used_subtree_root_hash(&tree)),
+        Some(block_number),
+        Some(validator_address),
+        Some(Fr::zero()),
+        Some(pub_data_commitment),
+        vec![operation],
         validator_balances,
         validator_audit_path,
-    };
+        validator_account_witness,
+    );
 
     // Block number is a part of pubdata, which is used to calculate the new root hash,
     // so the hash value will not match expected one.

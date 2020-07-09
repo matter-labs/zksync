@@ -23,7 +23,7 @@ use server::state_keeper::{
 };
 use std::collections::HashMap;
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
@@ -1104,7 +1104,33 @@ impl TestSetup {
         };
         block_on(block_sender);
 
-        let new_block = block_on(self.await_for_block_commit_request());
+        let mut new_block = block_on(self.await_for_block_commit_request());
+        new_block.block.block_timestamp = Some(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("unix timestamp calculation failed")
+                .as_secs(),
+        );
+
+        block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
+    }
+
+    /// Analog of `execute_commit_block`, but uses defined block timestamp value
+    pub fn execute_commit_block_with_defined_timestamp(
+        &mut self,
+        block_timestamp: u64,
+    ) -> ETHExecResult {
+        let block_sender = async {
+            self.state_keeper_request_sender
+                .clone()
+                .send(StateKeeperRequest::SealBlock)
+                .await
+                .expect("sk receiver dropped");
+        };
+        block_on(block_sender);
+
+        let mut new_block = block_on(self.await_for_block_commit_request());
+        new_block.block.block_timestamp = Some(block_timestamp);
 
         block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
     }
@@ -1120,7 +1146,13 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block = block_on(self.await_for_block_commit_request());
+        let mut new_block = block_on(self.await_for_block_commit_request());
+        new_block.block.block_timestamp = Some(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("unix timestamp calculation failed")
+                .as_secs(),
+        );
 
         let commit_result = block_on(self.commit_account.commit_block(&new_block.block))
             .expect("block commit send tx")

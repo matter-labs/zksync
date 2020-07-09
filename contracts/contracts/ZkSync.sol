@@ -240,6 +240,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
+    /// @param _blockTimestamp Timestamp to be used in the verifier
     /// @param _newBlockInfo New state of the block. (first element is the account tree root hash, rest of the array is reserved for the future)
     /// @param _publicData Operations pubdata
     /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
@@ -247,6 +248,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function commitBlock(
         uint32 _blockNumber,
         uint32 _feeAccount,
+        uint _blockTimestamp,
         bytes32[] calldata _newBlockInfo,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
@@ -255,19 +257,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
-        require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
-        bytes memory publicData = _publicData;
+        require(blocks[totalBlocksCommitted].blockTimestamp <= _blockTimestamp, "tms11"); // tms11 - _blockTimestamp smaller than for the previous block
+        require(now - COMMIT_TIMESTAMP_NOT_OLDER <= _blockTimestamp && _blockTimestamp <= now, "tms12"); // tms12 - _blockTimestamp is not valid
+        require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
         // Unpack onchain operations and store them.
         // Get priority operations number for this block.
         uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
-
-        bytes32 withdrawalsDataHash = collectOnchainOps(_blockNumber, publicData, _ethWitness, _ethWitnessSizes);
-
+        bytes32 withdrawalsDataHash = collectOnchainOps(_blockNumber, _publicData, _ethWitness, _ethWitnessSizes);
         uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
-        createCommittedBlock(_blockNumber, _feeAccount, _newBlockInfo[0], publicData, withdrawalsDataHash, nPriorityRequestProcessed);
+        createCommittedBlock(_blockNumber, _feeAccount, _blockTimestamp, _newBlockInfo[0], _publicData, withdrawalsDataHash, nPriorityRequestProcessed);
         totalBlocksCommitted++;
 
         emit BlockCommit(_blockNumber);
@@ -420,6 +421,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function createCommittedBlock(
         uint32 _blockNumber,
         uint32 _feeAccount,
+        uint _blockTimestamp,
         bytes32 _newRoot,
         bytes memory _publicData,
         bytes32 _withdrawalDataHash,
@@ -434,6 +436,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
             _feeAccount,
+            _blockTimestamp,
             blocks[_blockNumber - 1].stateRoot,
             _newRoot,
             _publicData
@@ -445,7 +448,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             blockChunks,
             _withdrawalDataHash, // hash of onchain withdrawals data (will be used during checking block withdrawal data in verifyBlock function)
             commitment, // blocks' commitment
-            _newRoot // new root
+            _newRoot, // new root
+            _blockTimestamp // block timestamp to be used in the verifier
         );
     }
 
@@ -594,6 +598,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Creates block commitment from its data
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
+    /// @param _blockTimestamp Timestamp to be used in the verifier
     /// @param _oldRoot Old tree root
     /// @param _newRoot New tree root
     /// @param _publicData Operations pubdata
@@ -601,6 +606,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function createBlockCommitment(
         uint32 _blockNumber,
         uint32 _feeAccount,
+        uint _blockTimestamp,
         bytes32 _oldRoot,
         bytes32 _newRoot,
         bytes memory _publicData
@@ -608,6 +614,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
+        hash = sha256(abi.encodePacked(hash, _blockTimestamp));
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
 

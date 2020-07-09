@@ -36,6 +36,9 @@ use models::{
 };
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
+use storage::ethereum::EthereumSchema;
+use storage::ConnectionPool;
+use web3::types::BlockId;
 
 mod eth_state;
 mod received_ops;
@@ -101,6 +104,8 @@ pub struct EthWatch<T: Transport> {
     mode: WatcherMode,
 
     eth_watch_req: mpsc::Receiver<EthWatchRequest>,
+
+    db_pool: ConnectionPool,
 }
 
 impl<T: Transport> EthWatch<T> {
@@ -110,6 +115,7 @@ impl<T: Transport> EthWatch<T> {
         zksync_contract_addr: H160,
         number_of_confirmations_for_event: u64,
         eth_watch_req: mpsc::Receiver<EthWatchRequest>,
+        db_pool: ConnectionPool,
     ) -> Self {
         let zksync_contract = {
             (
@@ -127,6 +133,7 @@ impl<T: Transport> EthWatch<T> {
 
             mode: WatcherMode::Working,
             number_of_confirmations_for_event,
+            db_pool,
         }
     }
 
@@ -391,10 +398,28 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
+    fn store_last_known_eth_timestamp(&self, timestamp: u64) -> Result<(), failure::Error> {
+        let storage = self
+            .db_pool
+            .access_storage()
+            .expect("Storage access failed");
+        EthereumSchema(&storage).store_last_known_eth_timestamp(timestamp)?;
+        Ok(())
+    }
+
     async fn poll_eth_node(&mut self) -> Result<(), failure::Error> {
         let last_block_number = self.web3.eth().block_number().compat().await?.as_u64();
 
         if last_block_number > self.eth_state.last_ethereum_block() {
+            if let Some(last_known_block) = self
+                .web3
+                .eth()
+                .block(BlockId::Number(BlockNumber::Latest))
+                .compat()
+                .await?
+            {
+                self.store_last_known_eth_timestamp(last_known_block.timestamp.as_u64())?;
+            }
             self.process_new_blocks(last_block_number).await?;
         }
 
@@ -532,6 +557,7 @@ pub fn start_eth_watch(
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     runtime: &Runtime,
+    db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
     let (web3_event_loop_handle, transport) =
         web3::transports::Http::new(&config_options.web3_url).unwrap();
@@ -543,6 +569,7 @@ pub fn start_eth_watch(
         config_options.contract_eth_addr,
         config_options.confirmations_for_eth_event,
         eth_req_receiver,
+        db_pool,
     );
     runtime.spawn(eth_watch.run());
 

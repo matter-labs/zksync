@@ -72,4 +72,8 @@ contract Config {
     /// @dev Value based on the assumption of ~750k gas cost of verifying and 5 used storage slots per PriorityOperation structure
     uint64 constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
 
+    /// @notice Maximum available diff between real commit block timestamp and analog used in the verifier (in seconds)
+    /// @dev Timestamp - seconds since unix epoch
+    uint constant COMMIT_TIMESTAMP_NOT_OLDER = 2 hours;
+
 }
