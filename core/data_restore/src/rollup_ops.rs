@@ -17,63 +17,107 @@ pub struct RollupOpsBlock {
     pub block_timestamp: u64,
 }
 
+pub enum ParametersOfRollupBlockCommitTx {
+    FeeAccount_PubData,
+    FeeAccount_BlockTimestamp_PubData,
+}
+
+impl ParametersOfRollupBlockCommitTx {
+    pub fn fee_account_argument_id(&self) -> Option<usize> {
+        match self {
+            Self::FeeAccount_PubData => Some(1),
+            Self::FeeAccount_BlockTimestamp_PubData => Some(1),
+        }
+    }
+    pub fn block_timestamp_argument_id(&self) -> Option<usize> {
+        match self {
+            Self::FeeAccount_PubData => None,
+            Self::FeeAccount_BlockTimestamp_PubData => Some(2),
+        }
+    }
+    pub fn public_data_argument_id(&self) -> Option<usize> {
+        match self {
+            Self::FeeAccount_PubData => Some(3),
+            Self::FeeAccount_BlockTimestamp_PubData => Some(4),
+        }
+    }
+    pub fn get_parameters(&self) -> Vec<ParamType> {
+        let mut res = vec![];
+        res.push(ParamType::Uint(32)); // uint32 _blockNumber
+        res.push(ParamType::Uint(32)); // uint32 _feeAccount
+        if self == Self::FeeAccount_BlockTimestamp_PubData {
+            res.push(ParamType::Uint(256)); // uint _blockTimestamp
+        }
+        res.push(ParamType::Array(Box::new(ParamType::FixedBytes(32)))); // bytes32[] _newRoots
+        res.push(ParamType::Bytes); // bytes calldata _publicData
+        res.push(ParamType::Bytes); // bytes calldata _ethWitness
+        res.push(ParamType::Array(Box::new(ParamType::Uint(32)))); // uint32[] calldata _ethWitnessSizes
+        res
+    }
+}
+
 impl RollupOpsBlock {
-    /// Returns a Rollup operations block description
-    ///
-    /// # Arguments
-    ///
-    /// * `web3` - Web3 provider url
-    /// * `event_data` - Rollup contract event description
-    ///
-    pub fn get_rollup_ops_block<T: Transport>(
+    fn get_rollup_ops_block_with_parameters<T: Transport>(
         web3: &Web3<T>,
         event_data: &BlockEvent,
+        parameters: &[ParamType],
+        fee_account_argument_id: Option<usize>,
+        block_timestamp_argument_id: Option<usize>,
+        public_data_argument_id: Option<usize>,
     ) -> Result<Self, failure::Error> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
-        let fee_account_argument_id = 1;
-        let block_timestamp_argument_id = 2;
-        let public_data_argument_id = 4;
-        let decoded_commitment_parameters = ethabi::decode(
-            vec![
-                ParamType::Uint(32),                                   // uint32 _blockNumber,
-                ParamType::Uint(32),                                   // uint32 _feeAccount,
-                ParamType::Uint(256),                                  // uint _blockTimestamp,
-                ParamType::Array(Box::new(ParamType::FixedBytes(32))), // bytes32[] _newRoots,
-                ParamType::Bytes, // bytes calldata _publicData,
-                ParamType::Bytes, // bytes calldata _ethWitness,
-                ParamType::Array(Box::new(ParamType::Uint(32))), // uint32[] calldata _ethWitnessSizes
-            ]
-            .as_slice(),
-            input_data.as_slice(),
-        )
-        .map_err(|_| {
-            failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "can't get decoded parameters from commitment transaction",
-            )))
-        })?;
+        let decoded_commitment_parameters = ethabi::decode(parameters, input_data.as_slice())
+            .map_err(|_| {
+                failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "can't get decoded parameters from commitment transaction",
+                )))
+            })?;
 
-        if let (
-            ethabi::Token::Uint(fee_acc),
-            ethabi::Token::Uint(timestamp),
-            ethabi::Token::Bytes(public_data),
-        ) = (
-            &decoded_commitment_parameters[fee_account_argument_id],
-            &decoded_commitment_parameters[block_timestamp_argument_id],
-            &decoded_commitment_parameters[public_data_argument_id],
-        ) {
-            let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
-            let fee_account = fee_acc.as_u32();
-            let block_timestamp = timestamp.as_u64();
+        let mut block = RollupOpsBlock {
+            block_num: 0,
+            ops: vec![],
+            fee_account: 0,
+            block_timestamp: 0,
+        };
 
-            let block = RollupOpsBlock {
-                block_num: event_data.block_num,
-                ops,
-                fee_account,
-                block_timestamp,
-            };
+        let mut parse_commitment_success = true;
+
+        block.block_num = event_data.block_num;
+
+        if let Some(fee_account_argument_id) = fee_account_argument_id {
+            if let ethabi::Token::Uint(fee_acc) =
+                &decoded_commitment_parameters[fee_account_argument_id]
+            {
+                block.fee_account = fee_acc.as_u32();
+            } else {
+                parse_commitment_success = false;
+            }
+        }
+
+        if let Some(block_timestamp_argument_id) = block_timestamp_argument_id {
+            if let ethabi::Token::Uint(timestamp) =
+                &decoded_commitment_parameters[block_timestamp_argument_id]
+            {
+                block.block_timestamp = timestamp.as_u64();
+            } else {
+                parse_commitment_success = false;
+            }
+        }
+
+        if let Some(public_data_argument_id) = public_data_argument_id {
+            if let ethabi::Token::Bytes(public_data) =
+                &decoded_commitment_parameters[public_data_argument_id]
+            {
+                block.ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
+            } else {
+                parse_commitment_success = false;
+            }
+        }
+
+        if parse_commitment_success {
             Ok(block)
         } else {
             Err(std::io::Error::new(
@@ -82,6 +126,29 @@ impl RollupOpsBlock {
             )
             .into())
         }
+    }
+
+    /// Returns a Rollup operations block description
+    ///
+    /// # Arguments
+    ///
+    /// * `web3` - Web3 provider url
+    /// * `event_data` - Rollup contract event description
+    /// * `signature_parameters` - tx input parameters signature
+    ///
+    pub fn get_rollup_ops_block<T: Transport>(
+        web3: &Web3<T>,
+        event_data: &BlockEvent,
+        signature_parameters: ParametersOfRollupBlockCommitTx,
+    ) -> Result<Self, failure::Error> {
+        Self::get_rollup_ops_block_with_parameters(
+            web3,
+            event_data,
+            &signature_parameters.get_parameters(),
+            signature_parameters.fee_account_argument_id(),
+            signature_parameters.block_timestamp_argument_id(),
+            signature_parameters.public_data_argument_id(),
+        )
     }
 
     /// Returns a Rollup operations vector
