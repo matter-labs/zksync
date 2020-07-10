@@ -45,6 +45,7 @@ mod tx_queue;
 mod tests;
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ETHSenderRequest {
     SendOperation(Operation),
     GetAverageUsedGasPrice(oneshot::Sender<U256>),

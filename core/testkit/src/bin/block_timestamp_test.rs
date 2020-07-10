@@ -88,7 +88,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 ETHAccountId(0),
                 ZKSyncAccountId(2),
                 Token(0),
-                deposit_amount.clone(),
+                deposit_amount,
             );
             test_setup
                 .execute_commit_block_with_defined_timestamp(0)
@@ -102,7 +102,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 ETHAccountId(0),
                 ZKSyncAccountId(2),
                 Token(0),
-                deposit_amount.clone(),
+                deposit_amount,
             );
             test_setup
                 .execute_commit_block_with_defined_timestamp(u64::min_value())
@@ -116,7 +116,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 ETHAccountId(0),
                 ZKSyncAccountId(2),
                 Token(0),
-                deposit_amount.clone(),
+                deposit_amount,
             );
             test_setup
                 .execute_commit_block_with_defined_timestamp(u64::max_value())
@@ -130,7 +130,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 ETHAccountId(0),
                 ZKSyncAccountId(2),
                 Token(0),
-                deposit_amount.clone(),
+                deposit_amount,
             );
             let current_timestamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)

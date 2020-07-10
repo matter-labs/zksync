@@ -17,6 +17,7 @@ pub struct RollupOpsBlock {
     pub block_timestamp: u64,
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParametersOfRollupBlockCommitTx {
     FeeAccount_PubData,
