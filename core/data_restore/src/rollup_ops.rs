@@ -17,35 +17,47 @@ pub struct RollupOpsBlock {
     pub block_timestamp: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParametersOfRollupBlockCommitTx {
     FeeAccount_PubData,
     FeeAccount_BlockTimestamp_PubData,
 }
 
 impl ParametersOfRollupBlockCommitTx {
+    pub fn from_forks_number(forks_number: u32) -> Self {
+        match forks_number {
+            0 => Self::FeeAccount_PubData,
+            1 => Self::FeeAccount_BlockTimestamp_PubData,
+            _ => unreachable!("number of forks of commitBlock signature can't be greater than 1"),
+        }
+    }
+
     pub fn fee_account_argument_id(&self) -> Option<usize> {
         match self {
             Self::FeeAccount_PubData => Some(1),
             Self::FeeAccount_BlockTimestamp_PubData => Some(1),
         }
     }
+
     pub fn block_timestamp_argument_id(&self) -> Option<usize> {
         match self {
             Self::FeeAccount_PubData => None,
             Self::FeeAccount_BlockTimestamp_PubData => Some(2),
         }
     }
+
     pub fn public_data_argument_id(&self) -> Option<usize> {
         match self {
             Self::FeeAccount_PubData => Some(3),
             Self::FeeAccount_BlockTimestamp_PubData => Some(4),
         }
     }
+
     pub fn get_parameters(&self) -> Vec<ParamType> {
         let mut res = vec![];
         res.push(ParamType::Uint(32)); // uint32 _blockNumber
         res.push(ParamType::Uint(32)); // uint32 _feeAccount
-        if self == Self::FeeAccount_BlockTimestamp_PubData {
+        if self == &Self::FeeAccount_BlockTimestamp_PubData {
             res.push(ParamType::Uint(256)); // uint _blockTimestamp
         }
         res.push(ParamType::Array(Box::new(ParamType::FixedBytes(32)))); // bytes32[] _newRoots

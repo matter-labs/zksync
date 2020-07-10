@@ -20,11 +20,13 @@ use models::{
         TokenId,
     },
 };
+use std::str::FromStr;
 use storage::ConnectionPool;
 use web3::transports::Http;
 
 const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
+const NUMBER_OF_COMMIT_TX_SIGNATURE_FORKS: u64 = 1;
 
 fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
     let genesis_tokens =
@@ -79,7 +81,14 @@ fn main() {
             Arg::with_name("final_hash")
                 .long("final_hash")
                 .takes_value(true)
-                .help("Expected tree root hash after restoring. This argument is ignored if mode is not `finite`")
+                .help("Expected tree root hash after restoring. This argument is ignored if mode is not `finite`"),
+        )
+        .arg(
+            Arg::with_name("forks_tx_signature")
+                .long("forks_tx_signature")
+                .multiple(true)
+                .number_of_values(NUMBER_OF_COMMIT_TX_SIGNATURE_FORKS)
+                .help("Forks of commit block signature"),
         )
         .get_matches();
 
@@ -97,6 +106,16 @@ fn main() {
     } else {
         None
     };
+    let forks_of_commit_signature = cli.values_of("forks_tx_signature").map_or(
+        vec![0; NUMBER_OF_COMMIT_TX_SIGNATURE_FORKS as usize],
+        |fork_block_ids| {
+            fork_block_ids
+                .map(|fork_block_id| {
+                    u32::from_str(fork_block_id).expect("can't convert fork_block_id to u32")
+                })
+                .collect()
+        },
+    );
 
     let mut driver = DataRestoreDriver::new(
         connection_pool,
@@ -108,6 +127,7 @@ fn main() {
         available_block_chunk_sizes,
         finite_mode,
         final_hash,
+        forks_of_commit_signature,
     );
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

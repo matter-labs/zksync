@@ -1,16 +1,17 @@
 #!/bin/bash
 
-USAGE='Usage: zksync data-restore [-h|--help|restart|continue|run|check] [EXPECTED_HASH]
+USAGE='Usage: zksync data-restore [-h|--help|restart|continue|run|check] [EXPECTED_HASH] forks_tx_signature
 where:
-    -h | --help       show this message
-    restart           wipe the database and run data restore in finite mode (default)
-    continue          run data restore in 'continue' mode
-    run               do not wipe the database and run data restore in finite mode
-    check             wipe the database, run the data restore in finite mode and check the root hash.
-                      Root hash must be provided as a single argument of hexadecimal string
-    check-existing    like `check`, but instead of taking expected hash as an argument, it is loaded
-                      from the database before wiping it
-    fetch-root-hash   find the hash of the latest verified block and print it to the stdout'
+    -h | --help          show this message
+    restart              wipe the database and run data restore in finite mode (default)
+    continue             run data restore in 'continue' mode
+    run                  do not wipe the database and run data restore in finite mode
+    check                wipe the database, run the data restore in finite mode and check the root hash.
+                         Root hash must be provided as a single argument of hexadecimal string
+    check-existing       like `check`, but instead of taking expected hash as an argument, it is loaded
+                         from the database before wiping it
+    fetch-root-hash      find the hash of the latest verified block and print it to the stdout
+    forks_tx_signature   rollup block ids on which we forked commitBlock signature'
 
 if [ -z $ZKSYNC_ENV ];
 then 

@@ -15,6 +15,7 @@ use crate::{
     contract_functions::{get_genesis_account, get_total_verified_blocks},
     eth_tx_helpers::get_ethereum_transaction,
     events_state::EventsState,
+    rollup_ops::ParametersOfRollupBlockCommitTx,
     rollup_ops::RollupOpsBlock,
     storage_interactor,
     tree_state::TreeState,
@@ -71,6 +72,8 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
+    /// Indexes of blocks on which we forked commitBlock function signature
+    forks_of_commit_signature: Vec<u32>,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -96,6 +99,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         available_block_chunk_sizes: Vec<usize>,
         finite_mode: bool,
         final_hash: Option<Fr>,
+        forks_of_commit_signature: Vec<u32>,
     ) -> Self {
         let web3 = Web3::new(web3_transport);
 
@@ -131,6 +135,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             available_block_chunk_sizes,
             finite_mode,
             final_hash,
+            forks_of_commit_signature,
         }
     }
 
@@ -378,8 +383,18 @@ impl<T: Transport> DataRestoreDriver<T> {
             .get_only_verified_committed_events()
             .iter()
             .map(|event| {
-                RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
-                    .expect("Cant get new operation blocks from events")
+                let mut forks_for_this_block = 0;
+                for fork_block_id in &self.forks_of_commit_signature {
+                    if fork_block_id <= &event.block_num {
+                        forks_for_this_block += 1;
+                    }
+                }
+                RollupOpsBlock::get_rollup_ops_block(
+                    &self.web3,
+                    &event,
+                    ParametersOfRollupBlockCommitTx::from_forks_number(forks_for_this_block),
+                )
+                .expect("Cant get new operation blocks from events")
             })
             .collect()
     }
