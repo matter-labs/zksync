@@ -10,7 +10,7 @@ echo Checking environment
 
 check_tool yarn
 check_tool node
-node --version | grep "v10.2" > /dev/null  || (echo "ERROR, node.js version 10.20.1 is required" && exit 1)
+(node --version | grep "v1" > /dev/null) && [[ "v10.20" < $(node --version) ]] || (echo "ERROR, node.js version 10.20.1 or higher is required" && exit 1)
 check_tool docker
 check_tool docker-compose
 check_tool envsubst
