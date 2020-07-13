@@ -444,6 +444,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             _publicData
         );
 
+        require(_blockTimestamp < (2 ** 64), "cbb12"); // cbb12 - _blockTimestamp must be convertible into uint64
         blocks[_blockNumber] = Block(
             uint32(block.number), // committed at
             _nCommittedPriorityRequests, // number of priority onchain ops in block
@@ -451,7 +452,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             _withdrawalDataHash, // hash of onchain withdrawals data (will be used during checking block withdrawal data in verifyBlock function)
             commitment, // blocks' commitment
             _newRoot, // new root
-            _blockTimestamp // block timestamp to be used in the verifier
+            uint64(_blockTimestamp) // block timestamp to be used in the verifier
         );
     }
 
