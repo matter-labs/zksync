@@ -61,7 +61,7 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_account: AccountWitness<E>,
 
     /// Global variables of circuit
-    /// This values should be Some only during the synthesis process
+    /// These values should be Some only during the synthesis process
     allocated_block_timestamp: Option<CircuitElement<E>>,
 }
 
