@@ -7,6 +7,7 @@ use web3::{
 // Workspace deps
 use models::{
     abi::{governance_contract, zksync_contract},
+    node::BlockNumber,
     node::{AccountMap, AccountUpdate, Fr},
 };
 use storage::ConnectionPool;
@@ -20,6 +21,7 @@ use crate::{
     storage_interactor,
     tree_state::TreeState,
 };
+use std::collections::HashMap;
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
@@ -30,6 +32,21 @@ pub enum StorageUpdateState {
     None,
     Events,
     Operations,
+}
+
+/// 0) `Initial` fork is just the first our version
+/// 1) `BlockTimestampAdded` fork: added BlockTimestamp to be used in verifier
+///     + Changed signature of `commitBlock` function on the contract
+#[derive(Debug, Clone, Copy)]
+pub enum ForkType {
+    Initial,
+    BlockTimestampAdded,
+}
+
+impl ForkType {
+    pub fn latest_fork() -> Self {
+        ForkType::BlockTimestampAdded
+    }
 }
 
 /// Data restore driver is a high level interface for all restoring components.
@@ -72,8 +89,9 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
-    /// Indexes of blocks on which we forked commitBlock function signature
-    forks_of_commit_signature: Vec<u32>,
+    /// ForkType per each block
+    /// (if there is no element per some block than should be used ForkType::Latest())
+    pub forks_of_blocks: HashMap<BlockNumber, ForkType>,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -99,7 +117,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         available_block_chunk_sizes: Vec<usize>,
         finite_mode: bool,
         final_hash: Option<Fr>,
-        forks_of_commit_signature: Vec<u32>,
+        forks_of_blocks: HashMap<BlockNumber, ForkType>,
     ) -> Self {
         let web3 = Web3::new(web3_transport);
 
@@ -135,7 +153,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             available_block_chunk_sizes,
             finite_mode,
             final_hash,
-            forks_of_commit_signature,
+            forks_of_blocks,
         }
     }
 
@@ -202,6 +220,13 @@ impl<T: Transport> DataRestoreDriver<T> {
         info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
+    }
+
+    fn get_fork_of_block(&self, block_num: BlockNumber) -> ForkType {
+        self.forks_of_blocks
+            .get(&block_num)
+            .copied()
+            .unwrap_or_else(|| ForkType::latest_fork())
     }
 
     /// Stops states from storage
@@ -383,16 +408,12 @@ impl<T: Transport> DataRestoreDriver<T> {
             .get_only_verified_committed_events()
             .iter()
             .map(|event| {
-                let mut forks_for_this_block = 0;
-                for fork_block_id in &self.forks_of_commit_signature {
-                    if fork_block_id <= &event.block_num {
-                        forks_for_this_block += 1;
-                    }
-                }
                 RollupOpsBlock::get_rollup_ops_block(
                     &self.web3,
                     &event,
-                    ParametersOfRollupBlockCommitTx::from_forks_number(forks_for_this_block),
+                    ParametersOfRollupBlockCommitTx::from_fork_type(
+                        self.get_fork_of_block(event.block_num),
+                    ),
                 )
                 .expect("Cant get new operation blocks from events")
             })

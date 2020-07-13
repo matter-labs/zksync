@@ -10,16 +10,17 @@ pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
 
-use crate::data_restore_driver::DataRestoreDriver;
+use crate::data_restore_driver::{DataRestoreDriver, ForkType};
 use clap::{App, Arg};
 use models::{
     config_options::ConfigurationOptions,
     fe_from_hex,
     node::{
         tokens::{get_genesis_token_list, Token},
-        TokenId,
+        BlockNumber, TokenId,
     },
 };
+use std::collections::HashMap;
 use std::str::FromStr;
 use storage::ConnectionPool;
 use web3::transports::Http;
@@ -105,11 +106,15 @@ fn main() {
     } else {
         None
     };
-    let forks_of_commit_signature = vec![u32::from_str(
+    let mut forks_of_blocks: HashMap<BlockNumber, ForkType> = HashMap::new();
+    let block_timestamp_added_fork_id = BlockNumber::from_str(
         cli.value_of("forks_tx_signature")
             .expect("value of forks_tx_signature should present"),
     )
-    .expect("Unable to convert forks_tx_signature to u32")];
+    .expect("Unable to convert block_timestamp_added_fork_id to BlockNumber type");
+    for block_num in 0..block_timestamp_added_fork_id {
+        forks_of_blocks.insert(block_num, ForkType::Initial);
+    }
 
     let mut driver = DataRestoreDriver::new(
         connection_pool,
@@ -121,7 +126,7 @@ fn main() {
         available_block_chunk_sizes,
         finite_mode,
         final_hash,
-        forks_of_commit_signature,
+        forks_of_blocks,
     );
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

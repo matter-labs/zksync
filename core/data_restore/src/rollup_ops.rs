@@ -1,3 +1,4 @@
+use crate::data_restore_driver::ForkType;
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
 use ethabi::ParamType;
@@ -17,48 +18,68 @@ pub struct RollupOpsBlock {
     pub block_timestamp: u64,
 }
 
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// 0) Initial
+/// function commitBlock(
+///        uint32 _blockNumber,
+///        uint32 _feeAccount,
+///        bytes32[] calldata _newBlockInfo,
+///        bytes calldata _publicData,
+///        bytes calldata _ethWitness,
+///        uint32[] calldata _ethWitnessSizes
+///    );
+///
+/// 1) BlockTimestampAdded
+/// function commitBlock(
+///        uint32 _blockNumber,
+///        uint32 _feeAccount,
+///        uint _blockTimestamp,
+///        bytes32[] calldata _newBlockInfo,
+///        bytes calldata _publicData,
+///        bytes calldata _ethWitness,
+///        uint32[] calldata _ethWitnessSizes
+///    );
+///
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParametersOfRollupBlockCommitTx {
-    FeeAccount_PubData,
-    FeeAccount_BlockTimestamp_PubData,
+    Initial,
+    BlockTimestampAdded,
 }
 
 impl ParametersOfRollupBlockCommitTx {
-    pub fn from_forks_number(forks_number: u32) -> Self {
-        match forks_number {
-            0 => Self::FeeAccount_PubData,
-            1 => Self::FeeAccount_BlockTimestamp_PubData,
-            _ => unreachable!("number of forks of commitBlock signature can't be greater than 1"),
+    pub fn from_fork_type(fork_type: ForkType) -> Self {
+        match fork_type {
+            ForkType::Initial => Self::Initial,
+            ForkType::BlockTimestampAdded => Self::BlockTimestampAdded,
         }
     }
 
-    pub fn fee_account_argument_id(&self) -> Option<usize> {
+    pub fn fee_account_argument_id(self) -> Option<usize> {
         match self {
-            Self::FeeAccount_PubData => Some(1),
-            Self::FeeAccount_BlockTimestamp_PubData => Some(1),
+            Self::Initial => Some(1),
+            Self::BlockTimestampAdded => Some(1),
         }
     }
 
-    pub fn block_timestamp_argument_id(&self) -> Option<usize> {
+    pub fn block_timestamp_argument_id(self) -> Option<usize> {
         match self {
-            Self::FeeAccount_PubData => None,
-            Self::FeeAccount_BlockTimestamp_PubData => Some(2),
+            Self::Initial => None,
+            Self::BlockTimestampAdded => Some(2),
         }
     }
 
-    pub fn public_data_argument_id(&self) -> Option<usize> {
+    pub fn public_data_argument_id(self) -> Option<usize> {
         match self {
-            Self::FeeAccount_PubData => Some(3),
-            Self::FeeAccount_BlockTimestamp_PubData => Some(4),
+            Self::Initial => Some(3),
+            Self::BlockTimestampAdded => Some(4),
         }
     }
 
-    pub fn get_parameters(&self) -> Vec<ParamType> {
+    pub fn get_parameters(self) -> Vec<ParamType> {
         let mut res = vec![];
         res.push(ParamType::Uint(32)); // uint32 _blockNumber
         res.push(ParamType::Uint(32)); // uint32 _feeAccount
-        if self == &Self::FeeAccount_BlockTimestamp_PubData {
+        if self == Self::BlockTimestampAdded {
             res.push(ParamType::Uint(256)); // uint _blockTimestamp
         }
         res.push(ParamType::Array(Box::new(ParamType::FixedBytes(32)))); // bytes32[] _newRoots
