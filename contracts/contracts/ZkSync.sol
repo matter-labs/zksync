@@ -260,8 +260,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
 
-        require(blocks[totalBlocksCommitted].blockTimestamp <= _blockTimestamp, "tms11"); // tms11 - _blockTimestamp smaller than for the previous block
-        require(now - COMMIT_TIMESTAMP_NOT_OLDER <= _blockTimestamp && _blockTimestamp <= now, "tms12"); // tms12 - _blockTimestamp is not valid
+        require(blocks[totalBlocksCommitted].blockTimestamp < _blockTimestamp, "tms11"); // tms11 - _blockTimestamp smaller or equal than for the previous block
+        require(now - COMMIT_TIMESTAMP_NOT_OLDER <= _blockTimestamp && _blockTimestamp <= (now + COMMIT_TIMESTAMP_APPROXIMATION_DELTA), "tms12"); // tms12 - _blockTimestamp is not valid
         require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
         // Unpack onchain operations and store them.
