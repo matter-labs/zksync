@@ -68,7 +68,7 @@ impl<'a> WitnessBuilder<'a> {
         let initial_root_hash = account_tree.root_hash();
         let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
         let block_timestamp =
-            Fr::from_str(&block_timestamp.to_string()).expect("failed to convert timestamp to Fr");
+            Fr::from_str(&block_timestamp.to_string()).expect("Unable to convert timestamp to Fr");
         WitnessBuilder {
             account_tree,
             fee_account_id,
