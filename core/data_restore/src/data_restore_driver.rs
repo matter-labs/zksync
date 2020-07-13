@@ -226,7 +226,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.forks_of_blocks
             .get(&block_num)
             .copied()
-            .unwrap_or_else(|| ForkType::latest_fork())
+            .unwrap_or_else(ForkType::latest_fork)
     }
 
     /// Stops states from storage
