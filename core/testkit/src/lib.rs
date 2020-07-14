@@ -23,7 +23,7 @@ use server::state_keeper::{
 };
 use std::collections::HashMap;
 use std::thread::JoinHandle;
-use std::time::{Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
@@ -33,7 +33,9 @@ pub mod external_commands;
 pub mod zksync_account;
 use crypto_exports::rand::Rng;
 use itertools::Itertools;
+use models::node::block::Block;
 use models::prover_utils::EncodedProofPlonk;
+use std::thread;
 use web3::types::{TransactionReceipt, U64};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -1093,6 +1095,11 @@ impl TestSetup {
         }
     }
 
+    pub fn commit_block(&self, block: &Block) -> ETHExecResult {
+        thread::sleep(Duration::from_millis(1000)); // TODO: #811
+        block_on(self.commit_account.commit_block(block)).expect("block commit fail")
+    }
+
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
     pub fn execute_commit_block(&mut self) -> ETHExecResult {
         let block_sender = async {
@@ -1112,7 +1119,7 @@ impl TestSetup {
                 .as_secs(),
         ));
 
-        block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
+        self.commit_block(&new_block.block)
     }
 
     /// Analog of `execute_commit_block`, but uses defined block timestamp value
@@ -1132,7 +1139,7 @@ impl TestSetup {
         let mut new_block = block_on(self.await_for_block_commit_request());
         new_block.block.block_timestamp = Some(block_timestamp);
 
-        block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
+        self.commit_block(&new_block.block)
     }
 
     pub fn execute_commit_and_verify_block(
@@ -1154,9 +1161,7 @@ impl TestSetup {
                 .as_secs(),
         ));
 
-        let commit_result = block_on(self.commit_account.commit_block(&new_block.block))
-            .expect("block commit send tx")
-            .expect_success();
+        let commit_result = self.commit_block(&new_block.block).expect_success();
         let verify_result = block_on(self.commit_account.verify_block(&new_block.block))
             .expect("block verify send tx")
             .expect_success();
