@@ -16,7 +16,8 @@ use models::{
             PendingBlock as SendablePendingBlock,
         },
         tx::{FranklinTx, TxHash},
-        Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+        Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber,
+        BlockTimestamp, PriorityOp,
     },
     ActionType, BlockCommitRequest, CommitRequest,
 };
@@ -24,6 +25,7 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
+use std::time::SystemTime;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -650,6 +652,13 @@ impl PlasmaStateKeeper {
             ),
         );
 
+        let block_timestamp = Some(BlockTimestamp::from(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("unix timestamp calculation failed")
+                .as_secs(),
+        ));
+
         let mut block_transactions = pending_block.success_operations;
         block_transactions.extend(
             pending_block
@@ -666,7 +675,7 @@ impl PlasmaStateKeeper {
                 self.state.block_number,
                 self.state.root_hash(),
                 self.fee_account_id,
-                None, // the timestamp not known at this moment of processing
+                block_timestamp,
                 block_transactions,
                 (
                     pending_block.unprocessed_priority_op_before,

@@ -11,8 +11,8 @@ use futures::{
 };
 use models::config_options::ConfigurationOptions;
 use models::node::{
-    Account, AccountId, AccountMap, Address, DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp,
-    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    Account, AccountId, AccountMap, Address, BlockTimestamp, DepositOp, FranklinTx, FullExitOp,
+    Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
@@ -1105,12 +1105,12 @@ impl TestSetup {
         block_on(block_sender);
 
         let mut new_block = block_on(self.await_for_block_commit_request());
-        new_block.block.block_timestamp = Some(
+        new_block.block.block_timestamp = Some(BlockTimestamp::from(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .expect("unix timestamp calculation failed")
                 .as_secs(),
-        );
+        ));
 
         block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
     }
@@ -1118,7 +1118,7 @@ impl TestSetup {
     /// Analog of `execute_commit_block`, but uses defined block timestamp value
     pub fn execute_commit_block_with_defined_timestamp(
         &mut self,
-        block_timestamp: u64,
+        block_timestamp: BlockTimestamp,
     ) -> ETHExecResult {
         let block_sender = async {
             self.state_keeper_request_sender
@@ -1147,12 +1147,12 @@ impl TestSetup {
         };
         block_on(block_sender);
         let mut new_block = block_on(self.await_for_block_commit_request());
-        new_block.block.block_timestamp = Some(
+        new_block.block.block_timestamp = Some(BlockTimestamp::from(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .expect("unix timestamp calculation failed")
                 .as_secs(),
-        );
+        ));
 
         let commit_result = block_on(self.commit_account.commit_block(&new_block.block))
             .expect("block commit send tx")

@@ -1,8 +1,11 @@
 use crate::data_restore_driver::ForkType;
-use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
+use crate::eth_tx_helpers::{
+    get_ethereum_block, get_ethereum_transaction, get_input_data_from_ethereum_transaction,
+};
 use crate::events::BlockEvent;
 use ethabi::ParamType;
 use models::node::operations::FranklinOp;
+use models::node::BlockTimestamp;
 use web3::{Transport, Web3};
 
 /// Description of a Rollup operations block
@@ -15,7 +18,7 @@ pub struct RollupOpsBlock {
     /// Fee account
     pub fee_account: u32,
     /// Block timestamp
-    pub block_timestamp: u64,
+    pub block_timestamp: BlockTimestamp,
 }
 
 ///
@@ -54,10 +57,10 @@ impl ParametersOfRollupBlockCommitTx {
         }
     }
 
-    pub fn fee_account_argument_id(self) -> Option<usize> {
+    pub fn fee_account_argument_id(self) -> usize {
         match self {
-            Self::Initial => Some(1),
-            Self::BlockTimestampAdded => Some(1),
+            Self::Initial => 1,
+            Self::BlockTimestampAdded => 1,
         }
     }
 
@@ -68,10 +71,10 @@ impl ParametersOfRollupBlockCommitTx {
         }
     }
 
-    pub fn public_data_argument_id(self) -> Option<usize> {
+    pub fn public_data_argument_id(self) -> usize {
         match self {
-            Self::Initial => Some(3),
-            Self::BlockTimestampAdded => Some(4),
+            Self::Initial => 3,
+            Self::BlockTimestampAdded => 4,
         }
     }
 
@@ -95,11 +98,15 @@ impl RollupOpsBlock {
         web3: &Web3<T>,
         event_data: &BlockEvent,
         parameters: &[ParamType],
-        fee_account_argument_id: Option<usize>,
+        fee_account_argument_id: usize,
         block_timestamp_argument_id: Option<usize>,
-        public_data_argument_id: Option<usize>,
+        public_data_argument_id: usize,
     ) -> Result<Self, failure::Error> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
+        let web3_block = get_ethereum_block(
+            web3,
+            &transaction.block_hash.expect("block should not be pending"),
+        )?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
         let decoded_commitment_parameters = ethabi::decode(parameters, input_data.as_slice())
@@ -114,41 +121,34 @@ impl RollupOpsBlock {
             block_num: 0,
             ops: vec![],
             fee_account: 0,
-            block_timestamp: 0,
+            block_timestamp: BlockTimestamp::from(0),
         };
 
         let mut parse_commitment_success = true;
 
         block.block_num = event_data.block_num;
 
-        if let Some(fee_account_argument_id) = fee_account_argument_id {
-            if let ethabi::Token::Uint(fee_acc) =
-                &decoded_commitment_parameters[fee_account_argument_id]
-            {
-                block.fee_account = fee_acc.as_u32();
-            } else {
-                parse_commitment_success = false;
-            }
+        if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
+            &decoded_commitment_parameters[fee_account_argument_id],
+            &decoded_commitment_parameters[public_data_argument_id],
+        ) {
+            block.fee_account = fee_acc.as_u32();
+            block.ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
+        } else {
+            parse_commitment_success = false;
         }
 
         if let Some(block_timestamp_argument_id) = block_timestamp_argument_id {
             if let ethabi::Token::Uint(timestamp) =
                 &decoded_commitment_parameters[block_timestamp_argument_id]
             {
-                block.block_timestamp = timestamp.as_u64();
+                block.block_timestamp = BlockTimestamp::from(timestamp.as_u64());
             } else {
                 parse_commitment_success = false;
             }
-        }
-
-        if let Some(public_data_argument_id) = public_data_argument_id {
-            if let ethabi::Token::Bytes(public_data) =
-                &decoded_commitment_parameters[public_data_argument_id]
-            {
-                block.ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
-            } else {
-                parse_commitment_success = false;
-            }
+        } else {
+            // if there is no timestamp in the arguments of commitBlock function we would store real block timestamp
+            block.block_timestamp = BlockTimestamp::from(web3_block.timestamp.as_u64());
         }
 
         if parse_commitment_success {

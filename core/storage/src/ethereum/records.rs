@@ -68,12 +68,6 @@ pub struct ETHParams {
     pub withdraw_ops: i64,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, PartialEq)]
-#[table_name = "eth_last_known_timestamp"]
-pub struct ETHLastTimestamp {
-    pub unix_timestamp: i64,
-}
-
 /// A slice of `ETHParams` structure with only stats part in it.
 #[derive(Debug)]
 pub struct ETHStats {

@@ -144,7 +144,6 @@ fn main() {
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
         &main_runtime,
-        connection_pool.clone(),
     );
 
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);

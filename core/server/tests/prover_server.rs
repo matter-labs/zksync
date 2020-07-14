@@ -318,13 +318,11 @@ pub fn test_operation_and_wanted_prover_data(
             initial_used_subtree_root,
             new_root: block.new_root_hash,
             validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
-            block_timestamp: models::node::Fr::from_str(
-                &block
-                    .block_timestamp
-                    .expect("timestamp must be known")
-                    .to_string(),
-            )
-            .expect("failed to convert timestamp to Fr"),
+            block_timestamp: block
+                .block_timestamp
+                .expect("timestamp must be known")
+                .into_fr()
+                .expect("failed to convert timestamp into Fr"),
             operations,
             validator_balances,
             validator_audit_path,

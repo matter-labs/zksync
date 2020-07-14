@@ -1,6 +1,7 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
+use models::node::BlockTimestamp;
 use std::time::SystemTime;
 use testkit::*;
 use web3::transports::Http;
@@ -91,7 +92,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 deposit_amount,
             );
             test_setup
-                .execute_commit_block_with_defined_timestamp(0)
+                .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(0))
                 .expect_revert("tms11");
             println!("blocks timestamps dependency works correctly");
         }
@@ -105,7 +106,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 deposit_amount,
             );
             test_setup
-                .execute_commit_block_with_defined_timestamp(u64::min_value())
+                .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(u64::min_value()))
                 .expect_revert("tms12");
             println!("small timestamp will not be passed to the verifier");
         }
@@ -119,7 +120,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 deposit_amount,
             );
             test_setup
-                .execute_commit_block_with_defined_timestamp(u64::max_value())
+                .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(u64::max_value()))
                 .expect_revert("tms12");
             println!("big timestamp will not be passed to the verifier");
         }
@@ -138,7 +139,9 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 .as_secs();
             let one_week = 7 * 24 * 60 * 60;
             test_setup
-                .execute_commit_block_with_defined_timestamp(current_timestamp - one_week - 1)
+                .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(
+                    current_timestamp - one_week - 1,
+                ))
                 .expect_revert("tms12");
             println!("an expired timestamp will not be passed to the verifier");
         }

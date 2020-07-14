@@ -2,7 +2,6 @@ use futures::{channel::mpsc, SinkExt};
 use log::*;
 use server::eth_watch::{EthWatch, EthWatchRequest};
 use std::time::Duration;
-use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 
 fn main() {
@@ -26,7 +25,6 @@ fn main() {
         contract_address,
         0,
         eth_req_receiver,
-        ConnectionPool::new(None),
     );
 
     main_runtime.spawn(watcher.run());

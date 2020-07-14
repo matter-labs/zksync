@@ -93,7 +93,7 @@ impl<'a> DataRestoreSchema<'a> {
                     block_num: block_num as u32,
                     ops,
                     fee_account: fee_account as u32,
-                    block_timestamp: block_timestamp as u64,
+                    block_timestamp: BlockTimestamp::from(block_timestamp as u64),
                 }
             })
             .collect();

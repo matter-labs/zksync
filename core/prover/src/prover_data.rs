@@ -41,20 +41,21 @@ pub struct ProverData {
 
 impl ProverData {
     pub fn into_circuit(self, block: i64) -> FranklinCircuit<'static, Engine> {
-        FranklinCircuit::<'static, Engine>::new(
-            &models::params::RESCUE_PARAMS as &Bn256RescueParams,
-            &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
-            Some(self.old_root),
-            Some(self.initial_used_subtree_root),
-            Fr::from_str(&block.to_string()),
-            Some(self.validator_address),
-            Some(self.block_timestamp),
-            Some(self.public_data_commitment),
-            self.operations,
-            self.validator_balances,
-            self.validator_audit_path,
-            self.validator_account,
-        )
+        FranklinCircuit {
+            rescue_params: &models::params::RESCUE_PARAMS as &Bn256RescueParams,
+            jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
+            old_root: Some(self.old_root),
+            initial_used_subtree_root: Some(self.initial_used_subtree_root),
+            block_number: Fr::from_str(&block.to_string()),
+            validator_address: Some(self.validator_address),
+            pub_data_commitment: Some(self.public_data_commitment),
+            operations: self.operations,
+            validator_balances: self.validator_balances,
+            validator_audit_path: self.validator_audit_path,
+            validator_account: self.validator_account,
+            block_timestamp: Some(self.block_timestamp),
+            allocated_block_timestamp: None,
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use super::merkle_tree::{RescueHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, unpack_float};
-use crate::franklin_crypto::bellman::pairing::bn256;
+use crate::franklin_crypto::bellman::pairing::{bn256, ff::PrimeField};
 use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
     jubjub::{FixedGenerators, JubjubEngine},
@@ -16,6 +16,7 @@ pub mod priority_ops;
 pub mod tokens;
 pub mod tx;
 
+use failure::format_err;
 pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
@@ -60,11 +61,35 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
     }
 }
 
+/// This type is supposed to hold a POSIX timestamp
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct BlockTimestamp(pub u64);
+
+impl std::ops::Deref for BlockTimestamp {
+    type Target = u64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<u64> for BlockTimestamp {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl BlockTimestamp {
+    pub fn into_fr(&self) -> Result<Fr, failure::Error> {
+        return Fr::from_str(&self.to_string())
+            .ok_or_else(|| format_err!("Unable to convert block timestamp to Fr"));
+    }
+}
+
 pub type TokenId = u16;
 
 pub type AccountId = u32;
 pub type BlockNumber = u32;
-pub type BlockTimestamp = u64;
 pub type Nonce = u32;
 
 pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {

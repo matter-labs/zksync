@@ -123,24 +123,25 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         },
     };
 
-    FranklinCircuit::<'_, Engine>::new(
-        &params::RESCUE_PARAMS,
-        &params::JUBJUB_PARAMS,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        vec![empty_operation; block_chunks],
-        vec![None; params::total_tokens()],
-        vec![None; params::account_tree_depth()],
-        AccountWitness {
+    FranklinCircuit::<'_, Engine> {
+        rescue_params: &params::RESCUE_PARAMS,
+        jubjub_params: &params::JUBJUB_PARAMS,
+        old_root: None,
+        initial_used_subtree_root: None,
+        validator_address: None,
+        block_number: None,
+        pub_data_commitment: None,
+        validator_balances: vec![None; params::total_tokens()],
+        validator_audit_path: vec![None; params::account_tree_depth()],
+        operations: vec![empty_operation; block_chunks],
+        validator_account: AccountWitness {
             nonce: None,
             pub_key_hash: None,
             address: None,
         },
-    )
+        block_timestamp: None,
+        allocated_block_timestamp: None,
+    }
 }
 
 /// Generates PLONK verification key for given circuit and saves key at the given path.

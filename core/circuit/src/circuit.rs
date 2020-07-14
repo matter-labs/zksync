@@ -60,45 +60,13 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_audit_path: Vec<Option<E::Fr>>,
     pub validator_account: AccountWitness<E>,
 
-    /// Global variables of circuit
-    /// These values should be Some only during the synthesis process
-    allocated_block_timestamp: Option<CircuitElement<E>>,
+    // Global variables of circuit
+    // These values should be Some only during the synthesis process
+    pub allocated_block_timestamp: Option<CircuitElement<E>>,
 }
 
 impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        rescue_params: &'a <E as RescueEngine>::Params,
-        jubjub_params: &'a <E as JubjubEngine>::Params,
-        old_root: Option<E::Fr>,
-        initial_used_subtree_root: Option<E::Fr>,
-        block_number: Option<E::Fr>,
-        validator_address: Option<E::Fr>,
-        block_timestamp: Option<E::Fr>,
-        pub_data_commitment: Option<E::Fr>,
-        operations: Vec<Operation<E>>,
-        validator_balances: Vec<Option<E::Fr>>,
-        validator_audit_path: Vec<Option<E::Fr>>,
-        validator_account: AccountWitness<E>,
-    ) -> Self {
-        Self {
-            rescue_params,
-            jubjub_params,
-            old_root,
-            initial_used_subtree_root,
-            block_number,
-            validator_address,
-            block_timestamp,
-            pub_data_commitment,
-            operations,
-            validator_balances,
-            validator_audit_path,
-            validator_account,
-            allocated_block_timestamp: None,
-        }
-    }
-
-    /// Getters for global variables
+    // Getters for global variables
     fn get_block_timestamp(&self) -> Result<CircuitElement<E>, SynthesisError> {
         self.allocated_block_timestamp.clone().grab()
     }

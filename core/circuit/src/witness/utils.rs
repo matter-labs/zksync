@@ -67,8 +67,9 @@ impl<'a> WitnessBuilder<'a> {
     ) -> WitnessBuilder {
         let initial_root_hash = account_tree.root_hash();
         let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
-        let block_timestamp =
-            Fr::from_str(&block_timestamp.to_string()).expect("Unable to convert timestamp to Fr");
+        let block_timestamp = block_timestamp
+            .into_fr()
+            .expect("Unable to convert timestamp into Fr");
         WitnessBuilder {
             account_tree,
             fee_account_id,
@@ -165,26 +166,30 @@ impl<'a> WitnessBuilder<'a> {
 
     /// Finaly, creates circuit instance for given operations.
     pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
-        FranklinCircuit::<'static, Engine>::new(
-            &models::params::RESCUE_PARAMS,
-            &models::params::JUBJUB_PARAMS,
-            Some(self.initial_root_hash),
-            Some(self.initial_used_subtree_root_hash),
-            Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
-            Some(Fr::from_str(&self.fee_account_id.to_string()).unwrap()),
-            Some(self.block_timestamp),
-            Some(
+        FranklinCircuit {
+            rescue_params: &models::params::RESCUE_PARAMS,
+            jubjub_params: &models::params::JUBJUB_PARAMS,
+            old_root: Some(self.initial_root_hash),
+            initial_used_subtree_root: Some(self.initial_used_subtree_root_hash),
+            operations: self.operations,
+            pub_data_commitment: Some(
                 self.pubdata_commitment
                     .expect("pubdata commitment not present"),
             ),
-            self.operations,
-            self.fee_account_balances
-                .expect("fee account balances not present"),
-            self.fee_account_audit_path
-                .expect("fee account audit path not present"),
-            self.fee_account_witness
+            block_number: Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
+            validator_account: self
+                .fee_account_witness
                 .expect("fee account witness not present"),
-        )
+            validator_address: Some(Fr::from_str(&self.fee_account_id.to_string()).unwrap()),
+            validator_balances: self
+                .fee_account_balances
+                .expect("fee account balances not present"),
+            validator_audit_path: self
+                .fee_account_audit_path
+                .expect("fee account audit path not present"),
+            block_timestamp: Some(self.block_timestamp),
+            allocated_block_timestamp: None,
+        }
     }
 }
 

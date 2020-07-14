@@ -112,12 +112,6 @@ table! {
 }
 
 table! {
-    eth_last_known_timestamp (unix_timestamp) {
-        unix_timestamp -> Int8,
-    }
-}
-
-table! {
     eth_operations (id) {
         id -> Int8,
         nonce -> Int8,
@@ -279,7 +273,6 @@ allow_tables_to_appear_in_same_query!(
     data_restore_last_watched_eth_block,
     data_restore_rollup_ops,
     data_restore_storage_state_update,
-    eth_last_known_timestamp,
     eth_operations,
     eth_ops_binding,
     eth_parameters,
