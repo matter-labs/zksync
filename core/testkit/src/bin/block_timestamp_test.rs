@@ -106,7 +106,9 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 deposit_amount,
             );
             test_setup
-                .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(u64::min_value()))
+                .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(
+                    u64::min_value() + 1,
+                ))
                 .expect_revert("tms12");
             println!("small timestamp will not be passed to the verifier");
         }
