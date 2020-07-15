@@ -35,7 +35,7 @@ pub enum ParametersOfRollupBlockCommitTx {
     /// function commitBlock(
     ///        uint32 _blockNumber,
     ///        uint32 _feeAccount,
-    ///        uint _blockTimestamp,
+    ///        uint64 _blockTimestamp,
     ///        bytes32[] calldata _newBlockInfo,
     ///        bytes calldata _publicData,
     ///        bytes calldata _ethWitness,

@@ -1064,7 +1064,7 @@ Onchain operations will be stored on contract and fulfilled on block verificatio
 commitBlock(
     uint32 _blockNumber,
     uint24 _feeAccount,
-    uint _blockTimestamp,
+    uint64 _blockTimestamp,
     bytes32 _newRoot,
     bytes calldata _publicData,
     bytes calldata _ethWitness,

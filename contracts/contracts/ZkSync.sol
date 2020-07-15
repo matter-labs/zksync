@@ -250,7 +250,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function commitBlock(
         uint32 _blockNumber,
         uint32 _feeAccount,
-        uint _blockTimestamp,
+        uint64 _blockTimestamp,
         bytes32[] calldata _newBlockInfo,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
@@ -423,7 +423,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function createCommittedBlock(
         uint32 _blockNumber,
         uint32 _feeAccount,
-        uint _blockTimestamp,
+        uint64 _blockTimestamp,
         bytes32 _newRoot,
         bytes memory _publicData,
         bytes32 _withdrawalDataHash,
@@ -444,7 +444,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             _publicData
         );
 
-        require(_blockTimestamp < (2 ** 64), "cbb12"); // cbb12 - _blockTimestamp must be convertible into uint64
         blocks[_blockNumber] = Block(
             uint32(block.number), // committed at
             _nCommittedPriorityRequests, // number of priority onchain ops in block
@@ -452,7 +451,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             _withdrawalDataHash, // hash of onchain withdrawals data (will be used during checking block withdrawal data in verifyBlock function)
             commitment, // blocks' commitment
             _newRoot, // new root
-            uint64(_blockTimestamp) // block timestamp to be used in the verifier
+            _blockTimestamp // block timestamp to be used in the verifier
         );
     }
 
@@ -609,7 +608,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function createBlockCommitment(
         uint32 _blockNumber,
         uint32 _feeAccount,
-        uint _blockTimestamp,
+        uint64 _blockTimestamp,
         bytes32 _oldRoot,
         bytes32 _newRoot,
         bytes memory _publicData
@@ -617,7 +616,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
-        hash = sha256(abi.encodePacked(hash, _blockTimestamp));
+        hash = sha256(abi.encodePacked(hash, uint256(_blockTimestamp)));
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
 

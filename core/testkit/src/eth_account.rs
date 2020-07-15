@@ -373,7 +373,7 @@ impl<T: Transport> EthereumAccount<T> {
                 (
                     u64::from(block.block_number),
                     u64::from(block.fee_account),
-                    U256::from(
+                    u64::from(
                         *block
                             .block_timestamp
                             .expect("block timestamp should be known at this moment"),
