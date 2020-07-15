@@ -1,7 +1,5 @@
 use crate::data_restore_driver::ForkType;
-use crate::eth_tx_helpers::{
-    get_ethereum_block, get_ethereum_transaction, get_input_data_from_ethereum_transaction,
-};
+use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
 use ethabi::ParamType;
 use models::node::operations::FranklinOp;
@@ -18,7 +16,7 @@ pub struct RollupOpsBlock {
     /// Fee account
     pub fee_account: u32,
     /// Block timestamp
-    pub block_timestamp: BlockTimestamp,
+    pub block_timestamp: Option<BlockTimestamp>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,10 +96,6 @@ impl RollupOpsBlock {
         public_data_argument_id: usize,
     ) -> Result<Self, failure::Error> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
-        let web3_block = get_ethereum_block(
-            web3,
-            &transaction.block_hash.expect("block should not be pending"),
-        )?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
         let decoded_commitment_parameters = ethabi::decode(parameters, input_data.as_slice())
@@ -116,7 +110,7 @@ impl RollupOpsBlock {
             block_num: 0,
             ops: vec![],
             fee_account: 0,
-            block_timestamp: BlockTimestamp::from(0),
+            block_timestamp: None,
         };
 
         let mut parse_commitment_success = true;
@@ -137,13 +131,10 @@ impl RollupOpsBlock {
             if let ethabi::Token::Uint(timestamp) =
                 &decoded_commitment_parameters[block_timestamp_argument_id]
             {
-                block.block_timestamp = BlockTimestamp::from(timestamp.as_u64());
+                block.block_timestamp = Some(BlockTimestamp::from(timestamp.as_u64()));
             } else {
                 parse_commitment_success = false;
             }
-        } else {
-            // if there is no timestamp in the arguments of commitBlock function we would store real block timestamp
-            block.block_timestamp = BlockTimestamp::from(web3_block.timestamp.as_u64());
         }
 
         if parse_commitment_success {

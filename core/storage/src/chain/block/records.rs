@@ -19,7 +19,7 @@ pub struct StorageBlock {
     pub block_size: i64,
     pub commit_gas_limit: i64,
     pub verify_gas_limit: i64,
-    pub block_timestamp: i64,
+    pub block_timestamp: Option<i64>,
 }
 
 #[derive(Debug, Insertable, Queryable, AsChangeset)]

@@ -125,18 +125,14 @@ impl<'a> BlockSchema<'a> {
         // Encode the root hash as `0xFF..FF`.
         let new_root_hash = fe_from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
-        // For blocks created prior to the `block_timestamp` field addition, timestamp is unknown
-        let block_timestamp: Option<BlockTimestamp> = match stored_block.block_timestamp {
-            0 => None,
-            timestamp => Some(BlockTimestamp::from(timestamp as u64)),
-        };
-
         // Return the obtained block in the expected format.
         Ok(Some(Block::new(
             block,
             new_root_hash,
             stored_block.fee_account_id as AccountId,
-            block_timestamp,
+            stored_block
+                .block_timestamp
+                .map(|timestamp| BlockTimestamp::from(timestamp as u64)),
             block_transactions,
             (
                 stored_block.unprocessed_prior_op_before as u64,
@@ -546,10 +542,7 @@ impl<'a> BlockSchema<'a> {
             let block_size = block.block_chunks_size as i64;
             let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
             let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
-            let block_timestamp = *block
-                .block_timestamp
-                .expect("block timestamp should be known at the moment of storing block")
-                as i64;
+            let block_timestamp = block.block_timestamp.map(|timestamp| *timestamp as i64);
 
             self.save_block_transactions(block.block_number, block.block_transactions)?;
 

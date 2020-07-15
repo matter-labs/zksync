@@ -1,7 +1,7 @@
 // External uses
 use failure::{ensure, format_err};
 use web3::futures::Future;
-use web3::types::{Block, BlockId, H256};
+use web3::types::H256;
 use web3::types::{Transaction, TransactionId};
 use web3::{Transport, Web3};
 
@@ -59,24 +59,4 @@ pub fn get_ethereum_transaction<T: Transport>(
         .map_err(|e| format_err!("No response from web3: {}", e))?
         .ok_or_else(|| format_err!("No tx with this hash"))?;
     Ok(web3_transaction)
-}
-
-/// Return Ethereum block
-///
-/// # Arguments
-///
-/// * `web3` - Web3 provider url
-/// * `block_hash` - The identifier of the particular Ethereum block
-///
-pub fn get_ethereum_block<T: Transport>(
-    web3: &Web3<T>,
-    block_hash: &H256,
-) -> Result<Block<H256>, failure::Error> {
-    let web3_block = web3
-        .eth()
-        .block(BlockId::Hash(*block_hash))
-        .wait()
-        .map_err(|e| format_err!("No response from web3: {}", e))?
-        .ok_or_else(|| format_err!("No block with this hash"))?;
-    Ok(web3_block)
 }

@@ -80,12 +80,12 @@ impl<'a> DataRestoreSchema<'a> {
                 // let mut ops: Vec<FranklinOp> = vec![];
                 let mut block_num: i64 = 0;
                 let mut fee_account: i64 = 0;
-                let mut block_timestamp: i64 = 0;
+                let mut block_timestamp: Option<i64> = None;
                 let ops: Vec<FranklinOp> = stored_ops
                     .map(|stored_op| {
                         block_num = stored_op.block_num;
                         fee_account = stored_op.fee_account;
-                        block_timestamp = stored_op.block_timestamp;
+                        block_timestamp = block_timestamp.or(stored_op.block_timestamp);
                         stored_op.into_franklin_op()
                     })
                     .collect();
@@ -93,7 +93,8 @@ impl<'a> DataRestoreSchema<'a> {
                     block_num: block_num as u32,
                     ops,
                     fee_account: fee_account as u32,
-                    block_timestamp: BlockTimestamp::from(block_timestamp as u64),
+                    block_timestamp: block_timestamp
+                        .map(|timestamp| BlockTimestamp::from(timestamp as u64)),
                 }
             })
             .collect();
@@ -151,7 +152,7 @@ impl<'a> DataRestoreSchema<'a> {
 
     pub fn save_rollup_ops(
         &self,
-        ops: &[(BlockNumber, &FranklinOp, AccountId, BlockTimestamp)],
+        ops: &[(BlockNumber, &FranklinOp, AccountId, Option<BlockTimestamp>)],
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             diesel::delete(data_restore_rollup_ops::table).execute(self.0.conn())?;

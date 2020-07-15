@@ -152,7 +152,7 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
 ///
 pub fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBlock]) {
     let storage = connection_pool.access_storage().expect("db failed");
-    let mut ops: Vec<(u32, &FranklinOp, u32, BlockTimestamp)> = vec![];
+    let mut ops: Vec<(u32, &FranklinOp, u32, Option<BlockTimestamp>)> = vec![];
 
     for block in blocks {
         for op in &block.ops {
