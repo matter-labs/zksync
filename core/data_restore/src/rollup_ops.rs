@@ -21,31 +21,26 @@ pub struct RollupOpsBlock {
     pub block_timestamp: BlockTimestamp,
 }
 
-///
-/// 0) Initial
-/// function commitBlock(
-///        uint32 _blockNumber,
-///        uint32 _feeAccount,
-///        bytes32[] calldata _newBlockInfo,
-///        bytes calldata _publicData,
-///        bytes calldata _ethWitness,
-///        uint32[] calldata _ethWitnessSizes
-///    );
-///
-/// 1) BlockTimestampAdded
-/// function commitBlock(
-///        uint32 _blockNumber,
-///        uint32 _feeAccount,
-///        uint _blockTimestamp,
-///        bytes32[] calldata _newBlockInfo,
-///        bytes calldata _publicData,
-///        bytes calldata _ethWitness,
-///        uint32[] calldata _ethWitnessSizes
-///    );
-///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParametersOfRollupBlockCommitTx {
+    /// function commitBlock(
+    ///        uint32 _blockNumber,
+    ///        uint32 _feeAccount,
+    ///        bytes32[] calldata _newBlockInfo,
+    ///        bytes calldata _publicData,
+    ///        bytes calldata _ethWitness,
+    ///        uint32[] calldata _ethWitnessSizes
+    ///    );
     Initial,
+    /// function commitBlock(
+    ///        uint32 _blockNumber,
+    ///        uint32 _feeAccount,
+    ///        uint _blockTimestamp,
+    ///        bytes32[] calldata _newBlockInfo,
+    ///        bytes calldata _publicData,
+    ///        bytes calldata _ethWitness,
+    ///        uint32[] calldata _ethWitnessSizes
+    ///    );
     BlockTimestampAdded,
 }
 
