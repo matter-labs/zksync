@@ -1096,7 +1096,7 @@ impl TestSetup {
     }
 
     pub fn commit_block(&self, block: &Block) -> ETHExecResult {
-        thread::sleep(Duration::from_millis(1000)); // TODO: #811
+        thread::sleep(Duration::from_millis(1000)); // TODO: remove this (#811)
         block_on(self.commit_account.commit_block(block)).expect("block commit fail")
     }
 
