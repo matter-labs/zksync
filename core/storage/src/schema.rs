@@ -178,6 +178,7 @@ table! {
         primary_account_address -> Bytea,
         nonce -> Int8,
         created_at -> Timestamptz,
+        eth_sign_data -> Nullable<Jsonb>,
     }
 }
 
@@ -186,6 +187,8 @@ table! {
         id -> Int8,
         tx_hash -> Text,
         tx -> Jsonb,
+        created_at -> Timestamptz,
+        eth_sign_data -> Nullable<Jsonb>,
     }
 }
 

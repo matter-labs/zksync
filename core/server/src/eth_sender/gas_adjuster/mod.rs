@@ -24,6 +24,8 @@ pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
     statistics: GasStatistics,
     /// Timestamp of the last maximum gas price update.
     last_price_renewal: Instant,
+    /// Timestamp of the last sample added to the `statistics`.
+    last_sample_added: Instant,
 
     _etherum_client: PhantomData<ETH>,
     _db: PhantomData<DB>,
@@ -37,6 +39,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
         Self {
             statistics: GasStatistics::new(gas_price_limit),
             last_price_renewal: Instant::now(),
+            last_sample_added: Instant::now(),
 
             _etherum_client: PhantomData,
             _db: PhantomData,
@@ -69,8 +72,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
             log::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
-        // Report used price to be gathered by the statistics module.
-        self.statistics.add_sample(price);
+        // FIXME: Currently instead of using sent txs as samples, we use the gas prices suggested by
+        // the Ethereum node.
+        // // Report used price to be gathered by the statistics module.
+        // self.statistics.add_sample(price);
 
         Ok(price)
     }
@@ -78,7 +83,21 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     /// Performs an actualization routine for `GasAdjuster`:
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
-    pub fn keep_updated(&mut self, db: &DB) {
+    pub fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
+        if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
+            // Report the current price to be gathered by the statistics module.
+            match ethereum.gas_price() {
+                Ok(network_price) => {
+                    self.statistics.add_sample(network_price);
+
+                    self.last_sample_added = Instant::now();
+                }
+                Err(err) => {
+                    log::warn!("Cannot add the sample gas price: {}", err);
+                }
+            }
+        }
+
         if self.last_price_renewal.elapsed() >= parameters::limit_update_interval() {
             // It's time to update the maximum price.
             let scale_factor = parameters::limit_scale_factor();

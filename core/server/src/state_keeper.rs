@@ -24,6 +24,7 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
+use models::node::SignedFranklinTx;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -298,7 +299,7 @@ impl PlasmaStateKeeper {
             for operation in pending_block.success_operations {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
-                        self.apply_tx(tx.tx)
+                        self.apply_tx(tx.signed_tx)
                             .expect("Tx from the pending block failed");
                         txs_count += 1;
                     }
@@ -422,15 +423,17 @@ impl PlasmaStateKeeper {
     }
 
     async fn notify_executed_ops(&self, executed_ops: &mut Vec<ExecutedOperations>) {
-        self.executed_tx_notify_sender
-            .clone()
-            .send(ExecutedOpsNotify {
-                operations: executed_ops.clone(),
-                block_number: self.state.block_number,
-            })
-            .await
-            .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
-            .unwrap_or_default();
+        if !executed_ops.is_empty() {
+            self.executed_tx_notify_sender
+                .clone()
+                .send(ExecutedOpsNotify {
+                    operations: executed_ops.clone(),
+                    block_number: self.state.block_number,
+                })
+                .await
+                .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+                .unwrap_or_default();
+        }
         executed_ops.clear();
     }
 
@@ -484,13 +487,11 @@ impl PlasmaStateKeeper {
             };
             if self.pending_block.pending_block_iteration > max_miniblock_iterations {
                 self.seal_pending_block().await;
-                self.notify_executed_ops(&mut executed_ops).await;
-                return;
             } else {
                 self.store_pending_block().await;
-                self.notify_executed_ops(&mut executed_ops).await;
             }
         }
+        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // Err if there is no space in current block
@@ -549,7 +550,7 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
-    fn apply_tx(&mut self, tx: FranklinTx) -> Result<ExecutedOperations, FranklinTx> {
+    fn apply_tx(&mut self, tx: SignedFranklinTx) -> Result<ExecutedOperations, SignedFranklinTx> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -560,7 +561,7 @@ impl PlasmaStateKeeper {
 
         // Check if adding this transaction to the block won't make the contract operations
         // too expensive.
-        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.clone());
+        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.tx.clone());
         if let Ok(non_executed_op) = non_executed_op {
             // We only care about successful conversions, since if conversion failed,
             // then transaction will fail as well (as it shares the same code base).
@@ -576,7 +577,7 @@ impl PlasmaStateKeeper {
             }
         }
 
-        if matches!(tx, FranklinTx::Withdraw(_)) {
+        if matches!(tx.tx, FranklinTx::Withdraw(_)) {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
         }
@@ -587,7 +588,7 @@ impl PlasmaStateKeeper {
             return Err(tx);
         }
 
-        let tx_updates = self.state.execute_tx(tx.clone());
+        let tx_updates = self.state.execute_tx(tx.tx.clone());
 
         let exec_result = match tx_updates {
             Ok(OpSuccess {
@@ -607,7 +608,7 @@ impl PlasmaStateKeeper {
                 self.pending_block.pending_op_block_index += 1;
 
                 let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
-                    tx,
+                    signed_tx: tx,
                     success: true,
                     op: Some(executed_op),
                     fail_reason: None,
@@ -622,7 +623,7 @@ impl PlasmaStateKeeper {
             Err(e) => {
                 warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
-                    tx,
+                    signed_tx: tx,
                     success: false,
                     op: None,
                     fail_reason: Some(e.to_string()),
@@ -741,14 +742,14 @@ impl PlasmaStateKeeper {
             ExecutedOpId::Transaction(hash) => {
                 for op in &self.pending_block.success_operations {
                     if let ExecutedOperations::Tx(exec_tx) = op {
-                        if exec_tx.tx.hash() == hash {
+                        if exec_tx.signed_tx.hash() == hash {
                             return Some((current_block_number, true));
                         }
                     }
                 }
 
                 for failed_tx in &self.pending_block.failed_txs {
-                    if failed_tx.tx.hash() == hash {
+                    if failed_tx.signed_tx.hash() == hash {
                         return Some((current_block_number, false));
                     }
                 }

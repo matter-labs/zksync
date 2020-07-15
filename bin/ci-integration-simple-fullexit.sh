@@ -18,11 +18,11 @@ timeout "$$" &
 TIMEOUT_PID=$!
 
 function cat_logs() {
+    exitcode=$?
     echo "Termination started"
     # Wait for server to finish any ongoing jobs
-    sleep 60
+    sleep 30
 
-    exitcode=$?
     set +e
     kill -9 $SERVER_PID
     kill -9 $PROVER_PID

@@ -37,21 +37,21 @@ export async function getDefaultProvider(
     } else if (network === "ropsten") {
         if (transport === "WS") {
             return await Provider.newWebsocketProvider(
-                "wss://ropsten-api.zksync.dev/jsrpc-ws"
+                "wss://ropsten-api.zksync.io/jsrpc-ws"
             );
         } else if (transport === "HTTP") {
             return await Provider.newHttpProvider(
-                "https://ropsten-api.zksync.dev/jsrpc"
+                "https://ropsten-api.zksync.io/jsrpc"
             );
         }
     } else if (network === "rinkeby") {
         if (transport === "WS") {
             return await Provider.newWebsocketProvider(
-                "wss://rinkeby-api.zksync.dev/jsrpc-ws"
+                "wss://rinkeby-api.zksync.io/jsrpc-ws"
             );
         } else if (transport === "HTTP") {
             return await Provider.newHttpProvider(
-                "https://rinkeby-api.zksync.dev/jsrpc"
+                "https://rinkeby-api.zksync.io/jsrpc"
             );
         }
     } else if (network === "mainnet") {
