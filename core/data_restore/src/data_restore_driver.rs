@@ -21,7 +21,6 @@ use crate::{
     storage_interactor,
     tree_state::TreeState,
 };
-use std::collections::HashMap;
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
@@ -89,9 +88,8 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
-    /// ForkType per each block
-    /// (if there is no element per some block, then `ForkType::Latest()` should be used)
-    pub forks_of_blocks: HashMap<BlockNumber, ForkType>,
+    /// Vector of forks: (block_id when the fork is expired, fork_type)
+    pub forks_of_blocks: Vec<(BlockNumber, ForkType)>,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -117,7 +115,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         available_block_chunk_sizes: Vec<usize>,
         finite_mode: bool,
         final_hash: Option<Fr>,
-        forks_of_blocks: HashMap<BlockNumber, ForkType>,
+        forks_of_blocks: Vec<(BlockNumber, ForkType)>,
     ) -> Self {
         let web3 = Web3::new(web3_transport);
 
@@ -223,10 +221,13 @@ impl<T: Transport> DataRestoreDriver<T> {
     }
 
     fn get_fork_of_block(&self, block_num: BlockNumber) -> ForkType {
-        self.forks_of_blocks
-            .get(&block_num)
-            .copied()
-            .unwrap_or_else(ForkType::latest_fork)
+        for (fork_block_id, fork_type) in &self.forks_of_blocks {
+            if block_num < *fork_block_id {
+                return *fork_type;
+            }
+        }
+        // if we did not find a fork of this block, it means that we should use `ForkType::latest_fork()`
+        ForkType::latest_fork()
     }
 
     /// Stops states from storage

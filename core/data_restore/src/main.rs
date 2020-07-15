@@ -20,7 +20,6 @@ use models::{
         BlockNumber, TokenId,
     },
 };
-use std::collections::HashMap;
 use std::str::FromStr;
 use storage::ConnectionPool;
 use web3::transports::Http;
@@ -106,15 +105,13 @@ fn main() {
     } else {
         None
     };
-    let mut forks_of_blocks: HashMap<BlockNumber, ForkType> = HashMap::new();
+    let mut forks_of_blocks: Vec<(BlockNumber, ForkType)> = vec![];
     let block_timestamp_added_fork_id = BlockNumber::from_str(
         cli.value_of("forks_tx_signature")
             .expect("value of forks_tx_signature should present"),
     )
     .expect("Unable to convert block_timestamp_added_fork_id to BlockNumber type");
-    for block_num in 0..block_timestamp_added_fork_id {
-        forks_of_blocks.insert(block_num, ForkType::Initial);
-    }
+    forks_of_blocks.push((block_timestamp_added_fork_id, ForkType::Initial));
 
     let mut driver = DataRestoreDriver::new(
         connection_pool,
