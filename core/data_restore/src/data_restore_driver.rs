@@ -90,7 +90,7 @@ pub struct DataRestoreDriver<T: Transport> {
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
     /// ForkType per each block
-    /// (if there is no element per some block than should be used ForkType::Latest())
+    /// (if there is no element per some block, then `ForkType::Latest()` should be used)
     pub forks_of_blocks: HashMap<BlockNumber, ForkType>,
 }
 
