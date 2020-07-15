@@ -125,7 +125,7 @@ impl<'a> BlockSchema<'a> {
         // Encode the root hash as `0xFF..FF`.
         let new_root_hash = fe_from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
-        // For blocks created before the adding block_timestamp field we don't know it
+        // For blocks created prior to the `block_timestamp` field addition, timestamp is unknown
         let block_timestamp: Option<BlockTimestamp> = match stored_block.block_timestamp {
             0 => None,
             timestamp => Some(BlockTimestamp::from(timestamp as u64)),
