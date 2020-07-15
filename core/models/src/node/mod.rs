@@ -81,8 +81,8 @@ impl From<u64> for BlockTimestamp {
 
 impl BlockTimestamp {
     pub fn into_fr(&self) -> Result<Fr, failure::Error> {
-        return Fr::from_str(&self.to_string())
-            .ok_or_else(|| format_err!("Unable to convert block timestamp to Fr"));
+        Fr::from_str(&self.to_string())
+            .ok_or_else(|| format_err!("Unable to convert block timestamp to Fr"))
     }
 }
 
