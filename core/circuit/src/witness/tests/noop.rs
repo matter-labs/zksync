@@ -17,6 +17,7 @@ use models::{
         utils::pub_key_hash_fe,
     },
     merkle_tree::RescueHasher,
+    node::BlockTimestamp,
     params::{self, account_tree_depth, used_account_subtree_depth},
 };
 
@@ -122,7 +123,8 @@ fn test_noop() {
     let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
     circuit_account_tree.insert(0, CircuitAccount::default());
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1, 0);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, 0, 1, BlockTimestamp::from(0));
     witness_accum.extend_pubdata_with_noops(1);
     witness_accum.collect_fees(&[]);
     witness_accum.calculate_pubdata_commitment();

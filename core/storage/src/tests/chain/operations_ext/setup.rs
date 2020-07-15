@@ -8,8 +8,8 @@ use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 use models::node::operations::{ChangePubKeyOp, FranklinOp};
 use models::node::priority_ops::PriorityOp;
 use models::node::{
-    Address, CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, Token, TransferOp,
-    TransferToNewOp, WithdrawOp,
+    Address, BlockTimestamp, CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, Token,
+    TransferOp, TransferToNewOp, WithdrawOp,
 };
 use testkit::zksync_account::ZksyncAccount;
 // Local imports
@@ -80,7 +80,7 @@ impl TransactionsHistoryTestSetup {
             block_id,
             Fr::zero(),
             0,
-            Some(0), // Not important
+            Some(BlockTimestamp::from(0)), // Not important
             operations,
             (0, 0), // Not important
             100,

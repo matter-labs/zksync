@@ -8,7 +8,7 @@ use circuit::witness::{deposit::DepositWitness, Witness};
 use models::{
     circuit::CircuitAccountTree,
     config_options::ConfigurationOptions,
-    node::{block::Block, Address},
+    node::{block::Block, Address, BlockTimestamp},
     params::{account_tree_depth, total_tokens},
     prover_utils::EncodedProofPlonk,
 };
@@ -243,7 +243,7 @@ pub fn test_operation_and_wanted_prover_data(
         state.block_number,
         state.root_hash(),
         validator_account_id,
-        Some(0),
+        Some(BlockTimestamp::from(0)),
         ops,
         (0, 1),
         &ConfigurationOptions::from_env().available_block_chunk_sizes,

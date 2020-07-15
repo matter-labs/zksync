@@ -7,7 +7,7 @@ use num::BigUint;
 // Workspace deps
 use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
-    node::{Account, AccountId, AccountMap, Address, Engine, Fr},
+    node::{Account, AccountId, AccountMap, Address, BlockTimestamp, Engine, Fr},
 };
 use plasma::state::{CollectedFee, PlasmaState};
 use testkit::zksync_account::ZksyncAccount;
@@ -131,7 +131,12 @@ pub fn generic_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        BlockTimestamp::from(0),
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -176,7 +181,12 @@ pub fn corrupted_input_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        BlockTimestamp::from(0),
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -230,7 +240,12 @@ pub fn incorrect_op_test_scenario<W, F>(
 {
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        BlockTimestamp::from(0),
+    );
 
     // Collect fees without actually applying the tx on plasma
     let fees = collect_fees();
