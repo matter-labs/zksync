@@ -10,7 +10,16 @@ contract ZkSyncProcessOpUnitTest is ZkSyncTest {
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
     ) external {
-        collectOnchainOps(0, _publicData, _ethWitness, _ethWitnessSizes);
+        (bool blockProcessorCallSuccess, ) = blockProcessorAddress.delegatecall(
+            abi.encodeWithSignature(
+                "collectOnchainOps(uint32,bytes,bytes,uint32[])",
+                    uint32(0),
+                    _publicData,
+                    _ethWitness,
+                    _ethWitnessSizes
+            )
+        );
+        require(blockProcessorCallSuccess, "coo91"); // coo91 - `collectOnchainOps` delegatecall fails
     }
 
 }

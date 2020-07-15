@@ -125,4 +125,8 @@ contract Storage {
     function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
         return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
+
+    /// @notice Part of the main contract
+    /// @dev Separated block processing logic to reduce main contract size
+    address public blockProcessorAddress;
 }
