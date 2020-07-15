@@ -78,7 +78,7 @@ impl ParametersOfRollupBlockCommitTx {
         res.push(ParamType::Uint(32)); // uint32 _blockNumber
         res.push(ParamType::Uint(32)); // uint32 _feeAccount
         if self == Self::BlockTimestampAdded {
-            res.push(ParamType::Uint(256)); // uint _blockTimestamp
+            res.push(ParamType::Uint(64)); // uint64 _blockTimestamp
         }
         res.push(ParamType::Array(Box::new(ParamType::FixedBytes(32)))); // bytes32[] _newRoots
         res.push(ParamType::Bytes); // bytes calldata _publicData
