@@ -93,7 +93,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
             );
             test_setup
                 .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(0))
-                .expect_revert("tms11");
+                .expect_revert("com91");
             println!("blocks timestamps dependency works correctly");
         }
         BlockTimestampTestScenario::VerySmallTimestamp => {
@@ -109,7 +109,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(
                     u64::min_value() + 1,
                 ))
-                .expect_revert("tms12");
+                .expect_revert("com91");
             println!("small timestamp will not be passed to the verifier");
         }
         BlockTimestampTestScenario::VeryBigTimestamp => {
@@ -123,7 +123,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
             );
             test_setup
                 .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(u64::max_value()))
-                .expect_revert("tms12");
+                .expect_revert("com91");
             println!("big timestamp will not be passed to the verifier");
         }
         BlockTimestampTestScenario::ExpiredTimestamp => {
@@ -144,7 +144,7 @@ fn block_timestamp_test(scenario: BlockTimestampTestScenario) {
                 .execute_commit_block_with_defined_timestamp(BlockTimestamp::from(
                     current_timestamp - one_week - 1,
                 ))
-                .expect_revert("tms12");
+                .expect_revert("com91");
             println!("an expired timestamp will not be passed to the verifier");
         }
     };
