@@ -35,10 +35,10 @@ ssed 's/contract ZkSyncTest/contract ZkSyncTestUpgradeTarget/' -i $OUT_DIR/ZkSyn
 # In solidity constant should be in the following form.
 # $SOME_TYPE constant $NAME = $VALUE;
 set_constant() {
-	ssed -E "s/(.*constant $1)(.*)\;/\1 = $2\;/" -i $3
+	ssed -E "s/(.*constant $1 =)(.*)\;/\1 $2\;/" -i $3
 }
 create_constant_getter() {
-	ssed -E "s/    (.*) (constant $1)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external pure returns (\1) {\n        return $1\;\n    }/" -i $2
+	ssed -E "s/    (.*) (constant $1 =)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external pure returns (\1) {\n        return $1\;\n    }/" -i $2
 }
 
 # Change constants
