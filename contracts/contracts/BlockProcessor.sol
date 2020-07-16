@@ -12,6 +12,9 @@ import "./Bytes.sol";
 import "./Operations.sol";
 
 /// @title BlockProcessor contract
+/// This is a "library contract". ZkSync contract would use it only with delegatecalls.
+/// This have 3 endpoints: `commitBlock`, `verifyBlock` and `revertBlocks`.
+/// At the end of the contract, there are a few external functions, which allow testing some of the internal functional.
 /// @author Matter Labs
 contract BlockProcessor is Storage, Config, Events {
     using SafeMath for uint256;
@@ -31,11 +34,11 @@ contract BlockProcessor is Storage, Config, Events {
         uint32 _blockNumber,
         uint32 _feeAccount,
         uint64 _blockTimestamp,
-        bytes32[] memory _newBlockInfo,
-        bytes memory _publicData,
-        bytes memory _ethWitness,
-        uint32[] memory _ethWitnessSizes
-    ) internal {
+        bytes32[] calldata _newBlockInfo,
+        bytes calldata _publicData,
+        bytes calldata _ethWitness,
+        uint32[] calldata _ethWitnessSizes
+    ) external {
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
 
@@ -60,8 +63,8 @@ contract BlockProcessor is Storage, Config, Events {
     /// @param _blockNumber Block number
     /// @param _proof Block proof
     /// @param _withdrawalsData Block withdrawals data
-    function verifyBlock(uint32 _blockNumber, uint256[] memory _proof, bytes memory _withdrawalsData)
-        internal
+    function verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
+        external
     {
         require(_blockNumber == totalBlocksVerified + 1, "fvk11"); // only verify next block
         governance.requireActiveValidator(msg.sender);
@@ -82,7 +85,7 @@ contract BlockProcessor is Storage, Config, Events {
 
     /// @notice Reverts unverified blocks
     /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
-    function revertBlocks(uint32 _maxBlocksToRevert) internal {
+    function revertBlocks(uint32 _maxBlocksToRevert) external {
         require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
         governance.requireActiveValidator(msg.sender);
 
@@ -419,4 +422,16 @@ contract BlockProcessor is Storage, Config, Events {
         totalCommittedPriorityRequests -= _number;
     }
 
+    ///
+    /// External function's to allow testing some of the internal functional
+    ///
+
+    function externalTestVerifyChangePubkeySignature(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) external returns (bool) {
+        return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress, _accountId);
+    }
+
+    function externalTestCollectOnchainOps(uint32 _blockNumber, bytes calldata _publicData, bytes calldata _ethWitness, uint32[] calldata _ethWitnessSizes)
+        external returns (bytes32 withdrawalsDataHash) {
+        return collectOnchainOps(_blockNumber, _publicData, _ethWitness, _ethWitnessSizes);
+    }
 }

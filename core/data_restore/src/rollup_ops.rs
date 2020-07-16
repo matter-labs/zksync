@@ -47,6 +47,7 @@ impl ParametersOfRollupBlockCommitTx {
         match fork_type {
             ForkType::Initial => Self::Initial,
             ForkType::BlockTimestampAdded => Self::BlockTimestampAdded,
+            ForkType::BlockProcessorAdded => Self::BlockTimestampAdded,
         }
     }
 

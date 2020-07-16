@@ -35,9 +35,7 @@ describe("zkSync signature verification unit tests", function() {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
         const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
-        const {revertReason, result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId));
-        expect(result).eq(true);
+        await testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId, true);
     });
 
     it("pubkey hash signature verification incorrect nonce", async () => {
@@ -46,9 +44,7 @@ describe("zkSync signature verification unit tests", function() {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
         const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
-        const {result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), incorrectNonce, randomWallet.address, accountId));
-        expect(result).eq(false);
+        await testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), incorrectNonce, randomWallet.address, accountId, false);
     });
 
     it("pubkey hash signature verification incorrect pubkey hash", async () => {
@@ -57,9 +53,7 @@ describe("zkSync signature verification unit tests", function() {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
         const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
-        const {result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, incorrectPubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId));
-        expect(result).eq(false);
+        await testContract.changePubkeySignatureCheck(signature, incorrectPubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId, false);
     });
 
     it("pubkey hash signature verification incorrect signer", async () => {
@@ -68,9 +62,7 @@ describe("zkSync signature verification unit tests", function() {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
         const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
-        const {result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, incorrectSignerAddress, accountId));
-        expect(result).eq(false);
+        await testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, incorrectSignerAddress, accountId, false);
     });
 
     it("pubkey hash signature verification incorrect account id", async () => {
@@ -79,9 +71,7 @@ describe("zkSync signature verification unit tests", function() {
         const nonce = 0x11223344;
         const accountId = 0xdeadba;
         const signature = await randomWallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
-        const {result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, incorrectAccountId));
-        expect(result).eq(false);
+        await testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, incorrectAccountId, false);
     });
 
     it("signature verification success", async () => {

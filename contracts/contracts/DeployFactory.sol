@@ -6,6 +6,7 @@ import "./UpgradeGatekeeper.sol";
 import "./ZkSync.sol";
 import "./Verifier.sol";
 import "./TokenInit.sol";
+import "./BlockProcessor.sol";
 
 contract DeployFactory is TokenDeployInit {
 
@@ -28,13 +29,13 @@ contract DeployFactory is TokenDeployInit {
     constructor(
         Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget,
         bytes32 _genesisRoot, address _firstValidator, address _governor,
-        address _feeAccountAddress
+        address _feeAccountAddress, BlockProcessor _blockProcessor
     ) public {
         require(_firstValidator != address(0));
         require(_governor != address(0));
         require(_feeAccountAddress != address(0));
         
-        deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor);
+        deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor, _blockProcessor);
 
         selfdestruct(msg.sender);
     }
@@ -44,13 +45,13 @@ contract DeployFactory is TokenDeployInit {
 
     function deployProxyContracts(
         Governance _governanceTarget, Verifier _verifierTarget, ZkSync _zksyncTarget,
-        bytes32 _genesisRoot, address _validator, address _governor
+        bytes32 _genesisRoot, address _validator, address _governor, BlockProcessor _blockProcessor
     ) internal {
 
         Proxy governance = new Proxy(address(_governanceTarget), abi.encode(this));
         // set this contract as governor
         Proxy verifier = new Proxy(address(_verifierTarget), abi.encode());
-        Proxy zkSync = new Proxy(address(_zksyncTarget), abi.encode(address(governance), address(verifier), _genesisRoot));
+        Proxy zkSync = new Proxy(address(_zksyncTarget), abi.encode(address(governance), address(verifier), _genesisRoot, address(_blockProcessor)));
 
         UpgradeGatekeeper upgradeGatekeeper = new UpgradeGatekeeper(zkSync);
 
