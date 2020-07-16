@@ -188,7 +188,6 @@ impl<'a> WitnessBuilder<'a> {
                 .fee_account_audit_path
                 .expect("fee account audit path not present"),
             block_timestamp: Some(self.block_timestamp),
-            allocated_block_timestamp: None,
         }
     }
 }

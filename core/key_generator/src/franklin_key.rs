@@ -140,7 +140,6 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             address: None,
         },
         block_timestamp: None,
-        allocated_block_timestamp: None,
     }
 }
 

@@ -54,7 +54,6 @@ impl ProverData {
             validator_audit_path: self.validator_audit_path,
             validator_account: self.validator_account,
             block_timestamp: Some(self.block_timestamp),
-            allocated_block_timestamp: None,
         }
     }
 }

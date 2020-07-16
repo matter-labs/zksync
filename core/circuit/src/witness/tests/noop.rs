@@ -238,7 +238,6 @@ fn incorrect_circuit_pubdata() {
             validator_balances: validator_balances.clone(),
             validator_audit_path: validator_audit_path.clone(),
             block_timestamp: Some(Fr::zero()),
-            allocated_block_timestamp: None,
         };
 
         let error = check_circuit_non_panicking(circuit_instance)
@@ -277,7 +276,6 @@ fn incorrect_circuit_pubdata() {
         validator_balances: validator_balances.clone(),
         validator_audit_path: validator_audit_path.clone(),
         block_timestamp: Some(Fr::zero()),
-        allocated_block_timestamp: None,
     };
 
     // Validator address is a part of pubdata, which is used to calculate the new root hash,
@@ -321,7 +319,6 @@ fn incorrect_circuit_pubdata() {
         validator_balances,
         validator_audit_path,
         block_timestamp: Some(Fr::zero()),
-        allocated_block_timestamp: None,
     };
 
     // Block number is a part of pubdata, which is used to calculate the new root hash,
