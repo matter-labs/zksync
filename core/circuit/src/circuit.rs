@@ -185,7 +185,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[ChangePubKeyOp::OP_CODE as usize] = vec![zero; 2];
 
             // this operation is disabled for now
             // data[CloseOp::OP_CODE as usize] = vec![];
