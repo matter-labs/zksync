@@ -1064,7 +1064,6 @@ Onchain operations will be stored on contract and fulfilled on block verificatio
 commitBlock(
     uint32 _blockNumber,
     uint24 _feeAccount,
-    uint64 _blockTimestamp,
     bytes32 _newRoot,
     bytes calldata _publicData,
     bytes calldata _ethWitness,
@@ -1074,7 +1073,6 @@ commitBlock(
 
 - _blockNumber: `BlockNumber`
 - _feeAccount: `AccountId` to collect fees
-- _blockTimestamp: Unix standard timestamp to be used in the verifier
 - _newRoot: New tree root `RootHash`
 - _publicData: Operations pubdata
 - _ethWitness - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g ETH signatures for pubkey change verification).

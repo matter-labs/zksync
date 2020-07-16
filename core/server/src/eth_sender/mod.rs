@@ -692,10 +692,14 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     (
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
-                        *op.block
-                            .block_timestamp
-                            .expect("block timestamp should be known at this moment"),
-                        vec![root],
+                        vec![
+                            root,
+                            H256::from_low_u64_be(
+                                *op.block
+                                    .block_timestamp
+                                    .expect("block timestamp should be known at this moment"),
+                            ),
+                        ],
                         public_data,
                         witness_data.0,
                         witness_data.1,

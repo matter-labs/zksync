@@ -18,7 +18,7 @@ use models::{
     fe_from_hex,
     node::{
         tokens::{get_genesis_token_list, Token},
-        BlockNumber, TokenId,
+        TokenId,
     },
 };
 use std::str::FromStr;
@@ -85,13 +85,6 @@ fn main() {
                 .takes_value(true)
                 .help("Expected tree root hash after restoring. This argument is ignored if mode is not `finite`"),
         )
-        .arg(
-            Arg::with_name("forks_tx_signature")
-                .long("forks_tx_signature")
-                .takes_value(true)
-                .default_value("0")
-                .help("Forks of commit block signature"),
-        )
         .get_matches();
 
     let (_event_loop, transport) =
@@ -108,13 +101,6 @@ fn main() {
     } else {
         None
     };
-    let mut forks_of_blocks: Vec<(BlockNumber, ForkType)> = vec![];
-    let block_timestamp_added_fork_id = BlockNumber::from_str(
-        cli.value_of("forks_tx_signature")
-            .expect("value of forks_tx_signature should present"),
-    )
-    .expect("Unable to convert block_timestamp_added_fork_id to BlockNumber type");
-    forks_of_blocks.push((block_timestamp_added_fork_id, ForkType::Initial));
 
     let mut driver = DataRestoreDriver::new(
         connection_pool,
@@ -126,7 +112,6 @@ fn main() {
         available_block_chunk_sizes,
         finite_mode,
         final_hash,
-        forks_of_blocks,
     );
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

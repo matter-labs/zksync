@@ -7,7 +7,6 @@ use web3::{
 // Workspace deps
 use models::{
     abi::{governance_contract, zksync_contract},
-    node::BlockNumber,
     node::{AccountMap, AccountUpdate, Fr},
 };
 use storage::ConnectionPool;
@@ -17,7 +16,6 @@ use crate::{
     contract_functions::{get_genesis_account, get_total_verified_blocks},
     eth_tx_helpers::get_ethereum_transaction,
     events_state::EventsState,
-    rollup_ops::ParametersOfRollupBlockCommitTx,
     rollup_ops::RollupOpsBlock,
     storage_interactor,
     tree_state::TreeState,
@@ -35,18 +33,17 @@ pub enum StorageUpdateState {
 }
 
 /// 0) `Initial` fork is just the first our version
-/// 1) `BlockTimestampAndBlockProcessorAdded` fork: added BlockTimestamp to be used in verifier and BlockProcessor contract (separating main contract)
-///     + Changed signature of `commitBlock` function on the contract
+/// 1) `BlockProcessorAdded` fork: added BlockProcessor contract (separating main contract)
 ///     + Changed DeployFactory's constructor's signature
 #[derive(Debug, Clone, Copy)]
 pub enum ForkType {
     Initial,
-    BlockTimestampAndBlockProcessorAdded,
+    BlockProcessorAdded,
 }
 
 impl ForkType {
     pub fn latest_fork() -> Self {
-        ForkType::BlockTimestampAndBlockProcessorAdded
+        ForkType::BlockProcessorAdded
     }
 }
 
@@ -57,9 +54,7 @@ impl std::str::FromStr for ForkType {
         match fork_name {
             "latest_fork" => Ok(Self::latest_fork()),
             "Initial" => Ok(Self::Initial),
-            "BlockTimestampAndBlockProcessorAdded" => {
-                Ok(Self::BlockTimestampAndBlockProcessorAdded)
-            }
+            "BlockProcessorAdded" => Ok(Self::BlockProcessorAdded),
             _ => Err(failure::format_err!("Fork unknown variant")),
         }
     }
@@ -105,8 +100,6 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Expected root hash to be observed after restoring process. Only
     /// available in finite mode, and intended for tests.
     pub final_hash: Option<Fr>,
-    /// Vector of forks: (block_id when the fork is expired, fork_type)
-    pub forks_of_blocks: Vec<(BlockNumber, ForkType)>,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -132,7 +125,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         available_block_chunk_sizes: Vec<usize>,
         finite_mode: bool,
         final_hash: Option<Fr>,
-        forks_of_blocks: Vec<(BlockNumber, ForkType)>,
     ) -> Self {
         let web3 = Web3::new(web3_transport);
 
@@ -168,7 +160,6 @@ impl<T: Transport> DataRestoreDriver<T> {
             available_block_chunk_sizes,
             finite_mode,
             final_hash,
-            forks_of_blocks,
         }
     }
 
@@ -239,16 +230,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
-    }
-
-    fn get_fork_of_block(&self, block_num: BlockNumber) -> ForkType {
-        for (fork_block_id, fork_type) in &self.forks_of_blocks {
-            if block_num < *fork_block_id {
-                return *fork_type;
-            }
-        }
-        // if we did not find a fork of this block, it means that we should use `ForkType::latest_fork()`
-        ForkType::latest_fork()
     }
 
     /// Stops states from storage
@@ -430,14 +411,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             .get_only_verified_committed_events()
             .iter()
             .map(|event| {
-                RollupOpsBlock::get_rollup_ops_block(
-                    &self.web3,
-                    &event,
-                    ParametersOfRollupBlockCommitTx::from_fork_type(
-                        self.get_fork_of_block(event.block_num),
-                    ),
-                )
-                .expect("Cant get new operation blocks from events")
+                RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
+                    .expect("Cant get new operation blocks from events")
             })
             .collect()
     }

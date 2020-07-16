@@ -373,10 +373,14 @@ impl<T: Transport> EthereumAccount<T> {
                 (
                     u64::from(block.block_number),
                     u64::from(block.fee_account),
-                    *block
-                        .block_timestamp
-                        .expect("block timestamp should be known at this moment"),
-                    vec![block.get_eth_encoded_root()],
+                    vec![
+                        block.get_eth_encoded_root(),
+                        H256::from_low_u64_be(
+                            *block
+                                .block_timestamp
+                                .expect("block timestamp should be known at this moment"),
+                        ),
+                    ],
                     block.get_eth_public_data(),
                     witness_data.0,
                     witness_data.1,

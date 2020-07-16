@@ -248,15 +248,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
-    /// @param _blockTimestamp Timestamp to be used in the verifier
-    /// @param _newBlockInfo New state of the block. (first element is the account tree root hash, rest of the array is reserved for the future)
+    /// @param _newBlockInfo New state of the block. (first element is the account tree root hash, second is the block timestamp, rest of the array is reserved for the future)
     /// @param _publicData Operations pubdata
     /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     function commitBlock(
         uint32 _blockNumber,
         uint32 _feeAccount,
-        uint64 _blockTimestamp,
         bytes32[] calldata _newBlockInfo,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
@@ -266,10 +264,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         (bool blockProcessorCallSuccess, ) = blockProcessorAddress.delegatecall(
             abi.encodeWithSignature(
-                "commitBlock(uint32,uint32,uint64,bytes32[],bytes,bytes,uint32[])",
+                "commitBlock(uint32,uint32,bytes32[],bytes,bytes,uint32[])",
                     _blockNumber,
                     _feeAccount,
-                    _blockTimestamp,
                     _newBlockInfo,
                     _publicData,
                     _ethWitness,

@@ -28,7 +28,7 @@ impl ParametersOfGenesisTx {
     pub fn from_fork_type(fork_type: ForkType) -> Self {
         match fork_type {
             ForkType::Initial => Self::Initial,
-            ForkType::BlockTimestampAndBlockProcessorAdded => Self::BlockProcessorAdded,
+            ForkType::BlockProcessorAdded => Self::BlockProcessorAdded,
         }
     }
 

@@ -26,15 +26,13 @@ contract BlockProcessor is Storage, Config, Events {
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
-    /// @param _blockTimestamp Timestamp to be used in the verifier
-    /// @param _newBlockInfo New state of the block. (first element is the account tree root hash, rest of the array is reserved for the future)
+    /// @param _newBlockInfo New state of the block. (first element is the account tree root hash, second is the block timestamp, rest of the array is reserved for the future)
     /// @param _publicData Operations pubdata
     /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     function commitBlock(
         uint32 _blockNumber,
         uint32 _feeAccount,
-        uint64 _blockTimestamp,
         bytes32[] calldata _newBlockInfo,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
@@ -42,10 +40,12 @@ contract BlockProcessor is Storage, Config, Events {
     ) external {
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
+        require(_newBlockInfo.length == 2, "fck13"); // This version of the contract expects only account tree root hash and block timestamp
+
+        uint64 _blockTimestamp = uint64(uint256(_newBlockInfo[1]));
 
         require(blocks[totalBlocksCommitted].blockTimestamp < _blockTimestamp, "tms11"); // tms11 - _blockTimestamp smaller or equal than for the previous block
-        require(now - COMMIT_TIMESTAMP_NOT_OLDER <= _blockTimestamp && _blockTimestamp <= (now + COMMIT_TIMESTAMP_APPROXIMATION_DELTA), "tms12"); // tms12 - _blockTimestamp is not valid
-        require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
+        require((now - COMMIT_TIMESTAMP_NOT_OLDER) <= _blockTimestamp && _blockTimestamp <= (now + COMMIT_TIMESTAMP_APPROXIMATION_DELTA), "tms12"); // tms12 - _blockTimestamp is not valid
 
         // Unpack onchain operations and store them.
         // Get priority operations number for this block.
