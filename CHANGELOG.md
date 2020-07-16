@@ -7,6 +7,7 @@
 - Added event denoting information about pending and completed withdrawals. [bb0d1bd](https://github.com/matter-labs/zksync/commit/bb0d1bd)
 - Added support for tokens that aren't fully compatible with ERC20. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
 - Block revert interval is changed to 0 hours. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
+- Redundant priority request check is removed from contract upgrade logic. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
 
 ### zkSync
 
