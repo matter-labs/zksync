@@ -17,9 +17,9 @@ pub enum ParametersOfGenesisTx {
     /// )
     Initial,
     /// constructor(
-    ///    Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget,
+    ///    Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget, BlockProcessor _blockProcessor,
     ///    bytes32 _genesisRoot, address _firstValidator, address _governor,
-    ///    address _feeAccountAddress, BlockProcessor _blockProcessor
+    ///    address _feeAccountAddress
     /// )
     BlockProcessorAdded,
 }
@@ -28,8 +28,7 @@ impl ParametersOfGenesisTx {
     pub fn from_fork_type(fork_type: ForkType) -> Self {
         match fork_type {
             ForkType::Initial => Self::Initial,
-            ForkType::BlockTimestampAdded => Self::Initial,
-            ForkType::BlockProcessorAdded => Self::BlockProcessorAdded,
+            ForkType::BlockTimestampAndBlockProcessorAdded => Self::BlockProcessorAdded,
         }
     }
 
@@ -56,12 +55,20 @@ impl ParametersOfGenesisTx {
             }
         }
     }
+
+    pub fn get_fee_account_address_argument_id(self) -> usize {
+        match self {
+            Self::Initial => 6,
+            Self::BlockProcessorAdded => 7,
+        }
+    }
 }
 
 fn get_genesis_account_with_parameters(
     genesis_transaction: &Transaction,
     parameters: &[ParamType],
     encoded_init_parameters_width: usize,
+    fee_account_address_argument_id: usize,
 ) -> Result<Account, failure::Error> {
     let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
 
@@ -72,8 +79,6 @@ fn get_genesis_account_with_parameters(
     // and then decode them to access required data.
     let encoded_init_parameters =
         input_data[input_data.len() - encoded_init_parameters_width..].to_vec();
-
-    let fee_account_address_argument_id = 6;
 
     let decoded_init_parameters = ethabi::decode(parameters, encoded_init_parameters.as_slice())
         .map_err(|_| {
@@ -112,6 +117,7 @@ pub fn get_genesis_account(
         genesis_transaction,
         &genesis_tx_signature.get_parameters(),
         genesis_tx_signature.get_init_parameters_width(),
+        genesis_tx_signature.get_fee_account_address_argument_id(),
     )
 }
 

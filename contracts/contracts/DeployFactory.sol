@@ -27,15 +27,15 @@ contract DeployFactory is TokenDeployInit {
     // genesis state, as the very first account in tree is a fee account, and we need its address before
     // we're able to start recovering the data from the Ethereum blockchain.
     constructor(
-        Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget,
+        Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget, BlockProcessor _blockProcessor,
         bytes32 _genesisRoot, address _firstValidator, address _governor,
-        address _feeAccountAddress, BlockProcessor _blockProcessor
+        address _feeAccountAddress
     ) public {
         require(_firstValidator != address(0));
         require(_governor != address(0));
         require(_feeAccountAddress != address(0));
         
-        deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor, _blockProcessor);
+        deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _blockProcessor, _genesisRoot, _firstValidator, _governor);
 
         selfdestruct(msg.sender);
     }
@@ -44,8 +44,8 @@ contract DeployFactory is TokenDeployInit {
 
 
     function deployProxyContracts(
-        Governance _governanceTarget, Verifier _verifierTarget, ZkSync _zksyncTarget,
-        bytes32 _genesisRoot, address _validator, address _governor, BlockProcessor _blockProcessor
+        Governance _governanceTarget, Verifier _verifierTarget, ZkSync _zksyncTarget, BlockProcessor _blockProcessor,
+        bytes32 _genesisRoot, address _validator, address _governor
     ) internal {
 
         Proxy governance = new Proxy(address(_governanceTarget), abi.encode(this));

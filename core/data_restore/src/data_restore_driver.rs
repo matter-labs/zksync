@@ -35,28 +35,27 @@ pub enum StorageUpdateState {
 }
 
 /// 0) `Initial` fork is just the first our version
-/// 1) `BlockTimestampAdded` fork: added BlockTimestamp to be used in verifier
+/// 1) `BlockTimestampAndBlockProcessorAdded` fork: added BlockTimestamp to be used in verifier and BlockProcessor contract (separating main contract)
 ///     + Changed signature of `commitBlock` function on the contract
-/// 2) `BlockProcessorAdded` fork: added BlockProcessor contract (separating main contract)
 ///     + Changed DeployFactory's constructor's signature
 #[derive(Debug, Clone, Copy)]
 pub enum ForkType {
     Initial,
-    BlockTimestampAdded,
-    BlockProcessorAdded,
+    BlockTimestampAndBlockProcessorAdded,
 }
 
 impl ForkType {
     pub fn latest_fork() -> Self {
-        ForkType::BlockProcessorAdded
+        ForkType::BlockTimestampAndBlockProcessorAdded
     }
 
     pub fn from_str(fork_name: &str) -> Result<Self, failure::Error> {
         match fork_name {
             "latest_fork" => Ok(Self::latest_fork()),
             "Initial" => Ok(Self::Initial),
-            "BlockTimestampAdded" => Ok(Self::BlockTimestampAdded),
-            "BlockProcessorAdded" => Ok(Self::BlockProcessorAdded),
+            "BlockTimestampAndBlockProcessorAdded" => {
+                Ok(Self::BlockTimestampAndBlockProcessorAdded)
+            }
             _ => Err(failure::format_err!("Fork unknown variant")),
         }
     }
