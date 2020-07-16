@@ -48,8 +48,12 @@ impl ForkType {
     pub fn latest_fork() -> Self {
         ForkType::BlockTimestampAndBlockProcessorAdded
     }
+}
 
-    pub fn from_str(fork_name: &str) -> Result<Self, failure::Error> {
+impl std::str::FromStr for ForkType {
+    type Err = failure::Error;
+
+    fn from_str(fork_name: &str) -> Result<Self, Self::Err> {
         match fork_name {
             "latest_fork" => Ok(Self::latest_fork()),
             "Initial" => Ok(Self::Initial),
