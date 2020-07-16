@@ -10,6 +10,7 @@ pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
 
+use crate::contract_functions::ParametersOfGenesisTx;
 use crate::data_restore_driver::{DataRestoreDriver, ForkType};
 use clap::{App, Arg};
 use models::{
@@ -64,6 +65,8 @@ fn main() {
         .arg(
             Arg::with_name("genesis")
                 .long("genesis")
+                .takes_value(true)
+                .default_value("latest_fork")
                 .help("Restores data with provided genesis (zero) block"),
         )
         .arg(
@@ -132,7 +135,16 @@ fn main() {
         // since these tokens do not have a corresponding Ethereum events.
         add_tokens_to_db(&driver.connection_pool, &config_opts.eth_network);
 
-        driver.set_genesis_state(genesis_tx_hash);
+        let genesis_fork_type = ForkType::from_str(
+            cli.value_of("genesis")
+                .expect("value of genesis fork type should present"),
+        )
+        .expect("Can't convert fork name to the ForkType variant");
+
+        driver.set_genesis_state(
+            genesis_tx_hash,
+            ParametersOfGenesisTx::from_fork_type(genesis_fork_type),
+        );
     }
 
     if cli.is_present("continue") {

@@ -46,7 +46,7 @@ impl ParametersOfRollupBlockCommitTx {
     pub fn from_fork_type(fork_type: ForkType) -> Self {
         match fork_type {
             ForkType::Initial => Self::Initial,
-            ForkType::BlockTimestampAdded => Self::BlockTimestampAdded,
+            ForkType::BlockTimestampAndBlockProcessorAdded => Self::BlockTimestampAdded,
         }
     }
 

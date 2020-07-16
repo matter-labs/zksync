@@ -6,6 +6,7 @@ import "./UpgradeGatekeeper.sol";
 import "./ZkSync.sol";
 import "./Verifier.sol";
 import "./TokenInit.sol";
+import "./BlockProcessor.sol";
 
 contract DeployFactory is TokenDeployInit {
 
@@ -26,7 +27,7 @@ contract DeployFactory is TokenDeployInit {
     // genesis state, as the very first account in tree is a fee account, and we need its address before
     // we're able to start recovering the data from the Ethereum blockchain.
     constructor(
-        Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget,
+        Governance _govTarget, Verifier _verifierTarget, ZkSync _zkSyncTarget, BlockProcessor _blockProcessor,
         bytes32 _genesisRoot, address _firstValidator, address _governor,
         address _feeAccountAddress
     ) public {
@@ -34,7 +35,7 @@ contract DeployFactory is TokenDeployInit {
         require(_governor != address(0));
         require(_feeAccountAddress != address(0));
         
-        deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor);
+        deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _blockProcessor, _genesisRoot, _firstValidator, _governor);
 
         selfdestruct(msg.sender);
     }
@@ -43,14 +44,14 @@ contract DeployFactory is TokenDeployInit {
 
 
     function deployProxyContracts(
-        Governance _governanceTarget, Verifier _verifierTarget, ZkSync _zksyncTarget,
+        Governance _governanceTarget, Verifier _verifierTarget, ZkSync _zksyncTarget, BlockProcessor _blockProcessor,
         bytes32 _genesisRoot, address _validator, address _governor
     ) internal {
 
         Proxy governance = new Proxy(address(_governanceTarget), abi.encode(this));
         // set this contract as governor
         Proxy verifier = new Proxy(address(_verifierTarget), abi.encode());
-        Proxy zkSync = new Proxy(address(_zksyncTarget), abi.encode(address(governance), address(verifier), _genesisRoot));
+        Proxy zkSync = new Proxy(address(_zksyncTarget), abi.encode(address(governance), address(verifier), _genesisRoot, address(_blockProcessor)));
 
         UpgradeGatekeeper upgradeGatekeeper = new UpgradeGatekeeper(zkSync);
 
