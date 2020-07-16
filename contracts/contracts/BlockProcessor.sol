@@ -13,8 +13,9 @@ import "./Operations.sol";
 
 /// @title BlockProcessor contract
 /// This is a "library contract". ZkSync contract would use it only with delegatecalls.
-/// This have 3 endpoints: `commitBlock`, `verifyBlock` and `revertBlocks`.
-/// At the end of the contract, there are a few external functions, which allow testing some of the internal functional.
+/// This contract has 3 external functions: `commitBlock`, `verifyBlock` and `revertBlocks`.
+/// Also, this contract has a few other external functions, which allow testing some of the internal functional.
+/// These functions must not be considered a part of public API and can be removed without a prior notice.
 /// @author Matter Labs
 contract BlockProcessor is Storage, Config, Events {
     using SafeMath for uint256;
