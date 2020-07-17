@@ -160,6 +160,7 @@ impl<'a> WitnessBuilder<'a> {
             ),
             Some(Fr::from_str(&self.fee_account_id.to_string()).expect("failed to parse")),
             Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
+            Some(self.block_timestamp),
         );
         self.pubdata_commitment = Some(public_data_commitment);
     }
@@ -296,6 +297,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     new_root: Option<E::Fr>,
     validator_address: Option<E::Fr>,
     block_number: Option<E::Fr>,
+    block_timestamp: Option<E::Fr>,
 ) -> E::Fr {
     let mut public_data_initial_bits = vec![];
 
@@ -327,6 +329,25 @@ pub fn public_data_commitment<E: JubjubEngine>(
     h.result(&mut hash_result[..]);
 
     debug!("Initial hash hex {}", hex::encode(hash_result));
+
+    let mut packed_block_timestamp_bits = vec![];
+    let block_timestamp_bits: Vec<bool> =
+        BitIterator::new(block_timestamp.unwrap().into_repr()).collect();
+    for _ in 0..256 - block_timestamp_bits.len() {
+        packed_block_timestamp_bits.push(false);
+    }
+    packed_block_timestamp_bits.extend(block_timestamp_bits);
+
+    let packed_block_timestamp_bytes = be_bit_vector_into_bytes(&packed_block_timestamp_bits);
+
+    let mut packed_with_block_timestamp = vec![];
+    packed_with_block_timestamp.extend(hash_result.iter());
+    packed_with_block_timestamp.extend(packed_block_timestamp_bytes);
+
+    h = Sha256::new();
+    h.input(&packed_with_block_timestamp);
+    hash_result = [0u8; 32];
+    h.result(&mut hash_result[..]);
 
     let mut packed_old_root_bits = vec![];
     let old_root_bits: Vec<bool> = BitIterator::new(initial_root.unwrap().into_repr()).collect();

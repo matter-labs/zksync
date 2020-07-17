@@ -194,35 +194,42 @@ fn incorrect_circuit_pubdata() {
             incorrect_hash,
             correct_hash,
             correct_hash,
+            Fr::zero(),
             "external data hash equality",
         ),
         (
             correct_hash,
             incorrect_hash,
             correct_hash,
+            Fr::zero(),
             "external data hash equality",
         ),
         (
             correct_hash,
             correct_hash,
             incorrect_hash,
+            Fr::zero(),
             "old_root contains initial_used_subtree_root",
         ),
         (
             incorrect_hash,
             correct_hash,
             incorrect_hash,
+            Fr::zero(),
             "old_root contains initial_used_subtree_root",
         ),
     ];
 
-    for (pubdata_old_hash, pubdata_new_hash, circuit_old_hash, expected_msg) in test_vector {
+    for (pubdata_old_hash, pubdata_new_hash, circuit_old_hash, block_timestamp, expected_msg) in
+        test_vector
+    {
         let public_data_commitment = public_data_commitment::<Bn256>(
             &[false; 64],
             Some(pubdata_old_hash),
             Some(pubdata_new_hash),
             Some(validator_address),
             Some(block_number),
+            Some(block_timestamp),
         );
 
         let circuit_instance = FranklinCircuit {
@@ -261,6 +268,7 @@ fn incorrect_circuit_pubdata() {
         Some(tree.root_hash()),
         Some(Default::default()),
         Some(block_number),
+        Some(Fr::zero()),
     );
 
     let circuit_instance = FranklinCircuit {
@@ -304,6 +312,7 @@ fn incorrect_circuit_pubdata() {
         Some(tree.root_hash()),
         Some(validator_address),
         Some(incorrect_block_number),
+        Some(Fr::zero()),
     );
 
     let circuit_instance = FranklinCircuit {
