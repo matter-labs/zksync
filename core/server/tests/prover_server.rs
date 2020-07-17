@@ -303,6 +303,7 @@ pub fn test_operation_and_wanted_prover_data(
             Some(root_after_fee),
             Some(models::node::Fr::from_str(&block.fee_account.to_string()).unwrap()),
             Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
+            Some(models::node::Fr::zero()),
         );
 
     (
