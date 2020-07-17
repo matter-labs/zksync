@@ -22,7 +22,7 @@ use models::{
     node::{
         operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
         tx::PackedPublicKey,
-        AccountId, BlockNumber, Engine,
+        AccountId, BlockNumber, BlockTimestamp, Engine,
     },
     params::{
         total_tokens, used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS,
@@ -47,6 +47,7 @@ pub struct WitnessBuilder<'a> {
     pub block_number: BlockNumber,
     pub initial_root_hash: Fr,
     pub initial_used_subtree_root_hash: Fr,
+    pub block_timestamp: Fr,
     pub operations: Vec<Operation<Engine>>,
     pub pubdata: Vec<bool>,
     pub root_before_fees: Option<Fr>,
@@ -62,15 +63,20 @@ impl<'a> WitnessBuilder<'a> {
         account_tree: &'a mut CircuitAccountTree,
         fee_account_id: AccountId,
         block_number: BlockNumber,
+        block_timestamp: BlockTimestamp,
     ) -> WitnessBuilder {
         let initial_root_hash = account_tree.root_hash();
         let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
+        let block_timestamp = block_timestamp
+            .into_fr()
+            .expect("Unable to convert timestamp into Fr");
         WitnessBuilder {
             account_tree,
             fee_account_id,
             block_number,
             initial_root_hash,
             initial_used_subtree_root_hash,
+            block_timestamp,
             operations: Vec::new(),
             pubdata: Vec::new(),
             root_before_fees: None,
@@ -154,6 +160,7 @@ impl<'a> WitnessBuilder<'a> {
             ),
             Some(Fr::from_str(&self.fee_account_id.to_string()).expect("failed to parse")),
             Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
+            Some(self.block_timestamp),
         );
         self.pubdata_commitment = Some(public_data_commitment);
     }
@@ -181,6 +188,7 @@ impl<'a> WitnessBuilder<'a> {
             validator_audit_path: self
                 .fee_account_audit_path
                 .expect("fee account audit path not present"),
+            block_timestamp: Some(self.block_timestamp),
         }
     }
 }
@@ -289,6 +297,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     new_root: Option<E::Fr>,
     validator_address: Option<E::Fr>,
     block_number: Option<E::Fr>,
+    block_timestamp: Option<E::Fr>,
 ) -> E::Fr {
     let mut public_data_initial_bits = vec![];
 
@@ -320,6 +329,25 @@ pub fn public_data_commitment<E: JubjubEngine>(
     h.result(&mut hash_result[..]);
 
     debug!("Initial hash hex {}", hex::encode(hash_result));
+
+    let mut packed_block_timestamp_bits = vec![];
+    let block_timestamp_bits: Vec<bool> =
+        BitIterator::new(block_timestamp.unwrap().into_repr()).collect();
+    for _ in 0..256 - block_timestamp_bits.len() {
+        packed_block_timestamp_bits.push(false);
+    }
+    packed_block_timestamp_bits.extend(block_timestamp_bits);
+
+    let packed_block_timestamp_bytes = be_bit_vector_into_bytes(&packed_block_timestamp_bits);
+
+    let mut packed_with_block_timestamp = vec![];
+    packed_with_block_timestamp.extend(hash_result.iter());
+    packed_with_block_timestamp.extend(packed_block_timestamp_bytes);
+
+    h = Sha256::new();
+    h.input(&packed_with_block_timestamp);
+    hash_result = [0u8; 32];
+    h.result(&mut hash_result[..]);
 
     let mut packed_old_root_bits = vec![];
     let old_root_bits: Vec<bool> = BitIterator::new(initial_root.unwrap().into_repr()).collect();

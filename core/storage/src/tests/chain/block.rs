@@ -2,7 +2,9 @@
 use web3::types::H256;
 // Workspace imports
 use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
-use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
+use models::node::{
+    apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, BlockTimestamp, Fr,
+};
 use models::{ethereum::OperationType, fe_to_bytes, Action, Operation};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
@@ -149,6 +151,7 @@ fn get_unique_operation(
             block_number,
             root_hash_for_block(block_number),
             0,
+            Some(BlockTimestamp::from(0)),
             Vec::new(),
             (0, 0),
             100,

@@ -19,7 +19,7 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
     parser.addArgument("--contract", {
         required: false,
-        help: "Contract name: Governance, ZkSync, Verifier, Proxies or all by default.",
+        help: "Contract name: Governance, ZkSync, Verifier, Proxies, BlockProcessor or all by default.",
     });
     parser.addArgument("--gasPrice", {required: false, help: "Gas price in GWei."});
     parser.addArgument("--nonce", {required: false, help: "nonce (requires --contract argument)"});
@@ -46,6 +46,10 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
     if (args.contract === "ZkSync" || args.contract == null) {
         await deployer.deployZkSyncTarget({gasPrice, nonce: args.nonce});
+    }
+
+    if (args.contract === "BlockProcessor" || args.contract == null) {
+        await deployer.deployBlockProcessor({gasPrice, nonce: args.nonce});
     }
 
     if (args.contract === "Verifier" || args.contract == null) {

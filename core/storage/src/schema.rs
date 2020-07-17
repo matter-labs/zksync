@@ -74,6 +74,7 @@ table! {
         block_size -> Int8,
         commit_gas_limit -> Int8,
         verify_gas_limit -> Int8,
+        block_timestamp -> Nullable<Int8>,
     }
 }
 
@@ -99,6 +100,7 @@ table! {
         block_num -> Int8,
         operation -> Jsonb,
         fee_account -> Int8,
+        block_timestamp -> Nullable<Int8>,
     }
 }
 
