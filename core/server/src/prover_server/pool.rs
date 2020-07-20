@@ -319,6 +319,9 @@ impl Maintainer {
                     });
                     pub_data.extend(transfer_to_new_witness.get_pubdata());
                 }
+                FranklinOp::TransferFrom(_transfer_from) => {
+                    unimplemented!();
+                }
                 FranklinOp::Withdraw(withdraw) => {
                     let withdraw_witness =
                         WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);

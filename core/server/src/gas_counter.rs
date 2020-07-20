@@ -27,6 +27,7 @@ impl CommitCost {
     pub const CHANGE_PUBKEY_COST: u64 = 15_866;
     pub const TRANSFER_COST: u64 = 334;
     pub const TRANSFER_TO_NEW_COST: u64 = 862;
+    pub const TRANSFER_FROM_COST: u64 = 0; // TODO: measure TransferFrom commit cost
     pub const FULL_EXIT_COST: u64 = 10_165;
     pub const WITHDRAW_COST: u64 = 2_167;
 
@@ -41,6 +42,7 @@ impl CommitCost {
             FranklinOp::ChangePubKeyOffchain(_) => Self::CHANGE_PUBKEY_COST,
             FranklinOp::Transfer(_) => Self::TRANSFER_COST,
             FranklinOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
+            FranklinOp::TransferFrom(_) => Self::TRANSFER_FROM_COST,
             FranklinOp::FullExit(_) => Self::FULL_EXIT_COST,
             FranklinOp::Withdraw(_) => Self::WITHDRAW_COST,
             FranklinOp::Close(_) => unreachable!("Close operations are disabled"),
@@ -64,6 +66,7 @@ impl VerifyCost {
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
+    pub const TRANSFER_FROM_COST: u64 = 0; // TODO: measure TransferFrom verify cost
     pub const FULL_EXIT_COST: u64 = 2_499;
     pub const WITHDRAW_COST: u64 = 45_668;
 
@@ -78,6 +81,7 @@ impl VerifyCost {
             FranklinOp::ChangePubKeyOffchain(_) => Self::CHANGE_PUBKEY_COST,
             FranklinOp::Transfer(_) => Self::TRANSFER_COST,
             FranklinOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
+            FranklinOp::TransferFrom(_) => Self::TRANSFER_FROM_COST,
             FranklinOp::FullExit(_) => Self::FULL_EXIT_COST,
             FranklinOp::Withdraw(_) => Self::WITHDRAW_COST,
             FranklinOp::Close(_) => unreachable!("Close operations are disabled"),

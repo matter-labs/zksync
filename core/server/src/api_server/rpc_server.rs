@@ -406,6 +406,12 @@ impl RpcApp {
                     tx.get_ethereum_sign_message(&token.symbol, token.decimals),
                 ))
             }
+            FranklinTx::TransferFrom(tx) => {
+                let token = self.token_info_from_id(tx.token)?;
+                Ok(Some(
+                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+                ))
+            }
             FranklinTx::Withdraw(tx) => {
                 let token = self.token_info_from_id(tx.token)?;
                 Ok(Some(

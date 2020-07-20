@@ -1,15 +1,15 @@
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
 use models::node::operations::{
-    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferFromOp, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
 use models::node::tx::ChangePubKey;
-use models::node::Address;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
+use models::node::{Address, TransferFrom};
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
 use models::params::max_account_id;
@@ -139,6 +139,7 @@ impl PlasmaState {
     pub fn execute_tx(&mut self, tx: FranklinTx) -> Result<OpSuccess, Error> {
         match tx {
             FranklinTx::Transfer(tx) => self.apply_transfer(*tx),
+            FranklinTx::TransferFrom(tx) => self.apply_transfer_from(*tx),
             FranklinTx::Withdraw(tx) => self.apply_withdraw(*tx),
             FranklinTx::Close(tx) => self.apply_close(*tx),
             FranklinTx::ChangePubKey(tx) => self.apply_change_pubkey(*tx),
@@ -306,6 +307,124 @@ impl PlasmaState {
                 })
             }
         }
+    }
+
+    fn create_transfer_from_op(&self, tx: TransferFrom) -> Result<TransferFromOp, Error> {
+        ensure!(
+            tx.token <= params::max_token_id(),
+            "Token id is not supported"
+        );
+
+        let (to, to_account) = self
+            .get_account_by_address(&tx.to)
+            .ok_or_else(|| format_err!("`To` account does not exist"))?;
+        ensure!(
+            to_account.pub_key_hash != PubKeyHash::default(),
+            "Account is locked"
+        );
+        ensure!(
+            tx.verify_sender_signature() == Some(to_account.pub_key_hash),
+            "TransferFrom `to` signature is incorrect"
+        );
+
+        let (from, from_account) = self
+            .get_account_by_address(&tx.from)
+            .ok_or_else(|| format_err!("`From` account does not exist"))?;
+        ensure!(
+            from_account.pub_key_hash != PubKeyHash::default(),
+            "Account is locked"
+        );
+        ensure!(
+            tx.verify_from_signature() == Some(from_account.pub_key_hash),
+            "TransferFrom `from` signature is incorrect"
+        );
+
+        ensure!(to == tx.account_id, "Transfer account id is incorrect");
+
+        Ok(TransferFromOp { tx, from, to })
+    }
+
+    pub fn apply_transfer_from_op(
+        &mut self,
+        op: &TransferFromOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        ensure!(
+            op.from <= max_account_id(),
+            "Transfer from account id is bigger than max supported"
+        );
+        ensure!(
+            op.to <= max_account_id(),
+            "Transfer to account id is bigger than max supported"
+        );
+
+        ensure!(
+            op.from != op.to,
+            "TransferFrom `from` and `to` accounts are same"
+        );
+
+        let mut updates = Vec::new();
+        let mut from_account = self.get_account(op.from).unwrap();
+        let mut to_account = self.get_account(op.to).unwrap();
+
+        // Update `from` account
+        let from_old_balance = from_account.get_balance(op.tx.token);
+        ensure!(
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            "Not enough balance"
+        );
+
+        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
+        let from_new_balance = from_account.get_balance(op.tx.token);
+        let from_account_nonce = from_account.nonce;
+
+        // Update `to` account
+        let to_old_nonce = to_account.nonce;
+        ensure!(op.tx.nonce == to_old_nonce, "Nonce mismatch");
+
+        let to_old_balance = to_account.get_balance(op.tx.token);
+        to_account.add_balance(op.tx.token, &op.tx.amount);
+        to_account.nonce += 1;
+        let to_new_balance = to_account.get_balance(op.tx.token);
+        let to_new_nonce = to_account.nonce;
+
+        self.insert_account(op.from, from_account);
+        self.insert_account(op.to, to_account);
+
+        updates.push((
+            op.from,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, from_old_balance, from_new_balance),
+                old_nonce: from_account_nonce,
+                new_nonce: from_account_nonce,
+            },
+        ));
+
+        updates.push((
+            op.to,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, to_old_balance, to_new_balance),
+                old_nonce: to_old_nonce,
+                new_nonce: to_new_nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: op.tx.token,
+            amount: op.tx.fee.clone(),
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_transfer_from(&mut self, tx: TransferFrom) -> Result<OpSuccess, Error> {
+        let transfer_from_op = self.create_transfer_from_op(tx)?;
+
+        let (fee, updates) = self.apply_transfer_from_op(&transfer_from_op)?;
+        Ok(OpSuccess {
+            fee: Some(fee),
+            updates,
+            executed_op: FranklinOp::TransferFrom(Box::new(transfer_from_op)),
+        })
     }
 
     fn create_withdraw_op(&self, tx: Withdraw) -> Result<WithdrawOp, Error> {
@@ -803,6 +922,7 @@ impl PlasmaState {
             FranklinTx::Transfer(tx) => self
                 .create_transfer_op(*tx)
                 .map(TransferOutcome::into_franklin_op),
+            FranklinTx::TransferFrom(_tx) => unimplemented!(),
             FranklinTx::Withdraw(tx) => self.create_withdraw_op(*tx).map(Into::into),
             FranklinTx::ChangePubKey(tx) => self.create_change_pubkey_op(*tx).map(Into::into),
             FranklinTx::Close(_) => failure::bail!("Close op is disabled"),
