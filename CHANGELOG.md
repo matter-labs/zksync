@@ -2,13 +2,6 @@
 
 ## [[Unreleased]]
 
-### Contracts
-
-- Added event denoting information about pending and completed withdrawals. [bb0d1bd](https://github.com/matter-labs/zksync/commit/bb0d1bd)
-- Added support for tokens that aren't fully compatible with ERC20. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
-- Block revert interval is changed to 0 hours. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
-- Redundant priority request check is removed from contract upgrade logic. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
-
 ### zkSync
 
 - Server: Robustness of the fee ticker's API interacting module was increased. [#786]
@@ -28,6 +21,14 @@
 
 - A link to the wallet was added to the explorer. [14424a6](https://github.com/matter-labs/zksync/commit/14424a6)
 - Fixed bug with accessing non-existent blocks in explorer. [e8ca026](https://github.com/matter-labs/zksync/commit/e8ca026)
+
+### Contracts v2 (20.07.2020)
+
+- Added event denoting information about pending and completed withdrawals. [bb0d1bd](https://github.com/matter-labs/zksync/commit/bb0d1bd)
+- Added support for tokens that aren't fully compatible with ERC20. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
+- Block revert interval is changed to 0 hours. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
+- Redundant priority request check is removed from contract upgrade logic. [c088328](https://github.com/matter-labs/zksync/commit/c088328)
+
 
 ## zkSync 1.0 (18.06.2020)
 
