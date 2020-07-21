@@ -291,6 +291,12 @@ pub trait Rpc {
         signature: Box<Option<TxEthSignature>>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
 
+    #[rpc(name = "submit_txs_batch", returns = "TxHash")]
+    fn submit_txs_batch(
+        &self,
+        txs: Box<Vec<(FranklinTx, Option<TxEthSignature>)>>,
+    ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send>;
+
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
 
@@ -835,7 +841,7 @@ impl Rpc for RpcApp {
                 let scaled_provided_fee =
                     provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
                 if required_fee.total_fee >= scaled_provided_fee {
-                    warn!(
+                    vlog::warn!(
                         "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
                         required_fee, provided_fee, scaled_provided_fee, token
                     );
@@ -876,11 +882,8 @@ impl Rpc for RpcApp {
                 .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
                 .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
-                        file!(),
-                        line!(),
-                        column!(),
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
                         err,
                         tx,
                         signature,
@@ -897,6 +900,93 @@ impl Rpc for RpcApp {
         };
 
         Box::new(mempool_resp.boxed().compat())
+    }
+
+    fn submit_txs_batch(
+        &self,
+        txs: Box<Vec<(FranklinTx, Option<TxEthSignature>)>>,
+    ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send> {
+        if txs.len() != 2 {
+            let error = Error {
+                code: RpcErrorCodes::from(TxAddError::Other).into(),
+                message: "Only batches of size 2 are currently supported".to_string(),
+                data: None,
+            };
+
+            return Box::new(futures01::future::err(error));
+        }
+
+        for (tx, _) in txs.iter() {
+            // `ChangePubKey` operation is not expected to be bundled with any other transaction,
+            // and since it has the execution limitations (due to lack of fee), it is not allowed
+            // to appear in batches.
+            if matches!(tx, FranklinTx::ChangePubKey(_)) {
+                let error = Error {
+                    code: RpcErrorCodes::from(TxAddError::Other).into(),
+                    message: "ChangePubKey operations are not allowed in batches".to_string(),
+                    data: None,
+                };
+
+                return Box::new(futures01::future::err(error));
+            }
+        }
+
+        let messages_to_sign: Result<Vec<Option<String>>> = txs
+            .iter()
+            .map(|(tx, _)| self.get_tx_info_message_to_sign(&tx))
+            .collect();
+
+        let messages_to_sign = match messages_to_sign {
+            Ok(msgs) => msgs,
+            Err(error) => return Box::new(futures01::future::err(error)),
+        };
+
+        let sign_verify_channel = self.sign_verify_request_sender.clone();
+        let mut mempool_sender = self.mempool_request_sender.clone();
+
+        let response = async move {
+            // TODO: Check fees data
+
+            let mut verified_txs = Vec::new();
+
+            for ((tx, signature), msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {
+                let verified_tx: VerifiedTx = verify_tx_info_message_signature(
+                    &tx,
+                    signature.clone(),
+                    msg_to_sign.clone(),
+                    sign_verify_channel.clone(),
+                )
+                .await?;
+
+                verified_txs.push(verified_tx);
+            }
+
+            let tx_hashes: Vec<TxHash> = txs.iter().map(|(tx, _)| tx.hash()).collect();
+
+            // Send verified transactions to the mempool.
+            let mempool_resp = oneshot::channel();
+            mempool_sender
+                .send(MempoolRequest::NewTxsBatch(verified_txs, mempool_resp.0))
+                .await
+                .map_err(|err| {
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: <Txs: '{:?}'>",
+                        err,
+                        txs,
+                    );
+                    Error::internal_error()
+                })?;
+            let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
+
+            // Check the mempool response and, if everything is OK, return the transactions hashes.
+            tx_add_result.map(|_| tx_hashes).map_err(|e| Error {
+                code: RpcErrorCodes::from(e).into(),
+                message: e.to_string(),
+                data: None,
+            })
+        };
+
+        Box::new(response.boxed().compat())
     }
 
     fn contract_address(&self) -> Result<ContractAddressResp> {

@@ -85,6 +85,11 @@ pub enum MempoolRequest {
     /// for correctness (including its Ethereum and ZKSync signatures).
     /// oneshot is used to receive tx add result.
     NewTx(Box<VerifiedTx>, oneshot::Sender<Result<(), TxAddError>>),
+    /// Add a new batch of transactions to the mempool. All transactions in batch must
+    /// be either executed successfully, or otherwise fail all together.
+    /// Invariants for each individual transaction in the batch are the same as in
+    /// `NewTx` variant of this enum.
+    NewTxsBatch(Vec<VerifiedTx>, oneshot::Sender<Result<(), TxAddError>>),
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -206,6 +211,11 @@ impl Mempool {
                 MempoolRequest::NewTx(tx, resp) => {
                     let tx_add_result = self.add_tx(tx.into_inner());
                     resp.send(tx_add_result).unwrap_or_default();
+                }
+                MempoolRequest::NewTxsBatch(_tx, _resp) => {
+                    // TODO
+                    // let tx_add_result = self.add_tx(tx.into_inner());
+                    // resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
                     // Generate proposed block.
