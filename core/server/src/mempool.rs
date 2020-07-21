@@ -63,10 +63,32 @@ pub enum TxAddError {
     DbError,
 }
 
+#[derive(Debug, Clone)]
+pub struct TxsBatch(pub Vec<FranklinTx>);
+
+#[derive(Debug, Clone)]
+pub enum TxVariant {
+    Tx(FranklinTx),
+    Batch(TxsBatch),
+}
+
+impl From<FranklinTx> for TxVariant {
+    fn from(tx: FranklinTx) -> Self {
+        Self::Tx(tx)
+    }
+}
+
+impl From<Vec<FranklinTx>> for TxVariant {
+    fn from(txs: Vec<FranklinTx>) -> Self {
+        let batch = TxsBatch(txs);
+        Self::Batch(batch)
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct ProposedBlock {
     pub priority_ops: Vec<PriorityOp>,
-    pub txs: Vec<FranklinTx>,
+    pub txs: Vec<TxVariant>,
 }
 
 impl ProposedBlock {
@@ -100,7 +122,7 @@ struct MempoolState {
     // account and last committed nonce
     account_nonces: HashMap<Address, Nonce>,
     account_ids: HashMap<AccountId, Address>,
-    ready_txs: VecDeque<FranklinTx>,
+    ready_txs: VecDeque<TxVariant>,
 }
 
 impl MempoolState {
@@ -114,6 +136,17 @@ impl MempoolState {
                 }
             }
             _ => tx.min_chunks(),
+        }
+    }
+
+    fn chunks_for_batch(&self, batch: &TxsBatch) -> usize {
+        batch.0.iter().map(|tx| self.chunks_for_tx(tx)).sum()
+    }
+
+    fn required_chunks(&self, element: &TxVariant) -> usize {
+        match element {
+            TxVariant::Tx(tx) => self.chunks_for_tx(tx),
+            TxVariant::Batch(batch) => self.chunks_for_batch(batch),
         }
     }
 
@@ -143,11 +176,14 @@ impl MempoolState {
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let ready_txs = storage
+        let ready_txs: VecDeque<_> = storage
             .chain()
             .mempool_schema()
             .load_txs()
-            .expect("Attempt to restore mempool txs from DB failed");
+            .expect("Attempt to restore mempool txs from DB failed")
+            .into_iter()
+            .map(TxVariant::from) // TODO: Batches should be considered on the DB side
+            .collect();
 
         log::info!(
             "{} transactions were restored from the persistent mempool storage",
@@ -170,11 +206,23 @@ impl MempoolState {
         // `tx.check_correctness()` is not invoked here.
 
         if tx.nonce() >= self.nonce(&tx.account()) {
-            self.ready_txs.push_back(tx);
+            self.ready_txs.push_back(tx.into());
             Ok(())
         } else {
             Err(TxAddError::NonceMismatch)
         }
+    }
+
+    fn add_batch(&mut self, batch: Vec<FranklinTx>) -> Result<(), TxAddError> {
+        for tx in batch.iter() {
+            if tx.nonce() < self.nonce(&tx.account()) {
+                return Err(TxAddError::NonceMismatch);
+            }
+        }
+
+        self.ready_txs.push_back(batch.into());
+
+        Ok(())
     }
 }
 
@@ -303,11 +351,11 @@ impl Mempool {
         )
     }
 
-    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
+    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<TxVariant>) {
         let mut txs_for_commit = Vec::new();
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
-            let chunks_for_tx = self.mempool_state.chunks_for_tx(&tx);
+            let chunks_for_tx = self.mempool_state.required_chunks(&tx);
             if chunks_left >= chunks_for_tx {
                 txs_for_commit.push(tx);
                 chunks_left -= chunks_for_tx;

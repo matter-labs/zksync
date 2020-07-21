@@ -23,7 +23,10 @@ use models::{
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
-use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
+use crate::{
+    gas_counter::GasCounter,
+    mempool::{ProposedBlock, TxVariant},
+};
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -458,19 +461,27 @@ impl PlasmaStateKeeper {
         }
 
         let mut tx_queue = proposed_block.txs.into_iter().collect::<VecDeque<_>>();
-        while let Some(tx) = tx_queue.pop_front() {
-            match self.apply_tx(tx) {
-                Ok(exec_op) => {
-                    executed_ops.push(exec_op);
-                }
-                Err(tx) => {
-                    // We could not execute the tx due to either of block size limit
-                    // or the withdraw operations limit, so we seal this block and
-                    // the last transaction will go to the next block instead.
-                    self.seal_pending_block().await;
-                    self.notify_executed_ops(&mut executed_ops).await;
+        while let Some(variant) = tx_queue.pop_front() {
+            match variant {
+                TxVariant::Tx(ref tx) => {
+                    match self.apply_tx(tx.clone()) {
+                        Ok(exec_op) => {
+                            executed_ops.push(exec_op);
+                        }
+                        Err(_) => {
+                            // We could not execute the tx due to either of block size limit
+                            // or the withdraw operations limit, so we seal this block and
+                            // the last transaction will go to the next block instead.
+                            self.seal_pending_block().await;
+                            self.notify_executed_ops(&mut executed_ops).await;
 
-                    tx_queue.push_front(tx);
+                            tx_queue.push_front(variant);
+                        }
+                    }
+                }
+                TxVariant::Batch(_batch) => {
+                    // TODO
+                    unimplemented!();
                 }
             }
         }
