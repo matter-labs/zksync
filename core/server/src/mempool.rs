@@ -25,6 +25,7 @@ use futures::{
 use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace uses
 use models::node::{
+    mempool::{TxVariant, TxsBatch},
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
     TransferToNewOp,
 };
@@ -61,28 +62,6 @@ pub enum TxAddError {
 
     #[fail(display = "Database unavailable")]
     DbError,
-}
-
-#[derive(Debug, Clone)]
-pub struct TxsBatch(pub Vec<FranklinTx>);
-
-#[derive(Debug, Clone)]
-pub enum TxVariant {
-    Tx(FranklinTx),
-    Batch(TxsBatch),
-}
-
-impl From<FranklinTx> for TxVariant {
-    fn from(tx: FranklinTx) -> Self {
-        Self::Tx(tx)
-    }
-}
-
-impl From<Vec<FranklinTx>> for TxVariant {
-    fn from(txs: Vec<FranklinTx>) -> Self {
-        let batch = TxsBatch(txs);
-        Self::Batch(batch)
-    }
 }
 
 #[derive(Clone, Debug, Default)]

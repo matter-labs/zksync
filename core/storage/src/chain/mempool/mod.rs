@@ -3,26 +3,32 @@ use std::collections::VecDeque;
 // External imports
 use diesel::prelude::*;
 // Workspace imports
-use models::node::{tx::TxHash, FranklinTx};
+use models::node::{mempool::TxVariant, tx::TxHash, FranklinTx};
 // Local imports
 use self::records::{MempoolTx, NewMempoolTx};
 use crate::{schema::*, StorageProcessor};
 
 pub mod records;
 
-/// Schema for TODO
+/// Schema for persisting transactions awaiting for the execution.
+///
+/// This schema holds the transactions that are received by the `mempool` module, but not yet have
+/// been included into some block. It is required to store these transactions in the database, so
+/// in case of the unexpected server reboot sent transactions won't disappear, and will be executed
+/// as if the server haven't been relaunched.
 #[derive(Debug)]
 pub struct MempoolSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> MempoolSchema<'a> {
     /// Loads all the transactions stored in the mempool schema.
-    pub fn load_txs(&self) -> Result<VecDeque<FranklinTx>, failure::Error> {
+    pub fn load_txs(&self) -> Result<VecDeque<TxVariant>, failure::Error> {
         let txs: Vec<MempoolTx> = mempool_txs::table.load(self.0.conn())?;
 
         let txs = txs
             .into_iter()
             .map(|tx_object| serde_json::from_value(tx_object.tx))
-            .collect::<Result<VecDeque<FranklinTx>, _>>()?;
+            .map(|tx: Result<FranklinTx, _>| tx.map(TxVariant::from))
+            .collect::<Result<VecDeque<TxVariant>, _>>()?;
         Ok(txs)
     }
 
@@ -45,6 +51,8 @@ impl<'a> MempoolSchema<'a> {
 
         diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq(&tx_hash)))
             .execute(self.0.conn())?;
+
+        // TODO: Check if there is a corresponding batch for the tx, and remove it as well if necessary.
 
         Ok(())
     }
@@ -70,16 +78,28 @@ impl<'a> MempoolSchema<'a> {
     pub fn collect_garbage(&self) -> Result<(), failure::Error> {
         let mut txs_to_remove: Vec<_> = self.load_txs()?.into_iter().collect();
         txs_to_remove.retain(|tx| {
-            let tx_hash = tx.hash();
-            self.0
-                .chain()
-                .operations_ext_schema()
-                .get_tx_by_hash(tx_hash.as_ref())
-                .expect("DB issue while restoring the mempool state")
-                .is_some()
+            match tx {
+                TxVariant::Tx(tx) => {
+                    let tx_hash = tx.hash();
+                    self.0
+                        .chain()
+                        .operations_ext_schema()
+                        .get_tx_by_hash(tx_hash.as_ref())
+                        .expect("DB issue while restoring the mempool state")
+                        .is_some()
+                }
+                TxVariant::Batch(_batch) => {
+                    // TODO
+                    unimplemented!()
+                }
+            }
         });
 
-        let tx_hashes: Vec<_> = txs_to_remove.into_iter().map(|tx| tx.hash()).collect();
+        let tx_hashes: Vec<_> = txs_to_remove
+            .into_iter()
+            .map(|tx| tx.hashes())
+            .flatten()
+            .collect();
 
         self.remove_txs(&tx_hashes)?;
 
