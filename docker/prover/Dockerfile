@@ -2,7 +2,7 @@
 FROM rust:1.45 as builder
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo install sccache
-ENV ACCOUNT_TREE_DEPTH_VALUE 32
+ENV ACCOUNT_TREE_DEPTH 32
 ENV BALANCE_TREE_DEPTH 11
 WORKDIR /usr/src/zksync
 COPY . .
