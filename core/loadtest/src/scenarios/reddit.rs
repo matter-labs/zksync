@@ -134,6 +134,11 @@ impl ScenarioExecutor {
 
         try_join_all(account_futures).await?;
 
+        // After executing these futures we must send one more (random) tx and wait it to be
+        // verified. The verification will mean that all the previously sent txs are verified as well.
+        // After that, we may check the balances of every account to check if all the txs were executed
+        // successfully.
+
         self.finish().await?;
 
         Ok(())
