@@ -27,6 +27,8 @@ pub struct ProverData {
     pub new_root: Fr,
     #[serde(with = "FrSerde")]
     pub validator_address: Fr,
+    #[serde(with = "FrSerde")]
+    pub block_timestamp: Fr,
     #[serde(with = "VecOptionalFrSerde")]
     pub validator_balances: Vec<Option<Fr>>,
     #[serde(with = "VecOptionalFrSerde")]
@@ -51,6 +53,7 @@ impl ProverData {
             validator_balances: self.validator_balances,
             validator_audit_path: self.validator_audit_path,
             validator_account: self.validator_account,
+            block_timestamp: Some(self.block_timestamp),
         }
     }
 }

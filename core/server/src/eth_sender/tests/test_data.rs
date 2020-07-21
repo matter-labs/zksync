@@ -3,7 +3,7 @@
 // External uses
 use lazy_static::lazy_static;
 // Workspace uses
-use models::node::{block::Block, Fr};
+use models::node::{block::Block, BlockTimestamp, Fr};
 use models::{Action, Operation};
 
 /// Creates a dummy operation as a test input for `ETHSender` tests.
@@ -15,6 +15,7 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
             block_number,
             Fr::default(),
             0,
+            Some(BlockTimestamp::from(0)),
             Vec::new(),
             (0, 0),
             50,

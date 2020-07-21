@@ -8,7 +8,7 @@ use circuit::witness::{deposit::DepositWitness, Witness};
 use models::{
     circuit::CircuitAccountTree,
     config_options::ConfigurationOptions,
-    node::{block::Block, Address},
+    node::{block::Block, Address, BlockTimestamp},
     params::{account_tree_depth, total_tokens},
     prover_utils::EncodedProofPlonk,
 };
@@ -243,6 +243,7 @@ pub fn test_operation_and_wanted_prover_data(
         state.block_number,
         state.root_hash(),
         validator_account_id,
+        Some(BlockTimestamp::from(0)),
         ops,
         (0, 1),
         &ConfigurationOptions::from_env().available_block_chunk_sizes,
@@ -302,6 +303,7 @@ pub fn test_operation_and_wanted_prover_data(
             Some(root_after_fee),
             Some(models::node::Fr::from_str(&block.fee_account.to_string()).unwrap()),
             Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
+            Some(models::node::Fr::zero()),
         );
 
     (
@@ -317,6 +319,11 @@ pub fn test_operation_and_wanted_prover_data(
             initial_used_subtree_root,
             new_root: block.new_root_hash,
             validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
+            block_timestamp: block
+                .block_timestamp
+                .expect("timestamp must be known")
+                .into_fr()
+                .expect("failed to convert timestamp into Fr"),
             operations,
             validator_balances,
             validator_audit_path,
