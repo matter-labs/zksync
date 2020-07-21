@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release
 
 FROM debian:buster-slim
-RUN apt-get update && apt-get install -y axel && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y axel ca-certificates && rm -rf /var/lib/apt/lists/*
 # Docs of env variables used for this image
 # to test this locally just run
 # docker build -t tmp_prover -f =(f envsubst < ./docker/prover/Dockerfile) .; docker run --rm  tmp_prover:latest

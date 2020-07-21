@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release
 
 FROM debian:buster-slim
-RUN apt-get update && apt-get install -y libpq5 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libpq5 ca-certificates && rm -rf /var/lib/apt/lists/*
 EXPOSE 3000
 EXPOSE 3031
 EXPOSE 3030
