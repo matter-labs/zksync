@@ -1,12 +1,13 @@
 // Built-in deps
 use std::collections::VecDeque;
 // External imports
+use diesel::dsl::max;
 use diesel::prelude::*;
 use itertools::Itertools;
 // Workspace imports
 use models::node::{mempool::TxVariant, tx::TxHash, FranklinTx};
 // Local imports
-use self::records::{MempoolBatchBinding, MempoolTx, NewMempoolTx};
+use self::records::{MempoolTx, NewMempoolTx};
 use crate::{schema::*, StorageProcessor};
 
 pub mod records;
@@ -23,22 +24,13 @@ pub struct MempoolSchema<'a>(pub &'a StorageProcessor);
 impl<'a> MempoolSchema<'a> {
     /// Loads all the transactions stored in the mempool schema.
     pub fn load_txs(&self) -> Result<VecDeque<TxVariant>, failure::Error> {
-        fn get_batch_id(batch: &Option<MempoolBatchBinding>) -> Option<i64> {
-            batch.as_ref().map(|batch| batch.batch_id)
-        }
-
         // Load the transactions from mempool along with corresponding batch IDs.
-        let query = "SELECT * FROM mempool_txs \
-                     LEFT JOIN mempool_batch_binding ON mempool_txs.id = mempool_tx_id
-                     ORDER BY mempool_txs.id";
+        let txs: Vec<MempoolTx> = mempool_txs::table.load(self.0.conn())?;
 
-        let txs: Vec<(MempoolTx, Option<MempoolBatchBinding>)> =
-            diesel::sql_query(query).load(self.0.conn())?;
+        let mut prev_batch_id = txs.first().map(|tx| tx.batch_id).flatten();
 
-        let mut prev_batch_id = txs.first().map(|(_, batch)| get_batch_id(batch)).flatten();
-
-        let grouped_txs = txs.into_iter().group_by(|(_, batch)| {
-            prev_batch_id = get_batch_id(&batch);
+        let grouped_txs = txs.into_iter().group_by(|tx| {
+            prev_batch_id = tx.batch_id;
 
             prev_batch_id
         });
@@ -47,7 +39,7 @@ impl<'a> MempoolSchema<'a> {
 
         for (batch_id, group) in grouped_txs.into_iter() {
             let deserialized_txs: Vec<FranklinTx> = group
-                .map(|(tx_object, _)| serde_json::from_value(tx_object.tx).map_err(From::from))
+                .map(|tx_data| serde_json::from_value(tx_data.tx).map_err(From::from))
                 .collect::<Result<Vec<FranklinTx>, failure::Error>>()?;
 
             match batch_id {
@@ -67,12 +59,55 @@ impl<'a> MempoolSchema<'a> {
         Ok(txs)
     }
 
+    /// Adds a new transactions batch to the mempool schema.
+    pub fn insert_batch(&self, txs: &[FranklinTx]) -> Result<(), failure::Error> {
+        if txs.is_empty() {
+            failure::bail!("Cannot insert an empty batch");
+        }
+
+        self.0.transaction(|| {
+            // Batch ID is set to the maximum transaction ID in the table. It is guaranteed to be unique,
+            // since as long as batch exists, the maximum ID will be greater than the batch ID (as we've inserted
+            // more transactions).
+            let batch_id = mempool_txs::table
+                .select(max(mempool_txs::id))
+                .first::<Option<i64>>(self.0.conn())?
+                .unwrap_or(0);
+
+            let new_transactions: Vec<_> = txs
+                .iter()
+                .map(|tx_data| {
+                    let tx_hash = hex::encode(tx_data.hash().as_ref());
+                    let tx = serde_json::to_value(tx_data)
+                        .expect("Unserializable TX provided to the database");
+
+                    NewMempoolTx {
+                        tx_hash,
+                        tx,
+                        batch_id: Some(batch_id),
+                    }
+                })
+                .collect();
+
+            diesel::insert_into(mempool_txs::table)
+                .values(new_transactions)
+                .execute(self.0.conn())?;
+
+            Ok(())
+        })
+    }
+
     /// Adds a new transaction to the mempool schema.
     pub fn insert_tx(&self, tx_data: &FranklinTx) -> Result<(), failure::Error> {
         let tx_hash = hex::encode(tx_data.hash().as_ref());
         let tx = serde_json::to_value(tx_data)?;
+        let batch_id = None;
 
-        let db_entry = NewMempoolTx { tx_hash, tx };
+        let db_entry = NewMempoolTx {
+            tx_hash,
+            tx,
+            batch_id,
+        };
 
         diesel::insert_into(mempool_txs::table)
             .values(db_entry)

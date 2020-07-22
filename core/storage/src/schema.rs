@@ -182,18 +182,11 @@ table! {
 }
 
 table! {
-    mempool_batch_binding (id) {
-        id -> Int8,
-        batch_id -> Int8,
-        mempool_tx_id -> Int8,
-    }
-}
-
-table! {
     mempool_txs (id) {
         id -> Int8,
         tx_hash -> Text,
         tx -> Jsonb,
+        batch_id -> Nullable<Int8>,
     }
 }
 
@@ -265,7 +258,6 @@ joinable!(balances -> tokens (coin_id));
 joinable!(eth_ops_binding -> eth_operations (eth_op_id));
 joinable!(eth_ops_binding -> operations (op_id));
 joinable!(eth_tx_hashes -> eth_operations (eth_op_id));
-joinable!(mempool_batch_binding -> mempool_txs (mempool_tx_id));
 joinable!(ticker_price -> tokens (token_id));
 
 allow_tables_to_appear_in_same_query!(
@@ -286,7 +278,6 @@ allow_tables_to_appear_in_same_query!(
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
-    mempool_batch_binding,
     mempool_txs,
     operations,
     pending_block,

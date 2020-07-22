@@ -1,2 +1,1 @@
-DROP TABLE mempool_batch_binding;
-DROP TABLE mempool_batches;
+ALTER TABLE mempool_txs DROP COLUMN batch_id;
