@@ -733,7 +733,7 @@ impl TestSetup {
     fn execute_tx(&mut self, tx: FranklinTx) {
         let block = ProposedBlock {
             priority_ops: Vec::new(),
-            txs: vec![tx],
+            txs: vec![tx.into()],
         };
         let block_sender = async {
             self.state_keeper_request_sender

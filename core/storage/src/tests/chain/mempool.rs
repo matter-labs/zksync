@@ -1,6 +1,7 @@
 // External imports
 // Workspace imports
 use models::node::{
+    mempool::TxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
     Address, FranklinTx,
 };
@@ -65,6 +66,14 @@ fn franklin_txs() -> Vec<FranklinTx> {
     ]
 }
 
+/// Gets a single transaction from a `TxVariant`. Panics if variant is a batch.
+fn unwrap_tx(tx: TxVariant) -> FranklinTx {
+    match tx {
+        TxVariant::Tx(tx) => tx,
+        TxVariant::Batch(_) => panic!("Attempt to unwrap a single transaction from a batch"),
+    }
+}
+
 /// Checks the save&load routine for mempool schema.
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
@@ -84,7 +93,7 @@ fn store_load() {
         assert_eq!(txs_from_db.len(), txs.len());
 
         for (tx, tx_from_db) in txs.iter().zip(txs_from_db) {
-            assert_eq!(tx_from_db.hash(), tx.hash());
+            assert_eq!(unwrap_tx(tx_from_db).hash(), tx.hash());
         }
 
         Ok(())
@@ -125,7 +134,7 @@ fn remove_txs() {
         assert_eq!(txs_from_db.len(), retained_hashes.len());
 
         for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
-            assert_eq!(*expected_hash, tx_from_db.hash());
+            assert_eq!(*expected_hash, unwrap_tx(tx_from_db).hash());
         }
 
         Ok(())
@@ -175,7 +184,7 @@ fn collect_garbage() {
         assert_eq!(txs_from_db.len(), retained_hashes.len());
 
         for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
-            assert_eq!(*expected_hash, tx_from_db.hash());
+            assert_eq!(*expected_hash, unwrap_tx(tx_from_db).hash());
         }
 
         Ok(())

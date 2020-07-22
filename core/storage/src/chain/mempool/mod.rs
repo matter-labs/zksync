@@ -2,10 +2,11 @@
 use std::collections::VecDeque;
 // External imports
 use diesel::prelude::*;
+use itertools::Itertools;
 // Workspace imports
 use models::node::{mempool::TxVariant, tx::TxHash, FranklinTx};
 // Local imports
-use self::records::{MempoolTx, NewMempoolTx};
+use self::records::{MempoolBatchBinding, MempoolTx, NewMempoolTx};
 use crate::{schema::*, StorageProcessor};
 
 pub mod records;
@@ -22,13 +23,47 @@ pub struct MempoolSchema<'a>(pub &'a StorageProcessor);
 impl<'a> MempoolSchema<'a> {
     /// Loads all the transactions stored in the mempool schema.
     pub fn load_txs(&self) -> Result<VecDeque<TxVariant>, failure::Error> {
-        let txs: Vec<MempoolTx> = mempool_txs::table.load(self.0.conn())?;
+        fn get_batch_id(batch: &Option<MempoolBatchBinding>) -> Option<i64> {
+            batch.as_ref().map(|batch| batch.batch_id)
+        }
 
-        let txs = txs
-            .into_iter()
-            .map(|tx_object| serde_json::from_value(tx_object.tx))
-            .map(|tx: Result<FranklinTx, _>| tx.map(TxVariant::from))
-            .collect::<Result<VecDeque<TxVariant>, _>>()?;
+        // Load the transactions from mempool along with corresponding batch IDs.
+        let query = "SELECT * FROM mempool_txs \
+                     LEFT JOIN mempool_batch_binding ON mempool_txs.id = mempool_tx_id
+                     ORDER BY mempool_txs.id";
+
+        let txs: Vec<(MempoolTx, Option<MempoolBatchBinding>)> =
+            diesel::sql_query(query).load(self.0.conn())?;
+
+        let mut prev_batch_id = txs.first().map(|(_, batch)| get_batch_id(batch)).flatten();
+
+        let grouped_txs = txs.into_iter().group_by(|(_, batch)| {
+            prev_batch_id = get_batch_id(&batch);
+
+            prev_batch_id
+        });
+
+        let mut txs = VecDeque::new();
+
+        for (batch_id, group) in grouped_txs.into_iter() {
+            let deserialized_txs: Vec<FranklinTx> = group
+                .map(|(tx_object, _)| serde_json::from_value(tx_object.tx).map_err(From::from))
+                .collect::<Result<Vec<FranklinTx>, failure::Error>>()?;
+
+            match batch_id {
+                Some(_) => {
+                    // Group of batched transactions.
+                    let variant = TxVariant::from(deserialized_txs);
+                    txs.push_back(variant);
+                }
+                None => {
+                    // Group of non-batched transactions.
+                    let mut variants = deserialized_txs.into_iter().map(TxVariant::from).collect();
+                    txs.append(&mut variants);
+                }
+            }
+        }
+
         Ok(txs)
     }
 

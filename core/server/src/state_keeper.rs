@@ -15,6 +15,7 @@ use models::{
             Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
             PendingBlock as SendablePendingBlock,
         },
+        mempool::TxVariant,
         tx::{FranklinTx, TxHash},
         Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
     },
@@ -23,10 +24,7 @@ use models::{
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
-use crate::{
-    gas_counter::GasCounter,
-    mempool::{ProposedBlock, TxVariant},
-};
+use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
