@@ -115,6 +115,10 @@ impl PlasmaState {
         account
     }
 
+    pub fn chunks_for_batch(&self, txs: &[FranklinTx]) -> usize {
+        txs.iter().map(|tx| self.chunks_for_tx(tx)).sum()
+    }
+
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
         match franklin_tx {
             FranklinTx::Transfer(tx) => {
@@ -134,6 +138,41 @@ impl PlasmaState {
             FranklinPriorityOp::Deposit(op) => self.apply_deposit(op),
             FranklinPriorityOp::FullExit(op) => self.apply_full_exit(op),
         }
+    }
+
+    pub fn execute_txs_batch(&mut self, txs: &[FranklinTx]) -> Vec<Result<OpSuccess, Error>> {
+        let old_state = self.clone();
+
+        let mut successes = Vec::new();
+
+        for (id, tx) in txs.iter().enumerate() {
+            match self.execute_tx(tx.clone()) {
+                Ok(success) => {
+                    successes.push(Ok(success));
+                }
+                Err(error) => {
+                    // Restore the state that was observed before the batch execution.
+                    *self = old_state;
+
+                    // Create message for an error.
+                    let error_msg = format!(
+                        "Batch execution failed, since tx #{} of batch failed with a reason: {}",
+                        id + 1,
+                        error
+                    );
+
+                    // Create the same error for each transaction.
+                    let errors = (0..txs.len())
+                        .map(|_| Err(failure::format_err!("{}", error_msg)))
+                        .collect();
+
+                    // Stop execution and return an error.
+                    return errors;
+                }
+            }
+        }
+
+        successes
     }
 
     pub fn execute_tx(&mut self, tx: FranklinTx) -> Result<OpSuccess, Error> {
