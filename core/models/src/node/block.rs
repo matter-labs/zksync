@@ -3,6 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use crate::node::BlockTimestamp;
 use crate::params::CHUNK_BIT_WIDTH;
 use crate::serialization::*;
 use chrono::DateTime;
@@ -76,6 +77,9 @@ pub struct Block {
     #[serde(with = "FrSerde")]
     pub new_root_hash: Fr,
     pub fee_account: AccountId,
+    // Can be None if the timestamp is not known at some moment of processing
+    // or block has been created before this field is added
+    pub block_timestamp: Option<BlockTimestamp>,
     pub block_transactions: Vec<ExecutedOperations>,
     /// (unprocessed prior op id before block, unprocessed prior op id after block)
     pub processed_priority_ops: (u64, u64),
@@ -95,6 +99,7 @@ impl Block {
         block_number: BlockNumber,
         new_root_hash: Fr,
         fee_account: AccountId,
+        block_timestamp: Option<BlockTimestamp>,
         block_transactions: Vec<ExecutedOperations>,
         processed_priority_ops: (u64, u64),
         block_chunks_size: usize,
@@ -105,6 +110,7 @@ impl Block {
             block_number,
             new_root_hash,
             fee_account,
+            block_timestamp,
             block_transactions,
             processed_priority_ops,
             block_chunks_size,
@@ -119,6 +125,7 @@ impl Block {
         block_number: BlockNumber,
         new_root_hash: Fr,
         fee_account: AccountId,
+        block_timestamp: Option<BlockTimestamp>,
         block_transactions: Vec<ExecutedOperations>,
         processed_priority_ops: (u64, u64),
         available_block_chunks_sizes: &[usize],
@@ -129,6 +136,7 @@ impl Block {
             block_number,
             new_root_hash,
             fee_account,
+            block_timestamp,
             block_transactions,
             processed_priority_ops,
             block_chunks_size: 0,

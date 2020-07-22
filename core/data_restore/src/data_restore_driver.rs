@@ -11,6 +11,7 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local deps
+use crate::contract_functions::ParametersOfGenesisTx;
 use crate::{
     contract_functions::{get_genesis_account, get_total_verified_blocks},
     eth_tx_helpers::get_ethereum_transaction,
@@ -29,6 +30,34 @@ pub enum StorageUpdateState {
     None,
     Events,
     Operations,
+}
+
+/// 0) `Initial` fork is just the first our version
+/// 1) `BlockProcessorAdded` fork: added BlockProcessor contract (separating main contract)
+///     + Changed DeployFactory's constructor's signature
+#[derive(Debug, Clone, Copy)]
+pub enum ForkType {
+    Initial,
+    BlockProcessorAdded,
+}
+
+impl ForkType {
+    pub fn latest_fork() -> Self {
+        ForkType::BlockProcessorAdded
+    }
+}
+
+impl std::str::FromStr for ForkType {
+    type Err = failure::Error;
+
+    fn from_str(fork_name: &str) -> Result<Self, Self::Err> {
+        match fork_name {
+            "latest_fork" => Ok(Self::latest_fork()),
+            "Initial" => Ok(Self::Initial),
+            "BlockProcessorAdded" => Ok(Self::BlockProcessorAdded),
+            _ => Err(failure::format_err!("Fork unknown variant")),
+        }
+    }
 }
 
 /// Data restore driver is a high level interface for all restoring components.
@@ -143,7 +172,11 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     /// * `franklin_contract_genesis_tx_hash` - Rollup contract creation tx hash
     ///
-    pub fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
+    pub fn set_genesis_state(
+        &mut self,
+        genesis_tx_hash: H256,
+        genesis_tx_signature: ParametersOfGenesisTx,
+    ) {
         let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
             .expect("Cant get franklin genesis transaction");
 
@@ -161,8 +194,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             genesis_eth_block_number,
         );
 
-        let genesis_fee_account =
-            get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
+        let genesis_fee_account = get_genesis_account(&genesis_transaction, genesis_tx_signature)
+            .expect("Cant get genesis account address");
 
         info!(
             "genesis fee account address: 0x{}",

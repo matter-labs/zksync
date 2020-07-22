@@ -21,6 +21,7 @@ use crate::{
     events_state::EventsState,
     rollup_ops::RollupOpsBlock,
 };
+use models::node::BlockTimestamp;
 
 /// Saves genesis account state in storage
 ///
@@ -151,11 +152,16 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
 ///
 pub fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBlock]) {
     let storage = connection_pool.access_storage().expect("db failed");
-    let mut ops: Vec<(u32, &FranklinOp, u32)> = vec![];
+    let mut ops: Vec<(u32, &FranklinOp, u32, Option<BlockTimestamp>)> = vec![];
 
     for block in blocks {
         for op in &block.ops {
-            ops.push((block.block_num, op, block.fee_account));
+            ops.push((
+                block.block_num,
+                op,
+                block.fee_account,
+                block.block_timestamp,
+            ));
         }
     }
 
@@ -193,6 +199,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> Rollu
         block_num: op_block.block_num,
         ops: op_block.ops.clone(),
         fee_account: op_block.fee_account,
+        block_timestamp: op_block.block_timestamp,
     }
 }
 

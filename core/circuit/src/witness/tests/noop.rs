@@ -17,6 +17,7 @@ use models::{
         utils::pub_key_hash_fe,
     },
     merkle_tree::RescueHasher,
+    node::BlockTimestamp,
     params::{self, account_tree_depth, used_account_subtree_depth},
 };
 
@@ -122,7 +123,8 @@ fn test_noop() {
     let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
     circuit_account_tree.insert(0, CircuitAccount::default());
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, 0, 1, BlockTimestamp::from(0));
     witness_accum.extend_pubdata_with_noops(1);
     witness_accum.collect_fees(&[]);
     witness_accum.calculate_pubdata_commitment();
@@ -192,35 +194,42 @@ fn incorrect_circuit_pubdata() {
             incorrect_hash,
             correct_hash,
             correct_hash,
+            Fr::zero(),
             "external data hash equality",
         ),
         (
             correct_hash,
             incorrect_hash,
             correct_hash,
+            Fr::zero(),
             "external data hash equality",
         ),
         (
             correct_hash,
             correct_hash,
             incorrect_hash,
+            Fr::zero(),
             "old_root contains initial_used_subtree_root",
         ),
         (
             incorrect_hash,
             correct_hash,
             incorrect_hash,
+            Fr::zero(),
             "old_root contains initial_used_subtree_root",
         ),
     ];
 
-    for (pubdata_old_hash, pubdata_new_hash, circuit_old_hash, expected_msg) in test_vector {
+    for (pubdata_old_hash, pubdata_new_hash, circuit_old_hash, block_timestamp, expected_msg) in
+        test_vector
+    {
         let public_data_commitment = public_data_commitment::<Bn256>(
             &[false; 64],
             Some(pubdata_old_hash),
             Some(pubdata_new_hash),
             Some(validator_address),
             Some(block_number),
+            Some(block_timestamp),
         );
 
         let circuit_instance = FranklinCircuit {
@@ -235,6 +244,7 @@ fn incorrect_circuit_pubdata() {
             validator_address: Some(validator_address),
             validator_balances: validator_balances.clone(),
             validator_audit_path: validator_audit_path.clone(),
+            block_timestamp: Some(Fr::zero()),
         };
 
         let error = check_circuit_non_panicking(circuit_instance)
@@ -258,6 +268,7 @@ fn incorrect_circuit_pubdata() {
         Some(tree.root_hash()),
         Some(Default::default()),
         Some(block_number),
+        Some(Fr::zero()),
     );
 
     let circuit_instance = FranklinCircuit {
@@ -272,6 +283,7 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances: validator_balances.clone(),
         validator_audit_path: validator_audit_path.clone(),
+        block_timestamp: Some(Fr::zero()),
     };
 
     // Validator address is a part of pubdata, which is used to calculate the new root hash,
@@ -300,6 +312,7 @@ fn incorrect_circuit_pubdata() {
         Some(tree.root_hash()),
         Some(validator_address),
         Some(incorrect_block_number),
+        Some(Fr::zero()),
     );
 
     let circuit_instance = FranklinCircuit {
@@ -314,6 +327,7 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances,
         validator_audit_path,
+        block_timestamp: Some(Fr::zero()),
     };
 
     // Block number is a part of pubdata, which is used to calculate the new root hash,

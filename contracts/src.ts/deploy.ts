@@ -15,6 +15,7 @@ type ContractName = "Governance" | "ZkSync" | "Verifier" | "Proxy" | "UpgradeGat
 export interface Contracts {
     governance;
     zkSync;
+    blockProcessor;
     verifier;
     proxy;
     upgradeGatekeeper;
@@ -28,6 +29,7 @@ export interface DeployedAddresses {
     VerifierTarget: string;
     ZkSync: string;
     ZkSyncTarget: string;
+    BlockProcessor: string;
     DeployFactory: string;
 }
 
@@ -53,6 +55,7 @@ export function readProductionContracts(): Contracts {
     return {
         governance: readContractCode("Governance"),
         zkSync: readContractCode("ZkSync"),
+        blockProcessor: readContractCode("BlockProcessor"),
         verifier: readContractCode("Verifier"),
         proxy: readContractCode("Proxy"),
         upgradeGatekeeper: readContractCode("UpgradeGatekeeper"),
@@ -63,6 +66,7 @@ export function readTestContracts(): Contracts {
     return {
         governance: readContractCode("GovernanceTest"),
         zkSync: readContractCode("ZkSyncTest"),
+        blockProcessor: readContractCode("BlockProcessor"),
         verifier: readContractCode("VerifierTest"),
         proxy: readContractCode("Proxy"),
         upgradeGatekeeper: readContractCode("UpgradeGatekeeperTest"),
@@ -79,6 +83,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         VerifierTarget: process.env.VERIFIER_TARGET_ADDR,
         ZkSync: process.env.CONTRACT_ADDR,
         ZkSyncTarget: process.env.CONTRACT_TARGET_ADDR,
+        BlockProcessor: process.env.BLOCK_PROCESSOR_ADDR,
     };
 }
 
@@ -156,11 +161,30 @@ export class Deployer {
         this.addresses.ZkSyncTarget = zksContract.address;
     }
 
+    public async deployBlockProcessor(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log("Deploying block processor");
+        }
+        const bprContract = await deployContract(
+            this.deployWallet,
+            this.contracts.blockProcessor, [],
+            {gasLimit: 6000000, ...ethTxOptions},
+        );
+        const bprRec = await bprContract.deployTransaction.wait();
+        const bprGasUsed = bprRec.gasUsed;
+        const gasPrice = bprContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`BLOCK_PROCESSOR_ADDR=${bprContract.address}`);
+            console.log(`Block Processor deployed, gasUsed: ${bprGasUsed.toString()}, eth spent: ${formatEther(bprGasUsed.mul(gasPrice))}`);
+        }
+        this.addresses.BlockProcessor = bprContract.address;
+    }
+
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode, [this.addresses.GovernanceTarget, this.addresses.VerifierTarget,
-                this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_COMMIT_ETH_ADDRESS,
+                this.addresses.ZkSyncTarget, this.addresses.BlockProcessor, process.env.GENESIS_ROOT, process.env.OPERATOR_COMMIT_ETH_ADDRESS,
                 this.governorAddress, process.env.OPERATOR_FEE_ETH_ADDRESS
             ],
             {gasLimit: 5000000, ...ethTxOptions},
@@ -231,6 +255,7 @@ export class Deployer {
 
     public async deployAll(ethTxOptions?: ethers.providers.TransactionRequest) {
         await this.deployZkSyncTarget(ethTxOptions);
+        await this.deployBlockProcessor(ethTxOptions);
         await this.deployGovernanceTarget(ethTxOptions);
         await this.deployVerifierTarget(ethTxOptions);
         await this.deployProxiesAndGatekeeper(ethTxOptions);

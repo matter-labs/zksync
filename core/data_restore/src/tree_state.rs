@@ -270,6 +270,7 @@ impl TreeState {
             ops_block.block_num,
             self.state.root_hash(),
             ops_block.fee_account,
+            ops_block.block_timestamp,
             ops,
             (
                 last_unprocessed_prior_op,
@@ -421,6 +422,7 @@ mod test {
             block_num: 1,
             ops: ops1,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let tx2 = Withdraw::new(
@@ -444,6 +446,7 @@ mod test {
             block_num: 2,
             ops: ops2,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let tx3 = Transfer::new(
@@ -468,6 +471,7 @@ mod test {
             block_num: 3,
             ops: ops3,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let tx4 = Transfer::new(
@@ -492,6 +496,7 @@ mod test {
             block_num: 4,
             ops: ops4,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         // let tx5 = Close {
@@ -612,6 +617,7 @@ mod test {
             block_num: 1,
             ops,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let mut tree = TreeState::new(vec![50]);
