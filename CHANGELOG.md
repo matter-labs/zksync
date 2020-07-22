@@ -1,7 +1,5 @@
 # zkSync changelog
 
-## [[Unreleased]]
-
 ### zkSync
 
 - Server: Robustness of the fee ticker's API interacting module was increased. [#786]
