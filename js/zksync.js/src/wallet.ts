@@ -204,12 +204,13 @@ export class Wallet {
 
         const transactionHashes = await this.provider.submitTxsBatch(signedTransfers);
         return transactionHashes.map(function(txHash, idx) {
-            return new Transaction(
-                signedTransfers[idx],
-                txHash,
-                this.provider
-            )
-        });
+                return new Transaction(
+                    signedTransfers[idx],
+                    txHash,
+                    this.provider
+                )
+            }, this
+        );
     }
 
     async syncTransfer(transfer: {

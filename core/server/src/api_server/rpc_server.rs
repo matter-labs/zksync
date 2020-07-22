@@ -260,6 +260,7 @@ impl From<TxAddError> for RpcErrorCodes {
             TxAddError::ChangePkNotAuthorized => Self::ChangePkNotAuthorized,
             TxAddError::Other => Self::Other,
             TxAddError::DbError => Self::Other,
+            TxAddError::BatchTooBig => Self::Other,
         }
     }
 }
@@ -268,6 +269,13 @@ impl Into<ErrorCode> for RpcErrorCodes {
     fn into(self) -> ErrorCode {
         (self as i64).into()
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxWithSignature {
+    tx: FranklinTx,
+    signature: Option<TxEthSignature>,
 }
 
 #[rpc]
@@ -294,7 +302,7 @@ pub trait Rpc {
     #[rpc(name = "submit_txs_batch", returns = "TxHash")]
     fn submit_txs_batch(
         &self,
-        txs: Box<Vec<(FranklinTx, Option<TxEthSignature>)>>,
+        txs: Box<Vec<TxWithSignature>>,
     ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send>;
 
     #[rpc(name = "contract_address")]
@@ -904,7 +912,7 @@ impl Rpc for RpcApp {
 
     fn submit_txs_batch(
         &self,
-        txs: Box<Vec<(FranklinTx, Option<TxEthSignature>)>>,
+        txs: Box<Vec<TxWithSignature>>,
     ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send> {
         if txs.len() != 2 {
             let error = Error {
@@ -916,11 +924,11 @@ impl Rpc for RpcApp {
             return Box::new(futures01::future::err(error));
         }
 
-        for (tx, _) in txs.iter() {
+        for tx in txs.iter() {
             // `ChangePubKey` operation is not expected to be bundled with any other transaction,
             // and since it has the execution limitations (due to lack of fee), it is not allowed
             // to appear in batches.
-            if matches!(tx, FranklinTx::ChangePubKey(_)) {
+            if matches!(tx.tx, FranklinTx::ChangePubKey(_)) {
                 let error = Error {
                     code: RpcErrorCodes::from(TxAddError::Other).into(),
                     message: "ChangePubKey operations are not allowed in batches".to_string(),
@@ -933,7 +941,7 @@ impl Rpc for RpcApp {
 
         let messages_to_sign: Result<Vec<Option<String>>> = txs
             .iter()
-            .map(|(tx, _)| self.get_tx_info_message_to_sign(&tx))
+            .map(|tx| self.get_tx_info_message_to_sign(&tx.tx))
             .collect();
 
         let messages_to_sign = match messages_to_sign {
@@ -948,11 +956,10 @@ impl Rpc for RpcApp {
             // TODO: Check fees data
 
             let mut verified_txs = Vec::new();
-
-            for ((tx, signature), msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {
+            for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {
                 let verified_tx: VerifiedTx = verify_tx_info_message_signature(
-                    &tx,
-                    signature.clone(),
+                    &tx.tx,
+                    tx.signature.clone(),
                     msg_to_sign.clone(),
                     sign_verify_channel.clone(),
                 )
@@ -961,7 +968,7 @@ impl Rpc for RpcApp {
                 verified_txs.push(verified_tx);
             }
 
-            let tx_hashes: Vec<TxHash> = txs.iter().map(|(tx, _)| tx.hash()).collect();
+            let tx_hashes: Vec<TxHash> = txs.iter().map(|tx| tx.tx.hash()).collect();
 
             // Send verified transactions to the mempool.
             let mempool_resp = oneshot::channel();
