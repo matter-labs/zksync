@@ -195,7 +195,7 @@ export class Provider {
     }
 
     async getTransactionFee(
-        txType: "Withdraw" | "Transfer",
+        txType: "Withdraw" | "Transfer" | "TransferFrom",
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {

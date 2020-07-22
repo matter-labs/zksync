@@ -1,28 +1,29 @@
-import { Contract, ContractTransaction, ethers, utils } from "ethers";
-import { ETHProxy, Provider } from "./provider";
-import { Signer } from "./signer";
+import {Contract, ContractTransaction, ethers, utils} from "ethers";
+import {ETHProxy, Provider} from "./provider";
+import {Signer} from "./signer";
 import {
     AccountState,
     Address,
-    TokenLike,
+    ChangePubKey,
+    EthSignerType,
     Nonce,
     PriorityOperationReceipt,
-    TransactionReceipt,
     PubKeyHash,
-    TxEthSignature,
-    ChangePubKey,
-    EthSignerType
+    Signature,
+    TokenLike,
+    TransactionReceipt, TransferFrom,
+    TxEthSignature
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
+    ERC20_DEPOSIT_GAS_LIMIT,
+    getChangePubkeyMessage,
+    getSignedBytesFromMessage,
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
-    getChangePubkeyMessage,
-    SYNC_MAIN_CONTRACT_INTERFACE,
-    getSignedBytesFromMessage,
     signMessagePersonalAPI,
-    ERC20_DEPOSIT_GAS_LIMIT
+    SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
 
 class ZKSyncTxError extends Error {
@@ -194,6 +195,136 @@ export class Wallet {
         );
         return new Transaction(
             signedTransferTransaction,
+            transactionHash,
+            this.provider
+        );
+    }
+
+    async syncSignTransferFrom(transferFrom: {
+        from: Address;
+        to: Address;
+        token: TokenLike;
+        amount: utils.BigNumberish;
+        fee: utils.BigNumberish;
+        nonce: number;
+    }): Promise<Signature> {
+        if (!this.signer) {
+            throw new Error(
+                "ZKSync signer is required for sending zksync transactions."
+            );
+        }
+
+        await this.setRequiredAccountIdFromServer("Transfer funds");
+
+        const tokenId = await this.provider.tokenSet.resolveTokenId(transferFrom.token);
+
+        // if (transferFrom.fee == null) {
+        //     const fullFee = await this.provider.getTransactionFee(
+        //         "TransferFrom",
+        //         transferFrom.to,
+        //         transferFrom.token
+        //     );
+        //     transferFrom.fee = fullFee.totalFee;
+        // }
+
+        const transactionData = {
+            accountId: this.accountId,
+            from: transferFrom.from,
+            to: transferFrom.to,
+            tokenId,
+            amount: transferFrom.amount,
+            fee: transferFrom.fee,
+            nonce: transferFrom.nonce,
+        };
+
+        return this.signer.signSyncTransferFrom(transactionData);
+    }
+
+    async syncTransferFrom(transferFrom: {
+        from: Address;
+        to: Address;
+        token: TokenLike;
+        amount: utils.BigNumberish;
+        fee?: utils.BigNumberish;
+        nonce?: Nonce;
+        fromSignature: Signature,
+        toSignature: Signature,
+    }): Promise<Transaction> {
+        if (!this.signer) {
+            throw new Error(
+                "ZKSync signer is required for sending zksync transactions."
+            );
+        }
+
+        await this.setRequiredAccountIdFromServer("Transfer funds");
+
+        const tokenId = await this.provider.tokenSet.resolveTokenId(
+            transferFrom.token
+        );
+        const nonce =
+            transferFrom.nonce != null
+                ? await this.getNonce(transferFrom.nonce)
+                : await this.getNonce();
+
+        if (transferFrom.fee == null) {
+            const fullFee = await this.provider.getTransactionFee(
+                "TransferFrom",
+                transferFrom.from,
+                transferFrom.token
+            );
+            transferFrom.fee = fullFee.totalFee;
+        }
+
+        const transactionData = {
+            accountId: this.accountId,
+            from: transferFrom.from,
+            to: this.address(),
+            tokenId,
+            amount: transferFrom.amount,
+            fee: transferFrom.fee,
+            nonce
+        };
+
+        const stringAmount = this.provider.tokenSet.formatToken(
+            transferFrom.token,
+            transferFrom.amount
+        );
+        const stringFee = this.provider.tokenSet.formatToken(
+            transferFrom.token,
+            transferFrom.fee
+        );
+        const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
+            transferFrom.token
+        );
+        const humanReadableTxInfo =
+            `TransferFrom ${stringAmount} ${stringToken}\n` +
+            `From: ${transferFrom.from.toLowerCase()}\n` +
+            `To: ${transferFrom.to.toLowerCase()}\n` +
+            `Nonce: ${nonce}\n` +
+            `Fee: ${stringFee} ${stringToken}\n` +
+            `Account Id: ${this.accountId}`;
+
+        const txMessageEthSignature = await this.getEthMessageSignature(
+            humanReadableTxInfo
+        );
+
+        const transferFromTx = {
+            type: "TransferFrom",
+            accountId: this.accountId,
+            from: transferFrom.from,
+            to: transferFrom.to,
+            token: tokenId,
+            amount: utils.bigNumberify(transferFrom.amount).toString(),
+            fee: utils.bigNumberify(transferFrom.fee).toString(),
+            nonce,
+            fromSignature: transferFrom.fromSignature,
+            senderSignature: transferFrom.toSignature,
+        }
+
+        const transactionHash = await this.provider.submitTx(transferFromTx, txMessageEthSignature);
+
+        return new Transaction(
+            transferFromTx,
             transactionHash,
             this.provider
         );

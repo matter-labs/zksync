@@ -153,6 +153,58 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
+async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+    const fullFee = await syncProvider.getTransactionFee("TransferFrom", syncWallet2.address(), token);
+    const fee = fullFee.totalFee;
+
+    const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
+    const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
+    const operatorBeforeTransfer = await getOperatorBalance(token);
+    const startTime = new Date().getTime();
+
+    const fromSignature = await syncWallet1.syncSignTransferFrom({
+        from: syncWallet1.address(),
+        to: syncWallet2.address(),
+        token,
+        amount,
+        fee,
+        nonce: 0,
+    })
+    const toSignature = await syncWallet2.syncSignTransferFrom({
+        from: syncWallet2.address(),
+        to: syncWallet2.address(),
+        token,
+        amount,
+        fee,
+        nonce: 0,
+    });
+    const transferFromHandle = await syncWallet2.syncTransferFrom({
+        from: syncWallet2.address(),
+        to: syncWallet2.address(),
+        token,
+        amount,
+        fee,
+        nonce: 0,
+        fromSignature,
+        toSignature
+    });
+
+    console.log(`TransferFrom posted: ${(new Date().getTime()) - startTime} ms`);
+    await transferFromHandle.awaitReceipt();
+    console.log(`TransferFrom committed: ${(new Date().getTime()) - startTime} ms`);
+    const wallet1AfterTransfer = await syncWallet1.getBalance(token);
+    const wallet2AfterTransfer = await syncWallet2.getBalance(token);
+    const operatorAfterTransfer = await getOperatorBalance(token);
+
+    let transferCorrect = true;
+    transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.add(fee));
+    transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount);
+    transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
+    if (!transferCorrect) {
+        throw new Error("Transfer checks failed");
+    }
+}
+
 async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
     const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
     const fee = fullFee.totalFee;
@@ -276,6 +328,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer to self with fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
+    await testTransferFrom(syncWallet1, syncWallet2, token, transfersAmount);
+    console.log(`TransferFrom ok, Token ${token}`);
 
     await apitype.checkBlockResponseType(1);
     const blocks = await apitype.checkBlocksResponseType();
