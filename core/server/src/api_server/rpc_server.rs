@@ -299,7 +299,7 @@ pub trait Rpc {
         signature: Box<Option<TxEthSignature>>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
 
-    #[rpc(name = "submit_txs_batch", returns = "TxHash")]
+    #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
