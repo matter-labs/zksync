@@ -62,6 +62,9 @@ pub enum TxAddError {
 
     #[fail(display = "Database unavailable")]
     DbError,
+
+    #[fail(display = "Batch will not fit in any of supported block sizes")]
+    BatchTooBig,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -189,14 +192,14 @@ impl MempoolState {
         }
     }
 
-    fn add_batch(&mut self, batch: Vec<FranklinTx>) -> Result<(), TxAddError> {
-        for tx in batch.iter() {
+    fn add_batch(&mut self, batch: TxsBatch) -> Result<(), TxAddError> {
+        for tx in batch.0.iter() {
             if tx.nonce() < self.nonce(&tx.account()) {
                 return Err(TxAddError::NonceMismatch);
             }
         }
 
-        self.ready_txs.push_back(batch.into());
+        self.ready_txs.push_back(TxVariant::Batch(batch));
 
         Ok(())
     }
@@ -235,16 +238,22 @@ impl Mempool {
             TxAddError::DbError
         })?;
 
+        let batch: TxsBatch = TxsBatch(txs);
+
+        if self.mempool_state.chunks_for_batch(&batch) > self.max_block_size_chunks {
+            return Err(TxAddError::BatchTooBig)?;
+        }
+
         storage
             .chain()
             .mempool_schema()
-            .insert_batch(&txs)
+            .insert_batch(&batch.0)
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
 
-        self.mempool_state.add_batch(txs)
+        self.mempool_state.add_batch(batch)
     }
 
     async fn run(mut self) {
