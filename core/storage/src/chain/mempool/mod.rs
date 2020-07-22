@@ -122,12 +122,10 @@ impl<'a> MempoolSchema<'a> {
         diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq(&tx_hash)))
             .execute(self.0.conn())?;
 
-        // TODO: Check if there is a corresponding batch for the tx, and remove it as well if necessary.
-
         Ok(())
     }
 
-    fn remove_txs(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
+    pub fn remove_txs(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
         let tx_hashes: Vec<_> = txs.iter().map(hex::encode).collect();
 
         diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq_any(&tx_hashes)))

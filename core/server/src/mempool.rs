@@ -159,10 +159,7 @@ impl MempoolState {
             .chain()
             .mempool_schema()
             .load_txs()
-            .expect("Attempt to restore mempool txs from DB failed")
-            .into_iter()
-            .map(TxVariant::from) // TODO: Batches should be considered on the DB side
-            .collect();
+            .expect("Attempt to restore mempool txs from DB failed");
 
         log::info!(
             "{} transactions were restored from the persistent mempool storage",
@@ -232,6 +229,24 @@ impl Mempool {
         self.mempool_state.add_tx(tx)
     }
 
+    fn add_batch(&mut self, txs: Vec<FranklinTx>) -> Result<(), TxAddError> {
+        let storage = self.db_pool.access_storage().map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        storage
+            .chain()
+            .mempool_schema()
+            .insert_batch(&txs)
+            .map_err(|err| {
+                log::warn!("Mempool storage access error: {}", err);
+                TxAddError::DbError
+            })?;
+
+        self.mempool_state.add_batch(txs)
+    }
+
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
             match request {
@@ -239,10 +254,12 @@ impl Mempool {
                     let tx_add_result = self.add_tx(tx.into_inner());
                     resp.send(tx_add_result).unwrap_or_default();
                 }
-                MempoolRequest::NewTxsBatch(_tx, _resp) => {
-                    // TODO
-                    // let tx_add_result = self.add_tx(tx.into_inner());
-                    // resp.send(tx_add_result).unwrap_or_default();
+                MempoolRequest::NewTxsBatch(txs, resp) => {
+                    // Convert `VerifiedTx` into `FranklinTx`.
+                    let txs = txs.into_iter().map(|tx| tx.into_inner()).collect();
+
+                    let tx_add_result = self.add_batch(txs);
+                    resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
                     // Generate proposed block.
