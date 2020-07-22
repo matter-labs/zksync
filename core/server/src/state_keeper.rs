@@ -42,7 +42,10 @@ pub enum StateKeeperRequest {
     GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
-    GetExecutedInPendingBlock(ExecutedOpId, oneshot::Sender<Option<(BlockNumber, bool)>>),
+    GetExecutedInPendingBlock(
+        ExecutedOpId,
+        oneshot::Sender<Option<(BlockNumber, bool, Option<String>)>>,
+    ),
     SealBlock,
 }
 
@@ -850,21 +853,24 @@ impl PlasmaStateKeeper {
             .expect("committer sender dropped");
     }
 
-    fn check_executed_in_pending_block(&self, op_id: ExecutedOpId) -> Option<(BlockNumber, bool)> {
+    fn check_executed_in_pending_block(
+        &self,
+        op_id: ExecutedOpId,
+    ) -> Option<(BlockNumber, bool, Option<String>)> {
         let current_block_number = self.state.block_number;
         match op_id {
             ExecutedOpId::Transaction(hash) => {
                 for op in &self.pending_block.success_operations {
                     if let ExecutedOperations::Tx(exec_tx) = op {
                         if exec_tx.tx.hash() == hash {
-                            return Some((current_block_number, true));
+                            return Some((current_block_number, true, None));
                         }
                     }
                 }
 
                 for failed_tx in &self.pending_block.failed_txs {
                     if failed_tx.tx.hash() == hash {
-                        return Some((current_block_number, false));
+                        return Some((current_block_number, false, failed_tx.fail_reason.clone()));
                     }
                 }
             }
@@ -872,7 +878,7 @@ impl PlasmaStateKeeper {
                 for op in &self.pending_block.success_operations {
                     if let ExecutedOperations::PriorityOp(exec_op) = op {
                         if exec_op.priority_op.serial_id == serial_id {
-                            return Some((current_block_number, true));
+                            return Some((current_block_number, true, None));
                         }
                     }
                 }
