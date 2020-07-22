@@ -76,7 +76,7 @@ export class Signer {
         fee: utils.BigNumberish;
         nonce: number;
     }): Signature {
-        const type = Buffer.from([5]); // tx type
+        const type = Buffer.from([8]); // tx type
         const accountId = serializeAccountId(transferFrom.accountId);
         const from = serializeAddress(transferFrom.from);
         const to = serializeAddress(transferFrom.to);
