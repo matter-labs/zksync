@@ -56,7 +56,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
     function isReadyForUpgrade() external returns (bool) {
-        return !exodusMode && totalOpenPriorityRequests == 0;
+        return !exodusMode;
     }
 
     /// @notice Franklin contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -138,6 +138,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 }
             }
         }
+        if (toProcess > 0) {
+            emit PendingWithdrawalsComplete(startIndex, startIndex + toProcess);
+        }
     }
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
@@ -186,7 +189,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
 
         uint256 balance_before = _token.balanceOf(address(this));
-        require(_token.transferFrom(msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit
+        require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit
         uint256 balance_after = _token.balanceOf(address(this));
         uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 
@@ -320,11 +323,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
         emit BlocksRevert(totalBlocksVerified, blocksCommited);
-    }
-
-    /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
-    function upgradePreparationLockStatus() public returns (bool) {
-        return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
     }
 
     /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
@@ -686,8 +684,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, _to, _tokenId, _amount));
             offset += ONCHAIN_WITHDRAWAL_BYTES;
         }
-        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
         require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
+        if (numberOfPendingWithdrawals != localNumberOfPendingWithdrawals) {
+            emit PendingWithdrawalsAdd(firstPendingWithdrawalIndex + numberOfPendingWithdrawals, firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals);
+        }
+        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
     }
 
     /// @notice Checks whether oldest unverified block has expired
@@ -715,8 +716,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         Operations.OpType _opType,
         bytes memory _pubData
     ) internal {
-        require(!upgradePreparationLockStatus(), "apr11"); // apr11 - priority request can't be added during lock period of preparation of upgrade
-
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 

@@ -1,6 +1,6 @@
 # zkSync: scaling and privacy engine for Ethereum
 
-Check out [zkSync live demo](https://demo.matter-labs.io/).
+zkSync io [Live on Mainnet!](https://wallet.zksync.io).
 
 zkSync is a scaling and privacy engine for Ethereum. Its current functionality scope includes low gas transfers of ETH and ERC20 tokens in the Ethereum network. This document is a description of the JS library that can be used to interact with zkSync. 
 

@@ -21,12 +21,13 @@ async function main() {
         parser.addArgument("contractAddress");
         parser.addArgument("upgradeGatekeeperAddress");
         const args = parser.parseArgs(process.argv.slice(2));
+        if (process.env.ETH_NETWORK !== "test") {
+            console.log("Upgrading test contract not on test network is not allowed");
+            process.exit(1);
+            return;
+        }
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-        if (process.env.ETH_NETWORK == "localhost") {
-            // small polling interval for localhost network
-            provider.pollingInterval = 200;
-        }
 
         const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 
@@ -67,7 +68,7 @@ async function main() {
             .to.equal(newTargetFranklin.address, "upgrade was unsuccessful");
     } catch (e) {
         console.error(JSON.stringify(e));
-        process.exit(121);
+        process.exit(1);
     }
 }
 

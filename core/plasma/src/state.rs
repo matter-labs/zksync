@@ -102,7 +102,17 @@ impl PlasmaState {
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
-        self.balance_tree.get(account_id).cloned()
+        let start = std::time::Instant::now();
+
+        let account = self.balance_tree.get(account_id).cloned();
+
+        log::trace!(
+            "Get account (id {}) execution time: {}ms",
+            account_id,
+            start.elapsed().as_millis()
+        );
+
+        account
     }
 
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
@@ -243,6 +253,10 @@ impl PlasmaState {
         ensure!(
             tx.token <= params::max_token_id(),
             "Token id is not supported"
+        );
+        ensure!(
+            tx.to != Address::zero(),
+            "Transfer to Account with address 0 is not allowed"
         );
         let (from, from_account) = self
             .get_account_by_address(&tx.from)
@@ -428,8 +442,7 @@ impl PlasmaState {
 
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
-        self.account_id_by_address
-            .insert(account.address.clone(), id);
+        self.account_id_by_address.insert(account.address, id);
         self.balance_tree.insert(id, account);
     }
 

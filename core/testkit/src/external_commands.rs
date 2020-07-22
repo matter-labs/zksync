@@ -105,6 +105,7 @@ pub fn deploy_test_contracts() -> Contracts {
         test_erc20_address: contracts.remove("TEST_ERC20").expect("TEST_ERC20 missing"),
     }
 }
+
 pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_address: Address) {
     run_external_command(
         "test-upgrade-franklin.sh",

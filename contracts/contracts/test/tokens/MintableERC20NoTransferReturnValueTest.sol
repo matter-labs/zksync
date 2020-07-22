@@ -98,10 +98,9 @@ contract MintableERC20NoTransferReturnValueTest is ContextTest, MintableIERC20No
      * - the caller must have allowance for `sender`'s tokens of at least
      * `amount`.
      */
-    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public {
         _transfer(sender, recipient, amount);
         _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
-        return true;
     }
 
     /**

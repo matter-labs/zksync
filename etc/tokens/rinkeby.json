@@ -124,5 +124,23 @@
     "decimals": 18,
     "symbol": "LAMB",
     "name": "Lambda"
+  },
+  {
+    "address": "0xd94e3DC39d4Cad1DAd634e7eb585A57A19dC7EFE",
+    "decimals": 18,
+    "symbol": "GNT",
+    "name": "New Golem Network Token"
+  },
+  {
+    "address": "0x690f4886c6911d81beb8130DB30C825c27281F22",
+    "decimals": 18,
+    "symbol": "MLTT",
+    "name": "Matter Labs Trial Token"
+  },
+  {
+    "address": "0xc3904a7c3A95bc265066Bb5BfC4D6664B2174774",
+    "decimals": 0,
+    "symbol": "NEM",
+    "name": "Dec0"
   }
 ]

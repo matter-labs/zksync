@@ -101,6 +101,20 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
+    pub async fn total_blocks_verified(&self) -> Result<u64, failure::Error> {
+        let contract = Contract::new(
+            self.main_contract_eth_client.web3.eth(),
+            self.main_contract_eth_client.contract_addr,
+            self.main_contract_eth_client.contract.clone(),
+        );
+
+        contract
+            .query("totalBlocksVerified", (), None, default_tx_options(), None)
+            .compat()
+            .await
+            .map_err(|e| format_err!("Contract query fail: {}", e))
+    }
+
     pub async fn is_exodus(&self) -> Result<bool, failure::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
@@ -215,12 +229,13 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(priority_op_from_tx_logs(&receipt).expect("no priority op log in change pubkey hash"))
     }
 
+    /// Returns only one tx receipt. Return type is `Vec` for compatibility with deposit erc20
     pub async fn deposit_eth(
         &self,
         amount: BigUint,
         to: &Address,
         nonce: Option<U256>,
-    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
+    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -237,10 +252,9 @@ impl<T: Transport> EthereumAccount<T> {
         let eth = self.main_contract_eth_client.web3.eth();
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         ensure!(receipt.status == Some(U64::from(1)), "eth deposit fail");
-        Ok((
-            receipt.clone(),
-            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit"),
-        ))
+        let priority_op =
+            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit");
+        Ok((vec![receipt], priority_op))
     }
 
     pub async fn eth_balance(&self) -> Result<BigUint, failure::Error> {
@@ -248,7 +262,7 @@ impl<T: Transport> EthereumAccount<T> {
             self.main_contract_eth_client
                 .web3
                 .eth()
-                .balance(self.address.clone(), None)
+                .balance(self.address, None)
                 .compat()
                 .await?,
         ))
@@ -293,7 +307,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         token_contract: Address,
         amount: BigUint,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<TransactionReceipt, failure::Error> {
         let erc20_client = ETHClient::new(
             self.main_contract_eth_client.web3.transport().clone(),
             erc20_contract(),
@@ -320,16 +334,17 @@ impl<T: Transport> EthereumAccount<T> {
 
         ensure!(receipt.status == Some(U64::from(1)), "erc20 approve fail");
 
-        Ok(())
+        Ok(receipt)
     }
 
+    /// Returns TransactionReceipt of erc20 approve and erc20 deposit
     pub async fn deposit_erc20(
         &self,
         token_contract: Address,
         amount: BigUint,
         to: &Address,
-    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
-        self.approve_erc20(token_contract, amount.clone()).await?;
+    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), failure::Error> {
+        let approve_receipt = self.approve_erc20(token_contract, amount.clone()).await?;
 
         let signed_tx = self
             .main_contract_eth_client
@@ -344,10 +359,9 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         let exec_result = ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await;
         let receipt = exec_result.success_result()?;
-        Ok((
-            receipt.clone(),
-            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit erc20"),
-        ))
+        let priority_op =
+            priority_op_from_tx_logs(&receipt).expect("no priority op log in deposit erc20");
+        Ok((vec![approve_receipt, receipt], priority_op))
     }
 
     pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, failure::Error> {
@@ -407,6 +421,25 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .await
             .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
+
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
+    }
+
+    pub async fn revert_blocks(
+        &self,
+        blocks_to_revert: u64,
+    ) -> Result<ETHExecResult, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "revertBlocks",
+                blocks_to_revert,
+                Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
+            )
+            .await
+            .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
         let eth = self.main_contract_eth_client.web3.eth();
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
@@ -590,4 +623,25 @@ fn default_tx_options() -> Options {
     options.gas = Some(500_000.into());
 
     options
+}
+
+/// Get fee paid in wei for tx execution
+pub async fn get_executed_tx_fee<T: Transport>(
+    eth: Eth<T>,
+    receipt: &TransactionReceipt,
+) -> Result<BigUint, failure::Error> {
+    let gas_used = receipt.gas_used.ok_or_else(|| {
+        format_err!(
+            "Not used gas in the receipt: 0x{:x?}",
+            receipt.transaction_hash
+        )
+    })?;
+
+    let tx = eth
+        .transaction(TransactionId::Hash(receipt.transaction_hash))
+        .compat()
+        .await?
+        .ok_or_else(|| format_err!("Transaction not found: 0x{:x?}", receipt.transaction_hash))?;
+
+    Ok((gas_used * tx.gas_price).to_string().parse().unwrap())
 }

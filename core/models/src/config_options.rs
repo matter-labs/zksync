@@ -60,6 +60,7 @@ pub struct EthSenderOptions {
     pub tx_poll_period: Duration,
     pub wait_confirmations: u64,
     pub max_txs_in_flight: u64,
+    pub is_enabled: bool,
 }
 
 impl EthSenderOptions {
@@ -73,6 +74,7 @@ impl EthSenderOptions {
             tx_poll_period: Duration::new(tx_poll_period_secs, 0),
             wait_confirmations: parse_env("ETH_WAIT_CONFIRMATIONS"),
             max_txs_in_flight: parse_env("ETH_MAX_TXS_IN_FLIGHT"),
+            is_enabled: parse_env("ETH_IS_ENABLED"),
         }
     }
 }
@@ -128,6 +130,8 @@ pub struct ConfigurationOptions {
     pub idle_provers: u32,
     /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
     pub max_miniblock_iterations: usize,
+    /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
+    pub max_miniblock_iterations_withdraw_block: usize,
 }
 
 impl ConfigurationOptions {
@@ -136,6 +140,14 @@ impl ConfigurationOptions {
     pub fn from_env() -> Self {
         let mut available_block_chunk_sizes = block_chunk_sizes().to_vec();
         available_block_chunk_sizes.sort();
+
+        let max_miniblock_iterations_withdraw_block =
+            if env::var("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS").is_ok() {
+                parse_env("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS")
+            } else {
+                parse_env("MINIBLOCKS_ITERATIONS")
+            };
+
         Self {
             rest_api_server_address: parse_env("REST_API_BIND"),
             json_rpc_http_server_address: parse_env("HTTP_RPC_API_BIND"),
@@ -164,6 +176,7 @@ impl ConfigurationOptions {
             ticker_url: parse_env("TICKER_URL"),
             idle_provers: parse_env("IDLE_PROVERS"),
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
+            max_miniblock_iterations_withdraw_block,
         }
     }
 }

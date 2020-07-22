@@ -288,7 +288,7 @@ async function test() {
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
             token,
-            amount: syncProvider.tokenSet.parseToken(token, "10"),
+            amount: syncProvider.tokenSet.parseToken(token, "1000"),
             approveDepositAmountForERC20: true,
         });
 
@@ -304,7 +304,7 @@ async function test() {
         const transfer = await syncWallet.syncTransfer({
             to: ethWallet2.address,
             token,
-            amount: syncProvider.tokenSet.parseToken(token, "3")
+            amount: syncProvider.tokenSet.parseToken(token, "300")
         });
         await transfer.awaitReceipt();
         console.log('transfer hash:', transfer.txHash);
@@ -312,7 +312,7 @@ async function test() {
         const withdraw = await syncWallet.withdrawFromSyncToEthereum({
             ethAddress: syncWallet.address(),
             token,
-            amount: syncProvider.tokenSet.parseToken(token, "2")
+            amount: syncProvider.tokenSet.parseToken(token, "200")
         });
         await withdraw.awaitReceipt();
         console.log('withdraw hash:', withdraw.txHash);
@@ -324,7 +324,7 @@ async function test() {
         const deposit2 = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
             token,
-            amount: syncProvider.tokenSet.parseToken(token, "1"),
+            amount: syncProvider.tokenSet.parseToken(token, "100"),
             approveDepositAmountForERC20: true,
         });
         await deposit2.awaitReceipt();

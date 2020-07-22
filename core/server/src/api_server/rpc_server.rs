@@ -43,6 +43,7 @@ use crate::{
     },
 };
 use bigdecimal::BigDecimal;
+use models::node::tx::EthSignData;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -669,7 +670,12 @@ impl Rpc for RpcApp {
         &self,
         address: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
+        // TODO: this method now has a lot debug output, to be removed as soon as problem is detected.
+        use std::time::Instant;
+
+        let started = Instant::now();
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
+
         let self_ = self.clone();
         let account_state_resp = async move {
             let state_keeper_response = oneshot::channel();
@@ -690,6 +696,7 @@ impl Rpc for RpcApp {
                     );
                     Error::internal_error()
                 })?;
+
             let committed_account_state = state_keeper_response.1.await.map_err(|err| {
                 log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
@@ -716,6 +723,12 @@ impl Rpc for RpcApp {
             let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
             let depositing =
                 DepositingAccountBalances::from_pending_ops(depositing_ops, &self_.token_cache)?;
+
+            log::trace!(
+                "account_info: address {}, total request processing {}ms",
+                &address,
+                started.elapsed().as_millis()
+            );
 
             Ok(AccountInfoResp {
                 address,
@@ -1024,7 +1037,10 @@ async fn verify_tx_info_message_signature(
             let signature =
                 signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
 
-            Some((signature, message_to_sign))
+            Some(EthSignData {
+                signature,
+                message: message_to_sign,
+            })
         }
         None => None,
     };

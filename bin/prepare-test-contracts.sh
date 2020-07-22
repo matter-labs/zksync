@@ -35,10 +35,10 @@ ssed 's/contract ZkSyncTest/contract ZkSyncTestUpgradeTarget/' -i $OUT_DIR/ZkSyn
 # In solidity constant should be in the following form.
 # $SOME_TYPE constant $NAME = $VALUE;
 set_constant() {
-	ssed -E "s/(.*constant $1)(.*)\;/\1 = $2\;/" -i $3
+	ssed -E "s/(.*constant $1 =)(.*)\;/\1 $2\;/" -i $3
 }
 create_constant_getter() {
-	ssed -E "s/    (.*) (constant $1)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external pure returns (\1) {\n        return $1\;\n    }/" -i $2
+	ssed -E "s/    (.*) (constant $1 =)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external pure returns (\1) {\n        return $1\;\n    }/" -i $2
 }
 
 # Change constants
@@ -49,6 +49,7 @@ set_constant PRIORITY_EXPIRATION 101 $OUT_DIR/ConfigTest.sol
 set_constant UPGRADE_NOTICE_PERIOD 4 $OUT_DIR/ConfigTest.sol
 
 create_constant_getter MAX_AMOUNT_OF_REGISTERED_TOKENS $OUT_DIR/ConfigTest.sol
+create_constant_getter EXPECT_VERIFICATION_IN $OUT_DIR/ConfigTest.sol
 create_constant_getter UPGRADE_NOTICE_PERIOD $OUT_DIR/UpgradeGatekeeperTest.sol
 
 # Verify always true
