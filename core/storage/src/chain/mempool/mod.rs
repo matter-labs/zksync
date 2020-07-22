@@ -156,9 +156,15 @@ impl<'a> MempoolSchema<'a> {
                         .expect("DB issue while restoring the mempool state")
                         .is_some()
                 }
-                TxVariant::Batch(_batch) => {
-                    // TODO
-                    unimplemented!()
+                TxVariant::Batch(batch) => {
+                    // We assume that for batch one executed transaction <=> all the transactions are executed.
+                    let tx_hash = batch.0[0].hash();
+                    self.0
+                        .chain()
+                        .operations_ext_schema()
+                        .get_tx_by_hash(tx_hash.as_ref())
+                        .expect("DB issue while restoring the mempool state")
+                        .is_some()
                 }
             }
         });
