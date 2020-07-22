@@ -481,8 +481,7 @@ impl PlasmaState {
 
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
-        self.account_id_by_address
-            .insert(account.address.clone(), id);
+        self.account_id_by_address.insert(account.address, id);
         self.balance_tree.insert(id, account);
     }
 

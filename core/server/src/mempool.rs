@@ -144,7 +144,7 @@ impl MempoolState {
         let mut account_nonces = HashMap::new();
 
         for (id, account) in accounts {
-            account_ids.insert(id, account.address.clone());
+            account_ids.insert(id, account.address);
             account_nonces.insert(account.address, account.nonce);
         }
 
@@ -241,7 +241,7 @@ impl Mempool {
         let batch: TxsBatch = TxsBatch(txs);
 
         if self.mempool_state.chunks_for_batch(&batch) > self.max_block_size_chunks {
-            return Err(TxAddError::BatchTooBig)?;
+            return Err(TxAddError::BatchTooBig);
         }
 
         storage
@@ -285,7 +285,7 @@ impl Mempool {
                     for (id, update) in updates {
                         match update {
                             AccountUpdate::Create { address, nonce } => {
-                                self.mempool_state.account_ids.insert(id, address.clone());
+                                self.mempool_state.account_ids.insert(id, address);
                                 self.mempool_state.account_nonces.insert(address, nonce);
                             }
                             AccountUpdate::Delete { address, .. } => {

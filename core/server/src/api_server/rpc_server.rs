@@ -302,7 +302,7 @@ pub trait Rpc {
     #[rpc(name = "submit_txs_batch", returns = "TxHash")]
     fn submit_txs_batch(
         &self,
-        txs: Box<Vec<TxWithSignature>>,
+        txs: Vec<TxWithSignature>,
     ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send>;
 
     #[rpc(name = "contract_address")]
@@ -912,7 +912,7 @@ impl Rpc for RpcApp {
 
     fn submit_txs_batch(
         &self,
-        txs: Box<Vec<TxWithSignature>>,
+        txs: Vec<TxWithSignature>,
     ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send> {
         if txs.len() != 2 {
             let error = Error {
