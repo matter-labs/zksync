@@ -157,33 +157,30 @@ async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token:
     const fullFee = await syncProvider.getTransactionFee("TransferFrom", syncWallet2.address(), token);
     const fee = fullFee.totalFee;
 
-    const nonce = await syncWallet2.getNonce();
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
     const startTime = new Date().getTime();
 
+    const tokenId = syncProvider.tokenSet.resolveTokenId(token);
+    const toNonce = await syncWallet2.getNonce();
     const dataToSign = {
         accountId: syncWallet2.accountId,
         from: syncWallet1.address(),
         to: syncWallet2.address(),
-        token,
+        tokenId,
         amount,
         fee,
-        nonce,
+        nonce: toNonce,
     };
-    const fromSignature = await syncWallet1.syncSignTransferFrom(dataToSign)
-    const toSignature = await syncWallet2.syncSignTransferFrom(dataToSign);
+    const fromSignature = await syncWallet1.signer.signSyncTransferFrom(dataToSign)
 
-    const transferFromHandle = await syncWallet2.syncTransferFrom({
+    const transferFromHandle = await syncWallet2.syncTransferFromOtherAccount({
         from: syncWallet1.address(),
-        to: syncWallet2.address(),
         token,
         amount,
         fee,
-        nonce,
         fromSignature,
-        toSignature
     });
 
     console.log(`TransferFrom posted: ${(new Date().getTime()) - startTime} ms`);

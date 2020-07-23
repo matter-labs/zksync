@@ -200,56 +200,13 @@ export class Wallet {
         );
     }
 
-    async syncSignTransferFrom(transferFrom: {
-        accountId: number,
+    async syncTransferFromOtherAccount(transferFrom: {
         from: Address;
-        to: Address;
-        token: TokenLike;
-        amount: utils.BigNumberish;
-        fee: utils.BigNumberish;
-        nonce: number;
-    }): Promise<Signature> {
-        if (!this.signer) {
-            throw new Error(
-                "ZKSync signer is required for sending zksync transactions."
-            );
-        }
-
-        await this.setRequiredAccountIdFromServer("Transfer funds");
-
-        const tokenId = await this.provider.tokenSet.resolveTokenId(transferFrom.token);
-
-        // if (transferFrom.fee == null) {
-        //     const fullFee = await this.provider.getTransactionFee(
-        //         "TransferFrom",
-        //         transferFrom.to,
-        //         transferFrom.token
-        //     );
-        //     transferFrom.fee = fullFee.totalFee;
-        // }
-
-        const transactionData = {
-            accountId: transferFrom.accountId,
-            from: transferFrom.from,
-            to: transferFrom.to,
-            tokenId,
-            amount: transferFrom.amount,
-            fee: transferFrom.fee,
-            nonce: transferFrom.nonce,
-        };
-
-        return this.signer.signSyncTransferFrom(transactionData);
-    }
-
-    async syncTransferFrom(transferFrom: {
-        from: Address;
-        to: Address;
         token: TokenLike;
         amount: utils.BigNumberish;
         fee?: utils.BigNumberish;
         nonce?: Nonce;
         fromSignature: Signature,
-        toSignature: Signature,
     }): Promise<Transaction> {
         if (!this.signer) {
             throw new Error(
@@ -285,6 +242,7 @@ export class Wallet {
             fee: transferFrom.fee,
             nonce
         };
+        const toSignature = this.signer.signSyncTransferFrom(transactionData);
 
         const stringAmount = this.provider.tokenSet.formatToken(
             transferFrom.token,
@@ -300,7 +258,7 @@ export class Wallet {
         const humanReadableTxInfo =
             `TransferFrom ${stringAmount} ${stringToken}\n` +
             `From: ${transferFrom.from.toLowerCase()}\n` +
-            `To: ${transferFrom.to.toLowerCase()}\n` +
+            `To: ${this.address().toLowerCase()}\n` +
             `Nonce: ${nonce}\n` +
             `Fee: ${stringFee} ${stringToken}\n` +
             `Account Id: ${this.accountId}`;
@@ -311,15 +269,15 @@ export class Wallet {
 
         const transferFromTx = {
             type: "TransferFrom",
-            accountId: this.accountId,
+            toAccountId: this.accountId,
             from: transferFrom.from,
-            to: transferFrom.to,
+            to: this.address(),
             token: tokenId,
             amount: utils.bigNumberify(transferFrom.amount).toString(),
             fee: utils.bigNumberify(transferFrom.fee).toString(),
-            nonce,
+            toNonce: nonce,
             fromSignature: transferFrom.fromSignature,
-            senderSignature: transferFrom.toSignature,
+            toSignature,
         }
 
         const transactionHash = await this.provider.submitTx(transferFromTx, txMessageEthSignature);

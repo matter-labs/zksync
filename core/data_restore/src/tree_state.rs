@@ -222,7 +222,7 @@ impl TreeState {
                         .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.to = to.address;
-                    op.tx.nonce = from.nonce;
+                    op.tx.to_nonce = from.nonce;
 
                     let tx = FranklinTx::TransferFrom(Box::new(op.tx.clone()));
                     let (fee, updates) = self

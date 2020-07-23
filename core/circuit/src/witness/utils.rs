@@ -586,14 +586,14 @@ impl SigDataInput {
         )?;
         let to_sign_packed = transfer_from_op
             .tx
-            .sender_signature
+            .to_signature
             .signature
             .serialize_packed()
             .expect("signature serialize");
         let to = SigDataInput::new(
             &to_sign_packed,
             &transfer_from_op.tx.get_bytes(),
-            &transfer_from_op.tx.sender_signature.pub_key,
+            &transfer_from_op.tx.to_signature.pub_key,
         )?;
         Ok((from, to))
     }
