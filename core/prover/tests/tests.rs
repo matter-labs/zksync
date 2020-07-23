@@ -14,8 +14,8 @@ use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
     config_options::ConfigurationOptions,
     node::{
-        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
-        Engine, Fr,
+        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address,
+        BlockTimestamp, Deposit, Engine, Fr,
     },
     prover_utils::EncodedProofPlonk,
 };
@@ -126,7 +126,12 @@ fn new_test_data_for_prover() -> ProverData {
     let fee_account = Account::default_with_address(&Address::default());
     circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        fee_account_id,
+        1,
+        BlockTimestamp::from(0),
+    );
 
     let empty_account_id = 1;
     let empty_account_address = [7u8; 20].into();
@@ -159,6 +164,7 @@ fn new_test_data_for_prover() -> ProverData {
         new_root: witness_accum.root_after_fees.unwrap(),
         validator_address: Fr::from_str(&witness_accum.fee_account_id.to_string())
             .expect("failed to parse"),
+        block_timestamp: witness_accum.block_timestamp,
         operations: witness_accum.operations,
         validator_balances: witness_accum.fee_account_balances.unwrap(),
         validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),

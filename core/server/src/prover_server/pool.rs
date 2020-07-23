@@ -260,6 +260,10 @@ impl Maintainer {
     ) -> Result<ProverData, String> {
         let block_number = commit_operation.block.block_number;
         let block_size = commit_operation.block.block_chunks_size;
+        let block_timestamp = commit_operation
+            .block
+            .block_timestamp
+            .expect("timestamp of the block must be known at this time");
 
         info!("building prover data for block {}", &block_number);
 
@@ -267,6 +271,7 @@ impl Maintainer {
             &mut self.account_tree,
             commit_operation.block.fee_account,
             block_number,
+            block_timestamp,
         );
 
         let ops = storage
@@ -409,6 +414,7 @@ impl Maintainer {
             new_root: commit_operation.block.new_root_hash,
             validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
                 .expect("failed to parse"),
+            block_timestamp: witness_accum.block_timestamp,
             operations: witness_accum.operations,
             validator_balances: witness_accum.fee_account_balances.unwrap(),
             validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),

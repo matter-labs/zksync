@@ -66,6 +66,7 @@ contract Storage {
         bytes32 withdrawalsDataHash; /// can be restricted to 16 bytes to reduce number of required storage slots
         bytes32 commitment;
         bytes32 stateRoot;
+        uint64 blockTimestamp;
     }
 
     /// @notice Blocks by Franklin block id
@@ -114,6 +115,10 @@ contract Storage {
     /// @notice Total number of committed requests.
     /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
     uint64 public totalCommittedPriorityRequests;
+
+    /// @notice Part of the main contract
+    /// @dev Separated block processing logic to reduce main contract size
+    address public blockProcessorAddress;
 
     /// @notice Packs address and token id into single word to use as a key in balances mapping
     function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {

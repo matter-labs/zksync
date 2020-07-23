@@ -5,7 +5,7 @@ use web3::types::{H256, U256};
 // Workspace imports
 use models::{
     ethereum::{ETHOperation, OperationType},
-    node::{block::Block, BlockNumber, Fr},
+    node::{block::Block, BlockNumber, BlockTimestamp, Fr},
     Action, Operation,
 };
 // Local imports
@@ -24,6 +24,7 @@ pub fn get_operation(block_number: BlockNumber) -> Operation {
             block_number,
             Fr::default(),
             0,
+            Some(BlockTimestamp::from(0)),
             Vec::new(),
             (0, 0),
             100,

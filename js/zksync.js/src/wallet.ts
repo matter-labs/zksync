@@ -25,6 +25,7 @@ import {
     signMessagePersonalAPI,
     SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
+import { privateKeyFromSeed } from "./crypto";
 
 class ZKSyncTxError extends Error {
     constructor(
@@ -95,6 +96,27 @@ export class Wallet {
         );
         wallet.connect(provider);
         return wallet;
+    }
+
+    async createDerivedWallet(postfix: string): Promise<Wallet> {
+        if (!this.signer) {
+            throw new Error(
+                "ZKSync signer is required for sending zksync transactions."
+            );
+        }
+
+        // Encode the wallet private key as a hexadecimal string, and add provided postfix.
+        // Obtained string will be a seed to generate a private key for derived wallet.
+        const encodedPrivateKey = utils.hexlify(this.signer.privateKey);
+        const privateKeyWithPostfix = encodedPrivateKey + postfix;
+        const privateKeyWithPostfixBytes = utils.toUtf8Bytes(privateKeyWithPostfix);
+
+        const derivedWalletPrivateKey = privateKeyFromSeed(privateKeyWithPostfixBytes);
+
+        const derivedEthWallet = new ethers.Wallet(derivedWalletPrivateKey);
+        const derivedSyncWallet = await Wallet.fromEthSigner(derivedEthWallet, this.provider);
+
+        return derivedSyncWallet;
     }
 
     async getEthMessageSignature(message: string): Promise<TxEthSignature> {

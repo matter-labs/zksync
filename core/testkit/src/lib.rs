@@ -11,8 +11,8 @@ use futures::{
 };
 use models::config_options::ConfigurationOptions;
 use models::node::{
-    Account, AccountId, AccountMap, Address, DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp,
-    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    Account, AccountId, AccountMap, Address, BlockTimestamp, DepositOp, FranklinTx, FullExitOp,
+    Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
@@ -23,7 +23,7 @@ use server::state_keeper::{
 };
 use std::collections::HashMap;
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
@@ -33,7 +33,9 @@ pub mod external_commands;
 pub mod zksync_account;
 use crypto_exports::rand::Rng;
 use itertools::Itertools;
+use models::node::block::Block;
 use models::prover_utils::EncodedProofPlonk;
+use std::thread;
 use web3::types::{TransactionReceipt, U64};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -1093,6 +1095,11 @@ impl TestSetup {
         }
     }
 
+    pub fn commit_block(&self, block: &Block) -> ETHExecResult {
+        thread::sleep(Duration::from_millis(1000)); // TODO: remove this (#811)
+        block_on(self.commit_account.commit_block(block)).expect("block commit fail")
+    }
+
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
     pub fn execute_commit_block(&mut self) -> ETHExecResult {
         let block_sender = async {
@@ -1104,9 +1111,35 @@ impl TestSetup {
         };
         block_on(block_sender);
 
-        let new_block = block_on(self.await_for_block_commit_request());
+        let mut new_block = block_on(self.await_for_block_commit_request());
+        new_block.block.block_timestamp = Some(BlockTimestamp::from(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("unix timestamp calculation failed")
+                .as_secs(),
+        ));
 
-        block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
+        self.commit_block(&new_block.block)
+    }
+
+    /// Analog of `execute_commit_block`, but uses defined block timestamp value
+    pub fn execute_commit_block_with_defined_timestamp(
+        &mut self,
+        block_timestamp: BlockTimestamp,
+    ) -> ETHExecResult {
+        let block_sender = async {
+            self.state_keeper_request_sender
+                .clone()
+                .send(StateKeeperRequest::SealBlock)
+                .await
+                .expect("sk receiver dropped");
+        };
+        block_on(block_sender);
+
+        let mut new_block = block_on(self.await_for_block_commit_request());
+        new_block.block.block_timestamp = Some(block_timestamp);
+
+        self.commit_block(&new_block.block)
     }
 
     pub fn execute_commit_and_verify_block(
@@ -1120,11 +1153,15 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block = block_on(self.await_for_block_commit_request());
+        let mut new_block = block_on(self.await_for_block_commit_request());
+        new_block.block.block_timestamp = Some(BlockTimestamp::from(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("unix timestamp calculation failed")
+                .as_secs(),
+        ));
 
-        let commit_result = block_on(self.commit_account.commit_block(&new_block.block))
-            .expect("block commit send tx")
-            .expect_success();
+        let commit_result = self.commit_block(&new_block.block).expect_success();
         let verify_result = block_on(self.commit_account.verify_block(&new_block.block))
             .expect("block verify send tx")
             .expect_success();
