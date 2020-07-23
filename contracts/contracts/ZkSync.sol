@@ -492,6 +492,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             // cheap operations processing
             if (opType == Operations.OpType.Transfer) {
                 pubDataPtr += TRANSFER_BYTES;
+            } else if (opType == Operations.OpType.TransferFrom) {
+                pubDataPtr += TRANSFER_FROM_BYTES;
             } else if (opType == Operations.OpType.Noop) {
                 pubDataPtr += NOOP_BYTES;
             } else if (opType == Operations.OpType.TransferToNew) {
