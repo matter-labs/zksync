@@ -172,6 +172,8 @@ async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token:
         amount,
         fee,
         nonce: toNonce,
+        validFrom: 0,
+        validUntil: 4294967295,
     };
     const fromSignature = await syncWallet1.signer.signSyncTransferFrom(dataToSign)
 
@@ -181,6 +183,8 @@ async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token:
         amount,
         fee,
         fromSignature,
+        validFrom: 0,
+        validUntil: 4294967295,
     });
 
     console.log(`TransferFrom posted: ${(new Date().getTime()) - startTime} ms`);

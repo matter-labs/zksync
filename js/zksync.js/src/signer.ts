@@ -75,6 +75,8 @@ export class Signer {
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce: number;
+        validFrom: number,
+        validUntil: number,
     }): Signature {
         const type = Buffer.from([8]); // tx type
         const accountId = serializeAccountId(transferFrom.accountId);
@@ -84,6 +86,8 @@ export class Signer {
         const amount = serializeAmountPacked(transferFrom.amount);
         const fee = serializeFeePacked(transferFrom.fee);
         const nonce = serializeNonce(transferFrom.nonce);
+        const validFrom = serializeTimestamp(transferFrom.validFrom);
+        const validUntil = serializeTimestamp(transferFrom.validUntil);
         const msgBytes = Buffer.concat([
             type,
             accountId,
@@ -92,7 +96,9 @@ export class Signer {
             token,
             amount,
             fee,
-            nonce
+            nonce,
+            validFrom,
+            validUntil
         ]);
 
         return signTransactionBytes(this.privateKey, msgBytes);
@@ -239,5 +245,17 @@ export function serializeNonce(nonce: number): Buffer {
     }
     const buff = Buffer.alloc(4);
     buff.writeUInt32BE(nonce, 0);
+    return buff;
+}
+
+export function serializeTimestamp(timestamp: number): Buffer {
+    if (timestamp < 0) {
+        throw new Error("Negative timestamp");
+    }
+    if (timestamp > Number.MAX_SAFE_INTEGER) {
+        throw new Error("Timestamp is not integer");
+    }
+    const buff = Buffer.alloc(8);
+    buff.writeUInt32BE(timestamp, 4);
     return buff;
 }

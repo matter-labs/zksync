@@ -229,6 +229,8 @@ export class Wallet {
         fee?: utils.BigNumberish;
         nonce?: Nonce;
         fromSignature: Signature,
+        validFrom: number,
+        validUntil: number,
     }): Promise<Transaction> {
         if (!this.signer) {
             throw new Error(
@@ -262,21 +264,11 @@ export class Wallet {
             tokenId,
             amount: transferFrom.amount,
             fee: transferFrom.fee,
-            nonce
+            nonce,
+            validFrom: transferFrom.validFrom,
+            validUntil: transferFrom.validUntil,
         };
         const toSignature = this.signer.signSyncTransferFrom(transactionData);
-
-        const stringAmount = this.provider.tokenSet.formatToken(
-            transferFrom.token,
-            transferFrom.amount
-        );
-        const stringFee = this.provider.tokenSet.formatToken(
-            transferFrom.token,
-            transferFrom.fee
-        );
-        const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
-            transferFrom.token
-        );
 
         const transferFromTx = {
             type: "TransferFrom",
@@ -289,6 +281,8 @@ export class Wallet {
             toNonce: nonce,
             fromSignature: transferFrom.fromSignature,
             toSignature,
+            validFrom: transferFrom.validFrom,
+            validUntil: transferFrom.validUntil
         }
 
         const transactionHash = await this.provider.submitTx(transferFromTx);

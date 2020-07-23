@@ -243,6 +243,10 @@ pub struct TransferFrom {
     pub to_nonce: Nonce,
     pub from_signature: TxSignature,
     pub to_signature: TxSignature,
+    // Time when tx starts to be valid in seconds since UNIX epoch.
+    pub valid_from: u64,
+    // Time when tx stops to be valid in seconds since UNIX epoch.
+    pub valid_until: u64,
     #[serde(skip)]
     cached_from_signer: VerifiedSignatureCache,
     #[serde(skip)]
@@ -263,6 +267,8 @@ impl TransferFrom {
         amount: BigUint,
         fee: BigUint,
         to_nonce: Nonce,
+        valid_from: u64,
+        valid_until: u64,
         from_signature: Option<TxSignature>,
         to_signature: Option<TxSignature>,
     ) -> Self {
@@ -274,6 +280,8 @@ impl TransferFrom {
             amount,
             fee,
             to_nonce,
+            valid_from,
+            valid_until,
             from_signature: from_signature.clone().unwrap_or_default(),
             to_signature: to_signature.clone().unwrap_or_default(),
             cached_from_signer: VerifiedSignatureCache::NotCached,
@@ -298,6 +306,8 @@ impl TransferFrom {
         amount: BigUint,
         fee: BigUint,
         nonce: Nonce,
+        valid_from: u64,
+        valid_until: u64,
         from_private_key: &PrivateKey<Engine>,
         to_private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
@@ -309,6 +319,8 @@ impl TransferFrom {
             amount,
             fee,
             nonce,
+            valid_from,
+            valid_until,
             None,
             None,
         );
@@ -330,6 +342,8 @@ impl TransferFrom {
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.to_nonce.to_be_bytes());
+        out.extend_from_slice(&self.valid_from.to_be_bytes());
+        out.extend_from_slice(&self.valid_until.to_be_bytes());
         out
     }
 
