@@ -363,7 +363,7 @@ impl TransferFrom {
 
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
     pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
-        let message = format!(
+        format!(
             "TransferFrom {amount} {token}\n\
             From: {from:?}\n\
             To: {to:?}\n\
@@ -377,9 +377,7 @@ impl TransferFrom {
             nonce = self.nonce,
             fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
-        );
-        eprintln!("{}", &message);
-        message
+        )
     }
 }
 

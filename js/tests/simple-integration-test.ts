@@ -157,6 +157,7 @@ async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token:
     const fullFee = await syncProvider.getTransactionFee("TransferFrom", syncWallet2.address(), token);
     const fee = fullFee.totalFee;
 
+    const nonce = await syncWallet2.getNonce();
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
@@ -169,18 +170,18 @@ async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token:
         token,
         amount,
         fee,
-        nonce: 0,
+        nonce,
     };
     const fromSignature = await syncWallet1.syncSignTransferFrom(dataToSign)
     const toSignature = await syncWallet2.syncSignTransferFrom(dataToSign);
 
     const transferFromHandle = await syncWallet2.syncTransferFrom({
-        from: syncWallet2.address(),
+        from: syncWallet1.address(),
         to: syncWallet2.address(),
         token,
         amount,
         fee,
-        nonce: 0,
+        nonce,
         fromSignature,
         toSignature
     });

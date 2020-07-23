@@ -922,7 +922,7 @@ impl PlasmaState {
             FranklinTx::Transfer(tx) => self
                 .create_transfer_op(*tx)
                 .map(TransferOutcome::into_franklin_op),
-            FranklinTx::TransferFrom(_tx) => unimplemented!(),
+            FranklinTx::TransferFrom(tx) => self.create_transfer_from_op(*tx).map(Into::into),
             FranklinTx::Withdraw(tx) => self.create_withdraw_op(*tx).map(Into::into),
             FranklinTx::ChangePubKey(tx) => self.create_change_pubkey_op(*tx).map(Into::into),
             FranklinTx::Close(_) => failure::bail!("Close op is disabled"),

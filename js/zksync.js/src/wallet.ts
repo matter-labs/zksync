@@ -201,6 +201,7 @@ export class Wallet {
     }
 
     async syncSignTransferFrom(transferFrom: {
+        accountId: number,
         from: Address;
         to: Address;
         token: TokenLike;
@@ -228,7 +229,7 @@ export class Wallet {
         // }
 
         const transactionData = {
-            accountId: this.accountId,
+            accountId: transferFrom.accountId,
             from: transferFrom.from,
             to: transferFrom.to,
             tokenId,

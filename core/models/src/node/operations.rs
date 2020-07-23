@@ -758,6 +758,12 @@ impl From<TransferOp> for FranklinOp {
     }
 }
 
+impl From<TransferFromOp> for FranklinOp {
+    fn from(op: TransferFromOp) -> Self {
+        Self::TransferFrom(Box::new(op))
+    }
+}
+
 impl From<FullExitOp> for FranklinOp {
     fn from(op: FullExitOp) -> Self {
         Self::FullExit(Box::new(op))

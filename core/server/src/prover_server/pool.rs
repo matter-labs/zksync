@@ -10,7 +10,7 @@ use log::info;
 use circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    TransferFromWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use models::params::CHUNK_BIT_WIDTH;
 use models::{
@@ -319,8 +319,21 @@ impl Maintainer {
                     });
                     pub_data.extend(transfer_to_new_witness.get_pubdata());
                 }
-                FranklinOp::TransferFrom(_transfer_from) => {
-                    unimplemented!();
+                FranklinOp::TransferFrom(transfer_from) => {
+                    let transfer_from_witness = TransferFromWitness::apply_tx(
+                        &mut witness_accum.account_tree,
+                        &transfer_from,
+                    );
+
+                    let input = SigDataInput::from_transfer_from_op(&transfer_from)?;
+                    let transfer_operations = transfer_from_witness.calculate_operations(input);
+
+                    operations.extend(transfer_operations);
+                    fees.push(CollectedFee {
+                        token: transfer_from.tx.token,
+                        amount: transfer_from.tx.fee,
+                    });
+                    pub_data.extend(transfer_from_witness.get_pubdata());
                 }
                 FranklinOp::Withdraw(withdraw) => {
                     let withdraw_witness =
