@@ -88,7 +88,9 @@ type TransferFrom = {
         },
         "to": string,
         "token": string,
-        "type": "TransferFrom"
+        "type": "TransferFrom",
+        "validFrom": number,
+        "validUntil": number
     },
     "success": boolean,
     "fail_reason"?: string,

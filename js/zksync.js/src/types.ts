@@ -85,6 +85,8 @@ export interface TransferFrom {
     amount: utils.BigNumberish;
     fee: utils.BigNumberish;
     toNonce: number;
+    validFrom: number,
+    validUntil: number,
     fromSignature: Signature;
     toSignature: Signature;
 }

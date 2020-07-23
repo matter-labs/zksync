@@ -77,6 +77,7 @@ impl PendingBlock {
             pending_block_iteration: 0,
             withdrawals_amount: 0,
             gas_counter: GasCounter::new(),
+            block_start_timestamp: 0,
         }
     }
 }
