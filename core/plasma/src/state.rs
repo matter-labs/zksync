@@ -320,10 +320,10 @@ impl PlasmaState {
             .ok_or_else(|| format_err!("`To` account does not exist"))?;
         ensure!(
             to_account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked"
+            "To account is locked"
         );
         ensure!(
-            tx.verify_sender_signature() == Some(to_account.pub_key_hash),
+            tx.verify_to_signature() == Some(to_account.pub_key_hash),
             "TransferFrom `to` signature is incorrect"
         );
 
@@ -332,14 +332,14 @@ impl PlasmaState {
             .ok_or_else(|| format_err!("`From` account does not exist"))?;
         ensure!(
             from_account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked"
+            "From account is locked"
         );
         ensure!(
             tx.verify_from_signature() == Some(from_account.pub_key_hash),
             "TransferFrom `from` signature is incorrect"
         );
 
-        ensure!(to == tx.account_id, "Transfer account id is incorrect");
+        ensure!(to == tx.to_account_id, "Transfer account id is incorrect");
 
         Ok(TransferFromOp { tx, from, to })
     }
@@ -379,7 +379,7 @@ impl PlasmaState {
 
         // Update `to` account
         let to_old_nonce = to_account.nonce;
-        ensure!(op.tx.nonce == to_old_nonce, "Nonce mismatch");
+        ensure!(op.tx.to_nonce == to_old_nonce, "Nonce mismatch");
 
         let to_old_balance = to_account.get_balance(op.tx.token);
         to_account.add_balance(op.tx.token, &op.tx.amount);

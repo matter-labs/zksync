@@ -257,7 +257,7 @@ pub struct TransferFromOp {
 
 impl TransferFromOp {
     pub const CHUNKS: usize = 2;
-    pub const OP_CODE: u8 = 0x05;
+    pub const OP_CODE: u8 = 0x08;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();

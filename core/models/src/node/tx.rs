@@ -227,10 +227,12 @@ impl Transfer {
     }
 }
 
+/// Transaction to send funds from `from` account  to `to` account,
+/// incrementing 'nonce of the `to` account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferFrom {
-    pub account_id: AccountId,
+    pub to_account_id: AccountId,
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
@@ -238,50 +240,50 @@ pub struct TransferFrom {
     pub amount: BigUint,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
-    pub nonce: Nonce,
+    pub to_nonce: Nonce,
     pub from_signature: TxSignature,
-    pub sender_signature: TxSignature,
+    pub to_signature: TxSignature,
     #[serde(skip)]
     cached_from_signer: VerifiedSignatureCache,
     #[serde(skip)]
-    cached_sender_signer: VerifiedSignatureCache,
+    cached_to_signer: VerifiedSignatureCache,
 }
 
 impl TransferFrom {
-    const TX_TYPE: u8 = 8;
+    const TX_TYPE: u8 = 0x08;
 
     #[allow(clippy::too_many_arguments)]
     /// Creates transaction from parts
     /// signatures are optional, because sometimes we don't know them (i.e. data_restore)
     pub fn new(
-        account_id: AccountId,
+        to_account_id: AccountId,
         from: Address,
         to: Address,
         token: TokenId,
         amount: BigUint,
         fee: BigUint,
-        nonce: Nonce,
+        to_nonce: Nonce,
         from_signature: Option<TxSignature>,
-        sender_signature: Option<TxSignature>,
+        to_signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
-            account_id,
+            to_account_id,
             from,
             to,
             token,
             amount,
             fee,
-            nonce,
+            to_nonce,
             from_signature: from_signature.clone().unwrap_or_default(),
-            sender_signature: sender_signature.clone().unwrap_or_default(),
+            to_signature: to_signature.clone().unwrap_or_default(),
             cached_from_signer: VerifiedSignatureCache::NotCached,
-            cached_sender_signer: VerifiedSignatureCache::NotCached,
+            cached_to_signer: VerifiedSignatureCache::NotCached,
         };
         if from_signature.is_some() {
             tx.cached_from_signer = VerifiedSignatureCache::Cached(tx.verify_from_signature());
         }
-        if sender_signature.is_some() {
-            tx.cached_sender_signer = VerifiedSignatureCache::Cached(tx.verify_sender_signature());
+        if to_signature.is_some() {
+            tx.cached_to_signer = VerifiedSignatureCache::Cached(tx.verify_to_signature());
         }
         tx
     }
@@ -289,7 +291,7 @@ impl TransferFrom {
     #[allow(clippy::too_many_arguments)]
     /// Creates signed transaction using private key, checks for correctness
     pub fn new_signed(
-        account_id: AccountId,
+        to_account_id: AccountId,
         from: Address,
         to: Address,
         token: TokenId,
@@ -297,11 +299,21 @@ impl TransferFrom {
         fee: BigUint,
         nonce: Nonce,
         from_private_key: &PrivateKey<Engine>,
-        sender_private_key: &PrivateKey<Engine>,
+        to_private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
-        let mut tx = Self::new(account_id, from, to, token, amount, fee, nonce, None, None);
+        let mut tx = Self::new(
+            to_account_id,
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce,
+            None,
+            None,
+        );
         tx.from_signature = TxSignature::sign_musig(from_private_key, &tx.get_bytes());
-        tx.sender_signature = TxSignature::sign_musig(sender_private_key, &tx.get_bytes());
+        tx.to_signature = TxSignature::sign_musig(to_private_key, &tx.get_bytes());
         if !tx.check_correctness() {
             bail!("Transfer is incorrect, check amounts");
         }
@@ -311,13 +323,13 @@ impl TransferFrom {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account_id.to_be_bytes());
+        out.extend_from_slice(&self.to_account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(&self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
-        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out.extend_from_slice(&self.to_nonce.to_be_bytes());
         out
     }
 
@@ -326,17 +338,17 @@ impl TransferFrom {
             && self.fee <= BigUint::from(u128::max_value())
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
-            && self.account_id <= max_account_id()
+            && self.to_account_id <= max_account_id()
             && self.token <= max_token_id()
             && self.to != Address::zero();
         if valid {
             let from_signer = self.verify_from_signature();
-            let sender_signer = self.verify_sender_signature();
+            let to_signer = self.verify_to_signature();
 
-            valid = valid && from_signer.is_some() && sender_signer.is_some();
+            valid = valid && from_signer.is_some() && to_signer.is_some();
 
             self.cached_from_signer = VerifiedSignatureCache::Cached(from_signer);
-            self.cached_sender_signer = VerifiedSignatureCache::Cached(sender_signer);
+            self.cached_to_signer = VerifiedSignatureCache::Cached(to_signer);
         };
         valid
     }
@@ -351,10 +363,10 @@ impl TransferFrom {
         }
     }
 
-    pub fn verify_sender_signature(&self) -> Option<PubKeyHash> {
-        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_sender_signer {
+    pub fn verify_to_signature(&self) -> Option<PubKeyHash> {
+        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_to_signer {
             cached_signer.clone()
-        } else if let Some(pub_key) = self.sender_signature.verify_musig(&self.get_bytes()) {
+        } else if let Some(pub_key) = self.to_signature.verify_musig(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -374,11 +386,10 @@ impl TransferFrom {
             token = token_symbol,
             from = self.from,
             to = self.to,
-            nonce = self.nonce,
+            nonce = self.to_nonce,
             fee = format_units(&self.fee, decimals),
-            account_id = self.account_id,
+            account_id = self.to_account_id,
         );
-        eprintln!("{}", &message);
         message
     }
 }
@@ -644,7 +655,7 @@ impl FranklinTx {
     pub fn nonce(&self) -> Nonce {
         match self {
             FranklinTx::Transfer(tx) => tx.nonce,
-            FranklinTx::TransferFrom(tx) => tx.nonce,
+            FranklinTx::TransferFrom(tx) => tx.to_nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
             FranklinTx::ChangePubKey(tx) => tx.nonce,

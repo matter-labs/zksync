@@ -78,15 +78,15 @@ export interface Transfer {
 
 export interface TransferFrom {
     type: "TransferFrom";
-    accountId: number;
+    toAccountId: number;
     from: Address;
     to: Address;
     token: number;
     amount: utils.BigNumberish;
     fee: utils.BigNumberish;
-    nonce: number;
-    from_signature: Signature;
-    sender_signature: Signature;
+    toNonce: number;
+    fromSignature: Signature;
+    toSignature: Signature;
 }
 
 export interface Withdraw {

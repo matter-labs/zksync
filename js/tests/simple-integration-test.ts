@@ -162,27 +162,25 @@ async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token:
     const operatorBeforeTransfer = await getOperatorBalance(token);
     const startTime = new Date().getTime();
 
+    const tokenId = syncProvider.tokenSet.resolveTokenId(token);
+    const toNonce = await syncWallet2.getNonce();
     const dataToSign = {
         accountId: syncWallet2.accountId,
         from: syncWallet1.address(),
         to: syncWallet2.address(),
-        token,
+        tokenId,
         amount,
         fee,
-        nonce: 0,
+        nonce: toNonce,
     };
-    const fromSignature = await syncWallet1.syncSignTransferFrom(dataToSign)
-    const toSignature = await syncWallet2.syncSignTransferFrom(dataToSign);
+    const fromSignature = await syncWallet1.signer.signSyncTransferFrom(dataToSign)
 
-    const transferFromHandle = await syncWallet2.syncTransferFrom({
-        from: syncWallet2.address(),
-        to: syncWallet2.address(),
+    const transferFromHandle = await syncWallet2.syncTransferFromOtherAccount({
+        from: syncWallet1.address(),
         token,
         amount,
         fee,
-        nonce: 0,
         fromSignature,
-        toSignature
     });
 
     console.log(`TransferFrom posted: ${(new Date().getTime()) - startTime} ms`);
