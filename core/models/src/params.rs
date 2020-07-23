@@ -213,6 +213,17 @@ pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
 
+/// Size of the data that is signed for TransferFrom tx
+pub const SIGNED_TRANSFER_FROM_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + AMOUNT_EXPONENT_BIT_WIDTH
+    + AMOUNT_MANTISSA_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH;
+
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
