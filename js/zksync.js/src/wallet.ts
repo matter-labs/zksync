@@ -255,17 +255,6 @@ export class Wallet {
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             transferFrom.token
         );
-        const humanReadableTxInfo =
-            `TransferFrom ${stringAmount} ${stringToken}\n` +
-            `From: ${transferFrom.from.toLowerCase()}\n` +
-            `To: ${this.address().toLowerCase()}\n` +
-            `Nonce: ${nonce}\n` +
-            `Fee: ${stringFee} ${stringToken}\n` +
-            `Account Id: ${this.accountId}`;
-
-        const txMessageEthSignature = await this.getEthMessageSignature(
-            humanReadableTxInfo
-        );
 
         const transferFromTx = {
             type: "TransferFrom",
@@ -280,7 +269,7 @@ export class Wallet {
             toSignature,
         }
 
-        const transactionHash = await this.provider.submitTx(transferFromTx, txMessageEthSignature);
+        const transactionHash = await this.provider.submitTx(transferFromTx);
 
         return new Transaction(
             transferFromTx,
