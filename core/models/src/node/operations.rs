@@ -769,3 +769,9 @@ impl From<ChangePubKeyOp> for FranklinOp {
         Self::ChangePubKeyOffchain(Box::new(op))
     }
 }
+
+impl From<TransferFromOp> for FranklinOp {
+    fn from(op: TransferFromOp) -> Self {
+        Self::TransferFrom(Box::new(op))
+    }
+}
