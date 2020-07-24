@@ -17,7 +17,8 @@ library Operations {
         _CloseAccount, // used for correct op id offset
         Transfer,
         FullExit,
-        ChangePubKey
+        ChangePubKey,
+        TransferFrom
     }
 
     // Byte lengths

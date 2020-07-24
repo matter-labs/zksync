@@ -11,6 +11,7 @@ pub use self::{
     deposit::DepositWitness,
     full_exit::FullExitWitness,
     transfer::TransferWitness,
+    transfer_from::TransferFromWitness,
     transfer_to_new::TransferToNewWitness,
     utils::{SigDataInput, WitnessBuilder},
     withdraw::WithdrawWitness,
@@ -22,6 +23,7 @@ pub mod deposit;
 pub mod full_exit;
 pub mod noop;
 pub mod transfer;
+pub mod transfer_from;
 pub mod transfer_to_new;
 pub mod withdraw;
 

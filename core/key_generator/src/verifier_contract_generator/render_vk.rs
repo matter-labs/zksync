@@ -19,6 +19,7 @@ pub(crate) fn rendered_key(
     key_getter_name: &str,
     verification_key: impl AsRef<Path>,
 ) -> serde_json::Value {
+    dbg!(verification_key.as_ref());
     let vk = VerificationKey::<NodeEngine, PlonkCsWidth4WithNextStepParams>::read(
         File::open(verification_key).expect("Failed to open verfifcation key file"),
     )

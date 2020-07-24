@@ -615,6 +615,7 @@ fn pending_block_workflow() {
             unprocessed_priority_op_before: 0,
             pending_block_iteration: 1,
             success_operations: txs_1,
+            block_timestamp: 0u64.into(),
         };
         let pending_block_2 = PendingBlock {
             number: 2,
@@ -622,6 +623,7 @@ fn pending_block_workflow() {
             unprocessed_priority_op_before: 0,
             pending_block_iteration: 2,
             success_operations: txs_2,
+            block_timestamp: 0u64.into(),
         };
 
         // Save pending block

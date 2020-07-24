@@ -37,6 +37,7 @@ use crate::{
     operation::{Operation, SignatureData},
     utils::sign_rescue,
 };
+use models::node::TransferFromOp;
 
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
@@ -595,6 +596,34 @@ impl SigDataInput {
             &transfer_op.tx.get_bytes(),
             &transfer_op.tx.signature.pub_key,
         )
+    }
+
+    pub fn from_transfer_from_op(
+        transfer_from_op: &TransferFromOp,
+    ) -> Result<(Self, Self), String> {
+        let from_sign_packed = transfer_from_op
+            .tx
+            .from_signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let from = SigDataInput::new(
+            &from_sign_packed,
+            &transfer_from_op.tx.get_bytes(),
+            &transfer_from_op.tx.from_signature.pub_key,
+        )?;
+        let to_sign_packed = transfer_from_op
+            .tx
+            .to_signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let to = SigDataInput::new(
+            &to_sign_packed,
+            &transfer_from_op.tx.get_bytes(),
+            &transfer_from_op.tx.to_signature.pub_key,
+        )?;
+        Ok((from, to))
     }
 
     pub fn from_withdraw_op(withdraw_op: &WithdrawOp) -> Result<Self, String> {

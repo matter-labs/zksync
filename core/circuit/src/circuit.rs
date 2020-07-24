@@ -40,8 +40,10 @@ use crate::{
         resize_grow_only, vectorized_compare,
     },
 };
+use models::node::TransferFromOp;
+use models::params::SIGNED_TRANSFER_FROM_BIT_WIDTH;
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
 pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
@@ -845,6 +847,20 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &ext_pubdata_chunk,
             &signature_data.is_verified,
             &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
+        )?);
+        op_flags.push(self.transfer_from(
+            cs.namespace(|| "transfer_from"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &global_variables,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &signer_key,
+            &ext_pubdata_chunk,
+            &signature_data.is_verified,
+            &mut previous_pubdatas[TransferOp::OP_CODE as usize],
         )?);
         op_flags.push(self.withdraw(
             cs.namespace(|| "withdraw"),
@@ -2065,6 +2081,204 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         Ok(correct)
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn transfer_from<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        lhs: &AllocatedOperationBranch<E>,
+        rhs: &AllocatedOperationBranch<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        is_sig_verified: &Boolean,
+        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+    ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        pubdata_bits.extend(lhs.account_id.get_bits_be());
+        pubdata_bits.extend(cur.token.get_bits_be());
+        pubdata_bits.extend(rhs.account_id.get_bits_be());
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+
+        resize_grow_only(
+            &mut pubdata_bits,
+            TransferFromOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        // construct signature message preimage (serialized_tx)
+
+        let mut serialized_tx_bits = vec![];
+
+        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(rhs.account_id.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(cur.token.get_bits_be());
+        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_FROM_BIT_WIDTH);
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &global_variables.chunk_data.chunk_number,
+            TransferFromOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_correct"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+
+        // verify correct tx_code
+
+        let is_transfer_from = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_transfer_from"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(TransferFromOp::OP_CODE)), // transfer tx_type
+        )?);
+
+        let mut lhs_valid_flags = vec![];
+
+        lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        lhs_valid_flags.push(is_transfer_from.clone());
+
+        let is_first_chunk = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &global_variables.chunk_data.chunk_number,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?);
+
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_first_chunk,
+            &is_equal_pubdata,
+        )?;
+
+        lhs_valid_flags.push(pubdata_properly_copied.clone());
+
+        lhs_valid_flags.push(is_first_chunk);
+
+        // check operation arguments
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+
+        lhs_valid_flags.push(is_a_correct);
+
+        let sum_amount_fee = Expression::from(&op_data.amount_unpacked.get_number())
+            + Expression::from(&op_data.fee.get_number());
+
+        let is_b_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            sum_amount_fee.clone(),
+        )?);
+
+        lhs_valid_flags.push(is_b_correct);
+        lhs_valid_flags.push(is_a_geq_b.clone());
+        lhs_valid_flags.push(is_sig_verified.clone());
+
+        let is_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            serialized_tx_bits,
+            &op_data,
+        )?;
+        lhs_valid_flags.push(is_serialized_tx_correct);
+
+        let _is_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "signer_key_correct"),
+            &signer_key.pubkey.get_hash(),
+            &lhs.account.pub_key_hash,
+        )?;
+        // lhs_valid_flags.push(is_signer_valid);
+
+        // lhs_valid_flags.push(_is_signer_valid);
+
+        let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
+
+        let updated_balance = Expression::from(&cur.balance.get_number()) - sum_amount_fee;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance"),
+            updated_balance,
+            &cur.balance,
+            &lhs_valid,
+        )?;
+
+        // rhs
+        let mut rhs_valid_flags = vec![];
+        rhs_valid_flags.push(pubdata_properly_copied);
+        rhs_valid_flags.push(is_transfer_from);
+
+        let is_chunk_second = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_chunk_second"),
+            &global_variables.chunk_data.chunk_number,
+            Expression::u64::<CS>(1),
+        )?);
+        rhs_valid_flags.push(is_chunk_second);
+        rhs_valid_flags.push(is_account_empty.not());
+
+        rhs_valid_flags.push(is_pubdata_chunk_correct);
+        let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
+
+        // calculate new rhs balance value
+        let updated_balance = Expression::from(&cur.balance.get_number())
+            + Expression::from(&op_data.amount_unpacked.get_number());
+
+        let updated_nonce =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
+
+        //update cur values if lhs is valid
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            updated_nonce,
+            &cur.account.nonce,
+            &is_rhs_valid,
+        )?;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated_balance rhs"),
+            updated_balance,
+            &cur.balance,
+            &is_rhs_valid,
+        )?;
+
+        // Either LHS or RHS are correct (due to chunking at least)
+        let correct = Boolean::xor(
+            cs.namespace(|| "lhs_valid XOR rhs_valid"),
+            &lhs_valid,
+            &is_rhs_valid,
+        )?;
+
+        Ok(correct)
+    }
 }
 
 pub fn check_account_data<E: RescueEngine, CS: ConstraintSystem<E>>(
@@ -2479,6 +2693,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     points.push(get_xy(TransferToNewOp::OP_CODE, TransferToNewOp::CHUNKS));
     points.push(get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS));
     points.push(get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS));
+    points.push(get_xy(TransferFromOp::OP_CODE, TransferFromOp::CHUNKS));
 
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);
