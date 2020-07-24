@@ -55,8 +55,9 @@ jobs:
     - name: db-tests
       run: zksync db-test
 
-    - name: prover-tests
-      run: zksync prover-tests
+#    TODO: #826
+#    - name: prover-tests
+#      run: zksync prover-tests
 
     - name: circuit-tests
       run: zksync circuit-tests "" `nproc`
