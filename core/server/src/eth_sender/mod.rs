@@ -625,7 +625,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         stuck_tx.last_deadline_block = deadline_block;
         stuck_tx.last_used_gas_price = signed_tx.gas_price;
-        stuck_tx.used_tx_hashes.push(signed_tx.hash.clone());
+        stuck_tx.used_tx_hashes.push(signed_tx.hash);
 
         Ok(signed_tx)
     }

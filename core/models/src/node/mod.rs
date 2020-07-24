@@ -11,6 +11,7 @@ use num::{BigUint, FromPrimitive};
 pub mod account;
 pub mod block;
 pub mod config;
+pub mod mempool;
 pub mod operations;
 pub mod priority_ops;
 pub mod tokens;
