@@ -7,7 +7,7 @@ use web3::types::U256;
 // Workspace imports
 use models::node::{
     block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, FranklinOp,
+    AccountId, BlockNumber, BlockTimestamp, FranklinOp,
 };
 use models::{
     fe_from_bytes, fe_to_bytes, node::block::PendingBlock, Action, ActionType, Operation,
@@ -130,6 +130,9 @@ impl<'a> BlockSchema<'a> {
             block,
             new_root_hash,
             stored_block.fee_account_id as AccountId,
+            stored_block
+                .block_timestamp
+                .map(|timestamp| BlockTimestamp::from(timestamp as u64)),
             block_transactions,
             (
                 stored_block.unprocessed_prior_op_before as u64,
@@ -539,6 +542,7 @@ impl<'a> BlockSchema<'a> {
             let block_size = block.block_chunks_size as i64;
             let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
             let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
+            let block_timestamp = block.block_timestamp.map(|timestamp| *timestamp as i64);
 
             self.save_block_transactions(block.block_number, block.block_transactions)?;
 
@@ -551,6 +555,7 @@ impl<'a> BlockSchema<'a> {
                 block_size,
                 commit_gas_limit,
                 verify_gas_limit,
+                block_timestamp,
             };
 
             // Remove pending block (as it's now completed).

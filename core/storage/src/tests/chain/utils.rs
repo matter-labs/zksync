@@ -5,7 +5,7 @@ use crypto_exports::rand::Rng;
 use models::{
     node::{
         block::{Block, ExecutedOperations},
-        AccountUpdate, BlockNumber, Fr, PubKeyHash,
+        AccountUpdate, BlockNumber, BlockTimestamp, Fr, PubKeyHash,
     },
     Action, Operation,
 };
@@ -71,6 +71,7 @@ pub fn get_operation(
             block_number,
             Fr::default(),
             0,
+            Some(BlockTimestamp::from(0)),
             Vec::new(),
             (0, 0),
             block_size,
@@ -95,6 +96,7 @@ pub fn get_operation_with_txs(
             block_number,
             Fr::default(),
             0,
+            Some(BlockTimestamp::from(0)),
             txs,
             (0, 0),
             block_size,

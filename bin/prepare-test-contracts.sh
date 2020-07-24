@@ -56,4 +56,4 @@ create_constant_getter UPGRADE_NOTICE_PERIOD $OUT_DIR/UpgradeGatekeeperTest.sol
 set_constant DUMMY_VERIFIER true $OUT_DIR/VerifierTest.sol
 
 # Make upgrade function in ZkSyncTestUpgradeTarget contract to do nothing
-ssed -E "s/revert\(\"upgzk\"\);(.*)/\/\*revert\(\"upgzk\"\);\*\/\1/" -i $OUT_DIR/ZkSyncTestUpgradeTarget.sol
+ssed -E "s/    function upgrade\(bytes calldata upgradeParameters\) external \{/    function upgrade\(bytes calldata upgradeParameters\) external \{return;/" -i $OUT_DIR/ZkSyncTestUpgradeTarget.sol

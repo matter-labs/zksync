@@ -130,5 +130,11 @@
     "decimals": 18,
     "symbol": "GNT",
     "name": "New Golem Network Token"
+  },
+  {
+    "address": "0x690f4886c6911d81beb8130db30c825c27281f22",
+    "decimals": 18,
+    "symbol": "MLTT",
+    "name": "Matter Labs Trial Token"
   }
 ]

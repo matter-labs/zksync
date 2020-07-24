@@ -45,6 +45,7 @@ mod tx_queue;
 mod tests;
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ETHSenderRequest {
     SendOperation(Operation),
     GetAverageUsedGasPrice(oneshot::Sender<U256>),
@@ -624,7 +625,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         stuck_tx.last_deadline_block = deadline_block;
         stuck_tx.last_used_gas_price = signed_tx.gas_price;
-        stuck_tx.used_tx_hashes.push(signed_tx.hash.clone());
+        stuck_tx.used_tx_hashes.push(signed_tx.hash);
 
         Ok(signed_tx)
     }
@@ -691,7 +692,14 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     (
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
-                        vec![root],
+                        vec![
+                            root,
+                            H256::from_low_u64_be(
+                                *op.block
+                                    .block_timestamp
+                                    .expect("block timestamp should be known at this moment"),
+                            ),
+                        ],
                         public_data,
                         witness_data.0,
                         witness_data.1,

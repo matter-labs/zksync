@@ -15,8 +15,10 @@ use models::{
             Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
             PendingBlock as SendablePendingBlock,
         },
+        mempool::TxVariant,
         tx::{FranklinTx, TxHash},
-        Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+        Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber,
+        BlockTimestamp, PriorityOp,
     },
     ActionType, BlockCommitRequest, CommitRequest,
 };
@@ -24,6 +26,7 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
+use std::time::SystemTime;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -41,7 +44,10 @@ pub enum StateKeeperRequest {
     GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
-    GetExecutedInPendingBlock(ExecutedOpId, oneshot::Sender<Option<(BlockNumber, bool)>>),
+    GetExecutedInPendingBlock(
+        ExecutedOpId,
+        oneshot::Sender<Option<(BlockNumber, bool, Option<String>)>>,
+    ),
     SealBlock,
 }
 
@@ -298,13 +304,13 @@ impl PlasmaStateKeeper {
             for operation in pending_block.success_operations {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
-                        self.apply_tx(tx.tx)
-                            .expect("Tx from the pending block failed");
+                        self.apply_tx(&tx.tx)
+                            .expect("Tx from the restored pending block was not executed");
                         txs_count += 1;
                     }
                     ExecutedOperations::PriorityOp(op) => {
                         self.apply_priority_op(op.priority_op)
-                            .expect("Priority op from the pending block failed");
+                            .expect("Priority op from the restored pending block was not executed");
                         priority_op_count += 1;
                     }
                 }
@@ -391,7 +397,7 @@ impl PlasmaStateKeeper {
                     );
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
-                    self.execute_tx_batch(proposed_block).await;
+                    self.execute_proposed_block(proposed_block).await;
 
                     log::trace!(
                         "ExecuteMiniBlock request processed in {}ms",
@@ -436,7 +442,7 @@ impl PlasmaStateKeeper {
         executed_ops.clear();
     }
 
-    async fn execute_tx_batch(&mut self, proposed_block: ProposedBlock) {
+    async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
         let mut executed_ops = Vec::new();
 
         let mut priority_op_queue = proposed_block
@@ -458,19 +464,39 @@ impl PlasmaStateKeeper {
         }
 
         let mut tx_queue = proposed_block.txs.into_iter().collect::<VecDeque<_>>();
-        while let Some(tx) = tx_queue.pop_front() {
-            match self.apply_tx(tx) {
-                Ok(exec_op) => {
-                    executed_ops.push(exec_op);
-                }
-                Err(tx) => {
-                    // We could not execute the tx due to either of block size limit
-                    // or the withdraw operations limit, so we seal this block and
-                    // the last transaction will go to the next block instead.
-                    self.seal_pending_block().await;
-                    self.notify_executed_ops(&mut executed_ops).await;
+        while let Some(variant) = tx_queue.pop_front() {
+            match &variant {
+                TxVariant::Tx(tx) => {
+                    match self.apply_tx(&tx) {
+                        Ok(exec_op) => {
+                            executed_ops.push(exec_op);
+                        }
+                        Err(_) => {
+                            // We could not execute the tx due to either of block size limit
+                            // or the withdraw operations limit, so we seal this block and
+                            // the last transaction will go to the next block instead.
+                            self.seal_pending_block().await;
+                            self.notify_executed_ops(&mut executed_ops).await;
 
-                    tx_queue.push_front(tx);
+                            tx_queue.push_front(variant);
+                        }
+                    }
+                }
+                TxVariant::Batch(batch) => {
+                    match self.apply_batch(&batch.0) {
+                        Ok(mut ops) => {
+                            executed_ops.append(&mut ops);
+                        }
+                        Err(_) => {
+                            // We could not execute the batch tx due to either of block size limit
+                            // or the withdraw operations limit, so we seal this block and
+                            // the last transaction will go to the next block instead.
+                            self.seal_pending_block().await;
+                            self.notify_executed_ops(&mut executed_ops).await;
+
+                            tx_queue.push_front(variant);
+                        }
+                    }
                 }
             }
         }
@@ -549,13 +575,107 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
-    fn apply_tx(&mut self, tx: FranklinTx) -> Result<ExecutedOperations, FranklinTx> {
+    fn apply_batch(&mut self, txs: &[FranklinTx]) -> Result<Vec<ExecutedOperations>, ()> {
+        let chunks_needed = self.state.chunks_for_batch(txs);
+
+        // If we can't add the tx to the block due to the size limit, we return this tx,
+        // seal the block and execute it again.
+        if self.pending_block.chunks_left < chunks_needed {
+            return Err(());
+        }
+
+        for tx in txs {
+            // Check if adding this transaction to the block won't make the contract operations
+            // too expensive.
+            let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.clone());
+            if let Ok(non_executed_op) = non_executed_op {
+                // We only care about successful conversions, since if conversion failed,
+                // then transaction will fail as well (as it shares the same code base).
+                if self
+                    .pending_block
+                    .gas_counter
+                    .add_op(&non_executed_op)
+                    .is_err()
+                {
+                    // We've reached the gas limit, seal the block.
+                    // This transaction will go into the next one.
+                    return Err(());
+                }
+            }
+
+            if matches!(tx, FranklinTx::Withdraw(_)) {
+                // Increase amount of the withdraw operations in this block.
+                self.pending_block.withdrawals_amount += 1;
+            }
+
+            // Check if we've reached the withdraw operations amount limit.
+            // If so, this block will be sealed and this tx will go to the next block.
+            if self.pending_block.withdrawals_amount > MAX_WITHDRAWALS_PER_BLOCK {
+                return Err(());
+            }
+        }
+
+        let all_updates = self.state.execute_txs_batch(txs);
+        let mut executed_operations = Vec::new();
+
+        for (tx, tx_updates) in txs.iter().zip(all_updates) {
+            match tx_updates {
+                Ok(OpSuccess {
+                    fee,
+                    mut updates,
+                    executed_op,
+                }) => {
+                    self.pending_block.chunks_left -= chunks_needed;
+                    self.pending_block.account_updates.append(&mut updates);
+                    if let Some(fee) = fee {
+                        let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
+                        self.pending_block
+                            .account_updates
+                            .extend(fee_updates.into_iter());
+                    }
+                    let block_index = self.pending_block.pending_op_block_index;
+                    self.pending_block.pending_op_block_index += 1;
+
+                    let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
+                        tx: tx.clone(),
+                        success: true,
+                        op: Some(executed_op),
+                        fail_reason: None,
+                        block_index: Some(block_index),
+                        created_at: chrono::Utc::now(),
+                    }));
+                    self.pending_block
+                        .success_operations
+                        .push(exec_result.clone());
+                    executed_operations.push(exec_result);
+                }
+                Err(e) => {
+                    warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                    let failed_tx = ExecutedTx {
+                        tx: tx.clone(),
+                        success: false,
+                        op: None,
+                        fail_reason: Some(e.to_string()),
+                        block_index: None,
+                        created_at: chrono::Utc::now(),
+                    };
+                    self.pending_block.failed_txs.push(failed_tx.clone());
+                    let exec_result = ExecutedOperations::Tx(Box::new(failed_tx));
+                    executed_operations.push(exec_result);
+                }
+            };
+        }
+
+        Ok(executed_operations)
+    }
+
+    fn apply_tx(&mut self, tx: &FranklinTx) -> Result<ExecutedOperations, ()> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
-            return Err(tx);
+            return Err(());
         }
 
         // Check if adding this transaction to the block won't make the contract operations
@@ -572,7 +692,7 @@ impl PlasmaStateKeeper {
             {
                 // We've reached the gas limit, seal the block.
                 // This transaction will go into the next one.
-                return Err(tx);
+                return Err(());
             }
         }
 
@@ -584,7 +704,7 @@ impl PlasmaStateKeeper {
         // Check if we've reached the withdraw operations amount limit.
         // If so, this block will be sealed and this tx will go to the next block.
         if self.pending_block.withdrawals_amount > MAX_WITHDRAWALS_PER_BLOCK {
-            return Err(tx);
+            return Err(());
         }
 
         let tx_updates = self.state.execute_tx(tx.clone());
@@ -607,7 +727,7 @@ impl PlasmaStateKeeper {
                 self.pending_block.pending_op_block_index += 1;
 
                 let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
-                    tx,
+                    tx: tx.clone(),
                     success: true,
                     op: Some(executed_op),
                     fail_reason: None,
@@ -622,7 +742,7 @@ impl PlasmaStateKeeper {
             Err(e) => {
                 warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
-                    tx,
+                    tx: tx.clone(),
                     success: false,
                     op: None,
                     fail_reason: Some(e.to_string()),
@@ -650,6 +770,13 @@ impl PlasmaStateKeeper {
             ),
         );
 
+        let block_timestamp = Some(BlockTimestamp::from(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("unix timestamp calculation failed")
+                .as_secs(),
+        ));
+
         let mut block_transactions = pending_block.success_operations;
         block_transactions.extend(
             pending_block
@@ -666,6 +793,7 @@ impl PlasmaStateKeeper {
                 self.state.block_number,
                 self.state.root_hash(),
                 self.fee_account_id,
+                block_timestamp,
                 block_transactions,
                 (
                     pending_block.unprocessed_priority_op_before,
@@ -735,21 +863,24 @@ impl PlasmaStateKeeper {
             .expect("committer sender dropped");
     }
 
-    fn check_executed_in_pending_block(&self, op_id: ExecutedOpId) -> Option<(BlockNumber, bool)> {
+    fn check_executed_in_pending_block(
+        &self,
+        op_id: ExecutedOpId,
+    ) -> Option<(BlockNumber, bool, Option<String>)> {
         let current_block_number = self.state.block_number;
         match op_id {
             ExecutedOpId::Transaction(hash) => {
                 for op in &self.pending_block.success_operations {
                     if let ExecutedOperations::Tx(exec_tx) = op {
                         if exec_tx.tx.hash() == hash {
-                            return Some((current_block_number, true));
+                            return Some((current_block_number, true, None));
                         }
                     }
                 }
 
                 for failed_tx in &self.pending_block.failed_txs {
                     if failed_tx.tx.hash() == hash {
-                        return Some((current_block_number, false));
+                        return Some((current_block_number, false, failed_tx.fail_reason.clone()));
                     }
                 }
             }
@@ -757,7 +888,7 @@ impl PlasmaStateKeeper {
                 for op in &self.pending_block.success_operations {
                     if let ExecutedOperations::PriorityOp(exec_op) = op {
                         if exec_op.priority_op.serial_id == serial_id {
-                            return Some((current_block_number, true));
+                            return Some((current_block_number, true, None));
                         }
                     }
                 }

@@ -9,6 +9,7 @@ pub struct MempoolTx {
     pub id: i64,
     pub tx_hash: String,
     pub tx: serde_json::Value,
+    pub batch_id: Option<i64>,
 }
 
 #[derive(Debug, Insertable)]
@@ -16,4 +17,5 @@ pub struct MempoolTx {
 pub struct NewMempoolTx {
     pub tx_hash: String,
     pub tx: serde_json::Value,
+    pub batch_id: Option<i64>,
 }
