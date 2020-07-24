@@ -88,6 +88,7 @@ pub trait ProverImpl<C: ApiClient> {
 
 pub trait ApiClient: Debug {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error>;
+    #[allow(clippy::type_complexity)]
     fn multiblock_to_prove(&self) -> Result<Option<((i64, i64), i32)>, failure::Error>;
     fn working_on(&self, job: ProverJob) -> Result<(), failure::Error>;
     fn prover_block_data(

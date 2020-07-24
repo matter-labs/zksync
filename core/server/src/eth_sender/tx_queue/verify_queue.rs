@@ -63,7 +63,7 @@ impl VerifyQueue {
     }
 
     pub fn front_element(&self) -> Option<TxData> {
-        return self.elements.get(&self.next_expected_idx).cloned();
+        self.elements.get(&self.next_expected_idx).cloned()
     }
 
     /// Returns the next expected element ID.

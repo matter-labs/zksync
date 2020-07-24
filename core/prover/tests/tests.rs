@@ -186,6 +186,30 @@ impl<F> fmt::Debug for MockApiClient<F> {
 }
 
 impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
+    // MockApiClient now not support multiblock proofs
+
+    #[allow(clippy::type_complexity)]
+    fn multiblock_to_prove(&self) -> Result<Option<((i64, i64), i32)>, failure::Error> {
+        unreachable!("MockApiClient now not support multiblock proofs");
+    }
+
+    fn prover_multiblock_data(
+        &self,
+        _block_from: i64,
+        _block_to: i64,
+    ) -> Result<Vec<(EncodedProofPlonk, usize)>, failure::Error> {
+        unreachable!("MockApiClient now not support multiblock proofs");
+    }
+
+    fn publish_multiblock(
+        &self,
+        _block_from: i64,
+        _block_to: i64,
+        _p: EncodedProofPlonk,
+    ) -> Result<(), failure::Error> {
+        unreachable!("MockApiClient now not support multiblock proofs");
+    }
+
     fn block_to_prove(&self, _block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
@@ -194,7 +218,7 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
     fn working_on(&self, job: ProverJob) -> Result<(), failure::Error> {
         let stored = self.block_to_prove.lock().unwrap();
         if let Some((_, stored)) = *stored {
-            if stored != job {
+            if ProverJob::BlockProve(stored) != job {
                 return Err(failure::format_err!("unexpected job id"));
             }
             let _ = self.heartbeats_tx.lock().unwrap().send(());

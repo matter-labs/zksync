@@ -144,15 +144,14 @@ impl<'a> ProverSchema<'a> {
             .0
             .conn()
             .transaction(|| {
-                let first_unverified_block_query = format!(" \
+                let first_unverified_block_query = " \
                     SELECT COALESCE(min(block_to + 1),0) AS integer_value FROM multiblock_proofs proof1 \
                         WHERE NOT EXISTS ( \
                             SELECT * FROM multiblock_proofs proof2 \
                             WHERE \
                                 proof2.block_from <= proof1.block_to + 1 AND proof1.block_to + 1 <= proof2.block_to \
                         ) \
-                    ",
-                );
+                    ".to_string();
 
                 let first_unverified_block_ = if self.load_multiblock_proof(1).is_ok() {
                     diesel::sql_query(first_unverified_block_query).get_result::<Option<IntegerNumber>>(self.0.conn())?
@@ -185,7 +184,7 @@ impl<'a> ProverSchema<'a> {
                     let mut batch_size = 1;
                     while batch_size < max_block_batch_size_ && batch_size < blocks.len()
                         && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
-                        && blocks[batch_size].multiblock_already_generated == false {
+                        && !blocks[batch_size].multiblock_already_generated {
                         batch_size += 1;
                     }
                     if batch_size == max_block_batch_size_ || blocks[0].blocks_batch_timeout_passed {
@@ -214,15 +213,14 @@ impl<'a> ProverSchema<'a> {
             .transaction(|| {
                 sql_query("LOCK TABLE prover_multiblock_runs IN EXCLUSIVE MODE").execute(self.0.conn())?;
 
-                let first_unverified_block_query = format!(" \
+                let first_unverified_block_query = " \
                     SELECT COALESCE(min(block_to + 1),0) AS integer_value FROM multiblock_proofs proof1 \
                         WHERE NOT EXISTS ( \
                             SELECT * FROM multiblock_proofs proof2 \
                             WHERE \
                                 proof2.block_from <= proof1.block_to + 1 AND proof1.block_to + 1 <= proof2.block_to \
                         ) \
-                    ",
-                );
+                    ".to_string();
 
                 let first_unverified_block_ = if self.load_multiblock_proof(1).is_ok() {
                     diesel::sql_query(first_unverified_block_query).get_result::<Option<IntegerNumber>>(self.0.conn())?
@@ -261,7 +259,7 @@ impl<'a> ProverSchema<'a> {
                     let mut batch_size = 1;
                     while batch_size < max_block_batch_size_ && batch_size < blocks.len()
                         && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
-                        && blocks[batch_size].multiblock_already_generated == false {
+                        && !blocks[batch_size].multiblock_already_generated {
                         batch_size += 1;
                     }
                     if batch_size == max_block_batch_size_ || blocks[0].blocks_batch_timeout_passed {
@@ -269,8 +267,8 @@ impl<'a> ProverSchema<'a> {
                         use crate::schema::prover_multiblock_runs::dsl::*;
                         let inserted: ProverMultiblockRun = insert_into(prover_multiblock_runs)
                             .values(&vec![(
-                                block_number_from.eq(i64::from(blocks[0].block_number)),
-                                block_number_to.eq(i64::from(blocks[batch_size - 1].block_number)),
+                                block_number_from.eq(blocks[0].block_number),
+                                block_number_to.eq(blocks[batch_size - 1].block_number),
                                 worker.eq(worker_.to_string()),
                             )])
                             .get_result(self.0.conn())?;

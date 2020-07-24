@@ -190,6 +190,7 @@ impl crate::ApiClient for ApiClient {
         Ok(self.with_retries(&op)?)
     }
 
+    #[allow(clippy::type_complexity)]
     fn multiblock_to_prove(&self) -> Result<Option<((i64, i64), i32)>, failure::Error> {
         let op = || -> Result<Option<((i64, i64), i32)>, failure::Error> {
             trace!("sending multiblock_to_prove");

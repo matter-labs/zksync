@@ -88,6 +88,7 @@ impl MockDatabase {
 }
 
 impl DatabaseAccess for MockDatabase {
+    #[allow(clippy::type_complexity)]
     fn restore_state(
         &self,
     ) -> Result<

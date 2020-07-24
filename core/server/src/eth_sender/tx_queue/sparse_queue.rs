@@ -1,5 +1,4 @@
 // Built-in imports
-#[allow(dead_code)]
 use std::{collections::HashMap, fmt};
 
 /// Sparse queue is a sparse queue which allows inserting an element
@@ -25,6 +24,7 @@ impl<T: fmt::Debug> Default for SparseQueue<T> {
 
 impl<T: fmt::Debug> SparseQueue<T> {
     /// Creates a new empty sparse queue with the custom next expected element ID.
+    #[allow(dead_code)]
     pub fn new(next_expected_idx: usize) -> Self {
         Self {
             next_expected_idx,
@@ -33,6 +33,7 @@ impl<T: fmt::Debug> SparseQueue<T> {
     }
 
     /// Returns a previously popped element to the front of the queue.
+    #[allow(dead_code)]
     pub fn return_popped(&mut self, element: T) {
         let popped_index = self.next_expected_idx - 1;
         self.elements.insert(popped_index, element);
@@ -40,6 +41,7 @@ impl<T: fmt::Debug> SparseQueue<T> {
     }
 
     /// Inserts an element to the queue given its index.
+    #[allow(dead_code)]
     pub fn insert(&mut self, idx: usize, element: T) {
         assert!(
             idx >= self.next_expected_idx,
@@ -51,6 +53,7 @@ impl<T: fmt::Debug> SparseQueue<T> {
     /// Attempts to take the next element from the queue. Returns `None`
     /// if either the queue is empty, or the next expected element is yet
     /// missing in the queue.
+    #[allow(dead_code)]
     pub fn pop_front(&mut self) -> Option<T> {
         match self.elements.remove(&self.next_expected_idx) {
             Some(value) => {
@@ -64,16 +67,19 @@ impl<T: fmt::Debug> SparseQueue<T> {
     /// Checks whether `pop_front` operation will return an element or not.
     /// Returns `true` if the next expected element exists in the queue,
     /// and returns `false` otherwise.
+    #[allow(dead_code)]
     pub fn has_next(&self) -> bool {
         self.elements.contains_key(&self.next_expected_idx)
     }
 
     /// Returns the next expected element ID.
+    #[allow(dead_code)]
     pub fn next_id(&self) -> usize {
         self.next_expected_idx
     }
 
     /// Returns the current size of the queue.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.elements.len()
     }

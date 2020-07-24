@@ -87,7 +87,7 @@ impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
                 block_from,
                 block_to
             );
-            return Ok(());
+            Ok(())
         } else {
             let mut block = 0;
             let mut job_id = 0;

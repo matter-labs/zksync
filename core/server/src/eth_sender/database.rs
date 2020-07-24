@@ -23,6 +23,7 @@ pub(super) trait DatabaseAccess {
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
     /// Unprocessed operations are zkSync operations that were not started at all.
+    #[allow(clippy::type_complexity)]
     fn restore_state(
         &self,
     ) -> Result<
@@ -87,6 +88,7 @@ impl Database {
 }
 
 impl DatabaseAccess for Database {
+    #[allow(clippy::type_complexity)]
     fn restore_state(
         &self,
     ) -> Result<

@@ -20,7 +20,7 @@ use server::prover_server;
 
 fn spawn_server(
     prover_timeout: time::Duration,
-    blocks_batch_timeout: time::Duraion,
+    blocks_batch_timeout: time::Duration,
     max_block_batch_size: usize,
     rounds_interval: time::Duration,
 ) -> String {
@@ -67,7 +67,12 @@ fn client_with_empty_worker_name_panics() {
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
-    let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
+    let addr = spawn_server(
+        time::Duration::from_secs(1),
+        time::Duration::from_secs(1),
+        1,
+        time::Duration::from_secs(1),
+    );
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
         "foo",
@@ -95,7 +100,12 @@ fn api_client_simple_simulation() {
     let prover_timeout = time::Duration::from_secs(1);
     let rounds_interval = time::Duration::from_secs(10);
 
-    let addr = spawn_server(prover_timeout, rounds_interval);
+    let addr = spawn_server(
+        prover_timeout,
+        time::Duration::from_secs(1),
+        1,
+        rounds_interval,
+    );
 
     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     let client = client::ApiClient::new(
@@ -148,7 +158,9 @@ fn api_client_simple_simulation() {
     let (block, job) = to_prove.unwrap();
     // sleep for prover_timeout and send heartbeat
     thread::sleep(prover_timeout * 2);
-    client.working_on(job).unwrap();
+    client
+        .working_on(prover::ProverJob::BlockProve(job))
+        .unwrap();
 
     let to_prove = client
         .block_to_prove(block_size_chunks)
@@ -344,7 +356,12 @@ pub fn test_operation_and_wanted_prover_data(
 fn api_server_publish_dummy() {
     let prover_timeout = time::Duration::from_secs(1);
     let rounds_interval = time::Duration::from_secs(10);
-    let addr = spawn_server(prover_timeout, rounds_interval);
+    let addr = spawn_server(
+        prover_timeout,
+        time::Duration::from_secs(1),
+        1,
+        rounds_interval,
+    );
 
     let client = reqwest::blocking::Client::new();
     let res = client
