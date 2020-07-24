@@ -92,6 +92,11 @@ export default {
 
 @media (min-width: 1000px) {
     .container {
+        width: 32em;
+    }
+}
+@media (min-width: 1200px) {
+    .container {
         width: 40em;
     }
 }
