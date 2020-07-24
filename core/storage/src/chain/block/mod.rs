@@ -491,6 +491,7 @@ impl<'a> BlockSchema<'a> {
                 unprocessed_priority_op_before: block.unprocessed_priority_op_before as u64,
                 pending_block_iteration: block.pending_block_iteration as usize,
                 success_operations: executed_ops,
+                block_timestamp: block.block_timestamp.map(|b| b as u64).unwrap_or(0).into(),
             };
 
             Ok(Some(result))
@@ -515,6 +516,7 @@ impl<'a> BlockSchema<'a> {
                 chunks_left: pending_block.chunks_left as i64,
                 unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
                 pending_block_iteration: pending_block.pending_block_iteration as i64,
+                block_timestamp: Some(pending_block.block_timestamp.0 as i64),
             };
 
             // Store the pending block header.

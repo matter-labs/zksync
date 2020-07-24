@@ -183,7 +183,7 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
         const wallet1AfterTransfer = await syncWallet1.getBalance(token);
         const wallet2AfterTransfer = await syncWallet2.getBalance(token);
         const operatorAfterTransfer = await getOperatorBalance(token);
-    
+
         let transferCorrect = true;
         transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.add(fee).mul(2));
         transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount.mul(2));
@@ -235,6 +235,56 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
     }
 }
 
+
+async function testTransferFrom(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+    const fullFee = await syncProvider.getTransactionFee("TransferFrom", syncWallet2.address(), token);
+    const fee = fullFee.totalFee;
+
+    const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
+    const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
+    const operatorBeforeTransfer = await getOperatorBalance(token);
+    const startTime = new Date().getTime();
+
+    const tokenId = syncProvider.tokenSet.resolveTokenId(token);
+    const toNonce = await syncWallet2.getNonce();
+    const dataToSign = {
+        accountId: syncWallet2.accountId,
+        from: syncWallet1.address(),
+        to: syncWallet2.address(),
+        tokenId,
+        amount,
+        fee,
+        nonce: toNonce,
+        validFrom: 0,
+        validUntil: 4294967295,
+    };
+    const fromSignature = await syncWallet1.signer.signSyncTransferFrom(dataToSign)
+
+    const transferFromHandle = await syncWallet2.syncTransferFromOtherAccount({
+        from: syncWallet1.address(),
+        token,
+        amount,
+        fee,
+        fromSignature,
+        validFrom: 0,
+        validUntil: 4294967295,
+    });
+
+    console.log(`TransferFrom posted: ${(new Date().getTime()) - startTime} ms`);
+    await transferFromHandle.awaitReceipt();
+    console.log(`TransferFrom committed: ${(new Date().getTime()) - startTime} ms`);
+    const wallet1AfterTransfer = await syncWallet1.getBalance(token);
+    const wallet2AfterTransfer = await syncWallet2.getBalance(token);
+    const operatorAfterTransfer = await getOperatorBalance(token);
+
+    let transferCorrect = true;
+    transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.add(fee));
+    transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount);
+    transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
+    if (!transferCorrect) {
+        throw new Error("Transfer checks failed");
+    }
+}
 
 async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
     const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
@@ -359,6 +409,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer to self with fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
+    await testTransferFrom(syncWallet1, syncWallet2, token, transfersAmount);
+    console.log(`TransferFrom ok, Token ${token}`);
 
     // TODO: Not executed, since it requires block sizes greater than 6, and sizes greater than 6 cause
     // server to crash in `integration-full-exit`. Issue: #831

@@ -151,7 +151,7 @@ impl Transfer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    /// Creates signed transaction using private key, checks for correcteness
+    /// Creates signed transaction using private key, checks for correctness
     pub fn new_signed(
         account_id: AccountId,
         from: Address,
@@ -227,6 +227,168 @@ impl Transfer {
     }
 }
 
+/// Transaction to send funds from `from` account  to `to` account,
+/// incrementing 'nonce of the `to` account.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferFrom {
+    pub to_account_id: AccountId,
+    pub from: Address,
+    pub to: Address,
+    pub token: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub amount: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub fee: BigUint,
+    pub to_nonce: Nonce,
+    pub from_signature: TxSignature,
+    pub to_signature: TxSignature,
+    // Time when tx starts to be valid in seconds since UNIX epoch.
+    pub valid_from: u64,
+    // Time when tx stops to be valid in seconds since UNIX epoch.
+    pub valid_until: u64,
+    #[serde(skip)]
+    cached_from_signer: VerifiedSignatureCache,
+    #[serde(skip)]
+    cached_to_signer: VerifiedSignatureCache,
+}
+
+impl TransferFrom {
+    const TX_TYPE: u8 = 0x08;
+
+    #[allow(clippy::too_many_arguments)]
+    /// Creates transaction from parts
+    /// signatures are optional, because sometimes we don't know them (i.e. data_restore)
+    pub fn new(
+        to_account_id: AccountId,
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigUint,
+        fee: BigUint,
+        to_nonce: Nonce,
+        valid_from: u64,
+        valid_until: u64,
+        from_signature: Option<TxSignature>,
+        to_signature: Option<TxSignature>,
+    ) -> Self {
+        let mut tx = Self {
+            to_account_id,
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            to_nonce,
+            valid_from,
+            valid_until,
+            from_signature: from_signature.clone().unwrap_or_default(),
+            to_signature: to_signature.clone().unwrap_or_default(),
+            cached_from_signer: VerifiedSignatureCache::NotCached,
+            cached_to_signer: VerifiedSignatureCache::NotCached,
+        };
+        if from_signature.is_some() {
+            tx.cached_from_signer = VerifiedSignatureCache::Cached(tx.verify_from_signature());
+        }
+        if to_signature.is_some() {
+            tx.cached_to_signer = VerifiedSignatureCache::Cached(tx.verify_to_signature());
+        }
+        tx
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    /// Creates signed transaction using private key, checks for correctness
+    pub fn new_signed(
+        to_account_id: AccountId,
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigUint,
+        fee: BigUint,
+        nonce: Nonce,
+        valid_from: u64,
+        valid_until: u64,
+        from_private_key: &PrivateKey<Engine>,
+        to_private_key: &PrivateKey<Engine>,
+    ) -> Result<Self, failure::Error> {
+        let mut tx = Self::new(
+            to_account_id,
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce,
+            valid_from,
+            valid_until,
+            None,
+            None,
+        );
+        tx.from_signature = TxSignature::sign_musig(from_private_key, &tx.get_bytes());
+        tx.to_signature = TxSignature::sign_musig(to_private_key, &tx.get_bytes());
+        if !tx.check_correctness() {
+            bail!("Transfer is incorrect, check amounts");
+        }
+        Ok(tx)
+    }
+
+    pub fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.to_account_id.to_be_bytes());
+        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(&self.to.as_bytes());
+        out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&pack_token_amount(&self.amount));
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.to_nonce.to_be_bytes());
+        out.extend_from_slice(&self.valid_from.to_be_bytes());
+        out.extend_from_slice(&self.valid_until.to_be_bytes());
+        out
+    }
+
+    pub fn check_correctness(&mut self) -> bool {
+        let mut valid = self.amount <= BigUint::from(u128::max_value())
+            && self.fee <= BigUint::from(u128::max_value())
+            && is_token_amount_packable(&self.amount)
+            && is_fee_amount_packable(&self.fee)
+            && self.to_account_id <= max_account_id()
+            && self.token <= max_token_id()
+            && self.to != Address::zero()
+            && self.valid_from <= self.valid_until;
+        if valid {
+            let from_signer = self.verify_from_signature();
+            let to_signer = self.verify_to_signature();
+
+            valid = valid && from_signer.is_some() && to_signer.is_some();
+
+            self.cached_from_signer = VerifiedSignatureCache::Cached(from_signer);
+            self.cached_to_signer = VerifiedSignatureCache::Cached(to_signer);
+        };
+        valid
+    }
+
+    pub fn verify_from_signature(&self) -> Option<PubKeyHash> {
+        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_from_signer {
+            cached_signer.clone()
+        } else if let Some(pub_key) = self.from_signature.verify_musig(&self.get_bytes()) {
+            Some(PubKeyHash::from_pubkey(&pub_key))
+        } else {
+            None
+        }
+    }
+
+    pub fn verify_to_signature(&self) -> Option<PubKeyHash> {
+        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_to_signer {
+            cached_signer.clone()
+        } else if let Some(pub_key) = self.to_signature.verify_musig(&self.get_bytes()) {
+            Some(PubKeyHash::from_pubkey(&pub_key))
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Withdraw {
@@ -278,7 +440,7 @@ impl Withdraw {
     }
 
     #[allow(clippy::too_many_arguments)]
-    /// Creates signed transaction using private key, checks for correcteness
+    /// Creates signed transaction using private key, checks for correctness
     pub fn new_signed(
         account_id: AccountId,
         from: Address,
@@ -459,6 +621,7 @@ impl ChangePubKey {
 #[serde(tag = "type")]
 pub enum FranklinTx {
     Transfer(Box<Transfer>),
+    TransferFrom(Box<TransferFrom>),
     Withdraw(Box<Withdraw>),
     Close(Box<Close>),
     ChangePubKey(Box<ChangePubKey>),
@@ -466,13 +629,7 @@ pub enum FranklinTx {
 
 impl FranklinTx {
     pub fn hash(&self) -> TxHash {
-        let bytes = match self {
-            FranklinTx::Transfer(tx) => tx.get_bytes(),
-            FranklinTx::Withdraw(tx) => tx.get_bytes(),
-            FranklinTx::Close(tx) => tx.get_bytes(),
-            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
-        };
-
+        let bytes = self.get_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&bytes);
         let mut out = [0u8; 32];
@@ -483,6 +640,7 @@ impl FranklinTx {
     pub fn account(&self) -> Address {
         match self {
             FranklinTx::Transfer(tx) => tx.from,
+            FranklinTx::TransferFrom(tx) => tx.to,
             FranklinTx::Withdraw(tx) => tx.from,
             FranklinTx::Close(tx) => tx.account,
             FranklinTx::ChangePubKey(tx) => tx.account,
@@ -492,6 +650,7 @@ impl FranklinTx {
     pub fn nonce(&self) -> Nonce {
         match self {
             FranklinTx::Transfer(tx) => tx.nonce,
+            FranklinTx::TransferFrom(tx) => tx.to_nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
             FranklinTx::ChangePubKey(tx) => tx.nonce,
@@ -501,6 +660,7 @@ impl FranklinTx {
     pub fn check_correctness(&mut self) -> bool {
         match self {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
+            FranklinTx::TransferFrom(tx) => tx.check_correctness(),
             FranklinTx::Withdraw(tx) => tx.check_correctness(),
             FranklinTx::Close(tx) => tx.check_correctness(),
             FranklinTx::ChangePubKey(tx) => tx.check_correctness(),
@@ -510,6 +670,7 @@ impl FranklinTx {
     pub fn get_bytes(&self) -> Vec<u8> {
         match self {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
+            FranklinTx::TransferFrom(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
             FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
@@ -519,6 +680,7 @@ impl FranklinTx {
     pub fn min_chunks(&self) -> usize {
         match self {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
+            FranklinTx::TransferFrom(_) => TransferOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
             FranklinTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,

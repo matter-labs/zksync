@@ -114,6 +114,9 @@ impl ObservedState {
                 FranklinOp::TransferToNew(transfer_to_new) => {
                     TransferToNewWitness::apply_tx(&mut self.circuit_acc_tree, &transfer_to_new);
                 }
+                FranklinOp::TransferFrom(_transfer_from) => {
+                    unimplemented!();
+                }
                 FranklinOp::Withdraw(withdraw) => {
                     WithdrawWitness::apply_tx(&mut self.circuit_acc_tree, &withdraw);
                 }

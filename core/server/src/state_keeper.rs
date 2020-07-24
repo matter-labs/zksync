@@ -26,7 +26,6 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
-use std::time::SystemTime;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -67,10 +66,16 @@ struct PendingBlock {
     pending_block_iteration: usize,
     withdrawals_amount: u32,
     gas_counter: GasCounter,
+    /// Block timestamp is not set until block processing is not started
+    block_timestamp: Option<BlockTimestamp>,
 }
 
 impl PendingBlock {
-    fn new(unprocessed_priority_op_before: u64, chunks_left: usize) -> Self {
+    fn new(
+        unprocessed_priority_op_before: u64,
+        chunks_left: usize,
+        block_timestamp: Option<BlockTimestamp>,
+    ) -> Self {
         Self {
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
@@ -81,6 +86,7 @@ impl PendingBlock {
             pending_block_iteration: 0,
             withdrawals_amount: 0,
             gas_counter: GasCounter::new(),
+            block_timestamp,
         }
     }
 }
@@ -276,7 +282,11 @@ impl PlasmaStateKeeper {
             current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
             rx_for_blocks,
             tx_for_commitments,
-            pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
+            pending_block: PendingBlock::new(
+                initial_state.unprocessed_priority_op,
+                max_block_size,
+                None,
+            ),
             executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
@@ -291,6 +301,8 @@ impl PlasmaStateKeeper {
 
     pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
         if let Some(pending_block) = pending_block {
+            self.pending_block.block_timestamp = Some(pending_block.block_timestamp);
+
             // Transform executed operations into non-executed, so they will be executed again.
             // Since it's a pending block, the state updates were not actually applied in the
             // database (as it happens only when full block is committed).
@@ -572,6 +584,9 @@ impl PlasmaStateKeeper {
             .success_operations
             .push(exec_result.clone());
         self.current_unprocessed_priority_op += 1;
+        if self.pending_block.block_timestamp.is_none() {
+            self.pending_block.block_timestamp = Some(BlockTimestamp::now());
+        }
         Ok(exec_result)
     }
 
@@ -671,6 +686,11 @@ impl PlasmaStateKeeper {
 
     fn apply_tx(&mut self, tx: &FranklinTx) -> Result<ExecutedOperations, ()> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
+        if let Some(current_timestamp) = self.pending_block.block_timestamp {
+            self.state.block_timestamp = current_timestamp;
+        } else {
+            self.state.block_timestamp = BlockTimestamp::now();
+        }
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
@@ -737,6 +757,10 @@ impl PlasmaStateKeeper {
                 self.pending_block
                     .success_operations
                     .push(exec_result.clone());
+                if self.pending_block.block_timestamp.is_none() {
+                    // We only set timestamp if transaction execution was successful
+                    self.pending_block.block_timestamp = Some(self.state.block_timestamp);
+                }
                 exec_result
             }
             Err(e) => {
@@ -767,15 +791,9 @@ impl PlasmaStateKeeper {
                     .available_block_chunk_sizes
                     .last()
                     .expect("failed to get max block size"),
+                None,
             ),
         );
-
-        let block_timestamp = Some(BlockTimestamp::from(
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .expect("unix timestamp calculation failed")
-                .as_secs(),
-        ));
 
         let mut block_transactions = pending_block.success_operations;
         block_transactions.extend(
@@ -793,7 +811,10 @@ impl PlasmaStateKeeper {
                 self.state.block_number,
                 self.state.root_hash(),
                 self.fee_account_id,
-                block_timestamp,
+                Some(pending_block.block_timestamp.unwrap_or_else(|| {
+                    error!("Creating block without timestamp, using current time");
+                    BlockTimestamp::now()
+                })),
                 block_transactions,
                 (
                     pending_block.unprocessed_priority_op_before,
@@ -840,6 +861,10 @@ impl PlasmaStateKeeper {
             unprocessed_priority_op_before: self.pending_block.unprocessed_priority_op_before,
             pending_block_iteration: self.pending_block.pending_block_iteration,
             success_operations: self.pending_block.success_operations.clone(),
+            block_timestamp: self.pending_block.block_timestamp.unwrap_or_else(|| {
+                warn!("Stored pending block timestamp is not set, using 0");
+                0u64.into()
+            }),
         };
 
         log::trace!(
