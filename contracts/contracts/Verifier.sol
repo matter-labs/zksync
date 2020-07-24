@@ -22,6 +22,13 @@ contract Verifier is KeysWithPlonkVerifier {
         }
     }
 
+    function verifyMultiblockProof(
+        uint256[] calldata _proof,
+        bytes32 _commitment
+    ) external view returns (bool) {
+        return true;
+    }
+
     function verifyBlockProof(
         uint256[] calldata _proof,
         bytes32 _commitment,

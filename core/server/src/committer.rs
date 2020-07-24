@@ -7,7 +7,11 @@ use tokio::{runtime::Runtime, task::JoinHandle, time};
 // Workspace uses
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
-use models::{node::block::PendingBlock, Action, BlockCommitRequest, CommitRequest, Operation};
+use models::prover_utils::EncodedMultiblockProofPlonk;
+use models::{
+    node::block::PendingBlock, Action, BlockCommitRequest, CommitRequest, Operation, Proof,
+    VerifyMultiblockInfo,
+};
 use storage::ConnectionPool;
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -139,33 +143,52 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool
             .expect("db connection failed for committer");
 
         loop {
-            let block_number = last_verified_block + 1;
-            let proof = storage.prover_schema().load_proof(block_number);
-            if let Ok(proof) = proof {
-                info!("New proof for block: {}", block_number);
-                let block = storage
-                    .chain()
-                    .block_schema()
-                    .load_committed_block(block_number)
-                    .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
-                let op = Operation {
-                    action: Action::Verify {
-                        proof: Box::new(proof),
-                    },
-                    block,
-                    accounts_updated: Vec::new(),
-                    id: None,
+            let proof = storage
+                .prover_schema()
+                .load_multiblock_proof(last_verified_block + 1);
+            if let Ok(((block_from, block_to), proof)) = proof {
+                let mutliblock_proof = EncodedMultiblockProofPlonk {
+                    proven_blocks: block_to - block_from + 1,
+                    proof,
                 };
-                let op = storage
-                    .chain()
-                    .block_schema()
-                    .execute_operation(op.clone())
-                    .expect("committer must commit the op into db");
+                let mut verify_multiblock_info = VerifyMultiblockInfo {
+                    block_from,
+                    block_to,
+                    blocks: vec![],
+                    proof: mutliblock_proof.clone(),
+                };
+                for block_number in block_from..=block_to {
+                    info!("New proof for block: {}", block_number);
+                    let block = storage
+                        .chain()
+                        .block_schema()
+                        .load_committed_block(block_number)
+                        .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
+                    verify_multiblock_info.blocks.push(block.clone());
+                    let op = Operation {
+                        action: Action::Verify {
+                            proof: Box::new(Proof::MultiBlock(mutliblock_proof.clone())),
+                        },
+                        block,
+                        accounts_updated: Vec::new(),
+                        id: None,
+                    };
+                    let _op = storage
+                        .chain()
+                        .block_schema()
+                        .execute_operation(op.clone())
+                        .expect("committer must commit the op into db");
+                }
+                storage
+                    .ethereum_schema()
+                    .save_new_multiproof_req(&verify_multiblock_info)
+                    .expect("save_new_multiproof_req fails");
                 tx_for_eth
-                    .send(ETHSenderRequest::SendOperation(op))
+                    .send(ETHSenderRequest::SendMultiproof(verify_multiblock_info))
                     .await
                     .expect("must send an operation for verification to ethereum");
-                last_verified_block += 1;
+
+                last_verified_block = block_to;
             } else {
                 break;
             }

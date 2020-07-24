@@ -23,7 +23,7 @@ pub use crypto_exports::rand;
 use crate::node::block::{Block, PendingBlock};
 use crate::node::BlockNumber;
 use crate::node::{AccountUpdates, TokenId};
-use crate::prover_utils::EncodedProofPlonk;
+use crate::prover_utils::{EncodedMultiblockProofPlonk, EncodedProofPlonk};
 
 use failure::format_err;
 use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
@@ -108,11 +108,41 @@ pub struct EthBlockData {
 
 pub struct ProverRequest(pub BlockNumber);
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum Proof {
+    SingleBlock(EncodedProofPlonk),
+    MultiBlock(EncodedMultiblockProofPlonk),
+}
+
+impl Default for Proof {
+    fn default() -> Self {
+        Self::SingleBlock(EncodedProofPlonk::default())
+    }
+}
+
+impl Proof {
+    /// TODO: refactor this
+    pub fn get_encoded_plonk_proof(&self) -> EncodedProofPlonk {
+        match self {
+            Self::SingleBlock(block_proof) => block_proof.clone(),
+            Self::MultiBlock(multiblock_proof) => multiblock_proof.proof.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifyMultiblockInfo {
+    pub block_from: u32,
+    pub block_to: u32,
+    pub blocks: Vec<Block>,
+    pub proof: EncodedMultiblockProofPlonk,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Action {
     Commit,
-    Verify { proof: Box<EncodedProofPlonk> },
+    Verify { proof: Box<Proof> },
 }
 
 impl Action {

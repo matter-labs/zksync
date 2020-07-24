@@ -11,7 +11,7 @@ pub struct StorageETHOperation {
     pub nonce: i64,
     pub confirmed: bool,
     pub raw_tx: Vec<u8>,
-    pub op_type: String,
+    pub op_type: serde_json::Value,
     pub final_hash: Option<Vec<u8>>,
     pub last_deadline_block: i64,
     pub last_used_gas_price: StoredBigUint,
@@ -37,7 +37,7 @@ pub struct NewETHTxHash {
 pub struct NewETHOperation {
     pub nonce: i64,
     pub raw_tx: Vec<u8>,
-    pub op_type: String,
+    pub op_type: serde_json::Value,
     pub last_deadline_block: i64,
     pub last_used_gas_price: StoredBigUint,
 }
@@ -55,6 +55,20 @@ pub struct ETHBinding {
     pub id: i64,
     pub op_id: i64,
     pub eth_op_id: i64,
+}
+
+#[derive(Debug, Insertable, PartialEq)]
+#[table_name = "verify_multiproof_queue_elements"]
+pub struct NewVerifyMultiproofQueueElement {
+    pub verify_multiblock_info: serde_json::Value,
+}
+
+#[derive(Debug, Queryable, QueryableByName, PartialEq)]
+#[table_name = "verify_multiproof_queue_elements"]
+pub struct VerifyMultiproofQueueElement {
+    pub id: i64,
+    pub verify_multiblock_info: serde_json::Value,
+    pub sended_to_eth: bool,
 }
 
 #[derive(Debug, Queryable, QueryableByName, PartialEq)]

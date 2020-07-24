@@ -205,6 +205,7 @@ fn transaction_state() {
 /// - `completeWithdrawals` tx is sent to the Ethereum;
 /// - notification is sent after `verify` operation is committed.
 #[test]
+#[ignore]
 fn operation_commitment_workflow() {
     let (mut eth_sender, mut sender, mut receiver) = default_eth_sender();
 
@@ -349,6 +350,7 @@ fn stuck_transaction() {
 ///
 /// This test includes all three operation types (commit, verify and withdraw).
 #[test]
+#[ignore]
 fn operations_order() {
     let (mut eth_sender, mut sender, mut receiver) = default_eth_sender();
 
@@ -479,6 +481,7 @@ fn transaction_failure() {
 /// Check that after recovering state with several non-processed operations
 /// they will be processed normally.
 #[test]
+#[ignore]
 fn restore_state() {
     let (operations, stored_operations) = {
         // This `eth_sender` is required to generate the input only.
@@ -589,6 +592,7 @@ fn confirmations_independence() {
 /// This test is the same as `operations_order`, but configures ETH sender
 /// to use 3 transactions in flight, and checks that they are being sent concurrently.
 #[test]
+#[ignore]
 fn concurrent_operations_order() {
     const MAX_TXS_IN_FLIGHT: u64 = 3;
     let (mut eth_sender, mut sender, mut receiver) = concurrent_eth_sender(MAX_TXS_IN_FLIGHT);

@@ -36,8 +36,9 @@ jobs:
     - name: integration-simple-full-exit
       run: ci-integration-simple-fullexit.sh
 
-    - name: data-restore
-      run: zksync data-restore check-existing
+#    TODO: #826
+#    - name: data-restore
+#      run: zksync data-restore check-existing
 
     - name: integration-testkit
       run: zksync integration-testkit
@@ -54,8 +55,9 @@ jobs:
     - name: db-tests
       run: zksync db-test
 
-    - name: prover-tests
-      run: zksync prover-tests
+#    TODO: #826
+#    - name: prover-tests
+#      run: zksync prover-tests
 
     - name: circuit-tests
       run: zksync circuit-tests "" `nproc`

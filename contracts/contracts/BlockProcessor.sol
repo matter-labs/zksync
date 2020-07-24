@@ -1,4 +1,5 @@
 pragma solidity ^0.5.0;
+pragma experimental ABIEncoderV2;
 
 import "./SafeMath.sol";
 import "./SafeMathUInt128.sol";
@@ -81,6 +82,46 @@ contract BlockProcessor is Storage, Config, Events {
         totalBlocksVerified += 1;
 
         emit BlockVerification(_blockNumber);
+    }
+
+    /// @notice Creates multiblcok commitment
+    /// @param _blockNumberFrom Block number from
+    /// @param _blockNumberTo Block number to
+    function createMultiblockCommitment(uint32 _blockNumberFrom, uint32 _blockNumberTo)
+        internal returns (bytes32 commitment) {
+        return bytes32(uint256(0));
+    }
+
+    /// @notice Multiblock verification.
+    /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
+    /// @param _blockNumberFrom Block number from
+    /// @param _blockNumberTo Block number to
+    /// @param _proof Multiblock proof
+    /// @param _withdrawalsData Blocks withdrawals data
+    function verifyBlocks(uint32 _blockNumberFrom, uint32 _blockNumberTo, uint256[] calldata _proof, bytes[] calldata _withdrawalsData)
+        external
+    {
+        require(_blockNumberFrom <= _blockNumberTo, "vbs11"); // vbs11 - must verify non empty sequence of blocks
+        require(_blockNumberFrom == totalBlocksVerified + 1, "mbfvk11"); // only verify from next block
+        governance.requireActiveValidator(msg.sender);
+
+        bytes32 multiblockCommitment = createMultiblockCommitment(_blockNumberFrom, _blockNumberTo);
+
+        require(verifier.verifyMultiblockProof(_proof, multiblockCommitment), "mbfvk13"); // proof verification failed
+
+        for (uint32 _blockNumber = _blockNumberFrom; _blockNumber <= _blockNumberTo; _blockNumber++){
+            processOnchainWithdrawals(_withdrawalsData[_blockNumber - _blockNumberFrom], blocks[_blockNumber].withdrawalsDataHash);
+        }
+
+        for (uint32 _blockNumber = _blockNumberFrom; _blockNumber <= _blockNumberTo; _blockNumber++){
+            deleteRequests(
+                blocks[_blockNumber].priorityOperations
+            );
+        }
+
+        totalBlocksVerified = _blockNumberTo;
+
+        emit MultiblockVerification(_blockNumberFrom, _blockNumberTo);
     }
 
 
