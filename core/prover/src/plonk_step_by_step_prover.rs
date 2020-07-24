@@ -24,7 +24,7 @@ impl<C: ApiClient> PlonkStepByStepProver<C> {
         &self,
         _data: Vec<(EncodedProofPlonk, usize)>,
     ) -> Result<EncodedProofPlonk, BabyProverError> {
-        /// TODO (AV)
+        // TODO (AV)
         let mut res = EncodedProofPlonk::default();
         use models::node::U256;
         res.proof[0] = U256::from(15);
@@ -119,7 +119,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
                 block_from,
                 block_to
             );
-            return Ok(());
+            Ok(())
         } else {
             // first we try last proved block, since we have precomputations for it
             let block_size_idx_to_try_first =

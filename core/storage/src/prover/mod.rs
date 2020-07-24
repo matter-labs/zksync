@@ -183,7 +183,7 @@ impl<'a> ProverSchema<'a> {
                 let blocks = diesel::sql_query(query).load::<MultiproofBlockItem>(self.0.conn())?;
                 if !blocks.is_empty() {
                     let mut batch_size = 1;
-                    while batch_size < max_block_batch_size_ && batch_size + 1 <= blocks.len()
+                    while batch_size < max_block_batch_size_ && batch_size < blocks.len()
                         && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
                         && blocks[batch_size].multiblock_already_generated == false {
                         batch_size += 1;
@@ -258,7 +258,7 @@ impl<'a> ProverSchema<'a> {
                 let blocks = diesel::sql_query(query).load::<MultiproofBlockItem>(self.0.conn())?;
                 if !blocks.is_empty() {
                     let mut batch_size = 1;
-                    while batch_size < max_block_batch_size_ && batch_size + 1 <= blocks.len()
+                    while batch_size < max_block_batch_size_ && batch_size < blocks.len()
                         && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
                         && blocks[batch_size].multiblock_already_generated == false {
                         batch_size += 1;
