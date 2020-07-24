@@ -375,7 +375,7 @@ fn required_replicas(
     let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
 
     let needed_count = oracle
-        .provers_required()
+        .provers_required(data.blocks_batch_timeout, data.max_block_batch_size)
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
     let response = RequiredReplicasOutput { needed_count };

@@ -135,6 +135,68 @@ impl<'a> ProverSchema<'a> {
             })
     }
 
+    pub fn multiblock_job_exists(
+        &self,
+        blocks_batch_timeout_: time::Duration,
+        max_block_batch_size_: usize,
+    ) -> QueryResult<bool> {
+        self
+            .0
+            .conn()
+            .transaction(|| {
+                let first_unverified_block_query = format!(" \
+                    SELECT COALESCE(min(block_to + 1),0) AS integer_value FROM multiblock_proofs proof1 \
+                        WHERE NOT EXISTS ( \
+                            SELECT * FROM multiblock_proofs proof2 \
+                            WHERE \
+                                proof2.block_from <= proof1.block_to + 1 AND proof1.block_to + 1 <= proof2.block_to \
+                        ) \
+                    ",
+                );
+
+                let first_unverified_block_ = if self.load_multiblock_proof(1).is_ok() {
+                    diesel::sql_query(first_unverified_block_query).get_result::<Option<IntegerNumber>>(self.0.conn())?
+                        .map(|index| index.integer_value).unwrap_or_default()
+                } else {
+                    1
+                };
+
+                let query = format!(" \
+                    WITH suitable_blocks AS ( \
+                        SELECT * FROM operations o \
+                        WHERE action_type = 'COMMIT' \
+                            AND block_number >= '{first_unverified_block}'
+                            AND EXISTS \
+                                (SELECT * FROM proofs WHERE block_number = o.block_number) \
+                    ) \
+                    SELECT \
+                        block_number, \
+                        ((now() - created_at) > interval '{blocks_batch_timeout} seconds') as blocks_batch_timeout_passed, \
+                        (EXISTS (SELECT * FROM multiblock_proofs WHERE block_from <= block_number AND block_to >= block_number)) as multiblock_already_generated \
+                    FROM suitable_blocks \
+                    order by suitable_blocks.block_number \
+                    ",
+                    first_unverified_block=first_unverified_block_,
+                    blocks_batch_timeout=blocks_batch_timeout_.as_secs()
+                );
+
+                let blocks = diesel::sql_query(query).load::<MultiproofBlockItem>(self.0.conn())?;
+                if !blocks.is_empty() {
+                    let mut batch_size = 1;
+                    while batch_size < max_block_batch_size_ && batch_size + 1 <= blocks.len()
+                        && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
+                        && blocks[batch_size].multiblock_already_generated == false {
+                        batch_size += 1;
+                    }
+                    if batch_size == max_block_batch_size_ || blocks[0].blocks_batch_timeout_passed {
+                        return Ok(true);
+                    }
+                }
+
+                Ok(false)
+            })
+    }
+
     /// Сhooses the next multiblock to prove for the certain prover.
     /// Returns `None` if either there are no multiblocks to prove, or
     /// there is already an ongoing job for non-proved multiblocks.
