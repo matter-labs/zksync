@@ -188,6 +188,7 @@ table! {
         id -> Int8,
         tx_hash -> Text,
         tx -> Jsonb,
+        batch_id -> Nullable<Int8>,
     }
 }
 
