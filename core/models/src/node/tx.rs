@@ -354,7 +354,8 @@ impl TransferFrom {
             && is_fee_amount_packable(&self.fee)
             && self.to_account_id <= max_account_id()
             && self.token <= max_token_id()
-            && self.to != Address::zero();
+            && self.to != Address::zero()
+            && self.valid_from <= self.valid_until;
         if valid {
             let from_signer = self.verify_from_signature();
             let to_signer = self.verify_to_signature();

@@ -207,6 +207,7 @@ table! {
         chunks_left -> Int8,
         unprocessed_priority_op_before -> Int8,
         pending_block_iteration -> Int8,
+        block_timestamp -> Nullable<Int8>,
     }
 }
 

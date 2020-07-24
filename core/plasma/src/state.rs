@@ -5,7 +5,7 @@ use models::node::operations::{
     TransferToNewOp, WithdrawOp,
 };
 use models::node::tx::ChangePubKey;
-use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
+use models::node::{Account, AccountTree, BlockTimestamp, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
@@ -33,6 +33,9 @@ pub struct PlasmaState {
 
     /// Current block number
     pub block_number: BlockNumber,
+    /// Current block timestamp.
+    /// Could be undefined during priority op execution, since it is set before first tx execution in block
+    pub block_timestamp: BlockTimestamp,
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +68,7 @@ impl PlasmaState {
             balance_tree,
             block_number: 0,
             account_id_by_address: HashMap::new(),
+            block_timestamp: 0u64.into(),
         }
     }
 
@@ -86,6 +90,7 @@ impl PlasmaState {
             balance_tree,
             block_number: current_block,
             account_id_by_address,
+            block_timestamp: 0u64.into(),
         }
     }
 
@@ -310,6 +315,19 @@ impl PlasmaState {
     }
 
     fn create_transfer_from_op(&self, tx: TransferFrom) -> Result<TransferFromOp, Error> {
+        ensure!(
+            tx.valid_from <= self.block_timestamp.0,
+            "Transaction valid from timestamp is incorrect, valid_from: {}, timestamp: {}",
+            tx.valid_from,
+            self.block_timestamp.0
+        );
+        ensure!(
+            tx.valid_until >= self.block_timestamp.0,
+            "Transaction valid until timestamp is incorrect, valid_until: {}, timestamp: {}",
+            tx.valid_until,
+            self.block_timestamp.0
+        );
+
         ensure!(
             tx.token <= params::max_token_id(),
             "Token id is not supported"
