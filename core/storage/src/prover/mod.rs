@@ -252,7 +252,8 @@ impl<'a> ProverSchema<'a> {
                     order by suitable_blocks.block_number \
                     ",
                     first_unverified_block=first_unverified_block_,
-                    prover_timeout_secs=prover_timeout.as_secs(), blocks_batch_timeout=blocks_batch_timeout_.as_secs()
+                    prover_timeout_secs=prover_timeout.as_secs(),
+                    blocks_batch_timeout=blocks_batch_timeout_.as_secs(),
                 );
 
                 let blocks = diesel::sql_query(query).load::<MultiproofBlockItem>(self.0.conn())?;
