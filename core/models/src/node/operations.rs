@@ -683,6 +683,9 @@ impl FranklinOp {
             ChangePubKeyOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOffchain(Box::new(
                 ChangePubKeyOp::from_public_data(&bytes)?,
             ))),
+            TransferFromOp::OP_CODE => Ok(FranklinOp::TransferFrom(Box::new(
+                TransferFromOp::from_public_data(&bytes)?,
+            ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -697,6 +700,7 @@ impl FranklinOp {
             TransferOp::OP_CODE => Ok(TransferOp::CHUNKS),
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
+            TransferFromOp::OP_CODE => Ok(TransferFromOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
@@ -706,6 +710,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Transfer(op) => Ok(FranklinTx::Transfer(Box::new(op.tx.clone()))),
             FranklinOp::TransferToNew(op) => Ok(FranklinTx::Transfer(Box::new(op.tx.clone()))),
+            FranklinOp::TransferFrom(op) => Ok(FranklinTx::TransferFrom(Box::new(op.tx.clone()))),
             FranklinOp::Withdraw(op) => Ok(FranklinTx::Withdraw(Box::new(op.tx.clone()))),
             FranklinOp::Close(op) => Ok(FranklinTx::Close(Box::new(op.tx.clone()))),
             FranklinOp::ChangePubKeyOffchain(op) => {
