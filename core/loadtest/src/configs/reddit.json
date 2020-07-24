@@ -5,5 +5,5 @@
     },
     "block_timeout": 120,
     "token_id": 0,
-    "token_id": "ETH"
+    "token_name": "ETH"
 }

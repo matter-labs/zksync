@@ -16,10 +16,14 @@
 // Additional: measure time to run the test.
 
 // Built-in deps
-use std::{iter::Iterator, time::Duration};
+use std::{
+    iter::Iterator,
+    sync::atomic::{AtomicU32, Ordering},
+    time::Duration,
+};
 // External deps
 use chrono::Utc;
-use futures::future::try_join_all;
+// use futures::future::try_join_all;
 use num::BigUint;
 use tokio::fs;
 use web3::{
@@ -32,7 +36,11 @@ use testkit::zksync_account::ZksyncAccount;
 // Local deps
 use crate::{
     rpc_client::RpcClient,
-    scenarios::{configs::RedditConfig, utils::wait_for_commit, ScenarioContext},
+    scenarios::{
+        configs::RedditConfig,
+        utils::{deposit_single, wait_for_commit},
+        ScenarioContext,
+    },
     test_accounts::TestAccount,
 };
 
@@ -56,6 +64,9 @@ struct ScenarioExecutor {
 
     /// Amount of time to wait for one zkSync block to be verified.
     verify_timeout: Duration,
+
+    /// Counter for operations.
+    counter: AtomicU32,
 
     /// Event loop handle so transport for Eth account won't be invalidated.
     _event_loop_handle: EventLoopHandle,
@@ -92,6 +103,8 @@ impl ScenarioExecutor {
             accounts,
             verify_timeout,
             token: (config.token_id, config.token_name),
+
+            counter: 0.into(),
 
             _event_loop_handle,
         }
@@ -152,11 +165,14 @@ impl ScenarioExecutor {
 
         self.initialize().await?;
 
-        let account_futures: Vec<_> = (0..N_ACCOUNTS)
-            .map(|account_id| self.one_account_run(account_id))
-            .collect();
+        // let account_futures: Vec<_> = (0..N_ACCOUNTS)
+        //     .map(|account_id| self.one_account_run(account_id))
+        //     .collect();
 
-        try_join_all(account_futures).await?;
+        // try_join_all(account_futures).await?;
+        for account_id in 0..N_ACCOUNTS {
+            self.one_account_run(account_id).await?;
+        }
 
         // After executing these futures we must send one more (random) tx and wait it to be
         // verified. The verification will mean that all the previously sent txs are verified as well.
@@ -170,6 +186,60 @@ impl ScenarioExecutor {
 
     /// Initializes the test, preparing the main account for the interaction.
     async fn initialize(&mut self) -> Result<(), failure::Error> {
+        if self.token.0 == 0 {
+            log::info!("Token ID is 0 (ETH). Assuming that genesis account has to be initialized");
+
+            // 1. Update the account nonce.
+            self.genesis_account
+                .update_nonce_values(&self.rpc_client)
+                .await?;
+
+            // 2. Perform a deposit
+            deposit_single(
+                &self.genesis_account,
+                BigUint::from(10u64).modpow(&BigUint::from(19u64), &BigUint::from(1u64)),
+                &self.rpc_client,
+            )
+            .await?;
+
+            // 3. Set the account ID.
+            let resp = self
+                .rpc_client
+                .account_state_info(self.genesis_account.zk_acc.address)
+                .await
+                .expect("rpc error");
+            assert!(resp.id.is_some(), "Account ID is none for new account");
+            self.genesis_account.zk_acc.set_account_id(resp.id);
+
+            // 4. Send the `ChangePubKey` tx to be able to work with account.
+            let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
+                self.genesis_account
+                    .zk_acc
+                    .create_change_pubkey_tx(None, true, false),
+            ));
+
+            let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+
+            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
+            log::info!("Genesis account initialized successfully");
+        } else {
+            log::info!(
+                "Token for test is not ETH (id: {}, symbol: {}). \
+                Assuming that account was initialized externally.",
+                self.token.0,
+                &self.token.1
+            );
+
+            // We only have to update the account ID.
+            let resp = self
+                .rpc_client
+                .account_state_info(self.genesis_account.zk_acc.address)
+                .await
+                .expect("rpc error");
+            assert!(resp.id.is_some(), "Account ID is none for new account");
+            self.genesis_account.zk_acc.set_account_id(resp.id);
+        }
+
         Ok(())
     }
 
@@ -199,20 +269,32 @@ impl ScenarioExecutor {
             self.transfer_funds(account).await?
         }
 
+        self.counter.fetch_add(1, Ordering::SeqCst);
+        let total = self.counter.load(Ordering::SeqCst);
+        if total % 50 == 0 {
+            log::info!(
+                "Performing loadtest... {} / {} iterations complete",
+                total,
+                N_ACCOUNTS
+            );
+        }
+
         Ok(())
     }
 
     async fn initialize_account(&self, account: &ZksyncAccount) -> Result<(), failure::Error> {
-        // 1. Send the `ChangePubKey` tx to add the account to the tree (this behavior must be implemented beforehand).
-        // Note: This currently won't work, as now account ID has to exist *before* sending the `ChangePubKey`.
-        let change_pubkey_tx =
-            FranklinTx::ChangePubKey(Box::new(account.create_change_pubkey_tx(None, true, false)));
+        // 1. Send the `Transfer` with 0 amount to account to initialize it.
+        let from_acc = &self.genesis_account.zk_acc;
+        let to_acc = account;
 
-        let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+        let fee = self.transfer_fee(&to_acc).await;
+        let (transfer_tx, eth_sign) = self.sign_transfer(from_acc, to_acc, 0u64, fee);
+
+        let tx_hash = self.rpc_client.send_tx(transfer_tx, eth_sign).await?;
 
         wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
 
-        // 2. Set the account ID (required for transfers).
+        // 2. Set the account ID.
         let resp = self
             .rpc_client
             .account_state_info(account.address)
@@ -220,6 +302,14 @@ impl ScenarioExecutor {
             .expect("rpc error");
         assert!(resp.id.is_some(), "Account ID is none for new account");
         account.set_account_id(resp.id);
+
+        // 3. Send the `ChangePubKey` tx to be able to work with account.
+        let change_pubkey_tx =
+            FranklinTx::ChangePubKey(Box::new(account.create_change_pubkey_tx(None, true, false)));
+
+        let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+
+        wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
 
         Ok(())
     }
@@ -326,7 +416,7 @@ impl ScenarioExecutor {
     async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
         let fee = self
             .rpc_client
-            .get_tx_fee("Transfer", to_acc.address, "ETH")
+            .get_tx_fee("Transfer", to_acc.address, &self.token.1)
             .await
             .expect("Can't get tx fee");
 
@@ -366,19 +456,9 @@ impl ScenarioExecutor {
         amount: impl Into<BigUint>,
         fee: impl Into<BigUint>,
     ) -> FranklinTx {
-        // TODO: Stub
+        let tx = to.sign_transfer_from(from, self.token.0, amount.into(), fee.into(), None, true);
 
-        let (tx, _eth_signature) = from.sign_transfer(
-            self.token.0,
-            &self.token.1,
-            amount.into(),
-            fee.into(),
-            &to.address,
-            None,
-            true,
-        );
-
-        FranklinTx::Transfer(Box::new(tx))
+        FranklinTx::TransferFrom(Box::new(tx))
     }
 
     fn create_subscription_account(
