@@ -88,8 +88,7 @@ contract BlockProcessor is Storage, Config, Events {
     /// @param _blockNumberFrom Block number from
     /// @param _blockNumberTo Block number to
     function createMultiblockCommitment(uint32 _blockNumberFrom, uint32 _blockNumberTo)
-        internal returns (bytes32 commitment)
-    {
+        internal returns (bytes32 commitment) {
         return bytes32(uint256(0));
     }
 
