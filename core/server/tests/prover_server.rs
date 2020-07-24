@@ -18,7 +18,12 @@ use prover::{client, ApiClient};
 use circuit::witness::utils::get_used_subtree_root_hash;
 use server::prover_server;
 
-fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
+fn spawn_server(
+    prover_timeout: time::Duration,
+    blocks_batch_timeout: time::Duraion,
+    max_block_batch_size: usize,
+    rounds_interval: time::Duration,
+) -> String {
     // TODO: make single server spawn for all tests
     let bind_to = "127.0.0.1:8088";
     let conn_pool = storage::ConnectionPool::new(Some(1));
@@ -30,6 +35,8 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
             conn_pool,
             addr,
             prover_timeout,
+            blocks_batch_timeout,
+            max_block_batch_size,
             rounds_interval,
             tx,
             tree,
@@ -149,8 +156,8 @@ fn api_client_simple_simulation() {
     assert!(to_prove.is_none());
 
     let prover_data = client
-        .prover_data(block)
-        .expect("failed to get prover data");
+        .prover_block_data(block)
+        .expect("failed to get prover block data");
     assert_eq!(prover_data.old_root, Some(wanted_prover_data.old_root));
     assert_eq!(
         prover_data.pub_data_commitment,
@@ -341,13 +348,13 @@ fn api_server_publish_dummy() {
 
     let client = reqwest::blocking::Client::new();
     let res = client
-        .post(&format!("http://{}/publish", &addr))
+        .post(&format!("http://{}/publish_block", &addr))
         .json(&client::PublishReq {
             block: 1,
             proof: EncodedProofPlonk::default(),
         })
         .send()
-        .expect("failed to send publish request");
+        .expect("failed to send publish_block request");
 
     assert_eq!(res.status(), reqwest::StatusCode::OK);
 }

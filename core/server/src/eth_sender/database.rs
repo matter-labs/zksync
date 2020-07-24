@@ -12,7 +12,7 @@ use web3::types::{H256, U256};
 // Workspace uses
 use models::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
-    Operation,
+    ActionType, Operation,
 };
 use storage::ConnectionPool;
 // Local uses
@@ -23,7 +23,15 @@ pub(super) trait DatabaseAccess {
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
     /// Unprocessed operations are zkSync operations that were not started at all.
-    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error>;
+    fn restore_state(
+        &self,
+    ) -> Result<
+        (
+            VecDeque<ETHOperation>,
+            Vec<(OperationType, Option<Operation>)>,
+        ),
+        failure::Error,
+    >;
 
     /// Saves a new unconfirmed operation to the database.
     fn save_new_eth_tx(
@@ -79,7 +87,15 @@ impl Database {
 }
 
 impl DatabaseAccess for Database {
-    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error> {
+    fn restore_state(
+        &self,
+    ) -> Result<
+        (
+            VecDeque<ETHOperation>,
+            Vec<(OperationType, Option<Operation>)>,
+        ),
+        failure::Error,
+    > {
         let storage = self
             .db_pool
             .access_storage()
@@ -87,7 +103,22 @@ impl DatabaseAccess for Database {
 
         let unconfirmed_ops = storage.ethereum_schema().load_unconfirmed_operations()?;
         let unprocessed_ops = storage.ethereum_schema().load_unprocessed_operations()?;
-        Ok((unconfirmed_ops, unprocessed_ops))
+        let unprocessed_verify_multiblocks = storage
+            .ethereum_schema()
+            .load_unprocessed_verify_multiblocks()?;
+        let mut all_unprocessed = vec![];
+        for unprocessed_op in unprocessed_ops {
+            if unprocessed_op.action.get_type() == ActionType::COMMIT {
+                all_unprocessed.push((OperationType::Commit, Some(unprocessed_op)));
+            }
+        }
+        for unprocessed_verify_multiblock in unprocessed_verify_multiblocks {
+            all_unprocessed.push((
+                OperationType::VerifyMultiblock(unprocessed_verify_multiblock),
+                None,
+            ));
+        }
+        Ok((unconfirmed_ops, all_unprocessed))
     }
 
     fn save_new_eth_tx(

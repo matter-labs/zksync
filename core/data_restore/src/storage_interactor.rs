@@ -6,7 +6,7 @@ use web3::types::H256;
 use models::{
     node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
     prover_utils::EncodedProofPlonk,
-    Action, NewTokenEvent, Operation,
+    Action, NewTokenEvent, Operation, Proof,
 };
 use storage::{
     data_restore::records::{
@@ -80,7 +80,7 @@ pub fn update_tree_state(
 
         let verify_op = Operation {
             action: Action::Verify {
-                proof: Box::new(EncodedProofPlonk::default()),
+                proof: Box::new(Proof::SingleBlock(EncodedProofPlonk::default())),
             },
             block,
             accounts_updated: Vec::new(),

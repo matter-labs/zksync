@@ -23,7 +23,7 @@ use models::{
 use prover::{
     plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
     prover_data::ProverData,
-    ProverImpl,
+    ProverImpl, ProverJob,
 };
 
 #[test]
@@ -191,7 +191,7 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         Ok(*block_to_prove)
     }
 
-    fn working_on(&self, job: i32) -> Result<(), failure::Error> {
+    fn working_on(&self, job: ProverJob) -> Result<(), failure::Error> {
         let stored = self.block_to_prove.lock().unwrap();
         if let Some((_, stored)) = *stored {
             if stored != job {
@@ -202,7 +202,7 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         Ok(())
     }
 
-    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
+    fn prover_block_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
@@ -213,7 +213,7 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         Err(failure::format_err!("mock not configured"))
     }
 
-    fn publish(&self, _block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error> {
+    fn publish_block(&self, _block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();
         *block_to_prove = None;

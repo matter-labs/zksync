@@ -13,7 +13,7 @@ use models::{
         block::{ExecutedPriorityOp, ExecutedTx},
         BlockNumber, FranklinOp, FranklinTx, PriorityOp,
     },
-    Action, ActionType, Operation,
+    Action, ActionType, Operation, Proof,
 };
 // Local imports
 use crate::{
@@ -37,7 +37,9 @@ impl StoredOperation {
         let action = if self.action_type == ActionType::COMMIT.to_string() {
             Action::Commit
         } else if self.action_type == ActionType::VERIFY.to_string() {
-            let proof = Box::new(ProverSchema(&conn).load_proof(block_number)?);
+            let proof = Box::new(Proof::SingleBlock(
+                ProverSchema(&conn).load_proof(block_number)?,
+            ));
             Action::Verify { proof }
         } else {
             unreachable!("Incorrect action type in db");

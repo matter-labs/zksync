@@ -10,6 +10,9 @@ use models::node::BlockNumber;
 use models::prover_utils::EncodedProofPlonk;
 // Local imports
 use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
+use crate::prover::records::{
+    MultiproofBlockItem, NewMultiblockProof, ProverMultiblockRun, StoredMultiblockProof,
+};
 use crate::{chain::block::BlockSchema, StorageProcessor};
 
 pub mod records;
@@ -132,11 +135,106 @@ impl<'a> ProverSchema<'a> {
             })
     }
 
+    /// Сhooses the next multiblock to prove for the certain prover.
+    /// Returns `None` if either there are no multiblocks to prove, or
+    /// there is already an ongoing job for non-proved multiblocks.
+    pub fn prover_multiblock_run(
+        &self,
+        worker_: &str,
+        prover_timeout: time::Duration,
+        blocks_batch_timeout_: time::Duration,
+        max_block_batch_size_: usize,
+    ) -> QueryResult<Option<ProverMultiblockRun>> {
+        // Select multiblock to prove.
+        self
+            .0
+            .conn()
+            .transaction(|| {
+                sql_query("LOCK TABLE prover_multiblock_runs IN EXCLUSIVE MODE").execute(self.0.conn())?;
+
+                let first_unverified_block_query = format!(" \
+                    SELECT COALESCE(min(block_to + 1),0) AS integer_value FROM multiblock_proofs proof1 \
+                        WHERE NOT EXISTS ( \
+                            SELECT * FROM multiblock_proofs proof2 \
+                            WHERE \
+                                proof2.block_from <= proof1.block_to + 1 AND proof1.block_to + 1 <= proof2.block_to \
+                        ) \
+                    ",
+                );
+
+                let first_unverified_block_ = if self.load_multiblock_proof(1).is_ok() {
+                    diesel::sql_query(first_unverified_block_query).get_result::<Option<IntegerNumber>>(self.0.conn())?
+                        .map(|index| index.integer_value).unwrap_or_default()
+                } else {
+                    1
+                };
+
+                let query = format!(" \
+                    WITH suitable_blocks AS ( \
+                        SELECT * FROM operations o \
+                        WHERE action_type = 'COMMIT' \
+                            AND block_number >= '{first_unverified_block}'
+                            AND EXISTS \
+                                (SELECT * FROM proofs WHERE block_number = o.block_number) \
+                            AND NOT EXISTS \
+                                (SELECT * FROM prover_multiblock_runs \
+                                    WHERE block_number_from <= o.block_number \
+                                    AND block_number_to >= o.block_number \
+                                    AND (now() - updated_at) < interval '{prover_timeout_secs} seconds') \
+                    ) \
+                    SELECT \
+                        block_number, \
+                        ((now() - created_at) > interval '{blocks_batch_timeout} seconds') as blocks_batch_timeout_passed, \
+                        (EXISTS (SELECT * FROM multiblock_proofs WHERE block_from <= block_number AND block_to >= block_number)) as multiblock_already_generated \
+                    FROM suitable_blocks \
+                    order by suitable_blocks.block_number \
+                    ",
+                    first_unverified_block=first_unverified_block_,
+                    prover_timeout_secs=prover_timeout.as_secs(), blocks_batch_timeout=blocks_batch_timeout_.as_secs()
+                );
+
+                let blocks = diesel::sql_query(query).load::<MultiproofBlockItem>(self.0.conn())?;
+                if !blocks.is_empty() {
+                    let mut batch_size = 1;
+                    while batch_size < max_block_batch_size_ && batch_size + 1 <= blocks.len()
+                        && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
+                        && blocks[batch_size].multiblock_already_generated == false {
+                        batch_size += 1;
+                    }
+                    if batch_size == max_block_batch_size_ || blocks[0].blocks_batch_timeout_passed {
+                        // we found a job for prover
+                        use crate::schema::prover_multiblock_runs::dsl::*;
+                        let inserted: ProverMultiblockRun = insert_into(prover_multiblock_runs)
+                            .values(&vec![(
+                                block_number_from.eq(i64::from(blocks[0].block_number)),
+                                block_number_to.eq(i64::from(blocks[batch_size - 1].block_number)),
+                                worker.eq(worker_.to_string()),
+                            )])
+                            .get_result(self.0.conn())?;
+                        return Ok(Some(inserted));
+                    }
+                }
+
+                Ok(None)
+            })
+    }
+
     /// Updates the state of ongoing prover job.
     pub fn record_prover_is_working(&self, job_id: i32) -> QueryResult<()> {
         use crate::schema::prover_runs::dsl::*;
 
         let target = prover_runs.filter(id.eq(job_id));
+        diesel::update(target)
+            .set(updated_at.eq(now))
+            .execute(self.0.conn())
+            .map(|_| ())
+    }
+
+    /// Updates the state of ongoing prover multiblock job.
+    pub fn record_prover_multiblock_is_working(&self, job_id: i32) -> QueryResult<()> {
+        use crate::schema::prover_multiblock_runs::dsl::*;
+
+        let target = prover_multiblock_runs.filter(id.eq(job_id));
         diesel::update(target)
             .set(updated_at.eq(now))
             .execute(self.0.conn())
@@ -194,6 +292,25 @@ impl<'a> ProverSchema<'a> {
         insert_into(proofs).values(&to_store).execute(self.0.conn())
     }
 
+    /// Stores the multiblock proof.
+    pub fn store_multiblock_proof(
+        &self,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+        proof: &EncodedProofPlonk,
+    ) -> QueryResult<()> {
+        let to_store = NewMultiblockProof {
+            block_from: i64::from(block_from),
+            block_to: i64::from(block_to),
+            proof: serde_json::to_value(proof).unwrap(),
+        };
+        use crate::schema::multiblock_proofs::dsl::multiblock_proofs;
+        insert_into(multiblock_proofs)
+            .values(to_store)
+            .execute(self.0.conn())?;
+        Ok(())
+    }
+
     /// Gets the stored proof for a block.
     pub fn load_proof(&self, block_number: BlockNumber) -> QueryResult<EncodedProofPlonk> {
         use crate::schema::proofs::dsl;
@@ -201,5 +318,23 @@ impl<'a> ProverSchema<'a> {
             .filter(dsl::block_number.eq(i64::from(block_number)))
             .get_result(self.0.conn())?;
         Ok(serde_json::from_value(stored.proof).unwrap())
+    }
+
+    /// Gets the stored multiblock proof.
+    pub fn load_multiblock_proof(
+        &self,
+        block_from: BlockNumber,
+    ) -> QueryResult<((BlockNumber, BlockNumber), EncodedProofPlonk)> {
+        use crate::schema::multiblock_proofs::dsl;
+        let stored: StoredMultiblockProof = dsl::multiblock_proofs
+            .filter(dsl::block_from.eq(i64::from(block_from)))
+            .get_result(self.0.conn())?;
+        Ok((
+            (
+                stored.block_from as BlockNumber,
+                stored.block_to as BlockNumber,
+            ),
+            serde_json::from_value(stored.proof).unwrap(),
+        ))
     }
 }

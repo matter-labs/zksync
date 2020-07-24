@@ -11,10 +11,12 @@ use futures::channel::mpsc;
 use log::{info, trace};
 // Workspace deps
 use models::{circuit::CircuitAccountTree, config_options::ThreadPanicNotify, node::BlockNumber};
-use prover::client;
+use prover::{client, ProverJob};
 use storage::ConnectionPool;
 // Local deps
 use crate::prover_server::scaler::ScalerOracle;
+use models::prover_utils::EncodedProofPlonk;
+use prover::client::MultiblockDataReq;
 
 mod pool;
 mod scaler;
@@ -25,6 +27,8 @@ struct AppState {
     preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
     scaler_oracle: Arc<RwLock<ScalerOracle>>,
     prover_timeout: Duration,
+    blocks_batch_timeout: Duration,
+    max_block_batch_size: usize,
 }
 
 impl AppState {
@@ -32,6 +36,8 @@ impl AppState {
         connection_pool: ConnectionPool,
         preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
         prover_timeout: Duration,
+        blocks_batch_timeout: Duration,
+        max_block_batch_size: usize,
         idle_provers: u32,
     ) -> Self {
         let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(
@@ -44,6 +50,8 @@ impl AppState {
             preparing_data_pool,
             scaler_oracle,
             prover_timeout,
+            blocks_batch_timeout,
+            max_block_batch_size,
         }
     }
 
@@ -111,20 +119,118 @@ fn block_to_prove(
     }
 }
 
-fn prover_data(
+fn multiblock_to_prove(
+    data: web::Data<AppState>,
+    r: web::Json<client::ProverMultiblockReq>,
+) -> actix_web::Result<HttpResponse> {
+    trace!("request multiblock to prove from worker: {}", r.name);
+    if r.name == "" {
+        return Err(actix_web::error::ErrorBadRequest("empty name"));
+    }
+    let storage = data.access_storage()?;
+    let ret = storage
+        .prover_schema()
+        .prover_multiblock_run(
+            &r.name,
+            data.prover_timeout,
+            data.blocks_batch_timeout,
+            data.max_block_batch_size,
+        )
+        .map_err(|e| {
+            vlog::warn!("could not get next unverified block sequence: {}", e);
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })?;
+    if let Some(prover_run) = ret {
+        info!(
+            "satisfied request multiblock with indexes [{};{}] to prove from worker: {}",
+            prover_run.block_number_from, prover_run.block_number_to, r.name
+        );
+        Ok(HttpResponse::Ok().json(client::MultiblockToProveRes {
+            prover_run_id: prover_run.id,
+            block_from: prover_run.block_number_from,
+            block_to: prover_run.block_number_to,
+        }))
+    } else {
+        Ok(HttpResponse::Ok().json(client::MultiblockToProveRes {
+            prover_run_id: 0,
+            block_from: 0,
+            block_to: 0,
+        }))
+    }
+}
+
+fn prover_block_data(
     data: web::Data<AppState>,
     block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    trace!("Got request for prover_data for block {}", *block);
+    trace!("Got request for prover_block_data for block {}", *block);
     let data_pool = data
         .preparing_data_pool
         .read()
         .expect("failed to get read lock on data");
     let res = data_pool.get(*block);
     if res.is_some() {
-        info!("Sent prover_data for block {}", *block);
+        info!("Sent prover_block_data for block {}", *block);
     }
     Ok(HttpResponse::Ok().json(res))
+}
+
+fn prover_multiblock_data(
+    data: web::Data<AppState>,
+    r: web::Json<MultiblockDataReq>,
+) -> actix_web::Result<HttpResponse> {
+    trace!(
+        "Got request for prover_multiblock_data for multiblock [{};{}]",
+        r.block_from,
+        r.block_to
+    );
+    let storage = data
+        .access_storage()
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+    let mut res: Vec<(EncodedProofPlonk, usize)> = vec![];
+    for block_num in r.block_from..=r.block_to {
+        let current_block_proof = storage
+            .prover_schema()
+            .load_proof(block_num as BlockNumber)
+            .map_err(|e| {
+                vlog::warn!("failed to load proof of block {}: {}", block_num, e);
+                actix_web::error::ErrorInternalServerError("storage layer error")
+            });
+        let current_block = storage
+            .chain()
+            .block_schema()
+            .get_block(block_num as BlockNumber)
+            .map_err(|e| {
+                vlog::warn!("failed to load block {}: {}", block_num, e);
+                actix_web::error::ErrorInternalServerError("storage layer error")
+            })?;
+        match current_block_proof {
+            Ok(proof) => {
+                res.push((
+                    proof,
+                    current_block
+                        .expect("block must be loaded")
+                        .block_chunks_size,
+                ));
+            }
+            Err(e) => {
+                warn!(
+                    "prover requested prover_multiblock_data for multiblock [{};{}], but proof for block {} is not already stored in db: {}",
+                    r.block_from,
+                    r.block_to,
+                    block_num,
+                    e
+                );
+
+                return Ok(HttpResponse::Ok().json(Option::<Vec<(EncodedProofPlonk, usize)>>::None));
+            }
+        }
+    }
+    info!(
+        "Sent prover_multiblock_data for multiblock [{};{}]",
+        r.block_from, r.block_to
+    );
+    Ok(HttpResponse::Ok().json(Some(res)))
 }
 
 fn working_on(
@@ -133,23 +239,35 @@ fn working_on(
 ) -> actix_web::Result<()> {
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
-    trace!(
-        "Received heartbeat for prover_run with id: {}",
-        r.prover_run_id
-    );
+    trace!("Received heartbeat for prover_run: {:?}", r.prover_run);
     let storage = data
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    storage
-        .prover_schema()
-        .record_prover_is_working(r.prover_run_id)
-        .map_err(|e| {
-            vlog::warn!("failed to record prover work in progress request: {}", e);
-            actix_web::error::ErrorInternalServerError("storage layer error")
-        })
+    match r.prover_run {
+        ProverJob::BlockProve(job_id) => storage
+            .prover_schema()
+            .record_prover_is_working(job_id)
+            .map_err(|e| {
+                vlog::warn!("failed to record prover work in progress request: {}", e);
+                actix_web::error::ErrorInternalServerError("storage layer error")
+            }),
+        ProverJob::MultiblockProve(job_id) => storage
+            .prover_schema()
+            .record_prover_multiblock_is_working(job_id)
+            .map_err(|e| {
+                vlog::warn!(
+                    "failed to record prover multiblock work in progress request: {}",
+                    e
+                );
+                actix_web::error::ErrorInternalServerError("storage layer error")
+            }),
+    }
 }
 
-fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix_web::Result<()> {
+fn publish_block(
+    data: web::Data<AppState>,
+    r: web::Json<client::PublishReq>,
+) -> actix_web::Result<()> {
     info!("Received a proof for block: {}", r.block);
     let storage = data
         .access_storage()
@@ -165,6 +283,34 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
         }
         Err(e) => {
             vlog::error!("failed to store received proof: {}", e);
+            let message = if e.to_string().contains("duplicate key") {
+                "duplicate key"
+            } else {
+                "storage layer error"
+            };
+            Err(actix_web::error::ErrorInternalServerError(message))
+        }
+    }
+}
+
+fn publish_multiblock(
+    data: web::Data<AppState>,
+    r: web::Json<client::PublishMultiblockReq>,
+) -> actix_web::Result<()> {
+    info!(
+        "Received a proof for multiblock: [{};{}]",
+        r.block_from, r.block_to
+    );
+    let storage = data
+        .access_storage()
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+    match storage
+        .prover_schema()
+        .store_multiblock_proof(r.block_from, r.block_to, &r.proof)
+    {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            vlog::error!("failed to store received multiblock proof: {}", e);
             let message = if e.to_string().contains("duplicate key") {
                 "duplicate key"
             } else {
@@ -242,6 +388,8 @@ pub fn start_prover_server(
     connection_pool: storage::ConnectionPool,
     bind_to: net::SocketAddr,
     prover_timeout: time::Duration,
+    blocks_batch_timeout: time::Duration,
+    max_block_batch_size: usize,
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
     account_tree: CircuitAccountTree,
@@ -273,6 +421,8 @@ pub fn start_prover_server(
                     connection_pool.clone(),
                     data_pool.clone(),
                     prover_timeout,
+                    blocks_batch_timeout,
+                    max_block_batch_size,
                     idle_provers,
                 );
 
@@ -284,9 +434,15 @@ pub fn start_prover_server(
                     .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
                     .route("/block_to_prove", web::get().to(block_to_prove))
+                    .route("/multiblock_to_prove", web::get().to(multiblock_to_prove))
                     .route("/working_on", web::post().to(working_on))
-                    .route("/prover_data", web::get().to(prover_data))
-                    .route("/publish", web::post().to(publish))
+                    .route("/prover_block_data", web::get().to(prover_block_data))
+                    .route(
+                        "/prover_multiblock_data",
+                        web::get().to(prover_multiblock_data),
+                    )
+                    .route("/publish_block", web::post().to(publish_block))
+                    .route("/publish_multiblock", web::post().to(publish_multiblock))
                     .route("/stopped", web::post().to(stopped))
                     .route(
                         "/api/internal/prover/replicas",

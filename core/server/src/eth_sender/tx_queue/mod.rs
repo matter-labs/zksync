@@ -1,10 +1,11 @@
 // Workspace imports
 use models::{ethereum::OperationType, Operation};
 // Local imports
-use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
+use self::{counter_queue::CounterQueue, verify_queue::VerifyQueue};
 
 mod counter_queue;
 mod sparse_queue;
+mod verify_queue;
 
 pub type RawTxData = Vec<u8>;
 
@@ -115,7 +116,7 @@ impl TxQueueBuilder {
             sent_pending_txs: self.sent_pending_txs,
 
             commit_operations: CounterQueue::new(self.commit_operations_count),
-            verify_operations: SparseQueue::new(verify_operations_next_block),
+            verify_operations: VerifyQueue::new(verify_operations_next_block),
             withdraw_operations: CounterQueue::new(self.withdraw_operations_count),
         }
     }
@@ -141,7 +142,7 @@ pub struct TxQueue {
     sent_pending_txs: usize,
 
     commit_operations: CounterQueue<TxData>,
-    verify_operations: SparseQueue<TxData>,
+    verify_operations: VerifyQueue,
     withdraw_operations: CounterQueue<TxData>,
 }
 
@@ -161,9 +162,30 @@ impl TxQueue {
         );
     }
 
-    /// Adds the `verify` operation to the queue.
-    pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: TxData) {
-        self.verify_operations.insert(block_idx, verify_operation);
+    //    /// Adds the `verify` operation to the queue.
+    //    pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: TxData) {
+    //        self.verify_operations.insert(block_idx, verify_operation);
+    //
+    //        log::info!(
+    //            "Adding verify operation to the queue. \
+    //            Sent pending txs count: {}, \
+    //            max pending txs count: {}, \
+    //            size of verify queue: {}",
+    //            self.sent_pending_txs,
+    //            self.max_pending_txs,
+    //            self.verify_operations.len()
+    //        );
+    //    }
+
+    /// Adds the `VerifyMultiblock` operation to the queue.
+    pub fn add_verify_multiblock_operation(
+        &mut self,
+        block_from: usize,
+        _block_to: usize,
+        verify_multiblock_operation: TxData,
+    ) {
+        self.verify_operations
+            .insert(block_from, verify_multiblock_operation);
 
         log::info!(
             "Adding verify operation to the queue. \
@@ -191,7 +213,7 @@ impl TxQueue {
         );
     }
 
-    /// Returns a previously popped element to the front of the queue.
+    /// Returns a previously popped element to the front of the queuze.
     pub fn return_popped(&mut self, element: TxData) {
         assert!(
             self.sent_pending_txs > 0,
@@ -203,6 +225,9 @@ impl TxQueue {
                 self.commit_operations.return_popped(element);
             }
             OperationType::Verify => {
+                self.verify_operations.return_popped(element);
+            }
+            OperationType::VerifyMultiblock(_) => {
                 self.verify_operations.return_popped(element);
             }
             OperationType::Withdraw => {
@@ -241,8 +266,14 @@ impl TxQueue {
         // there is a pending `verify` operation, chose it.
         let next_verify_op_id = self.verify_operations.next_id();
         let next_commit_op_id = self.commit_operations.get_count() + 1;
-        if next_verify_op_id < next_commit_op_id && self.verify_operations.has_next() {
-            return Some(self.verify_operations.pop_front().unwrap());
+        if let Some(front_verify_element) = self.verify_operations.front_element() {
+            let blocks_to_verify = front_verify_element
+                .op_type
+                .number_of_block_to_verify()
+                .expect("must be a verify operation");
+            if next_verify_op_id + blocks_to_verify <= next_commit_op_id {
+                return Some(self.verify_operations.pop_front().unwrap());
+            }
         }
 
         // 2. After verify operations we should process withdraw operation.

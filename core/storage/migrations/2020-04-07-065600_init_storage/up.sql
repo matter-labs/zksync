@@ -249,7 +249,7 @@ CREATE TABLE eth_operations (
     nonce BIGINT NOT NULL,
     confirmed bool NOT NULL DEFAULT false,
     raw_tx bytea NOT NULL,
-    op_type TEXT NOT NULL,
+    op_type jsonb NOT NULL,
     final_hash bytea DEFAULT NULL,
     last_deadline_block BIGINT NOT NULL,
     last_used_gas_price NUMERIC NOT NULL

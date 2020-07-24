@@ -85,6 +85,8 @@ pub struct ProverOptions {
     pub heartbeat_interval: Duration,
     pub cycle_wait: Duration,
     pub gone_timeout: Duration,
+    pub blocks_batch_timeout: Duration,
+    pub max_block_batch_size: usize,
 }
 
 impl ProverOptions {
@@ -96,12 +98,16 @@ impl ProverOptions {
         let heartbeat_interval = Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL"));
         let cycle_wait = Duration::from_millis(parse_env("PROVER_CYCLE_WAIT"));
         let gone_timeout = Duration::from_millis(parse_env("PROVER_GONE_TIMEOUT"));
+        let blocks_batch_timeout = Duration::from_millis(parse_env("BLOCKS_BATCH_TIMEOUT"));
+        let max_block_batch_size = parse_env("MAX_BLOCK_BATCH_SIZE");
 
         Self {
             prepare_data_interval,
             heartbeat_interval,
             cycle_wait,
             gone_timeout,
+            blocks_batch_timeout,
+            max_block_batch_size,
         }
     }
 }
