@@ -76,6 +76,7 @@ impl ScenarioExecutor {
             TestAccount::from_info(&config.genesis_account, &transport, &ctx.options);
 
         // Create a burn account to burn tokens.
+        // TODO: Burn account should be deterministic, not random.
         let burn_account = ZksyncAccount::rand();
 
         // Generate random accounts to rotate funds within.
