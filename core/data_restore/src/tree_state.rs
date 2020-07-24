@@ -211,6 +211,38 @@ impl TreeState {
                         &mut ops,
                     );
                 }
+                FranklinOp::TransferFrom(mut op) => {
+                    let from = self
+                        .state
+                        .get_account(op.from)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                    let to = self
+                        .state
+                        .get_account(op.to)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                    op.tx.from = from.address;
+                    op.tx.to = to.address;
+                    op.tx.to_nonce = to.nonce;
+
+                    let tx = FranklinTx::TransferFrom(Box::new(op.tx.clone()));
+                    let (fee, updates) = self
+                        .state
+                        .apply_transfer_from_op(&op)
+                        .map_err(|e| format_err!("Transfer from fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::TransferFrom(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
                 FranklinOp::FullExit(op) => {
                     let priority_op = FranklinPriorityOp::FullExit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());

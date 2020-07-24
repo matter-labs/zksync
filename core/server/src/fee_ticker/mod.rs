@@ -24,8 +24,8 @@ use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace deps
 use models::{
     node::{
-        pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp,
-        TransferToNewOp, TxFeeTypes, WithdrawOp,
+        pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferFromOp,
+        TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
     },
     primitives::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str},
 };
@@ -47,6 +47,8 @@ mod ticker_info;
 const BASE_TRANSFER_COST: u32 = 350;
 /// TODO: change to real value after lauch settles: issue #743
 const BASE_TRANSFER_TO_NEW_COST: u32 = 350;
+/// TODO: estimate real value
+const BASE_TRANSFER_FROM_COST: u32 = 350;
 const BASE_WITHDRAW_COST: u32 = 90_000;
 
 /// Type of the fee calculation pattern.
@@ -59,6 +61,7 @@ const BASE_WITHDRAW_COST: u32 = 90_000;
 pub enum OutputFeeType {
     Transfer,
     TransferToNew,
+    TransferFrom,
     Withdraw,
 }
 
@@ -149,6 +152,7 @@ pub fn run_ticker_task(
                 BASE_TRANSFER_TO_NEW_COST.into(),
             ),
             (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
+            (OutputFeeType::TransferFrom, BASE_TRANSFER_FROM_COST.into()),
         ]
         .into_iter()
         .collect(),
@@ -230,6 +234,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
+            TxFeeTypes::TransferFrom => (OutputFeeType::TransferFrom, TransferFromOp::CHUNKS),
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);

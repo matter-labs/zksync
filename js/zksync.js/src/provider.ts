@@ -98,6 +98,12 @@ export class Provider {
         return await this.transport.request("tx_submit", [tx, signature]);
     }
 
+    // Requests `zkSync` server to execute several transactions together.
+    // return transaction hash (e.g. sync-tx:dead..beef)
+    async submitTxsBatch(transactions: { tx: any, signature?: TxEthSignature }[]): Promise<string[]> {
+        return await this.transport.request("submit_txs_batch", [transactions]);
+    }
+
     async getContractAddress(): Promise<ContractAddress> {
         return await this.transport.request("contract_address", null);
     }
@@ -195,7 +201,7 @@ export class Provider {
     }
 
     async getTransactionFee(
-        txType: "Withdraw" | "Transfer",
+        txType: "Withdraw" | "Transfer" | "TransferFrom",
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {

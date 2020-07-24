@@ -149,7 +149,7 @@ impl NewExecutedTransaction {
         let operation = serde_json::to_value(&exec_tx.op).expect("Cannot serialize operation");
 
         let (from_account_hex, to_account_hex): (String, Option<String>) = match exec_tx.tx {
-            FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
+            FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) | FranklinTx::TransferFrom(_) => (
                 serde_json::from_value(tx["from"].clone()).unwrap(),
                 serde_json::from_value(tx["to"].clone()).unwrap(),
             ),

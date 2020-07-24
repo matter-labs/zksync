@@ -92,6 +92,8 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             pub_nonce: None,
             new_pub_key_hash: None,
             eth_address: None,
+            valid_from: None,
+            valid_until: None,
         },
         lhs: OperationBranch {
             address: None,

@@ -34,6 +34,7 @@ mod full_exit;
 mod noop;
 pub(crate) mod test_utils;
 mod transfer;
+mod transfer_from;
 mod transfer_to_new;
 mod withdraw;
 

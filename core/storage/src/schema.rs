@@ -188,6 +188,7 @@ table! {
         id -> Int8,
         tx_hash -> Text,
         tx -> Jsonb,
+        batch_id -> Nullable<Int8>,
     }
 }
 
@@ -217,6 +218,7 @@ table! {
         chunks_left -> Int8,
         unprocessed_priority_op_before -> Int8,
         pending_block_iteration -> Int8,
+        block_timestamp -> Nullable<Int8>,
     }
 }
 

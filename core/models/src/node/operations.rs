@@ -4,7 +4,7 @@ use super::FranklinTx;
 use crate::node::tx::ChangePubKey;
 use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
-    FranklinPriorityOp, FullExit, PubKeyHash, Transfer, Withdraw,
+    FranklinPriorityOp, FullExit, PubKeyHash, Transfer, TransferFrom, Withdraw,
 };
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
@@ -240,6 +240,83 @@ impl TransferOp {
                 amount,
                 fee,
                 nonce,
+                None,
+            ),
+            from: from_id,
+            to: to_id,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferFromOp {
+    pub tx: TransferFrom,
+    pub from: AccountId,
+    pub to: AccountId,
+}
+
+impl TransferFromOp {
+    pub const CHUNKS: usize = 2;
+    pub const OP_CODE: u8 = 0x08;
+
+    fn get_public_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.push(Self::OP_CODE); // opcode
+        data.extend_from_slice(&self.from.to_be_bytes());
+        data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(&self.to.to_be_bytes());
+        data.extend_from_slice(&pack_token_amount(&self.tx.amount));
+        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
+        data
+    }
+
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
+            "Wrong bytes length for transfer pubdata"
+        );
+
+        let from_offset = 1;
+        let token_id_offset = from_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let to_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
+        let amount_offset = to_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let fee_offset =
+            amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8;
+
+        let from_address = Address::zero(); // From pubdata its unknown
+        let to_address = Address::zero(); // From pubdata its unknown
+        let token =
+            bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+                .ok_or_else(|| format_err!("Cant get token id from transfer pubdata"))?;
+        let amount = unpack_token_amount(
+            &bytes[amount_offset
+                ..amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
+        )
+        .ok_or_else(|| format_err!("Cant get amount from transfer pubdata"))?;
+        let fee = unpack_fee_amount(
+            &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
+        )
+        .ok_or_else(|| format_err!("Cant get fee from transfer pubdata"))?;
+        let nonce = 0; // It is unknown from pubdata
+        let from_id =
+            bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
+                .ok_or_else(|| format_err!("Cant get from account id from transfer pubdata"))?;
+        let to_id = bytes_slice_to_uint32(&bytes[to_offset..to_offset + ACCOUNT_ID_BIT_WIDTH / 8])
+            .ok_or_else(|| format_err!("Cant get to account id from transfer pubdata"))?;
+
+        Ok(Self {
+            tx: TransferFrom::new(
+                from_id,
+                from_address,
+                to_address,
+                token,
+                amount,
+                fee,
+                nonce,
+                0,
+                u64::max_value(),
+                None,
                 None,
             ),
             from: from_id,
@@ -534,6 +611,7 @@ pub enum FranklinOp {
     Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),
     ChangePubKeyOffchain(Box<ChangePubKeyOp>),
+    TransferFrom(Box<TransferFromOp>),
 }
 
 impl FranklinOp {
@@ -547,6 +625,7 @@ impl FranklinOp {
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
             FranklinOp::FullExit(_) => FullExitOp::CHUNKS,
             FranklinOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
+            FranklinOp::TransferFrom(_) => TransferFromOp::CHUNKS,
         }
     }
 
@@ -560,6 +639,7 @@ impl FranklinOp {
             FranklinOp::Transfer(op) => op.get_public_data(),
             FranklinOp::FullExit(op) => op.get_public_data(),
             FranklinOp::ChangePubKeyOffchain(op) => op.get_public_data(),
+            FranklinOp::TransferFrom(op) => op.get_public_data(),
         }
     }
 
@@ -603,6 +683,9 @@ impl FranklinOp {
             ChangePubKeyOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOffchain(Box::new(
                 ChangePubKeyOp::from_public_data(&bytes)?,
             ))),
+            TransferFromOp::OP_CODE => Ok(FranklinOp::TransferFrom(Box::new(
+                TransferFromOp::from_public_data(&bytes)?,
+            ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -617,6 +700,7 @@ impl FranklinOp {
             TransferOp::OP_CODE => Ok(TransferOp::CHUNKS),
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
+            TransferFromOp::OP_CODE => Ok(TransferFromOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
@@ -626,6 +710,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Transfer(op) => Ok(FranklinTx::Transfer(Box::new(op.tx.clone()))),
             FranklinOp::TransferToNew(op) => Ok(FranklinTx::Transfer(Box::new(op.tx.clone()))),
+            FranklinOp::TransferFrom(op) => Ok(FranklinTx::TransferFrom(Box::new(op.tx.clone()))),
             FranklinOp::Withdraw(op) => Ok(FranklinTx::Withdraw(Box::new(op.tx.clone()))),
             FranklinOp::Close(op) => Ok(FranklinTx::Close(Box::new(op.tx.clone()))),
             FranklinOp::ChangePubKeyOffchain(op) => {
@@ -677,6 +762,12 @@ impl From<CloseOp> for FranklinOp {
 impl From<TransferOp> for FranklinOp {
     fn from(op: TransferOp) -> Self {
         Self::Transfer(Box::new(op))
+    }
+}
+
+impl From<TransferFromOp> for FranklinOp {
+    fn from(op: TransferFromOp) -> Self {
+        Self::TransferFrom(Box::new(op))
     }
 }
 
