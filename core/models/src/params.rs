@@ -168,6 +168,8 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 pub const LEAF_DATA_BIT_WIDTH: usize =
     NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
 
+pub const TIMESTAMP_BIT_WIDTH: usize = 8 * 8;
+
 static mut BLOCK_CHUNK_SIZES_VALUE: Vec<usize> = Vec::new();
 
 pub(crate) fn block_chunk_sizes() -> &'static [usize] {
@@ -222,7 +224,8 @@ pub const SIGNED_TRANSFER_FROM_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + AMOUNT_MANTISSA_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
-    + NONCE_BIT_WIDTH;
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

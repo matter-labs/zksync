@@ -410,6 +410,8 @@ impl TransferToNewWitness<Bn256> {
                 b: Some(b),
                 pub_nonce: Some(Fr::zero()),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::zero()),
+                valid_until: Some(Fr::from_str(&u64::max_value().to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),

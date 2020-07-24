@@ -116,6 +116,10 @@ pub struct OperationArgumentsDef {
     pub eth_address: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
     pub pub_nonce: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub valid_from: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub valid_until: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]

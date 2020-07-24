@@ -38,6 +38,8 @@ pub struct TransferFromData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct TransferFromWitness<E: RescueEngine> {
@@ -65,6 +67,8 @@ impl Witness for TransferFromWitness<Bn256> {
             token: u32::from(transfer.tx.token),
             from_account_address: transfer.from,
             to_account_address: transfer.to,
+            valid_from: transfer.tx.valid_from,
+            valid_until: transfer.tx.valid_until,
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)
@@ -360,11 +364,13 @@ impl TransferFromWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::from_str(&transfer.valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&transfer.valid_until.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("5").unwrap()),
+            tx_type: Some(Fr::from_str(&TransferFromOp::OP_CODE.to_string()).unwrap()),
         }
     }
 }

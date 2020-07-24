@@ -40,7 +40,6 @@ use crate::{
         resize_grow_only, vectorized_compare,
     },
 };
-use models::node::tokens::TxFeeTypes::TransferFrom;
 use models::node::TransferFromOp;
 use models::params::SIGNED_TRANSFER_FROM_BIT_WIDTH;
 
@@ -2107,7 +2106,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
-        pubdata_bits.extend(rhs.account_id.get_bits_be());
+        pubdata_bits.extend(lhs.account_id.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
         pubdata_bits.extend(rhs.account_id.get_bits_be());
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
@@ -2138,7 +2137,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_FROM_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
@@ -2200,10 +2201,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         lhs_valid_flags.push(is_b_correct);
         lhs_valid_flags.push(is_a_geq_b.clone());
         lhs_valid_flags.push(is_sig_verified.clone());
-        lhs_valid_flags.push(no_nonce_overflow(
-            cs.namespace(|| "no nonce overflow"),
-            &cur.account.nonce.get_number(),
-        )?);
 
         let is_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_tx_correct"),
@@ -2212,12 +2209,12 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
-        let is_signer_valid = CircuitElement::equals(
+        let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
-        lhs_valid_flags.push(is_signer_valid);
+        // lhs_valid_flags.push(is_signer_valid);
 
         // lhs_valid_flags.push(_is_signer_valid);
 
