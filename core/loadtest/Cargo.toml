@@ -8,6 +8,7 @@ edition = "2018"
 models = { path = "../models", version = "0.0.1" }
 testkit = { path = "../testkit", version = "0.1.0"}
 server = { path = "../server", version = "0.0.1" }
+crypto_exports = { path = "../../core/crypto_exports", version = "0.1.0" }
 
 serde = "1.0.90"
 serde_derive = "1.0.90"
@@ -29,3 +30,4 @@ log = "0.4"
 env_logger = "0.6"
 structopt = "0.3"
 chrono = "0.4"
+sha2 = "0.8"
