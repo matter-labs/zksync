@@ -9,6 +9,7 @@ use crypto_exports::franklin_crypto::{
     },
     circuit::{
         boolean::{AllocatedBit, Boolean},
+        expression::Expression,
         multipack,
         num::{AllocatedNum, Num},
         Assignment,
@@ -456,4 +457,23 @@ pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
     let is_equal = multi_and(cs.namespace(|| "all data is equal"), &equality_bits)?;
 
     Ok((is_equal, packed))
+}
+
+pub fn less_than<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    a: Expression<E>,
+    b: Expression<E>,
+    bit_width: usize,
+) -> Result<Boolean, SynthesisError> {
+    let diff = a - b;
+    let diff_bits = diff.into_bits_le_fixed(cs.namespace(|| "diff bits"), bit_width)?;
+    let diff_bits_repacked = Expression::from_le_bits::<CS>(&diff_bits);
+
+    let ge = Boolean::from(Expression::equals(
+        cs.namespace(|| "ge: diff equal to repacked"),
+        diff,
+        diff_bits_repacked,
+    )?);
+
+    Ok(ge.not())
 }

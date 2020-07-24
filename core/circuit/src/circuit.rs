@@ -25,6 +25,7 @@ use models::{
     params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH},
 };
 // Local deps
+use crate::utils::less_than;
 use crate::{
     account::{AccountContent, AccountWitness},
     allocated_structures::*,
@@ -185,6 +186,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             data[DepositOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[TransferOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[TransferFromOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero; 2];
@@ -757,6 +759,16 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 &op_data.full_amount,
                 &prev.op_data.full_amount,
             )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_from equal to previous"),
+                &op_data.valid_from,
+                &prev.op_data.valid_from,
+            )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_until equal to previous"),
+                &op_data.valid_until,
+                &prev.op_data.valid_until,
+            )?);
 
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
@@ -794,21 +806,19 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             generator,
         )?;
 
-        let diff_a_b =
-            Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
-
-        let diff_a_b_bits = diff_a_b.into_bits_le_fixed(
-            cs.namespace(|| "balance-fee bits"),
+        let is_a_geq_b = less_than(
+            cs.namespace(|| "fee less_than balance"),
+            Expression::from(&op_data.a.get_number()),
+            Expression::from(&op_data.b.get_number()),
             params::BALANCE_BIT_WIDTH,
+        )?
+        .not();
+
+        self.verify_operation_timestamp(
+            cs.namespace(|| "verify operation "),
+            &op_data,
+            &global_variables,
         )?;
-
-        let diff_a_b_bits_repacked = Expression::from_le_bits::<CS>(&diff_a_b_bits);
-
-        let is_a_geq_b = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_a_geq_b: diff equal to repacked"),
-            diff_a_b,
-            diff_a_b_bits_repacked,
-        )?);
 
         let mut op_flags = vec![];
         op_flags.push(self.deposit(
@@ -860,7 +870,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
-            &mut previous_pubdatas[TransferOp::OP_CODE as usize],
+            &mut previous_pubdatas[TransferFromOp::OP_CODE as usize],
         )?);
         op_flags.push(self.withdraw(
             cs.namespace(|| "withdraw"),
@@ -2278,6 +2288,42 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         Ok(correct)
+    }
+
+    fn verify_operation_timestamp<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        op_data: &AllocatedOperationData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+    ) -> Result<(), SynthesisError> {
+        let is_valid_from_ok = less_than(
+            cs.namespace(|| "valid_from less_than block_timestamp"),
+            Expression::from(&op_data.valid_from.get_number()),
+            Expression::from(&global_variables.block_timestamp.get_number()),
+            params::TIMESTAMP_BIT_WIDTH,
+        )?
+        .not();
+
+        let is_valid_until_ok = less_than(
+            cs.namespace(|| "block_timestamp less_than valid_until"),
+            Expression::from(&global_variables.block_timestamp.get_number()),
+            Expression::from(&op_data.valid_until.get_number()),
+            params::TIMESTAMP_BIT_WIDTH,
+        )?;
+
+        let is_valid_timestamp = Boolean::and(
+            cs.namespace(|| "is_valid_from_ok AND is_valid_until_ok"),
+            &is_valid_from_ok,
+            &is_valid_until_ok,
+        )?;
+
+        Boolean::enforce_equal(
+            cs.namespace(|| "enforce is_valid_timestamp equal to one"),
+            &is_valid_timestamp,
+            &Boolean::constant(true),
+        )?;
+
+        Ok(())
     }
 }
 
