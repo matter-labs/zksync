@@ -451,12 +451,8 @@ impl ScenarioExecutor {
         let (burn_tx, burn_eth_sign) = self.sign_transfer(from_acc, to_acc, SUBSCRIPTION_COST, fee);
 
         // 3. Send both txs in a bundle.
-        // let txs = vec![(transfer_from_tx, None), (burn_tx, burn_eth_sign)];
-        // let tx_hashes = self.rpc_client.send_txs_batch(txs).await?;
-
-        let tx_hash_1 = self.rpc_client.send_tx(transfer_from_tx, None).await?;
-        let tx_hash_2 = self.rpc_client.send_tx(burn_tx, burn_eth_sign).await?;
-        let tx_hashes = vec![tx_hash_1, tx_hash_2];
+        let txs = vec![(transfer_from_tx, None), (burn_tx, burn_eth_sign)];
+        let tx_hashes = self.rpc_client.send_txs_batch(txs).await?;
 
         // 4. Wait for txs to be executed.
         for tx_hash in tx_hashes {
