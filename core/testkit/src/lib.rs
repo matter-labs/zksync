@@ -661,10 +661,11 @@ impl TestSetup {
         self.expected_changes_for_current_block
             .eth_accounts_state
             .get(&(account, token))
-            .or(self
-                .expected_changes_for_current_block_batch
-                .eth_accounts_state
-                .get(&(account, token)))
+            .or_else(|| {
+                self.expected_changes_for_current_block_batch
+                    .eth_accounts_state
+                    .get(&(account, token))
+            })
             .cloned()
             .unwrap_or_else(|| self.get_eth_balance(account, token))
     }
