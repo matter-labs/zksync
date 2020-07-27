@@ -35,7 +35,11 @@ pack() {
 gen() {
     SUBCOMMAND=${1:-all}
     OUTPUT_DIR=$KEY_DIR/account-"$ACCOUNT_TREE_DEPTH"_balance-"$BALANCE_TREE_DEPTH"/
-    case $SUBCOMMAND in 
+    case $SUBCOMMAND in
+        recursive)
+            cargo run --bin key_generator --release -- recursive-keys
+            echo "Recursive keys generated"
+            ;;
         contract)
             cargo run --bin key_generator --release -- contract
             cp $OUTPUT_DIR/KeysWithPlonkVerifier.sol $ZKSYNC_HOME/contracts/contracts
@@ -47,6 +51,7 @@ gen() {
             mkdir -p $OUTPUT_DIR
             cargo run --bin key_generator --release -- keys
             cargo run --bin key_generator --release -- contract
+            cargo run --bin key_generator --release -- recursive-keys
             cp $OUTPUT_DIR/KeysWithPlonkVerifier.sol $ZKSYNC_HOME/contracts/contracts
             echo "Keys and contract generated"
             ;;

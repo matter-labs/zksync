@@ -11,11 +11,13 @@
 //! Before generating parameters universal setup keys should be downloaded using `zksync plonk-setup` command.
 
 mod franklin_key;
+mod recursive_keys;
 mod verifier_contract_generator;
 
 use clap::{App, SubCommand};
 
 use crate::franklin_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
+use crate::recursive_keys::make_recursive_verification_keys;
 use crate::verifier_contract_generator::create_verifier_contract;
 use models::config_options::AvailableBlockSizesConfig;
 
@@ -28,6 +30,9 @@ fn main() {
             SubCommand::with_name("keys").about("Generate zkSync main circuit(for various block sizes), and exodus circuit verification keys"),
         )
         .subcommand(SubCommand::with_name("contract").about("Generate verifier contract based on verification keys"))
+        .subcommand(
+            SubCommand::with_name("recursive-keys").about("Generate recursive keys"),
+        )
         .get_matches();
 
     let config = AvailableBlockSizesConfig::from_env();
@@ -37,5 +42,7 @@ fn main() {
         make_plonk_blocks_verify_keys(config);
     } else if cmd == "contract" {
         create_verifier_contract(config);
+    } else if cmd == "recursive-keys" {
+        make_recursive_verification_keys()
     }
 }
