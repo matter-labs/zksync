@@ -599,6 +599,12 @@ impl PlasmaStateKeeper {
             return Err(());
         }
 
+        if let Some(current_timestamp) = self.pending_block.block_timestamp {
+            self.state.block_timestamp = current_timestamp;
+        } else {
+            self.state.block_timestamp = BlockTimestamp::now();
+        }
+
         for tx in txs {
             // Check if adding this transaction to the block won't make the contract operations
             // too expensive.
@@ -663,6 +669,10 @@ impl PlasmaStateKeeper {
                         .success_operations
                         .push(exec_result.clone());
                     executed_operations.push(exec_result);
+                    if self.pending_block.block_timestamp.is_none() {
+                        // We only set timestamp if transaction execution was successful
+                        self.pending_block.block_timestamp = Some(self.state.block_timestamp);
+                    }
                 }
                 Err(e) => {
                     warn!("Failed to execute transaction: {:?}, {}", tx, e);
@@ -686,16 +696,17 @@ impl PlasmaStateKeeper {
 
     fn apply_tx(&mut self, tx: &FranklinTx) -> Result<ExecutedOperations, ()> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
-        if let Some(current_timestamp) = self.pending_block.block_timestamp {
-            self.state.block_timestamp = current_timestamp;
-        } else {
-            self.state.block_timestamp = BlockTimestamp::now();
-        }
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
             return Err(());
+        }
+
+        if let Some(current_timestamp) = self.pending_block.block_timestamp {
+            self.state.block_timestamp = current_timestamp;
+        } else {
+            self.state.block_timestamp = BlockTimestamp::now();
         }
 
         // Check if adding this transaction to the block won't make the contract operations
