@@ -646,7 +646,7 @@ impl PlasmaStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
-                    self.pending_block.chunks_left -= chunks_needed;
+                    self.pending_block.chunks_left -= executed_op.chunks();
                     self.pending_block.account_updates.append(&mut updates);
                     if let Some(fee) = fee {
                         let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
