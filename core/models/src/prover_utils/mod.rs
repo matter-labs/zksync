@@ -103,6 +103,7 @@ impl SetupForStepByStepProver {
             self.key_monomial_form
                 .as_ref()
                 .expect("Setup should have universal setup struct"),
+            None,
         )?;
 
         let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk.0)?;
@@ -142,6 +143,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
         &setup,
         None,
         &key_monomial_form,
+        None,
     )?;
 
     let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
