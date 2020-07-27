@@ -2230,14 +2230,12 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
-        let _is_signer_valid = CircuitElement::equals(
-            cs.namespace(|| "signer_key_correct"),
+        let is_lhs_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "lhs_signer_key_correct"),
             &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
-        // lhs_valid_flags.push(is_signer_valid);
-
-        // lhs_valid_flags.push(_is_signer_valid);
+        lhs_valid_flags.push(is_lhs_signer_valid);
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
@@ -2264,8 +2262,15 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         rhs_valid_flags.push(is_chunk_second);
         rhs_valid_flags.push(is_account_empty.not());
-
         rhs_valid_flags.push(is_pubdata_chunk_correct);
+
+        let is_rhs_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "rhs_signer_key_correct"),
+            &signer_key.pubkey.get_hash(),
+            &rhs.account.pub_key_hash,
+        )?;
+        rhs_valid_flags.push(is_rhs_signer_valid);
+
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
