@@ -186,7 +186,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             data[DepositOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[TransferOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[TransferFromOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[TransferFromOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero; 2];
@@ -806,16 +806,24 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             generator,
         )?;
 
-        let is_a_geq_b = less_than(
-            cs.namespace(|| "fee less_than balance"),
-            Expression::from(&op_data.a.get_number()),
-            Expression::from(&op_data.b.get_number()),
-            params::BALANCE_BIT_WIDTH,
-        )?
-        .not();
+        let diff_a_b =
+            Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
 
-        self.verify_operation_timestamp(
-            cs.namespace(|| "verify operation "),
+        let diff_a_b_bits = diff_a_b.into_bits_le_fixed(
+            cs.namespace(|| "balance-fee bits"),
+            params::BALANCE_BIT_WIDTH,
+        )?;
+
+        let diff_a_b_bits_repacked = Expression::from_le_bits::<CS>(&diff_a_b_bits);
+
+        let is_a_geq_b = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_a_geq_b: diff equal to repacked"),
+            diff_a_b,
+            diff_a_b_bits_repacked,
+        )?);
+
+        let is_valid_timestamp = self.verify_operation_timestamp(
+            cs.namespace(|| "verify operation timestamp"),
             &op_data,
             &global_variables,
         )?;
@@ -870,6 +878,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
+            &is_valid_timestamp,
             &mut previous_pubdatas[TransferFromOp::OP_CODE as usize],
         )?);
         op_flags.push(self.withdraw(
@@ -2106,6 +2115,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         is_sig_verified: &Boolean,
+        is_valid_timestamp: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
@@ -2176,6 +2186,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         lhs_valid_flags.push(is_transfer_from.clone());
+        lhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -2244,6 +2255,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut rhs_valid_flags = vec![];
         rhs_valid_flags.push(pubdata_properly_copied);
         rhs_valid_flags.push(is_transfer_from);
+        rhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_chunk_second = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
@@ -2295,7 +2307,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         mut cs: CS,
         op_data: &AllocatedOperationData<E>,
         global_variables: &CircuitGlobalVariables<E>,
-    ) -> Result<(), SynthesisError> {
+    ) -> Result<Boolean, SynthesisError> {
         let is_valid_from_ok = less_than(
             cs.namespace(|| "valid_from less_than block_timestamp"),
             Expression::from(&op_data.valid_from.get_number()),
@@ -2317,13 +2329,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_valid_until_ok,
         )?;
 
-        Boolean::enforce_equal(
-            cs.namespace(|| "enforce is_valid_timestamp equal to one"),
-            &is_valid_timestamp,
-            &Boolean::constant(true),
-        )?;
-
-        Ok(())
+        Ok(is_valid_timestamp)
     }
 }
 

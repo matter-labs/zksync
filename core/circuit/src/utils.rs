@@ -466,7 +466,8 @@ pub fn less_than<E: Engine, CS: ConstraintSystem<E>>(
     bit_width: usize,
 ) -> Result<Boolean, SynthesisError> {
     let diff = a - b;
-    let diff_bits = diff.into_bits_le_fixed(cs.namespace(|| "diff bits"), bit_width)?;
+    let mut diff_bits = diff.into_bits_le(cs.namespace(|| "diff bits"))?;
+    diff_bits.truncate(bit_width);
     let diff_bits_repacked = Expression::from_le_bits::<CS>(&diff_bits);
 
     let ge = Boolean::from(Expression::equals(
