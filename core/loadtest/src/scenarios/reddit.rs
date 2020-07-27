@@ -23,7 +23,7 @@ use std::{
 };
 // External deps
 use chrono::Utc;
-// use futures::future::try_join_all;
+use futures::future::try_join_all;
 use num::BigUint;
 use tokio::fs;
 use web3::{
@@ -44,7 +44,10 @@ use crate::{
     test_accounts::TestAccount,
 };
 
-const N_ACCOUNTS: usize = 25_000;
+const N_ACCOUNTS: usize = 50; // TODO should be 25_000
+const COMMUNITY_NAME: &str = "TestCommunity";
+
+const REPORT_RATE: usize = 50; // How many iterations to execute quietly before reporting the execution state.
 
 #[derive(Debug)]
 struct ScenarioExecutor {
@@ -59,8 +62,11 @@ struct ScenarioExecutor {
     /// ID and symbol of used token (e.g. `(0, "ETH")`).
     token: (u16, String),
 
-    /// Intermediate account to rotate funds within.
+    /// Intermediate accounts.
     accounts: Vec<ZksyncAccount>,
+
+    /// Created subscription accounts.
+    subscription_accounts: Vec<ZksyncAccount>,
 
     /// Amount of time to wait for one zkSync block to be verified.
     verify_timeout: Duration,
@@ -91,7 +97,15 @@ impl ScenarioExecutor {
         let burn_account = ZksyncAccount::rand();
 
         // Generate random accounts to rotate funds within.
-        let accounts = (0..N_ACCOUNTS).map(|_| ZksyncAccount::rand()).collect();
+        let (accounts, subscription_accounts) = (0..N_ACCOUNTS)
+            .map(|_| {
+                let account = ZksyncAccount::rand();
+                let subscription_account =
+                    Self::create_subscription_account(&account, COMMUNITY_NAME);
+
+                (account, subscription_account)
+            })
+            .unzip();
 
         let verify_timeout = Duration::from_secs(config.block_timeout);
 
@@ -101,6 +115,7 @@ impl ScenarioExecutor {
             genesis_account,
             burn_account,
             accounts,
+            subscription_accounts,
             verify_timeout,
             token: (config.token_id, config.token_name),
 
@@ -122,8 +137,8 @@ impl ScenarioExecutor {
 
     /// Method to be used before the scenario.
     /// It stores all the zkSync account keys into a file named
-    /// like "loadtest_accounts_2020_05_05_12_23_55.txt"
-    /// so the funds left on accounts will not be lost.
+    /// like "reddit_accounts_2020_05_05_12_23_55.txt"
+    /// so we can gain access to every account created in the loadtest.
     ///
     /// If saving the file fails, the accounts are printed to the log.
     async fn save_accounts(&self) {
@@ -161,19 +176,25 @@ impl ScenarioExecutor {
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
     pub async fn run_test(&mut self) -> Result<(), failure::Error> {
+        const PARALLEL_JOBS: usize = 50;
+
         self.save_accounts().await;
 
         self.initialize().await?;
 
-        // let account_futures: Vec<_> = (0..N_ACCOUNTS)
-        //     .map(|account_id| self.one_account_run(account_id))
-        //     .collect();
+        log::info!("Initialization complete, starting the test");
 
-        // try_join_all(account_futures).await?;
-        for account_id in 0..N_ACCOUNTS {
-            self.one_account_run(account_id).await?;
+        for account_id in (0..N_ACCOUNTS).step_by(PARALLEL_JOBS) {
+            let range_start = account_id;
+            let range_end = account_id + PARALLEL_JOBS;
+            let account_futures: Vec<_> = (range_start..range_end)
+                .map(|account_id| self.one_account_run(account_id))
+                .collect();
+
+            try_join_all(account_futures).await?;
         }
 
+        // TODO:
         // After executing these futures we must send one more (random) tx and wait it to be
         // verified. The verification will mean that all the previously sent txs are verified as well.
         // After that, we may check the balances of every account to check if all the txs were executed
@@ -184,7 +205,7 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    /// Initializes the test, preparing the main account for the interaction.
+    /// Initializes the test, preparing the both main account and all the intermediate accounts for the interaction.
     async fn initialize(&mut self) -> Result<(), failure::Error> {
         if self.token.0 == 0 {
             log::info!("Token ID is 0 (ETH). Assuming that genesis account has to be initialized");
@@ -197,7 +218,7 @@ impl ScenarioExecutor {
             // 2. Perform a deposit
             deposit_single(
                 &self.genesis_account,
-                BigUint::from(10u64).modpow(&BigUint::from(19u64), &BigUint::from(1u64)),
+                BigUint::from(1_000_000_000_000_000_000u64),
                 &self.rpc_client,
             )
             .await?;
@@ -240,6 +261,114 @@ impl ScenarioExecutor {
             self.genesis_account.zk_acc.set_account_id(resp.id);
         }
 
+        // After the main wallet initialization, we have to initialize all the intermediate accounts
+        // (both the main "user" accounts and subscription wallets).
+        self.initialize_accounts().await?;
+
+        Ok(())
+    }
+
+    async fn initialize_accounts(&self) -> Result<(), failure::Error> {
+        log::info!("Initializing the Reddit accounts...");
+        self.initialize_accounts_batch(&self.accounts).await?;
+        log::info!("Initializing the subscription accounts...");
+        self.initialize_accounts_batch(&self.subscription_accounts)
+            .await?;
+        Ok(())
+    }
+
+    async fn initialize_accounts_batch(
+        &self,
+        accounts: &[ZksyncAccount],
+    ) -> Result<(), failure::Error> {
+        // 1. Send the `Transfer` with 0 amount to each account to initialize it.
+        let mut tx_hashes = Vec::new();
+        for account_id in 0..N_ACCOUNTS {
+            let account = &accounts[account_id];
+            let from_acc = &self.genesis_account.zk_acc;
+            let to_acc = account;
+
+            let fee = self.transfer_fee(&to_acc).await;
+            let (transfer_tx, eth_sign) = self.sign_transfer(from_acc, to_acc, 0u64, fee);
+
+            let tx_hash = self.rpc_client.send_tx(transfer_tx, eth_sign).await?;
+
+            tx_hashes.push(tx_hash);
+
+            let num_processed = account_id + 1;
+            if num_processed % REPORT_RATE == 0 {
+                log::info!(
+                    "Sent {} / {} initial transfers...",
+                    num_processed,
+                    N_ACCOUNTS
+                );
+            }
+        }
+
+        log::info!("All the initial transfers for current batch are sent");
+
+        for (account_id, tx_hash) in tx_hashes.into_iter().enumerate() {
+            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
+
+            let num_processed = account_id + 1;
+            if num_processed % REPORT_RATE == 0 {
+                log::info!(
+                    "Committed {} / {} initial transfers...",
+                    num_processed,
+                    N_ACCOUNTS
+                );
+            }
+        }
+
+        log::info!("All the initial transfers for current batch are committed");
+
+        // 2. Set the account ID and call the `ChangePubKey` to be able to work with account.
+        let mut tx_hashes = Vec::new();
+        for account_id in 0..N_ACCOUNTS {
+            let account = &accounts[account_id];
+            let resp = self
+                .rpc_client
+                .account_state_info(account.address)
+                .await
+                .expect("rpc error");
+            assert!(resp.id.is_some(), "Account ID is none for new account");
+            account.set_account_id(resp.id);
+
+            let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
+                account.create_change_pubkey_tx(None, true, false),
+            ));
+
+            let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+
+            tx_hashes.push(tx_hash);
+
+            let num_processed = account_id + 1;
+            if num_processed % REPORT_RATE == 0 {
+                log::info!(
+                    "Sent {} / {} ChangePubKey transactions...",
+                    num_processed,
+                    N_ACCOUNTS
+                );
+            }
+        }
+
+        log::info!("All the ChangePubKey transactions for current batch are sent");
+
+        for (account_id, tx_hash) in tx_hashes.into_iter().enumerate() {
+            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
+
+            let num_processed = account_id + 1;
+            if num_processed % REPORT_RATE == 0 {
+                log::info!(
+                    "Committed {} / {} ChangePubKey transactions...",
+                    num_processed,
+                    N_ACCOUNTS
+                );
+            }
+        }
+
+        log::info!("All the ChangePubKey transactions for current batch are committed");
+
         Ok(())
     }
 
@@ -250,15 +379,14 @@ impl ScenarioExecutor {
         const N_TRANSFER_OPS: usize = 4;
 
         let account = &self.accounts[account_id];
-
-        self.initialize_account(account).await?;
+        let subscription_wallet = &self.subscription_accounts[account_id];
 
         for _ in 0..N_MINT_OPS {
             self.mint_tokens(account).await?
         }
 
         for _ in 0..N_SUBSCRIPTIONS {
-            self.subscribe(account).await?
+            self.subscribe(account, subscription_wallet).await?
         }
 
         for _ in 0..N_BURN_FUNDS_OPS {
@@ -271,45 +399,13 @@ impl ScenarioExecutor {
 
         self.counter.fetch_add(1, Ordering::SeqCst);
         let total = self.counter.load(Ordering::SeqCst);
-        if total % 50 == 0 {
+        if total % REPORT_RATE as u32 == 0 {
             log::info!(
                 "Performing loadtest... {} / {} iterations complete",
                 total,
                 N_ACCOUNTS
             );
         }
-
-        Ok(())
-    }
-
-    async fn initialize_account(&self, account: &ZksyncAccount) -> Result<(), failure::Error> {
-        // 1. Send the `Transfer` with 0 amount to account to initialize it.
-        let from_acc = &self.genesis_account.zk_acc;
-        let to_acc = account;
-
-        let fee = self.transfer_fee(&to_acc).await;
-        let (transfer_tx, eth_sign) = self.sign_transfer(from_acc, to_acc, 0u64, fee);
-
-        let tx_hash = self.rpc_client.send_tx(transfer_tx, eth_sign).await?;
-
-        wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
-
-        // 2. Set the account ID.
-        let resp = self
-            .rpc_client
-            .account_state_info(account.address)
-            .await
-            .expect("rpc error");
-        assert!(resp.id.is_some(), "Account ID is none for new account");
-        account.set_account_id(resp.id);
-
-        // 3. Send the `ChangePubKey` tx to be able to work with account.
-        let change_pubkey_tx =
-            FranklinTx::ChangePubKey(Box::new(account.create_change_pubkey_tx(None, true, false)));
-
-        let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
-
-        wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
 
         Ok(())
     }
@@ -333,36 +429,39 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    async fn subscribe(&self, account: &ZksyncAccount) -> Result<(), failure::Error> {
-        const COMMUNITY_NAME: &str = "TestCommunity";
+    async fn subscribe(
+        &self,
+        account: &ZksyncAccount,
+        subscription_wallet: &ZksyncAccount,
+    ) -> Result<(), failure::Error> {
         const SUBSCRIPTION_COST: u64 = 1;
 
-        // 1. Create a subscription account.
-        let subscription_wallet = self.create_subscription_account(account, COMMUNITY_NAME);
-        self.initialize_account(&subscription_wallet).await?;
-
-        // 2. Create a TransferFrom tx.
+        // 1. Create a TransferFrom tx.
         let from_acc = account;
         let to_acc = &subscription_wallet;
 
         let fee = self.transfer_fee(&to_acc).await;
         let transfer_from_tx = self.sign_transfer_from(from_acc, to_acc, SUBSCRIPTION_COST, fee);
 
-        // 3. Create a Burn tx
+        // 2. Create a Burn tx
         let from_acc = &subscription_wallet;
         let to_acc = &self.burn_account;
 
         let fee = self.transfer_fee(&to_acc).await;
         let (burn_tx, burn_eth_sign) = self.sign_transfer(from_acc, to_acc, SUBSCRIPTION_COST, fee);
 
-        // 4. Send both txs in a bundle.
-        // TODO: txs currently sent not together
+        // 3. Send both txs in a bundle.
+        // let txs = vec![(transfer_from_tx, None), (burn_tx, burn_eth_sign)];
+        // let tx_hashes = self.rpc_client.send_txs_batch(txs).await?;
+
         let tx_hash_1 = self.rpc_client.send_tx(transfer_from_tx, None).await?;
         let tx_hash_2 = self.rpc_client.send_tx(burn_tx, burn_eth_sign).await?;
+        let tx_hashes = vec![tx_hash_1, tx_hash_2];
 
-        // 5. Wait for txs to be executed.
-        wait_for_commit(tx_hash_1, Duration::from_secs(60), &self.rpc_client).await?;
-        wait_for_commit(tx_hash_2, Duration::from_secs(60), &self.rpc_client).await?;
+        // 4. Wait for txs to be executed.
+        for tx_hash in tx_hashes {
+            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
+        }
 
         Ok(())
     }
@@ -461,11 +560,7 @@ impl ScenarioExecutor {
         FranklinTx::TransferFrom(Box::new(tx))
     }
 
-    fn create_subscription_account(
-        &self,
-        account: &ZksyncAccount,
-        community_name: &str,
-    ) -> ZksyncAccount {
+    fn create_subscription_account(account: &ZksyncAccount, community_name: &str) -> ZksyncAccount {
         let mut sk_bytes = [0u8; 32];
         account
             .private_key
@@ -498,14 +593,14 @@ fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
     use sha2::{Digest, Sha256};
     pub type Fs = <Engine as JubjubEngine>::Fs;
 
-    if seed.len() < 32 {
-        panic!("Seed is too short");
-    };
-
-    let sha256_bytes = |input: &[u8]| -> Vec<u8> {
+    fn sha256_bytes(input: &[u8]) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.input(input);
         hasher.result().to_vec()
+    };
+
+    if seed.len() < 32 {
+        panic!("Seed is too short");
     };
 
     let mut effective_seed = sha256_bytes(seed);
@@ -514,7 +609,7 @@ fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
         let raw_priv_key = sha256_bytes(&effective_seed);
         let mut fs_repr = FsRepr::default();
         fs_repr
-            .read_be(&raw_priv_key[..])
+            .read_le(&raw_priv_key[..])
             .expect("failed to read raw_priv_key");
         if Fs::from_repr(fs_repr).is_ok() {
             return raw_priv_key;
