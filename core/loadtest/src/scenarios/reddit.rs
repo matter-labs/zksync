@@ -44,7 +44,7 @@ use crate::{
     test_accounts::TestAccount,
 };
 
-const N_ACCOUNTS: usize = 50; // TODO should be 25_000
+const N_ACCOUNTS: usize = 25_000;
 const COMMUNITY_NAME: &str = "TestCommunity";
 
 const REPORT_RATE: usize = 50; // How many iterations to execute quietly before reporting the execution state.
