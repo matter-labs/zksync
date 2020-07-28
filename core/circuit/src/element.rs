@@ -287,7 +287,6 @@ impl<E: Engine> CircuitElement<E> {
         y: &Self,
     ) -> Result<Boolean, SynthesisError> {
         let length = std::cmp::max(x.length, y.length);
-        dbg!(x.length, y.length);
         assert!(
             length < E::Fr::CAPACITY as usize,
             "comparison is only supported for fixed-length elements"

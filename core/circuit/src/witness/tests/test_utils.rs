@@ -20,7 +20,7 @@ pub use crate::witness::utils::WitnessBuilder;
 pub const FEE_ACCOUNT_ID: u32 = 0;
 
 /// Constant timestamp used in test blocks
-pub const TEST_BLOCK_TIMESTAMP: BlockTimestamp = BlockTimestamp(1595945009); // 2020-07-28T14:03:29
+pub const TEST_BLOCK_TIMESTAMP: BlockTimestamp = BlockTimestamp(1_595_945_009); // 2020-07-28T14:03:29
 
 /// Verifies that circuit has no unsatisfied constraints, and returns an error otherwise.
 pub fn check_circuit_non_panicking(circuit: FranklinCircuit<Engine>) -> Result<(), String> {
