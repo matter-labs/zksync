@@ -818,7 +818,11 @@ impl PlasmaState {
         op: &ChangePubKeyOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
-        let mut account = self.get_account(op.account_id).unwrap();
+        let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
+            let (account, upd) = Account::create_account(op.account_id, op.tx.account);
+            updates.extend(upd.into_iter());
+            account
+        });
 
         let old_pub_key_hash = account.pub_key_hash.clone();
         let old_nonce = account.nonce;
