@@ -19,7 +19,7 @@
 use std::{
     iter::Iterator,
     sync::atomic::{AtomicU32, Ordering},
-    time::Duration,
+    time::{Duration, Instant},
 };
 // External deps
 use chrono::Utc;
@@ -31,16 +31,21 @@ use web3::{
     types::H256,
 };
 // Workspace deps
-use models::node::{closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx, PrivateKey};
+use models::node::{
+    closest_packable_fee_amount,
+    tx::{PackedEthSignature, TxHash},
+    FranklinTx, PrivateKey,
+};
 use testkit::zksync_account::ZksyncAccount;
 // Local deps
 use crate::{
     rpc_client::RpcClient,
     scenarios::{
         configs::RedditConfig,
-        utils::{deposit_single, wait_for_commit},
+        utils::{deposit_single, wait_for_commit, wait_for_verify},
         ScenarioContext,
     },
+    sent_transactions::SentTransactions,
     test_accounts::TestAccount,
 };
 
@@ -176,17 +181,28 @@ impl ScenarioExecutor {
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
     pub async fn run_test(&mut self) -> Result<(), failure::Error> {
-        const PARALLEL_JOBS: usize = 50;
-
+        const PARALLEL_JOBS: usize = 100;
         self.save_accounts().await;
 
+        let total_start_time = Instant::now();
+
+        let start_time = Instant::now();
         self.initialize().await?;
+        let init_duration = start_time.elapsed();
 
         log::info!("Initialization complete, starting the test");
+        log::info!(
+            "Initialization taken {} minutes and {} seconds",
+            init_duration.as_secs() / 60,
+            init_duration.as_secs() % 60
+        );
 
+        let start_time = Instant::now();
+
+        // We can't open too many connections at once, thus we process accounts in chunks.
         for account_id in (0..N_ACCOUNTS).step_by(PARALLEL_JOBS) {
             let range_start = account_id;
-            let range_end = account_id + PARALLEL_JOBS;
+            let range_end = std::cmp::min(account_id + PARALLEL_JOBS, N_ACCOUNTS);
             let account_futures: Vec<_> = (range_start..range_end)
                 .map(|account_id| self.one_account_run(account_id))
                 .collect();
@@ -194,13 +210,31 @@ impl ScenarioExecutor {
             try_join_all(account_futures).await?;
         }
 
-        // TODO:
-        // After executing these futures we must send one more (random) tx and wait it to be
-        // verified. The verification will mean that all the previously sent txs are verified as well.
-        // After that, we may check the balances of every account to check if all the txs were executed
-        // successfully.
+        let run_duration = start_time.elapsed();
+
+        log::info!("Main part of the test is completed. Committing all the transactions taken {} minutes and {} seconds",
+            run_duration.as_secs() / 60,
+            run_duration.as_secs() % 60);
+
+        let start_time = Instant::now();
 
         self.finish().await?;
+
+        let finish_duration = start_time.elapsed();
+
+        log::info!(
+            "Test is finished. Verification taken {} minutes and {} seconds",
+            finish_duration.as_secs() / 60,
+            finish_duration.as_secs() % 60
+        );
+
+        let total_duration = total_start_time.elapsed();
+
+        log::info!(
+            "Total test execution time: {} minutes and {} seconds",
+            total_duration.as_secs() / 60,
+            total_duration.as_secs() % 60
+        );
 
         Ok(())
     }
@@ -379,20 +413,31 @@ impl ScenarioExecutor {
         let account = &self.accounts[account_id];
         let subscription_wallet = &self.subscription_accounts[account_id];
 
+        let mut tx_hashes = Vec::new();
+
         for _ in 0..N_MINT_OPS {
-            self.mint_tokens(account).await?
+            let tx_hash = self.mint_tokens(account).await?;
+            tx_hashes.push(tx_hash);
         }
 
         for _ in 0..N_SUBSCRIPTIONS {
-            self.subscribe(account, subscription_wallet).await?
+            let mut sub_tx_hashes = self.subscribe(account, subscription_wallet).await?;
+            tx_hashes.append(&mut sub_tx_hashes);
         }
 
         for _ in 0..N_BURN_FUNDS_OPS {
-            self.burn_funds(account).await?
+            let tx_hash = self.burn_funds(account).await?;
+            tx_hashes.push(tx_hash);
         }
 
         for _ in 0..N_TRANSFER_OPS {
-            self.transfer_funds(account).await?
+            let tx_hash = self.transfer_funds(account).await?;
+            tx_hashes.push(tx_hash);
+        }
+
+        // Now, once all the transactions from this account are sent, wait for every of them to be committed.
+        for tx_hash in tx_hashes {
+            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
         }
 
         self.counter.fetch_add(1, Ordering::SeqCst);
@@ -408,7 +453,7 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    async fn mint_tokens(&self, account: &ZksyncAccount) -> Result<(), failure::Error> {
+    async fn mint_tokens(&self, account: &ZksyncAccount) -> Result<TxHash, failure::Error> {
         const MINT_SIZE: u64 = 100; // 100 tokens for everybody.
 
         // 1. Create a minting tx, signed by both participants.
@@ -421,17 +466,14 @@ impl ScenarioExecutor {
         // 2. Send the tx.
         let tx_hash = self.rpc_client.send_tx(mint_tx, None).await?;
 
-        // 3. Wait for it to be executed.
-        wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
-
-        Ok(())
+        Ok(tx_hash)
     }
 
     async fn subscribe(
         &self,
         account: &ZksyncAccount,
         subscription_wallet: &ZksyncAccount,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<Vec<TxHash>, failure::Error> {
         const SUBSCRIPTION_COST: u64 = 1;
 
         // 1. Create a TransferFrom tx.
@@ -452,15 +494,10 @@ impl ScenarioExecutor {
         let txs = vec![(transfer_from_tx, None), (burn_tx, burn_eth_sign)];
         let tx_hashes = self.rpc_client.send_txs_batch(txs).await?;
 
-        // 4. Wait for txs to be executed.
-        for tx_hash in tx_hashes {
-            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
-        }
-
-        Ok(())
+        Ok(tx_hashes)
     }
 
-    async fn burn_funds(&self, account: &ZksyncAccount) -> Result<(), failure::Error> {
+    async fn burn_funds(&self, account: &ZksyncAccount) -> Result<TxHash, failure::Error> {
         const BURN_SIZE: u64 = 1; // Burn 1 token at a time.
 
         // 1. Create a minting tx, signed by both participants.
@@ -473,13 +510,10 @@ impl ScenarioExecutor {
         // 2. Send the tx.
         let tx_hash = self.rpc_client.send_tx(burn_tx, eth_sign).await?;
 
-        // 3. Wait for it to be executed.
-        wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
-
-        Ok(())
+        Ok(tx_hash)
     }
 
-    async fn transfer_funds(&self, account: &ZksyncAccount) -> Result<(), failure::Error> {
+    async fn transfer_funds(&self, account: &ZksyncAccount) -> Result<TxHash, failure::Error> {
         const TRANSFER_SIZE: u64 = 1; // Send 1 token.
 
         // 1. Create a transfer tx (to self for simplicity).
@@ -495,13 +529,25 @@ impl ScenarioExecutor {
             .send_tx(tx.clone(), eth_sign.clone())
             .await?;
 
-        // 3. Wait for it to be executed.
-        wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
-
-        Ok(())
+        Ok(tx_hash)
     }
 
     async fn finish(&mut self) -> Result<(), failure::Error> {
+        // After executing these futures we must send one more (random) tx and wait it to be
+        // verified. The verification will mean that (at least most of) the previously sent txs are verified as well.
+        log::info!("Starting the finish phase of the test, sending one more transaction and waiting for it to be verified");
+
+        let tx_hash = self.transfer_funds(&self.genesis_account.zk_acc).await?;
+
+        let mut sent_transactions = SentTransactions::new();
+        sent_transactions.add_tx_hash(tx_hash);
+
+        wait_for_verify(sent_transactions, self.verify_timeout, &self.rpc_client).await?;
+
+        // TODO (consider):
+        // After awaiting for verification, we may check the balances of every account to check if all the txs were executed
+        // successfully.
+
         Ok(())
     }
 
