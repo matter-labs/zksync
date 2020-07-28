@@ -2271,6 +2271,13 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_rhs_signer_valid);
 
+        let is_transfer_from_self = CircuitElement::equals(
+            cs.namespace(|| "is_transfer_from_self"),
+            &lhs.account_id,
+            &rhs.account_id,
+        )?;
+        rhs_valid_flags.push(is_transfer_from_self.not());
+
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
@@ -2315,18 +2322,19 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
     ) -> Result<Boolean, SynthesisError> {
         let is_valid_from_ok = less_than(
             cs.namespace(|| "valid_from less_than block_timestamp"),
-            Expression::from(&op_data.valid_from.get_number()),
             Expression::from(&global_variables.block_timestamp.get_number()),
+            Expression::from(&op_data.valid_from.get_number()),
             params::TIMESTAMP_BIT_WIDTH,
         )?
         .not();
 
         let is_valid_until_ok = less_than(
             cs.namespace(|| "block_timestamp less_than valid_until"),
-            Expression::from(&global_variables.block_timestamp.get_number()),
             Expression::from(&op_data.valid_until.get_number()),
+            Expression::from(&global_variables.block_timestamp.get_number()),
             params::TIMESTAMP_BIT_WIDTH,
-        )?;
+        )?
+        .not();
 
         let is_valid_timestamp = Boolean::and(
             cs.namespace(|| "is_valid_from_ok AND is_valid_until_ok"),
