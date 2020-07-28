@@ -283,8 +283,7 @@ impl ScenarioExecutor {
     ) -> Result<(), failure::Error> {
         // 1. Send the `Transfer` with 0 amount to each account to initialize it.
         let mut tx_hashes = Vec::new();
-        for account_id in 0..N_ACCOUNTS {
-            let account = &accounts[account_id];
+        for (account_id, account) in accounts.iter().enumerate() {
             let from_acc = &self.genesis_account.zk_acc;
             let to_acc = account;
 
@@ -324,8 +323,7 @@ impl ScenarioExecutor {
 
         // 2. Set the account ID and call the `ChangePubKey` to be able to work with account.
         let mut tx_hashes = Vec::new();
-        for account_id in 0..N_ACCOUNTS {
-            let account = &accounts[account_id];
+        for (account_id, account) in accounts.iter().enumerate() {
             let resp = self
                 .rpc_client
                 .account_state_info(account.address)
