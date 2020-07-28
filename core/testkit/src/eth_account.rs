@@ -401,11 +401,12 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "verifyBlock",
+                "verifyBlocks",
                 (
                     u64::from(block.block_number),
+                    u64::from(block.block_number),
                     vec![U256::default(); 10],
-                    block.get_withdrawals_data(),
+                    vec![block.get_withdrawals_data()],
                 ),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )

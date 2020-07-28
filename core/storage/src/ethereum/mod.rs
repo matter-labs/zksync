@@ -8,7 +8,7 @@ use web3::types::{H256, U256};
 // Workspace imports
 use models::{
     ethereum::{ETHOperation, InsertedOperationResponse, OperationType},
-    Operation,
+    Operation, VerifyMultiblockInfo,
 };
 // Local imports
 use self::records::{
@@ -16,6 +16,7 @@ use self::records::{
     StorageETHOperation,
 };
 use crate::chain::operations::records::StoredOperation;
+use crate::ethereum::records::{NewVerifyMultiproofQueueElement, VerifyMultiproofQueueElement};
 use crate::schema::*;
 use crate::utils::StoredBigUint;
 use crate::StorageProcessor;
@@ -77,7 +78,7 @@ impl<'a> EthereumSchema<'a> {
                 };
 
                 // Convert the fields into expected format.
-                let op_type = OperationType::from_str(eth_op.op_type.as_ref())
+                let op_type = serde_json::from_value(eth_op.op_type)
                     .expect("Stored operation type must have a valid value");
                 let last_used_gas_price =
                     U256::from_str(&eth_op.last_used_gas_price.0.to_string()).unwrap();
@@ -136,6 +137,37 @@ impl<'a> EthereumSchema<'a> {
         Ok(operations)
     }
 
+    pub fn save_new_multiproof_req(
+        &self,
+        verify_multiblock_info_: &VerifyMultiblockInfo,
+    ) -> QueryResult<()> {
+        use crate::schema::verify_multiproof_queue_elements::dsl::*;
+
+        let value = NewVerifyMultiproofQueueElement {
+            verify_multiblock_info: serde_json::to_value(verify_multiblock_info_).unwrap(),
+        };
+
+        insert_into(verify_multiproof_queue_elements)
+            .values(value)
+            .execute(self.0.conn())?;
+
+        Ok(())
+    }
+
+    pub fn load_unprocessed_verify_multiblocks(&self) -> QueryResult<Vec<VerifyMultiblockInfo>> {
+        let res: Vec<VerifyMultiproofQueueElement> = self.0.conn().transaction(|| {
+            verify_multiproof_queue_elements::table
+                .filter(verify_multiproof_queue_elements::sended_to_eth.eq(false))
+                .load(self.0.conn())
+        })?;
+        let mut res = res
+            .iter()
+            .map(|stored| serde_json::from_value(stored.verify_multiblock_info.clone()).unwrap())
+            .collect::<Vec<VerifyMultiblockInfo>>();
+        res.sort_by(|a, b| a.block_from.cmp(&b.block_from));
+        Ok(res)
+    }
+
     /// Stores the sent (but not confirmed yet) Ethereum transaction in the database.
     /// Returns the `ETHOperation` object containing the assigned nonce and operation ID.
     pub fn save_new_eth_tx(
@@ -153,7 +185,7 @@ impl<'a> EthereumSchema<'a> {
 
             // Create and insert the operation.
             let operation = NewETHOperation {
-                op_type: op_type.to_string(),
+                op_type: serde_json::to_value(op_type.clone()).unwrap(),
                 nonce,
                 last_deadline_block,
                 last_used_gas_price: last_used_gas_price.into(),
@@ -193,6 +225,16 @@ impl<'a> EthereumSchema<'a> {
                 insert_into(eth_ops_binding::table)
                     .values(&binding)
                     .execute(self.0.conn())?;
+            }
+            if let OperationType::VerifyMultiblock(info) = op_type.clone() {
+                update(
+                    verify_multiproof_queue_elements::table.filter(
+                        verify_multiproof_queue_elements::verify_multiblock_info
+                            .eq(serde_json::to_value(info).unwrap()),
+                    ),
+                )
+                .set((verify_multiproof_queue_elements::sended_to_eth.eq(true),))
+                .execute(self.0.conn())?;
             }
 
             // Update the stored stats.
@@ -276,6 +318,9 @@ impl<'a> EthereumSchema<'a> {
                 }
                 OperationType::Verify => {
                     current_stats.verify_ops += 1;
+                }
+                OperationType::VerifyMultiblock(info) => {
+                    current_stats.verify_ops += (info.block_to - info.block_from + 1) as i64;
                 }
                 OperationType::Withdraw => {
                     current_stats.withdraw_ops += 1;

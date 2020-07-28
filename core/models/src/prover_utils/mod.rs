@@ -56,6 +56,12 @@ impl Default for EncodedProofPlonk {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct EncodedMultiblockProofPlonk {
+    pub proven_blocks: u32,
+    pub proof: EncodedProofPlonk,
+}
+
 pub struct SetupForStepByStepProver {
     setup_polynomials: SetupPolynomials<Engine, PlonkCsWidth4WithNextStepParams>,
     hints: Vec<(usize, TranspilationVariant)>,

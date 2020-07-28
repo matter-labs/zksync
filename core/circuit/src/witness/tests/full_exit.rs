@@ -131,7 +131,7 @@ fn test_incorrect_full_exit_withdraw_amount() {
             (full_exit_op, success),
             (),
             ERR_MSG,
-            || vec![],
+            Vec::new,
         );
     }
 }

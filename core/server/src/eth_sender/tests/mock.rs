@@ -88,7 +88,16 @@ impl MockDatabase {
 }
 
 impl DatabaseAccess for MockDatabase {
-    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error> {
+    #[allow(clippy::type_complexity)]
+    fn restore_state(
+        &self,
+    ) -> Result<
+        (
+            VecDeque<ETHOperation>,
+            Vec<(OperationType, Option<Operation>)>,
+        ),
+        failure::Error,
+    > {
         Ok((self.restore_state.clone(), Vec::new()))
     }
 

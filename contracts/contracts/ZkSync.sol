@@ -1,4 +1,5 @@
 pragma solidity ^0.5.0;
+pragma experimental ABIEncoderV2;
 
 import "./ReentrancyGuard.sol";
 import "./SafeMath.sol";
@@ -290,6 +291,29 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             abi.encodeWithSignature(
                 "verifyBlock(uint32,uint256[],bytes)",
                     _blockNumber,
+                    _proof,
+                    _withdrawalsData
+            )
+        );
+        require(blockProcessorCallSuccess, "ver91"); // ver91 - `verifyBlock` delegatecall fails
+    }
+
+    /// @notice Multiblock verification.
+    /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
+    /// @param _blockNumberFrom Block number from
+    /// @param _blockNumberTo Block number to
+    /// @param _proof Multiblock proof
+    /// @param _withdrawalsData Blocks withdrawals data
+    function verifyBlocks(uint32 _blockNumberFrom, uint32 _blockNumberTo, uint256[] calldata _proof, bytes[] calldata _withdrawalsData)
+        external nonReentrant
+    {
+        requireActive();
+
+        (bool blockProcessorCallSuccess, ) = blockProcessorAddress.delegatecall(
+            abi.encodeWithSignature(
+                "verifyBlocks(uint32,uint32,uint256[],bytes[])",
+                    _blockNumberFrom,
+                    _blockNumberTo,
                     _proof,
                     _withdrawalsData
             )
