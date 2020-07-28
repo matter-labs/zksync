@@ -90,8 +90,12 @@ impl ApiClient {
                 )
             })
             .map_err(|e| {
+                let backoff_config = Self::get_backoff();
+                let max_elapsed_time_secs = backoff_config.max_elapsed_time.unwrap().as_secs();
+
                 panic!(
-                    "Prover can't reach server, for the max elapsed time of the backoff: {}",
+                    "Prover couldn't reach server for the max elapsed time of the backoff ({} secs): {}",
+                    max_elapsed_time_secs,
                     e
                 )
             })
@@ -103,7 +107,7 @@ impl ApiClient {
         backoff.initial_interval = Duration::from_secs(1);
         backoff.multiplier = 1.5f64;
         backoff.max_interval = Duration::from_secs(10);
-        backoff.max_elapsed_time = Some(Duration::from_secs(2 * 60));
+        backoff.max_elapsed_time = Some(Duration::from_secs(20 * 60));
         backoff
     }
 
