@@ -10,7 +10,6 @@ use crate::witness::{
     TransferFromWitness,
 };
 use models::node::{TransferFrom, TransferFromOp};
-use std::time::SystemTime;
 
 /// Basic check for execution of `TransferFrom` operation in circuit.
 /// Here we create two accounts and perform a TransferFrom between them.

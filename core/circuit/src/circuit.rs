@@ -25,7 +25,6 @@ use models::{
     params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH},
 };
 // Local deps
-use crate::utils::less_than;
 use crate::{
     account::{AccountContent, AccountWitness},
     allocated_structures::*,
@@ -155,7 +154,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let block_timestamp = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "allocated_block_timestamp"),
             || self.block_timestamp.grab(),
-            E::Fr::NUM_BITS as usize,
+            params::TIMESTAMP_BIT_WIDTH,
         )?;
         let chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
@@ -2320,19 +2319,17 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         global_variables: &CircuitGlobalVariables<E>,
     ) -> Result<Boolean, SynthesisError> {
-        let is_valid_from_ok = less_than(
+        let is_valid_from_ok = CircuitElement::less_than(
             cs.namespace(|| "valid_from less_than block_timestamp"),
-            Expression::from(&global_variables.block_timestamp.get_number()),
-            Expression::from(&op_data.valid_from.get_number()),
-            params::TIMESTAMP_BIT_WIDTH,
+            &global_variables.block_timestamp,
+            &op_data.valid_from,
         )?
         .not();
 
-        let is_valid_until_ok = less_than(
+        let is_valid_until_ok = CircuitElement::less_than(
             cs.namespace(|| "block_timestamp less_than valid_until"),
-            Expression::from(&op_data.valid_until.get_number()),
-            Expression::from(&global_variables.block_timestamp.get_number()),
-            params::TIMESTAMP_BIT_WIDTH,
+            &op_data.valid_until,
+            &global_variables.block_timestamp,
         )?
         .not();
 
