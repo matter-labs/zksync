@@ -775,12 +775,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .into_iter()
             .map(|block| block.get_withdrawals_data())
             .collect();
+        let mut limbs = [U256::zero(); 16];
+        limbs.copy_from_slice(&op.proof.proof.subproof_limbs);
         self.ethereum.encode_tx_data(
             "verifyBlocks",
             (
                 u64::from(op.block_from),
                 u64::from(op.block_to),
+                op.proof.proof.inputs.clone(),
                 op.proof.proof.proof.clone(),
+                limbs,
                 withdrawals_data,
             ),
         )

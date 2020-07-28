@@ -516,6 +516,8 @@ function promiseTimeout(ms, promise) {
         await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("6.0")})).wait();
         await (await erc20.transfer(syncDepositorWallet.address, parseEther("110.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
+        await zksyncDepositorWallet.depositToSyncFromEthereum({depositTo: zksyncDepositorWallet.address(), token: "ETH", amount: 1});
+        process.exit(0);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("6.0")}));

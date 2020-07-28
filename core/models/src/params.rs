@@ -232,7 +232,7 @@ pub const RECURSIVE_CIRCUIT_SIZES: &[(usize, u32)] = &[(1, 22), (2, 22)];
 /// Number of inputs in the basic circuit that is aggregated by recursive circuit
 pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
 /// Depth of the tree which contains different verification keys for basic circuit
-pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 1;
+pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 3;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

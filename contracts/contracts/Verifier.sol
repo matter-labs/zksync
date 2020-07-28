@@ -1,4 +1,5 @@
 pragma solidity ^0.5.0;
+pragma experimental ABIEncoderV2;
 
 import "./KeysWithPlonkVerifier.sol";
 
@@ -23,32 +24,18 @@ contract Verifier is KeysWithPlonkVerifier {
     }
 
     function verifyMultiblockProof(
+        uint256[] calldata _public_inputs,
         uint256[] calldata _proof,
-        bytes32 _commitment
+        uint32[] calldata _block_sizes,
+        uint256[] calldata _individual_vks_inputs,
+        uint256[16] calldata subproofs_limbs
     ) external view returns (bool) {
-        return true;
-    }
-
-    function verifyBlockProof(
-        uint256[] calldata _proof,
-        bytes32 _commitment,
-        uint32 _chunks
-    ) external view returns (bool) {
-        if (DUMMY_VERIFIER) {
-            uint oldGasValue = gasleft();
-            uint tmp;
-            while (gasleft() + 470000 > oldGasValue) {
-                tmp += 1;
-            }
-            return true;
+        uint8[] memory vkIndexes = new uint8[](_block_sizes.length);
+        for (uint32 i = 0; i < _block_sizes.length; i++) {
+            vkIndexes[i] = blockSizeToVkIndex(_block_sizes[i]);
         }
-        uint256[] memory inputs = new uint256[](1);
-        uint256 mask = (~uint256(0)) >> 3;
-        inputs[0] = uint256(_commitment) & mask;
-        Proof memory proof = deserialize_proof(inputs, _proof);
-        VerificationKey memory vk = getVkBlock(_chunks);
-        require(vk.num_inputs == inputs.length);
-        return verify(proof, vk);
+        VerificationKey memory vk = getVkAggregated(uint32(_block_sizes.length));
+        return verify_serialized_proof_with_recursion(_public_inputs, _proof, VK_TREE_ROOT, VK_MAX_INDEX, vkIndexes, _individual_vks_inputs, subproofs_limbs, vk);
     }
 
     function verifyExitProof(
@@ -59,14 +46,15 @@ contract Verifier is KeysWithPlonkVerifier {
         uint128 _amount,
         uint256[] calldata _proof
     ) external view returns (bool) {
-        bytes32 commitment = sha256(abi.encodePacked(_rootHash, _accountId, _owner, _tokenId, _amount));
-
-        uint256[] memory inputs = new uint256[](1);
-        uint256 mask = (~uint256(0)) >> 3;
-        inputs[0] = uint256(commitment) & mask;
-        Proof memory proof = deserialize_proof(inputs, _proof);
-        VerificationKey memory vk = getVkExit();
-        require(vk.num_inputs == inputs.length);
-        return verify(proof, vk);
+        return true; // TODO
+//        bytes32 commitment = sha256(abi.encodePacked(_rootHash, _accountId, _owner, _tokenId, _amount));
+//
+//        uint256[] memory inputs = new uint256[](1);
+//        uint256 mask = (~uint256(0)) >> 3;
+//        inputs[0] = uint256(commitment) & mask;
+//        Proof memory proof = deserialize_proof(inputs, _proof);
+//        VerificationKey memory vk = getVkExit();
+//        require(vk.num_inputs == inputs.length);
+//        return verify(proof, vk);
     }
 }
