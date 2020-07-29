@@ -18,9 +18,9 @@ contract RedditToken is Context, IERC20 {
 
     uint104 constant INITIAL_AMOUNT_TO_DEPOSIT_TO_ZKSYNC = 10**20;
 
-    constructor(address _ZkSyncAddress, address _addressToDeposit) public {
+    constructor(address _ZkSyncAddress) public {
         ZkSyncContract = ZkSync(_ZkSyncAddress);
-        ZkSyncContract.depositERC20(IERC20(this), INITIAL_AMOUNT_TO_DEPOSIT_TO_ZKSYNC, _addressToDeposit);
+        ZkSyncContract.depositERC20(IERC20(this), INITIAL_AMOUNT_TO_DEPOSIT_TO_ZKSYNC, address(this));
     }
 
     function totalSupply() public view returns (uint256) {
