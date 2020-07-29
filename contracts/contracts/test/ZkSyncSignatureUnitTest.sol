@@ -6,15 +6,14 @@ import "../generated/ZkSyncTest.sol";
 
 contract ZKSyncSignatureUnitTest is ZkSyncTest {
 
-    function testChangePubkeySignatureCheck(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId, bool expectedValue) external {
+    function testChangePubkeySignatureCheck(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, bool expectedValue) external {
         (bool blockProcessorCallSuccess, bytes memory encodedResult) = blockProcessorAddress.delegatecall(
             abi.encodeWithSignature(
-                "externalTestVerifyChangePubkeySignature(bytes,bytes20,uint32,address,uint32)",
+                "externalTestVerifyChangePubkeySignature(bytes,bytes20,uint32,address)",
                     _signature,
                     _newPkHash,
                     _nonce,
-                    _ethAddress,
-                    uint32(_accountId)
+                    _ethAddress
             )
         );
         require(blockProcessorCallSuccess, "vcpks91"); // vcpks91 - `externalTestVerifyChangePubkeySignature` delegatecall fails

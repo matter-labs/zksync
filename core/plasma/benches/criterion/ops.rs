@@ -234,7 +234,6 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     };
 
     let change_pubkey = ChangePubKey {
-        account_id: 0,
         account: to_change.address,
         new_pk_hash: PubKeyHash::from_privkey(&new_sk),
         nonce,
