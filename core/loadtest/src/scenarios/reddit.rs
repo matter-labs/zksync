@@ -94,8 +94,19 @@ impl ScenarioExecutor {
             Http::new(&ctx.options.web3_url).expect("http transport start");
 
         // Create genesis account to mint tokens from.
-        let genesis_account =
-            TestAccount::from_info(&config.genesis_account, &transport, &ctx.options);
+        let private_key_bytes: Vec<_> = hex::decode(config.genesis_account_zksync_sk)
+            .unwrap()
+            .into_iter()
+            .rev()
+            .collect();
+        let zk_private_key =
+            PrivateKey::read(&private_key_bytes[..]).expect("Can't read private key [zk]");
+        let genesis_account = TestAccount::from_info_and_private_key(
+            &config.genesis_account,
+            zk_private_key,
+            &transport,
+            &ctx.options,
+        );
 
         // Create a burn account to burn tokens.
         // TODO: Burn account should be deterministic, not random.
@@ -241,21 +252,19 @@ impl ScenarioExecutor {
 
     /// Initializes the test, preparing the both main account and all the intermediate accounts for the interaction.
     async fn initialize(&mut self) -> Result<(), failure::Error> {
+        // 1. Update the account nonce.
+        self.genesis_account
+            .update_nonce_values(&self.rpc_client)
+            .await?;
+
         if self.token.0 == 0 {
             log::info!("Token ID is 0 (ETH). Assuming that genesis account has to be initialized");
 
-            // 1. Update the account nonce.
-            self.genesis_account
-                .update_nonce_values(&self.rpc_client)
-                .await?;
-
             // 2. Perform a deposit
-            deposit_single(
-                &self.genesis_account,
-                BigUint::from(1_000_000_000_000_000_000u64),
-                &self.rpc_client,
-            )
-            .await?;
+            let one_token = BigUint::from(1_000_000_000_000_000_000u64);
+            let deposit_amount =
+                one_token * BigUint::from(1_000u64) * BigUint::from(N_ACCOUNTS as u64);
+            deposit_single(&self.genesis_account, deposit_amount, &self.rpc_client).await?;
 
             // 3. Set the account ID.
             let resp = self
@@ -322,7 +331,9 @@ impl ScenarioExecutor {
             let to_acc = account;
 
             // A big transfer amount to cover the fees in transfers.
-            let transfer_amount = 1_000_000_000_000u64;
+            // Transfer amount is 100 MLTT (assuming that precision is 18 decimals).
+            let one_token = BigUint::from(1_000_000_000_000_000_000u64);
+            let transfer_amount = one_token * BigUint::from(100u64);
 
             let fee = self.transfer_fee(&to_acc).await;
             let (transfer_tx, eth_sign) =

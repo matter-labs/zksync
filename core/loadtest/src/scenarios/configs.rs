@@ -82,6 +82,8 @@ impl RealLifeConfig {
 pub struct RedditConfig {
     /// Main account to mint tokens from.
     pub genesis_account: AccountInfo,
+    /// zkSync private key of genesis account.
+    pub genesis_account_zksync_sk: String,
     /// Timeout for awaiting a block to be verified.
     pub block_timeout: u64,
     /// Used token ID.
