@@ -88,7 +88,7 @@ contract RedditToken is Context, IERC20 {
     }
 
     function setMintingMultisigKey(bytes32 _newMultisigKey) public {
-        /* Check authorization here */
+        /* TODO: check authorization here */
 
         ZkSyncContract.setMintingMultisigKey(_newMultisigKey);
     }
