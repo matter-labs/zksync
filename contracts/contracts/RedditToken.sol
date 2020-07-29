@@ -76,6 +76,7 @@ contract RedditToken is Context, IERC20 {
         } else{
             _balances[recipient] = _balances[recipient].add(amount);
         }
+
         emit Transfer(sender, recipient, amount);
     }
 
@@ -87,9 +88,9 @@ contract RedditToken is Context, IERC20 {
         emit Approval(owner, spender, amount);
     }
 
-    function setMintingMultisigKey(bytes32 _newMultisigKey) public {
+    function setMintingMultisigKey(bytes calldata _newPubKeyHash, uint32 _nonce) external {
         /* TODO: check authorization here */
 
-        ZkSyncContract.setMintingMultisigKey(_newMultisigKey);
+        ZkSyncContract.setAuthPubkeyHash(_newPubKeyHash, _nonce);
     }
 }
