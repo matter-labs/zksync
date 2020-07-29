@@ -1,0 +1,3 @@
+#!/bin/bash
+cd js/tests
+npx ts-node prepare-mintable-token-account.ts
