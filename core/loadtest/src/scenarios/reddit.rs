@@ -321,8 +321,12 @@ impl ScenarioExecutor {
             let from_acc = &self.genesis_account.zk_acc;
             let to_acc = account;
 
+            // A big transfer amount to cover the fees in transfers.
+            let transfer_amount = 1_000_000_000_000u64;
+
             let fee = self.transfer_fee(&to_acc).await;
-            let (transfer_tx, eth_sign) = self.sign_transfer(from_acc, to_acc, 0u64, fee);
+            let (transfer_tx, eth_sign) =
+                self.sign_transfer(from_acc, to_acc, transfer_amount, fee);
 
             let tx_hash = self.rpc_client.send_tx(transfer_tx, eth_sign).await?;
 
