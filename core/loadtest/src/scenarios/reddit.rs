@@ -464,7 +464,7 @@ impl ScenarioExecutor {
         let from_acc = &self.genesis_account.zk_acc;
         let to_acc = account;
 
-        let fee = self.transfer_fee(&to_acc).await;
+        let fee = self.transfer_from_fee(&to_acc).await;
         let mint_tx = self.sign_transfer_from(from_acc, to_acc, MINT_SIZE, fee);
 
         // 2. Send the tx.
@@ -484,7 +484,7 @@ impl ScenarioExecutor {
         let from_acc = account;
         let to_acc = &subscription_wallet;
 
-        let fee = self.transfer_fee(&to_acc).await;
+        let fee = self.transfer_from_fee(&to_acc).await;
         let transfer_from_tx = self.sign_transfer_from(from_acc, to_acc, SUBSCRIPTION_COST, fee);
 
         // 2. Create a Burn tx
@@ -553,6 +553,17 @@ impl ScenarioExecutor {
         // successfully.
 
         Ok(())
+    }
+
+    /// Obtains a fee required for the transfer operation.
+    async fn transfer_from_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+        let fee = self
+            .rpc_client
+            .get_tx_fee("TransferFrom", to_acc.address, &self.token.1)
+            .await
+            .expect("Can't get tx fee");
+
+        closest_packable_fee_amount(&fee)
     }
 
     /// Obtains a fee required for the transfer operation.
