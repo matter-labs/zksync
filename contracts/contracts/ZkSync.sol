@@ -168,6 +168,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
+    function setMintingMultisigKey(bytes32 _newMultisigKey) external {
+        /* Check that this priority request is received from the token contract */
+
+        /* Create corresponding priority request */
+    }
+
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(address _franklinAddr) external payable nonReentrant {
