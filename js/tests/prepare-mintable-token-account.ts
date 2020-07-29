@@ -31,10 +31,12 @@ let syncProvider: Provider;
         const ethWallet = ethers.Wallet.fromMnemonic(
             process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/5"
         ).connect(ethersProvider);
+        const syncWallet = await Wallet.fromEthSigner(ethWallet, syncProvider);
         console.log("Wallet address:", ethWallet.address);
         console.log("Wallet ethereum private key:", ethWallet.privateKey);
+        console.log("Wallet sync private key:", Buffer.from(syncWallet.signer.privateKey).toString("hex"));
+        console.log("Wallet sync pubkey hash:", syncWallet.signer.pubKeyHash());
 
-        const syncWallet = await Wallet.fromEthSigner(ethWallet, syncProvider);
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
             token: ERC20_SYMBOL,
@@ -42,8 +44,14 @@ let syncProvider: Provider;
             approveDepositAmountForERC20: true
         });
         await deposit.awaitReceipt();
-
         console.log("Deposit success");
+
+        if (!await syncWallet.isSigningKeySet()) {
+            const changePubkey = await syncWallet.setSigningKey();
+            await changePubkey.awaitReceipt();
+        }
+        console.log("Pubkey set success");
+
         process.exit(0);
     } catch (e) {
         console.error("Error: ", e);
