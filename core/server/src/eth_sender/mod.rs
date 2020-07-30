@@ -655,7 +655,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     .get(0)
                     .expect("must verify at least one block")
                     .verify_gas_limit
-                    * 2
             }
             OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
         }
