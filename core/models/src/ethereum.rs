@@ -4,21 +4,40 @@ use std::fmt;
 use std::str::FromStr;
 // External uses
 /// Local uses
-use crate::{Action, Operation};
+use crate::{Action, Operation, VerifyMultiblockInfo};
 use web3::types::{H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
 pub type EthOpId = i64;
 
 /// Type of the transactions sent to the Ethereum network.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OperationType {
     /// Commit action (`commitBlock` method of the smart contract).
     Commit,
     /// Verify action (`verifyBlock` method of the smart contract).
     Verify,
+    /// Verify action (`verifyMultiblock` method of the smart contract).
+    VerifyMultiblock(VerifyMultiblockInfo),
     /// Withdraw action (`completeWithdrawals` method of the smart contract).
     Withdraw,
+}
+
+impl OperationType {
+    pub fn is_verify(&self) -> bool {
+        match self {
+            Self::Verify | Self::VerifyMultiblock(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn number_of_block_to_verify(&self) -> Option<usize> {
+        match self {
+            Self::Verify => Some(1),
+            Self::VerifyMultiblock(info) => Some((info.block_to - info.block_from + 1) as usize),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for OperationType {
@@ -26,6 +45,11 @@ impl fmt::Display for OperationType {
         match self {
             Self::Commit => write!(f, "commit"),
             Self::Verify => write!(f, "verify"),
+            Self::VerifyMultiblock(info) => write!(
+                f,
+                "verifyMultiblock([{};{}])",
+                info.block_from, info.block_to
+            ),
             Self::Withdraw => write!(f, "withdraw"),
         }
     }
@@ -39,7 +63,7 @@ impl FromStr for OperationType {
             "commit" => Self::Commit,
             "verify" => Self::Verify,
             "withdraw" => Self::Withdraw,
-            _ => failure::bail!("Unknown type of operation: {}", s),
+            _ => failure::bail!("Not convertible from str: {}", s),
         };
 
         Ok(op)

@@ -60,7 +60,8 @@ impl<'a> BlockSchema<'a> {
                     let stored_proof = ProverSchema(self.0).load_proof(block_number);
                     match stored_proof {
                         Err(DieselError::NotFound) => {
-                            ProverSchema(self.0).store_proof(block_number, proof)?;
+                            ProverSchema(self.0)
+                                .store_proof(block_number, &proof.get_encoded_plonk_proof())?;
                         }
                         Err(e) => return Err(e),
                         Ok(_) => {}

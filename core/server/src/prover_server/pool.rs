@@ -231,7 +231,7 @@ impl Maintainer {
                     .conn_pool
                     .access_storage()
                     .expect("failed to connect to db");
-                let pd = self.build_prover_data(&storage, &op)?;
+                let pd = self.build_prover_block_data(&storage, &op)?;
                 // Always build prover data to update circuit tree to the next block, but store only
                 // if there is no proof for the block.
                 if !has_proof {
@@ -253,7 +253,7 @@ impl Maintainer {
         Ok(())
     }
 
-    fn build_prover_data(
+    fn build_prover_block_data(
         &mut self,
         storage: &storage::StorageProcessor,
         commit_operation: &models::Operation,

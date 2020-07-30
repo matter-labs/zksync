@@ -134,19 +134,23 @@ impl ChangePubkeyOffChainWitness<Bn256> {
         let a = Fr::zero();
         let b = Fr::zero();
 
-        //applying deposit
+        //applying change pub key
         let (account_witness_before, account_witness_after, balance_before, balance_after) =
             apply_leaf_operation(
                 tree,
                 change_pubkey_offcahin.account_id,
                 0,
                 |acc| {
-                    assert_eq!(
-                        acc.address, change_pubkey_offcahin.address,
-                        "change pubkey address tx mismatch"
-                    );
+                    // change pub key can be applied to the empty account
+                    if acc.address != Fr::zero() {
+                        assert_eq!(
+                            acc.address, change_pubkey_offcahin.address,
+                            "change pubkey address tx mismatch"
+                        );
+                    }
                     acc.pub_key_hash = change_pubkey_offcahin.new_pubkey_hash;
                     acc.nonce.add_assign(&Fr::from_str("1").unwrap());
+                    acc.address = change_pubkey_offcahin.address;
                 },
                 |_| {},
             );

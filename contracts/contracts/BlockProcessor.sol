@@ -1,4 +1,5 @@
 pragma solidity ^0.5.0;
+pragma experimental ABIEncoderV2;
 
 import "./SafeMath.sol";
 import "./SafeMathUInt128.sol";
@@ -81,6 +82,46 @@ contract BlockProcessor is Storage, Config, Events {
         totalBlocksVerified += 1;
 
         emit BlockVerification(_blockNumber);
+    }
+
+    /// @notice Creates multiblcok commitment
+    /// @param _blockNumberFrom Block number from
+    /// @param _blockNumberTo Block number to
+    function createMultiblockCommitment(uint32 _blockNumberFrom, uint32 _blockNumberTo)
+        internal returns (bytes32 commitment) {
+        return bytes32(uint256(0));
+    }
+
+    /// @notice Multiblock verification.
+    /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
+    /// @param _blockNumberFrom Block number from
+    /// @param _blockNumberTo Block number to
+    /// @param _proof Multiblock proof
+    /// @param _withdrawalsData Blocks withdrawals data
+    function verifyBlocks(uint32 _blockNumberFrom, uint32 _blockNumberTo, uint256[] calldata _proof, bytes[] calldata _withdrawalsData)
+        external
+    {
+        require(_blockNumberFrom <= _blockNumberTo, "vbs11"); // vbs11 - must verify non empty sequence of blocks
+        require(_blockNumberFrom == totalBlocksVerified + 1, "mbfvk11"); // only verify from next block
+        governance.requireActiveValidator(msg.sender);
+
+        bytes32 multiblockCommitment = createMultiblockCommitment(_blockNumberFrom, _blockNumberTo);
+
+        require(verifier.verifyMultiblockProof(_proof, multiblockCommitment), "mbfvk13"); // proof verification failed
+
+        for (uint32 _blockNumber = _blockNumberFrom; _blockNumber <= _blockNumberTo; _blockNumber++){
+            processOnchainWithdrawals(_withdrawalsData[_blockNumber - _blockNumberFrom], blocks[_blockNumber].withdrawalsDataHash);
+        }
+
+        for (uint32 _blockNumber = _blockNumberFrom; _blockNumber <= _blockNumberTo; _blockNumber++){
+            deleteRequests(
+                blocks[_blockNumber].priorityOperations
+            );
+        }
+
+        totalBlocksVerified = _blockNumberTo;
+
+        emit MultiblockVerification(_blockNumberFrom, _blockNumberTo);
     }
 
 
@@ -247,7 +288,7 @@ contract BlockProcessor is Storage, Config, Events {
                     if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
                         bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
 
-                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
+                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
                         bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
@@ -276,14 +317,12 @@ contract BlockProcessor is Storage, Config, Events {
     /// @param _newPkHash New pubkey hash
     /// @param _nonce Nonce used for message
     /// @param _ethAddress Account's ethereum address
-    /// @param _accountId Id of zkSync account
-    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) internal pure returns (bool) {
+    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n152",
+            "\x19Ethereum Signed Message:\n130",
             "Register zkSync pubkey:\n\n",
             Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)), "\n",
             "nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n",
-            "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
             "\n\n",
             "Only sign this message for a trusted client!"
         );
@@ -429,8 +468,8 @@ contract BlockProcessor is Storage, Config, Events {
     /// External function's to allow testing some of the internal functional
     ///
 
-    function externalTestVerifyChangePubkeySignature(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) external returns (bool) {
-        return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress, _accountId);
+    function externalTestVerifyChangePubkeySignature(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) external returns (bool) {
+        return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress);
     }
 
     function externalTestCollectOnchainOps(uint32 _blockNumber, bytes calldata _publicData, bytes calldata _ethWitness, uint32[] calldata _ethWitnessSizes)

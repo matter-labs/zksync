@@ -14,6 +14,9 @@ interface Events {
     /// @notice Event emitted when a block is verified
     event BlockVerification(uint32 indexed blockNumber);
 
+    /// @notice Event emitted when a sequence of blocks is verified
+    event MultiblockVerification(uint32 indexed blockNumberFrom, uint32 indexed blockNumberTo);
+
     /// @notice Event emitted when user send a transaction to withdraw her funds from onchain balance
     event OnchainWithdrawal(
         address indexed owner,
