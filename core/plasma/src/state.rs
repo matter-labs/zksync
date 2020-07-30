@@ -541,17 +541,23 @@ impl PlasmaState {
     }
 
     fn create_change_pubkey_op(&self, tx: ChangePubKey) -> Result<ChangePubKeyOp, Error> {
-        let (account_id, account) = self
-            .get_account_by_address(&tx.account)
-            .ok_or_else(|| format_err!("Account does not exist"))?;
-        ensure!(
-            tx.eth_signature.is_none() || tx.verify_eth_signature() == Some(account.address),
-            "ChangePubKey signature is incorrect"
-        );
-        ensure!(
-            account_id == tx.account_id,
-            "ChangePubKey account id is incorrect"
-        );
+        let account_id = match self.get_account_by_address(&tx.account) {
+            Some((account_id, account)) => {
+                ensure!(
+                    tx.eth_signature.is_none()
+                        || tx.verify_eth_signature() == Some(account.address),
+                    "ChangePubKey signature is incorrect"
+                );
+                account_id
+            }
+            None => {
+                ensure!(
+                    tx.eth_signature.is_none() || tx.verify_eth_signature() == Some(tx.account),
+                    "ChangePubKey signature is incorrect"
+                );
+                self.get_free_account_id()
+            }
+        };
         ensure!(
             account_id <= params::max_account_id(),
             "ChangePubKey account id is bigger than max supported"
@@ -818,7 +824,11 @@ impl PlasmaState {
         op: &ChangePubKeyOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
-        let mut account = self.get_account(op.account_id).unwrap();
+        let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
+            let (account, upd) = Account::create_account(op.account_id, op.tx.account);
+            updates.extend(upd.into_iter());
+            account
+        });
 
         let old_pub_key_hash = account.pub_key_hash.clone();
         let old_nonce = account.nonce;

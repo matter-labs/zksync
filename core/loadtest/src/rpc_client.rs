@@ -66,6 +66,18 @@ impl RpcClient {
         Ok(tx_hash)
     }
 
+    pub async fn send_txs_batch(
+        &self,
+        txs: Vec<(FranklinTx, Option<PackedEthSignature>)>,
+    ) -> Result<Vec<TxHash>, failure::Error> {
+        let msg = JsonRpcRequest::submit_txs_batch(txs);
+
+        let ret = self.post(&msg).await?;
+        let tx_hashes =
+            serde_json::from_value(ret).expect("failed to parse `send_txs_batch` response");
+        Ok(tx_hashes)
+    }
+
     /// Sends the transaction to the ZKSync server and returns raw response.
     pub async fn send_tx_raw(
         &self,
@@ -184,6 +196,13 @@ mod messages {
         pub params: Vec<serde_json::Value>,
     }
 
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct TxWithSignature {
+        tx: FranklinTx,
+        signature: Option<TxEthSignature>,
+    }
+
     impl JsonRpcRequest {
         fn create(method: impl ToString, params: Vec<serde_json::Value>) -> Self {
             Self {
@@ -202,6 +221,20 @@ mod messages {
                     .expect("serialization fail"),
             );
             Self::create("tx_submit", params)
+        }
+
+        pub fn submit_txs_batch(txs: Vec<(FranklinTx, Option<PackedEthSignature>)>) -> Self {
+            let txs: Vec<_> = txs
+                .into_iter()
+                .map(|(tx, signature)| TxWithSignature {
+                    tx,
+                    signature: signature.map(TxEthSignature::EthereumSignature),
+                })
+                .collect();
+
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(txs).expect("serialization fail"));
+            Self::create("submit_txs_batch", params)
         }
 
         pub fn account_state(address: Address) -> Self {

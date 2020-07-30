@@ -281,6 +281,29 @@ impl<E: Engine> CircuitElement<E> {
         Ok(Boolean::from(is_equal))
     }
 
+    pub fn less_than<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        x: &Self,
+        y: &Self,
+    ) -> Result<Boolean, SynthesisError> {
+        let length = std::cmp::max(x.length, y.length);
+        assert!(
+            length < E::Fr::CAPACITY as usize,
+            "comparison is only supported for fixed-length elements"
+        );
+
+        use crypto_exports::ff::Field;
+        let two = E::Fr::from_str("2").unwrap();
+        let power = E::Fr::from_str(&length.to_string()).unwrap();
+        let mut base = two.pow(&power.into_repr());
+        base.sub_assign(&E::Fr::one());
+
+        let expr = Expression::constant::<CS>(base) - &x.get_number() + &y.get_number();
+        let mut bits = expr.into_bits_le_fixed(cs.namespace(|| "diff bits"), length + 1)?;
+
+        Ok(bits.pop().unwrap())
+    }
+
     pub fn get_number(&self) -> AllocatedNum<E> {
         self.number.clone()
     }

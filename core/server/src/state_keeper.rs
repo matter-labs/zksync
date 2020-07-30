@@ -563,7 +563,11 @@ impl PlasmaStateKeeper {
             executed_op,
         } = self.state.execute_priority_op(priority_op.data.clone());
 
-        self.pending_block.chunks_left -= chunks_needed;
+        self.pending_block.chunks_left = self
+            .pending_block
+            .chunks_left
+            .checked_sub(chunks_needed)
+            .expect("Underflow happened while subtracting checked value");
         self.pending_block.account_updates.append(&mut updates);
         if let Some(fee) = fee {
             let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
@@ -597,6 +601,12 @@ impl PlasmaStateKeeper {
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
             return Err(());
+        }
+
+        if let Some(current_timestamp) = self.pending_block.block_timestamp {
+            self.state.block_timestamp = current_timestamp;
+        } else {
+            self.state.block_timestamp = BlockTimestamp::now();
         }
 
         for tx in txs {
@@ -640,7 +650,11 @@ impl PlasmaStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
-                    self.pending_block.chunks_left -= chunks_needed;
+                    self.pending_block.chunks_left = self
+                        .pending_block
+                        .chunks_left
+                        .checked_sub(executed_op.chunks())
+                        .expect("Underflow happened while subtracting checked value");
                     self.pending_block.account_updates.append(&mut updates);
                     if let Some(fee) = fee {
                         let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
@@ -663,6 +677,10 @@ impl PlasmaStateKeeper {
                         .success_operations
                         .push(exec_result.clone());
                     executed_operations.push(exec_result);
+                    if self.pending_block.block_timestamp.is_none() {
+                        // We only set timestamp if transaction execution was successful
+                        self.pending_block.block_timestamp = Some(self.state.block_timestamp);
+                    }
                 }
                 Err(e) => {
                     warn!("Failed to execute transaction: {:?}, {}", tx, e);
@@ -686,16 +704,17 @@ impl PlasmaStateKeeper {
 
     fn apply_tx(&mut self, tx: &FranklinTx) -> Result<ExecutedOperations, ()> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
-        if let Some(current_timestamp) = self.pending_block.block_timestamp {
-            self.state.block_timestamp = current_timestamp;
-        } else {
-            self.state.block_timestamp = BlockTimestamp::now();
-        }
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
         // seal the block and execute it again.
         if self.pending_block.chunks_left < chunks_needed {
             return Err(());
+        }
+
+        if let Some(current_timestamp) = self.pending_block.block_timestamp {
+            self.state.block_timestamp = current_timestamp;
+        } else {
+            self.state.block_timestamp = BlockTimestamp::now();
         }
 
         // Check if adding this transaction to the block won't make the contract operations
@@ -735,7 +754,11 @@ impl PlasmaStateKeeper {
                 mut updates,
                 executed_op,
             }) => {
-                self.pending_block.chunks_left -= chunks_needed;
+                self.pending_block.chunks_left = self
+                    .pending_block
+                    .chunks_left
+                    .checked_sub(chunks_needed)
+                    .expect("Underflow happened while subtracting checked value");
                 self.pending_block.account_updates.append(&mut updates);
                 if let Some(fee) = fee {
                     let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);

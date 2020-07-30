@@ -39,6 +39,36 @@ fn test_change_pubkey_offchain_success() {
     );
 }
 
+/// Basic check for execution of `ChangePubKeyOp` in circuit.
+/// Here we apply changepubkey operation to the empty account.
+#[test]
+#[ignore]
+fn test_change_pubkey_offchain_empty_account_success() {
+    // Input data.
+    let accounts = vec![WitnessTestAccount::new_empty(0xc1)];
+    let account = &accounts[0];
+    let change_pkhash_op = ChangePubKeyOp {
+        tx: account
+            .zksync_account
+            .create_change_pubkey_tx(None, true, false),
+        account_id: account.id,
+    };
+
+    generic_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+        &[],
+        change_pkhash_op,
+        (),
+        |plasma_state, op| {
+            let fee = plasma_state
+                .apply_change_pubkey_op(op)
+                .expect("Operation failed")
+                .0;
+
+            vec![fee]
+        },
+    );
+}
+
 /// Checks that executing a change pubkey operation with incorrect
 /// data (account `from` ID) results in an error.
 #[test]

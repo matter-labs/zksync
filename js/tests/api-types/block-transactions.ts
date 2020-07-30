@@ -39,7 +39,6 @@ type ChangePubKey = {
     "block_number": number,
     "op": {
         "account": string,
-        "accountId": number,
         "ethSignature"?: string,
         "newPkHash": string,
         "nonce": number,
