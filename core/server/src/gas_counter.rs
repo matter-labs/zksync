@@ -27,7 +27,7 @@ impl CommitCost {
     pub const CHANGE_PUBKEY_COST: u64 = 15_889;
     pub const TRANSFER_COST: u64 = 339;
     pub const TRANSFER_TO_NEW_COST: u64 = 881;
-    pub const TRANSFER_FROM_COST: u64 = 0; // TODO: measure TransferFrom commit cost
+    pub const TRANSFER_FROM_COST: u64 = 339;
     pub const FULL_EXIT_COST: u64 = 10_210;
     pub const WITHDRAW_COST: u64 = 2_178;
 
@@ -66,7 +66,7 @@ impl VerifyCost {
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
-    pub const TRANSFER_FROM_COST: u64 = 0; // TODO: measure TransferFrom verify cost
+    pub const TRANSFER_FROM_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 2_499;
     pub const WITHDRAW_COST: u64 = 46_053;
 
