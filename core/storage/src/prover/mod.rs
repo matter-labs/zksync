@@ -272,20 +272,24 @@ impl<'a> ProverSchema<'a> {
                         }
                     }
                     if *available_batch_size as i64 == (block_number_to_val - block_number_from_val + 1) {
-                        available_jobs.push((block_number_from_val, block_number_to_val));
+                        available_jobs.push((block_number_from_val, block_number_to_val, blocks[0].blocks_batch_timeout_passed));
                     }
                 }
-                if let Some((block_number_from_val, block_number_to_val))  = available_jobs.last() {
-                    // we found a job for prover
-                    use crate::schema::prover_multiblock_runs::dsl::*;
-                    let inserted: ProverMultiblockRun = insert_into(prover_multiblock_runs)
-                        .values(&vec![(
-                            block_number_from.eq(*block_number_from_val),
-                            block_number_to.eq(*block_number_to_val),
-                            worker.eq(worker_.to_string()),
-                        )])
-                        .get_result(self.0.conn())?;
-                    return Ok(Some(inserted));
+
+                let max_batch_size = RECURSIVE_CIRCUIT_SIZES.last().unwrap().0;
+                if let Some((block_number_from_val, block_number_to_val, timeout))  = available_jobs.last() {
+                    if *timeout || (block_number_to_val - block_number_from_val + 1) == max_batch_size as i64 {
+                        // we found a job for prover
+                        use crate::schema::prover_multiblock_runs::dsl::*;
+                        let inserted: ProverMultiblockRun = insert_into(prover_multiblock_runs)
+                            .values(&vec![(
+                                block_number_from.eq(*block_number_from_val),
+                                block_number_to.eq(*block_number_to_val),
+                                worker.eq(worker_.to_string()),
+                            )])
+                            .get_result(self.0.conn())?;
+                        return Ok(Some(inserted));
+                    }
                 }
 
 
