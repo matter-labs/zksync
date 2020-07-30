@@ -24,18 +24,18 @@ contract Verifier is KeysWithPlonkVerifier {
     }
 
     function verifyMultiblockProof(
-        uint256[] calldata _public_inputs,
+        uint256[] calldata _recursiveInput,
         uint256[] calldata _proof,
         uint32[] calldata _block_sizes,
         uint256[] calldata _individual_vks_inputs,
-        uint256[16] calldata subproofs_limbs
+        uint256[] calldata _subproofs_limbs
     ) external view returns (bool) {
         uint8[] memory vkIndexes = new uint8[](_block_sizes.length);
         for (uint32 i = 0; i < _block_sizes.length; i++) {
             vkIndexes[i] = blockSizeToVkIndex(_block_sizes[i]);
         }
         VerificationKey memory vk = getVkAggregated(uint32(_block_sizes.length));
-        return verify_serialized_proof_with_recursion(_public_inputs, _proof, VK_TREE_ROOT, VK_MAX_INDEX, vkIndexes, _individual_vks_inputs, subproofs_limbs, vk);
+        return  verify_serialized_proof_with_recursion(_recursiveInput, _proof, VK_TREE_ROOT, VK_MAX_INDEX, vkIndexes, _individual_vks_inputs, _subproofs_limbs, vk);
     }
 
     function verifyExitProof(

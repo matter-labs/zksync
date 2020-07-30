@@ -283,7 +283,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// param _blockNumberTo Block number to
     /// param _proof Multiblock proof
     /// param _withdrawalsData Blocks withdrawals data
-    function verifyBlocks(uint32 _blockNumberFrom, uint32 _blockNumberTo, uint256[] calldata _inputs, uint256[] calldata _proof, uint256[16] calldata _subProofLimbs, bytes[] calldata _withdrawalsData)
+    function verifyBlocks(uint32 _blockNumberFrom, uint32 _blockNumberTo, uint256[] calldata _recursiveinput, uint256[] calldata _proof, uint256[] calldata _subProofLimbs, bytes[] calldata _withdrawalsData)
         external nonReentrant
     {
         requireActive();
@@ -293,9 +293,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 "verifyBlocks(uint32,uint32,uint256[],uint256[],uint256[],bytes[])",
                     _blockNumberFrom,
                     _blockNumberTo,
+                    _recursiveinput,
                     _proof,
-                    _proof,
-                    _proof,
+                    _subProofLimbs,
                     _withdrawalsData
             )
         );

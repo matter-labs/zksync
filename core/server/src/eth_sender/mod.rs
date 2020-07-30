@@ -652,6 +652,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     .get(0)
                     .expect("must verify at least one block")
                     .verify_gas_limit
+                    * 2
             }
             OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
         }
@@ -775,8 +776,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .into_iter()
             .map(|block| block.get_withdrawals_data())
             .collect();
-        let mut limbs = [U256::zero(); 16];
-        limbs.copy_from_slice(&op.proof.proof.subproof_limbs);
         self.ethereum.encode_tx_data(
             "verifyBlocks",
             (
@@ -784,7 +783,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 u64::from(op.block_to),
                 op.proof.proof.inputs.clone(),
                 op.proof.proof.proof.clone(),
-                limbs,
+                op.proof.proof.subproof_limbs.clone(),
                 withdrawals_data,
             ),
         )

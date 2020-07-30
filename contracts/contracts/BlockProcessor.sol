@@ -88,7 +88,7 @@ contract BlockProcessor is Storage, Config, Events {
     /// @notice Creates multiblock verify info
     function createMultiblockCommitment(uint32 _blockNumberFrom, uint32 _blockNumberTo)
         internal returns (uint32[] memory blockSizes, uint256[] memory inputs) {
-        uint32 numberOfBlocks = _blockNumberTo - _blockNumberFrom;
+        uint32 numberOfBlocks = _blockNumberTo - _blockNumberFrom + 1;
         blockSizes = new uint32[](numberOfBlocks);
         inputs = new uint256[](numberOfBlocks);
         for (uint32 i = 0; i < numberOfBlocks; i++) {
@@ -104,13 +104,13 @@ contract BlockProcessor is Storage, Config, Events {
     /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
     /// @param _blockNumberFrom Block number from
     /// @param _blockNumberTo Block number to
-    /// @param _inputs Multiblock proof inputs
+    /// @param _recursiveInput Multiblock proof inputs
     /// @param _proof Multiblock proof
     /// @param _subProofLimbs Multiblock proof subproof limbs
     /// @param _withdrawalsData Blocks withdrawals data
     function verifyBlocks(
         uint32 _blockNumberFrom, uint32 _blockNumberTo,
-        uint256[] calldata _inputs, uint256[] calldata _proof, uint256[16] calldata _subProofLimbs,
+        uint256[] calldata _recursiveInput, uint256[] calldata _proof, uint256[] calldata _subProofLimbs,
         bytes[] calldata _withdrawalsData
     )
         external
@@ -119,9 +119,9 @@ contract BlockProcessor is Storage, Config, Events {
         require(_blockNumberFrom == totalBlocksVerified + 1, "mbfvk11"); // only verify from next block
         governance.requireActiveValidator(msg.sender);
 
-        (uint32[] memory blockSizes,  uint256[] memory inputs) = createMultiblockCommitment(_blockNumberFrom, _blockNumberTo);
+        (uint32[] memory aggregatedBlockSizes,  uint256[] memory aggregatedInputs) = createMultiblockCommitment(_blockNumberFrom, _blockNumberTo);
 
-        require(verifier.verifyMultiblockProof(_inputs, _proof, blockSizes, inputs, _subProofLimbs), "mbfvk13"); // proof verification failed
+        require(verifier.verifyMultiblockProof(_recursiveInput, _proof, aggregatedBlockSizes, aggregatedInputs, _subProofLimbs), "mbfvk13");
 
         for (uint32 _blockNumber = _blockNumberFrom; _blockNumber <= _blockNumberTo; _blockNumber++){
             processOnchainWithdrawals(_withdrawalsData[_blockNumber - _blockNumberFrom], blocks[_blockNumber].withdrawalsDataHash);

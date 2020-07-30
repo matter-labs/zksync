@@ -964,7 +964,7 @@ contract Plonk4VerifierWithAccessToDNext {
         uint8 max_valid_index,
         uint8[] memory recursive_vks_indexes,
         uint256[] memory individual_vks_inputs,
-        uint256[16] memory subproofs_limbs
+        uint256[] memory subproofs_limbs
     ) internal view returns (bool) {
         (uint256 recursive_input, PairingsBn254.G1Point[2] memory aggregated_g1s) = reconstruct_recursive_public_input(
             recursive_vks_root, max_valid_index, recursive_vks_indexes,
@@ -991,7 +991,7 @@ contract Plonk4VerifierWithAccessToDNext {
         uint8 max_valid_index,
         uint8[] memory recursive_vks_indexes,
         uint256[] memory individual_vks_inputs,
-        uint256[16] memory subproofs_aggregated
+        uint256[] memory subproofs_aggregated
     ) internal pure returns (uint256 recursive_input, PairingsBn254.G1Point[2] memory reconstructed_g1s) {
         assert(recursive_vks_indexes.length == individual_vks_inputs.length);
         bytes memory concatenated = abi.encodePacked(recursive_vks_root);
@@ -1149,7 +1149,7 @@ contract VerifierWithDeserialize is Plonk4VerifierWithAccessToDNext {
         uint8 max_valid_index,
         uint8[] memory recursive_vks_indexes,
         uint256[] memory individual_vks_inputs,
-        uint256[16] memory subproofs_limbs,
+        uint256[] memory subproofs_limbs,
         VerificationKey memory vk
     ) public view returns (bool) {
         require(vk.num_inputs == public_inputs.length);
