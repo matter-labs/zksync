@@ -55,6 +55,26 @@ impl<'a> OperationsSchema<'a> {
             .optional()
     }
 
+    /// Loads a range of VERIFY operations. Used when multiblock proof is created.
+    pub fn load_verify_operations(
+        &self,
+        block_range_start: i64,
+        block_range_end: i64,
+    ) -> QueryResult<Vec<i64>> {
+        self.0.conn().transaction(|| {
+            let mut operation_ids = Vec::new();
+            for block_number in block_range_start..=block_range_end {
+                let result: StoredOperation = self
+                    .get_operation(block_number as u32, ActionType::VERIFY)
+                    .expect("Operation must be created");
+
+                operation_ids.push(result.id);
+            }
+
+            Ok(operation_ids)
+        })
+    }
+
     pub(crate) fn store_operation(&self, operation: NewOperation) -> QueryResult<StoredOperation> {
         diesel::insert_into(operations::table)
             .values(&operation)
