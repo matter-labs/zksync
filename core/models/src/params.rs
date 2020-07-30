@@ -201,7 +201,8 @@ pub const SIGNED_TRANSFER_FROM_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// (Number of proofs, setup power) in different recursive circuit variants
-pub const RECURSIVE_CIRCUIT_SIZES: &[(usize, u32)] = &[(1, 22), (2, 22)];
+pub const RECURSIVE_CIRCUIT_SIZES: &[(usize, u32)] =
+    &[(1, 22), (5, 23), (10, 24), (20, 25), (40, 26)];
 /// Number of inputs in the basic circuit that is aggregated by recursive circuit
 pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
 /// Depth of the tree which contains different verification keys for basic circuit
