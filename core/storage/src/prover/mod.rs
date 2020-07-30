@@ -271,7 +271,7 @@ impl<'a> ProverSchema<'a> {
                             block_number_to_val = blocks[batch_size - 1].block_number;
                         }
                     }
-                    if *available_batch_size as i64 == (block_number_to_val - block_number_from_val + 1) {
+                    if *available_batch_size as i64 == (block_number_to_val - block_number_from_val + 1) && block_number_from_val != 0 {
                         available_jobs.push((block_number_from_val, block_number_to_val, blocks[0].blocks_batch_timeout_passed));
                     }
                 }
