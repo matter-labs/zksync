@@ -902,7 +902,7 @@ version = "0.1.0"
 dependencies = [
  "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=plonk_gadgets)",
  "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "recursive_aggregation_circuit 0.1.0",
+ "recursive_aggregation_circuit 0.1.0 (git+https://github.com/matter-labs/recursive_aggregation_circuit.git)",
 ]
 
 [[package]]
@@ -2977,6 +2977,7 @@ dependencies = [
 [[package]]
 name = "recursive_aggregation_circuit"
 version = "0.1.0"
+source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git#ce86717cdda79527b1555bb45bc707bd6d90e6aa"
 dependencies = [
  "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=plonk_gadgets)",
  "hex 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4684,6 +4685,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rayon 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "db6ce3297f9c85e16621bb8cca38a06779ffc31bb8184e1be4bed2be4678a098"
 "checksum rayon-core 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "08a89b46efaf957e52b18062fb2f4660f8b8a4dde1807ca002690868ef2c85a9"
 "checksum rdrand 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
+"checksum recursive_aggregation_circuit 0.1.0 (git+https://github.com/matter-labs/recursive_aggregation_circuit.git)" = "<none>"
 "checksum redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)" = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 "checksum regex 1.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "9c3780fcf44b193bc4d09f36d2a3c87b251da4a046c87795a0d35f4f927ad8e6"
 "checksum regex-automata 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "ae1ded71d66a4a97f5e961fd0cb25a5f366a42a41570d16a763a69c092c26ae4"
