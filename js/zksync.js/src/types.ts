@@ -169,5 +169,5 @@ export interface Fee {
 export interface SubscriptionTx {
     transferToSub: TransferFrom;
     burnTx: Transfer;
-    butnTxEthSignature: TxEthSignature;
+    burnTxEthSignature: TxEthSignature;
 }
