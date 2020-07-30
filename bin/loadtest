@@ -3,10 +3,11 @@
 USAGE='Usage: zksync loadtest [-h|--help] [SCENARIO] [PATH_TO_CONFIG]
 where:
     -h | --help     show this message
-    SCENARIO        {outgoing,execution,real-life,api-test} (outgoing by default)
+    SCENARIO        {outgoing,execution,real-life,api-test,reddit} (outgoing by default)
     PATH_TO_CONFIG  path to loadtest config (default is 'core/loadtest/src/loadtest.json'
-                    for outgoing/execution and 'core/loadtest/src/configs/reallife.json'
-                    for real-life scenario)'
+                    for outgoing/execution, 'core/loadtest/src/configs/reallife.json'
+                    for real-life scenario, and 'core/loadtest/src/configs/reddit.json'
+                    for Reddit scenario)'
 
 if [ -z $ZKSYNC_ENV ];
 then 
@@ -22,6 +23,9 @@ case $SCENARIO in
       ;;
   real-life|reallife|real_life)
       CONFIG=${2:-"$ZKSYNC_HOME/core/loadtest/src/configs/reallife.json"}
+      ;;
+  reddit)
+      CONFIG=${2:-"$ZKSYNC_HOME/core/loadtest/src/configs/reddit.json"}
       ;;
   api-test|apitest|api_test)
       # Config for API test is the same as for real-life.
