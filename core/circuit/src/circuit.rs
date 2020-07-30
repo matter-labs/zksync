@@ -154,7 +154,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let block_timestamp = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "allocated_block_timestamp"),
             || self.block_timestamp.grab(),
-            E::Fr::NUM_BITS as usize,
+            params::TIMESTAMP_BIT_WIDTH,
         )?;
         let chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
@@ -185,6 +185,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             data[DepositOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[TransferOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[TransferFromOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero; 2];
@@ -757,6 +758,16 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 &op_data.full_amount,
                 &prev.op_data.full_amount,
             )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_from equal to previous"),
+                &op_data.valid_from,
+                &prev.op_data.valid_from,
+            )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_until equal to previous"),
+                &op_data.valid_until,
+                &prev.op_data.valid_until,
+            )?);
 
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
@@ -810,6 +821,12 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             diff_a_b_bits_repacked,
         )?);
 
+        let is_valid_timestamp = self.verify_operation_timestamp(
+            cs.namespace(|| "verify operation timestamp"),
+            &op_data,
+            &global_variables,
+        )?;
+
         let mut op_flags = vec![];
         op_flags.push(self.deposit(
             cs.namespace(|| "deposit"),
@@ -860,7 +877,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
-            &mut previous_pubdatas[TransferOp::OP_CODE as usize],
+            &is_valid_timestamp,
+            &mut previous_pubdatas[TransferFromOp::OP_CODE as usize],
         )?);
         op_flags.push(self.withdraw(
             cs.namespace(|| "withdraw"),
@@ -2112,6 +2130,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         is_sig_verified: &Boolean,
+        is_valid_timestamp: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
@@ -2182,6 +2201,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         lhs_valid_flags.push(is_transfer_from.clone());
+        lhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -2225,14 +2245,12 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
-        let _is_signer_valid = CircuitElement::equals(
-            cs.namespace(|| "signer_key_correct"),
+        let is_lhs_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "lhs_signer_key_correct"),
             &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
-        // lhs_valid_flags.push(is_signer_valid);
-
-        // lhs_valid_flags.push(_is_signer_valid);
+        lhs_valid_flags.push(is_lhs_signer_valid);
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
@@ -2250,6 +2268,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut rhs_valid_flags = vec![];
         rhs_valid_flags.push(pubdata_properly_copied);
         rhs_valid_flags.push(is_transfer_from);
+        rhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_chunk_second = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
@@ -2258,8 +2277,22 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         rhs_valid_flags.push(is_chunk_second);
         rhs_valid_flags.push(is_account_empty.not());
-
         rhs_valid_flags.push(is_pubdata_chunk_correct);
+
+        let is_rhs_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "rhs_signer_key_correct"),
+            &signer_key.pubkey.get_hash(),
+            &rhs.account.pub_key_hash,
+        )?;
+        rhs_valid_flags.push(is_rhs_signer_valid);
+
+        let is_transfer_from_self = CircuitElement::equals(
+            cs.namespace(|| "is_transfer_from_self"),
+            &lhs.account_id,
+            &rhs.account_id,
+        )?;
+        rhs_valid_flags.push(is_transfer_from_self.not());
+
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
@@ -2294,6 +2327,35 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         Ok(correct)
+    }
+
+    fn verify_operation_timestamp<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        op_data: &AllocatedOperationData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        let is_valid_from_ok = CircuitElement::less_than(
+            cs.namespace(|| "valid_from less_than block_timestamp"),
+            &global_variables.block_timestamp,
+            &op_data.valid_from,
+        )?
+        .not();
+
+        let is_valid_until_ok = CircuitElement::less_than(
+            cs.namespace(|| "block_timestamp less_than valid_until"),
+            &op_data.valid_until,
+            &global_variables.block_timestamp,
+        )?
+        .not();
+
+        let is_valid_timestamp = Boolean::and(
+            cs.namespace(|| "is_valid_from_ok AND is_valid_until_ok"),
+            &is_valid_from_ok,
+            &is_valid_until_ok,
+        )?;
+
+        Ok(is_valid_timestamp)
     }
 }
 
