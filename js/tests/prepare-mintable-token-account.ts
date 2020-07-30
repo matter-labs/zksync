@@ -16,17 +16,19 @@ let syncProvider: Provider;
 
 (async () => {
     try {
+        console.log(process.env.WS_API_ADDR);
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
 
         // PARAMS
         const depositAmount = parseEther("100000000000") // 10^11
         const ERC20_SYMBOL = "MLTT";
         const ERC20_ID = syncProvider.tokenSet.resolveTokenId(ERC20_SYMBOL);
+        const ERC20_ADDRESS = syncProvider.tokenSet.resolveTokenAddress(ERC20_SYMBOL);
 
 
         console.log("Token symbol:", ERC20_SYMBOL);
         console.log("Token Id:", ERC20_ID)
-        console.log("Token address:", syncProvider.tokenSet.resolveTokenAddress(ERC20_SYMBOL));
+        console.log("Token address:", ERC20_ADDRESS);
 
         const ethWallet = ethers.Wallet.fromMnemonic(
             process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/5"
@@ -36,6 +38,37 @@ let syncProvider: Provider;
         console.log("Wallet ethereum private key:", ethWallet.privateKey);
         console.log("Wallet sync private key:", Buffer.from(syncWallet.signer.privateKey).toString("hex"));
         console.log("Wallet sync pubkey hash:", syncWallet.signer.pubKeyHash());
+
+        const ABI = [{
+            "constant": false,
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "_to",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_amount",
+                    "type": "uint256"
+                }
+            ],
+            "name": "mint",
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "type": "function"
+        }]
+        const erc20Mintable = new ethers.Contract(ERC20_ADDRESS, ABI, ethWallet);
+        const mintTx = await erc20Mintable.mint(ethWallet.address, depositAmount);
+        await mintTx.wait();
+        console.log("Mint successful");
 
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
