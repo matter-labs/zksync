@@ -181,7 +181,6 @@ mod tests {
     fn commit_cost() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey {
-                account_id: 1,
                 account: Default::default(),
                 new_pk_hash: Default::default(),
                 nonce: Default::default(),
@@ -206,7 +205,6 @@ mod tests {
     fn verify_cost() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey {
-                account_id: 1,
                 account: Default::default(),
                 new_pk_hash: Default::default(),
                 nonce: Default::default(),
@@ -231,7 +229,6 @@ mod tests {
     fn gas_counter() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey {
-                account_id: 1,
                 account: Default::default(),
                 new_pk_hash: Default::default(),
                 nonce: Default::default(),

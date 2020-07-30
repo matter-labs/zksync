@@ -106,7 +106,6 @@ type ChangePubKey = {
     "pq_id": null,
     "tx": {
         "account": string,
-        "accountId": number,
         "ethSignature"?: string,
         "newPkHash": string,
         "nonce": number,

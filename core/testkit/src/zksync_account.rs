@@ -244,25 +244,18 @@ impl ZksyncAccount {
         increment_nonce: bool,
         auth_onchain: bool,
     ) -> ChangePubKey {
-        let account_id = self
-            .account_id
-            .lock()
-            .unwrap()
-            .expect("can't sign tx withoud account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let nonce = nonce.unwrap_or_else(|| *stored_nonce);
         let eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes =
-                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                    .expect("Failed to construct change pubkey signed message.");
+            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash)
+                .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)
         };
         let change_pubkey = ChangePubKey {
-            account_id,
             account: self.address,
             new_pk_hash: self.pubkey_hash.clone(),
             nonce,

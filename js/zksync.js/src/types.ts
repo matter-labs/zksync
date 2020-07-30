@@ -105,7 +105,6 @@ export interface Withdraw {
 
 export interface ChangePubKey {
     type: "ChangePubKey";
-    accountId: number;
     account: Address;
     newPkHash: PubKeyHash;
     nonce: number;

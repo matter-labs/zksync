@@ -588,21 +588,20 @@ export class Wallet {
             );
         }
 
-        const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
-        if (currentPubKeyHash === newPubKeyHash) {
-            throw new Error("Current signing key is already set");
+        let numNonce = 0;
+        try {
+            await this.setRequiredAccountIdFromServer("Set Signing Key");
+            numNonce = await this.getNonce(nonce);
         }
-
-        await this.setRequiredAccountIdFromServer("Set Signing Key");
-
-        const numNonce = await this.getNonce(nonce);
+        catch (e) {
+            // account can be empty
+        }
 
         const changePubKeyMessage = getChangePubkeyMessage(
             newPubKeyHash,
-            numNonce,
-            this.accountId
+            numNonce
         );
         const ethSignature = onchainAuth
             ? null
@@ -611,7 +610,6 @@ export class Wallet {
 
         const txData: ChangePubKey = {
             type: "ChangePubKey",
-            accountId: this.accountId,
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
             nonce: numNonce,
