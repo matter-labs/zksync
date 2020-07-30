@@ -405,7 +405,9 @@ impl<T: Transport> EthereumAccount<T> {
                 (
                     u64::from(block.block_number),
                     u64::from(block.block_number),
-                    vec![U256::default(); 10],
+                    vec![U256::from([0xff; 32]); 1],
+                    vec![U256::from([0xff; 32]); 34],
+                    vec![U256::from([0xfc; 32]); 16],
                     vec![block.get_withdrawals_data()],
                 ),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
@@ -439,7 +441,9 @@ impl<T: Transport> EthereumAccount<T> {
                             .expect("blocks should contain at least one element")
                             .block_number,
                     ),
-                    vec![U256::default(); 10],
+                    vec![U256::from([0xff; 32]); 1],
+                    vec![U256::from([0xff; 32]); 34],
+                    vec![U256::from([0xfc; 32]); 16],
                     blocks
                         .iter()
                         .map(|block| block.get_withdrawals_data())

@@ -30,6 +30,14 @@ contract Verifier is KeysWithPlonkVerifier {
         uint256[] calldata _individual_vks_inputs,
         uint256[] calldata _subproofs_limbs
     ) external view returns (bool) {
+        if (DUMMY_VERIFIER) {
+            uint oldGasValue = gasleft();
+            uint tmp;
+            while (gasleft() + 500000 > oldGasValue) {
+                tmp += 1;
+            }
+            return true;
+        }
         uint8[] memory vkIndexes = new uint8[](_block_sizes.length);
         for (uint32 i = 0; i < _block_sizes.length; i++) {
             vkIndexes[i] = blockSizeToVkIndex(_block_sizes[i]);

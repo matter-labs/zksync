@@ -22,14 +22,14 @@ impl CommitCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 165_212;
-    pub const DEPOSIT_COST: u64 = 10_442;
-    pub const CHANGE_PUBKEY_COST: u64 = 15_889;
-    pub const TRANSFER_COST: u64 = 339;
-    pub const TRANSFER_TO_NEW_COST: u64 = 881;
-    pub const TRANSFER_FROM_COST: u64 = 339;
-    pub const FULL_EXIT_COST: u64 = 10_210;
-    pub const WITHDRAW_COST: u64 = 2_178;
+    pub const BASE_COST: u64 = 180_000;
+    pub const DEPOSIT_COST: u64 = 11_000;
+    pub const CHANGE_PUBKEY_COST: u64 = 17_000;
+    pub const TRANSFER_COST: u64 = 390;
+    pub const TRANSFER_TO_NEW_COST: u64 = 1100;
+    pub const TRANSFER_FROM_COST: u64 = 390;
+    pub const FULL_EXIT_COST: u64 = 11_000;
+    pub const WITHDRAW_COST: u64 = 3_000;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -61,14 +61,14 @@ impl VerifyCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 828_434;
+    pub const BASE_COST: u64 = 700_000;
     pub const DEPOSIT_COST: u64 = 0;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
     pub const TRANSFER_FROM_COST: u64 = 0;
-    pub const FULL_EXIT_COST: u64 = 2_499;
-    pub const WITHDRAW_COST: u64 = 46_053;
+    pub const FULL_EXIT_COST: u64 = 3_000;
+    pub const WITHDRAW_COST: u64 = 48_000;
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -119,8 +119,8 @@ impl Default for GasCounter {
 
 impl GasCounter {
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
-    const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
-    const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
+    const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 35_000;
+    const COMPLETE_WITHDRAWALS_COST: u64 = 45_000;
 
     pub fn new() -> Self {
         Self::default()
