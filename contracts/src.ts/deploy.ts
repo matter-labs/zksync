@@ -130,7 +130,7 @@ export class Deployer {
         const verifierContract = await deployContract(
             this.deployWallet,
             this.contracts.verifier, [],
-            {gasLimit: 4000000, ...ethTxOptions},
+            {gasLimit: 5000000, ...ethTxOptions},
         );
         const verRec = await verifierContract.deployTransaction.wait();
         const verGasUsed = verRec.gasUsed;

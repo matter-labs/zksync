@@ -68,46 +68,60 @@ contract BlockProcessor is Storage, Config, Events {
     function verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
         external
     {
-        require(_blockNumber == totalBlocksVerified + 1, "fvk11"); // only verify next block
-        governance.requireActiveValidator(msg.sender);
-
-        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
-
-        processOnchainWithdrawals(_withdrawalsData, blocks[_blockNumber].withdrawalsDataHash);
-
-        deleteRequests(
-            blocks[_blockNumber].priorityOperations
-        );
-
-        totalBlocksVerified += 1;
-
-        emit BlockVerification(_blockNumber);
+        revert("fb1"); // verify one block is not supported
+//        require(_blockNumber == totalBlocksVerified + 1, "fvk11"); // only verify next block
+//        governance.requireActiveValidator(msg.sender);
+//
+//        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
+//
+//        processOnchainWithdrawals(_withdrawalsData, blocks[_blockNumber].withdrawalsDataHash);
+//
+//        deleteRequests(
+//            blocks[_blockNumber].priorityOperations
+//        );
+//
+//        totalBlocksVerified += 1;
+//
+//        emit BlockVerification(_blockNumber);
     }
 
-    /// @notice Creates multiblcok commitment
-    /// @param _blockNumberFrom Block number from
-    /// @param _blockNumberTo Block number to
+    /// @notice Creates multiblock verify info
     function createMultiblockCommitment(uint32 _blockNumberFrom, uint32 _blockNumberTo)
-        internal returns (bytes32 commitment) {
-        return bytes32(uint256(0));
+        internal returns (uint32[] memory blockSizes, uint256[] memory inputs) {
+        uint32 numberOfBlocks = _blockNumberTo - _blockNumberFrom + 1;
+        blockSizes = new uint32[](numberOfBlocks);
+        inputs = new uint256[](numberOfBlocks);
+        for (uint32 i = 0; i < numberOfBlocks; i++) {
+            blockSizes[i] = blocks[_blockNumberFrom + i].chunks;
+
+            bytes32 blockCommitment = blocks[_blockNumberFrom + i].commitment;
+            uint256 mask = (~uint256(0)) >> 3;
+            inputs[i] = uint256(blockCommitment) & mask;
+        }
     }
 
     /// @notice Multiblock verification.
     /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
     /// @param _blockNumberFrom Block number from
     /// @param _blockNumberTo Block number to
+    /// @param _recursiveInput Multiblock proof inputs
     /// @param _proof Multiblock proof
+    /// @param _subProofLimbs Multiblock proof subproof limbs
     /// @param _withdrawalsData Blocks withdrawals data
-    function verifyBlocks(uint32 _blockNumberFrom, uint32 _blockNumberTo, uint256[] calldata _proof, bytes[] calldata _withdrawalsData)
+    function verifyBlocks(
+        uint32 _blockNumberFrom, uint32 _blockNumberTo,
+        uint256[] calldata _recursiveInput, uint256[] calldata _proof, uint256[] calldata _subProofLimbs,
+        bytes[] calldata _withdrawalsData
+    )
         external
     {
         require(_blockNumberFrom <= _blockNumberTo, "vbs11"); // vbs11 - must verify non empty sequence of blocks
         require(_blockNumberFrom == totalBlocksVerified + 1, "mbfvk11"); // only verify from next block
         governance.requireActiveValidator(msg.sender);
 
-        bytes32 multiblockCommitment = createMultiblockCommitment(_blockNumberFrom, _blockNumberTo);
+        (uint32[] memory aggregatedBlockSizes,  uint256[] memory aggregatedInputs) = createMultiblockCommitment(_blockNumberFrom, _blockNumberTo);
 
-        require(verifier.verifyMultiblockProof(_proof, multiblockCommitment), "mbfvk13"); // proof verification failed
+        require(verifier.verifyMultiblockProof(_recursiveInput, _proof, aggregatedBlockSizes, aggregatedInputs, _subProofLimbs), "mbfvk13");
 
         for (uint32 _blockNumber = _blockNumberFrom; _blockNumber <= _blockNumberTo; _blockNumber++){
             processOnchainWithdrawals(_withdrawalsData[_blockNumber - _blockNumberFrom], blocks[_blockNumber].withdrawalsDataHash);

@@ -218,6 +218,19 @@ impl DatabaseAccess for MockDatabase {
         Ok(self.stats.borrow().clone())
     }
 
+    fn confirm_multiblock_operation(
+        &self,
+        _block_range_start: i64,
+        _block_range_end: i64,
+        _hash: &H256,
+        _raw_tx: Vec<u8>,
+        _nonce: i64,
+    ) -> Result<(), failure::Error> {
+        // TODO: Currently this method does nothing.
+
+        Ok(())
+    }
+
     fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
     where
         F: FnOnce() -> Result<T, failure::Error>,

@@ -348,6 +348,20 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                                 // Complete pending withdrawals per each verify.
                                 self.add_complete_withdrawals_to_queue();
                             }
+
+                            let hash = current_op
+                                .used_tx_hashes
+                                .last()
+                                .expect("There must be at least one tx hash");
+                            self.db
+                                .confirm_multiblock_operation(
+                                    verify_multiblock_info.block_from as i64,
+                                    verify_multiblock_info.block_to as i64,
+                                    &hash,
+                                    current_op.encoded_tx_data.clone(),
+                                    current_op.nonce.as_u64() as i64,
+                                )
+                                .expect("Can't store operations in the database");
                         } else {
                             unreachable!("can't receive from eth non multiblock verify operation")
                         }
@@ -415,8 +429,11 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         // After storing all the tx data in the database, we can finally send the tx.
         info!(
-            "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
-            new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
+            "Sending new tx: [ETH Operation <id: {}, type: {}>. ETH tx: {}. ZKSync operation: {}]",
+            new_op.id,
+            new_op.op_type,
+            self.eth_tx_description(&signed_tx),
+            self.zksync_operation_description(&new_op),
         );
         self.ethereum.send_tx(&signed_tx).unwrap_or_else(|e| {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
@@ -780,7 +797,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             (
                 u64::from(op.block_from),
                 u64::from(op.block_to),
+                op.proof.proof.inputs.clone(),
                 op.proof.proof.proof.clone(),
+                op.proof.proof.subproof_limbs.clone(),
                 withdrawals_data,
             ),
         )

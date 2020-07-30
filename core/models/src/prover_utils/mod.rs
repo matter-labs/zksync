@@ -1,17 +1,25 @@
 use crate::franklin_crypto::bellman::Circuit;
 use crate::node::U256;
 use crate::node::{Engine, Fr};
+use crate::params::RECURSIVE_CIRCUIT_VK_TREE_DEPTH;
 use crate::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethereum};
 use crate::prover_utils::fs_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
 };
 use crypto_exports::bellman::kate_commitment::{Crs, CrsForMonomialForm};
+use crypto_exports::bellman::plonk::better_better_cs::cs::Circuit as NewCircuit;
+use crypto_exports::bellman::plonk::better_better_cs::proof::Proof as NewProof;
 use crypto_exports::bellman::plonk::better_cs::{
     adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::Proof,
-    keys::SetupPolynomials, keys::VerificationKey,
+    keys::SetupPolynomials, keys::VerificationKey, verifier::verify,
 };
 use crypto_exports::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile, verify};
+use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile};
+use crypto_exports::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
+use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use crypto_exports::franklin_crypto::rescue::rescue_transcript::RescueTranscriptForRNS;
+use crypto_exports::pairing::Engine as EngineTrait;
+use crypto_exports::recursive_aggregation_circuit::circuit::create_vks_tree;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fs::File;
@@ -23,7 +31,7 @@ pub mod network_utils;
 pub const SETUP_MIN_POW2: u32 = 20;
 pub const SETUP_MAX_POW2: u32 = 26;
 
-pub struct PlonkVerificationKey(VerificationKey<Engine, PlonkCsWidth4WithNextStepParams>);
+pub struct PlonkVerificationKey(pub VerificationKey<Engine, PlonkCsWidth4WithNextStepParams>);
 
 impl PlonkVerificationKey {
     pub fn read_verification_key_for_main_circuit(
@@ -39,12 +47,28 @@ impl PlonkVerificationKey {
             VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
         Ok(Self(verification_key))
     }
+
+    pub fn get_vk_tree_root_hash(blocks_chunks: &[usize]) -> Fr {
+        let block_vks = blocks_chunks
+            .iter()
+            .map(|block_chunks| {
+                PlonkVerificationKey::read_verification_key_for_main_circuit(*block_chunks)
+                    .expect("Failed to get block vk")
+                    .0
+            })
+            .collect::<Vec<_>>();
+        let (_, (vk_tree, _)) = create_vks_tree(&block_vks, RECURSIVE_CIRCUIT_VK_TREE_DEPTH)
+            .expect("Failed to create vk tree");
+        vk_tree.get_commitment()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EncodedProofPlonk {
     pub inputs: Vec<U256>,
     pub proof: Vec<U256>,
+    pub proof_binary: Vec<u8>,
+    pub subproof_limbs: Vec<U256>,
 }
 
 impl Default for EncodedProofPlonk {
@@ -52,6 +76,8 @@ impl Default for EncodedProofPlonk {
         Self {
             inputs: vec![U256::default(); 1],
             proof: vec![U256::default(); 33],
+            proof_binary: Vec::new(),
+            subproof_limbs: Vec::new(),
         }
     }
 }
@@ -95,7 +121,12 @@ impl SetupForStepByStepProver {
         circuit: C,
         vk: &PlonkVerificationKey,
     ) -> Result<EncodedProofPlonk, failure::Error> {
-        let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
+        let rns_params =
+            RnsParameters::<Engine, <Engine as EngineTrait>::Fq>::new_for_field(68, 110, 4);
+        let rescue_params = Bn256RescueParams::new_checked_2_into_1();
+
+        let transcript_params = (&rescue_params, &rns_params);
+        let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
             circuit,
             &self.hints,
             &self.setup_polynomials,
@@ -103,9 +134,10 @@ impl SetupForStepByStepProver {
             self.key_monomial_form
                 .as_ref()
                 .expect("Setup should have universal setup struct"),
+            Some(transcript_params),
         )?;
-
-        let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk.0)?;
+        let valid =
+            verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         failure::ensure!(valid, "proof for block is invalid");
         Ok(serialize_proof(&proof))
     }
@@ -125,7 +157,7 @@ impl Drop for SetupForStepByStepProver {
 pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     circuit: C,
 ) -> Result<EncodedProofPlonk, failure::Error> {
-    let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
+    // let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
 
     info!("Proof for circuit started");
 
@@ -142,10 +174,11 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
         &setup,
         None,
         &key_monomial_form,
+        None,
     )?;
 
-    let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
-    failure::ensure!(valid, "proof for exit is invalid");
+    // let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
+    // failure::ensure!(valid, "proof for exit is invalid");
 
     info!("Proof for circuit successful");
     Ok(serialize_proof(&proof))
@@ -203,10 +236,78 @@ pub fn serialize_proof(
     serialized_proof.push(x);
     serialized_proof.push(y);
 
+    let mut proof_binary = Vec::new();
+    proof
+        .write(&mut proof_binary)
+        .expect("old proof serialize fail");
     EncodedProofPlonk {
         inputs,
         proof: serialized_proof,
+        proof_binary,
+        subproof_limbs: Vec::new(),
     }
+}
+
+pub fn serialize_new_proof<C: NewCircuit<Engine>>(
+    proof: &NewProof<Engine, C>,
+) -> (Vec<U256>, Vec<U256>) {
+    let mut inputs = vec![];
+    for input in proof.inputs.iter() {
+        inputs.push(serialize_fe_for_ethereum(&input));
+    }
+    let mut serialized_proof = vec![];
+
+    for c in proof.state_polys_commitments.iter() {
+        let (x, y) = serialize_g1_for_ethereum(&c);
+        serialized_proof.push(x);
+        serialized_proof.push(y);
+    }
+
+    let (x, y) = serialize_g1_for_ethereum(&proof.copy_permutation_grand_product_commitment);
+    serialized_proof.push(x);
+    serialized_proof.push(y);
+
+    for c in proof.quotient_poly_parts_commitments.iter() {
+        let (x, y) = serialize_g1_for_ethereum(&c);
+        serialized_proof.push(x);
+        serialized_proof.push(y);
+    }
+
+    for c in proof.state_polys_openings_at_z.iter() {
+        serialized_proof.push(serialize_fe_for_ethereum(&c));
+    }
+
+    for (_, _, c) in proof.state_polys_openings_at_dilations.iter() {
+        serialized_proof.push(serialize_fe_for_ethereum(&c));
+    }
+
+    assert_eq!(proof.gate_setup_openings_at_z.len(), 0);
+
+    for (_, c) in proof.gate_selectors_openings_at_z.iter() {
+        serialized_proof.push(serialize_fe_for_ethereum(&c));
+    }
+
+    for c in proof.copy_permutation_polys_openings_at_z.iter() {
+        serialized_proof.push(serialize_fe_for_ethereum(&c));
+    }
+
+    serialized_proof.push(serialize_fe_for_ethereum(
+        &proof.copy_permutation_grand_product_opening_at_z_omega,
+    ));
+    serialized_proof.push(serialize_fe_for_ethereum(&proof.quotient_poly_opening_at_z));
+    serialized_proof.push(serialize_fe_for_ethereum(
+        &proof.linearization_poly_opening_at_z,
+    ));
+
+    let (x, y) = serialize_g1_for_ethereum(&proof.opening_proof_at_z);
+    serialized_proof.push(x);
+    serialized_proof.push(y);
+
+    let (x, y) = serialize_g1_for_ethereum(&proof.opening_proof_at_z_omega);
+    serialized_proof.push(x);
+    serialized_proof.push(y);
+
+    (inputs, serialized_proof)
 }
 
 /// Reads universal setup from disk or downloads from network.
@@ -221,6 +322,13 @@ pub fn get_universal_setup_monomial_form(
     } else {
         fs_utils::get_universal_setup_monomial_form(power_of_two)
     }
+}
+
+pub fn save_to_cache_universal_setup_monomial_form(
+    power_of_two: u32,
+    setup: Crs<Engine, CrsForMonomialForm>,
+) {
+    UNIVERSAL_SETUP_CACHE.put_setup_struct(power_of_two, setup);
 }
 
 /// Plonk prover may need to change keys on the fly to prove block of the smaller size
