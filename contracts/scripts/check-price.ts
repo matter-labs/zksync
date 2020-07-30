@@ -1,3 +1,5 @@
+import {BigNumber} from "ethers/utils";
+
 const ethers = require("ethers");
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
@@ -14,6 +16,9 @@ async function calc(addr) {
 }
 
 async function main() {
+    const block = await provider.getBlock(87425);
+    console.log(block.timestamp);
+    return;
 
     console.log("gas price rinkeby", (await provider.getGasPrice()).toNumber() );
     console.log("gas price rinkeby", (await rinkeby.getGasPrice()).toNumber() );

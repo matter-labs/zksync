@@ -14,8 +14,8 @@ use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
     config_options::ConfigurationOptions,
     node::{
-        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
-        Engine, Fr,
+        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address,
+        BlockTimestamp, Deposit, Engine, Fr,
     },
     prover_utils::EncodedProofPlonk,
 };
@@ -23,7 +23,7 @@ use models::{
 use prover::{
     plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
     prover_data::ProverData,
-    ProverImpl,
+    ProverImpl, ProverJob,
 };
 
 #[test]
@@ -126,7 +126,12 @@ fn new_test_data_for_prover() -> ProverData {
     let fee_account = Account::default_with_address(&Address::default());
     circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        fee_account_id,
+        1,
+        BlockTimestamp::from(0),
+    );
 
     let empty_account_id = 1;
     let empty_account_address = [7u8; 20].into();
@@ -159,6 +164,7 @@ fn new_test_data_for_prover() -> ProverData {
         new_root: witness_accum.root_after_fees.unwrap(),
         validator_address: Fr::from_str(&witness_accum.fee_account_id.to_string())
             .expect("failed to parse"),
+        block_timestamp: witness_accum.block_timestamp,
         operations: witness_accum.operations,
         validator_balances: witness_accum.fee_account_balances.unwrap(),
         validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
@@ -180,15 +186,39 @@ impl<F> fmt::Debug for MockApiClient<F> {
 }
 
 impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
+    // MockApiClient now not support multiblock proofs
+
+    #[allow(clippy::type_complexity)]
+    fn multiblock_to_prove(&self) -> Result<Option<((i64, i64), i32)>, failure::Error> {
+        unreachable!("MockApiClient now not support multiblock proofs");
+    }
+
+    fn prover_multiblock_data(
+        &self,
+        _block_from: i64,
+        _block_to: i64,
+    ) -> Result<Vec<(EncodedProofPlonk, usize)>, failure::Error> {
+        unreachable!("MockApiClient now not support multiblock proofs");
+    }
+
+    fn publish_multiblock(
+        &self,
+        _block_from: i64,
+        _block_to: i64,
+        _p: EncodedProofPlonk,
+    ) -> Result<(), failure::Error> {
+        unreachable!("MockApiClient now not support multiblock proofs");
+    }
+
     fn block_to_prove(&self, _block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
     }
 
-    fn working_on(&self, job: i32) -> Result<(), failure::Error> {
+    fn working_on(&self, job: ProverJob) -> Result<(), failure::Error> {
         let stored = self.block_to_prove.lock().unwrap();
         if let Some((_, stored)) = *stored {
-            if stored != job {
+            if ProverJob::BlockProve(stored) != job {
                 return Err(failure::format_err!("unexpected job id"));
             }
             let _ = self.heartbeats_tx.lock().unwrap().send(());
@@ -196,7 +226,7 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         Ok(())
     }
 
-    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
+    fn prover_block_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
@@ -207,7 +237,7 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         Err(failure::format_err!("mock not configured"))
     }
 
-    fn publish(&self, _block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error> {
+    fn publish_block(&self, _block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();
         *block_to_prove = None;

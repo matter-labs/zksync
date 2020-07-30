@@ -74,6 +74,7 @@ table! {
         block_size -> Int8,
         commit_gas_limit -> Int8,
         verify_gas_limit -> Int8,
+        block_timestamp -> Nullable<Int8>,
     }
 }
 
@@ -99,6 +100,7 @@ table! {
         block_num -> Int8,
         operation -> Jsonb,
         fee_account -> Int8,
+        block_timestamp -> Nullable<Int8>,
     }
 }
 
@@ -115,7 +117,7 @@ table! {
         nonce -> Int8,
         confirmed -> Bool,
         raw_tx -> Bytea,
-        op_type -> Text,
+        op_type -> Jsonb,
         final_hash -> Nullable<Bytea>,
         last_deadline_block -> Int8,
         last_used_gas_price -> Numeric,
@@ -178,6 +180,7 @@ table! {
         primary_account_address -> Bytea,
         nonce -> Int8,
         created_at -> Timestamptz,
+        eth_sign_data -> Nullable<Jsonb>,
     }
 }
 
@@ -186,6 +189,19 @@ table! {
         id -> Int8,
         tx_hash -> Text,
         tx -> Jsonb,
+        created_at -> Timestamptz,
+        eth_sign_data -> Nullable<Jsonb>,
+        batch_id -> Nullable<Int8>,
+    }
+}
+
+table! {
+    multiblock_proofs (id) {
+        id -> Int4,
+        block_from -> Int8,
+        block_to -> Int8,
+        proof -> Jsonb,
+        created_at -> Timestamptz,
     }
 }
 
@@ -205,6 +221,7 @@ table! {
         chunks_left -> Int8,
         unprocessed_priority_op_before -> Int8,
         pending_block_iteration -> Int8,
+        block_timestamp -> Nullable<Int8>,
     }
 }
 
@@ -213,6 +230,17 @@ table! {
         block_number -> Int8,
         proof -> Jsonb,
         created_at -> Timestamptz,
+    }
+}
+
+table! {
+    prover_multiblock_runs (id) {
+        id -> Int4,
+        block_number_from -> Int8,
+        block_number_to -> Int8,
+        worker -> Nullable<Text>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
@@ -251,6 +279,14 @@ table! {
     }
 }
 
+table! {
+    verify_multiproof_queue_elements (id) {
+        id -> Int8,
+        verify_multiblock_info -> Jsonb,
+        sended_to_eth -> Bool,
+    }
+}
+
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
@@ -278,11 +314,14 @@ allow_tables_to_appear_in_same_query!(
     executed_priority_operations,
     executed_transactions,
     mempool_txs,
+    multiblock_proofs,
     operations,
     pending_block,
     proofs,
+    prover_multiblock_runs,
     prover_runs,
     server_config,
     ticker_price,
     tokens,
+    verify_multiproof_queue_elements,
 );

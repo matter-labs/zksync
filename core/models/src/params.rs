@@ -14,27 +14,11 @@ use crate::node::{AccountId, TokenId};
 
 static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
 /// account_tree_depth.
-/// Value must be specified as environment variable at compile time under `ACCOUNT_TREE_DEPTH_VALUE` key.
 pub fn account_tree_depth() -> usize {
-    // use of mutable static is unsafe as it can be mutated by multiple threads.
-    // There's no risk of data race, the worst that can happen is that we parse
-    // and set environment value multuple times, which is ok.
-
     unsafe {
         if ACCOUNT_TREE_DEPTH_VALUE == 0 {
-            #[allow(clippy::option_env_unwrap)]
-            let value: &'static str = option_env!("ACCOUNT_TREE_DEPTH")
-                .expect("ACCOUNT_TREE_DEPTH variable was not set during compilation. \
-                        Make sure that ACCOUNT_TREE_DEPTH is set in `dev.env` file and recompile the project");
-            ACCOUNT_TREE_DEPTH_VALUE =
-                usize::from_str(value).expect("ACCOUNT_TREE_DEPTH compile value is invalid");
             let runtime_value = parse_env::<usize>("ACCOUNT_TREE_DEPTH");
-            if runtime_value != ACCOUNT_TREE_DEPTH_VALUE {
-                panic!(
-                    "ACCOUNT_TREE_DEPTH want runtime value: {}, got: {}",
-                    ACCOUNT_TREE_DEPTH_VALUE, runtime_value
-                );
-            }
+            ACCOUNT_TREE_DEPTH_VALUE = runtime_value;
         }
         assert!(ACCOUNT_TREE_DEPTH_VALUE <= ACCOUNT_ID_BIT_WIDTH);
 
@@ -52,19 +36,8 @@ pub fn balance_tree_depth() -> usize {
 
     unsafe {
         if BALANCE_TREE_DEPTH_VALUE == 0 {
-            #[allow(clippy::option_env_unwrap)]
-            let value: &'static str = option_env!("BALANCE_TREE_DEPTH")
-                .expect("BALANCE_TREE_DEPTH variable was not set during compilation. \
-                        Make sure that BALANCE_TREE_DEPTH is set in `dev.env` file and recompile the project");
-            BALANCE_TREE_DEPTH_VALUE =
-                usize::from_str(value).expect("BALANCE_TREE_DEPTH compile value is invalid");
             let runtime_value = parse_env::<usize>("BALANCE_TREE_DEPTH");
-            if runtime_value != BALANCE_TREE_DEPTH_VALUE {
-                panic!(
-                    "BALANCE_TREE_DEPTH want runtime value: {}, got: {}",
-                    BALANCE_TREE_DEPTH_VALUE, runtime_value
-                );
-            }
+            BALANCE_TREE_DEPTH_VALUE = runtime_value;
         }
         assert!(BALANCE_TREE_DEPTH_VALUE <= TOKEN_BIT_WIDTH);
 
@@ -168,6 +141,8 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 pub const LEAF_DATA_BIT_WIDTH: usize =
     NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
 
+pub const TIMESTAMP_BIT_WIDTH: usize = 8 * 8;
+
 static mut BLOCK_CHUNK_SIZES_VALUE: Vec<usize> = Vec::new();
 
 pub(crate) fn block_chunk_sizes() -> &'static [usize] {
@@ -212,6 +187,18 @@ pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
+
+/// Size of the data that is signed for TransferFrom tx
+pub const SIGNED_TRANSFER_FROM_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + AMOUNT_EXPONENT_BIT_WIDTH
+    + AMOUNT_MANTISSA_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

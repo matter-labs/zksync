@@ -2,6 +2,7 @@ use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethere
 use crate::events::BlockEvent;
 use ethabi::ParamType;
 use models::node::operations::FranklinOp;
+use models::node::BlockTimestamp;
 use web3::{Transport, Web3};
 
 /// Description of a Rollup operations block
@@ -13,6 +14,8 @@ pub struct RollupOpsBlock {
     pub ops: Vec<FranklinOp>,
     /// Fee account
     pub fee_account: u32,
+    /// Block timestamp
+    pub block_timestamp: Option<BlockTimestamp>,
 }
 
 impl RollupOpsBlock {
@@ -31,6 +34,7 @@ impl RollupOpsBlock {
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
         let fee_account_argument_id = 1;
+        let new_block_info_argument_id = 2;
         let public_data_argument_id = 3;
         let decoded_commitment_parameters = ethabi::decode(
             vec![
@@ -51,18 +55,30 @@ impl RollupOpsBlock {
             )))
         })?;
 
-        if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
+        if let (
+            ethabi::Token::Uint(fee_acc),
+            ethabi::Token::Array(new_block_info),
+            ethabi::Token::Bytes(public_data),
+        ) = (
             &decoded_commitment_parameters[fee_account_argument_id],
+            &decoded_commitment_parameters[new_block_info_argument_id],
             &decoded_commitment_parameters[public_data_argument_id],
         ) {
             let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
             let fee_account = fee_acc.as_u32();
 
-            let block = RollupOpsBlock {
+            let mut block = RollupOpsBlock {
                 block_num: event_data.block_num,
                 ops,
                 fee_account,
+                block_timestamp: None,
             };
+
+            // If new_block_info have the second element - it is the block timestamp
+            if let Some(&ethabi::Token::Uint(block_timestamp)) = new_block_info.get(1) {
+                block.block_timestamp = Some(BlockTimestamp::from(block_timestamp.as_u64()));
+            }
+
             Ok(block)
         } else {
             Err(std::io::Error::new(
@@ -265,7 +281,6 @@ mod test {
     #[test]
     fn test_change_pubkey_offchain() {
         let tx = ChangePubKey {
-            account_id: 11,
             account: "7777777777777777777777777777777777777777".parse().unwrap(),
             new_pk_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
                 .unwrap(),

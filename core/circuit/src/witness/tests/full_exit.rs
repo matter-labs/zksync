@@ -126,12 +126,13 @@ fn test_incorrect_full_exit_withdraw_amount() {
             withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
         };
 
+        #[allow(clippy::redundant_closure)]
         incorrect_op_test_scenario::<FullExitWitness<Bn256>, _>(
             &accounts,
             (full_exit_op, success),
             (),
             ERR_MSG,
-            || vec![],
+            Vec::new,
         );
     }
 }

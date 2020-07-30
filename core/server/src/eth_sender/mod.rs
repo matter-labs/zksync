@@ -22,7 +22,7 @@ use models::{
     config_options::{ConfigurationOptions, EthSenderOptions},
     ethereum::{ETHOperation, OperationType},
     node::config,
-    Action, Operation,
+    Action, Operation, Proof, VerifyMultiblockInfo,
 };
 use storage::ConnectionPool;
 // Local uses
@@ -45,8 +45,10 @@ mod tx_queue;
 mod tests;
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ETHSenderRequest {
     SendOperation(Operation),
+    SendMultiproof(VerifyMultiblockInfo),
     GetAverageUsedGasPrice(oneshot::Sender<U256>),
 }
 
@@ -178,14 +180,29 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         };
 
         // Add all the unprocessed operations to the queue.
-        for operation in unprocessed_ops {
-            info!(
-                "Adding unprocessed ZKSync operation <id {}; action: {}; block: {}> to queue",
-                operation.id.expect("ID must be set"),
-                operation.action.to_string(),
-                operation.block.block_number
-            );
-            sender.add_operation_to_queue(operation);
+        for (op_type, operation) in unprocessed_ops {
+            match op_type {
+                OperationType::Commit => {
+                    let operation = operation.expect("must contain an operation");
+                    info!(
+                        "Adding unprocessed ZKSync operation <id {}; action: {}; block: {}> to queue",
+                        operation.id.expect("ID must be set"),
+                        operation.action.to_string(),
+                        operation.block.block_number
+                    );
+                    sender.add_operation_to_queue(operation);
+                }
+                OperationType::VerifyMultiblock(info) => {
+                    info!(
+                        "Adding unprocessed ZKSync verify multiblock operation to queue :: {:?}",
+                        info
+                    );
+                    sender.add_verify_multiblock_operation_to_queue(&info);
+                }
+                _ => {
+                    unreachable!("only commit and verify multiblock operations can be restored");
+                }
+            }
         }
 
         sender
@@ -220,6 +237,13 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         operation.block.block_number
                     );
                     self.add_operation_to_queue(operation);
+                }
+                ETHSenderRequest::SendMultiproof(verify_multiblock_info) => {
+                    info!(
+                        "Adding `verify multiproof` operation <blocks: [{},{}]> to queue",
+                        verify_multiblock_info.block_from, verify_multiblock_info.block_to,
+                    );
+                    self.add_verify_multiblock_operation_to_queue(&verify_multiblock_info);
                 }
                 ETHSenderRequest::GetAverageUsedGasPrice(response_sender) => response_sender
                     .send(self.gas_adjuster.get_average_gas_price())
@@ -292,24 +316,41 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     // Free a slot for the next tx in the queue.
                     self.tx_queue.report_commitment();
 
-                    if current_op.is_verify() {
-                        self.current_zksync_info.set_new_verified_block(
-                            current_op
-                                .op
-                                .as_ref()
-                                .expect("Should be verify operation")
-                                .block
-                                .block_number,
-                        );
+                    if current_op.op_type.is_verify() {
+                        if let OperationType::VerifyMultiblock(verify_multiblock_info) =
+                            current_op.op_type
+                        {
+                            for (block_num, block) in (verify_multiblock_info.block_from
+                                ..=verify_multiblock_info.block_to)
+                                .zip(verify_multiblock_info.blocks)
+                            {
+                                self.current_zksync_info.set_new_verified_block(block_num);
 
-                        // We notify about verify only when it's confirmed on the Ethereum.
-                        self.op_notify
-                            .try_send(current_op.op.expect("Should be verify operation"))
-                            .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
-                            .unwrap_or_default();
+                                let op = Operation {
+                                    action: Action::Verify {
+                                        proof: Box::new(Proof::MultiBlock(
+                                            verify_multiblock_info.proof.clone(),
+                                        )),
+                                    },
+                                    block,
+                                    accounts_updated: Vec::new(),
+                                    id: None,
+                                };
 
-                        // Complete pending withdrawals after each verify.
-                        self.add_complete_withdrawals_to_queue();
+                                // We notify about verify only when it's confirmed on the Ethereum.
+                                self.op_notify
+                                    .try_send(op)
+                                    .map_err(|e| {
+                                        warn!("Failed notify about verify op confirmation: {}", e)
+                                    })
+                                    .unwrap_or_default();
+
+                                // Complete pending withdrawals per each verify.
+                                self.add_complete_withdrawals_to_queue();
+                            }
+                        } else {
+                            unreachable!("can't receive from eth non multiblock verify operation")
+                        }
                     }
                 }
                 OperationCommitment::Pending => {
@@ -338,7 +379,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             // First, we should store the operation in the database and obtain the assigned
             // operation ID and nonce. Without them we won't be able to sign the transaction.
             let assigned_data = self.db.save_new_eth_tx(
-                tx.op_type,
+                tx.op_type.clone(),
                 tx.operation.clone(),
                 deadline_block as i64,
                 gas_price,
@@ -591,7 +632,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Calculates the gas limit for transaction to be send, depending on the type of operation.
     fn gas_limit_for_op(op: &ETHOperation) -> U256 {
-        match op.op_type {
+        match &op.op_type {
             OperationType::Commit => {
                 op.op
                     .as_ref()
@@ -604,6 +645,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     .as_ref()
                     .expect("No zkSync operation for Verify")
                     .block
+                    .verify_gas_limit
+            }
+            OperationType::VerifyMultiblock(info) => {
+                info.blocks
+                    .get(0)
+                    .expect("must verify at least one block")
                     .verify_gas_limit
             }
             OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
@@ -624,7 +671,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         stuck_tx.last_deadline_block = deadline_block;
         stuck_tx.last_used_gas_price = signed_tx.gas_price;
-        stuck_tx.used_tx_hashes.push(signed_tx.hash.clone());
+        stuck_tx.used_tx_hashes.push(signed_tx.hash);
 
         Ok(signed_tx)
     }
@@ -691,7 +738,14 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     (
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
-                        vec![root],
+                        vec![
+                            root,
+                            H256::from_low_u64_be(
+                                *op.block
+                                    .block_timestamp
+                                    .expect("block timestamp should be known at this moment"),
+                            ),
+                        ],
                         public_data,
                         witness_data.0,
                         witness_data.1,
@@ -705,12 +759,31 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     "verifyBlock",
                     (
                         u64::from(block_number),
-                        proof.proof.clone(),
+                        proof.get_encoded_plonk_proof().proof,
                         withdrawals_data,
                     ),
                 )
             }
         }
+    }
+
+    /// Encodes the verify multiblock operation to the Ethereum tx payload (not signs it!).
+    fn verify_multiblock_to_raw_tx(&self, op: &VerifyMultiblockInfo) -> Vec<u8> {
+        let withdrawals_data: Vec<Vec<u8>> = op
+            .blocks
+            .clone()
+            .into_iter()
+            .map(|block| block.get_withdrawals_data())
+            .collect();
+        self.ethereum.encode_tx_data(
+            "verifyBlocks",
+            (
+                u64::from(op.block_from),
+                u64::from(op.block_to),
+                op.proof.proof.proof.clone(),
+                withdrawals_data,
+            ),
+        )
     }
 
     /// Encodes the zkSync operation to the tx payload and adds it to the queue.
@@ -726,14 +799,30 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 ));
             }
             Action::Verify { .. } => {
-                let block_number = op.block.block_number;
-
-                self.tx_queue.add_verify_operation(
-                    block_number as usize,
-                    TxData::from_operation(OperationType::Verify, op, raw_tx),
-                );
+                unreachable!("only multiblock verify operations available now");
+                //                let block_number = op.block.block_number;
+                //
+                //                self.tx_queue.add_verify_operation(
+                //                    block_number as usize,
+                //                    TxData::from_operation(OperationType::Verify, op, raw_tx),
+                //                );
             }
         }
+    }
+
+    /// Adds verify multiblock operation to queue.
+    fn add_verify_multiblock_operation_to_queue(&mut self, op: &VerifyMultiblockInfo) {
+        let raw_tx = self.verify_multiblock_to_raw_tx(op);
+
+        self.tx_queue.add_verify_multiblock_operation(
+            op.block_from as usize,
+            op.block_to as usize,
+            TxData {
+                op_type: OperationType::VerifyMultiblock(op.clone()),
+                raw: raw_tx,
+                operation: None,
+            },
+        );
     }
 
     /// The same as `add_operation_to_queue`, but for the withdraw operation.

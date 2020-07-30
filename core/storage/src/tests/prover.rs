@@ -259,6 +259,7 @@ fn unstarted_prover_jobs_count() {
             unprocessed_priority_op_before: 0,
             pending_block_iteration: 1,
             success_operations: vec![],
+            block_timestamp: 0u64.into(),
         })?;
         let blocks_count = ProverSchema(&conn).unstarted_jobs_count()?;
         assert_eq!(blocks_count, 2);

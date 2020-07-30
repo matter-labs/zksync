@@ -9,8 +9,8 @@ use log::*;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
-use crate::client;
 use crate::prover_data::ProverData;
+use crate::{client, ProverJob};
 use circuit::circuit::FranklinCircuit;
 use models::node::Engine;
 use models::prover_utils::EncodedProofPlonk;
@@ -21,15 +21,33 @@ pub struct ProverReq {
     pub block_size: usize,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ProverMultiblockReq {
+    pub name: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BlockToProveRes {
     pub prover_run_id: i32,
     pub block: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MultiblockToProveRes {
+    pub prover_run_id: i32,
+    pub block_from: i64,
+    pub block_to: i64,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct WorkingOnReq {
-    pub prover_run_id: i32,
+    pub prover_run: ProverJob,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MultiblockDataReq {
+    pub block_from: i64,
+    pub block_to: i64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -38,13 +56,23 @@ pub struct PublishReq {
     pub proof: EncodedProofPlonk,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct PublishMultiblockReq {
+    pub block_from: u32,
+    pub block_to: u32,
+    pub proof: EncodedProofPlonk,
+}
+
 #[derive(Debug, Clone)]
 pub struct ApiClient {
     register_url: Url,
     block_to_prove_url: Url,
+    multiblock_to_prove_url: Url,
     working_on_url: Url,
-    prover_data_url: Url,
-    publish_url: Url,
+    prover_block_data_url: Url,
+    prover_multiblock_data_url: Url,
+    publish_block_url: Url,
+    publish_multiblock_url: Url,
     stopped_url: Url,
     worker: String,
     // client keeps connection pool inside, so it is recommended to reuse it (see docstring for reqwest::Client)
@@ -63,9 +91,12 @@ impl ApiClient {
         Self {
             register_url: base_url.join("/register").unwrap(),
             block_to_prove_url: base_url.join("/block_to_prove").unwrap(),
+            multiblock_to_prove_url: base_url.join("/multiblock_to_prove").unwrap(),
             working_on_url: base_url.join("/working_on").unwrap(),
-            prover_data_url: base_url.join("/prover_data").unwrap(),
-            publish_url: base_url.join("/publish").unwrap(),
+            prover_block_data_url: base_url.join("/prover_block_data").unwrap(),
+            prover_multiblock_data_url: base_url.join("/prover_multiblock_data").unwrap(),
+            publish_block_url: base_url.join("/publish_block").unwrap(),
+            publish_multiblock_url: base_url.join("/publish_multiblock").unwrap(),
             stopped_url: base_url.join("/stopped").unwrap(),
             worker: worker.to_string(),
             http_client,
@@ -90,8 +121,12 @@ impl ApiClient {
                 )
             })
             .map_err(|e| {
+                let backoff_config = Self::get_backoff();
+                let max_elapsed_time_secs = backoff_config.max_elapsed_time.unwrap().as_secs();
+
                 panic!(
-                    "Prover can't reach server, for the max elapsed time of the backoff: {}",
+                    "Prover couldn't reach server for the max elapsed time of the backoff ({} secs): {}",
+                    max_elapsed_time_secs,
                     e
                 )
             })
@@ -103,7 +138,7 @@ impl ApiClient {
         backoff.initial_interval = Duration::from_secs(1);
         backoff.multiplier = 1.5f64;
         backoff.max_interval = Duration::from_secs(10);
-        backoff.max_elapsed_time = Some(Duration::from_secs(2 * 60));
+        backoff.max_elapsed_time = Some(Duration::from_secs(20 * 60));
         backoff
     }
 
@@ -159,14 +194,38 @@ impl crate::ApiClient for ApiClient {
         Ok(self.with_retries(&op)?)
     }
 
-    fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
-        trace!("sending working_on {}", job_id);
+    #[allow(clippy::type_complexity)]
+    fn multiblock_to_prove(&self) -> Result<Option<((i64, i64), i32)>, failure::Error> {
+        let op = || -> Result<Option<((i64, i64), i32)>, failure::Error> {
+            trace!("sending multiblock_to_prove");
+            let res = self
+                .http_client
+                .get(self.multiblock_to_prove_url.as_str())
+                .json(&client::ProverMultiblockReq {
+                    name: self.worker.clone(),
+                })
+                .send()
+                .map_err(|e| format_err!("multiblock to prove request failed: {}", e))?;
+            let text = res
+                .text()
+                .map_err(|e| format_err!("failed to read multiblock to prove response: {}", e))?;
+            let res: client::MultiblockToProveRes = serde_json::from_str(&text)
+                .map_err(|e| format_err!("failed to parse multiblock to prove response: {}", e))?;
+            if res.block_from != 0 {
+                return Ok(Some(((res.block_from, res.block_to), res.prover_run_id)));
+            }
+            Ok(None)
+        };
+
+        Ok(self.with_retries(&op)?)
+    }
+
+    fn working_on(&self, job: ProverJob) -> Result<(), failure::Error> {
+        trace!("sending working_on {:?}", job);
         let res = self
             .http_client
             .post(self.working_on_url.as_str())
-            .json(&client::WorkingOnReq {
-                prover_run_id: job_id,
-            })
+            .json(&client::WorkingOnReq { prover_run: job })
             .send()
             .map_err(|e| format_err!("failed to send working on request: {}", e))?;
         if res.status() != reqwest::StatusCode::OK {
@@ -176,20 +235,20 @@ impl crate::ApiClient for ApiClient {
         }
     }
 
-    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
+    fn prover_block_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
         let op = || -> Result<ProverData, failure::Error> {
-            trace!("sending prover_data");
+            trace!("sending prover_block_data");
             let res = self
                 .http_client
-                .get(self.prover_data_url.as_str())
+                .get(self.prover_block_data_url.as_str())
                 .json(&block)
                 .send()
-                .map_err(|e| format_err!("failed to request prover data: {}", e))?;
+                .map_err(|e| format_err!("failed to request prover block data: {}", e))?;
             let text = res
                 .text()
-                .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
+                .map_err(|e| format_err!("failed to read prover block data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
-                .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
+                .map_err(|e| format_err!("failed to parse prover block data response: {}", e))?;
             Ok(res.ok_or_else(|| format_err!("ProverData for block {} is not ready yet", block))?)
         };
 
@@ -197,19 +256,54 @@ impl crate::ApiClient for ApiClient {
         Ok(prover_data.into_circuit(block))
     }
 
-    fn publish(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), failure::Error> {
+    fn prover_multiblock_data(
+        &self,
+        block_from: i64,
+        block_to: i64,
+    ) -> Result<Vec<(EncodedProofPlonk, usize)>, failure::Error> {
+        let op = || -> Result<Vec<(EncodedProofPlonk, usize)>, failure::Error> {
+            trace!("sending prover_multiblock_data");
+            let res = self
+                .http_client
+                .get(self.prover_multiblock_data_url.as_str())
+                .json(&client::MultiblockDataReq {
+                    block_from,
+                    block_to,
+                })
+                .send()
+                .map_err(|e| format_err!("failed to request prover multiblock data: {}", e))?;
+            let text = res.text().map_err(|e| {
+                format_err!("failed to read prover multiblock data response: {}", e)
+            })?;
+            let res: Option<Vec<(EncodedProofPlonk, usize)>> = serde_json::from_str(&text)
+                .map_err(|e| {
+                    format_err!("failed to parse prover multiblock data response: {}", e)
+                })?;
+            Ok(res.ok_or_else(|| {
+                format_err!(
+                    "Proofs of blocks for multiblock [{};{}] is not ready yet",
+                    block_from,
+                    block_to
+                )
+            })?)
+        };
+
+        Ok(self.with_retries(&op)?)
+    }
+
+    fn publish_block(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), failure::Error> {
         let op = move || -> Result<(), failure::Error> {
             trace!("Trying publish proof {}", block);
             let proof = proof.clone();
             let res = self
                 .http_client
-                .post(self.publish_url.as_str())
+                .post(self.publish_block_url.as_str())
                 .json(&client::PublishReq {
                     block: block as u32,
                     proof,
                 })
                 .send()
-                .map_err(|e| format_err!("failed to send publish request: {}", e))?;
+                .map_err(|e| format_err!("failed to send publish_block request: {}", e))?;
             let status = res.status();
             if status != reqwest::StatusCode::OK {
                 match res.text() {
@@ -218,14 +312,66 @@ impl crate::ApiClient for ApiClient {
                             warn!("proof for block {} already exists", block);
                         } else {
                             bail!(
-                                "publish request failed with status: {} and message: {}",
+                                "publish_block request failed with status: {} and message: {}",
                                 status,
                                 message
                             );
                         }
                     }
                     Err(_) => {
-                        bail!("publish request failed with status: {}", status);
+                        bail!("publish_block request failed with status: {}", status);
+                    }
+                };
+            }
+
+            Ok(())
+        };
+
+        Ok(self.with_retries(&op)?)
+    }
+
+    fn publish_multiblock(
+        &self,
+        block_from: i64,
+        block_to: i64,
+        proof: EncodedProofPlonk,
+    ) -> Result<(), failure::Error> {
+        let op = move || -> Result<(), failure::Error> {
+            trace!(
+                "Trying publish multiblock proof: [{};{}]",
+                block_from,
+                block_to
+            );
+            let proof = proof.clone();
+            let res = self
+                .http_client
+                .post(self.publish_multiblock_url.as_str())
+                .json(&client::PublishMultiblockReq {
+                    block_from: block_from as u32,
+                    block_to: block_to as u32,
+                    proof,
+                })
+                .send()
+                .map_err(|e| format_err!("failed to send publish_multiblock request: {}", e))?;
+            let status = res.status();
+            if status != reqwest::StatusCode::OK {
+                match res.text() {
+                    Ok(message) => {
+                        if message == "duplicate key" {
+                            warn!(
+                                "proof for multiblock [{};{}] already exists",
+                                block_from, block_to
+                            );
+                        } else {
+                            bail!(
+                                "publish_multiblock request failed with status: {} and message: {}",
+                                status,
+                                message
+                            );
+                        }
+                    }
+                    Err(_) => {
+                        bail!("publish_multiblock request failed with status: {}", status);
                     }
                 };
             }

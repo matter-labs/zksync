@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate serde_derive;
+
 pub mod cli_utils;
 pub mod client;
 pub mod exit_proof;
@@ -77,7 +80,7 @@ pub trait ProverImpl<C: ApiClient> {
     /// Fetches job from the server and creates proof for it
     fn next_round(
         &self,
-        start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
+        start_heartbeats_tx: mpsc::Sender<ProverHeartbeat>,
     ) -> Result<(), BabyProverError>;
     /// Returns client reference and config needed for heartbeat.
     fn get_heartbeat_options(&self) -> (&C, Duration);
@@ -85,12 +88,25 @@ pub trait ProverImpl<C: ApiClient> {
 
 pub trait ApiClient: Debug {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error>;
-    fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
-    fn prover_data(
+    #[allow(clippy::type_complexity)]
+    fn multiblock_to_prove(&self) -> Result<Option<((i64, i64), i32)>, failure::Error>;
+    fn working_on(&self, job: ProverJob) -> Result<(), failure::Error>;
+    fn prover_block_data(
         &self,
         block: i64,
     ) -> Result<circuit::circuit::FranklinCircuit<'_, Engine>, failure::Error>;
-    fn publish(&self, block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error>;
+    fn prover_multiblock_data(
+        &self,
+        block_from: i64,
+        block_to: i64,
+    ) -> Result<Vec<(EncodedProofPlonk, usize)>, failure::Error>;
+    fn publish_block(&self, block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error>;
+    fn publish_multiblock(
+        &self,
+        block_from: i64,
+        block_to: i64,
+        p: EncodedProofPlonk,
+    ) -> Result<(), failure::Error>;
     fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error>;
 }
 
@@ -108,6 +124,24 @@ impl fmt::Display for BabyProverError {
         };
         write!(f, "{}", desc)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProverJob {
+    BlockProve(i32),
+    MultiblockProve(i32),
+}
+
+impl Default for ProverJob {
+    fn default() -> Self {
+        Self::BlockProve(0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProverHeartbeat {
+    WorkingOn(ProverJob),
+    Finishes,
 }
 
 pub fn start<CLIENT, PROVER>(
@@ -131,7 +165,7 @@ pub fn start<CLIENT, PROVER>(
             ))
             .expect("failed to send exit error");
         tx_block_start2
-            .send((0, true))
+            .send(ProverHeartbeat::Finishes)
             .expect("failed to send heartbeat exit request"); // exit heartbeat routine request.
     });
     let (client, heartbeat_interval) = prover_rc.get_heartbeat_options();
@@ -143,7 +177,7 @@ pub fn start<CLIENT, PROVER>(
 
 fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
     prover: &PROVER,
-    start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
+    start_heartbeats_tx: mpsc::Sender<ProverHeartbeat>,
     shutdown_request: ShutdownRequest,
 ) -> BabyProverError {
     log::info!("Running worker rounds");
@@ -190,9 +224,9 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
 fn keep_sending_work_heartbeats<C: ApiClient>(
     client: &C,
     heartbeat_interval: Duration,
-    start_heartbeats_rx: mpsc::Receiver<(i32, bool)>,
+    start_heartbeats_rx: mpsc::Receiver<ProverHeartbeat>,
 ) {
-    let mut job_id = 0;
+    let mut job = ProverJob::default();
     loop {
         let mut rng = rand::thread_rng();
 
@@ -206,20 +240,17 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
         // This loop exists as soon as message queue is empty.
         loop {
             match start_heartbeats_rx.try_recv() {
-                Ok((new_job_id, quit_now)) => {
-                    // Check if we should stop this thread immediately.
-                    if quit_now {
-                        return;
+                Ok(ProverHeartbeat::Finishes) => {
+                    // We should stop this thread immediately.
+                    return;
+                }
+                Ok(ProverHeartbeat::WorkingOn(new_job)) => {
+                    if new_job != ProverJob::default() {
+                        // Message with non-default job is sent once per job, so it won't be spammed all over the log.
+                        log::info!("Starting sending heartbeats for job: {:?}", new_job);
                     }
-                    // Update the current job ID.
-                    if new_job_id != 0 {
-                        // Message with non-zero job ID is sent once per job, so it won't be spammed all over the log.
-                        log::info!(
-                            "Starting sending heartbeats for job with ID: {}",
-                            new_job_id
-                        );
-                    }
-                    job_id = new_job_id;
+                    // Update the current job
+                    job = new_job;
                 }
                 Err(mpsc::TryRecvError::Empty) => {
                     // No messages in queue, use the last received value.
@@ -230,9 +261,9 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
                 }
             };
         }
-        if job_id != 0 {
-            log::trace!("sending working_on request for job_id: {}", job_id);
-            let ret = client.working_on(job_id);
+        if job != ProverJob::default() {
+            log::trace!("sending working_on request for job: {:?}", job);
+            let ret = client.working_on(job);
             if let Err(e) = ret {
                 log::error!("working_on request erred: {}", e);
             }

@@ -1,5 +1,5 @@
 #!/bin/bash
-USAGE="Usage: zksync ciruit-tests-debug [test_name,def all] [threads,def=1] [other_features(e.g) --nocapture]"
+USAGE="Usage: zksync circuit-tests-debug [test_name,def all] [threads,def=1] [other_features(e.g) --nocapture]"
 
 if [ "$1" == "-h" ]; then
     echo "$USAGE"

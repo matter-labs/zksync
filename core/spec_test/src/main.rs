@@ -57,6 +57,7 @@ fn check_tx_signature(req: web::Json<FranklinTx>) -> impl Responder {
     info!("tx bytes: {}", hex::encode(tx.get_bytes()));
     let pub_key_hash = match tx {
         FranklinTx::Transfer(tx) => tx.verify_signature(),
+        FranklinTx::TransferFrom(tx) => tx.verify_to_signature(),
         FranklinTx::Withdraw(tx) => tx.verify_signature(),
         FranklinTx::Close(tx) => tx.verify_signature(),
         _ => None,

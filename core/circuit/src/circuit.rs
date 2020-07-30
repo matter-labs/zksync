@@ -40,8 +40,10 @@ use crate::{
         resize_grow_only, vectorized_compare,
     },
 };
+use models::node::TransferFromOp;
+use models::params::SIGNED_TRANSFER_FROM_BIT_WIDTH;
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
 pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
@@ -51,6 +53,7 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
 
     pub block_number: Option<E::Fr>,
     pub validator_address: Option<E::Fr>,
+    pub block_timestamp: Option<E::Fr>,
 
     pub pub_data_commitment: Option<E::Fr>,
     pub operations: Vec<Operation<E>>,
@@ -58,6 +61,12 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_balances: Vec<Option<E::Fr>>,
     pub validator_audit_path: Vec<Option<E::Fr>>,
     pub validator_account: AccountWitness<E>,
+}
+
+pub struct CircuitGlobalVariables<E: RescueEngine + JubjubEngine> {
+    pub explicit_zero: CircuitElement<E>,
+    pub block_timestamp: CircuitElement<E>,
+    pub chunk_data: AllocatedChunkData<E>,
 }
 
 impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'a, E> {
@@ -69,6 +78,7 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'
             initial_used_subtree_root: self.initial_used_subtree_root,
             block_number: self.block_number,
             validator_address: self.validator_address,
+            block_timestamp: self.block_timestamp,
             pub_data_commitment: self.pub_data_commitment,
             operations: self.operations.clone(),
 
@@ -141,11 +151,21 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         // vector of pub_data_bits that will be aggregated during block processing
         let mut block_pub_data_bits = vec![];
 
-        let mut allocated_chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
+        let block_timestamp = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "allocated_block_timestamp"),
+            || self.block_timestamp.grab(),
+            params::TIMESTAMP_BIT_WIDTH,
+        )?;
+        let chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
             is_chunk_first: Boolean::constant(false),
             chunk_number: zero_circuit_element.get_number(),
-            tx_type: zero_circuit_element,
+            tx_type: zero_circuit_element.clone(),
+        };
+        let mut global_variables = CircuitGlobalVariables {
+            block_timestamp,
+            chunk_data,
+            explicit_zero: zero_circuit_element,
         };
 
         // we create a memory value for a token ID that is used to collect fees.
@@ -165,9 +185,10 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             data[DepositOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[TransferOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[TransferFromOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[ChangePubKeyOp::OP_CODE as usize] = vec![zero; 2];
 
             // this operation is disabled for now
             // data[CloseOp::OP_CODE as usize] = vec![];
@@ -187,7 +208,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 cs.namespace(|| "verify_correct_chunking"),
             )?;
 
-            allocated_chunk_data = chunk_data;
+            global_variables.chunk_data = chunk_data;
             next_chunk_number = next_chunk;
             let operation_pub_data_chunk = CircuitElement::from_fe_with_known_length(
                 cs.namespace(|| "operation_pub_data_chunk"),
@@ -205,7 +226,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &lhs,
                 &rhs,
                 operation,
-                &allocated_chunk_data,
+                &global_variables,
             )?;
 
             // calculate root for given account data
@@ -230,7 +251,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &lhs,
                 &rhs,
                 &operation,
-                &allocated_chunk_data,
+                &global_variables,
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
                 // &subtree_root, // Close disable
@@ -238,7 +259,6 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &mut fees,
                 &mut prev,
                 &mut pubdata_holder,
-                &zero,
             )?;
             let (new_state_root, _, _) = check_account_data(
                 cs.namespace(|| "calculate new account root"),
@@ -253,7 +273,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         cs.enforce(
             || "ensure last chunk of the block is a last chunk of corresponding transaction",
             |_| {
-                allocated_chunk_data
+                global_variables
+                    .chunk_data
                     .is_chunk_last
                     .lc(CS::one(), E::Fr::one())
             },
@@ -423,6 +444,13 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
 
+            pack_bits.extend(global_variables.block_timestamp.into_padded_be_bits(256));
+
+            hash_block = sha256::sha256(cs.namespace(|| "hash with block timestamp"), &pack_bits)?;
+
+            let mut pack_bits = vec![];
+            pack_bits.extend(hash_block);
+
             // Perform bit decomposition with an explicit in-field check
             // and change to MSB first bit order
             let old_root_be_bits = {
@@ -481,6 +509,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         Ok(())
     }
 }
+
 impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
     fn verify_correct_chunking<CS: ConstraintSystem<E>>(
         &self,
@@ -562,17 +591,17 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         first: &AllocatedOperationBranch<E>,
         second: &AllocatedOperationBranch<E>,
         _op: &Operation<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
         let deposit_tx_type = Expression::u64::<CS>(1);
         let left_side = Expression::constant::<CS>(E::Fr::zero());
 
         let cur_side = Expression::select_ifeq(
             cs.namespace(|| "select corresponding branch"),
-            &chunk_data.tx_type.get_number(),
+            &global_variables.chunk_data.tx_type.get_number(),
             deposit_tx_type,
             left_side.clone(),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
         )?;
 
         let is_left = Boolean::from(Expression::equals(
@@ -644,7 +673,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         lhs: &AllocatedOperationBranch<E>,
         rhs: &AllocatedOperationBranch<E>,
         op: &Operation<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
         is_account_empty: &Boolean,
         ext_pubdata_chunk: &AllocatedNum<E>,
         // subtree_root: &CircuitElement<E>, // Close disable
@@ -652,7 +681,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
         previous_pubdatas: &mut [Vec<AllocatedNum<E>>],
-        explicit_zero: &AllocatedNum<E>,
     ) -> Result<(), SynthesisError> {
         let max_token_id =
             Expression::<E>::u64::<CS>(params::number_of_processable_tokens() as u64);
@@ -730,6 +758,16 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 &op_data.full_amount,
                 &prev.op_data.full_amount,
             )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_from equal to previous"),
+                &op_data.valid_from,
+                &prev.op_data.valid_from,
+            )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_until equal to previous"),
+                &op_data.valid_until,
+                &prev.op_data.valid_until,
+            )?);
 
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
@@ -740,7 +778,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 cs.namespace(|| "is_op_data_correct"),
                 &[
                     is_op_data_equal_to_previous,
-                    chunk_data.is_chunk_first.clone(),
+                    global_variables.chunk_data.is_chunk_first.clone(),
                 ],
             )?;
             Boolean::enforce_equal(
@@ -783,23 +821,28 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             diff_a_b_bits_repacked,
         )?);
 
+        let is_valid_timestamp = self.verify_operation_timestamp(
+            cs.namespace(|| "verify operation timestamp"),
+            &op_data,
+            &global_variables,
+        )?;
+
         let mut op_flags = vec![];
         op_flags.push(self.deposit(
             cs.namespace(|| "deposit"),
             &mut cur,
-            &chunk_data,
+            &global_variables,
             &is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
             &mut previous_pubdatas[DepositOp::OP_CODE as usize],
-            &explicit_zero,
         )?);
         op_flags.push(self.transfer(
             cs.namespace(|| "transfer"),
             &mut cur,
             &lhs,
             &rhs,
-            &chunk_data,
+            &global_variables,
             &is_a_geq_b,
             &is_account_empty,
             &op_data,
@@ -813,7 +856,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &mut cur,
             &lhs,
             &rhs,
-            &chunk_data,
+            &global_variables,
             &is_a_geq_b,
             &is_account_empty,
             &op_data,
@@ -822,10 +865,25 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signature_data.is_verified,
             &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
         )?);
+        op_flags.push(self.transfer_from(
+            cs.namespace(|| "transfer_from"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &global_variables,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &signer_key,
+            &ext_pubdata_chunk,
+            &signature_data.is_verified,
+            &is_valid_timestamp,
+            &mut previous_pubdatas[TransferFromOp::OP_CODE as usize],
+        )?);
         op_flags.push(self.withdraw(
             cs.namespace(|| "withdraw"),
             &mut cur,
-            &chunk_data,
+            &global_variables,
             &is_a_geq_b,
             &op_data,
             &signer_key,
@@ -837,7 +895,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         //  op_flags.push(self.close_account(
         //      cs.namespace(|| "close_account"),
         //      &mut cur,
-        //      &chunk_data,
+        //      &global_variables,
         //      &ext_pubdata_chunk,
         //      &op_data,
         //      &signer_key,
@@ -847,28 +905,26 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         op_flags.push(self.full_exit(
             cs.namespace(|| "full_exit"),
             &mut cur,
-            &chunk_data,
+            &global_variables,
             &op_data,
             &ext_pubdata_chunk,
             &mut previous_pubdatas[FullExitOp::OP_CODE as usize],
-            &explicit_zero,
         )?);
         op_flags.push(self.change_pubkey_offchain(
             cs.namespace(|| "change_pubkey_offchain"),
             &mut cur,
-            &chunk_data,
+            &global_variables,
+            is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
             &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
-            explicit_zero,
         )?);
         op_flags.push(self.noop(
             cs.namespace(|| "noop"),
-            &chunk_data,
+            &global_variables,
             &ext_pubdata_chunk,
             &op_data,
             &mut previous_pubdatas[NoopOp::OP_CODE as usize],
-            &explicit_zero,
         )?);
 
         assert_eq!(DIFFERENT_TRANSACTIONS_TYPE_NUMBER - 1, op_flags.len());
@@ -891,7 +947,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         // First chunk is also always an LHS by "select-branch" function
         // There is always a signature on "cur" in the corresponding operations on the first chunk
 
-        // if chunk_data.is_chunk_first we take value from the current chunk, else - we keep an
+        // if global_variables.chunk_data.is_chunk_first we take value from the current chunk, else - we keep an
         // old value
         let new_last_token_id = AllocatedNum::conditionally_select(
             cs.namespace(|| {
@@ -900,7 +956,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             }),
             &cur.token.get_number(),
             &last_token_id,
-            &chunk_data.is_chunk_first,
+            &global_variables.chunk_data.is_chunk_first,
         )?;
 
         *last_token_id = new_last_token_id.clone();
@@ -917,7 +973,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             let should_update = Boolean::and(
                 cs.namespace(|| format!("should update fee number {}", i)),
                 &is_token_correct,
-                &chunk_data.is_chunk_last.clone(),
+                &global_variables.chunk_data.is_chunk_last.clone(),
             )?;
 
             *fee = Expression::conditionally_select(
@@ -935,7 +991,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
         is_a_geq_b: &Boolean,
         op_data: &AllocatedOperationData<E>,
         signer_key: &AllocatedSignerPubkey<E>,
@@ -947,7 +1003,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         //construct pubdata
         let mut pubdata_bits = vec![];
 
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
@@ -973,7 +1029,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let mut serialized_tx_bits = vec![];
 
-        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
         serialized_tx_bits.extend(cur.account_id.get_bits_be());
         serialized_tx_bits.extend(cur.account.address.get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
@@ -986,13 +1042,13 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             WithdrawOp::CHUNKS,
         )?;
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
 
@@ -1014,7 +1070,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         // verify correct tx_code
         let is_withdraw = Boolean::from(Expression::equals(
             cs.namespace(|| "is_withdraw"),
-            &chunk_data.tx_type.get_number(),
+            &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(u64::from(WithdrawOp::OP_CODE)),
         )?);
         base_valid_flags.push(is_withdraw);
@@ -1031,7 +1087,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
-            &[is_signed_correctly, is_first_chunk.clone().not()],
+            &[is_signed_correctly, is_first_chunk.not()],
         )?;
         base_valid_flags.push(is_sig_correct);
 
@@ -1115,17 +1171,16 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
-        explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         // Execute first chunk
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
 
@@ -1134,7 +1189,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             //construct pubdata
             let pubdata_bits = {
                 let mut pub_data = Vec::new();
-                pub_data.extend(chunk_data.tx_type.get_bits_be()); //1
+                pub_data.extend(global_variables.chunk_data.tx_type.get_bits_be()); //1
                 pub_data.extend(cur.account_id.get_bits_be()); //3
                 pub_data.extend(op_data.eth_address.get_bits_be()); //20
                 pub_data.extend(cur.token.get_bits_be()); // 2
@@ -1152,7 +1207,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             let pubdata_chunk = select_pubdata_chunk(
                 cs.namespace(|| "select_pubdata_chunk"),
                 &pubdata_bits,
-                &chunk_data.chunk_number,
+                &global_variables.chunk_data.chunk_number,
                 FullExitOp::CHUNKS,
             )?;
 
@@ -1182,7 +1237,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let fee_is_zero = AllocatedNum::equals(
             cs.namespace(|| "fee is zero for full exit"),
             &op_data.fee.get_number(),
-            &explicit_zero,
+            &global_variables.explicit_zero.get_number(),
         )?;
 
         let fee_is_zero = Boolean::from(fee_is_zero);
@@ -1198,7 +1253,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             // MUST be true
             let is_full_exit = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_full_exit"),
-                &chunk_data.tx_type.get_number(),
+                &global_variables.chunk_data.tx_type.get_number(),
                 Expression::u64::<CS>(u64::from(FullExitOp::OP_CODE)), //full_exit tx code
             )?);
 
@@ -1278,12 +1333,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
-        explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -1292,7 +1346,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         //construct pubdata
         let mut pubdata_bits = vec![];
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
@@ -1314,7 +1368,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         //useful below
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
 
@@ -1331,7 +1385,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let fee_is_zero = AllocatedNum::equals(
             cs.namespace(|| "fee is zero for deposit"),
             &op_data.fee.get_number(),
-            &explicit_zero,
+            &global_variables.explicit_zero.get_number(),
         )?;
 
         is_valid_flags.push(Boolean::from(fee_is_zero));
@@ -1339,7 +1393,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             DepositOp::CHUNKS,
         )?;
 
@@ -1353,7 +1407,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         // verify correct tx_code
         let is_deposit = Boolean::from(Expression::equals(
             cs.namespace(|| "is_deposit"),
-            &chunk_data.tx_type.get_number(),
+            &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(u64::from(DepositOp::OP_CODE)),
         )?);
         is_valid_flags.push(is_deposit);
@@ -1402,9 +1456,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_valid_first,
         )?;
 
-        // update pub_key
+        // update address
         cur.account.address = CircuitElement::conditionally_select(
-            cs.namespace(|| "mutated_pubkey"),
+            cs.namespace(|| "mutated_address"),
             &op_data.eth_address,
             &cur.account.address,
             &is_valid_first,
@@ -1416,11 +1470,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
-        explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -1429,7 +1483,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         //construct pubdata
         let mut pubdata_bits = vec![];
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
@@ -1452,7 +1506,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         //useful below
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
 
@@ -1469,7 +1523,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let fee_is_zero = AllocatedNum::equals(
             cs.namespace(|| "fee is zero for change pubkey op"),
             &op_data.fee.get_number(),
-            &explicit_zero,
+            &global_variables.explicit_zero.get_number(),
         )?;
 
         is_valid_flags.push(Boolean::from(fee_is_zero));
@@ -1477,7 +1531,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             ChangePubKeyOp::CHUNKS,
         )?;
 
@@ -1491,16 +1545,22 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         // verify correct tx_code
         let is_change_pubkey_offchain = Boolean::from(Expression::equals(
             cs.namespace(|| "is_change_pubkey_offchain"),
-            &chunk_data.tx_type.get_number(),
+            &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(u64::from(ChangePubKeyOp::OP_CODE)),
         )?);
         is_valid_flags.push(is_change_pubkey_offchain);
 
         // verify if address is to previous one (if existed)
-        let is_address_correct = CircuitElement::equals(
-            cs.namespace(|| "is_address_correct"),
+        let is_address_equal_to_stored = CircuitElement::equals(
+            cs.namespace(|| "is_address_equal_to_stored"),
             &op_data.eth_address,
             &cur.account.address,
+        )?;
+
+        let is_address_correct = Boolean::xor(
+            cs.namespace(|| "addresses are same or account is empty"),
+            &is_address_equal_to_stored,
+            &is_account_empty,
         )?;
 
         is_valid_flags.push(is_address_correct);
@@ -1542,17 +1602,24 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_valid_first,
         )?;
 
+        // update address
+        cur.account.address = CircuitElement::conditionally_select(
+            cs.namespace(|| "mutated_address"),
+            &op_data.eth_address,
+            &cur.account.address,
+            &is_valid_first,
+        )?;
+
         Ok(tx_valid)
     }
 
     fn noop<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         op_data: &AllocatedOperationData<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
-        explicit_zero: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         assert_eq!(
             pubdata_holder.len(),
@@ -1578,7 +1645,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             1,
         )?;
 
@@ -1592,14 +1659,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let fee_is_zero = AllocatedNum::equals(
             cs.namespace(|| "fee is zero for no-op"),
             &op_data.fee.get_number(),
-            &explicit_zero,
+            &global_variables.explicit_zero.get_number(),
         )?;
 
         is_valid_flags.push(Boolean::from(fee_is_zero));
 
         let is_noop = Boolean::from(Expression::equals(
             cs.namespace(|| "is_noop"),
-            &chunk_data.tx_type.get_number(),
+            &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(0), //noop tx_type
         )?);
         is_valid_flags.push(is_noop);
@@ -1616,7 +1683,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         cur: &mut AllocatedOperationBranch<E>,
         lhs: &AllocatedOperationBranch<E>,
         rhs: &AllocatedOperationBranch<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
@@ -1631,7 +1698,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         );
 
         let mut pubdata_bits = vec![];
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //8
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //8
         pubdata_bits.extend(lhs.account_id.get_bits_be()); //24
         pubdata_bits.extend(cur.token.get_bits_be()); //16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
@@ -1677,7 +1744,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             TransferToNewOp::CHUNKS,
         )?;
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -1691,14 +1758,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_transfer = Boolean::from(Expression::equals(
             cs.namespace(|| "is_transfer"),
-            &chunk_data.tx_type.get_number(),
+            &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(u64::from(TransferToNewOp::OP_CODE)),
         )?);
         lhs_valid_flags.push(is_transfer.clone());
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
         lhs_valid_flags.push(is_first_chunk.clone());
@@ -1749,7 +1816,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
-            &[is_signed_correctly, is_first_chunk.clone().not()],
+            &[is_signed_correctly, is_first_chunk.not()],
         )?;
         lhs_valid_flags.push(is_sig_correct);
 
@@ -1806,7 +1873,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_second_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_second_chunk"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::u64::<CS>(1),
         )?);
         rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
@@ -1856,7 +1923,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         cur: &mut AllocatedOperationBranch<E>,
         lhs: &AllocatedOperationBranch<E>,
         rhs: &AllocatedOperationBranch<E>,
-        chunk_data: &AllocatedChunkData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
@@ -1872,7 +1939,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct pubdata
         let mut pubdata_bits = vec![];
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
         pubdata_bits.extend(lhs.account_id.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
         pubdata_bits.extend(rhs.account_id.get_bits_be());
@@ -1897,7 +1964,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let mut serialized_tx_bits = vec![];
 
-        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
         serialized_tx_bits.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
         serialized_tx_bits.extend(rhs.account.address.get_bits_be());
@@ -1910,7 +1977,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             TransferOp::CHUNKS,
         )?;
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -1923,7 +1990,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_transfer = Boolean::from(Expression::equals(
             cs.namespace(|| "is_transfer"),
-            &chunk_data.tx_type.get_number(),
+            &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(u64::from(TransferOp::OP_CODE)), // transfer tx_type
         )?);
 
@@ -1934,7 +2001,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
 
@@ -2018,7 +2085,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_chunk_second = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
-            &chunk_data.chunk_number,
+            &global_variables.chunk_data.chunk_number,
             Expression::u64::<CS>(1),
         )?);
         rhs_valid_flags.push(is_chunk_second);
@@ -2047,6 +2114,248 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         Ok(correct)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn transfer_from<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        lhs: &AllocatedOperationBranch<E>,
+        rhs: &AllocatedOperationBranch<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        is_sig_verified: &Boolean,
+        is_valid_timestamp: &Boolean,
+        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+    ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        pubdata_bits.extend(lhs.account_id.get_bits_be());
+        pubdata_bits.extend(cur.token.get_bits_be());
+        pubdata_bits.extend(rhs.account_id.get_bits_be());
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+
+        resize_grow_only(
+            &mut pubdata_bits,
+            TransferFromOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        // construct signature message preimage (serialized_tx)
+
+        let mut serialized_tx_bits = vec![];
+
+        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(rhs.account_id.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(cur.token.get_bits_be());
+        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_FROM_BIT_WIDTH);
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &global_variables.chunk_data.chunk_number,
+            TransferFromOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_correct"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+
+        // verify correct tx_code
+
+        let is_transfer_from = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_transfer_from"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(TransferFromOp::OP_CODE)), // transfer tx_type
+        )?);
+
+        let mut lhs_valid_flags = vec![];
+
+        lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        lhs_valid_flags.push(is_transfer_from.clone());
+        lhs_valid_flags.push(is_valid_timestamp.clone());
+
+        let is_first_chunk = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &global_variables.chunk_data.chunk_number,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?);
+
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_first_chunk,
+            &is_equal_pubdata,
+        )?;
+
+        lhs_valid_flags.push(pubdata_properly_copied.clone());
+
+        lhs_valid_flags.push(is_first_chunk);
+
+        // check operation arguments
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+
+        lhs_valid_flags.push(is_a_correct);
+
+        let sum_amount_fee = Expression::from(&op_data.amount_unpacked.get_number())
+            + Expression::from(&op_data.fee.get_number());
+
+        let is_b_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            sum_amount_fee.clone(),
+        )?);
+
+        lhs_valid_flags.push(is_b_correct);
+        lhs_valid_flags.push(is_a_geq_b.clone());
+        lhs_valid_flags.push(is_sig_verified.clone());
+
+        let is_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            serialized_tx_bits,
+            &op_data,
+        )?;
+        lhs_valid_flags.push(is_serialized_tx_correct);
+
+        let is_lhs_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "lhs_signer_key_correct"),
+            &signer_key.pubkey.get_hash(),
+            &lhs.account.pub_key_hash,
+        )?;
+        lhs_valid_flags.push(is_lhs_signer_valid);
+
+        let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
+
+        let updated_balance = Expression::from(&cur.balance.get_number()) - sum_amount_fee;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance"),
+            updated_balance,
+            &cur.balance,
+            &lhs_valid,
+        )?;
+
+        // rhs
+        let mut rhs_valid_flags = vec![];
+        rhs_valid_flags.push(pubdata_properly_copied);
+        rhs_valid_flags.push(is_transfer_from);
+        rhs_valid_flags.push(is_valid_timestamp.clone());
+
+        let is_chunk_second = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_chunk_second"),
+            &global_variables.chunk_data.chunk_number,
+            Expression::u64::<CS>(1),
+        )?);
+        rhs_valid_flags.push(is_chunk_second);
+        rhs_valid_flags.push(is_account_empty.not());
+        rhs_valid_flags.push(is_pubdata_chunk_correct);
+
+        let is_rhs_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "rhs_signer_key_correct"),
+            &signer_key.pubkey.get_hash(),
+            &rhs.account.pub_key_hash,
+        )?;
+        rhs_valid_flags.push(is_rhs_signer_valid);
+
+        let is_transfer_from_self = CircuitElement::equals(
+            cs.namespace(|| "is_transfer_from_self"),
+            &lhs.account_id,
+            &rhs.account_id,
+        )?;
+        rhs_valid_flags.push(is_transfer_from_self.not());
+
+        let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
+
+        // calculate new rhs balance value
+        let updated_balance = Expression::from(&cur.balance.get_number())
+            + Expression::from(&op_data.amount_unpacked.get_number());
+
+        let updated_nonce =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
+
+        //update cur values if lhs is valid
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            updated_nonce,
+            &cur.account.nonce,
+            &is_rhs_valid,
+        )?;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated_balance rhs"),
+            updated_balance,
+            &cur.balance,
+            &is_rhs_valid,
+        )?;
+
+        // Either LHS or RHS are correct (due to chunking at least)
+        let correct = Boolean::xor(
+            cs.namespace(|| "lhs_valid XOR rhs_valid"),
+            &lhs_valid,
+            &is_rhs_valid,
+        )?;
+
+        Ok(correct)
+    }
+
+    fn verify_operation_timestamp<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        op_data: &AllocatedOperationData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        let is_valid_from_ok = CircuitElement::less_than(
+            cs.namespace(|| "valid_from less_than block_timestamp"),
+            &global_variables.block_timestamp,
+            &op_data.valid_from,
+        )?
+        .not();
+
+        let is_valid_until_ok = CircuitElement::less_than(
+            cs.namespace(|| "block_timestamp less_than valid_until"),
+            &op_data.valid_until,
+            &global_variables.block_timestamp,
+        )?
+        .not();
+
+        let is_valid_timestamp = Boolean::and(
+            cs.namespace(|| "is_valid_from_ok AND is_valid_until_ok"),
+            &is_valid_from_ok,
+            &is_valid_until_ok,
+        )?;
+
+        Ok(is_valid_timestamp)
     }
 }
 
@@ -2462,6 +2771,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     points.push(get_xy(TransferToNewOp::OP_CODE, TransferToNewOp::CHUNKS));
     points.push(get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS));
     points.push(get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS));
+    points.push(get_xy(TransferFromOp::OP_CODE, TransferFromOp::CHUNKS));
 
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);

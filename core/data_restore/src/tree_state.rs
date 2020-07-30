@@ -211,6 +211,38 @@ impl TreeState {
                         &mut ops,
                     );
                 }
+                FranklinOp::TransferFrom(mut op) => {
+                    let from = self
+                        .state
+                        .get_account(op.from)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                    let to = self
+                        .state
+                        .get_account(op.to)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                    op.tx.from = from.address;
+                    op.tx.to = to.address;
+                    op.tx.to_nonce = to.nonce;
+
+                    let tx = FranklinTx::TransferFrom(Box::new(op.tx.clone()));
+                    let (fee, updates) = self
+                        .state
+                        .apply_transfer_from_op(&op)
+                        .map_err(|e| format_err!("Transfer from fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::TransferFrom(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
                 FranklinOp::FullExit(op) => {
                     let priority_op = FranklinPriorityOp::FullExit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());
@@ -270,6 +302,7 @@ impl TreeState {
             ops_block.block_num,
             self.state.root_hash(),
             ops_block.fee_account,
+            ops_block.block_timestamp,
             ops,
             (
                 last_unprocessed_prior_op,
@@ -361,7 +394,7 @@ impl TreeState {
         }
         let block_index = current_op_block_index;
         let exec_result = ExecutedTx {
-            tx,
+            signed_tx: tx.into(),
             success: true,
             op: Some(executed_op),
             fail_reason: None,
@@ -421,6 +454,7 @@ mod test {
             block_num: 1,
             ops: ops1,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let tx2 = Withdraw::new(
@@ -444,6 +478,7 @@ mod test {
             block_num: 2,
             ops: ops2,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let tx3 = Transfer::new(
@@ -468,6 +503,7 @@ mod test {
             block_num: 3,
             ops: ops3,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let tx4 = Transfer::new(
@@ -492,6 +528,7 @@ mod test {
             block_num: 4,
             ops: ops4,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         // let tx5 = Close {
@@ -612,6 +649,7 @@ mod test {
             block_num: 1,
             ops,
             fee_account: 0,
+            block_timestamp: None,
         };
 
         let mut tree = TreeState::new(vec![50]);

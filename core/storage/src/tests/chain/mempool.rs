@@ -1,8 +1,10 @@
 // External imports
+use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
 use models::node::{
+    mempool::TxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
-    Address, FranklinTx,
+    Address, FranklinTx, SignedFranklinTx,
 };
 // Local imports
 use crate::tests::db_test;
@@ -14,8 +16,10 @@ use crate::{
     StorageProcessor,
 };
 
-/// Generates several different `FranlinTx` objects.
-fn franklin_txs() -> Vec<FranklinTx> {
+use crate::tests::chain::utils::get_eth_sing_data;
+
+/// Generates several different `SignedFranlinTx` objects.
+fn franklin_txs() -> Vec<SignedFranklinTx> {
     let transfer_1 = Transfer::new(
         42,
         Address::random(),
@@ -50,19 +54,62 @@ fn franklin_txs() -> Vec<FranklinTx> {
     );
 
     let change_pubkey = ChangePubKey {
-        account_id: 123,
         account: Address::random(),
         new_pk_hash: Default::default(),
         nonce: 13,
         eth_signature: None,
     };
 
-    vec![
+    let txs = [
         FranklinTx::Transfer(Box::new(transfer_1)),
         FranklinTx::Transfer(Box::new(transfer_2)),
         FranklinTx::Withdraw(Box::new(withdraw)),
         FranklinTx::ChangePubKey(Box::new(change_pubkey)),
-    ]
+    ];
+
+    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+    txs.iter()
+        .map(|tx| {
+            let test_message = format!("test message {}", rng.gen::<u32>());
+
+            SignedFranklinTx {
+                tx: tx.clone(),
+                eth_sign_data: Some(get_eth_sing_data(test_message)),
+            }
+        })
+        .collect()
+}
+
+/// Generates the required number of transfer transactions.
+fn gen_transfers(n: usize) -> Vec<SignedFranklinTx> {
+    (0..n)
+        .map(|id| {
+            let transfer = Transfer::new(
+                id as u32,
+                Address::random(),
+                Address::random(),
+                0,
+                100u32.into(),
+                10u32.into(),
+                10,
+                None,
+            );
+
+            SignedFranklinTx {
+                tx: FranklinTx::Transfer(Box::new(transfer)),
+                eth_sign_data: None,
+            }
+        })
+        .collect()
+}
+
+/// Gets a single transaction from a `TxVariant`. Panics if variant is a batch.
+fn unwrap_tx(tx: TxVariant) -> FranklinTx {
+    match tx {
+        TxVariant::Tx(tx) => tx.tx,
+        TxVariant::Batch(_) => panic!("Attempt to unwrap a single transaction from a batch"),
+    }
 }
 
 /// Checks the save&load routine for mempool schema.
@@ -75,7 +122,7 @@ fn store_load() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone())
                 .expect("Can't insert txs");
         }
 
@@ -84,8 +131,64 @@ fn store_load() {
         assert_eq!(txs_from_db.len(), txs.len());
 
         for (tx, tx_from_db) in txs.iter().zip(txs_from_db) {
-            assert_eq!(tx_from_db.hash(), tx.hash());
+            assert_eq!(unwrap_tx(tx_from_db).hash(), tx.hash());
         }
+
+        Ok(())
+    });
+}
+
+/// Checks the save&load routine for mempool schema.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn store_load_batch() {
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        // Insert several txs into the mempool schema.
+        let txs = gen_transfers(10);
+        let alone_txs_1 = &txs[0..2];
+        let batch_1 = &txs[2..4];
+        let batch_2 = &txs[4..6];
+        let alone_txs_2 = &txs[6..8];
+        let batch_3 = &txs[8..10];
+
+        let elements_count = alone_txs_1.len() + alone_txs_2.len() + 3; // Amount of alone txs + amount of batches.
+
+        for tx in alone_txs_1 {
+            MempoolSchema(&conn)
+                .insert_tx(tx)
+                .expect("Can't insert txs");
+        }
+
+        MempoolSchema(&conn)
+            .insert_batch(batch_1)
+            .expect("Can't insert txs");
+
+        MempoolSchema(&conn)
+            .insert_batch(batch_2)
+            .expect("Can't insert txs");
+
+        for tx in alone_txs_2 {
+            MempoolSchema(&conn)
+                .insert_tx(tx)
+                .expect("Can't insert txs");
+        }
+
+        MempoolSchema(&conn)
+            .insert_batch(batch_3)
+            .expect("Can't insert txs");
+
+        // Load the txs and check that they match the expected list.
+        let txs_from_db = MempoolSchema(&conn).load_txs().expect("Can't load txs");
+        assert_eq!(txs_from_db.len(), elements_count);
+
+        assert!(matches!(txs_from_db[0], TxVariant::Tx(_)));
+        assert!(matches!(txs_from_db[1], TxVariant::Tx(_)));
+        assert!(matches!(txs_from_db[2], TxVariant::Batch(_)));
+        assert!(matches!(txs_from_db[3], TxVariant::Batch(_)));
+        assert!(matches!(txs_from_db[4], TxVariant::Tx(_)));
+        assert!(matches!(txs_from_db[5], TxVariant::Tx(_)));
+        assert!(matches!(txs_from_db[6], TxVariant::Batch(_)));
 
         Ok(())
     });
@@ -104,7 +207,7 @@ fn remove_txs() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone())
                 .expect("Can't insert txs");
         }
 
@@ -125,7 +228,7 @@ fn remove_txs() {
         assert_eq!(txs_from_db.len(), retained_hashes.len());
 
         for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
-            assert_eq!(*expected_hash, tx_from_db.hash());
+            assert_eq!(*expected_hash, unwrap_tx(tx_from_db).hash());
         }
 
         Ok(())
@@ -142,7 +245,7 @@ fn collect_garbage() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone())
                 .expect("Can't insert txs");
         }
 
@@ -160,6 +263,7 @@ fn collect_garbage() {
             primary_account_address: Default::default(),
             nonce: Default::default(),
             created_at: chrono::Utc::now(),
+            eth_sign_data: None,
         };
         OperationsSchema(&conn).store_executed_operation(executed_tx)?;
 
@@ -175,7 +279,7 @@ fn collect_garbage() {
         assert_eq!(txs_from_db.len(), retained_hashes.len());
 
         for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
-            assert_eq!(*expected_hash, tx_from_db.hash());
+            assert_eq!(*expected_hash, unwrap_tx(tx_from_db).hash());
         }
 
         Ok(())

@@ -10,7 +10,7 @@ use log::info;
 use circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    TransferFromWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use models::params::CHUNK_BIT_WIDTH;
 use models::{
@@ -231,7 +231,7 @@ impl Maintainer {
                     .conn_pool
                     .access_storage()
                     .expect("failed to connect to db");
-                let pd = self.build_prover_data(&storage, &op)?;
+                let pd = self.build_prover_block_data(&storage, &op)?;
                 // Always build prover data to update circuit tree to the next block, but store only
                 // if there is no proof for the block.
                 if !has_proof {
@@ -253,13 +253,17 @@ impl Maintainer {
         Ok(())
     }
 
-    fn build_prover_data(
+    fn build_prover_block_data(
         &mut self,
         storage: &storage::StorageProcessor,
         commit_operation: &models::Operation,
     ) -> Result<ProverData, String> {
         let block_number = commit_operation.block.block_number;
         let block_size = commit_operation.block.block_chunks_size;
+        let block_timestamp = commit_operation
+            .block
+            .block_timestamp
+            .expect("timestamp of the block must be known at this time");
 
         info!("building prover data for block {}", &block_number);
 
@@ -267,6 +271,7 @@ impl Maintainer {
             &mut self.account_tree,
             commit_operation.block.fee_account,
             block_number,
+            block_timestamp,
         );
 
         let ops = storage
@@ -318,6 +323,22 @@ impl Maintainer {
                         amount: transfer_to_new.tx.fee,
                     });
                     pub_data.extend(transfer_to_new_witness.get_pubdata());
+                }
+                FranklinOp::TransferFrom(transfer_from) => {
+                    let transfer_from_witness = TransferFromWitness::apply_tx(
+                        &mut witness_accum.account_tree,
+                        &transfer_from,
+                    );
+
+                    let input = SigDataInput::from_transfer_from_op(&transfer_from)?;
+                    let transfer_operations = transfer_from_witness.calculate_operations(input);
+
+                    operations.extend(transfer_operations);
+                    fees.push(CollectedFee {
+                        token: transfer_from.tx.token,
+                        amount: transfer_from.tx.fee,
+                    });
+                    pub_data.extend(transfer_from_witness.get_pubdata());
                 }
                 FranklinOp::Withdraw(withdraw) => {
                     let withdraw_witness =
@@ -393,6 +414,7 @@ impl Maintainer {
             new_root: commit_operation.block.new_root_hash,
             validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
                 .expect("failed to parse"),
+            block_timestamp: witness_accum.block_timestamp,
             operations: witness_accum.operations,
             validator_balances: witness_accum.fee_account_balances.unwrap(),
             validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),

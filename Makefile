@@ -113,11 +113,6 @@ image-keybase:
 push-image-keybase: image-keybase
 	docker push "${KEYBASE_DOCKER_IMAGE}"
 
-# Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
-docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
-rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
-
-
 # Rust: main stuff
 
 server:
@@ -126,19 +121,11 @@ server:
 sandbox:
 	@cargo run --bin sandbox
 
-# See more more at https://github.com/emk/rust-musl-builder#caching-builds
-build-target: build-contracts
-	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/src /home/rust/.cargo/git /home/rust/.cargo/registry
-	$(rust-musl-builder) cargo build --release
+image-server: build-contracts
+	@DOCKER_BUILDKIT=1 docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
 
-clean-target:
-	$(rust-musl-builder) cargo clean
-
-image-server: build-target
-	@docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
-
-image-prover: build-target
-	@docker build -t "${PROVER_DOCKER_IMAGE}" -t "${PROVER_DOCKER_IMAGE_LATEST}"  -f ./docker/prover/Dockerfile .
+image-prover: build-contracts
+	@DOCKER_BUILDKIT=1 docker build -t "${PROVER_DOCKER_IMAGE}" -t "${PROVER_DOCKER_IMAGE_LATEST}"  -f ./docker/prover/Dockerfile .
 
 image-rust: image-server image-prover
 
@@ -289,7 +276,7 @@ dev-build-geth:
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
 
-image-dev-ticker: build-target
+image-dev-ticker:
 	@docker build -t "${DEV_TICKER_DOCKER_IMAGE}" -f ./docker/dev-ticker/Dockerfile .
 
 push-image-dev-ticker: image-dev-ticker

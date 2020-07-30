@@ -7,7 +7,7 @@ use num::BigUint;
 // Workspace deps
 use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
-    node::{Account, AccountId, AccountMap, Address, Engine, Fr},
+    node::{Account, AccountId, AccountMap, Address, BlockTimestamp, Engine, Fr},
 };
 use plasma::state::{CollectedFee, PlasmaState};
 use testkit::zksync_account::ZksyncAccount;
@@ -18,6 +18,9 @@ use crate::{circuit::FranklinCircuit, witness::Witness};
 pub use crate::witness::utils::WitnessBuilder;
 
 pub const FEE_ACCOUNT_ID: u32 = 0;
+
+/// Constant timestamp used in test blocks
+pub const TEST_BLOCK_TIMESTAMP: BlockTimestamp = BlockTimestamp(1_595_945_009); // 2020-07-28T14:03:29
 
 /// Verifies that circuit has no unsatisfied constraints, and returns an error otherwise.
 pub fn check_circuit_non_panicking(circuit: FranklinCircuit<Engine>) -> Result<(), String> {
@@ -131,7 +134,12 @@ pub fn generic_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        TEST_BLOCK_TIMESTAMP,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -176,7 +184,12 @@ pub fn corrupted_input_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        TEST_BLOCK_TIMESTAMP,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -230,7 +243,12 @@ pub fn incorrect_op_test_scenario<W, F>(
 {
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        TEST_BLOCK_TIMESTAMP,
+    );
 
     // Collect fees without actually applying the tx on plasma
     let fees = collect_fees();

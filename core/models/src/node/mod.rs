@@ -1,7 +1,7 @@
 use super::merkle_tree::{RescueHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, unpack_float};
-use crate::franklin_crypto::bellman::pairing::bn256;
+use crate::franklin_crypto::bellman::pairing::{bn256, ff::PrimeField};
 use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
     jubjub::{FixedGenerators, JubjubEngine},
@@ -11,22 +11,25 @@ use num::{BigUint, FromPrimitive};
 pub mod account;
 pub mod block;
 pub mod config;
+pub mod mempool;
 pub mod operations;
 pub mod priority_ops;
 pub mod tokens;
 pub mod tx;
 
+use failure::format_err;
 pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{
-    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferFromOp, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
-pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
+pub use self::tx::{Close, FranklinTx, SignedFranklinTx, Transfer, TransferFrom, Withdraw};
+use std::time::SystemTime;
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
@@ -57,6 +60,40 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
     updates.reverse();
     for (_, acc_upd) in updates.iter_mut() {
         *acc_upd = acc_upd.reversed_update();
+    }
+}
+
+/// This type is supposed to hold a POSIX timestamp
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct BlockTimestamp(pub u64);
+
+impl std::ops::Deref for BlockTimestamp {
+    type Target = u64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<u64> for BlockTimestamp {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl BlockTimestamp {
+    pub fn now() -> Self {
+        Self(
+            SystemTime::UNIX_EPOCH
+                .elapsed()
+                .expect("failed to get timestamp")
+                .as_secs(),
+        )
+    }
+
+    pub fn into_fr(self) -> Result<Fr, failure::Error> {
+        Fr::from_str(&self.to_string())
+            .ok_or_else(|| format_err!("Unable to convert block timestamp to Fr"))
     }
 }
 
