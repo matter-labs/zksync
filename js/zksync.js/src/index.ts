@@ -1,4 +1,4 @@
-import { Wallet } from "./wallet";
+import { Wallet, Transaction } from "./wallet";
 import { Provider, ETHProxy, getDefaultProvider } from "./provider";
 import { Signer } from "./signer";
 import {
@@ -12,6 +12,7 @@ import * as crypto from "./crypto";
 
 export {
     Wallet,
+    Transaction,
     Signer,
     Provider,
     ETHProxy,
