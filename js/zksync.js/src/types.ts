@@ -166,3 +166,9 @@ export interface Fee {
     // Total fee amount (in wei)
     totalFee: utils.BigNumber;
 }
+
+export interface SubscriptionTx {
+    transferToSub: TransferFrom;
+    burnTx: Transfer;
+    butnTxEthSignature: TxEthSignature;
+}
