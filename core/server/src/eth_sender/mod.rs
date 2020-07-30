@@ -348,6 +348,20 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                                 // Complete pending withdrawals per each verify.
                                 self.add_complete_withdrawals_to_queue();
                             }
+
+                            let hash = current_op
+                                .used_tx_hashes
+                                .last()
+                                .expect("There must be at least one tx hash");
+                            self.db
+                                .confirm_multiblock_operation(
+                                    verify_multiblock_info.block_from as i64,
+                                    verify_multiblock_info.block_to as i64,
+                                    &hash,
+                                    current_op.encoded_tx_data.clone(),
+                                    current_op.nonce.as_u64() as i64,
+                                )
+                                .expect("Can't store operations in the database");
                         } else {
                             unreachable!("can't receive from eth non multiblock verify operation")
                         }

@@ -58,6 +58,16 @@ pub(super) trait DatabaseAccess {
     /// Marks an operation as completed in the database.
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error>;
 
+    /// Marks a multiblock proof operation as completed in the database.
+    fn confirm_multiblock_operation(
+        &self,
+        block_range_start: i64,
+        block_range_end: i64,
+        hash: &H256,
+        raw_tx: Vec<u8>,
+        nonce: i64,
+    ) -> Result<(), failure::Error>;
+
     /// Loads the stored Ethereum operations stats.
     fn load_stats(&self) -> Result<ETHStats, failure::Error>;
 
@@ -165,6 +175,28 @@ impl DatabaseAccess for Database {
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
         Ok(storage.ethereum_schema().confirm_eth_tx(hash)?)
+    }
+
+    fn confirm_multiblock_operation(
+        &self,
+        block_range_start: i64,
+        block_range_end: i64,
+        hash: &H256,
+        raw_tx: Vec<u8>,
+        nonce: i64,
+    ) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+
+        let op_ids = storage
+            .chain()
+            .operations_schema()
+            .load_verify_operations(block_range_start, block_range_end)?;
+
+        storage
+            .ethereum_schema()
+            .create_confirmed_eth_txs_range(raw_tx, nonce, hash, &op_ids)?;
+
+        Ok(())
     }
 
     fn load_stats(&self) -> Result<ETHStats, failure::Error> {
