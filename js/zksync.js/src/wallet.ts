@@ -394,7 +394,7 @@ export class Wallet {
             const subTx: SubscriptionTx = {
                 transferToSub: transferFrom, 
                 burnTx: burnTransfer.transfer,
-                butnTxEthSignature: burnTransfer.ethSignature
+                burnTxEthSignature: burnTransfer.ethSignature
             };
             subscriptionTxs.push(subTx);
         }
