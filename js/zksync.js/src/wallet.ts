@@ -992,7 +992,7 @@ class ETHOperation {
     }
 }
 
-class Transaction {
+export class Transaction {
     state: "Sent" | "Committed" | "Verified" | "Failed";
     error?: ZKSyncTxError;
 
