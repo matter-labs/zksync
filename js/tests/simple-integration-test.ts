@@ -429,6 +429,19 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Withdraw ok, Token: ${token}`);
 }
 
+async function checkChangePubKeyToEmptyAccount(contract: Contract, ethProxy: ETHProxy, syncWallet: Wallet) {
+    await testChangePubkeyOffchain(syncWallet);
+
+    await apitype.checkBlockResponseType(1);
+    const blocks = await apitype.checkBlocksResponseType();
+    for (const {block_number} of blocks.slice(-10)) {
+        await apitype.checkBlockTransactionsResponseType(block_number);
+    }
+    await apitype.checkTxHistoryResponseType(syncWallet.address());
+
+    console.log(`checkChangePubKeyToEmptyAccount ok`);
+}
+
 async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: Wallet) {
     const signedTransfer: types.Transfer = syncWallet1.signer.signSyncTransfer({
         accountId: await syncWallet1.getAccountId(),
@@ -544,11 +557,20 @@ function promiseTimeout(ms, promise) {
             syncProvider,
         );
 
+        const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({to: ethWallet4.address, value: parseEther("6.0")}));
+        const syncWallet4 = await Wallet.fromEthSigner(
+            ethWallet4,
+            syncProvider,
+        );
+
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
         apitype.deleteUnusedGenFiles();
         await apitype.checkStatusResponseType();
         await apitype.checkTestnetConfigResponseType();
+
+        await checkChangePubKeyToEmptyAccount(contract, ethProxy, syncWallet4);
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
