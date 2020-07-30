@@ -15,14 +15,11 @@ use crypto_exports::bellman::plonk::better_cs::{
 };
 use crypto_exports::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
 use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile};
-use crypto_exports::bellman::worker::Worker;
 use crypto_exports::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
 use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crypto_exports::franklin_crypto::rescue::rescue_transcript::RescueTranscriptForRNS;
 use crypto_exports::pairing::Engine as EngineTrait;
-use crypto_exports::recursive_aggregation_circuit::circuit::{
-    create_vks_tree, proof_recursive_aggregate_for_zksync,
-};
+use crypto_exports::recursive_aggregation_circuit::circuit::create_vks_tree;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fs::File;
@@ -63,15 +60,6 @@ impl PlonkVerificationKey {
         let (_, (vk_tree, _)) = create_vks_tree(&block_vks, RECURSIVE_CIRCUIT_VK_TREE_DEPTH)
             .expect("Failed to create vk tree");
         vk_tree.get_commitment()
-    }
-
-    pub fn verify(&self, proof: &EncodedProofPlonk) -> bool {
-        true
-        // let proof =
-        //     Proof::<Engine, PlonkCsWidth4WithNextStepParams>::read(proof.proof_binary.as_slice())
-        //         .unwrap();
-        // verify::<_, RollingKeccakTranscript<Fr>>(&proof, &self.0)
-        //     .expect("Failed to verify plonk proof")
     }
 }
 
@@ -334,6 +322,13 @@ pub fn get_universal_setup_monomial_form(
     } else {
         fs_utils::get_universal_setup_monomial_form(power_of_two)
     }
+}
+
+pub fn save_to_cache_universal_setup_monomial_form(
+    power_of_two: u32,
+    setup: Crs<Engine, CrsForMonomialForm>,
+) {
+    UNIVERSAL_SETUP_CACHE.put_setup_struct(power_of_two, setup);
 }
 
 /// Plonk prover may need to change keys on the fly to prove block of the smaller size

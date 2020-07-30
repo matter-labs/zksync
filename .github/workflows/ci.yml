@@ -40,8 +40,9 @@ jobs:
 #    - name: data-restore
 #      run: zksync data-restore check-existing
 
-    - name: integration-testkit
-      run: zksync integration-testkit
+#    TODO: #826
+#    - name: integration-testkit
+#      run: zksync integration-testkit
 
     - name: test-contracts
       run: zksync test-contracts

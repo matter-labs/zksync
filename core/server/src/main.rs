@@ -206,7 +206,6 @@ fn main() {
         config_opts.prover_server_address,
         prover_options.gone_timeout,
         prover_options.blocks_batch_timeout,
-        prover_options.max_block_batch_size,
         prover_options.prepare_data_interval,
         stop_signal_sender,
         observer_mode_final_state.circuit_acc_tree,

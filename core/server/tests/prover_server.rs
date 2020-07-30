@@ -21,7 +21,6 @@ use server::prover_server;
 fn spawn_server(
     prover_timeout: time::Duration,
     blocks_batch_timeout: time::Duration,
-    max_block_batch_size: usize,
     rounds_interval: time::Duration,
 ) -> String {
     // TODO: make single server spawn for all tests
@@ -36,7 +35,6 @@ fn spawn_server(
             addr,
             prover_timeout,
             blocks_batch_timeout,
-            max_block_batch_size,
             rounds_interval,
             tx,
             tree,
@@ -70,7 +68,6 @@ fn api_client_register_start_and_stop_of_prover() {
     let addr = spawn_server(
         time::Duration::from_secs(1),
         time::Duration::from_secs(1),
-        1,
         time::Duration::from_secs(1),
     );
     let client = client::ApiClient::new(
@@ -103,7 +100,6 @@ fn api_client_simple_simulation() {
     let addr = spawn_server(
         prover_timeout,
         time::Duration::from_secs(1),
-        1,
         rounds_interval,
     );
 
@@ -359,7 +355,6 @@ fn api_server_publish_dummy() {
     let addr = spawn_server(
         prover_timeout,
         time::Duration::from_secs(1),
-        1,
         rounds_interval,
     );
 

@@ -415,8 +415,11 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         // After storing all the tx data in the database, we can finally send the tx.
         info!(
-            "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
-            new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
+            "Sending new tx: [ETH Operation <id: {}, type: {}>. ETH tx: {}. ZKSync operation: {}]",
+            new_op.id,
+            new_op.op_type,
+            self.eth_tx_description(&signed_tx),
+            self.zksync_operation_description(&new_op),
         );
         self.ethereum.send_tx(&signed_tx).unwrap_or_else(|e| {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
