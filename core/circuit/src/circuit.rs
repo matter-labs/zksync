@@ -1087,7 +1087,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
-            &[is_signed_correctly, is_first_chunk.clone().not()],
+            &[is_signed_correctly, is_first_chunk.not()],
         )?;
         base_valid_flags.push(is_sig_correct);
 
@@ -1816,7 +1816,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
-            &[is_signed_correctly, is_first_chunk.clone().not()],
+            &[is_signed_correctly, is_first_chunk.not()],
         )?;
         lhs_valid_flags.push(is_sig_correct);
 

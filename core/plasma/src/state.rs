@@ -5,7 +5,9 @@ use models::node::operations::{
     TransferToNewOp, WithdrawOp,
 };
 use models::node::tx::ChangePubKey;
-use models::node::{Account, AccountTree, BlockTimestamp, FranklinPriorityOp, PubKeyHash};
+use models::node::{
+    Account, AccountTree, BlockTimestamp, FranklinPriorityOp, PubKeyHash, SignedFranklinTx,
+};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
@@ -120,7 +122,7 @@ impl PlasmaState {
         account
     }
 
-    pub fn chunks_for_batch(&self, txs: &[FranklinTx]) -> usize {
+    pub fn chunks_for_batch(&self, txs: &[SignedFranklinTx]) -> usize {
         txs.iter().map(|tx| self.chunks_for_tx(tx)).sum()
     }
 
@@ -145,13 +147,13 @@ impl PlasmaState {
         }
     }
 
-    pub fn execute_txs_batch(&mut self, txs: &[FranklinTx]) -> Vec<Result<OpSuccess, Error>> {
+    pub fn execute_txs_batch(&mut self, txs: &[SignedFranklinTx]) -> Vec<Result<OpSuccess, Error>> {
         let old_state = self.clone();
 
         let mut successes = Vec::new();
 
         for (id, tx) in txs.iter().enumerate() {
-            match self.execute_tx(tx.clone()) {
+            match self.execute_tx(tx.tx.clone()) {
                 Ok(success) => {
                     successes.push(Ok(success));
                 }

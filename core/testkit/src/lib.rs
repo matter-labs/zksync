@@ -12,7 +12,7 @@ use futures::{
 use models::config_options::ConfigurationOptions;
 use models::node::{
     Account, AccountId, AccountMap, Address, BlockTimestamp, DepositOp, FranklinTx, FullExitOp,
-    Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    Nonce, PriorityOp, SignedFranklinTx, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
@@ -749,6 +749,10 @@ impl TestSetup {
     }
 
     fn execute_tx(&mut self, tx: FranklinTx) {
+        let tx = SignedFranklinTx {
+            tx,
+            eth_sign_data: None,
+        };
         let block = ProposedBlock {
             priority_ops: Vec::new(),
             txs: vec![tx.into()],

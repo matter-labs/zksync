@@ -69,10 +69,25 @@ impl<'a> OperationsSchema<'a> {
         self.0.conn().transaction(|| {
             MempoolSchema(&self.0).remove_tx(&operation.tx_hash)?;
 
-            diesel::insert_into(executed_transactions::table)
-                .values(&operation)
-                .on_conflict_do_nothing()
-                .execute(self.0.conn())?;
+            if operation.success {
+                // If transaction succeed, it should replace the stored tx with the same hash.
+                // The situation when a duplicate tx is stored in the database may exist only if has
+                // failed previously.
+                // Possible scenario: user had no enough funds for transfer, then deposited some and
+                // sent the same transfer again.
+                diesel::insert_into(executed_transactions::table)
+                    .values(&operation)
+                    .on_conflict(executed_transactions::tx_hash)
+                    .do_update()
+                    .set(&operation)
+                    .execute(self.0.conn())?;
+            } else {
+                // If transaction failed, we do nothing on conflict.
+                diesel::insert_into(executed_transactions::table)
+                    .values(&operation)
+                    .on_conflict_do_nothing()
+                    .execute(self.0.conn())?;
+            };
             Ok(())
         })
     }

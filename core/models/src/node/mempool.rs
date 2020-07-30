@@ -1,27 +1,28 @@
-use super::{tx::TxHash, FranklinTx};
+use super::tx::TxHash;
+use crate::node::SignedFranklinTx;
 
 /// A collection of transactions that must be executed together.
 /// All the transactions in the batch must be included into the same block,
 /// and either succeed or fail all together.
 #[derive(Debug, Clone)]
-pub struct TxsBatch(pub Vec<FranklinTx>);
+pub struct TxsBatch(pub Vec<SignedFranklinTx>);
 
 /// A wrapper around possible atomic block elements: it can be either
 /// a single transaction, or the transactions batch.
 #[derive(Debug, Clone)]
 pub enum TxVariant {
-    Tx(FranklinTx),
+    Tx(SignedFranklinTx),
     Batch(TxsBatch),
 }
 
-impl From<FranklinTx> for TxVariant {
-    fn from(tx: FranklinTx) -> Self {
+impl From<SignedFranklinTx> for TxVariant {
+    fn from(tx: SignedFranklinTx) -> Self {
         Self::Tx(tx)
     }
 }
 
-impl From<Vec<FranklinTx>> for TxVariant {
-    fn from(txs: Vec<FranklinTx>) -> Self {
+impl From<Vec<SignedFranklinTx>> for TxVariant {
+    fn from(txs: Vec<SignedFranklinTx>) -> Self {
         let batch = TxsBatch(txs);
         Self::Batch(batch)
     }

@@ -46,7 +46,7 @@ impl RawTransaction {
         self.encode(&mut tx);
         tx.append(&sig.v);
         let r_start = find_first_nonzero(&sig.r);
-        let r = &sig.r.clone()[r_start..];
+        let r = &sig.r[r_start..];
         tx.append(&r);
         let s_start = find_first_nonzero(&sig.s);
         let s = &sig.s[s_start..];

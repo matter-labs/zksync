@@ -6,8 +6,8 @@ import {
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/ZkSync.json');
 import {ethers, utils, Contract} from "ethers";
-import {bigNumberify, parseEther} from "ethers/utils";
-import {IERC20_INTERFACE} from "zksync/src/utils";
+import {BigNumber, bigNumberify, parseEther} from "ethers/utils";
+import {IERC20_INTERFACE, sleep} from "zksync/src/utils";
 import {TokenLike} from "zksync/build/types";
 import * as apitype from "./api-type-validate";
 import * as assert from "assert";
@@ -123,7 +123,7 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
     }
 }
 
-async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber, timeoutBeforeReceipt = 0) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
     const fee = fullFee.totalFee;
 
@@ -138,6 +138,7 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
         fee
     });
     console.log(`Transfer posted: ${(new Date().getTime()) - startTime} ms`);
+    await sleep(timeoutBeforeReceipt);
     await transferToNewHandle.awaitReceipt();
     console.log(`Transfer committed: ${(new Date().getTime()) - startTime} ms`);
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
@@ -509,6 +510,32 @@ function promiseTimeout(ms, promise) {
   ])
 }
 
+async function checkFailedTransactionResending(contract: Contract, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
+    console.log('Checking invalid transaction resending');
+    const amount = utils.parseEther("0.2");
+
+    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
+    const fee = fullFee.totalFee;
+
+    await testAutoApprovedDeposit(depositWallet, syncWallet1, "ETH", amount.div(2).add(fee));
+    await testChangePubkeyOnchain(syncWallet1);
+    try {
+        await testTransfer(syncWallet1, syncWallet2, "ETH", amount);
+    } catch (e) {
+        assert(e.value.failReason == `Not enough balance`);
+        console.log('Transfer failed (expected)');
+    }
+
+    await testDeposit(depositWallet, syncWallet1, "ETH", amount.div(2));
+    // We should wait some `timeoutBeforeReceipt` to give server enough time
+    // to move our transaction with success flag from mempool to statekeeper
+    //
+    // If we won't wait enough, then we'll get the receipt for the previous, failed tx,
+    // which has the same hash. The new (successful) receipt will be available only
+    // when tx will be executed again in state keeper, so we must wait for it.
+    await testTransfer(syncWallet1, syncWallet2, "ETH", amount, 3000);
+}
+
 (async () => {
     try {
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
@@ -557,18 +584,26 @@ function promiseTimeout(ms, promise) {
             syncProvider,
         );
 
+        await testThrowingErrorOnTxFail(zksyncDepositorWallet);
+
+        apitype.deleteUnusedGenFiles();
+        await apitype.checkStatusResponseType();
+        await apitype.checkTestnetConfigResponseType();
+
+        // Check that transaction can be successfully executed after previous failure.
         const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: ethWallet4.address, value: parseEther("6.0")}));
         const syncWallet4 = await Wallet.fromEthSigner(
             ethWallet4,
             syncProvider,
         );
-
-        await testThrowingErrorOnTxFail(zksyncDepositorWallet);
-
-        apitype.deleteUnusedGenFiles();
-        await apitype.checkStatusResponseType();
-        await apitype.checkTestnetConfigResponseType();
+        const ethWallet5 = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({to: ethWallet5.address, value: parseEther("6.0")}));
+        const syncWallet5 = await Wallet.fromEthSigner(
+            ethWallet5,
+            syncProvider,
+        );
+        await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
 
         await checkChangePubKeyToEmptyAccount(contract, ethProxy, syncWallet4);
 

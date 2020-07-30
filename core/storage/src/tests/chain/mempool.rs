@@ -1,9 +1,10 @@
 // External imports
+use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
 use models::node::{
     mempool::TxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
-    Address, FranklinTx,
+    Address, FranklinTx, SignedFranklinTx,
 };
 // Local imports
 use crate::tests::db_test;
@@ -15,8 +16,10 @@ use crate::{
     StorageProcessor,
 };
 
-/// Generates several different `FranlinTx` objects.
-fn franklin_txs() -> Vec<FranklinTx> {
+use crate::tests::chain::utils::get_eth_sing_data;
+
+/// Generates several different `SignedFranlinTx` objects.
+fn franklin_txs() -> Vec<SignedFranklinTx> {
     let transfer_1 = Transfer::new(
         42,
         Address::random(),
@@ -57,16 +60,29 @@ fn franklin_txs() -> Vec<FranklinTx> {
         eth_signature: None,
     };
 
-    vec![
+    let txs = [
         FranklinTx::Transfer(Box::new(transfer_1)),
         FranklinTx::Transfer(Box::new(transfer_2)),
         FranklinTx::Withdraw(Box::new(withdraw)),
         FranklinTx::ChangePubKey(Box::new(change_pubkey)),
-    ]
+    ];
+
+    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+    txs.iter()
+        .map(|tx| {
+            let test_message = format!("test message {}", rng.gen::<u32>());
+
+            SignedFranklinTx {
+                tx: tx.clone(),
+                eth_sign_data: Some(get_eth_sing_data(test_message)),
+            }
+        })
+        .collect()
 }
 
 /// Generates the required number of transfer transactions.
-fn gen_transfers(n: usize) -> Vec<FranklinTx> {
+fn gen_transfers(n: usize) -> Vec<SignedFranklinTx> {
     (0..n)
         .map(|id| {
             let transfer = Transfer::new(
@@ -80,7 +96,10 @@ fn gen_transfers(n: usize) -> Vec<FranklinTx> {
                 None,
             );
 
-            FranklinTx::Transfer(Box::new(transfer))
+            SignedFranklinTx {
+                tx: FranklinTx::Transfer(Box::new(transfer)),
+                eth_sign_data: None,
+            }
         })
         .collect()
 }
@@ -88,7 +107,7 @@ fn gen_transfers(n: usize) -> Vec<FranklinTx> {
 /// Gets a single transaction from a `TxVariant`. Panics if variant is a batch.
 fn unwrap_tx(tx: TxVariant) -> FranklinTx {
     match tx {
-        TxVariant::Tx(tx) => tx,
+        TxVariant::Tx(tx) => tx.tx,
         TxVariant::Batch(_) => panic!("Attempt to unwrap a single transaction from a batch"),
     }
 }
@@ -103,7 +122,7 @@ fn store_load() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone())
                 .expect("Can't insert txs");
         }
 
@@ -188,7 +207,7 @@ fn remove_txs() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone())
                 .expect("Can't insert txs");
         }
 
@@ -226,7 +245,7 @@ fn collect_garbage() {
         let txs = franklin_txs();
         for tx in &txs {
             MempoolSchema(&conn)
-                .insert_tx(tx)
+                .insert_tx(&tx.clone())
                 .expect("Can't insert txs");
         }
 
@@ -244,6 +263,7 @@ fn collect_garbage() {
             primary_account_address: Default::default(),
             nonce: Default::default(),
             created_at: chrono::Utc::now(),
+            eth_sign_data: None,
         };
         OperationsSchema(&conn).store_executed_operation(executed_tx)?;
 

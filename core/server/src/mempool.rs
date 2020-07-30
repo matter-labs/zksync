@@ -26,8 +26,8 @@ use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace uses
 use models::node::{
     mempool::{TxVariant, TxsBatch},
-    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
-    TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
+    SignedFranklinTx, TransferOp, TransferToNewOp,
 };
 use storage::ConnectionPool;
 // Local uses
@@ -180,7 +180,7 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
-    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: SignedFranklinTx) -> Result<(), TxAddError> {
         // Correctness should be checked by `signature_checker`, thus
         // `tx.check_correctness()` is not invoked here.
 
@@ -214,7 +214,7 @@ struct Mempool {
 }
 
 impl Mempool {
-    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: VerifiedTx) -> Result<(), TxAddError> {
         let storage = self.db_pool.access_storage().map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -223,16 +223,16 @@ impl Mempool {
         storage
             .chain()
             .mempool_schema()
-            .insert_tx(&tx)
+            .insert_tx(tx.inner())
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
 
-        self.mempool_state.add_tx(tx)
+        self.mempool_state.add_tx(tx.into_inner())
     }
 
-    fn add_batch(&mut self, txs: Vec<FranklinTx>) -> Result<(), TxAddError> {
+    fn add_batch(&mut self, txs: Vec<SignedFranklinTx>) -> Result<(), TxAddError> {
         let storage = self.db_pool.access_storage().map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -260,7 +260,7 @@ impl Mempool {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(tx.into_inner());
+                    let tx_add_result = self.add_tx(*tx);
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::NewTxsBatch(txs, resp) => {
