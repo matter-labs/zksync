@@ -420,6 +420,75 @@ impl<'a> EthereumSchema<'a> {
         })
     }
 
+    /// Marks multiple operations as confirmed. Used when multiblock proof is confirmed.
+    pub fn create_confirmed_eth_txs_range(
+        &self,
+        raw_tx: Vec<u8>,
+        nonce: i64,
+        hash: &H256,
+        operation_ids: &[i64],
+    ) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            for op_id in operation_ids {
+                // Create and insert the operation.
+                let op_type = OperationType::Verify;
+                let operation = NewETHOperation {
+                    op_type: serde_json::to_value(op_type).unwrap(),
+                    nonce,
+                    last_deadline_block: 0,
+                    last_used_gas_price: num::BigUint::from(0u64).into(),
+                    raw_tx: raw_tx.clone(),
+                };
+
+                // Insert a new ETH operation.
+                let inserted_tx = insert_into(eth_operations::table)
+                    .values(&operation)
+                    .returning(eth_operations::id)
+                    .get_results(self.0.conn())?;
+                let eth_op_id = inserted_tx[0];
+
+                // Create a corresponding ETH hash table entry.
+                let hash_entry = NewETHTxHash {
+                    eth_op_id,
+                    tx_hash: hash.as_bytes().to_vec(),
+                };
+                let inserted_hashes_rows = insert_into(eth_tx_hashes::table)
+                    .values(&hash_entry)
+                    .execute(self.0.conn())?;
+                assert_eq!(
+                    inserted_hashes_rows, 1,
+                    "Wrong amount of updated rows (eth_tx_hashes)"
+                );
+
+                // Create a binding between ETH operation and zkSync operation.
+                let binding = NewETHBinding {
+                    op_id: *op_id,
+                    eth_op_id,
+                };
+
+                insert_into(eth_ops_binding::table)
+                    .values(&binding)
+                    .execute(self.0.conn())?;
+
+                // Set the ETH operation as confirmed.
+                update(eth_operations::table.filter(eth_operations::id.eq(eth_op_id)))
+                    .set((
+                        eth_operations::confirmed.eq(true),
+                        eth_operations::final_hash.eq(Some(hash.as_bytes().to_vec())),
+                    ))
+                    .execute(self.0.conn())?;
+
+                // Set the zkSync operation as confirmed.
+                update(operations::table.filter(operations::id.eq(*op_id)))
+                    .set(operations::confirmed.eq(true))
+                    .execute(self.0.conn())
+                    .map(drop)?;
+            }
+
+            Ok(())
+        })
+    }
+
     /// Obtains the next nonce to use and updates the corresponding entry in the database
     /// for the next invocation.
     ///
