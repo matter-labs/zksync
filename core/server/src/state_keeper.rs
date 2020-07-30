@@ -26,6 +26,7 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
+use models::node::SignedFranklinTx;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -316,7 +317,7 @@ impl PlasmaStateKeeper {
             for operation in pending_block.success_operations {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
-                        self.apply_tx(&tx.tx)
+                        self.apply_tx(tx.signed_tx.clone())
                             .expect("Tx from the restored pending block was not executed");
                         txs_count += 1;
                     }
@@ -479,7 +480,7 @@ impl PlasmaStateKeeper {
         while let Some(variant) = tx_queue.pop_front() {
             match &variant {
                 TxVariant::Tx(tx) => {
-                    match self.apply_tx(&tx) {
+                    match self.apply_tx(tx.clone()) {
                         Ok(exec_op) => {
                             executed_ops.push(exec_op);
                         }
@@ -563,7 +564,11 @@ impl PlasmaStateKeeper {
             executed_op,
         } = self.state.execute_priority_op(priority_op.data.clone());
 
-        self.pending_block.chunks_left -= chunks_needed;
+        self.pending_block.chunks_left = self
+            .pending_block
+            .chunks_left
+            .checked_sub(chunks_needed)
+            .expect("Underflow happened while subtracting checked value");
         self.pending_block.account_updates.append(&mut updates);
         if let Some(fee) = fee {
             let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
@@ -590,7 +595,7 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
-    fn apply_batch(&mut self, txs: &[FranklinTx]) -> Result<Vec<ExecutedOperations>, ()> {
+    fn apply_batch(&mut self, txs: &[SignedFranklinTx]) -> Result<Vec<ExecutedOperations>, ()> {
         let chunks_needed = self.state.chunks_for_batch(txs);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -599,10 +604,16 @@ impl PlasmaStateKeeper {
             return Err(());
         }
 
+        if let Some(current_timestamp) = self.pending_block.block_timestamp {
+            self.state.block_timestamp = current_timestamp;
+        } else {
+            self.state.block_timestamp = BlockTimestamp::now();
+        }
+
         for tx in txs {
             // Check if adding this transaction to the block won't make the contract operations
             // too expensive.
-            let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.clone());
+            let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.tx.clone());
             if let Ok(non_executed_op) = non_executed_op {
                 // We only care about successful conversions, since if conversion failed,
                 // then transaction will fail as well (as it shares the same code base).
@@ -618,7 +629,7 @@ impl PlasmaStateKeeper {
                 }
             }
 
-            if matches!(tx, FranklinTx::Withdraw(_)) {
+            if matches!(tx.tx, FranklinTx::Withdraw(_)) {
                 // Increase amount of the withdraw operations in this block.
                 self.pending_block.withdrawals_amount += 1;
             }
@@ -640,7 +651,11 @@ impl PlasmaStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
-                    self.pending_block.chunks_left -= chunks_needed;
+                    self.pending_block.chunks_left = self
+                        .pending_block
+                        .chunks_left
+                        .checked_sub(executed_op.chunks())
+                        .expect("Underflow happened while subtracting checked value");
                     self.pending_block.account_updates.append(&mut updates);
                     if let Some(fee) = fee {
                         let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
@@ -652,7 +667,7 @@ impl PlasmaStateKeeper {
                     self.pending_block.pending_op_block_index += 1;
 
                     let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
-                        tx: tx.clone(),
+                        signed_tx: tx.clone(),
                         success: true,
                         op: Some(executed_op),
                         fail_reason: None,
@@ -663,11 +678,15 @@ impl PlasmaStateKeeper {
                         .success_operations
                         .push(exec_result.clone());
                     executed_operations.push(exec_result);
+                    if self.pending_block.block_timestamp.is_none() {
+                        // We only set timestamp if transaction execution was successful
+                        self.pending_block.block_timestamp = Some(self.state.block_timestamp);
+                    }
                 }
                 Err(e) => {
                     warn!("Failed to execute transaction: {:?}, {}", tx, e);
                     let failed_tx = ExecutedTx {
-                        tx: tx.clone(),
+                        signed_tx: tx.clone(),
                         success: false,
                         op: None,
                         fail_reason: Some(e.to_string()),
@@ -684,23 +703,24 @@ impl PlasmaStateKeeper {
         Ok(executed_operations)
     }
 
-    fn apply_tx(&mut self, tx: &FranklinTx) -> Result<ExecutedOperations, ()> {
+    fn apply_tx(&mut self, tx: SignedFranklinTx) -> Result<ExecutedOperations, SignedFranklinTx> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
+
+        // If we can't add the tx to the block due to the size limit, we return this tx,
+        // seal the block and execute it again.
+        if self.pending_block.chunks_left < chunks_needed {
+            return Err(tx);
+        }
+
         if let Some(current_timestamp) = self.pending_block.block_timestamp {
             self.state.block_timestamp = current_timestamp;
         } else {
             self.state.block_timestamp = BlockTimestamp::now();
         }
 
-        // If we can't add the tx to the block due to the size limit, we return this tx,
-        // seal the block and execute it again.
-        if self.pending_block.chunks_left < chunks_needed {
-            return Err(());
-        }
-
         // Check if adding this transaction to the block won't make the contract operations
         // too expensive.
-        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.clone());
+        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.tx.clone());
         if let Ok(non_executed_op) = non_executed_op {
             // We only care about successful conversions, since if conversion failed,
             // then transaction will fail as well (as it shares the same code base).
@@ -712,11 +732,11 @@ impl PlasmaStateKeeper {
             {
                 // We've reached the gas limit, seal the block.
                 // This transaction will go into the next one.
-                return Err(());
+                return Err(tx);
             }
         }
 
-        if matches!(tx, FranklinTx::Withdraw(_)) {
+        if matches!(tx.tx, FranklinTx::Withdraw(_)) {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
         }
@@ -724,10 +744,10 @@ impl PlasmaStateKeeper {
         // Check if we've reached the withdraw operations amount limit.
         // If so, this block will be sealed and this tx will go to the next block.
         if self.pending_block.withdrawals_amount > MAX_WITHDRAWALS_PER_BLOCK {
-            return Err(());
+            return Err(tx);
         }
 
-        let tx_updates = self.state.execute_tx(tx.clone());
+        let tx_updates = self.state.execute_tx(tx.tx.clone());
 
         let exec_result = match tx_updates {
             Ok(OpSuccess {
@@ -735,7 +755,11 @@ impl PlasmaStateKeeper {
                 mut updates,
                 executed_op,
             }) => {
-                self.pending_block.chunks_left -= chunks_needed;
+                self.pending_block.chunks_left = self
+                    .pending_block
+                    .chunks_left
+                    .checked_sub(chunks_needed)
+                    .expect("Underflow happened while subtracting checked value");
                 self.pending_block.account_updates.append(&mut updates);
                 if let Some(fee) = fee {
                     let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
@@ -747,7 +771,7 @@ impl PlasmaStateKeeper {
                 self.pending_block.pending_op_block_index += 1;
 
                 let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
-                    tx: tx.clone(),
+                    signed_tx: tx,
                     success: true,
                     op: Some(executed_op),
                     fail_reason: None,
@@ -766,7 +790,7 @@ impl PlasmaStateKeeper {
             Err(e) => {
                 warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
-                    tx: tx.clone(),
+                    signed_tx: tx,
                     success: false,
                     op: None,
                     fail_reason: Some(e.to_string()),
@@ -897,14 +921,14 @@ impl PlasmaStateKeeper {
             ExecutedOpId::Transaction(hash) => {
                 for op in &self.pending_block.success_operations {
                     if let ExecutedOperations::Tx(exec_tx) = op {
-                        if exec_tx.tx.hash() == hash {
+                        if exec_tx.signed_tx.hash() == hash {
                             return Some((current_block_number, true, None));
                         }
                     }
                 }
 
                 for failed_tx in &self.pending_block.failed_txs {
-                    if failed_tx.tx.hash() == hash {
+                    if failed_tx.signed_tx.hash() == hash {
                         return Some((current_block_number, false, failed_tx.fail_reason.clone()));
                     }
                 }

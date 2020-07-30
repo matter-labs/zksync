@@ -234,6 +234,7 @@ fn main() {
         state_keeper_req_sender,
         ticker_request_receiver,
         &main_runtime,
+        config_opts.fee_ticker_enabled,
     );
 
     let task_futures = vec![

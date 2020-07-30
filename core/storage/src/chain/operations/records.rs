@@ -52,7 +52,7 @@ pub struct StoredExecutedPriorityOperation {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Debug, Clone, Insertable)]
+#[derive(Debug, Clone, Insertable, AsChangeset)]
 #[table_name = "executed_transactions"]
 pub struct NewExecutedTransaction {
     pub block_number: i64,
@@ -67,6 +67,7 @@ pub struct NewExecutedTransaction {
     pub primary_account_address: Vec<u8>,
     pub nonce: i64,
     pub created_at: DateTime<Utc>,
+    pub eth_sign_data: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -84,4 +85,5 @@ pub struct StoredExecutedTransaction {
     pub primary_account_address: Vec<u8>,
     pub nonce: i64,
     pub created_at: NaiveDateTime,
+    pub eth_sign_data: Option<serde_json::Value>,
 }

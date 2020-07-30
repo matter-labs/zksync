@@ -49,8 +49,7 @@ where
     let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
-    let _is_valid_signature =
-        pk.verify_musig_sha256(&message_bytes, &signature.clone(), p_g, params);
+    let _is_valid_signature = pk.verify_musig_sha256(&message_bytes, &signature, p_g, params);
 
     // TODO: handle the case where it is not valid
     // if !is_valid_signature {
@@ -83,7 +82,7 @@ where
     let pk = PublicKey::from_private(&private_key, p_g, jubjub_params);
     let _is_valid_signature = pk.verify_musig_rescue(
         &message_bytes,
-        &signature.clone(),
+        &signature,
         p_g,
         rescue_params,
         jubjub_params,
@@ -105,7 +104,7 @@ pub fn convert_signature_to_representation<E>(signature: Signature<E>) -> Signat
 where
     E: JubjubEngine,
 {
-    let (sig_x, sig_y) = signature.clone().r.into_xy();
+    let (sig_x, sig_y) = signature.r.into_xy();
     let mut signature_s_be_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
     signature_s_be_bits.reverse();
     resize_grow_only(
@@ -177,8 +176,7 @@ where
     let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
-    let is_valid_signature =
-        pk.verify_musig_sha256(&message_bytes, &signature.clone(), p_g, params);
+    let is_valid_signature = pk.verify_musig_sha256(&message_bytes, &signature, p_g, params);
     if !is_valid_signature {
         return None;
     }

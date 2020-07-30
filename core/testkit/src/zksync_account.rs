@@ -8,7 +8,7 @@ use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
     priv_key_from_fs, AccountId, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer,
-    Withdraw,
+    TransferFrom, Withdraw,
 };
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
@@ -140,6 +140,48 @@ impl ZksyncAccount {
         (transfer, eth_signature)
     }
 
+    /// Creates a signed `TransferToNew` operation.
+    ///
+    /// Notes:
+    /// - `valid_from` / `valid_until` are set to `0` / `u64::max()` correspondingly,
+    ///   meaning that tx is always valid.
+    /// - Ethereum signature is not generated, as it's not required for this operation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_transfer_from(
+        &self,
+        from: &ZksyncAccount,
+        token_id: TokenId,
+        amount: BigUint,
+        fee: BigUint,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> TransferFrom {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let transfer = TransferFrom::new_signed(
+            self.account_id
+                .lock()
+                .unwrap()
+                .expect("can't sign tx withoud account id"),
+            from.address,
+            self.address,
+            token_id,
+            amount,
+            fee,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            0,
+            u64::MAX,
+            &from.private_key,
+            &self.private_key,
+        )
+        .expect("Failed to sign transfer");
+
+        if increment_nonce {
+            *stored_nonce += 1;
+        }
+
+        transfer
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn sign_withdraw(
         &self,
@@ -202,25 +244,18 @@ impl ZksyncAccount {
         increment_nonce: bool,
         auth_onchain: bool,
     ) -> ChangePubKey {
-        let account_id = self
-            .account_id
-            .lock()
-            .unwrap()
-            .expect("can't sign tx withoud account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let nonce = nonce.unwrap_or_else(|| *stored_nonce);
         let eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes =
-                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                    .expect("Failed to construct change pubkey signed message.");
+            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash)
+                .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)
         };
         let change_pubkey = ChangePubKey {
-            account_id,
             account: self.address,
             new_pk_hash: self.pubkey_hash.clone(),
             nonce,

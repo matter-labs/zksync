@@ -55,7 +55,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
     function isReadyForUpgrade() external returns (bool) {
-        return !exodusMode && totalOpenPriorityRequests == 0;
+        return !exodusMode;
     }
 
     /// @notice Franklin contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -318,11 +318,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     // end of "BlockProcessor part"
     //
 
-    /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
-    function upgradePreparationLockStatus() public returns (bool) {
-        return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
-    }
-
     /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
@@ -421,8 +416,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         Operations.OpType _opType,
         bytes memory _pubData
     ) internal {
-        require(!upgradePreparationLockStatus(), "apr11"); // apr11 - priority request can't be added during lock period of preparation of upgrade
-
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 

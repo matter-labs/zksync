@@ -502,7 +502,7 @@ impl OperationNotifier {
         for tx in ops {
             match tx {
                 ExecutedOperations::Tx(tx) => {
-                    let hash = tx.tx.hash();
+                    let hash = tx.signed_tx.hash();
                     if let Some(subs) = self.tx_subs.remove(&(hash, action)) {
                         let rec = TransactionInfoResp {
                             executed: true,

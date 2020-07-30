@@ -86,14 +86,9 @@ There is three **phases of upgrade** which described in UpgradeGatekeeper:
 
 ## Current Franklin contract upgrade specification or "How notice period works"
 
-`UPGRADE_NOTICE_PERIOD` defined in Config.sol as 1 week.
+`UPGRADE_NOTICE_PERIOD` defined in Config.sol.
 
-`Franklin` decides that the upgrade can be completed if both of these conditions are met:
-1. exodus mode is not activated
-2. number of open priority requests equals to zero.
+`Franklin` decides that the upgrade can be completed if the next condition satisfied: exodus mode is not activated.
 
-The number of open priority requests should be equal to zero at the time when targets were changed because in this case contract can change its logic of processing priority operations and maintain the correctness of the processing already received priority operations and the data structure of the contract.
-
-To allow the governor to prepare `Franklin` for upgrading, there is a `preparation lock period` --- a period when the contract will not add new priority requests. This period starts from the notification from the gatekeeper about the start of preparation status of upgrade and ends when the upgrade finishes, or after `UPGRADE_PREPARATION_LOCK_PERIOD` seconds from its start.
-
-`UPGRADE_PREPARATION_LOCK_PERIOD` is defined in Config.sol as 1 day.
+`UPGRADE_NOTICE_PERIOD` calculates by the next **formula**:
+`UPGRADE_NOTICE_PERIOD = MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT`.

@@ -302,7 +302,7 @@ contract BlockProcessor is Storage, Config, Events {
                     if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
                         bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
 
-                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
+                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
                         bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
@@ -331,14 +331,12 @@ contract BlockProcessor is Storage, Config, Events {
     /// @param _newPkHash New pubkey hash
     /// @param _nonce Nonce used for message
     /// @param _ethAddress Account's ethereum address
-    /// @param _accountId Id of zkSync account
-    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) internal pure returns (bool) {
+    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n152",
+            "\x19Ethereum Signed Message:\n130",
             "Register zkSync pubkey:\n\n",
             Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)), "\n",
             "nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n",
-            "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
             "\n\n",
             "Only sign this message for a trusted client!"
         );
@@ -484,8 +482,8 @@ contract BlockProcessor is Storage, Config, Events {
     /// External function's to allow testing some of the internal functional
     ///
 
-    function externalTestVerifyChangePubkeySignature(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) external returns (bool) {
-        return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress, _accountId);
+    function externalTestVerifyChangePubkeySignature(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) external returns (bool) {
+        return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress);
     }
 
     function externalTestCollectOnchainOps(uint32 _blockNumber, bytes calldata _publicData, bytes calldata _ethWitness, uint32[] calldata _ethWitnessSizes)

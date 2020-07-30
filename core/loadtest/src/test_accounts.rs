@@ -8,7 +8,7 @@ use web3::transports::Http;
 // Workspace uses
 use models::{
     config_options::ConfigurationOptions,
-    node::{tx::PackedEthSignature, FranklinTx},
+    node::{tx::PackedEthSignature, FranklinTx, PrivateKey},
 };
 use testkit::{eth_account::EthereumAccount, zksync_account::ZksyncAccount};
 // Local uses
@@ -44,6 +44,29 @@ impl TestAccount {
                 eth_acc.address,
                 eth_acc.private_key,
             ),
+            eth_acc,
+            eth_nonce: Mutex::new(0),
+        }
+    }
+
+    pub fn from_info_and_private_key(
+        acc_info: &AccountInfo,
+        zksync_private_key: PrivateKey,
+        transport: &Http,
+        config: &ConfigurationOptions,
+    ) -> Self {
+        let addr = acc_info.address;
+        let pk = acc_info.private_key;
+        let eth_acc = EthereumAccount::new(
+            pk,
+            addr,
+            transport.clone(),
+            config.contract_eth_addr,
+            config.chain_id,
+            config.gas_price_factor,
+        );
+        Self {
+            zk_acc: ZksyncAccount::new(zksync_private_key, 0, eth_acc.address, eth_acc.private_key),
             eth_acc,
             eth_nonce: Mutex::new(0),
         }

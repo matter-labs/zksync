@@ -1,7 +1,10 @@
 // External imports
+
+use parity_crypto::publickey::{Generator, Random};
 use web3::types::Address;
 // Workspace imports
 use crypto_exports::rand::Rng;
+use models::node::tx::{EthSignData, PackedEthSignature, TxEthSignature};
 use models::{
     node::{
         block::{Block, ExecutedOperations},
@@ -10,6 +13,7 @@ use models::{
     Action, Operation,
 };
 use num::BigUint;
+use std::ops::Deref;
 // Local imports
 
 pub fn acc_create_random_updates<R: Rng>(
@@ -104,5 +108,18 @@ pub fn get_operation_with_txs(
             1_500_000.into(),
         ),
         accounts_updated,
+    }
+}
+
+/// Generates EthSignData for testing (not a valid signature)
+pub fn get_eth_sing_data(message: String) -> EthSignData {
+    let keypair = Random.generate();
+    let private_key = keypair.secret();
+
+    let signature = PackedEthSignature::sign(private_key.deref(), message.as_bytes()).unwrap();
+
+    EthSignData {
+        message,
+        signature: TxEthSignature::EthereumSignature(signature),
     }
 }

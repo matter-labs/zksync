@@ -245,7 +245,10 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
                     return;
                 }
                 Ok(ProverHeartbeat::WorkingOn(new_job)) => {
-                    log::info!("Starting sending heartbeats for job: {:?}", new_job);
+                    if new_job != ProverJob::default() {
+                        // Message with non-default job is sent once per job, so it won't be spammed all over the log.
+                        log::info!("Starting sending heartbeats for job: {:?}", new_job);
+                    }
                     // Update the current job
                     job = new_job;
                 }

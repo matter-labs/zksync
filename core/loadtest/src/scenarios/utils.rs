@@ -10,6 +10,8 @@ use num::BigUint;
 use rand::Rng;
 use tokio::time;
 use web3::types::U256;
+// Workspace deps
+use models::node::tx::TxHash;
 // Local deps
 use crate::{
     rpc_client::RpcClient, sent_transactions::SentTransactions, test_accounts::TestAccount,
@@ -66,6 +68,31 @@ pub async fn wait_for_deposit_executed(
     }
 
     Ok(serial_id)
+}
+
+/// Waits for tx to be committed.
+pub async fn wait_for_commit(
+    hash: TxHash,
+    timeout: Duration,
+    rpc_client: &RpcClient,
+) -> Result<(), failure::Error> {
+    let start = Instant::now();
+    let polling_interval = Duration::from_millis(250);
+    let mut timer = time::interval(polling_interval);
+
+    loop {
+        let state = rpc_client.tx_info(hash.clone()).await?;
+        if state.executed {
+            log::debug!("{} is committed", hash.to_string());
+            break;
+        }
+        if start.elapsed() > timeout {
+            failure::bail!("[wait_for_commit] Timeout")
+        }
+        timer.tick().await;
+    }
+
+    Ok(())
 }
 
 /// Waits for all the priority operations and transactions to become a part of some block and get verified.

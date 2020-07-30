@@ -28,7 +28,7 @@ pub use self::operations::{
 };
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
-pub use self::tx::{Close, FranklinTx, Transfer, TransferFrom, Withdraw};
+pub use self::tx::{Close, FranklinTx, SignedFranklinTx, Transfer, TransferFrom, Withdraw};
 use std::time::SystemTime;
 
 pub type Engine = bn256::Bn256;

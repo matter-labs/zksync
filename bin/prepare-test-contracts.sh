@@ -35,14 +35,14 @@ ssed 's/contract ZkSyncTest/contract ZkSyncTestUpgradeTarget/' -i $OUT_DIR/ZkSyn
 # In solidity constant should be in the following form.
 # $SOME_TYPE constant $NAME = $VALUE;
 set_constant() {
-	ssed -E "s/(.*constant $1)(.*)\;/\1 = $2\;/" -i $3
+	ssed -E "s/(.*constant $1 =)(.*)\;/\1 $2\;/" -i $3
 }
 create_constant_getter() {
-	ssed -E "s/    (.*) (constant $1)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external pure returns (\1) {\n        return $1\;\n    }/" -i $2
+	ssed -E "s/    (.*) (constant $1 =)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external pure returns (\1) {\n        return $1\;\n    }/" -i $2
 }
 
 # Change constants
-set_constant MAX_AMOUNT_OF_REGISTERED_TOKENS 4 $OUT_DIR/ConfigTest.sol
+set_constant MAX_AMOUNT_OF_REGISTERED_TOKENS 5 $OUT_DIR/ConfigTest.sol
 set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/ConfigTest.sol
 set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/ConfigTest.sol
 set_constant PRIORITY_EXPIRATION 101 $OUT_DIR/ConfigTest.sol
