@@ -5,7 +5,6 @@ authors = ["Matter Labs"]
 edition = "2018"
 
 [dependencies]
-# franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="plonk"}
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
-# franklin_crypto = { package = "franklin-crypto", path = "../../../franklin-crypto" }
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="plonk_gadgets", features = ["multicore"] }
+recursive_aggregation_circuit = { package = "recursive_aggregation_circuit", git = "https://github.com/matter-labs/recursive_aggregation_circuit.git" }
 rand = "0.4"

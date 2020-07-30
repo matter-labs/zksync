@@ -28,7 +28,6 @@ struct AppState {
     scaler_oracle: Arc<RwLock<ScalerOracle>>,
     prover_timeout: Duration,
     blocks_batch_timeout: Duration,
-    max_block_batch_size: usize,
 }
 
 impl AppState {
@@ -37,7 +36,6 @@ impl AppState {
         preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
         prover_timeout: Duration,
         blocks_batch_timeout: Duration,
-        max_block_batch_size: usize,
         idle_provers: u32,
     ) -> Self {
         let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(
@@ -51,7 +49,6 @@ impl AppState {
             scaler_oracle,
             prover_timeout,
             blocks_batch_timeout,
-            max_block_batch_size,
         }
     }
 
@@ -130,12 +127,7 @@ fn multiblock_to_prove(
     let storage = data.access_storage()?;
     let ret = storage
         .prover_schema()
-        .prover_multiblock_run(
-            &r.name,
-            data.prover_timeout,
-            data.blocks_batch_timeout,
-            data.max_block_batch_size,
-        )
+        .prover_multiblock_run(&r.name, data.prover_timeout, data.blocks_batch_timeout)
         .map_err(|e| {
             vlog::warn!("could not get next unverified block sequence: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
@@ -375,7 +367,7 @@ fn required_replicas(
     let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
 
     let needed_count = oracle
-        .provers_required(data.blocks_batch_timeout, data.max_block_batch_size)
+        .provers_required(data.blocks_batch_timeout)
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
     let response = RequiredReplicasOutput { needed_count };
@@ -389,7 +381,6 @@ pub fn start_prover_server(
     bind_to: net::SocketAddr,
     prover_timeout: time::Duration,
     blocks_batch_timeout: time::Duration,
-    max_block_batch_size: usize,
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
     account_tree: CircuitAccountTree,
@@ -422,7 +413,6 @@ pub fn start_prover_server(
                     data_pool.clone(),
                     prover_timeout,
                     blocks_batch_timeout,
-                    max_block_batch_size,
                     idle_provers,
                 );
 

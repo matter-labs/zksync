@@ -14,6 +14,7 @@ use crate::prover::records::{
     MultiproofBlockItem, NewMultiblockProof, ProverMultiblockRun, StoredMultiblockProof,
 };
 use crate::{chain::block::BlockSchema, StorageProcessor};
+use models::params::RECURSIVE_CIRCUIT_SIZES;
 
 pub mod records;
 
@@ -138,7 +139,6 @@ impl<'a> ProverSchema<'a> {
     pub fn multiblock_job_exists(
         &self,
         blocks_batch_timeout_: time::Duration,
-        max_block_batch_size_: usize,
     ) -> QueryResult<bool> {
         self
             .0
@@ -182,12 +182,12 @@ impl<'a> ProverSchema<'a> {
                 let blocks = diesel::sql_query(query).load::<MultiproofBlockItem>(self.0.conn())?;
                 if !blocks.is_empty() {
                     let mut batch_size = 1;
-                    while batch_size < max_block_batch_size_ && batch_size < blocks.len()
+                    while batch_size < 1 && batch_size < blocks.len()
                         && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
                         && !blocks[batch_size].multiblock_already_generated {
                         batch_size += 1;
                     }
-                    if batch_size == max_block_batch_size_ || blocks[0].blocks_batch_timeout_passed {
+                    if batch_size == 1 || blocks[0].blocks_batch_timeout_passed {
                         return Ok(true);
                     }
                 }
@@ -204,7 +204,6 @@ impl<'a> ProverSchema<'a> {
         worker_: &str,
         prover_timeout: time::Duration,
         blocks_batch_timeout_: time::Duration,
-        max_block_batch_size_: usize,
     ) -> QueryResult<Option<ProverMultiblockRun>> {
         // Select multiblock to prove.
         self
@@ -255,26 +254,44 @@ impl<'a> ProverSchema<'a> {
                 );
 
                 let blocks = diesel::sql_query(query).load::<MultiproofBlockItem>(self.0.conn())?;
-                if !blocks.is_empty() {
-                    let mut batch_size = 1;
-                    while batch_size < max_block_batch_size_ && batch_size < blocks.len()
-                        && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
-                        && !blocks[batch_size].multiblock_already_generated {
-                        batch_size += 1;
+
+                let mut available_jobs = Vec::new();
+                for (available_batch_size, _) in RECURSIVE_CIRCUIT_SIZES {
+                    let mut block_number_from_val = 0;
+                    let mut block_number_to_val = 0;
+                    if !blocks.is_empty() {
+                        let mut batch_size = 1;
+                        while batch_size < *available_batch_size && batch_size < blocks.len()
+                            && blocks[batch_size].block_number == blocks[batch_size - 1].block_number + 1
+                            && !blocks[batch_size].multiblock_already_generated {
+                            batch_size += 1;
+                        }
+                        if batch_size == *available_batch_size || blocks[0].blocks_batch_timeout_passed {
+                            block_number_from_val =  blocks[0].block_number;
+                            block_number_to_val = blocks[batch_size - 1].block_number;
+                        }
                     }
-                    if batch_size == max_block_batch_size_ || blocks[0].blocks_batch_timeout_passed {
+                    if *available_batch_size as i64 == (block_number_to_val - block_number_from_val + 1) {
+                        available_jobs.push((block_number_from_val, block_number_to_val, blocks[0].blocks_batch_timeout_passed));
+                    }
+                }
+
+                let max_batch_size = RECURSIVE_CIRCUIT_SIZES.last().unwrap().0;
+                if let Some((block_number_from_val, block_number_to_val, timeout))  = available_jobs.last() {
+                    if *timeout || (block_number_to_val - block_number_from_val + 1) == max_batch_size as i64 {
                         // we found a job for prover
                         use crate::schema::prover_multiblock_runs::dsl::*;
                         let inserted: ProverMultiblockRun = insert_into(prover_multiblock_runs)
                             .values(&vec![(
-                                block_number_from.eq(blocks[0].block_number),
-                                block_number_to.eq(blocks[batch_size - 1].block_number),
+                                block_number_from.eq(*block_number_from_val),
+                                block_number_to.eq(*block_number_to_val),
                                 worker.eq(worker_.to_string()),
                             )])
                             .get_result(self.0.conn())?;
                         return Ok(Some(inserted));
                     }
                 }
+
 
                 Ok(None)
             })

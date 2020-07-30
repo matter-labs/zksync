@@ -61,7 +61,7 @@ impl VerifyCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 528_434;
+    pub const BASE_COST: u64 = 828_434;
     pub const DEPOSIT_COST: u64 = 0;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;

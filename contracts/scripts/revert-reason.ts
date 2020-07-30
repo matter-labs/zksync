@@ -3,8 +3,8 @@ import {Interface} from "ethers/utils";
 import {readContractCode, readProductionContracts} from "../src.ts/deploy";
 const contracts = readProductionContracts();
 const franklinInterface = new Interface(contracts.zkSync.interface);
-const governanceInterface = new Interface(contracts.governance.interface);
-const verifierInterface = new Interface(contracts.governance.interface);
+const governanceInterface = new Interface(contracts.blockProcessor.interface);
+const verifierInterface = new Interface(contracts.verifier.interface);
 const deployFactoryInterface = new Interface(readContractCode("DeployFactory").interface);
 
 function hex_to_ascii(str1) {
@@ -33,6 +33,7 @@ async function reason() {
         const parsedTransaction = franklinInterface.parseTransaction({data: tx.data});
         if (parsedTransaction) {
             console.log("parsed tx: ", parsedTransaction);
+            console.log(parsedTransaction.args);
         } else {
             console.log("tx:", tx);
         }
@@ -66,7 +67,8 @@ async function reason() {
                 parsedLog = deployFactoryInterface.parseLog(log);
             }
             if (parsedLog) {
-                console.log(parsedLog);
+                console.log(parsedLog.name);
+                console.log(parsedLog.values);
             } else {
                 console.log(log);
             }

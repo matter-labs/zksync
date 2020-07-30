@@ -1,7 +1,26 @@
 use crate::{ApiClient, BabyProverError, ProverConfig, ProverHeartbeat, ProverImpl, ProverJob};
-use models::config_options::{get_env, parse_env};
-use models::prover_utils::EncodedProofPlonk;
+use crypto_exports::bellman::pairing::{CurveAffine, Engine as EngineTrait};
+use crypto_exports::bellman::plonk::better_better_cs::{setup::VerificationKey, verifier::verify};
+use crypto_exports::bellman::plonk::better_cs::{cs::PlonkCsWidth4WithNextStepParams, keys::Proof};
+use crypto_exports::bellman::worker::Worker;
+use crypto_exports::ff::ScalarEngine;
+use crypto_exports::recursive_aggregation_circuit::circuit::{
+    create_recursive_circuit_setup, create_zksync_recursive_aggregate,
+    proof_recursive_aggregate_for_zksync,
+};
+use models::config_options::{get_env, parse_env, AvailableBlockSizesConfig};
+use models::node::Engine;
+use models::params::{
+    RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_SIZES, RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
+};
+use models::primitives::serialize_fe_for_ethereum;
+use models::prover_utils::fs_utils::get_recursive_verification_key_path;
+use models::prover_utils::{
+    get_universal_setup_monomial_form, save_to_cache_universal_setup_monomial_form,
+    serialize_new_proof, EncodedProofPlonk,
+};
 use models::prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
+use std::fs::File;
 use std::sync::{mpsc, Mutex};
 use std::time::Duration;
 
@@ -22,12 +41,111 @@ pub struct PlonkStepByStepProver<C: ApiClient> {
 impl<C: ApiClient> PlonkStepByStepProver<C> {
     fn generate_multiblock_proof(
         &self,
-        _data: Vec<(EncodedProofPlonk, usize)>,
+        data: Vec<(EncodedProofPlonk, usize)>,
     ) -> Result<EncodedProofPlonk, BabyProverError> {
-        // TODO (AV)
-        let mut res = EncodedProofPlonk::default();
-        use models::node::U256;
-        res.proof[0] = U256::from(15);
+        let worker = Worker::new();
+
+        let block_sizes_config = AvailableBlockSizesConfig::from_env();
+        let all_vks = block_sizes_config
+            .blocks_chunks
+            .iter()
+            .map(|chunks| {
+                PlonkVerificationKey::read_verification_key_for_main_circuit(*chunks)
+                    .unwrap()
+                    .0
+            })
+            .collect::<Vec<_>>();
+        let mut proofs = Vec::new();
+        let mut vk_indexes = Vec::new();
+        for (proof, chunks) in data.clone() {
+            let proof = Proof::<Engine, PlonkCsWidth4WithNextStepParams>::read(
+                proof.proof_binary.as_slice(),
+            )
+            .expect("Failed to deserialize proof");
+            proofs.push(proof);
+            let idx = block_sizes_config
+                .blocks_chunks
+                .iter()
+                .position(|block_chunks| *block_chunks == chunks)
+                .expect("block size not found in available block sizes");
+            vk_indexes.push(idx);
+        }
+
+        let setup_power = RECURSIVE_CIRCUIT_SIZES
+            .iter()
+            .find_map(|(aggr_size, aggregate_setup_power)| {
+                if *aggr_size == proofs.len() {
+                    Some(*aggregate_setup_power)
+                } else {
+                    None
+                }
+            })
+            .expect("Aggregate cirucit of correct size not found");
+
+        let universal_setup =
+            get_universal_setup_monomial_form(setup_power, self.config.download_setup_from_network)
+                .expect("universal_setup");
+        let mut g2_bases = [<<Engine as EngineTrait>::G2Affine as CurveAffine>::zero(); 2];
+        g2_bases.copy_from_slice(&universal_setup.g2_monomial_bases.as_ref()[..]);
+        let aggregate = create_zksync_recursive_aggregate(
+            RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
+            RECURSIVE_CIRCUIT_NUM_INPUTS,
+            &all_vks,
+            &proofs,
+            &vk_indexes,
+            &g2_bases,
+        )
+        .expect("must create aggregate");
+        let aggr_limbs = aggregate
+            .limbed_aggregated_g1_elements
+            .iter()
+            .map(|l| serialize_fe_for_ethereum(l))
+            .collect::<Vec<_>>();
+
+        let setup = create_recursive_circuit_setup(
+            data.len(),
+            RECURSIVE_CIRCUIT_NUM_INPUTS,
+            RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
+        )
+        .expect("failed to create_recursive_circuit_vk_and_setup");
+
+        let vk_for_recursive_circuit = VerificationKey::read(
+            File::open(get_recursive_verification_key_path(proofs.len()))
+                .expect("recursive verification key not found"),
+        )
+        .expect("recursive verification key read fail");
+        let rec_aggr_proof = proof_recursive_aggregate_for_zksync(
+            RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
+            RECURSIVE_CIRCUIT_NUM_INPUTS,
+            &all_vks,
+            &proofs,
+            &vk_indexes,
+            &vk_for_recursive_circuit,
+            &setup,
+            &universal_setup,
+            true,
+            &worker,
+        )
+        .expect("must create aggregate");
+        save_to_cache_universal_setup_monomial_form(setup_power, universal_setup);
+
+        use crypto_exports::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
+        let is_valid = verify::<_, _, RollingKeccakTranscript<<Engine as ScalarEngine>::Fr>>(
+            &vk_for_recursive_circuit,
+            &rec_aggr_proof,
+            None,
+        )
+        .expect("must perform verification");
+        if !is_valid {
+            return Err(BabyProverError::Internal("Proof is invalid".to_string()));
+        }
+        let (inputs, proof) = serialize_new_proof(&rec_aggr_proof);
+        let res = EncodedProofPlonk {
+            inputs,
+            proof,
+            proof_binary: Vec::new(),
+            subproof_limbs: aggr_limbs,
+        };
         Ok(res)
     }
 }

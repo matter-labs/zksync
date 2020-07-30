@@ -25,7 +25,6 @@ impl ScalerOracle {
     pub fn provers_required(
         &mut self,
         blocks_batch_timeout: time::Duration,
-        max_block_batch_size: usize,
     ) -> Result<u32, failure::Error> {
         // Currently the logic of this method is very simple:
         // We require a prover for each pending block or IDLE_RROVERS amount if there are not so many
@@ -37,7 +36,7 @@ impl ScalerOracle {
 
         if storage
             .prover_schema()
-            .multiblock_job_exists(blocks_batch_timeout, max_block_batch_size)?
+            .multiblock_job_exists(blocks_batch_timeout)?
         {
             provers_required += 1;
         }

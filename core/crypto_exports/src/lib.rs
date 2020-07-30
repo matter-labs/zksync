@@ -3,3 +3,4 @@ pub use crate::franklin_crypto::bellman::pairing;
 pub use crate::franklin_crypto::bellman::pairing::ff;
 pub use franklin_crypto;
 pub use rand;
+pub use recursive_aggregation_circuit;
