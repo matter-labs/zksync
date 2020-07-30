@@ -896,7 +896,7 @@ function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
     return `Register zkSync pubkey:\n\n` +
            `${pubKeyHashHex}\n` +
            `nonce: 0x${msgNonce}\n` +
-           `account id: 0x${msgAccId}\n\n` +
+           `\n\n` +
            `Only sign this message for a trusted client!`;
 }
 ```

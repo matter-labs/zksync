@@ -508,7 +508,6 @@ impl ChangePubKeyOp {
 
         Ok(ChangePubKeyOp {
             tx: ChangePubKey {
-                account_id,
                 account,
                 new_pk_hash,
                 nonce,

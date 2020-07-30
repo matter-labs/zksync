@@ -51,7 +51,6 @@ fn franklin_txs() -> Vec<FranklinTx> {
     );
 
     let change_pubkey = ChangePubKey {
-        account_id: 123,
         account: Address::random(),
         new_pk_hash: Default::default(),
         nonce: 13,

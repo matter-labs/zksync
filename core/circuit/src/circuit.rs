@@ -896,6 +896,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "change_pubkey_offchain"),
             &mut cur,
             &global_variables,
+            is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
             &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
@@ -1437,9 +1438,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &is_valid_first,
         )?;
 
-        // update pub_key
+        // update address
         cur.account.address = CircuitElement::conditionally_select(
-            cs.namespace(|| "mutated_pubkey"),
+            cs.namespace(|| "mutated_address"),
             &op_data.eth_address,
             &cur.account.address,
             &is_valid_first,
@@ -1452,6 +1453,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
         global_variables: &CircuitGlobalVariables<E>,
+        is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
@@ -1531,10 +1533,16 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         is_valid_flags.push(is_change_pubkey_offchain);
 
         // verify if address is to previous one (if existed)
-        let is_address_correct = CircuitElement::equals(
-            cs.namespace(|| "is_address_correct"),
+        let is_address_equal_to_stored = CircuitElement::equals(
+            cs.namespace(|| "is_address_equal_to_stored"),
             &op_data.eth_address,
             &cur.account.address,
+        )?;
+
+        let is_address_correct = Boolean::xor(
+            cs.namespace(|| "addresses are same or account is empty"),
+            &is_address_equal_to_stored,
+            &is_account_empty,
         )?;
 
         is_valid_flags.push(is_address_correct);
@@ -1573,6 +1581,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "update cur nonce"),
             Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1),
             &cur.account.nonce,
+            &is_valid_first,
+        )?;
+
+        // update address
+        cur.account.address = CircuitElement::conditionally_select(
+            cs.namespace(|| "mutated_address"),
+            &op_data.eth_address,
+            &cur.account.address,
             &is_valid_first,
         )?;
 

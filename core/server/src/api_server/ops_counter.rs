@@ -14,7 +14,8 @@ use std::{
     time::{Duration, Instant},
 };
 // Workspace deps.
-use models::node::{tx::ChangePubKey, AccountId};
+use models::node::tx::ChangePubKey;
+use web3::types::Address;
 
 const ONE_DAY: Duration = Duration::from_secs(60 * 60 * 24);
 const MAX_OPS_PER_DAY: usize = 10;
@@ -29,7 +30,7 @@ const MAX_OPS_PER_DAY: usize = 10;
 #[derive(Debug, Clone)]
 pub struct ChangePubKeyOpsCounter {
     last_reset: Instant,
-    account_ops: HashMap<AccountId, usize>,
+    account_ops: HashMap<Address, usize>,
 }
 
 impl Default for ChangePubKeyOpsCounter {
@@ -58,7 +59,7 @@ impl ChangePubKeyOpsCounter {
         // Get the operations count for this account and check if it's beyond the limit.
         let account_ops_count = self
             .account_ops
-            .entry(tx.account_id)
+            .entry(tx.account)
             .and_modify(|e| *e += 1)
             .or_insert(1);
         if *account_ops_count > MAX_OPS_PER_DAY {
