@@ -22,7 +22,7 @@ impl CommitCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 180_000;
+    pub const BASE_COST: u64 = 400_000;
     pub const DEPOSIT_COST: u64 = 11_000;
     pub const CHANGE_PUBKEY_COST: u64 = 17_000;
     pub const TRANSFER_COST: u64 = 390;
