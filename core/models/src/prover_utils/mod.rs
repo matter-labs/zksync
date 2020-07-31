@@ -126,8 +126,8 @@ impl SetupForStepByStepProver {
         let rescue_params = Bn256RescueParams::new_checked_2_into_1();
 
         let transcript_params = (&rescue_params, &rns_params);
-        let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
-            circuit,
+        let may_be_proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
+            circuit.clone(),
             &self.hints,
             &self.setup_polynomials,
             None,
@@ -135,7 +135,24 @@ impl SetupForStepByStepProver {
                 .as_ref()
                 .expect("Setup should have universal setup struct"),
             Some(transcript_params),
-        )?;
+        );
+        if let Some(error) = may_be_proof.as_ref().err() {
+            // make test CS and find what is a problem
+
+            let mut cs = crypto_exports::franklin_crypto::circuit::test::TestConstraintSystem::<Engine>::new();
+            let err = circuit.synthesize(&mut cs);
+            if let Some(err) = err.err() {
+                return Err(failure::format_err!("Debugging test CS failed to synthesize for failed proof, error: {}", err));
+            }
+
+            if let Some(potentially_failed_constraint) = cs.which_is_unsatisfied() {
+                return Err(failure::format_err!("Error: {}. Test constraint system found failed constraint: {}", crypto_exports::bellman::SynthesisError::Unsatisfiable, potentially_failed_constraint));
+            }
+            
+            return Err(failure::format_err!("Proof was not generated, error: {}", error));
+        }
+
+        let proof = may_be_proof.expect("proof is made");
         let valid =
             verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         failure::ensure!(valid, "proof for block is invalid");
