@@ -138,6 +138,7 @@ pub struct ConfigurationOptions {
     pub max_miniblock_iterations: usize,
     /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
     pub max_miniblock_iterations_withdraw_block: usize,
+    pub fee_ticker_enabled: bool,
 }
 
 impl ConfigurationOptions {
@@ -183,6 +184,7 @@ impl ConfigurationOptions {
             idle_provers: parse_env("IDLE_PROVERS"),
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
             max_miniblock_iterations_withdraw_block,
+            fee_ticker_enabled: parse_env("FEE_TICKER_ENABLED"),
         }
     }
 }

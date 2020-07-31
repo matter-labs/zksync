@@ -366,13 +366,9 @@ export class TokenSet {
 
 export function getChangePubkeyMessage(
     pubKeyHash: PubKeyHash,
-    nonce: number,
-    accountId: number
+    nonce: number
 ): string {
     const msgNonce = serializeNonce(nonce)
-        .toString("hex")
-        .toLowerCase();
-    const msgAccId = serializeAccountId(accountId)
         .toString("hex")
         .toLowerCase();
     const pubKeyHashHex = pubKeyHash.replace("sync:", "").toLowerCase();
@@ -380,7 +376,7 @@ export function getChangePubkeyMessage(
         `Register zkSync pubkey:\n\n` +
         `${pubKeyHashHex}\n` +
         `nonce: 0x${msgNonce}\n` +
-        `account id: 0x${msgAccId}\n\n` +
+        `\n\n` +
         `Only sign this message for a trusted client!`;
     return message;
 }

@@ -417,9 +417,46 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
+    // Verifies block batch using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
+    pub async fn verify_blocks_batch(
+        &self,
+        blocks: &[Block],
+    ) -> Result<ETHExecResult, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "verifyBlocks",
+                (
+                    u64::from(
+                        blocks
+                            .first()
+                            .expect("blocks should contain at least one element")
+                            .block_number,
+                    ),
+                    u64::from(
+                        blocks
+                            .last()
+                            .expect("blocks should contain at least one element")
+                            .block_number,
+                    ),
+                    vec![U256::default(); 10],
+                    blocks
+                        .iter()
+                        .map(|block| block.get_withdrawals_data())
+                        .collect::<Vec<Vec<u8>>>(),
+                ),
+                Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
+            )
+            .await
+            .map_err(|e| format_err!("Verify blocks send err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
+    }
+
     // Completes pending withdrawals.
     pub async fn complete_withdrawals(&self) -> Result<ETHExecResult, failure::Error> {
-        let max_withdrawals_to_complete: u64 = 999;
+        let max_withdrawals_to_complete: u64 = 20;
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(

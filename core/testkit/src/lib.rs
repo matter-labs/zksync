@@ -12,7 +12,7 @@ use futures::{
 use models::config_options::ConfigurationOptions;
 use models::node::{
     Account, AccountId, AccountMap, Address, BlockTimestamp, DepositOp, FranklinTx, FullExitOp,
-    Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    Nonce, PriorityOp, SignedFranklinTx, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
@@ -609,7 +609,7 @@ pub struct ExpectedAccountState {
 
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
-/// and end with `execute_commit_and_verify_block()`
+/// and end with `execute_commit_and_verify_block()` (or `execute_commit_block()` for multiblock proving)
 /// with desired transactions in between.
 ///
 /// Transactions balance side effects are checked,
@@ -623,6 +623,10 @@ pub struct TestSetup {
     pub tokens: HashMap<TokenId, Address>,
 
     pub expected_changes_for_current_block: ExpectedAccountState,
+
+    pub current_block_batch: Vec<Block>,
+    /// will be empty in case of each block verifying
+    pub expected_changes_for_current_block_batch: ExpectedAccountState,
 
     pub commit_account: EthereumAccount<Http>,
 }
@@ -642,8 +646,10 @@ impl TestSetup {
             proposed_blocks_receiver: sk_channels.new_blocks,
             accounts,
             tokens,
-            expected_changes_for_current_block: ExpectedAccountState::default(),
+            expected_changes_for_current_block_batch: ExpectedAccountState::default(),
             commit_account,
+            current_block_batch: vec![],
+            expected_changes_for_current_block: ExpectedAccountState::default(),
         }
     }
 
@@ -655,6 +661,11 @@ impl TestSetup {
         self.expected_changes_for_current_block
             .eth_accounts_state
             .get(&(account, token))
+            .or_else(|| {
+                self.expected_changes_for_current_block_batch
+                    .eth_accounts_state
+                    .get(&(account, token))
+            })
             .cloned()
             .unwrap_or_else(|| self.get_eth_balance(account, token))
     }
@@ -673,6 +684,11 @@ impl TestSetup {
 
     pub fn start_block(&mut self) {
         self.expected_changes_for_current_block = ExpectedAccountState::default();
+    }
+
+    pub fn start_block_batch(&mut self) {
+        self.current_block_batch.clear();
+        self.expected_changes_for_current_block_batch = ExpectedAccountState::default();
     }
 
     pub fn execute_incorrect_tx(&mut self, tx: FranklinTx) {
@@ -733,6 +749,10 @@ impl TestSetup {
     }
 
     fn execute_tx(&mut self, tx: FranklinTx) {
+        let tx = SignedFranklinTx {
+            tx,
+            eth_sign_data: None,
+        };
         let block = ProposedBlock {
             priority_ops: Vec::new(),
             txs: vec![tx.into()],
@@ -1100,7 +1120,8 @@ impl TestSetup {
         block_on(self.commit_account.commit_block(block)).expect("block commit fail")
     }
 
-    /// Should not be used execept special cases(when we want to commit but don't want to verify block)
+    /// Should be used in special cases(when we want to commit but don't want to verify block)
+    /// Also will be used for verifying block batches
     pub fn execute_commit_block(&mut self) -> ETHExecResult {
         let block_sender = async {
             self.state_keeper_request_sender
@@ -1119,10 +1140,31 @@ impl TestSetup {
                 .as_secs(),
         ));
 
+        for (key, value) in self
+            .expected_changes_for_current_block
+            .eth_accounts_state
+            .clone()
+        {
+            self.expected_changes_for_current_block_batch
+                .eth_accounts_state
+                .insert(key, value);
+        }
+        for (key, value) in self
+            .expected_changes_for_current_block
+            .sync_accounts_state
+            .clone()
+        {
+            self.expected_changes_for_current_block_batch
+                .sync_accounts_state
+                .insert(key, value);
+        }
+
+        self.current_block_batch.push(new_block.block.clone());
+
         self.commit_block(&new_block.block)
     }
 
-    /// Analog of `execute_commit_block`, but uses defined block timestamp value
+    /// Should be used in blocktimestamp tests only.
     pub fn execute_commit_block_with_defined_timestamp(
         &mut self,
         block_timestamp: BlockTimestamp,
@@ -1218,6 +1260,62 @@ impl TestSetup {
             withdrawals_result,
             block_chunks,
         ))
+    }
+
+    pub fn execute_verify_blocks_batch(&mut self) -> Result<(), failure::Error> {
+        block_on(
+            self.commit_account
+                .verify_blocks_batch(&self.current_block_batch),
+        )
+        .expect("blocks batch verify send tx")
+        .expect_success();
+        for _ in 0..self.current_block_batch.len() {
+            block_on(self.commit_account.complete_withdrawals())
+                .expect("complete withdrawal send tx")
+                .expect_success();
+        }
+
+        let mut block_checks_failed = false;
+        for ((eth_account, token), expeted_balance) in &self
+            .expected_changes_for_current_block_batch
+            .eth_accounts_state
+        {
+            let real_balance = self.get_eth_balance(*eth_account, *token);
+            if expeted_balance != &real_balance {
+                println!("eth acc: {}, token: {}", eth_account.0, token);
+                println!("expected: {}", expeted_balance);
+                println!("real:     {}", real_balance);
+                block_checks_failed = true;
+            }
+        }
+
+        for ((zksync_account, token), balance) in &self
+            .expected_changes_for_current_block_batch
+            .sync_accounts_state
+        {
+            let real = self.get_zksync_balance(*zksync_account, *token);
+            let is_diff_valid = real.clone() - balance == BigUint::from(0u32);
+            if !is_diff_valid {
+                println!(
+                    "zksync acc {} diff {}, real: {}",
+                    zksync_account.0,
+                    real.clone() - balance,
+                    real.clone()
+                );
+                block_checks_failed = true;
+            }
+        }
+
+        if block_checks_failed {
+            bail!("Blocks batch checks failed")
+        }
+
+        for zk_id in 0..self.accounts.zksync_accounts.len() {
+            self.accounts.zksync_accounts[zk_id]
+                .set_account_id(self.get_zksync_account_id(ZKSyncAccountId(zk_id)));
+        }
+
+        Ok(())
     }
 
     pub fn get_zksync_account_committed_state(

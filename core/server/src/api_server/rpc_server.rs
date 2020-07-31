@@ -43,6 +43,7 @@ use crate::{
     },
 };
 use bigdecimal::BigDecimal;
+use models::node::tx::EthSignData;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -848,7 +849,7 @@ impl Rpc for RpcApp {
                 // We allow fee to be 5% off the required fee
                 let scaled_provided_fee =
                     provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
-                if required_fee.total_fee >= scaled_provided_fee {
+                if required_fee.total_fee > scaled_provided_fee {
                     vlog::warn!(
                         "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
                         required_fee, provided_fee, scaled_provided_fee, token
@@ -1133,7 +1134,10 @@ async fn verify_tx_info_message_signature(
             let signature =
                 signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
 
-            Some((signature, message_to_sign))
+            Some(EthSignData {
+                signature,
+                message: message_to_sign,
+            })
         }
         None => None,
     };

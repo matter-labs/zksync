@@ -12,7 +12,14 @@ where:
     status            get the status of the Dummy Prover (enabled/disabled)
     enable            enables the Dummy Prover support
     disable           disables the Dummy Prover support
-    ensure-disabled   checks that Dummy Prover is disabled and exits with code 1 otherwise'
+    ensure-disabled   checks that Dummy Prover is disabled and exits with code 1 otherwise
+
+`run` command can optionally accept the name of the prover instance, e.g.:
+
+$ zksync dummy-prover run prover-instance-2
+
+This will run a dummy prover with name "prover-instance-2"
+'
 
 if [ -z $ZKSYNC_ENV ];
 then 
@@ -21,6 +28,7 @@ then
 fi
 
 COMMAND=${1:-run}
+DUMMY_PROVER_NAME=${2:-'dummy-prover-instance'}
 
 function perform_redeployment {
     # Reset the database and redeploy contracts.
@@ -30,7 +38,7 @@ function perform_redeployment {
 }
 
 function run_dummy_prover {
-    cargo run --release --bin dummy_prover "dummy-prover-instance"
+    cargo run --release --bin dummy_prover $DUMMY_PROVER_NAME
     exit 0
 }
 

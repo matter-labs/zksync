@@ -17,6 +17,7 @@ pub(crate) mod configs;
 mod execution_tps;
 mod outgoing_tps;
 mod real_life;
+mod reddit;
 mod utils;
 
 pub type Scenario = Box<dyn Fn(ScenarioContext)>;
@@ -32,6 +33,8 @@ pub enum ScenarioType {
     RealLife,
     /// Run the API integration test scenario.
     ApiTest,
+    /// Run the Reddit demo scenario.
+    Reddit,
 }
 
 impl ScenarioType {
@@ -42,6 +45,7 @@ impl ScenarioType {
             Self::ExecutionTps => Box::new(execution_tps::run_scenario),
             Self::RealLife => Box::new(real_life::run_scenario),
             Self::ApiTest => Box::new(api_test::run_scenario),
+            Self::Reddit => Box::new(reddit::run_scenario),
         }
     }
 }
@@ -55,12 +59,13 @@ impl FromStr for ScenarioType {
             "execution" | "execution_tps" => Self::ExecutionTps,
             "reallife" | "real-life" | "real_life" => Self::RealLife,
             "apitest" | "api-test" | "api_test" => Self::ApiTest,
+            "reddit" => Self::Reddit,
             other => {
                 failure::bail!(
                     "Unknown scenario type '{}'. \
                      Available options are: \
                      'outgoing_tps', 'execution_tps', 'real_life', \
-                     'api_test'",
+                     'api_test', 'reddit'",
                     other
                 );
             }

@@ -5,7 +5,7 @@ use diesel::dsl::max;
 use diesel::prelude::*;
 use itertools::Itertools;
 // Workspace imports
-use models::node::{mempool::TxVariant, tx::TxHash, FranklinTx};
+use models::node::{mempool::TxVariant, tx::TxHash, SignedFranklinTx};
 // Local imports
 use self::records::{MempoolTx, NewMempoolTx};
 use crate::{schema::*, StorageProcessor};
@@ -38,9 +38,9 @@ impl<'a> MempoolSchema<'a> {
         let mut txs = VecDeque::new();
 
         for (batch_id, group) in grouped_txs.into_iter() {
-            let deserialized_txs: Vec<FranklinTx> = group
+            let deserialized_txs: Vec<SignedFranklinTx> = group
                 .map(|tx_data| serde_json::from_value(tx_data.tx).map_err(From::from))
-                .collect::<Result<Vec<FranklinTx>, failure::Error>>()?;
+                .collect::<Result<Vec<SignedFranklinTx>, failure::Error>>()?;
 
             match batch_id {
                 Some(_) => {
@@ -60,7 +60,7 @@ impl<'a> MempoolSchema<'a> {
     }
 
     /// Adds a new transactions batch to the mempool schema.
-    pub fn insert_batch(&self, txs: &[FranklinTx]) -> Result<(), failure::Error> {
+    pub fn insert_batch(&self, txs: &[SignedFranklinTx]) -> Result<(), failure::Error> {
         if txs.is_empty() {
             failure::bail!("Cannot insert an empty batch");
         }
@@ -85,6 +85,10 @@ impl<'a> MempoolSchema<'a> {
                         tx_hash,
                         tx,
                         batch_id: Some(batch_id),
+                        created_at: chrono::Utc::now(),
+                        eth_sign_data: tx_data.eth_sign_data.as_ref().map(|sd| {
+                            serde_json::to_value(sd).expect("failed to encode EthSignData")
+                        }),
                     }
                 })
                 .collect();
@@ -98,15 +102,20 @@ impl<'a> MempoolSchema<'a> {
     }
 
     /// Adds a new transaction to the mempool schema.
-    pub fn insert_tx(&self, tx_data: &FranklinTx) -> Result<(), failure::Error> {
-        let tx_hash = hex::encode(tx_data.hash().as_ref());
-        let tx = serde_json::to_value(tx_data)?;
+    pub fn insert_tx(&self, tx_data: &SignedFranklinTx) -> Result<(), failure::Error> {
+        let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
+        let tx = serde_json::to_value(&tx_data)?;
         let batch_id = None;
 
         let db_entry = NewMempoolTx {
             tx_hash,
             tx,
             batch_id,
+            created_at: chrono::Utc::now(),
+            eth_sign_data: tx_data
+                .eth_sign_data
+                .as_ref()
+                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData")),
         };
 
         diesel::insert_into(mempool_txs::table)

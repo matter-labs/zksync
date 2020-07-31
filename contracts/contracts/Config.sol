@@ -5,12 +5,6 @@ pragma solidity ^0.5.0;
 /// @author Matter Labs
 contract Config {
 
-    /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
-    uint constant UPGRADE_NOTICE_PERIOD = 1 days;
-
-    /// @notice Period after the start of preparation upgrade when contract wouldn't register new priority operations (in seconds)
-    uint constant UPGRADE_PREPARATION_LOCK_PERIOD = 1 days;
-
     /// @notice ERC20 token withdrawal gas limit, used only for complete withdrawals
     uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 250000;
 
@@ -64,9 +58,12 @@ contract Config {
     /// @notice ChangePubKey operation length
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 
+    /// @notice Expiration delta for priority request to be satisfied (in seconds)
+    /// NOTE: Priority expiration should be > (EXPECT_VERIFICATION_IN * BLOCK_PERIOD), otherwise incorrect block with priority op could not be reverted.
+    uint256 constant PRIORITY_EXPIRATION_PERIOD = 3 days;
+
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
-    /// NOTE: Priority expiration should be > EXPECT_VERIFICATION_IN, otherwise incorrect block with priority op could not be reverted.
-    uint256 constant PRIORITY_EXPIRATION = 6 days / BLOCK_PERIOD;
+    uint256 constant PRIORITY_EXPIRATION = PRIORITY_EXPIRATION_PERIOD / BLOCK_PERIOD;
 
     /// @notice Maximum number of priority request to clear during verifying the block
     /// @dev Cause deleting storage slots cost 5k gas per each slot it's unprofitable to clear too many slots
@@ -80,5 +77,15 @@ contract Config {
     /// @notice Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
     /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)
     uint constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 minutes;
+
+    /// @notice Reserved time for users to send full exit priority operation in case of an upgrade (in seconds)
+    uint constant MASS_FULL_EXIT_PERIOD = 3 days;
+
+    /// @notice Reserved time for users to withdraw funds from full exit priority operation in case of an upgrade (in seconds)
+    uint constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;
+
+    /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
+    // NOTE: we must reserve for users enough time to send full exit operation, wait maximum time for processing this operation and withdraw funds from it.
+    uint constant UPGRADE_NOTICE_PERIOD = MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
 
 }

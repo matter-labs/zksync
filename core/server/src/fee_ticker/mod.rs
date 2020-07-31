@@ -112,6 +112,7 @@ pub struct TickerConfig {
     zkp_cost_chunk_usd: Ratio<BigUint>,
     gas_cost_tx: HashMap<OutputFeeType, BigUint>, //wei
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
+    enabled: bool,
 }
 
 pub enum TickerRequest {
@@ -142,6 +143,7 @@ pub fn run_ticker_task(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
     runtime: &Runtime,
+    enabled: bool,
 ) -> JoinHandle<()> {
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
@@ -157,6 +159,7 @@ pub fn run_ticker_task(
         .into_iter()
         .collect(),
         tokens_risk_factors: HashMap::new(),
+        enabled,
     };
 
     let ticker_api = TickerApi::new(api_base_url, db_pool, eth_sender_request_sender);
@@ -236,6 +239,18 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
             }
             TxFeeTypes::TransferFrom => (OutputFeeType::TransferFrom, TransferFromOp::CHUNKS),
         };
+
+        // Check whether we should calculate the fee at all.
+        if !self.config.enabled {
+            return Ok(Fee::new(
+                fee_type,
+                Ratio::new(0u64.into(), 1u64.into()),
+                Ratio::new(0u64.into(), 1u64.into()),
+                0u64.into(),
+                0u64.into(),
+            ));
+        }
+
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
         let gas_tx_amount = self.config.gas_cost_tx.get(&fee_type).cloned().unwrap();
@@ -348,6 +363,7 @@ mod test {
                     t.risk_factor.map(|risk| (id, risk))
                 })
                 .collect(),
+            enabled: true,
         }
     }
 

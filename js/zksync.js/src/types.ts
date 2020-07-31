@@ -105,7 +105,6 @@ export interface Withdraw {
 
 export interface ChangePubKey {
     type: "ChangePubKey";
-    accountId: number;
     account: Address;
     newPkHash: PubKeyHash;
     nonce: number;
@@ -165,4 +164,10 @@ export interface Fee {
     zkpFee: utils.BigNumber;
     // Total fee amount (in wei)
     totalFee: utils.BigNumber;
+}
+
+export interface SubscriptionTx {
+    transferToSub: TransferFrom;
+    burnTx: Transfer;
+    burnTxEthSignature: TxEthSignature;
 }

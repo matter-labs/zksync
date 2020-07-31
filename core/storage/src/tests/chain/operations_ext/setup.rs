@@ -163,7 +163,7 @@ impl TransactionsHistoryTestSetup {
         }));
 
         let executed_transfer_to_new_op = ExecutedTx {
-            tx: transfer_to_new_op.try_get_tx().unwrap(),
+            signed_tx: transfer_to_new_op.try_get_tx().unwrap().into(),
             success: true,
             op: Some(transfer_to_new_op),
             fail_reason: None,
@@ -193,7 +193,7 @@ impl TransactionsHistoryTestSetup {
         }));
 
         let executed_transfer_op = ExecutedTx {
-            tx: transfer_op.try_get_tx().unwrap(),
+            signed_tx: transfer_op.try_get_tx().unwrap().into(),
             success: true,
             op: Some(transfer_op),
             fail_reason: None,
@@ -222,7 +222,7 @@ impl TransactionsHistoryTestSetup {
         }));
 
         let executed_withdraw_op = ExecutedTx {
-            tx: withdraw_op.try_get_tx().unwrap(),
+            signed_tx: withdraw_op.try_get_tx().unwrap().into(),
             success: true,
             op: Some(withdraw_op),
             fail_reason: None,
@@ -240,7 +240,7 @@ impl TransactionsHistoryTestSetup {
         }));
 
         let executed_close_op = ExecutedTx {
-            tx: close_op.try_get_tx().unwrap(),
+            signed_tx: close_op.try_get_tx().unwrap().into(),
             success: true,
             op: Some(close_op),
             fail_reason: None,
@@ -260,7 +260,7 @@ impl TransactionsHistoryTestSetup {
         }));
 
         let executed_change_pubkey_op = ExecutedTx {
-            tx: change_pubkey_op.try_get_tx().unwrap(),
+            signed_tx: change_pubkey_op.try_get_tx().unwrap().into(),
             success: true,
             op: Some(change_pubkey_op),
             fail_reason: None,
