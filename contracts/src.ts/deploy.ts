@@ -232,6 +232,8 @@ export class Deployer {
 
         console.log("Publishing sourcecode for ZkSyncTarget", this.addresses.ZkSyncTarget);
         await publishSourceCodeToEtherscan(this.addresses.ZkSyncTarget, "ZkSync", "");
+        console.log("Publishing sourcecode for BlockProcessorTarget", this.addresses.BlockProcessor);
+        await publishSourceCodeToEtherscan(this.addresses.BlockProcessor, "BlockProcessor", "");
         console.log("Publishing sourcecode for GovernanceTarget", this.addresses.GovernanceTarget);
         await publishSourceCodeToEtherscan(this.addresses.GovernanceTarget, "Governance", "");
         console.log("Publishing sourcecode for VerifierTarget", this.addresses.VerifierTarget);
