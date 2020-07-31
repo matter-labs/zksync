@@ -65,10 +65,12 @@ let syncProvider: Provider;
             "stateMutability": "nonpayable",
             "type": "function"
         }]
-        const erc20Mintable = new ethers.Contract(ERC20_ADDRESS, ABI, ethWallet);
-        const mintTx = await erc20Mintable.mint(ethWallet.address, depositAmount);
-        await mintTx.wait();
-        console.log("Mint successful");
+        if (network !== "localhost") {
+            const erc20Mintable = new ethers.Contract(ERC20_ADDRESS, ABI, ethWallet);
+            const mintTx = await erc20Mintable.mint(ethWallet.address, depositAmount);
+            await mintTx.wait();
+            console.log("Mint successful");
+        }
 
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
