@@ -89,3 +89,10 @@ pub struct MultiproofBlockItem {
     #[sql_type = "Bool"]
     pub multiblock_already_generated: bool,
 }
+
+#[derive(Debug, Clone, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
+#[table_name = "block_witness"]
+pub struct StorageBlockWitness {
+    pub block: i64,
+    pub witness: serde_json::Value,
+}

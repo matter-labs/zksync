@@ -136,6 +136,7 @@ pub struct ConfigurationOptions {
     /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
     pub max_miniblock_iterations_withdraw_block: usize,
     pub fee_ticker_enabled: bool,
+    pub witness_generators: usize,
 }
 
 impl ConfigurationOptions {
@@ -182,6 +183,11 @@ impl ConfigurationOptions {
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
             max_miniblock_iterations_withdraw_block,
             fee_ticker_enabled: parse_env("FEE_TICKER_ENABLED"),
+            witness_generators: if env::var("WITNESS_GENERATORS").is_ok() {
+                parse_env("WITNESS_GENERATORS")
+            } else {
+                8
+            },
         }
     }
 }
