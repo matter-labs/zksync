@@ -23,7 +23,7 @@ use std::{
 };
 // External deps
 use chrono::Utc;
-use futures::future::try_join_all;
+use futures::future::join_all;
 use num::BigUint;
 use tokio::fs;
 use web3::{
@@ -39,7 +39,7 @@ use models::node::{
 use testkit::zksync_account::ZksyncAccount;
 // Local deps
 use crate::{
-    rpc_client::RpcClient,
+    rpc_client::{JsonRpcRequest, RpcClient},
     scenarios::{
         configs::RedditConfig,
         utils::{deposit_single, wait_for_commit, wait_for_verify},
@@ -49,10 +49,13 @@ use crate::{
     test_accounts::TestAccount,
 };
 
-const N_ACCOUNTS: usize = 25_000;
+const N_ACCOUNTS: usize = 25_0;
 const COMMUNITY_NAME: &str = "TestCommunity";
 
 const REPORT_RATE: usize = 50; // How many iterations to execute quietly before reporting the execution state.
+
+// Since all the transactions are sent fully asynchronously, this interval has to be big.
+const COMMIT_WAIT_INTERVAL: Duration = Duration::from_secs(36000);
 
 #[derive(Debug)]
 struct ScenarioExecutor {
@@ -112,6 +115,8 @@ impl ScenarioExecutor {
         // TODO: Burn account should be deterministic, not random.
         let burn_account = ZksyncAccount::rand();
 
+        log::info!("Generating test accounts");
+
         // Generate random accounts to rotate funds within.
         let (accounts, subscription_accounts) = (0..N_ACCOUNTS)
             .map(|_| {
@@ -122,6 +127,8 @@ impl ScenarioExecutor {
                 (account, subscription_account)
             })
             .unzip();
+
+        log::info!("Generating test accounts completed");
 
         let verify_timeout = Duration::from_secs(config.block_timeout);
 
@@ -192,7 +199,7 @@ impl ScenarioExecutor {
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
     pub async fn run_test(&mut self) -> Result<(), failure::Error> {
-        const PARALLEL_JOBS: usize = 100;
+        const PARALLEL_JOBS: usize = 250;
         self.save_accounts().await;
 
         let total_start_time = Instant::now();
@@ -218,8 +225,20 @@ impl ScenarioExecutor {
                 .map(|account_id| self.one_account_run(account_id))
                 .collect();
 
-            try_join_all(account_futures).await?;
+            let results = join_all(account_futures).await;
+
+            for result in results {
+                if let Err(error) = result {
+                    log::error!("One account down. Error: {}", error);
+                }
+            }
         }
+
+        // for account_id in 0..N_ACCOUNTS {
+        //     if let Err(error) = self.one_account_run(account_id).await {
+        //         log::error!("One account down. Error: {}", error);
+        //     }
+        // }
 
         let run_duration = start_time.elapsed();
 
@@ -284,7 +303,7 @@ impl ScenarioExecutor {
 
             let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
 
-            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
+            wait_for_commit(tx_hash, COMMIT_WAIT_INTERVAL, &self.rpc_client).await?;
             log::info!("Genesis account initialized successfully");
         } else {
             log::info!(
@@ -306,118 +325,131 @@ impl ScenarioExecutor {
 
         // After the main wallet initialization, we have to initialize all the intermediate accounts
         // (both the main "user" accounts and subscription wallets).
-        self.initialize_accounts().await?;
+        // self.initialize_accounts().await?;
 
         Ok(())
     }
 
-    async fn initialize_accounts(&self) -> Result<(), failure::Error> {
-        log::info!("Initializing the Reddit accounts...");
-        self.initialize_accounts_batch(&self.accounts).await?;
-        log::info!("Initializing the subscription accounts...");
-        self.initialize_accounts_batch(&self.subscription_accounts)
-            .await?;
-        Ok(())
-    }
+    // async fn initialize_accounts(&self) -> Result<(), failure::Error> {
+    //     const PARALLEL_JOBS: usize = 250;
+    //     log::info!("Initializing the Reddit accounts...");
+    //     for account_id in (0..N_ACCOUNTS).step_by(PARALLEL_JOBS) {
+    //         let range_start = account_id;
+    //         let range_end = std::cmp::min(account_id + PARALLEL_JOBS, N_ACCOUNTS);
 
-    async fn initialize_accounts_batch(
-        &self,
-        accounts: &[ZksyncAccount],
-    ) -> Result<(), failure::Error> {
-        // 1. Send the `Transfer` with 0 amount to each account to initialize it.
-        let mut tx_hashes = Vec::new();
-        for (account_id, account) in accounts.iter().enumerate() {
-            let from_acc = &self.genesis_account.zk_acc;
-            let to_acc = account;
+    //         self.initialize_accounts_batch(&self.accounts[range_start..range_end])
+    //             .await?;
 
-            // A big transfer amount to cover the fees in transfers.
-            // Transfer amount is 100 MLTT (assuming that precision is 18 decimals).
-            let one_token = BigUint::from(1_000_000_000_000_000_000u64);
-            let transfer_amount = one_token * BigUint::from(100u64);
+    //         log::info!(
+    //             "Initialized {} / {} User accounts...",
+    //             range_end,
+    //             N_ACCOUNTS
+    //         );
+    //     }
 
-            let fee = self.transfer_fee(&to_acc).await;
-            let (transfer_tx, eth_sign) =
-                self.sign_transfer(from_acc, to_acc, transfer_amount, fee);
+    //     log::info!("Initializing the subscription accounts...");
+    //     for account_id in (0..N_ACCOUNTS).step_by(PARALLEL_JOBS) {
+    //         let range_start = account_id;
+    //         let range_end = std::cmp::min(account_id + PARALLEL_JOBS, N_ACCOUNTS);
 
-            let tx_hash = self.rpc_client.send_tx(transfer_tx, eth_sign).await?;
+    //         self.initialize_accounts_batch(&self.subscription_accounts[range_start..range_end])
+    //             .await?;
 
-            tx_hashes.push(tx_hash);
+    //         log::info!(
+    //             "Initialized {} / {} Subscription accounts...",
+    //             range_end,
+    //             N_ACCOUNTS
+    //         );
+    //     }
+    //     Ok(())
+    // }
 
-            let num_processed = account_id + 1;
-            if num_processed % REPORT_RATE == 0 {
-                log::info!(
-                    "Sent {} / {} initial transfers...",
-                    num_processed,
-                    N_ACCOUNTS
-                );
-            }
-        }
+    // async fn initialize_accounts_batch(
+    //     &self,
+    //     accounts: &[ZksyncAccount],
+    // ) -> Result<(), failure::Error> {
+    //     // 1. Initialize accounts using the `ChangePubKey` operation.
+    //     let mut tx_hashes = Vec::new();
+    //     for account in accounts {
+    //         let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
+    //             account.create_change_pubkey_tx(None, true, false),
+    //         ));
 
-        log::info!("All the initial transfers for current batch are sent");
+    //         let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
 
-        for (account_id, tx_hash) in tx_hashes.into_iter().enumerate() {
-            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
+    //         tx_hashes.push(tx_hash);
+    //     }
 
-            let num_processed = account_id + 1;
-            if num_processed % REPORT_RATE == 0 {
-                log::info!(
-                    "Committed {} / {} initial transfers...",
-                    num_processed,
-                    N_ACCOUNTS
-                );
-            }
-        }
+    //     // log::info!("All the ChangePubKey transactions for current batch are sent");
 
-        log::info!("All the initial transfers for current batch are committed");
+    //     // We have to wait for all the transactions to be committed, because otherwise accounts
+    //     // won't have an account ID.
+    //     for tx_hash in tx_hashes {
+    //         wait_for_commit(tx_hash, COMMIT_WAIT_INTERVAL, &self.rpc_client).await?;
+    //     }
 
-        // 2. Set the account ID and call the `ChangePubKey` to be able to work with account.
-        let mut tx_hashes = Vec::new();
-        for (account_id, account) in accounts.iter().enumerate() {
-            let resp = self
-                .rpc_client
-                .account_state_info(account.address)
-                .await
-                .expect("rpc error");
-            assert!(resp.id.is_some(), "Account ID is none for new account");
-            account.set_account_id(resp.id);
+    //     log::info!("ChangePubKey operations are committed");
 
-            let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
-                account.create_change_pubkey_tx(None, true, false),
-            ));
+    //     // 2. Send the `TransferFrom` from genesis to each account to cover fees.
+    //     let mut tx_hashes = Vec::new();
+    //     for account in accounts {
+    //         let resp = self
+    //             .rpc_client
+    //             .account_state_info(account.address)
+    //             .await
+    //             .expect("rpc error");
+    //         assert!(resp.id.is_some(), "Account ID is none for new account");
+    //         account.set_account_id(resp.id);
 
-            let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+    //         let from_acc = &self.genesis_account.zk_acc;
+    //         let to_acc = account;
 
-            tx_hashes.push(tx_hash);
+    //         // A big transfer amount to cover the fees in transfers.
+    //         // Transfer amount is 100 MLTT (assuming that precision is 18 decimals).
+    //         let one_token = BigUint::from(1_000_000_000_000_000_000u64);
+    //         let transfer_amount = one_token * BigUint::from(100u64);
 
-            let num_processed = account_id + 1;
-            if num_processed % REPORT_RATE == 0 {
-                log::info!(
-                    "Sent {} / {} ChangePubKey transactions...",
-                    num_processed,
-                    N_ACCOUNTS
-                );
-            }
-        }
+    //         let fee = self.transfer_from_fee(&to_acc).await;
+    //         let transfer_tx = self.sign_transfer_from(from_acc, to_acc, transfer_amount, fee)?;
 
-        log::info!("All the ChangePubKey transactions for current batch are sent");
+    //         let tx_hash = self.rpc_client.send_tx(transfer_tx, None).await?;
 
-        for (account_id, tx_hash) in tx_hashes.into_iter().enumerate() {
-            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
+    //         tx_hashes.push(tx_hash);
+    //     }
 
-            let num_processed = account_id + 1;
-            if num_processed % REPORT_RATE == 0 {
-                log::info!(
-                    "Committed {} / {} ChangePubKey transactions...",
-                    num_processed,
-                    N_ACCOUNTS
-                );
-            }
-        }
+    //     // log::info!("All the initial transfers for current batch are sent");
 
-        log::info!("All the ChangePubKey transactions for current batch are committed");
+    //     // We don't have to wait for all the transactions to be committed, only for the last one.
+    //     // Waiting for the last tx is essentially the same, but introduces less HTTP requests (which
+    //     // is important when request time is big).
+    //     // for (account_id, tx_hash) in tx_hashes.into_iter().enumerate() {
+    //     //     wait_for_commit(tx_hash, COMMIT_WAIT_INTERVAL, &self.rpc_client).await?;
 
-        Ok(())
-    }
+    //     //     let num_processed = account_id + 1;
+    //     //     if num_processed % REPORT_RATE == 0 {
+    //     //         log::info!(
+    //     //             "Committed {} / {} initial transfers...",
+    //     //             num_processed,
+    //     //             N_ACCOUNTS
+    //     //         );
+    //     //     }
+    //     // }
+    //     // log::info!("Waiting for all the init transactions to be committed");
+    //     wait_for_commit(
+    //         tx_hashes.last().unwrap().clone(),
+    //         COMMIT_WAIT_INTERVAL,
+    //         &self.rpc_client,
+    //     )
+    //     .await?;
+
+    //     log::info!("Transfers are committed");
+
+    //     // log::info!("All the initial transfers for current batch are committed");
+
+    //     // log::info!("All the ChangePubKey transactions for current batch are committed");
+
+    //     Ok(())
+    // }
 
     async fn one_account_run(&self, account_id: usize) -> Result<(), failure::Error> {
         const N_MINT_OPS: usize = 4;
@@ -429,31 +461,103 @@ impl ScenarioExecutor {
         let subscription_wallet = &self.subscription_accounts[account_id];
 
         let mut tx_hashes = Vec::new();
+        let mut requests = Vec::new();
+
+        // Create ChangePubKey for main account to init it.
+        let change_pubkey_tx =
+            FranklinTx::ChangePubKey(Box::new(account.create_change_pubkey_tx(None, true, false)));
+        let tx_hash_main = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+
+        // Create ChangePubKey for sub account to init it.
+        let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
+            subscription_wallet.create_change_pubkey_tx(None, true, false),
+        ));
+        let tx_hash_sub = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+
+        // Wait for both txs so we can set account IDs.
+        wait_for_commit(tx_hash_main, COMMIT_WAIT_INTERVAL, &self.rpc_client).await?;
+        wait_for_commit(tx_hash_sub, COMMIT_WAIT_INTERVAL, &self.rpc_client).await?;
+
+        // Set account ID of main account.
+        let resp = self
+            .rpc_client
+            .account_state_info(account.address)
+            .await
+            .expect("rpc error");
+        assert!(resp.id.is_some(), "Account ID is none for User account");
+        account.set_account_id(resp.id);
+
+        // Set account ID of sub account.
+        let resp = self
+            .rpc_client
+            .account_state_info(subscription_wallet.address)
+            .await
+            .expect("rpc error");
+        assert!(
+            resp.id.is_some(),
+            "Account ID is none for Subscription account"
+        );
+        subscription_wallet.set_account_id(resp.id);
+
+        let from_acc = &self.genesis_account.zk_acc;
+        let to_acc = account;
+
+        // A big transfer amount to cover the fees in transfers.
+        // Transfer amount is 100 MLTT (assuming that precision is 18 decimals).
+        let one_token = BigUint::from(1_000_000_000_000_000_000u64);
+        let transfer_amount = one_token * BigUint::from(100u64);
+
+        // Send money for fees to main account.
+        let fee = self.transfer_from_fee(&to_acc).await?;
+        let transfer_tx =
+            self.sign_transfer_from(from_acc, to_acc, transfer_amount.clone(), fee.clone());
+        let (_hash, req) = self
+            .rpc_client
+            .prepare_send_tx_request(transfer_tx, None)
+            .await;
+        requests.push(req);
+
+        // Send money for fees to sub account.
+        let transfer_tx =
+            self.sign_transfer_from(from_acc, subscription_wallet, transfer_amount, fee);
+        let (_hash, req) = self
+            .rpc_client
+            .prepare_send_tx_request(transfer_tx, None)
+            .await;
+        requests.push(req);
+
+        // let tx_hash = self.rpc_client.send_tx(transfer_tx, None).await?;
 
         for _ in 0..N_MINT_OPS {
-            let tx_hash = self.mint_tokens(account).await?;
+            let (tx_hash, req) = self.mint_tokens(account).await?;
             tx_hashes.push(tx_hash);
+            requests.push(req);
         }
 
         for _ in 0..N_SUBSCRIPTIONS {
-            let mut sub_tx_hashes = self.subscribe(account, subscription_wallet).await?;
+            let (mut sub_tx_hashes, req) = self.subscribe(account, subscription_wallet).await?;
             tx_hashes.append(&mut sub_tx_hashes);
+            requests.push(req);
         }
 
         for _ in 0..N_BURN_FUNDS_OPS {
-            let tx_hash = self.burn_funds(account).await?;
+            let (tx_hash, req) = self.burn_funds(account).await?;
             tx_hashes.push(tx_hash);
+            requests.push(req);
         }
 
         for _ in 0..N_TRANSFER_OPS {
-            let tx_hash = self.transfer_funds(account).await?;
+            let (tx_hash, req) = self.transfer_funds(account).await?;
             tx_hashes.push(tx_hash);
+            requests.push(req);
         }
 
+        self.rpc_client.post_batch(requests).await;
+
         // Now, once all the transactions from this account are sent, wait for every of them to be committed.
-        for tx_hash in tx_hashes {
-            wait_for_commit(tx_hash, Duration::from_secs(60), &self.rpc_client).await?;
-        }
+        // for tx_hash in tx_hashes {
+        //     wait_for_commit(tx_hash, COMMIT_WAIT_INTERVAL, &self.rpc_client).await?;
+        // }
 
         self.counter.fetch_add(1, Ordering::SeqCst);
         let total = self.counter.load(Ordering::SeqCst);
@@ -468,83 +572,95 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    async fn mint_tokens(&self, account: &ZksyncAccount) -> Result<TxHash, failure::Error> {
+    async fn mint_tokens(
+        &self,
+        account: &ZksyncAccount,
+    ) -> Result<(TxHash, JsonRpcRequest), failure::Error> {
         const MINT_SIZE: u64 = 100; // 100 tokens for everybody.
 
         // 1. Create a minting tx, signed by both participants.
         let from_acc = &self.genesis_account.zk_acc;
         let to_acc = account;
 
-        let fee = self.transfer_from_fee(&to_acc).await;
+        let fee = self.transfer_from_fee(&to_acc).await?;
         let mint_tx = self.sign_transfer_from(from_acc, to_acc, MINT_SIZE, fee);
 
         // 2. Send the tx.
-        let tx_hash = self.rpc_client.send_tx(mint_tx, None).await?;
+        let (tx_hash, request) = self.rpc_client.prepare_send_tx_request(mint_tx, None).await;
 
-        Ok(tx_hash)
+        Ok((tx_hash, request))
     }
 
     async fn subscribe(
         &self,
         account: &ZksyncAccount,
         subscription_wallet: &ZksyncAccount,
-    ) -> Result<Vec<TxHash>, failure::Error> {
+    ) -> Result<(Vec<TxHash>, JsonRpcRequest), failure::Error> {
         const SUBSCRIPTION_COST: u64 = 1;
 
         // 1. Create a TransferFrom tx.
         let from_acc = account;
         let to_acc = &subscription_wallet;
 
-        let fee = self.transfer_from_fee(&to_acc).await;
+        let fee = self.transfer_from_fee(&to_acc).await?;
         let transfer_from_tx = self.sign_transfer_from(from_acc, to_acc, SUBSCRIPTION_COST, fee);
 
         // 2. Create a Burn tx
         let from_acc = &subscription_wallet;
         let to_acc = &self.burn_account;
 
-        let fee = self.transfer_fee(&to_acc).await;
+        let fee = self.transfer_fee(&to_acc).await?;
         let (burn_tx, burn_eth_sign) = self.sign_transfer(from_acc, to_acc, SUBSCRIPTION_COST, fee);
 
         // 3. Send both txs in a bundle.
         let txs = vec![(transfer_from_tx, None), (burn_tx, burn_eth_sign)];
-        let tx_hashes = self.rpc_client.send_txs_batch(txs).await?;
+        let (tx_hashes, req) = self.rpc_client.prepare_send_txs_batch_request(txs).await;
 
-        Ok(tx_hashes)
+        Ok((tx_hashes, req))
     }
 
-    async fn burn_funds(&self, account: &ZksyncAccount) -> Result<TxHash, failure::Error> {
+    async fn burn_funds(
+        &self,
+        account: &ZksyncAccount,
+    ) -> Result<(TxHash, JsonRpcRequest), failure::Error> {
         const BURN_SIZE: u64 = 1; // Burn 1 token at a time.
 
         // 1. Create a minting tx, signed by both participants.
         let from_acc = account;
         let to_acc = &self.burn_account;
 
-        let fee = self.transfer_fee(&to_acc).await;
+        let fee = self.transfer_fee(&to_acc).await?;
         let (burn_tx, eth_sign) = self.sign_transfer(from_acc, to_acc, BURN_SIZE, fee);
 
         // 2. Send the tx.
-        let tx_hash = self.rpc_client.send_tx(burn_tx, eth_sign).await?;
+        let (tx_hash, req) = self
+            .rpc_client
+            .prepare_send_tx_request(burn_tx, eth_sign)
+            .await;
 
-        Ok(tx_hash)
+        Ok((tx_hash, req))
     }
 
-    async fn transfer_funds(&self, account: &ZksyncAccount) -> Result<TxHash, failure::Error> {
+    async fn transfer_funds(
+        &self,
+        account: &ZksyncAccount,
+    ) -> Result<(TxHash, JsonRpcRequest), failure::Error> {
         const TRANSFER_SIZE: u64 = 1; // Send 1 token.
 
         // 1. Create a transfer tx (to self for simplicity).
         let from_acc = account;
         let to_acc = account;
 
-        let fee = self.transfer_fee(account).await;
+        let fee = self.transfer_fee(account).await?;
         let (tx, eth_sign) = self.sign_transfer(from_acc, to_acc, TRANSFER_SIZE, fee);
 
         // 2. Send the tx.
-        let tx_hash = self
+        let (tx_hash, req) = self
             .rpc_client
-            .send_tx(tx.clone(), eth_sign.clone())
-            .await?;
+            .prepare_send_tx_request(tx.clone(), eth_sign.clone())
+            .await;
 
-        Ok(tx_hash)
+        Ok((tx_hash, req))
     }
 
     async fn finish(&mut self) -> Result<(), failure::Error> {
@@ -552,7 +668,9 @@ impl ScenarioExecutor {
         // verified. The verification will mean that (at least most of) the previously sent txs are verified as well.
         log::info!("Starting the finish phase of the test, sending one more transaction and waiting for it to be verified");
 
-        let tx_hash = self.transfer_funds(&self.genesis_account.zk_acc).await?;
+        let (tx_hash, req) = self.transfer_funds(&self.genesis_account.zk_acc).await?;
+
+        self.rpc_client.post_batch(vec![req]).await;
 
         let mut sent_transactions = SentTransactions::new();
         sent_transactions.add_tx_hash(tx_hash);
@@ -567,25 +685,23 @@ impl ScenarioExecutor {
     }
 
     /// Obtains a fee required for the transfer operation.
-    async fn transfer_from_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+    async fn transfer_from_fee(&self, to_acc: &ZksyncAccount) -> Result<BigUint, failure::Error> {
         let fee = self
             .rpc_client
             .get_tx_fee("TransferFrom", to_acc.address, &self.token.1)
-            .await
-            .expect("Can't get tx fee");
+            .await?;
 
-        closest_packable_fee_amount(&fee)
+        Ok(closest_packable_fee_amount(&fee))
     }
 
     /// Obtains a fee required for the transfer operation.
-    async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+    async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> Result<BigUint, failure::Error> {
         let fee = self
             .rpc_client
             .get_tx_fee("Transfer", to_acc.address, &self.token.1)
-            .await
-            .expect("Can't get tx fee");
+            .await?;
 
-        closest_packable_fee_amount(&fee)
+        Ok(closest_packable_fee_amount(&fee))
     }
 
     /// Creates a signed transfer transaction.
