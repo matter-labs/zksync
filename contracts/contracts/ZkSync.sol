@@ -263,7 +263,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     ) external nonReentrant {
         requireActive();
 
-        (bool blockProcessorCallSuccess, ) = blockProcessorAddress.delegatecall(
+        (bool blockProcessorCallSuccess, bytes memory data) = blockProcessorAddress.delegatecall(
             abi.encodeWithSignature(
                 "commitBlock(uint32,uint32,bytes32[],bytes,bytes,uint32[])",
                     _blockNumber,
@@ -274,7 +274,33 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     _ethWitnessSizes
             )
         );
-        require(blockProcessorCallSuccess, "com91"); // com91 - `commitBlock` delegatecall fails
+
+        if (!blockProcessorCallSuccess) {
+            decodeRevertReason(data, "com91"); // com91 - `commitBlock` delegatecall fails
+        }
+    }
+
+    function decodeRevertReason(
+        bytes memory _encodedRevertReason,
+        string memory _fallbackRevertMessage
+    ) internal {
+        // Return value is abi-encoded as if it were a call to a function `Error(string)`,
+        // where "string" is the the actual fail reason.
+        // So, we strip first 4 bytes and decode the string to be reported.
+        if (_encodedRevertReason.length < 4) {
+            // For some strange reason, it may happen.
+            // If no function selector provided, fail with a generic reason.
+            revert(_fallbackRevertMessage);
+        }
+
+        // As the array slicing was introduced in solidity 0.6 only, we have to strip the function selector manually.
+        bytes memory revertReasonData = new bytes(_encodedRevertReason.length - 4); // `4` is the function selector length.
+        for(uint i = 0; i < _encodedRevertReason.length - 4; i++){
+            revertReasonData[i] = _encodedRevertReason[i + 4];
+        }
+
+        string memory revertReason = abi.decode(revertReasonData, (string));
+        revert(revertReason);
     }
 
     /// @notice Multiblock verification.
