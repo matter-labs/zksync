@@ -45,7 +45,7 @@ contract BlockProcessor is Storage, Config, Events {
 
         uint64 _blockTimestamp = uint64(uint256(_newBlockInfo[1]));
 
-        require(blocks[totalBlocksCommitted].blockTimestamp < _blockTimestamp, "tms11"); // tms11 - _blockTimestamp smaller or equal than for the previous block
+        require(blocks[totalBlocksCommitted].blockTimestamp <= _blockTimestamp, "tms11"); // tms11 - _blockTimestamp smaller or equal than for the previous block
         require((now - COMMIT_TIMESTAMP_NOT_OLDER) <= _blockTimestamp && _blockTimestamp <= (now + COMMIT_TIMESTAMP_APPROXIMATION_DELTA), "tms12"); // tms12 - _blockTimestamp is not valid
 
         // Unpack onchain operations and store them.
