@@ -11,7 +11,8 @@ use models::prover_utils::EncodedProofPlonk;
 // Local imports
 use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
 use crate::prover::records::{
-    MultiproofBlockItem, NewMultiblockProof, ProverMultiblockRun, StoredMultiblockProof,
+    MultiproofBlockItem, NewMultiblockProof, ProverMultiblockRun, StorageBlockWitness,
+    StoredMultiblockProof,
 };
 use crate::{chain::block::BlockSchema, StorageProcessor};
 use models::params::RECURSIVE_CIRCUIT_SIZES;
@@ -414,5 +415,29 @@ impl<'a> ProverSchema<'a> {
             ),
             serde_json::from_value(stored.proof).unwrap(),
         ))
+    }
+
+    pub fn get_witness(&self, block_number: BlockNumber) -> QueryResult<Option<serde_json::Value>> {
+        use crate::schema::*;
+        let block_witness = block_witness::table
+            .filter(block_witness::block.eq(block_number as i64))
+            .first::<StorageBlockWitness>(self.0.conn())
+            .optional()?;
+
+        Ok(block_witness.map(|w| w.witness))
+    }
+
+    pub fn store_witness(&self, block: BlockNumber, witness: serde_json::Value) -> QueryResult<()> {
+        use crate::schema::*;
+
+        insert_into(block_witness::table)
+            .values(&StorageBlockWitness {
+                block: block as i64,
+                witness,
+            })
+            .on_conflict(block_witness::block)
+            .do_nothing()
+            .execute(self.0.conn())
+            .map(drop)
     }
 }
