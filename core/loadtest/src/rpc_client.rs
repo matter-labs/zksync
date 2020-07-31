@@ -10,7 +10,7 @@ use models::node::{
 };
 use server::api_server::rpc_server::AccountInfoResp;
 // Local uses
-use self::messages::JsonRpcRequest;
+pub use self::messages::JsonRpcRequest;
 
 /// State of the ZKSync operation.
 #[derive(Debug)]
@@ -25,6 +25,40 @@ pub struct OperationState {
 pub struct RpcClient {
     rpc_addr: String,
     client: reqwest::Client,
+}
+
+async fn post(
+    delay: u64,
+    rpc_addr: String,
+    client: reqwest::Client,
+    message: JsonRpcRequest,
+) -> Result<(), failure::Error> {
+    let client = RpcClient { rpc_addr, client };
+
+    // A short delay (<= 10 ms) to not overwhelm server with requests.
+    tokio::time::delay_for(std::time::Duration::from_millis(delay)).await;
+
+    client.post(&message).await?;
+
+    Ok(())
+}
+
+async fn post_batch(
+    delay: u64,
+    rpc_addr: String,
+    client: reqwest::Client,
+    messages: Vec<JsonRpcRequest>,
+) -> Result<(), failure::Error> {
+    let client = RpcClient { rpc_addr, client };
+
+    // A short delay (<= 10 ms) to not overwhelm server with requests.
+    tokio::time::delay_for(std::time::Duration::from_millis(delay)).await;
+
+    for message in messages {
+        client.post(&message).await?;
+    }
+
+    Ok(())
 }
 
 impl RpcClient {
@@ -53,30 +87,94 @@ impl RpcClient {
         Ok(fee)
     }
 
+    // /// Sends the transaction to the ZKSync server using the JSON RPC.
+    // pub async fn send_tx(
+    //     &self,
+    //     tx: FranklinTx,
+    //     eth_signature: Option<PackedEthSignature>,
+    // ) -> Result<TxHash, failure::Error> {
+    //     // let tx_hash = tx.clone().hash();
+
+    //     let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
+
+    //     // let rpc_addr = self.rpc_addr.clone();
+    //     // let client = self.client.clone();
+    //     // tokio::spawn(post(rpc_addr, client, msg));
+    //     let ret = self.post(&msg).await?;
+    //     let tx_hash = serde_json::from_value(ret).expect("failed to parse `send_tx` response");
+    //     Ok(tx_hash)
+    // }
+
     /// Sends the transaction to the ZKSync server using the JSON RPC.
     pub async fn send_tx(
         &self,
         tx: FranklinTx,
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<TxHash, failure::Error> {
+        use rand::Rng;
+        let tx_hash = tx.clone().hash();
+
         let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
 
-        let ret = self.post(&msg).await?;
-        let tx_hash = serde_json::from_value(ret).expect("failed to parse `send_tx` response");
+        let mut rng = rand::thread_rng();
+        let delay = rng.gen_range::<u64>(0, 10);
+
+        let rpc_addr = self.rpc_addr.clone();
+        let client = self.client.clone();
+        tokio::spawn(post(delay, rpc_addr, client, msg));
+        // let tx_hash = serde_json::from_value(ret).expect("failed to parse `send_tx` response");
         Ok(tx_hash)
     }
 
-    pub async fn send_txs_batch(
+    pub async fn post_batch(&self, messages: Vec<JsonRpcRequest>) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let delay = rng.gen_range::<u64>(0, 10);
+
+        let rpc_addr = self.rpc_addr.clone();
+        let client = self.client.clone();
+        tokio::spawn(post_batch(delay, rpc_addr, client, messages));
+    }
+
+    pub async fn prepare_send_tx_request(
+        &self,
+        tx: FranklinTx,
+        eth_signature: Option<PackedEthSignature>,
+    ) -> (TxHash, JsonRpcRequest) {
+        let tx_hash = tx.clone().hash();
+
+        let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
+
+        (tx_hash, msg)
+    }
+
+    pub async fn prepare_send_txs_batch_request(
         &self,
         txs: Vec<(FranklinTx, Option<PackedEthSignature>)>,
-    ) -> Result<Vec<TxHash>, failure::Error> {
+    ) -> (Vec<TxHash>, JsonRpcRequest) {
+        let tx_hashes = txs.iter().map(|tx| tx.0.hash()).collect();
+
         let msg = JsonRpcRequest::submit_txs_batch(txs);
 
-        let ret = self.post(&msg).await?;
-        let tx_hashes =
-            serde_json::from_value(ret).expect("failed to parse `send_txs_batch` response");
-        Ok(tx_hashes)
+        (tx_hashes, msg)
+
+        // let ret = self.post(&msg).await?;
+        // let tx_hashes =
+        //     serde_json::from_value(ret).expect("failed to parse `send_txs_batch` response");
+        // Ok(tx_hashes)
     }
+
+    // pub async fn send_txs_batch(
+    //     &self,
+    //     txs: Vec<(FranklinTx, Option<PackedEthSignature>)>,
+    // ) -> Result<Vec<TxHash>, failure::Error> {
+    //     let msg = JsonRpcRequest::submit_txs_batch(txs);
+
+    //     let ret = self.post(&msg).await?;
+    //     let tx_hashes =
+    //         serde_json::from_value(ret).expect("failed to parse `send_txs_batch` response");
+    //     Ok(tx_hashes)
+    // }
 
     /// Sends the transaction to the ZKSync server and returns raw response.
     pub async fn send_tx_raw(

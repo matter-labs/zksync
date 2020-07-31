@@ -77,7 +77,7 @@ pub async fn wait_for_commit(
     rpc_client: &RpcClient,
 ) -> Result<(), failure::Error> {
     let start = Instant::now();
-    let polling_interval = Duration::from_millis(250);
+    let polling_interval = Duration::from_millis(5);
     let mut timer = time::interval(polling_interval);
 
     loop {
