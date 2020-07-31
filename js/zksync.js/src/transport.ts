@@ -53,9 +53,9 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
             return resp.data;
         });
 
-        if (response.result) {
+        if ("result" in response) {
             return response.result;
-        } else if (response.error) {
+        } else if ("error" in response) {
             throw new JRPCError("JRPC response error", response.error);
         } else {
             throw new Error("Unknown JRPC Error");
@@ -158,9 +158,9 @@ export class WSTransport extends AbstractJSONRPCTransport {
 
         const response = await this.ws.sendRequest(request);
 
-        if (response.result) {
+        if ("result" in response) {
             return response.result;
-        } else if (response.error) {
+        } else if ("error" in response) {
             throw new JRPCError("JRPC response error", response.error);
         } else {
             throw new Error("Unknown JRPC Error");
