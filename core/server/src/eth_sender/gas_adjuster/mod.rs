@@ -53,31 +53,34 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
         ethereum: &ETH,
         old_tx_gas_price: Option<U256>,
     ) -> Result<U256, failure::Error> {
-        let network_price = ethereum.gas_price()?;
-
-        let scaled_price = if let Some(old_price) = old_tx_gas_price {
-            // Stuck transaction, scale it up.
-            self.scale_up(old_price, network_price)
-        } else {
-            // New transaction, use the network price as the base.
-            network_price
-        };
-
-        // Now, cut the price if it's too big.
-        let price = self.limit_max(scaled_price);
-
-        if price == self.get_current_max_price() {
-            // We're suggesting the max price, so we must notify the log
-            // entry about it.
-            log::warn!("Maximum possible gas price will be used: <{}>", price);
-        }
-
-        // FIXME: Currently instead of using sent txs as samples, we use the gas prices suggested by
-        // the Ethereum node.
-        // // Report used price to be gathered by the statistics module.
-        // self.statistics.add_sample(price);
-
-        Ok(price)
+        //we need to fix the gas to run with Evrynet
+        let fixed_gas_price = U256::from(1000000000);
+        Ok(fixed_gas_price)
+//        let network_price = ethereum.gas_price()?;
+//
+//        let scaled_price = if let Some(old_price) = old_tx_gas_price {
+//            // Stuck transaction, scale it up.
+//            self.scale_up(old_price, network_price)
+//        } else {
+//            // New transaction, use the network price as the base.
+//            network_price
+//        };
+//
+//        // Now, cut the price if it's too big.
+//        let price = self.limit_max(scaled_price);
+//
+//        if price == self.get_current_max_price() {
+//            // We're suggesting the max price, so we must notify the log
+//            // entry about it.
+//            log::warn!("Maximum possible gas price will be used: <{}>", price);
+//        }
+//
+//        // FIXME: Currently instead of using sent txs as samples, we use the gas prices suggested by
+//        // the Ethereum node.
+//        // // Report used price to be gathered by the statistics module.
+//        // self.statistics.add_sample(price);
+//
+//        Ok(price)
     }
 
     /// Performs an actualization routine for `GasAdjuster`:

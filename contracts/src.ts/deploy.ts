@@ -106,7 +106,7 @@ export class Deployer {
         const govContract = await deployContract(
             this.deployWallet,
             this.contracts.governance, [],
-            {gasLimit: 600000, ...ethTxOptions},
+            {gasLimit: 1000000, ...ethTxOptions},
         );
         const govRec = await govContract.deployTransaction.wait();
         const govGasUsed = govRec.gasUsed;
@@ -125,7 +125,7 @@ export class Deployer {
         const verifierContract = await deployContract(
             this.deployWallet,
             this.contracts.verifier, [],
-            {gasLimit: 4000000, ...ethTxOptions},
+            {gasLimit: 1000000, ...ethTxOptions},
         );
         const verRec = await verifierContract.deployTransaction.wait();
         const verGasUsed = verRec.gasUsed;
@@ -144,7 +144,7 @@ export class Deployer {
         const zksContract = await deployContract(
             this.deployWallet,
             this.contracts.zkSync, [],
-            {gasLimit: 6000000, ...ethTxOptions},
+            {gasLimit: 1000000, ...ethTxOptions},
         );
         const zksRec = await zksContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
@@ -163,7 +163,7 @@ export class Deployer {
                 this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_COMMIT_ETH_ADDRESS,
                 this.governorAddress, process.env.OPERATOR_FEE_ETH_ADDRESS
             ],
-            {gasLimit: 5000000, ...ethTxOptions},
+            {gasLimit: 1000000, ...ethTxOptions},
         );
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
         const deployFactoryInterface = new Interface(this.deployFactoryCode.interface);

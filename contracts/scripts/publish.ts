@@ -9,7 +9,9 @@ import {
         const deployer = new Deployer({deployWallet: Wallet.createRandom()});
         if (process.env.ETH_NETWORK === "localhost") {
             await deployer.publishSourcesToTesseracts();
-        } else {
+        } if (process.env.ETH_NETWORK === "evrynet") {
+            console.info("There is no explorer for evrynet yet");
+        }else {
             await deployer.publishSourcesToEtherscan();
         }
     } catch (e) {

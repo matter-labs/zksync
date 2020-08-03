@@ -395,7 +395,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let gas_price = tx.gas_price / (1_000_000_000);
         format!(
             "<hash: {:#x}; gas price: {} gwei; nonce: {}>",
-            tx.hash, gas_price, tx.nonce
+            tx.hash, gas_price, tx.nonce, self.ethereum.
         )
     }
 
@@ -591,23 +591,30 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Calculates the gas limit for transaction to be send, depending on the type of operation.
     fn gas_limit_for_op(op: &ETHOperation) -> U256 {
-        match op.op_type {
-            OperationType::Commit => {
-                op.op
-                    .as_ref()
-                    .expect("No zkSync operation for Commit")
-                    .block
-                    .commit_gas_limit
-            }
-            OperationType::Verify => {
-                op.op
-                    .as_ref()
-                    .expect("No zkSync operation for Verify")
-                    .block
-                    .verify_gas_limit
-            }
-            OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
-        }
+        //we get oog error here. For now just fix this max gas for every tx.
+        U256::from(1000000000)
+//        match op.op_type {
+//            OperationType::Commit => {
+//                op.op
+//                    .as_ref()
+//                    .expect("No zkSync operation for Commit")
+//                    .block
+//                    .commit_gas_limit
+//            }
+//            OperationType::Verify => {
+//                  op.op
+//                    .as_ref()
+//                    .expect("No zkSync operation for Verify")
+//                    .block
+//                    .verify_gas_limit;
+//                op.op
+//                    .as_ref()
+//                    .expect("No zkSync operation for Verify")
+//                    .block
+//                    .verify_gas_limit
+//            }
+//            OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
+//        }
     }
 
     /// Creates a new transaction for the existing Ethereum operation.

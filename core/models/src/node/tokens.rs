@@ -24,7 +24,7 @@ impl From<TokenId> for TokenLike {
 /// Token supported in zkSync protocol
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Token {
-    /// id is used for tx signature and serialization
+    /// id used for tx signature and serialization
     pub id: TokenId,
     /// Contract address of ERC20 token or Address::zero() for "ETH"
     pub address: Address,
@@ -62,6 +62,7 @@ pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>
     file_path.push("tokens");
     file_path.push(network);
     file_path.set_extension("json");
+    println!("token list file {}", file_path.display());
     Ok(serde_json::from_str(&read_to_string(file_path)?)?)
 }
 

@@ -31,11 +31,11 @@ mkdir -p keys/setup && cd keys/setup
 
 download() {
     for i in ${POWERS//,/ }; do
-        axel -c $SETUP_DO_SPACE_DIR/setup_2%5E$i.key || true #dont download file if it is already there
+        wget -c $SETUP_DO_SPACE_DIR/setup_2%5E$i.key || true #dont download file if it is already there
         sleep 1 # to not receive “503 Slow Down”
 
         if [ "$1" = "all" ]; then
-            axel -c $SETUP_DO_SPACE_DIR/setup_2%5E"$i"_lagrange.key || true
+            wget -c $SETUP_DO_SPACE_DIR/setup_2%5E"$i"_lagrange.key || true
             sleep 1 # to not receive “503 Slow Down”
         fi
     done

@@ -13,9 +13,11 @@ import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
-const VERIFY_TIMEOUT = 120000; // 2 minutes in ms.
+console.log(WEB3_URL)
+const VERIFY_TIMEOUT = 1200000; // 2 minutes in ms.
 
-const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+// const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+const network = "evrynet"
 console.log("Running integration test on the ", network, " network");
 const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
 if (network == "localhost") {

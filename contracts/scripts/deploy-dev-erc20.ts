@@ -6,7 +6,7 @@ import {readContractCode} from "../src.ts/deploy";
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
 async function main() {
-    const wallet = Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+    const wallet = Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 
     const result = [];
 
@@ -14,7 +14,7 @@ async function main() {
         const erc20 = await deployContract(
             wallet,
             readContractCode("TEST-ERC20"), [],
-            {gasLimit: 5000000},
+            {gasLimit: 5000000, gasPrice:1000000000},
         );
 
         await erc20.mint(wallet.address, parseEther("3000000000"));
