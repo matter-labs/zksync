@@ -13,6 +13,7 @@ import Home from './Home.vue';
 import Block from './Block.vue';
 import Transaction from './Transaction.vue';
 import Account from './Account.vue';
+import Tokens from './Tokens.vue';
 
 import config from './env-config';
 import VueTimers from 'vue-timers';
@@ -30,6 +31,7 @@ const routes = [
     { path: '/blocks/:blockNumber', component: Block },
     { path: '/transactions/:id',    component: Transaction },
     { path: '/accounts/:address',   component: Account, props: true },
+    { path: '/tokens',              component: Tokens },
 ];
 
 function getRouterBase() {
@@ -62,13 +64,13 @@ Vue.mixin({
     methods: {
         blockchainExplorerToken(token, account) {
             if (this.store.network === 'localhost') return `http://localhost:8000/${account}`;
-            const prefix = this.store.network === 'mainnet' ? '' : this.store.network;
+            const prefix = this.store.network === 'mainnet' ? '' : `${this.store.network}.`;
             const tokenAddress = window.syncProvider.tokenSet.resolveTokenAddress(token);
             
             if (tokenAddress != '0x0000000000000000000000000000000000000000') {
-                return `https://${prefix}.etherscan.io/token/${tokenAddress}?a=${account}`;
+                return `https://${prefix}etherscan.io/token/${tokenAddress}?a=${account}`;
             } else {
-                return `https://${prefix}.etherscan.io/address/${account}`;
+                return `https://${prefix}etherscan.io/address/${account}`;
             }
         }
     }
