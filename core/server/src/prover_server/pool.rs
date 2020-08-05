@@ -258,6 +258,7 @@ impl Maintainer {
         storage: &storage::StorageProcessor,
         commit_operation: &models::Operation,
     ) -> Result<ProverData, String> {
+        trace!("Operations: {:#?}", commit_operation.block);
         let block_number = commit_operation.block.block_number;
         let block_size = commit_operation.block.block_chunks_size;
 
