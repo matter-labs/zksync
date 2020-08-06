@@ -227,7 +227,7 @@ fn main() {
     );
 
     let ticker_task = run_ticker_task(
-        config_opts.ticker_url,
+        config_opts.ticker_url.clone(),
         connection_pool.clone(),
         eth_send_request_sender,
         state_keeper_req_sender,
@@ -235,7 +235,8 @@ fn main() {
         &main_runtime,
     );
 
-    let prometheus_exporter = start_prometheus_exporter(connection_pool, &main_runtime);
+    let prometheus_exporter =
+        start_prometheus_exporter(connection_pool, &config_opts, &main_runtime);
 
     let task_futures = vec![
         eth_watch_task,

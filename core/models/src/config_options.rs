@@ -132,6 +132,7 @@ pub struct ConfigurationOptions {
     pub max_miniblock_iterations: usize,
     /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
     pub max_miniblock_iterations_withdraw_block: usize,
+    pub prometheus_export_port: u16,
 }
 
 impl ConfigurationOptions {
@@ -177,6 +178,7 @@ impl ConfigurationOptions {
             idle_provers: parse_env("IDLE_PROVERS"),
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
             max_miniblock_iterations_withdraw_block,
+            prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
         }
     }
 }
