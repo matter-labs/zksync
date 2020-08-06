@@ -472,7 +472,7 @@ impl<'a> BlockSchema<'a> {
         use crate::schema::pending_block::dsl::*;
         self.0.conn().transaction(|| {
             let pending_block_result: QueryResult<StoragePendingBlock> =
-                pending_block.first(self.0.conn());
+                pending_block.order_by(number.desc()).first(self.0.conn());
 
             let block = match pending_block_result {
                 Ok(block) => block,
