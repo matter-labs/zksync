@@ -245,6 +245,7 @@ impl<T: Transport> EthereumAccount<T> {
                     opt.value = Some(big_dec_to_u256(amount.clone()));
                     opt.nonce = nonce;
                     opt.gas = Some(500_000.into());
+                    opt.gas_price = Some(U256::from(1000000000));
                 }),
             )
             .await
