@@ -529,6 +529,18 @@ impl<'a> BlockSchema<'a> {
         })
     }
 
+    pub fn count_operations(
+        &self,
+        action_type: ActionType,
+        is_confirmed: bool,
+    ) -> QueryResult<i64> {
+        operations::table
+            .filter(operations::action_type.eq(action_type.to_string()))
+            .filter(operations::confirmed.eq(is_confirmed))
+            .count()
+            .get_result(self.0.conn())
+    }
+
     pub(crate) fn save_block(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             let number = i64::from(block.block_number);

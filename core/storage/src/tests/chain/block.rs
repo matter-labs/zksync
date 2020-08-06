@@ -1,11 +1,13 @@
 // External imports
+use diesel::prelude::*;
 use web3::types::H256;
 // Workspace imports
 use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
 use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
-use models::{ethereum::OperationType, fe_to_bytes, Action, Operation};
+use models::{ethereum::OperationType, fe_to_bytes, Action, ActionType, Operation};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
+use crate::chain::operations::records::NewOperation;
 use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{
@@ -14,6 +16,7 @@ use crate::{
     },
     ethereum::EthereumSchema,
     prover::ProverSchema,
+    schema::operations,
     StorageProcessor,
 };
 
@@ -763,6 +766,86 @@ fn test_unproven_block_query() {
             BLOCK_SIZE_CHUNKS,
         ))?;
         assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 0);
+        Ok(())
+    });
+}
+
+/// Here we create blocks and publish proofs for them in different order
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn test_operations_counter() {
+    let _ = env_logger::try_init();
+
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::COMMIT, false)?,
+            0
+        );
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::VERIFY, false)?,
+            0
+        );
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::COMMIT, true)?,
+            0
+        );
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::VERIFY, true)?,
+            0
+        );
+
+        for (block_number, action) in &[
+            (1, ActionType::COMMIT),
+            (2, ActionType::COMMIT),
+            (3, ActionType::COMMIT),
+            (4, ActionType::COMMIT),
+            (1, ActionType::VERIFY),
+            (2, ActionType::VERIFY),
+        ] {
+            diesel::insert_into(operations::table)
+                .values(NewOperation {
+                    block_number: *block_number,
+                    action_type: action.to_string(),
+                })
+                .execute(conn.conn())
+                .expect("operation creation failed");
+        }
+
+        for (block, action) in &[
+            (1, ActionType::COMMIT),
+            (2, ActionType::COMMIT),
+            (3, ActionType::COMMIT),
+            (1, ActionType::VERIFY),
+            (2, ActionType::VERIFY),
+        ] {
+            diesel::update(
+                operations::table
+                    .filter(operations::block_number.eq(block))
+                    .filter(operations::action_type.eq(action.to_string())),
+            )
+            .set(operations::confirmed.eq(true))
+            .execute(conn.conn())
+            .expect("operation update failed");
+        }
+
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::COMMIT, false)?,
+            1
+        );
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::VERIFY, false)?,
+            0
+        );
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::COMMIT, true)?,
+            3
+        );
+        assert_eq!(
+            BlockSchema(&conn).count_operations(ActionType::VERIFY, true)?,
+            2
+        );
+
         Ok(())
     });
 }
