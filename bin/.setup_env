@@ -2,6 +2,11 @@
 
 pushd `dirname $0`/.. > /dev/null
 
+# Setup the git hooks folder.
+if ! git config --local core.hooksPath > /dev/null; then
+    git config --local core.hooksPath $ZKSYNC_HOME/.githooks/ > /dev/null
+fi
+
 # Setup env itself
 if [ -z "$ZKSYNC_ENV" ]
 then
@@ -37,8 +42,3 @@ else
 fi
 
 popd > /dev/null
-
-# Setup the git hooks folder.
-if ! git config --local core.hooksPath > /dev/null; then
-    git config --local core.hooksPath $ZKSYNC_HOME/.githooks/ > /dev/null
-fi
