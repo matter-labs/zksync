@@ -1,10 +1,8 @@
 import {ArgumentParser} from "argparse";
 import {deployContract} from "ethereum-waffle";
-import {ethers} from "ethers";
-import {AddressZero} from "ethers/constants";
-import {readContractCode, readTestContracts} from "../src.ts/deploy";
+import {constants, ethers} from "ethers";
+import {readTestContracts} from "../src.ts/deploy";
 
-const {performance} = require("perf_hooks");
 const {expect} = require("chai");
 
 export const FranklinTestUpgradeTargetContractCode = require(`../build/ZkSyncTestUpgradeTarget`);
@@ -33,13 +31,13 @@ async function main() {
 
         const proxyContract = new ethers.Contract(
             args.contractAddress,
-            testContracts.proxy.interface,
+            testContracts.proxy.abi,
             wallet,
         );
 
         const upgradeGatekeeper = new ethers.Contract(
             args.upgradeGatekeeperAddress,
-            testContracts.upgradeGatekeeper.interface,
+            testContracts.upgradeGatekeeper.abi,
             wallet,
         );
 
@@ -51,7 +49,7 @@ async function main() {
         );
 
         console.log("Starting upgrade");
-        await (await upgradeGatekeeper.startUpgrade([AddressZero, AddressZero, newTargetFranklin.address])).wait();
+        await (await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address])).wait();
 
         // wait notice period
         console.log("Waiting notice period");

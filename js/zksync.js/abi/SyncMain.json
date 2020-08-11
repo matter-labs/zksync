@@ -1,5 +1,5 @@
 {
-  "interface": [
+  "abi": [
     {
       "anonymous": false,
       "inputs": [
@@ -51,7 +51,7 @@
         {
           "indexed": true,
           "internalType": "uint32",
-          "name": "franklinBlockId",
+          "name": "zkSyncBlockId",
           "type": "uint32"
         },
         {
@@ -119,7 +119,7 @@
         {
           "indexed": true,
           "internalType": "uint32",
-          "name": "franklinBlockId",
+          "name": "zkSyncBlockId",
           "type": "uint32"
         },
         {
@@ -241,6 +241,44 @@
         }
       ],
       "name": "OnchainWithdrawal",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "queueStartIndex",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "queueEndIndex",
+          "type": "uint32"
+        }
+      ],
+      "name": "PendingWithdrawalsAdd",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "queueStartIndex",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "queueEndIndex",
+          "type": "uint32"
+        }
+      ],
+      "name": "PendingWithdrawalsComplete",
       "type": "event"
     },
     {
@@ -910,21 +948,6 @@
       ],
       "payable": false,
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [],
-      "name": "upgradePreparationLockStatus",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

@@ -1,7 +1,7 @@
 import {deployContract} from "ethereum-waffle";
 import {ethers, Wallet} from "ethers";
-import {parseEther} from "ethers/utils";
 import {readContractCode} from "../src.ts/deploy";
+import {parseEther} from "ethers/lib/utils";
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 

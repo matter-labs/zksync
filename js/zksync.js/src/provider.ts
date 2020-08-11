@@ -3,7 +3,7 @@ import {
     HTTPTransport,
     WSTransport
 } from "./transport";
-import { utils, ethers, Contract } from "ethers";
+import {ethers, Contract, BigNumber} from "ethers";
 import {
     AccountState,
     Address,
@@ -73,6 +73,9 @@ export class Provider {
     contractAddress: ContractAddress;
     public tokenSet: TokenSet;
 
+    // For HTTP provider
+    public pollIntervalMilliSecs = 500;
+
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
     static async newWebsocketProvider(address: string): Promise<Provider> {
@@ -84,10 +87,14 @@ export class Provider {
     }
 
     static async newHttpProvider(
-        address: string = "http://127.0.0.1:3030"
+        address: string = "http://127.0.0.1:3030",
+        pollIntervalMilliSecs?: number
     ): Promise<Provider> {
         const transport = new HTTPTransport(address);
         const provider = new Provider(transport);
+        if (pollIntervalMilliSecs) {
+            provider.pollIntervalMilliSecs = pollIntervalMilliSecs;
+        }
         provider.contractAddress = await provider.getContractAddress();
         provider.tokenSet = new TokenSet(await provider.getTokens());
         return provider;
@@ -154,7 +161,7 @@ export class Provider {
                 if (notifyDone) {
                     return priorOpStatus;
                 } else {
-                    await sleep(3000);
+                    await sleep(this.pollIntervalMilliSecs);
                 }
             }
         }
@@ -188,7 +195,7 @@ export class Provider {
                 if (notifyDone) {
                     return transactionStatus;
                 } else {
-                    await sleep(3000);
+                    await sleep(this.pollIntervalMilliSecs);
                 }
             }
         }
@@ -206,11 +213,11 @@ export class Provider {
         ]);
         return {
             feeType: transactionFee.feeType,
-            gasTxAmount: utils.bigNumberify(transactionFee.gasTxAmount),
-            gasPriceWei: utils.bigNumberify(transactionFee.gasPriceWei),
-            gasFee: utils.bigNumberify(transactionFee.gasFee),
-            zkpFee: utils.bigNumberify(transactionFee.zkpFee),
-            totalFee: utils.bigNumberify(transactionFee.totalFee)
+            gasTxAmount: BigNumber.from(transactionFee.gasTxAmount),
+            gasPriceWei: BigNumber.from(transactionFee.gasPriceWei),
+            gasFee: BigNumber.from(transactionFee.gasFee),
+            zkpFee: BigNumber.from(transactionFee.zkpFee),
+            totalFee: BigNumber.from(transactionFee.totalFee)
         };
     }
 

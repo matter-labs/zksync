@@ -1,4 +1,4 @@
-import { Contract, ContractTransaction, ethers, utils } from "ethers";
+import {BigNumber, BigNumberish, Contract, ContractTransaction, ethers} from "ethers";
 import { ETHProxy, Provider } from "./provider";
 import { Signer } from "./signer";
 import {
@@ -123,8 +123,8 @@ export class Wallet {
     async syncTransfer(transfer: {
         to: Address;
         token: TokenLike;
-        amount: utils.BigNumberish;
-        fee?: utils.BigNumberish;
+        amount: BigNumberish;
+        fee?: BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
         if (!this.signer) {
@@ -202,8 +202,8 @@ export class Wallet {
     async withdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
-        amount: utils.BigNumberish;
-        fee?: utils.BigNumberish;
+        amount: BigNumberish;
+        fee?: BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
         if (!this.signer) {
@@ -381,7 +381,7 @@ export class Wallet {
             newPubKeyHash.replace("sync:", "0x"),
             numNonce,
             {
-                gasLimit: utils.bigNumberify("200000"),
+                gasLimit: BigNumber.from("200000"),
                 ...ethTxOptions
             }
         );
@@ -418,7 +418,7 @@ export class Wallet {
     async getBalance(
         token: TokenLike,
         type: "committed" | "verified" = "committed"
-    ): Promise<utils.BigNumber> {
+    ): Promise<BigNumber> {
         const accountState = await this.getAccountState();
         const tokenSymbol = this.provider.tokenSet.resolveTokenSymbol(token);
         let balance;
@@ -427,11 +427,11 @@ export class Wallet {
         } else {
             balance = accountState.verified.balances[tokenSymbol] || "0";
         }
-        return utils.bigNumberify(balance);
+        return BigNumber.from(balance);
     }
 
-    async getEthereumBalance(token: TokenLike): Promise<utils.BigNumber> {
-        let balance: utils.BigNumber;
+    async getEthereumBalance(token: TokenLike): Promise<BigNumber> {
+        let balance: BigNumber;
         if (isTokenETH(token)) {
             balance = await this.ethSigner.provider.getBalance(
                 this.cachedAddress
@@ -461,7 +461,7 @@ export class Wallet {
             this.address(),
             this.provider.contractAddress.mainContract
         );
-        return utils.bigNumberify(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
+        return BigNumber.from(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
     }
 
     async approveERC20TokenDeposits(
@@ -486,7 +486,7 @@ export class Wallet {
     async depositToSyncFromEthereum(deposit: {
         depositTo: Address;
         token: TokenLike;
-        amount: utils.BigNumberish;
+        amount: BigNumberish;
         ethTxOptions?: ethers.providers.TransactionRequest;
         approveDepositAmountForERC20?: boolean;
     }): Promise<ETHOperation> {
@@ -509,8 +509,8 @@ export class Wallet {
             ethTransaction = await mainZkSyncContract.depositETH(
                 deposit.depositTo,
                 {
-                    value: utils.bigNumberify(deposit.amount),
-                    gasLimit: utils.bigNumberify("200000"),
+                    value: BigNumber.from(deposit.amount),
+                    gasLimit: BigNumber.from("200000"),
                     gasPrice,
                     ...deposit.ethTxOptions
                 }
@@ -549,11 +549,11 @@ export class Wallet {
                 args.length - 1
             ] as ethers.providers.TransactionRequest;
             if (txRequest.gasLimit == null) {
-                const gasEstimate = await mainZkSyncContract.estimate
+                const gasEstimate = await mainZkSyncContract.estimateGas
                     .depositERC20(...args)
                     .then(
                         estimate => estimate,
-                        _err => utils.bigNumberify("0")
+                        _err => BigNumber.from("0")
                     );
                 txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT)
                     ? gasEstimate
@@ -606,7 +606,7 @@ export class Wallet {
             accountId,
             tokenAddress,
             {
-                gasLimit: utils.bigNumberify("500000"),
+                gasLimit: BigNumber.from("500000"),
                 gasPrice,
                 ...withdraw.ethTxOptions
             }
@@ -632,7 +632,7 @@ export class Wallet {
 class ETHOperation {
     state: "Sent" | "Mined" | "Committed" | "Verified" | "Failed";
     error?: ZKSyncTxError;
-    priorityOpId?: utils.BigNumber;
+    priorityOpId?: BigNumber;
 
     constructor(
         public ethTx: ContractTransaction,
@@ -646,10 +646,12 @@ class ETHOperation {
 
         const txReceipt = await this.ethTx.wait();
         for (const log of txReceipt.logs) {
-            const priorityQueueLog = SYNC_MAIN_CONTRACT_INTERFACE.parseLog(log);
-            if (priorityQueueLog && priorityQueueLog.values.serialId != null) {
-                this.priorityOpId = priorityQueueLog.values.serialId;
-            }
+            try {
+                const priorityQueueLog = SYNC_MAIN_CONTRACT_INTERFACE.parseLog(log);
+                if (priorityQueueLog && priorityQueueLog.args.serialId != null) {
+                    this.priorityOpId = priorityQueueLog.args.serialId;
+                }
+            } catch {}
         }
         if (!this.priorityOpId) {
             throw new Error("Failed to parse tx logs");

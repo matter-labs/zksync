@@ -1,5 +1,5 @@
 import BN = require("bn.js");
-import { utils, constants, ethers } from "ethers";
+import {utils, constants, ethers, BigNumber, BigNumberish} from "ethers";
 import {
     PubKeyHash,
     TokenAddress,
@@ -11,18 +11,18 @@ import {
 import { serializeAccountId, serializeNonce } from "./signer";
 
 export const IERC20_INTERFACE = new utils.Interface(
-    require("../abi/IERC20.json").interface
+    require("../abi/IERC20.json").abi
 );
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(
-    require("../abi/SyncMain.json").interface
+    require("../abi/SyncMain.json").abi
 );
 
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
-    require("../abi/SyncGov.json").interface
+    require("../abi/SyncGov.json").abi
 );
 
 export const IEIP1271_INTERFACE = new utils.Interface(
-    require("../abi/IEIP1271.json").interface
+    require("../abi/IEIP1271.json").abi
 );
 
 export const MAX_ERC20_APPROVE_AMOUNT =
@@ -31,7 +31,7 @@ export const MAX_ERC20_APPROVE_AMOUNT =
 export const ERC20_APPROVE_TRESHOLD =
     "57896044618658097711785492504343953926634992332820282019728792003956564819968"; // 2^255
 
-export const ERC20_DEPOSIT_GAS_LIMIT = utils.bigNumberify("300000"); // 300k
+export const ERC20_DEPOSIT_GAS_LIMIT = BigNumber.from("300000"); // 300k
 
 const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
@@ -213,11 +213,11 @@ export function packFeeChecked(amount: BN): Buffer {
  * @param amount
  */
 export function closestPackableTransactionAmount(
-    amount: utils.BigNumberish
-): utils.BigNumber {
-    const amountBN = new BN(utils.bigNumberify(amount).toString());
+    amount: BigNumberish
+): BigNumber {
+    const amountBN = new BN(BigNumber.from(amount).toString());
     const packedAmount = packAmount(amountBN);
-    return utils.bigNumberify(
+    return BigNumber.from(
         floatToInteger(
             packedAmount,
             AMOUNT_EXPONENT_BIT_WIDTH,
@@ -228,7 +228,7 @@ export function closestPackableTransactionAmount(
 }
 
 export function isTransactionAmountPackable(
-    amount: utils.BigNumberish
+    amount: BigNumberish
 ): boolean {
     return closestPackableTransactionAmount(amount).eq(amount);
 }
@@ -239,11 +239,11 @@ export function isTransactionAmountPackable(
  * @param fee
  */
 export function closestPackableTransactionFee(
-    fee: utils.BigNumberish
-): utils.BigNumber {
-    const feeBN = new BN(utils.bigNumberify(fee).toString());
+    fee: BigNumberish
+): BigNumber {
+    const feeBN = new BN(BigNumber.from(fee).toString());
     const packedFee = packFee(feeBN);
-    return utils.bigNumberify(
+    return BigNumber.from(
         floatToInteger(
             packedFee,
             FEE_EXPONENT_BIT_WIDTH,
@@ -253,7 +253,7 @@ export function closestPackableTransactionFee(
     );
 }
 
-export function isTransactionFeePackable(amount: utils.BigNumberish): boolean {
+export function isTransactionFeePackable(amount: BigNumberish): boolean {
     return closestPackableTransactionFee(amount).eq(amount);
 }
 
@@ -336,13 +336,13 @@ export class TokenSet {
 
     public formatToken(
         tokenLike: TokenLike,
-        amount: utils.BigNumberish
+        amount: BigNumberish
     ): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.formatUnits(amount, decimals);
     }
 
-    public parseToken(tokenLike: TokenLike, amount: string): utils.BigNumber {
+    public parseToken(tokenLike: TokenLike, amount: string): BigNumber {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.parseUnits(amount, decimals);
     }
@@ -386,7 +386,7 @@ export function getChangePubkeyMessage(
 }
 
 export function getSignedBytesFromMessage(
-    message: ethers.utils.Arrayish | string,
+    message: ethers.utils.BytesLike | string,
     addPrefix: boolean
 ): Uint8Array {
     let messageBytes =

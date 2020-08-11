@@ -1,6 +1,6 @@
 {
   "name": "zksync",
-  "version": "0.5.15",
+  "version": "0.6.0",
   "license": "MIT",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -12,14 +12,14 @@
     "zksync-crypto": "^0.2.1"
   },
   "peerDependencies": {
-    "ethers": "^4.0.46"
+    "ethers": "^5.0.0"
   },
   "devDependencies": {
     "@types/chai": "^4.1.7",
     "@types/mocha": "^5.2.7",
     "@types/node": "^12.6.8",
     "chai": "^4.2.0",
-    "ethers": "4.0.47",
+    "ethers": "^5.0.0",
     "mocha": "^6.2.0",
     "prettier": "1.18.2",
     "ts-node": "^8.3.0",

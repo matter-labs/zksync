@@ -482,12 +482,22 @@ impl<'a> BlockSchema<'a> {
 
             let executed_ops = self.get_block_executed_ops(block.number as u32)?;
 
+            let mut success_operations = Vec::new();
+            let mut failed_txs = Vec::new();
+            for executed_op in executed_ops {
+                match executed_op {
+                    ExecutedOperations::Tx(tx) if !tx.success => failed_txs.push(*tx),
+                    _ => success_operations.push(executed_op),
+                }
+            }
+
             let result = PendingBlock {
                 number: block.number as u32,
                 chunks_left: block.chunks_left as usize,
                 unprocessed_priority_op_before: block.unprocessed_priority_op_before as u64,
                 pending_block_iteration: block.pending_block_iteration as usize,
-                success_operations: executed_ops,
+                success_operations,
+                failed_txs,
             };
 
             Ok(Some(result))
@@ -523,7 +533,17 @@ impl<'a> BlockSchema<'a> {
                 .execute(self.0.conn())?;
 
             // Store the transactions from the block.
-            self.save_block_transactions(pending_block.number, pending_block.success_operations)?;
+            let executed_transactions = pending_block
+                .success_operations
+                .into_iter()
+                .chain(
+                    pending_block
+                        .failed_txs
+                        .into_iter()
+                        .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
+                )
+                .collect();
+            self.save_block_transactions(pending_block.number, executed_transactions)?;
 
             Ok(())
         })

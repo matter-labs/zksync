@@ -1,5 +1,5 @@
+const { BigNumber } = require("ethers")
 const { expect } = require("chai")
-const { bigNumberify } = require("ethers/utils");
 const { provider, wallet, deployTestContract, getCallRevertReason } = require("./common")
 
 describe("Bytes unit tests", function () {
@@ -15,7 +15,7 @@ describe("Bytes unit tests", function () {
     it("should read bytes", async () => {
         let r = await bytesTestContract.read("0x0102030405060708", 4, 2)
         expect(r.data).equal("0x0506")
-        expect(r.new_offset).equal(bigNumberify(6))
+        expect(r.new_offset).equal(BigNumber.from(6))
     });
 
     it("should fail to read bytes beyond range", async () => {

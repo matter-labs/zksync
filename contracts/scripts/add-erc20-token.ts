@@ -1,5 +1,4 @@
-import {ethers} from "ethers";
-import {bigNumberify} from "ethers/utils";
+import {BigNumber, ethers} from "ethers";
 import {Deployer} from "../src.ts/deploy";
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -11,7 +10,7 @@ async function main() {
     console.log("Adding new ERC20 token to network: ", tokenAddress);
     const tx = await deployer
         .governanceContract(governorWallet)
-        .addToken(tokenAddress, {gasLimit: bigNumberify("1000000")});
+        .addToken(tokenAddress, {gasLimit: BigNumber.from("1000000")});
     console.log("tx hash: ", tx.hash);
     const receipt = await tx.wait();
     console.log("status: ", receipt.status);
