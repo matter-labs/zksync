@@ -1,13 +1,41 @@
 //! Data to be used in tests as the input for `ETHSender`.
 
+use std::time::SystemTime;
 // External uses
+use chrono::DateTime;
 use lazy_static::lazy_static;
 // Workspace uses
-use models::node::{block::Block, Fr};
+use models::node::{
+    block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FranklinOp,
+    FranklinPriorityOp, FullExit, FullExitOp, PriorityOp,
+};
 use models::{Action, Operation};
 
 /// Creates a dummy operation as a test input for `ETHSender` tests.
 fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
+    // Create full exit operation for non-zero return data.
+    let executed_full_exit_op = {
+        let priority_op = FullExit {
+            account_id: 0,
+            eth_address: Address::zero(),
+            token: 0,
+        };
+        ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
+            priority_op: PriorityOp {
+                serial_id: 0,
+                data: FranklinPriorityOp::FullExit(priority_op.clone()),
+                deadline_block: 0,
+                eth_hash: Vec::new(),
+                eth_block: 0,
+            },
+            op: FranklinOp::FullExit(Box::new(FullExitOp {
+                priority_op,
+                withdraw_amount: None,
+            })),
+            block_index: 0,
+            created_at: DateTime::from(SystemTime::UNIX_EPOCH),
+        }))
+    };
     Operation {
         id: Some(id),
         action,
@@ -15,7 +43,7 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
             block_number,
             Fr::default(),
             0,
-            Vec::new(),
+            vec![executed_full_exit_op],
             (0, 0),
             50,
             1_000_000.into(),

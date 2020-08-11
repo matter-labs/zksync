@@ -1,6 +1,5 @@
-import {Contract, ethers} from "ethers";
-import {AddressZero} from "ethers/constants";
-import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
+import {Contract, ethers, constants, BigNumber} from "ethers";
+import { parseEther} from "ethers/lib/utils";
 import {ETHProxy} from "zksync";
 import {Address, TokenAddress} from "zksync/build/types";
 import {
@@ -19,7 +18,7 @@ async function onchainTokenBalanceOfContract(ethWallet: ethers.Wallet, contractA
         IERC20_INTERFACE.abi,
         ethWallet,
     );
-    return bigNumberify(await erc20contract.balanceOf(contractAddress));
+    return BigNumber.from(await erc20contract.balanceOf(contractAddress));
 }
 
 async function onchainBalance(ethWallet: ethers.Wallet, token: Address): Promise<BigNumber> {
@@ -31,7 +30,7 @@ async function onchainBalance(ethWallet: ethers.Wallet, token: Address): Promise
             IERC20_INTERFACE.abi,
             ethWallet,
         );
-        return bigNumberify(await erc20contract.balanceOf(ethWallet.address));
+        return BigNumber.from(await erc20contract.balanceOf(ethWallet.address));
     }
 }
 
@@ -67,7 +66,7 @@ describe("zkSync process tokens which have no return value in `transfer` and `tr
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
-        const contractBalanceBefore = bigNumberify((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
+        const contractBalanceBefore = BigNumber.from((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
         if (token === ethers.constants.AddressZero) {
             const tx = await zksyncContract.withdrawETH(amount);
             const receipt = await tx.wait();
@@ -77,10 +76,10 @@ describe("zkSync process tokens which have no return value in `transfer` and `tr
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
 
-        const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
+        const expectedBalance = token == constants.AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
 
-        const contractBalanceAfter = bigNumberify((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
+        const contractBalanceAfter = BigNumber.from((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
         const expectedContractBalance = contractBalanceBefore.sub(amount);
         expect(contractBalanceAfter.toString(), "withdraw contract balance mismatch").eq(expectedContractBalance.toString());
     }
@@ -189,7 +188,7 @@ describe("zkSync process tokens which take fee from sender", function() {
             readContractCode("MintableERC20FeeAndDividendsTest"), [true, true],
             {gasLimit: 5000000},
         );
-        FEE_AMOUNT = bigNumberify((await tokenContract.FEE_AMOUNT_AS_VALUE()));
+        FEE_AMOUNT = BigNumber.from((await tokenContract.FEE_AMOUNT_AS_VALUE()));
         await tokenContract.mint(wallet.address, parseEther("1000000"));
 
         const govContract = deployer.governanceContract(wallet);
@@ -213,7 +212,7 @@ describe("zkSync process tokens which take fee from sender", function() {
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
 
-        const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
+        const expectedBalance = token == constants.AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
     }
 
@@ -301,7 +300,7 @@ describe("zkSync process tokens which take fee from recipient", function() {
             readContractCode("MintableERC20FeeAndDividendsTest"), [true, false],
             {gasLimit: 5000000},
         );
-        FEE_AMOUNT = bigNumberify((await tokenContract.FEE_AMOUNT_AS_VALUE()));
+        FEE_AMOUNT = BigNumber.from((await tokenContract.FEE_AMOUNT_AS_VALUE()));
         await tokenContract.mint(wallet.address, parseEther("1000000"));
 
         const govContract = deployer.governanceContract(wallet);
@@ -344,7 +343,7 @@ describe("zkSync process tokens which adds dividends to recipient", function() {
             readContractCode("MintableERC20FeeAndDividendsTest"), [false, false],
             {gasLimit: 5000000},
         );
-        DIVIDEND_AMOUNT = bigNumberify((await tokenContract.DIVIDEND_AMOUNT_AS_VALUE()));
+        DIVIDEND_AMOUNT = BigNumber.from((await tokenContract.DIVIDEND_AMOUNT_AS_VALUE()));
         await tokenContract.mint(wallet.address, parseEther("1000000"));
 
         const govContract = deployer.governanceContract(wallet);

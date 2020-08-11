@@ -1,7 +1,6 @@
 const ethers = require("ethers")
 const { expect, use } = require("chai")
-const { createMockProvider, getWallets, solidity, deployContract } = require("ethereum-waffle");
-const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
+const { defaultAccounts, solidity, deployContract, MockProvider } = require("ethereum-waffle");
 
 const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
 const {rawEncode} = require('ethereumjs-abi')
@@ -14,8 +13,8 @@ const {rawEncode} = require('ethereumjs-abi')
 
 // For: ganache
 
-const provider = createMockProvider() //{gasLimit: 7000000, gasPrice: 2000000000});
-const [wallet, wallet1, wallet2, exitWallet]  = getWallets(provider);
+const provider = new MockProvider({ ganacheOptions: { gasLimit: "8000000", gasPrice: "1"}});
+const [wallet, wallet1, wallet2, exitWallet]  = provider.getWallets();
 
 use(solidity);
 
@@ -45,7 +44,7 @@ async function deployProxyContract(
             gasLimit: 3000000,
         });
 
-        const returnContract = new ethers.Contract(proxy.address, contractCode.interface, wallet);
+        const returnContract = new ethers.Contract(proxy.address, contractCode.abi, wallet);
         return [returnContract, contract.address];
     } catch (err) {
         console.log('Error deploying proxy contract: ', err)

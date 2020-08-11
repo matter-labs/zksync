@@ -3,7 +3,7 @@ import {
     signTransactionBytes,
     privateKeyToPubKeyHash
 } from "./crypto";
-import { ethers, utils } from "ethers";
+import {BigNumber, BigNumberish, ethers} from "ethers";
 import {
     packAmountChecked,
     packFeeChecked,
@@ -39,8 +39,8 @@ export class Signer {
         from: Address;
         to: Address;
         tokenId: number;
-        amount: utils.BigNumberish;
-        fee: utils.BigNumberish;
+        amount: BigNumberish;
+        fee: BigNumberish;
         nonce: number;
     }): Transfer {
         const type = Buffer.from([5]); // tx type
@@ -70,8 +70,8 @@ export class Signer {
             from: transfer.from,
             to: transfer.to,
             token: transfer.tokenId,
-            amount: utils.bigNumberify(transfer.amount).toString(),
-            fee: utils.bigNumberify(transfer.fee).toString(),
+            amount: BigNumber.from(transfer.amount).toString(),
+            fee: BigNumber.from(transfer.fee).toString(),
             nonce: transfer.nonce,
             signature
         };
@@ -82,8 +82,8 @@ export class Signer {
         from: Address;
         ethAddress: string;
         tokenId: number;
-        amount: utils.BigNumberish;
-        fee: utils.BigNumberish;
+        amount: BigNumberish;
+        fee: BigNumberish;
         nonce: number;
     }): Withdraw {
         const typeBytes = Buffer.from([3]);
@@ -111,8 +111,8 @@ export class Signer {
             from: withdraw.from,
             to: withdraw.ethAddress,
             token: withdraw.tokenId,
-            amount: utils.bigNumberify(withdraw.amount).toString(),
-            fee: utils.bigNumberify(withdraw.fee).toString(),
+            amount: BigNumber.from(withdraw.amount).toString(),
+            fee: BigNumber.from(withdraw.fee).toString(),
             nonce: withdraw.nonce,
             signature
         };
@@ -197,18 +197,18 @@ export function serializeTokenId(tokenId: number): Buffer {
     return buffer;
 }
 
-export function serializeAmountPacked(amount: utils.BigNumberish): Buffer {
-    const bnAmount = new BN(utils.bigNumberify(amount).toString());
+export function serializeAmountPacked(amount: BigNumberish): Buffer {
+    const bnAmount = new BN(BigNumber.from(amount).toString());
     return packAmountChecked(bnAmount);
 }
 
-export function serializeAmountFull(amount: utils.BigNumberish): Buffer {
-    const bnAmount = new BN(utils.bigNumberify(amount).toString());
+export function serializeAmountFull(amount: BigNumberish): Buffer {
+    const bnAmount = new BN(BigNumber.from(amount).toString());
     return bnAmount.toArrayLike(Buffer, "be", 16);
 }
 
-export function serializeFeePacked(fee: utils.BigNumberish): Buffer {
-    const bnFee = new BN(utils.bigNumberify(fee).toString());
+export function serializeFeePacked(fee: BigNumberish): Buffer {
+    const bnFee = new BN(BigNumber.from(fee).toString());
     return packFeeChecked(bnFee);
 }
 

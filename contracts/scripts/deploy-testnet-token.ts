@@ -3,7 +3,6 @@ import {ethers, Wallet} from "ethers";
 import {readContractCode} from "../src.ts/deploy";
 import {encodeConstructorArgs, publishSourceCodeToEtherscan} from "../src.ts/publish-utils";
 import * as fs from "fs";
-import {formatUnits, parseUnits} from "ethers/utils";
 import {ArgumentParser} from "argparse";
 
 

@@ -17,6 +17,7 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local uses
+use server::prometheus_exporter::start_prometheus_exporter;
 use server::{
     api_server::start_api_server,
     block_proposer::run_block_proposer_task,
@@ -226,13 +227,16 @@ fn main() {
     );
 
     let ticker_task = run_ticker_task(
-        config_opts.ticker_url,
-        connection_pool,
+        config_opts.ticker_url.clone(),
+        connection_pool.clone(),
         eth_send_request_sender,
         state_keeper_req_sender,
         ticker_request_receiver,
         &main_runtime,
     );
+
+    let prometheus_exporter =
+        start_prometheus_exporter(connection_pool, &config_opts, &main_runtime);
 
     let task_futures = vec![
         eth_watch_task,
@@ -242,6 +246,7 @@ fn main() {
         mempool_task,
         proposer_task,
         ticker_task,
+        prometheus_exporter,
     ];
 
     main_runtime.block_on(async move {

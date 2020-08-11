@@ -1,7 +1,7 @@
 import {deployContract} from "ethereum-waffle";
 import {ethers, Wallet} from "ethers";
-import {parseEther} from "ethers/utils";
 import {readContractCode} from "../src.ts/deploy";
+import {parseEther} from "ethers/lib/utils";
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
@@ -10,7 +10,7 @@ async function main() {
 
     const result = [];
 
-    for (const token of [{symbol: "DAI", decimals: 18}, {symbol: "wBTC", decimals: 8}, {symbol: "BAT", decimals: 18}]) {
+    for (const token of [{symbol: "DAI", decimals: 18}, {symbol: "wBTC", decimals: 8}, {symbol: "BAT", decimals: 18}, {symbol: "MLTT", decimals: 18}]) {
         const erc20 = await deployContract(
             wallet,
             readContractCode("TEST-ERC20"), [],

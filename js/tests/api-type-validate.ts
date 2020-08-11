@@ -12,7 +12,6 @@ import { Interface as TransactionInterface } from './api-types/transaction';
 
 import * as zksync from 'zksync';
 import * as ethers from 'ethers';
-import { bigNumberify, parseEther, formatEther } from 'ethers/utils';
 
 
 const apiTypesFolder = './api-types';

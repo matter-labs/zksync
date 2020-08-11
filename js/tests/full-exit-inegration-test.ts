@@ -4,7 +4,6 @@ import {
     ETHProxy, getDefaultProvider, types
 } from "zksync";
 import { ethers, utils } from "ethers";
-import {parseEther} from "ethers/utils";
 
 let syncProvider: Provider;
 
@@ -100,7 +99,7 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
                 ethWallet2,
                 syncProvider,
             );
-            await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.5")})).wait();
+            await (await ethWallet.sendTransaction({to: ethWallet2.address, value: utils.parseEther("0.5")})).wait();
 
             await testRandomAccountFullExit(syncWallet2, token);
             const deposit = await depositWallet.depositToSyncFromEthereum({
