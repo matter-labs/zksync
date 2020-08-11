@@ -1,5 +1,8 @@
 # zkSync changelog
 
+### zksync.js 0.6.0 
+- Upgrade ethers to ^5.0.0 
+
 ### zkSync
 
 - Server: Robustness of the fee ticker's API interacting module was increased. [#786]
