@@ -4,7 +4,7 @@ use super::FranklinTx;
 use crate::node::tx::ChangePubKey;
 use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
-    FranklinPriorityOp, FullExit, PubKeyHash, Transfer, Withdraw,
+    ForcedExit, FranklinPriorityOp, FullExit, PubKeyHash, Transfer, Withdraw,
 };
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
@@ -320,6 +320,106 @@ impl WithdrawOp {
         })
     }
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForcedExitOp {
+    pub tx: ForcedExit,
+    pub account_id: AccountId,
+    /// None if withdraw was unsuccessful
+    pub withdraw_amount: Option<BigUintSerdeWrapper>,
+}
+
+impl ForcedExitOp {
+    pub const CHUNKS: usize = 6;
+    pub const OP_CODE: u8 = 0x03;
+    pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
+
+    fn get_public_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.push(Self::OP_CODE); // opcode
+        data.extend_from_slice(&self.account_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.from.as_bytes());
+        data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
+        data.extend_from_slice(
+            &self
+                .withdraw_amount
+                .clone()
+                .unwrap_or_default()
+                .0
+                .to_u128()
+                .unwrap()
+                .to_be_bytes(),
+        );
+        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
+        data
+    }
+
+    fn get_withdrawal_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
+        data.extend_from_slice(self.tx.from.as_bytes());
+        data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(
+            &self
+                .withdraw_amount
+                .clone()
+                .map(|a| a.0.to_u128().unwrap())
+                .unwrap_or(0)
+                .to_be_bytes(),
+        );
+        data
+    }
+
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(
+            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
+            "Wrong bytes length for withdraw pubdata"
+        );
+
+        let account_id_offset = 1;
+        let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
+        let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
+
+        let account_id = bytes_slice_to_uint32(&bytes[account_id_offset..eth_address_offset])
+            .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
+        let from = Address::from_slice(&bytes[eth_address_offset..token_offset]);
+        let token = bytes_slice_to_uint16(&bytes[token_offset..amount_offset])
+            .ok_or_else(|| format_err!("Cant get token id from full exit pubdata"))?;
+        let amount = BigUint::from_u128(
+            bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
+                .ok_or_else(|| format_err!("Cant get amount from full exit pubdata"))?,
+        )
+        .unwrap();
+
+        let nonce = 0; // From pubdata it is unknown
+        let fee = BigUint::from(0u64); // From pubdata it is unknown
+
+        // let account_offset = 1;
+        // let token_id_offset = account_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        // let fee_offset = token_id_offset + BALANCE_BIT_WIDTH / 8;
+        // let eth_address_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
+
+        // let account_id = bytes_slice_to_uint32(
+        //     &bytes[account_offset..account_offset + ACCOUNT_ID_BIT_WIDTH / 8],
+        // )
+        // .ok_or_else(|| format_err!("Cant get account id from withdraw pubdata"))?;
+        // let from = Address::zero(); // From pubdata it is unknown
+        // let token =
+        //     bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+        //         .ok_or_else(|| format_err!("Cant get token id from withdraw pubdata"))?;
+        // let fee = unpack_fee_amount(
+        //     &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
+        // )
+        // .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
+
+        Ok(Self {
+            tx: ForcedExit::new(account_id, from, token, fee, nonce, None),
+            account_id,
+            withdraw_amount: Some(amount.into()),
+        })
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloseOp {
@@ -534,6 +634,7 @@ pub enum FranklinOp {
     Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),
     ChangePubKeyOffchain(Box<ChangePubKeyOp>),
+    ForcedExit(Box<ForcedExitOp>),
 }
 
 impl FranklinOp {
@@ -547,6 +648,7 @@ impl FranklinOp {
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
             FranklinOp::FullExit(_) => FullExitOp::CHUNKS,
             FranklinOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
+            FranklinOp::ForcedExit(_) => ForcedExitOp::CHUNKS,
         }
     }
 
@@ -560,6 +662,7 @@ impl FranklinOp {
             FranklinOp::Transfer(op) => op.get_public_data(),
             FranklinOp::FullExit(op) => op.get_public_data(),
             FranklinOp::ChangePubKeyOffchain(op) => op.get_public_data(),
+            FranklinOp::ForcedExit(op) => op.get_public_data(),
         }
     }
 
@@ -574,6 +677,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Withdraw(op) => Some(op.get_withdrawal_data()),
             FranklinOp::FullExit(op) => Some(op.get_withdrawal_data()),
+            FranklinOp::ForcedExit(op) => Some(op.get_withdrawal_data()),
             _ => None,
         }
     }
@@ -603,6 +707,9 @@ impl FranklinOp {
             ChangePubKeyOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOffchain(Box::new(
                 ChangePubKeyOp::from_public_data(&bytes)?,
             ))),
+            ForcedExitOp::OP_CODE => Ok(FranklinOp::ForcedExit(Box::new(
+                ForcedExitOp::from_public_data(&bytes)?,
+            ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -617,6 +724,7 @@ impl FranklinOp {
             TransferOp::OP_CODE => Ok(TransferOp::CHUNKS),
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
+            ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
@@ -631,6 +739,7 @@ impl FranklinOp {
             FranklinOp::ChangePubKeyOffchain(op) => {
                 Ok(FranklinTx::ChangePubKey(Box::new(op.tx.clone())))
             }
+            FranklinOp::ForcedExit(op) => Ok(FranklinTx::ForcedExit(Box::new(op.tx.clone()))),
             _ => Err(format_err!("Wrong tx type")),
         }
     }
@@ -689,5 +798,11 @@ impl From<FullExitOp> for FranklinOp {
 impl From<ChangePubKeyOp> for FranklinOp {
     fn from(op: ChangePubKeyOp) -> Self {
         Self::ChangePubKeyOffchain(Box::new(op))
+    }
+}
+
+impl From<ForcedExitOp> for FranklinOp {
+    fn from(op: ForcedExitOp) -> Self {
+        Self::ForcedExit(Box::new(op))
     }
 }

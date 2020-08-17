@@ -21,12 +21,12 @@ pub use web3::types::{H256, U128, U256};
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{
-    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    ChangePubKeyOp, CloseOp, DepositOp, ForcedExitOp, FranklinOp, FullExitOp, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
-pub use self::tx::{Close, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
+pub use self::tx::{Close, ForcedExit, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
