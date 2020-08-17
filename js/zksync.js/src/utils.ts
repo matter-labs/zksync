@@ -6,9 +6,11 @@ import {
     TokenLike,
     Tokens,
     TokenSymbol,
-    EthSignerType
+    EthSignerType, Address
 } from "./types";
-import { serializeAccountId, serializeNonce } from "./signer";
+
+const MAX_NUMBER_OF_TOKENS = 128;
+const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").abi
@@ -44,7 +46,7 @@ export function floatToInteger(
     mantissaBits: number,
     expBaseNumber: number
 ): BN {
-    if (floatBytes.length * 8 != mantissaBits + expBits) {
+    if (floatBytes.length * 8 !== mantissaBits + expBits) {
         throw new Error("Float unpacking, incorrect input length");
     }
 
@@ -72,7 +74,7 @@ export function floatToInteger(
 }
 
 export function bitsIntoBytesInBEOrder(bits: boolean[]): Buffer {
-    if (bits.length % 8 != 0) {
+    if (bits.length % 8 !== 0) {
         throw new Error("wrong number of bits to pack");
     }
     const nBytes = bits.length / 8;
@@ -485,4 +487,74 @@ export async function getEthSignatureType(
         verificationMethod: "ERC-1271",
         isSignedMsgPrefixed: true
     };
+}
+
+function removeAddressPrefix(address: Address | PubKeyHash): string {
+    if (address.startsWith("0x")) return address.substr(2);
+
+    if (address.startsWith("sync:")) return address.substr(5);
+
+    throw new Error(
+        "ETH address must start with '0x' and PubKeyHash must start with 'sync:'"
+    );
+}
+
+// PubKeyHash or eth address
+export function serializeAddress(address: Address | PubKeyHash): Buffer {
+    const prefixlessAddress = removeAddressPrefix(address);
+
+    const addressBytes = Buffer.from(prefixlessAddress, "hex");
+    if (addressBytes.length !== 20) {
+        throw new Error("Address must be 20 bytes long");
+    }
+
+    return addressBytes;
+}
+
+export function serializeAccountId(accountId: number): Buffer {
+    if (accountId < 0) {
+        throw new Error("Negative account id");
+    }
+    if (accountId >= MAX_NUMBER_OF_ACCOUNTS) {
+        throw new Error("AccountId is too big");
+    }
+    const buffer = Buffer.alloc(4);
+    buffer.writeUInt32BE(accountId, 0);
+    return buffer;
+}
+
+export function serializeTokenId(tokenId: number): Buffer {
+    if (tokenId < 0) {
+        throw new Error("Negative tokenId");
+    }
+    if (tokenId >= MAX_NUMBER_OF_TOKENS) {
+        throw new Error("TokenId is too big");
+    }
+    const buffer = Buffer.alloc(2);
+    buffer.writeUInt16BE(tokenId, 0);
+    return buffer;
+}
+
+export function serializeAmountPacked(amount: BigNumberish): Buffer {
+    const bnAmount = new BN(BigNumber.from(amount).toString());
+    return packAmountChecked(bnAmount);
+}
+
+export function serializeAmountFull(amount: BigNumberish): Buffer {
+    const bnAmount = new BN(BigNumber.from(amount).toString());
+    return bnAmount.toArrayLike(Buffer, "be", 16);
+}
+
+export function serializeFeePacked(fee: BigNumberish): Buffer {
+    const bnFee = new BN(BigNumber.from(fee).toString());
+    return packFeeChecked(bnFee);
+}
+
+export function serializeNonce(nonce: number): Buffer {
+    if (nonce < 0) {
+        throw new Error("Negative nonce");
+    }
+    const buff = Buffer.alloc(4);
+    buff.writeUInt32BE(nonce, 0);
+    return buff;
 }

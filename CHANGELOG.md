@@ -1,7 +1,12 @@
 # zkSync changelog
 
-### zksync.js 0.6.0 
-- Upgrade ethers to ^5.0.0 
+### zksync.js 0.6.1
+
+- Bundled version added.
+
+### zksync.js 0.6.0
+
+- Upgrade ethers to ^5.0.0
 
 ### zkSync
 

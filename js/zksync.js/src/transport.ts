@@ -1,6 +1,7 @@
 import Axios from "axios";
 import WebSocketAsPromised = require("websocket-as-promised");
-const W3CWebSocket = require("websocket").w3cwebsocket;
+import * as websocket from "websocket";
+const W3CWebSocket = websocket.w3cwebsocket;
 
 export abstract class AbstractJSONRPCTransport {
     abstract async request(method: string, params): Promise<any>;
