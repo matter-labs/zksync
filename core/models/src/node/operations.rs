@@ -337,10 +337,9 @@ impl ForcedExitOp {
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.target_account_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.initiator_account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.target.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(
             &self
                 .withdraw_amount
@@ -351,6 +350,7 @@ impl ForcedExitOp {
                 .unwrap()
                 .to_be_bytes(),
         );
+        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
@@ -381,8 +381,10 @@ impl ForcedExitOp {
         let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
+        let fee_offset = amount_offset + BALANCE_BIT_WIDTH / 8;
+        let fee_end = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
-        let target_account_id =
+        let initiator_account_id =
             bytes_slice_to_uint32(&bytes[account_id_offset..eth_address_offset])
                 .ok_or_else(|| format_err!("Cant get account id from forced exit pubdata"))?;
         let target = Address::from_slice(&bytes[eth_address_offset..token_offset]);
@@ -393,10 +395,11 @@ impl ForcedExitOp {
                 .ok_or_else(|| format_err!("Cant get amount from forced exit pubdata"))?,
         )
         .unwrap();
+        let fee = unpack_fee_amount(&bytes[fee_offset..fee_end])
+            .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
 
-        let initiator_account_id = 0; // From pubdata it is unknown
+        let target_account_id = 0; // From pubdata it is unknown
         let nonce = 0; // From pubdata it is unknown
-        let fee = BigUint::from(0u64); // From pubdata it is unknown
 
         Ok(Self {
             tx: ForcedExit::new(initiator_account_id, target, token, fee, nonce, None),

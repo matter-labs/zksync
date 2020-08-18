@@ -1,8 +1,11 @@
 // External deps
 use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::node::operations::ChangePubKeyOp;
-use plasma::state::CollectedFee;
+use models::node::{tx::ChangePubKey, ChangePubKeyOp};
+use plasma::{
+    handler::TxHandler,
+    state::{CollectedFee, PlasmaState},
+};
 // Local deps
 use crate::witness::{
     change_pubkey_offchain::ChangePubkeyOffChainWitness,
@@ -29,10 +32,10 @@ fn test_change_pubkey_offchain_success() {
         change_pkhash_op,
         (),
         |plasma_state, op| {
-            let fee = plasma_state
-                .apply_change_pubkey_op(op)
+            let fee = <PlasmaState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
                 .expect("Operation failed")
-                .0;
+                .0
+                .unwrap();
 
             vec![fee]
         },

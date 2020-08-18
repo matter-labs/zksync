@@ -17,7 +17,7 @@ mod withdraw;
 /// Template parameter `Tx` represents a type of transaction being handled.
 /// It has to be a template parameter rather than an associated type, so
 /// there may be more than one trait implementation for a structure.
-pub(crate) trait TxHandler<Tx> {
+pub trait TxHandler<Tx> {
     /// Operation wrapper for the transaction.
     type Op;
 

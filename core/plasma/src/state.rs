@@ -37,7 +37,7 @@ pub struct CollectedFee {
 
 /// Helper enum to unify Transfer / TransferToNew operations.
 #[derive(Debug)]
-pub(crate) enum TransferOutcome {
+pub enum TransferOutcome {
     Transfer(TransferOp),
     TransferToNew(TransferToNewOp),
 }
