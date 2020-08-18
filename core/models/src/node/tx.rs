@@ -354,7 +354,9 @@ impl Withdraw {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ForcedExit {
-    pub account_id: AccountId,
+    /// Account ID of the transaction initiator.
+    pub initiator_account_id: AccountId,
+    /// Address of the account to withdraw funds from.
     pub from: Address,
     pub token: TokenId,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
@@ -371,7 +373,7 @@ impl ForcedExit {
     /// Creates transaction from parts
     /// signature is optional, because sometimes we don't know it (i.e. data_restore)
     pub fn new(
-        account_id: AccountId,
+        initiator_account_id: AccountId,
         from: Address,
         token: TokenId,
         fee: BigUint,
@@ -379,7 +381,7 @@ impl ForcedExit {
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
-            account_id,
+            initiator_account_id,
             from,
             token,
             fee,
@@ -413,7 +415,7 @@ impl ForcedExit {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account_id.to_be_bytes());
+        out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -423,7 +425,7 @@ impl ForcedExit {
 
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = is_fee_amount_packable(&self.fee)
-            && self.account_id <= max_account_id()
+            && self.initiator_account_id <= max_account_id()
             && self.token <= max_token_id();
 
         if valid {

@@ -323,20 +323,21 @@ impl WithdrawOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForcedExitOp {
     pub tx: ForcedExit,
-    pub account_id: AccountId,
+    /// Account ID of the account to which ForcedExit is applied.
+    pub target_account_id: AccountId,
     /// None if withdraw was unsuccessful
     pub withdraw_amount: Option<BigUintSerdeWrapper>,
 }
 
 impl ForcedExitOp {
     pub const CHUNKS: usize = 6;
-    pub const OP_CODE: u8 = 0x03;
+    pub const OP_CODE: u8 = 0x09;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.account_id.to_be_bytes());
+        data.extend_from_slice(&self.target_account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.from.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
@@ -381,8 +382,9 @@ impl ForcedExitOp {
         let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
 
-        let account_id = bytes_slice_to_uint32(&bytes[account_id_offset..eth_address_offset])
-            .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
+        let target_account_id =
+            bytes_slice_to_uint32(&bytes[account_id_offset..eth_address_offset])
+                .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
         let from = Address::from_slice(&bytes[eth_address_offset..token_offset]);
         let token = bytes_slice_to_uint16(&bytes[token_offset..amount_offset])
             .ok_or_else(|| format_err!("Cant get token id from full exit pubdata"))?;
@@ -392,12 +394,13 @@ impl ForcedExitOp {
         )
         .unwrap();
 
+        let initiator_account_id = 0; // From pubdata it is unknown
         let nonce = 0; // From pubdata it is unknown
         let fee = BigUint::from(0u64); // From pubdata it is unknown
 
         Ok(Self {
-            tx: ForcedExit::new(account_id, from, token, fee, nonce, None),
-            account_id,
+            tx: ForcedExit::new(initiator_account_id, from, token, fee, nonce, None),
+            target_account_id,
             withdraw_amount: Some(amount.into()),
         })
     }
