@@ -35,7 +35,7 @@ impl TxHandler<ForcedExit> for PlasmaState {
             .ok_or_else(|| format_err!("Target account does not exist"))?;
         ensure!(
             account.pub_key_hash == PubKeyHash::default(),
-            "Account is not locked; forced exit is forbidden"
+            "Target account is not locked; forced exit is forbidden"
         );
 
         // Obtain the token balance to be withdrawn.
@@ -69,9 +69,6 @@ impl TxHandler<ForcedExit> for PlasmaState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
-        // TODO: We must check that target account is older than 24 hours. It is mandatory,
-        // since we must give new account owners some time to set a signing key.
-
         ensure!(
             op.tx.initiator_account_id <= params::max_account_id(),
             "Incorrect initiator account ID"
