@@ -395,24 +395,6 @@ impl ForcedExitOp {
         let nonce = 0; // From pubdata it is unknown
         let fee = BigUint::from(0u64); // From pubdata it is unknown
 
-        // let account_offset = 1;
-        // let token_id_offset = account_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        // let fee_offset = token_id_offset + BALANCE_BIT_WIDTH / 8;
-        // let eth_address_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
-
-        // let account_id = bytes_slice_to_uint32(
-        //     &bytes[account_offset..account_offset + ACCOUNT_ID_BIT_WIDTH / 8],
-        // )
-        // .ok_or_else(|| format_err!("Cant get account id from withdraw pubdata"))?;
-        // let from = Address::zero(); // From pubdata it is unknown
-        // let token =
-        //     bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-        //         .ok_or_else(|| format_err!("Cant get token id from withdraw pubdata"))?;
-        // let fee = unpack_fee_amount(
-        //     &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
-        // )
-        // .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
-
         Ok(Self {
             tx: ForcedExit::new(account_id, from, token, fee, nonce, None),
             account_id,
