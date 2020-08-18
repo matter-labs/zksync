@@ -357,7 +357,7 @@ pub struct ForcedExit {
     /// Account ID of the transaction initiator.
     pub initiator_account_id: AccountId,
     /// Address of the account to withdraw funds from.
-    pub from: Address,
+    pub target: Address,
     pub token: TokenId,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
@@ -374,7 +374,7 @@ impl ForcedExit {
     /// signature is optional, because sometimes we don't know it (i.e. data_restore)
     pub fn new(
         initiator_account_id: AccountId,
-        from: Address,
+        target: Address,
         token: TokenId,
         fee: BigUint,
         nonce: Nonce,
@@ -382,7 +382,7 @@ impl ForcedExit {
     ) -> Self {
         let mut tx = Self {
             initiator_account_id,
-            from,
+            target,
             token,
             fee,
             nonce,
@@ -416,7 +416,7 @@ impl ForcedExit {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.initiator_account_id.to_be_bytes());
-        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(&self.target.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -612,7 +612,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(tx) => tx.from,
             FranklinTx::Close(tx) => tx.account,
             FranklinTx::ChangePubKey(tx) => tx.account,
-            FranklinTx::ForcedExit(tx) => tx.from,
+            FranklinTx::ForcedExit(tx) => tx.target,
         }
     }
 

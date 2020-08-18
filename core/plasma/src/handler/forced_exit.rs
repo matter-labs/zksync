@@ -31,7 +31,7 @@ impl TxHandler<ForcedExit> for PlasmaState {
 
         // Check that target account does not have an account ID set.
         let (target_account_id, account) = self
-            .get_account_by_address(&tx.from)
+            .get_account_by_address(&tx.target)
             .ok_or_else(|| format_err!("Target account does not exist"))?;
         ensure!(
             account.pub_key_hash == PubKeyHash::default(),
@@ -41,7 +41,7 @@ impl TxHandler<ForcedExit> for PlasmaState {
         // Obtain the token balance to be withdrawn.
         let account_balance = self
             .get_account(target_account_id)
-            .filter(|account| account.address == tx.from)
+            .filter(|account| account.address == tx.target)
             .map(|account| account.get_balance(tx.token))
             .map(BigUintSerdeWrapper);
 
