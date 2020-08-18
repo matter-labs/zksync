@@ -1,5 +1,15 @@
 # zkSync changelog
 
+### zksync.js 0.6.2
+
+- Bundled version with new `zksync-crypto` is used for browser by default, now builds with bundlers should copy `zksync-crypto-web_bg.wasm` file
+  manually.
+- `zksync.crypto.loadZkSyncCrypto()` method is added for browser builds that loads and compiles `zksync-crypto-web_bg.wasm` file.
+
+### zksync-crypto 0.3.0
+
+- Now file for browser does not include wasm file but downloads it. Code that uses bundlers for browser builds should also copy `wasm` file.  
+
 ### zksync.js 0.6.1
 
 - Bundled version added.

@@ -42,7 +42,7 @@ export class Signer {
         fee: BigNumberish;
         nonce: number;
     }): Transfer {
-        const type = Buffer.from([5]); // tx type
+        const type = new Uint8Array([5]); // tx type
         const accountId = serializeAccountId(transfer.accountId);
         const from = serializeAddress(transfer.from);
         const to = serializeAddress(transfer.to);
@@ -50,7 +50,7 @@ export class Signer {
         const amount = serializeAmountPacked(transfer.amount);
         const fee = serializeFeePacked(transfer.fee);
         const nonce = serializeNonce(transfer.nonce);
-        const msgBytes = Buffer.concat([
+        const msgBytes = ethers.utils.concat([
             type,
             accountId,
             from,
@@ -85,7 +85,7 @@ export class Signer {
         fee: BigNumberish;
         nonce: number;
     }): Withdraw {
-        const typeBytes = Buffer.from([3]);
+        const typeBytes = new Uint8Array([3]);
         const accountId = serializeAccountId(withdraw.accountId);
         const accountBytes = serializeAddress(withdraw.from);
         const ethAddressBytes = serializeAddress(withdraw.ethAddress);
@@ -93,7 +93,7 @@ export class Signer {
         const amountBytes = serializeAmountFull(withdraw.amount);
         const feeBytes = serializeFeePacked(withdraw.fee);
         const nonceBytes = serializeNonce(withdraw.nonce);
-        const msgBytes = Buffer.concat([
+        const msgBytes = ethers.utils.concat([
             typeBytes,
             accountId,
             accountBytes,
@@ -121,7 +121,7 @@ export class Signer {
         return new Signer(pk);
     }
 
-    static fromSeed(seed: Buffer): Signer {
+    static fromSeed(seed: Uint8Array): Signer {
         return new Signer(privateKeyFromSeed(seed));
     }
 
@@ -144,7 +144,7 @@ export class Signer {
             signature,
             address
         );
-        const seed = Buffer.from(signature.substr(2), "hex");
+        const seed = ethers.utils.arrayify(signature);
         const signer = Signer.fromSeed(seed);
         return { signer, ethSignatureType };
     }

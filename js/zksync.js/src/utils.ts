@@ -41,7 +41,7 @@ const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
 
 export function floatToInteger(
-    floatBytes: Buffer,
+    floatBytes: Uint8Array,
     expBits: number,
     mantissaBits: number,
     expBaseNumber: number
@@ -73,12 +73,12 @@ export function floatToInteger(
     return exponent.mul(mantissa);
 }
 
-export function bitsIntoBytesInBEOrder(bits: boolean[]): Buffer {
+export function bitsIntoBytesInBEOrder(bits: boolean[]): Uint8Array {
     if (bits.length % 8 !== 0) {
         throw new Error("wrong number of bits to pack");
     }
     const nBytes = bits.length / 8;
-    const resultBytes = Buffer.alloc(nBytes, 0);
+    const resultBytes = new Uint8Array(nBytes);
 
     for (let byte = 0; byte < nBytes; ++byte) {
         let value = 0;
@@ -118,7 +118,7 @@ export function integerToFloat(
     exp_bits: number,
     mantissa_bits: number,
     exp_base: number
-): Buffer {
+): Uint8Array {
     const max_exponent = new BN(10).pow(new BN((1 << exp_bits) - 1));
     const max_mantissa = new BN(2).pow(new BN(mantissa_bits)).subn(1);
 
@@ -152,11 +152,11 @@ export function integerToFloat(
         }
     }
 
-    return Buffer.from(bitsIntoBytesInBEOrder(encoding.reverse()).reverse());
+    return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
 }
 
-export function reverseBits(buffer: Buffer): Buffer {
-    const reversed = Buffer.from(buffer.reverse());
+export function reverseBits(buffer: Uint8Array): Uint8Array {
+    const reversed = buffer.reverse();
     reversed.map(b => {
         // reverse bits in byte
         b = ((b & 0xf0) >> 4) | ((b & 0x0f) << 4);
@@ -167,7 +167,7 @@ export function reverseBits(buffer: Buffer): Buffer {
     return reversed;
 }
 
-function packAmount(amount: BN): Buffer {
+function packAmount(amount: BN): Uint8Array {
     return reverseBits(
         integerToFloat(
             amount,
@@ -178,7 +178,7 @@ function packAmount(amount: BN): Buffer {
     );
 }
 
-function packFee(amount: BN): Buffer {
+function packFee(amount: BN): Uint8Array {
     return reverseBits(
         integerToFloat(
             amount,
@@ -189,7 +189,7 @@ function packFee(amount: BN): Buffer {
     );
 }
 
-export function packAmountChecked(amount: BN): Buffer {
+export function packAmountChecked(amount: BN): Uint8Array {
     if (
         closestPackableTransactionAmount(amount.toString()).toString() !==
         amount.toString()
@@ -199,7 +199,7 @@ export function packAmountChecked(amount: BN): Buffer {
     return packAmount(amount);
 }
 
-export function packFeeChecked(amount: BN): Buffer {
+export function packFeeChecked(amount: BN): Uint8Array {
     if (
         closestPackableTransactionFee(amount.toString()).toString() !==
         amount.toString()
@@ -371,33 +371,29 @@ export function getChangePubkeyMessage(
     nonce: number,
     accountId: number
 ): string {
-    const msgNonce = serializeNonce(nonce)
-        .toString("hex")
-        .toLowerCase();
-    const msgAccId = serializeAccountId(accountId)
-        .toString("hex")
-        .toLowerCase();
+    const msgNonce = utils.hexlify(serializeNonce(nonce))
+    const msgAccId = utils.hexlify(serializeAccountId(accountId))
     const pubKeyHashHex = pubKeyHash.replace("sync:", "").toLowerCase();
     const message =
         `Register zkSync pubkey:\n\n` +
         `${pubKeyHashHex}\n` +
-        `nonce: 0x${msgNonce}\n` +
-        `account id: 0x${msgAccId}\n\n` +
+        `nonce: ${msgNonce}\n` +
+        `account id: ${msgAccId}\n\n` +
         `Only sign this message for a trusted client!`;
     return message;
 }
 
 export function getSignedBytesFromMessage(
-    message: ethers.utils.BytesLike | string,
+    message: utils.BytesLike | string,
     addPrefix: boolean
 ): Uint8Array {
     let messageBytes =
         typeof message === "string"
-            ? ethers.utils.toUtf8Bytes(message)
-            : ethers.utils.arrayify(message);
+            ? utils.toUtf8Bytes(message)
+            : utils.arrayify(message);
     if (addPrefix) {
-        messageBytes = ethers.utils.concat([
-            ethers.utils.toUtf8Bytes(
+        messageBytes = utils.concat([
+            utils.toUtf8Bytes(
                 `\x19Ethereum Signed Message:\n${messageBytes.length}`
             ),
             messageBytes
@@ -461,8 +457,8 @@ export async function getEthSignatureType(
     const messageNoPrefix = getSignedBytesFromMessage(message, false);
     const messageWithPrefix = getSignedBytesFromMessage(message, true);
 
-    const prefixedECDSASigner = ethers.utils.recoverAddress(
-        ethers.utils.keccak256(messageWithPrefix),
+    const prefixedECDSASigner = utils.recoverAddress(
+        utils.keccak256(messageWithPrefix),
         signature
     );
     if (prefixedECDSASigner.toLowerCase() === address.toLowerCase()) {
@@ -472,8 +468,8 @@ export async function getEthSignatureType(
         };
     }
 
-    const notPrefixedMsgECDSASigner = ethers.utils.recoverAddress(
-        ethers.utils.keccak256(messageNoPrefix),
+    const notPrefixedMsgECDSASigner = utils.recoverAddress(
+        utils.keccak256(messageNoPrefix),
         signature
     );
     if (notPrefixedMsgECDSASigner.toLowerCase() === address.toLowerCase()) {
@@ -500,10 +496,10 @@ function removeAddressPrefix(address: Address | PubKeyHash): string {
 }
 
 // PubKeyHash or eth address
-export function serializeAddress(address: Address | PubKeyHash): Buffer {
+export function serializeAddress(address: Address | PubKeyHash): Uint8Array {
     const prefixlessAddress = removeAddressPrefix(address);
 
-    const addressBytes = Buffer.from(prefixlessAddress, "hex");
+    const addressBytes = utils.arrayify(`0x${prefixlessAddress}`);
     if (addressBytes.length !== 20) {
         throw new Error("Address must be 20 bytes long");
     }
@@ -511,50 +507,53 @@ export function serializeAddress(address: Address | PubKeyHash): Buffer {
     return addressBytes;
 }
 
-export function serializeAccountId(accountId: number): Buffer {
+export function serializeAccountId(accountId: number): Uint8Array {
     if (accountId < 0) {
         throw new Error("Negative account id");
     }
     if (accountId >= MAX_NUMBER_OF_ACCOUNTS) {
         throw new Error("AccountId is too big");
     }
-    const buffer = Buffer.alloc(4);
-    buffer.writeUInt32BE(accountId, 0);
-    return buffer;
+    return numberToBytes(accountId, 4);
 }
 
-export function serializeTokenId(tokenId: number): Buffer {
+export function serializeTokenId(tokenId: number): Uint8Array {
     if (tokenId < 0) {
         throw new Error("Negative tokenId");
     }
     if (tokenId >= MAX_NUMBER_OF_TOKENS) {
         throw new Error("TokenId is too big");
     }
-    const buffer = Buffer.alloc(2);
-    buffer.writeUInt16BE(tokenId, 0);
-    return buffer;
+    return numberToBytes(tokenId, 2);
 }
 
-export function serializeAmountPacked(amount: BigNumberish): Buffer {
+export function serializeAmountPacked(amount: BigNumberish): Uint8Array {
     const bnAmount = new BN(BigNumber.from(amount).toString());
     return packAmountChecked(bnAmount);
 }
 
-export function serializeAmountFull(amount: BigNumberish): Buffer {
+export function serializeAmountFull(amount: BigNumberish): Uint8Array {
     const bnAmount = new BN(BigNumber.from(amount).toString());
-    return bnAmount.toArrayLike(Buffer, "be", 16);
+    return bnAmount.toArrayLike(Uint8Array, "be", 16);
 }
 
-export function serializeFeePacked(fee: BigNumberish): Buffer {
+export function serializeFeePacked(fee: BigNumberish): Uint8Array {
     const bnFee = new BN(BigNumber.from(fee).toString());
     return packFeeChecked(bnFee);
 }
 
-export function serializeNonce(nonce: number): Buffer {
+export function serializeNonce(nonce: number): Uint8Array {
     if (nonce < 0) {
         throw new Error("Negative nonce");
     }
-    const buff = Buffer.alloc(4);
-    buff.writeUInt32BE(nonce, 0);
-    return buff;
+    return numberToBytes(nonce, 4);
+}
+
+function numberToBytes(number, bytes): Uint8Array {
+        const result = new Uint8Array(bytes);
+        for (let i = bytes - 1; i >= 0; i--) {
+            result[i] = number & 0xff;
+            number >>= 8;
+        }
+        return result;
 }
