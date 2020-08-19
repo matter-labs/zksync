@@ -41,7 +41,7 @@ use crate::{
     },
 };
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 10;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
 pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
@@ -168,8 +168,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            // TransferFrom is not merged yet and thus skipped.
-            data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 1];
 
             // this operation is disabled for now
             // data[CloseOp::OP_CODE as usize] = vec![];
@@ -2248,6 +2247,25 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_rhs_signing_key_unset);
 
+        // Check that rhs has enough balance.
+        let diff_balance_withdraw = Expression::from(&rhs.balance.get_number())
+            - Expression::from(&op_data.amount_unpacked.get_number());
+
+        let diff_balance_withdraw_bits = diff_balance_withdraw.into_bits_le_fixed(
+            cs.namespace(|| "rhs balance-amount bits"),
+            params::BALANCE_BIT_WIDTH,
+        )?;
+
+        let diff_balance_withdraw_repacked =
+            Expression::from_le_bits::<CS>(&diff_balance_withdraw_bits);
+
+        let is_balance_geq_amount = Boolean::from(Expression::equals(
+            cs.namespace(|| "RHS is_balance_geq_amount: diff equal to repacked"),
+            diff_balance_withdraw,
+            diff_balance_withdraw_repacked,
+        )?);
+        rhs_valid_flags.push(is_balance_geq_amount);
+
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
@@ -2685,6 +2703,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     points.push(get_xy(TransferToNewOp::OP_CODE, TransferToNewOp::CHUNKS));
     points.push(get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS));
     points.push(get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS));
+    points.push(get_xy(ForcedExitOp::OP_CODE, ForcedExitOp::CHUNKS));
 
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);

@@ -159,7 +159,7 @@ impl<E: RescueEngine> ForcedExitWitness<E> {
         let mut sig_bits = vec![];
         append_be_fixed_width(
             &mut sig_bits,
-            &Fr::from_str("9").unwrap(), //Corresponding tx_type
+            &Fr::from_str("8").unwrap(), //Corresponding tx_type
             TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
@@ -381,7 +381,7 @@ impl ForcedExitWitness<Bn256> {
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("9").unwrap()),
+            tx_type: Some(Fr::from_str("8").unwrap()),
         }
     }
 }

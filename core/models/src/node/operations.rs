@@ -331,7 +331,7 @@ pub struct ForcedExitOp {
 
 impl ForcedExitOp {
     pub const CHUNKS: usize = 2;
-    pub const OP_CODE: u8 = 0x09;
+    pub const OP_CODE: u8 = 0x08;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     fn get_public_data(&self) -> Vec<u8> {

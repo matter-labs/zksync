@@ -368,7 +368,7 @@ pub struct ForcedExit {
 }
 
 impl ForcedExit {
-    const TX_TYPE: u8 = 9;
+    const TX_TYPE: u8 = 8;
 
     /// Creates transaction from parts
     /// signature is optional, because sometimes we don't know it (i.e. data_restore)
