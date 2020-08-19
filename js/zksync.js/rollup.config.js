@@ -2,7 +2,7 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import copy from 'rollup-plugin-copy';
-import { terser } from "rollup-plugin-terser";
+import {terser} from "rollup-plugin-terser";
 
 function resolveWithZksyncCryptoReplace(options) {
     const plugin = resolve(options);
@@ -18,9 +18,9 @@ function resolveWithZksyncCryptoReplace(options) {
 }
 
 export default [
-	{
-		input: 'build/index.js',
-		output: {
+    {
+        input: 'build/index.js',
+        output: {
             file: 'dist/main.js',
             format: 'iife',
             name: 'zksync',
@@ -29,17 +29,17 @@ export default [
             },
         },
         external: ['ethers'],
-		plugins: [
+        plugins: [
             resolveWithZksyncCryptoReplace({
                 browser: true,
             }),
-			commonjs(),
+            commonjs(),
             json(),
             copy({
-                targets: [{ src: 'node_modules/zksync-crypto/dist/zksync-crypto-web_bg.wasm', dest: 'dist/'}],
+                targets: [{src: 'node_modules/zksync-crypto/dist/zksync-crypto-web_bg.wasm', dest: 'dist/'}],
                 verbose: true
             }),
             terser(),
-		]
-	},
+        ]
+    },
 ];

@@ -1,4 +1,3 @@
-import BN = require("bn.js");
 import { utils, constants, ethers, BigNumber, BigNumberish } from "ethers";
 import {
     PubKeyHash,
@@ -46,35 +45,34 @@ export function floatToInteger(
     expBits: number,
     mantissaBits: number,
     expBaseNumber: number
-): BN {
+): BigNumber {
     if (floatBytes.length * 8 !== mantissaBits + expBits) {
         throw new Error("Float unpacking, incorrect input length");
     }
 
-    const floatHolder = new BN(floatBytes, 16, "be"); // keep bit order
-    const expBase = new BN(expBaseNumber);
-    let exponent = new BN(0);
-    let expPow2 = new BN(1);
-    const two = new BN(2);
+    const bits = buffer2bitsBE(floatBytes).reverse();
+    let exponent = BigNumber.from(0);
+    let expPow2 = BigNumber.from(1);
     for (let i = 0; i < expBits; i++) {
-        if (floatHolder.testn(i)) {
+        if (bits[i] === 1) {
             exponent = exponent.add(expPow2);
         }
-        expPow2 = expPow2.mul(two);
+        expPow2 = expPow2.mul(2);
     }
-    exponent = expBase.pow(exponent);
-    let mantissa = new BN(0);
-    let mantissaPow2 = new BN(1);
+    exponent = BigNumber.from(expBaseNumber).pow(exponent);
+
+    let mantissa = BigNumber.from(0);
+    let mantissaPow2 = BigNumber.from(1);
     for (let i = expBits; i < expBits + mantissaBits; i++) {
-        if (floatHolder.testn(i)) {
+        if (bits[i] === 1) {
             mantissa = mantissa.add(mantissaPow2);
         }
-        mantissaPow2 = mantissaPow2.mul(two);
+        mantissaPow2 = mantissaPow2.mul(2);
     }
     return exponent.mul(mantissa);
 }
 
-export function bitsIntoBytesInBEOrder(bits: boolean[]): Uint8Array {
+export function bitsIntoBytesInBEOrder(bits: number[]): Uint8Array {
     if (bits.length % 8 !== 0) {
         throw new Error("wrong number of bits to pack");
     }
@@ -83,28 +81,28 @@ export function bitsIntoBytesInBEOrder(bits: boolean[]): Uint8Array {
 
     for (let byte = 0; byte < nBytes; ++byte) {
         let value = 0;
-        if (bits[byte * 8]) {
+        if (bits[byte * 8] === 1) {
             value |= 0x80;
         }
-        if (bits[byte * 8 + 1]) {
+        if (bits[byte * 8 + 1] === 1) {
             value |= 0x40;
         }
-        if (bits[byte * 8 + 2]) {
+        if (bits[byte * 8 + 2] === 1) {
             value |= 0x20;
         }
-        if (bits[byte * 8 + 3]) {
+        if (bits[byte * 8 + 3] === 1) {
             value |= 0x10;
         }
-        if (bits[byte * 8 + 4]) {
+        if (bits[byte * 8 + 4] === 1) {
             value |= 0x08;
         }
-        if (bits[byte * 8 + 5]) {
+        if (bits[byte * 8 + 5] === 1) {
             value |= 0x04;
         }
-        if (bits[byte * 8 + 6]) {
+        if (bits[byte * 8 + 6] === 1) {
             value |= 0x02;
         }
-        if (bits[byte * 8 + 7]) {
+        if (bits[byte * 8 + 7] === 1) {
             value |= 0x01;
         }
 
@@ -114,14 +112,25 @@ export function bitsIntoBytesInBEOrder(bits: boolean[]): Uint8Array {
     return resultBytes;
 }
 
+function numberToBits(integer: number, bits: number): number[] {
+    const result = [];
+    for (let i = 0; i < bits; i++) {
+        result.push(integer & 1);
+        integer /= 2;
+    }
+    return result;
+}
+
 export function integerToFloat(
-    integer: BN,
+    integer: BigNumber,
     exp_bits: number,
     mantissa_bits: number,
     exp_base: number
 ): Uint8Array {
-    const max_exponent = new BN(10).pow(new BN((1 << exp_bits) - 1));
-    const max_mantissa = new BN(2).pow(new BN(mantissa_bits)).subn(1);
+    const max_exponent = BigNumber.from(10).pow(Math.pow(2, exp_bits) - 1);
+    const max_mantissa = BigNumber.from(2)
+        .pow(mantissa_bits)
+        .sub(1);
 
     if (integer.gt(max_mantissa.mul(max_exponent))) {
         throw new Error("Integer is too big");
@@ -130,28 +139,16 @@ export function integerToFloat(
     let exponent = 0;
     let mantissa = integer;
     while (mantissa.gt(max_mantissa)) {
-        mantissa = mantissa.divn(exp_base);
+        mantissa = mantissa.div(exp_base);
         exponent += 1;
     }
 
     // encode into bits. First bits of mantissa in LE order
     const encoding = [];
 
-    for (let i = 0; i < exp_bits; ++i) {
-        if ((exponent & (1 << i)) == 0) {
-            encoding.push(false);
-        } else {
-            encoding.push(true);
-        }
-    }
-
-    for (let i = 0; i < mantissa_bits; ++i) {
-        if (mantissa.testn(i)) {
-            encoding.push(true);
-        } else {
-            encoding.push(false);
-        }
-    }
+    encoding.push(...numberToBits(exponent, exp_bits));
+    const mantissaNumber = mantissa.toNumber();
+    encoding.push(...numberToBits(mantissaNumber, mantissa_bits));
 
     return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
 }
@@ -168,7 +165,7 @@ export function reverseBits(buffer: Uint8Array): Uint8Array {
     return reversed;
 }
 
-function packAmount(amount: BN): Uint8Array {
+function packAmount(amount: BigNumber): Uint8Array {
     return reverseBits(
         integerToFloat(
             amount,
@@ -179,7 +176,7 @@ function packAmount(amount: BN): Uint8Array {
     );
 }
 
-function packFee(amount: BN): Uint8Array {
+function packFee(amount: BigNumber): Uint8Array {
     return reverseBits(
         integerToFloat(
             amount,
@@ -190,7 +187,7 @@ function packFee(amount: BN): Uint8Array {
     );
 }
 
-export function packAmountChecked(amount: BN): Uint8Array {
+export function packAmountChecked(amount: BigNumber): Uint8Array {
     if (
         closestPackableTransactionAmount(amount.toString()).toString() !==
         amount.toString()
@@ -200,7 +197,7 @@ export function packAmountChecked(amount: BN): Uint8Array {
     return packAmount(amount);
 }
 
-export function packFeeChecked(amount: BN): Uint8Array {
+export function packFeeChecked(amount: BigNumber): Uint8Array {
     if (
         closestPackableTransactionFee(amount.toString()).toString() !==
         amount.toString()
@@ -218,15 +215,12 @@ export function packFeeChecked(amount: BN): Uint8Array {
 export function closestPackableTransactionAmount(
     amount: BigNumberish
 ): BigNumber {
-    const amountBN = new BN(BigNumber.from(amount).toString());
-    const packedAmount = packAmount(amountBN);
-    return BigNumber.from(
-        floatToInteger(
-            packedAmount,
-            AMOUNT_EXPONENT_BIT_WIDTH,
-            AMOUNT_MANTISSA_BIT_WIDTH,
-            10
-        ).toString()
+    const packedAmount = packAmount(BigNumber.from(amount));
+    return floatToInteger(
+        packedAmount,
+        AMOUNT_EXPONENT_BIT_WIDTH,
+        AMOUNT_MANTISSA_BIT_WIDTH,
+        10
     );
 }
 
@@ -240,15 +234,12 @@ export function isTransactionAmountPackable(amount: BigNumberish): boolean {
  * @param fee
  */
 export function closestPackableTransactionFee(fee: BigNumberish): BigNumber {
-    const feeBN = new BN(BigNumber.from(fee).toString());
-    const packedFee = packFee(feeBN);
-    return BigNumber.from(
-        floatToInteger(
-            packedFee,
-            FEE_EXPONENT_BIT_WIDTH,
-            FEE_MANTISSA_BIT_WIDTH,
-            10
-        ).toString()
+    const packedFee = packFee(BigNumber.from(fee));
+    return floatToInteger(
+        packedFee,
+        FEE_EXPONENT_BIT_WIDTH,
+        FEE_MANTISSA_BIT_WIDTH,
+        10
     );
 }
 
@@ -256,34 +247,18 @@ export function isTransactionFeePackable(amount: BigNumberish): boolean {
     return closestPackableTransactionFee(amount).eq(amount);
 }
 
-export function buffer2bitsLE(buff) {
-    const res = new Array(buff.length * 8);
-    for (let i = 0; i < buff.length; i++) {
-        const b = buff[i];
-        res[i * 8] = (b & 0x01) != 0;
-        res[i * 8 + 1] = (b & 0x02) != 0;
-        res[i * 8 + 2] = (b & 0x04) != 0;
-        res[i * 8 + 3] = (b & 0x08) != 0;
-        res[i * 8 + 4] = (b & 0x10) != 0;
-        res[i * 8 + 5] = (b & 0x20) != 0;
-        res[i * 8 + 6] = (b & 0x40) != 0;
-        res[i * 8 + 7] = (b & 0x80) != 0;
-    }
-    return res;
-}
-
 export function buffer2bitsBE(buff) {
     const res = new Array(buff.length * 8);
     for (let i = 0; i < buff.length; i++) {
         const b = buff[i];
-        res[i * 8] = (b & 0x80) != 0;
-        res[i * 8 + 1] = (b & 0x40) != 0;
-        res[i * 8 + 2] = (b & 0x20) != 0;
-        res[i * 8 + 3] = (b & 0x10) != 0;
-        res[i * 8 + 4] = (b & 0x08) != 0;
-        res[i * 8 + 5] = (b & 0x04) != 0;
-        res[i * 8 + 6] = (b & 0x02) != 0;
-        res[i * 8 + 7] = (b & 0x01) != 0;
+        res[i * 8] = (b & 0x80) !== 0 ? 1 : 0;
+        res[i * 8 + 1] = (b & 0x40) !== 0 ? 1 : 0;
+        res[i * 8 + 2] = (b & 0x20) !== 0 ? 1 : 0;
+        res[i * 8 + 3] = (b & 0x10) !== 0 ? 1 : 0;
+        res[i * 8 + 4] = (b & 0x08) !== 0 ? 1 : 0;
+        res[i * 8 + 5] = (b & 0x04) !== 0 ? 1 : 0;
+        res[i * 8 + 6] = (b & 0x02) !== 0 ? 1 : 0;
+        res[i * 8 + 7] = (b & 0x01) !== 0 ? 1 : 0;
     }
     return res;
 }
@@ -522,18 +497,16 @@ export function serializeTokenId(tokenId: number): Uint8Array {
 }
 
 export function serializeAmountPacked(amount: BigNumberish): Uint8Array {
-    const bnAmount = new BN(BigNumber.from(amount).toString());
-    return packAmountChecked(bnAmount);
+    return packAmountChecked(BigNumber.from(amount));
 }
 
 export function serializeAmountFull(amount: BigNumberish): Uint8Array {
-    const bnAmount = new BN(BigNumber.from(amount).toString());
-    return bnAmount.toArrayLike(Uint8Array, "be", 16);
+    const bnAmount = BigNumber.from(amount);
+    return utils.zeroPad(utils.arrayify(bnAmount), 16);
 }
 
 export function serializeFeePacked(fee: BigNumberish): Uint8Array {
-    const bnFee = new BN(BigNumber.from(fee).toString());
-    return packFeeChecked(bnFee);
+    return packFeeChecked(BigNumber.from(fee));
 }
 
 export function serializeNonce(nonce: number): Uint8Array {

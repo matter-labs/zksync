@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import BN = require("bn.js");
 import {
     closestPackableTransactionAmount,
     closestPackableTransactionFee,

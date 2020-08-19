@@ -1,18 +1,11 @@
 # zkSync changelog
 
-### zksync.js 0.6.2
+### zksync.js 0.6.3
 
-- Bundled version with new `zksync-crypto` is used for browser by default, now builds with bundlers should copy `zksync-crypto-web_bg.wasm` file
-  manually.
+- Bundled version for browsers added. File `dist/main.js` can be used in `<script>` html tag.
+  It requires global `ethers` object from [ethers-io/ethers.js](https://github.com/ethers-io/ethers.js/)
 - `zksync.crypto.loadZkSyncCrypto()` method is added for browser builds that loads and compiles `zksync-crypto-web_bg.wasm` file.
-
-### zksync-crypto 0.3.0
-
-- Now file for browser does not include wasm file but downloads it. Code that uses bundlers for browser builds should also copy `wasm` file.  
-
-### zksync.js 0.6.1
-
-- Bundled version added.
+  Should be called before any calls that use `zksync-crypto`.
 
 ### zksync.js 0.6.0
 

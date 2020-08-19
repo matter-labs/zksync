@@ -4,7 +4,7 @@ set -e
 
 which wasm-pack || cargo install wasm-pack
 
-# pack for bundler (!note this verions is used in the pkg.browser field)
+# pack for bundler (!note this verion is used in the pkg.browser field)
 wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
 
 # pack for browser
