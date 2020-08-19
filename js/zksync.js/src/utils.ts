@@ -483,7 +483,7 @@ export function serializeAccountId(accountId: number): Uint8Array {
     if (accountId >= MAX_NUMBER_OF_ACCOUNTS) {
         throw new Error("AccountId is too big");
     }
-    return numberToBytes(accountId, 4);
+    return numberToBytesBE(accountId, 4);
 }
 
 export function serializeTokenId(tokenId: number): Uint8Array {
@@ -493,7 +493,7 @@ export function serializeTokenId(tokenId: number): Uint8Array {
     if (tokenId >= MAX_NUMBER_OF_TOKENS) {
         throw new Error("TokenId is too big");
     }
-    return numberToBytes(tokenId, 2);
+    return numberToBytesBE(tokenId, 2);
 }
 
 export function serializeAmountPacked(amount: BigNumberish): Uint8Array {
@@ -513,10 +513,10 @@ export function serializeNonce(nonce: number): Uint8Array {
     if (nonce < 0) {
         throw new Error("Negative nonce");
     }
-    return numberToBytes(nonce, 4);
+    return numberToBytesBE(nonce, 4);
 }
 
-function numberToBytes(number, bytes): Uint8Array {
+function numberToBytesBE(number: number, bytes: number): Uint8Array {
     const result = new Uint8Array(bytes);
     for (let i = bytes - 1; i >= 0; i--) {
         result[i] = number & 0xff;
