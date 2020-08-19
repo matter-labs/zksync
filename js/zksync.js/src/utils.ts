@@ -1,7 +1,9 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from "ethers";
 import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address } from "./types";
 
+// Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
+// Max number of accounts for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export const IERC20_INTERFACE = new utils.Interface(require("../abi/IERC20.json").abi);
