@@ -1,4 +1,4 @@
-import {BigNumber, BigNumberish} from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
 
 // 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;

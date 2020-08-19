@@ -3,7 +3,7 @@ import {
     HTTPTransport,
     WSTransport
 } from "./transport";
-import {ethers, Contract, BigNumber} from "ethers";
+import { ethers, Contract, BigNumber } from "ethers";
 import {
     AccountState,
     Address,

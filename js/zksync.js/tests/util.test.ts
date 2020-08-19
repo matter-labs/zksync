@@ -7,7 +7,7 @@ import {
     isTransactionFeePackable,
     TokenSet
 } from "../src/utils";
-import {BigNumber} from "ethers";
+import { BigNumber } from "ethers";
 
 describe("Packing and unpacking", function() {
     it("Test basic fee packing/unpacking", function() {
@@ -45,13 +45,13 @@ describe("Token cache resolve", function() {
                 address: "0x0000000000000000000000000000000000000000",
                 id: 0,
                 symbol: "ETH",
-                decimals: 18,
+                decimals: 18
             },
             "ERC20-1": {
                 address: "0xEEeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 id: 1,
                 symbol: "ERC20-1",
-                decimals: 6,
+                decimals: 6
             }
         };
         const tokenCache = new TokenSet(tokens);

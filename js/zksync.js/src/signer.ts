@@ -3,7 +3,7 @@ import {
     signTransactionBytes,
     privateKeyToPubKeyHash
 } from "./crypto";
-import {BigNumber, BigNumberish, ethers} from "ethers";
+import { BigNumber, BigNumberish, ethers } from "ethers";
 import {
     getEthSignatureType,
     signMessagePersonalAPI,
@@ -12,7 +12,9 @@ import {
     serializeAddress,
     serializeTokenId,
     serializeAmountPacked,
-    serializeFeePacked, serializeNonce, serializeAmountFull
+    serializeFeePacked,
+    serializeNonce,
+    serializeAmountFull
 } from "./utils";
 import {
     Address,
@@ -149,4 +151,3 @@ export class Signer {
         return { signer, ethSignatureType };
     }
 }
-

@@ -12,7 +12,7 @@ export function signTransactionBytes(
 ): Signature {
     const signaturePacked = sign_musig(privKey, bytes);
     const pubKey = utils.hexlify(signaturePacked.slice(0, 32)).substr(2);
-    const signature = utils.hexlify(signaturePacked.slice(32)).substr(2)
+    const signature = utils.hexlify(signaturePacked.slice(32)).substr(2);
     return {
         pubKey,
         signature
@@ -20,9 +20,10 @@ export function signTransactionBytes(
 }
 
 export function privateKeyToPubKeyHash(privateKey: Uint8Array): string {
-    return `sync:${utils.hexlify(private_key_to_pubkey_hash(privateKey)).substr(2)}`;
+    return `sync:${utils
+        .hexlify(private_key_to_pubkey_hash(privateKey))
+        .substr(2)}`;
 }
-
 
 let zksyncCryptoLoaded = false;
 
@@ -32,7 +33,7 @@ export async function loadZkSyncCrypto(wasmFileUrl?: string) {
         // @ts-ignore
         const url = wasmFileUrl ? wasmFileUrl : zks.DefaultZksyncCryptoWasmURL;
         if (!zksyncCryptoLoaded) {
-            await ((zks as any)).default(url);
+            await (zks as any).default(url);
             zksyncCryptoLoaded = true;
         }
     }

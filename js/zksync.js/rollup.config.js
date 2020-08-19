@@ -4,6 +4,19 @@ import json from '@rollup/plugin-json';
 import copy from 'rollup-plugin-copy';
 import { terser } from "rollup-plugin-terser";
 
+function resolveWithZksyncCryptoReplace(options) {
+    const plugin = resolve(options);
+    const defaultPluginResolveId = plugin.resolveId;
+    plugin.resolveId = async (source, importer) => {
+        const defaultResolveResult = await defaultPluginResolveId(source, importer);
+        if (source === "zksync-crypto") {
+            defaultResolveResult.id = defaultResolveResult.id.replace("zksync-crypto-bundler", "zksync-crypto-web");
+        }
+        return defaultResolveResult;
+    }
+    return plugin;
+}
+
 export default [
 	{
 		input: 'build/index.js',
@@ -11,9 +24,13 @@ export default [
             file: 'dist/main.js',
             format: 'iife',
             name: 'zksync',
+            globals: {
+                ethers: 'ethers'
+            },
         },
+        external: ['ethers'],
 		plugins: [
-			resolve({
+            resolveWithZksyncCryptoReplace({
                 browser: true,
             }),
 			commonjs(),

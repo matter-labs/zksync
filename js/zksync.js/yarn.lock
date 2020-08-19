@@ -3348,7 +3348,7 @@ yn@3.1.1:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.1.tgz#1e87401a09d767c1d5eab26a6e4c185182d2eb50"
   integrity sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==
 
-zksync-crypto@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.3.0.tgz#932d6293880f0ba674b475dbdf43684c0be742fa"
-  integrity sha512-Q+1m30QsXN6LrXwbiVc6rlJCUa8C5K9wM6FZ5xRj0hTODEUg3mdw/p9Bbay/8aW8NwNR05Pzn3OVnqwKlw2nmg==
+zksync-crypto@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.3.1.tgz#ad0c1d299246de6fdd7907532387466599787edd"
+  integrity sha512-9BbIxVPIKXAAT+TUiMJXuoaVcNJqBZ23CNEHWOSJrQNJHUGkaHUQ426xAw/bNjNbRn4UTkM/AhyyqAUMnVX6nA==

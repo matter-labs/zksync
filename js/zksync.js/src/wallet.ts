@@ -1,4 +1,10 @@
-import {BigNumber, BigNumberish, Contract, ContractTransaction, ethers} from "ethers";
+import {
+    BigNumber,
+    BigNumberish,
+    Contract,
+    ContractTransaction,
+    ethers
+} from "ethers";
 import { ETHProxy, Provider } from "./provider";
 import { Signer } from "./signer";
 import {
@@ -551,10 +557,7 @@ export class Wallet {
             if (txRequest.gasLimit == null) {
                 const gasEstimate = await mainZkSyncContract.estimateGas
                     .depositERC20(...args)
-                    .then(
-                        estimate => estimate,
-                        _err => BigNumber.from("0")
-                    );
+                    .then(estimate => estimate, _err => BigNumber.from("0"));
                 txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT)
                     ? gasEstimate
                     : ERC20_DEPOSIT_GAS_LIMIT;
@@ -647,8 +650,13 @@ class ETHOperation {
         const txReceipt = await this.ethTx.wait();
         for (const log of txReceipt.logs) {
             try {
-                const priorityQueueLog = SYNC_MAIN_CONTRACT_INTERFACE.parseLog(log);
-                if (priorityQueueLog && priorityQueueLog.args.serialId != null) {
+                const priorityQueueLog = SYNC_MAIN_CONTRACT_INTERFACE.parseLog(
+                    log
+                );
+                if (
+                    priorityQueueLog &&
+                    priorityQueueLog.args.serialId != null
+                ) {
                     this.priorityOpId = priorityQueueLog.args.serialId;
                 }
             } catch {}

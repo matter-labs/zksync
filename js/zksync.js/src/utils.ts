@@ -1,12 +1,13 @@
 import BN = require("bn.js");
-import {utils, constants, ethers, BigNumber, BigNumberish} from "ethers";
+import { utils, constants, ethers, BigNumber, BigNumberish } from "ethers";
 import {
     PubKeyHash,
     TokenAddress,
     TokenLike,
     Tokens,
     TokenSymbol,
-    EthSignerType, Address
+    EthSignerType,
+    Address
 } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -229,9 +230,7 @@ export function closestPackableTransactionAmount(
     );
 }
 
-export function isTransactionAmountPackable(
-    amount: BigNumberish
-): boolean {
+export function isTransactionAmountPackable(amount: BigNumberish): boolean {
     return closestPackableTransactionAmount(amount).eq(amount);
 }
 
@@ -240,9 +239,7 @@ export function isTransactionAmountPackable(
  * e.g 1000000003 => 1000000000
  * @param fee
  */
-export function closestPackableTransactionFee(
-    fee: BigNumberish
-): BigNumber {
+export function closestPackableTransactionFee(fee: BigNumberish): BigNumber {
     const feeBN = new BN(BigNumber.from(fee).toString());
     const packedFee = packFee(feeBN);
     return BigNumber.from(
@@ -336,10 +333,7 @@ export class TokenSet {
         return isTransactionFeePackable(parsedAmount);
     }
 
-    public formatToken(
-        tokenLike: TokenLike,
-        amount: BigNumberish
-    ): string {
+    public formatToken(tokenLike: TokenLike, amount: BigNumberish): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.formatUnits(amount, decimals);
     }
@@ -371,8 +365,8 @@ export function getChangePubkeyMessage(
     nonce: number,
     accountId: number
 ): string {
-    const msgNonce = utils.hexlify(serializeNonce(nonce))
-    const msgAccId = utils.hexlify(serializeAccountId(accountId))
+    const msgNonce = utils.hexlify(serializeNonce(nonce));
+    const msgAccId = utils.hexlify(serializeAccountId(accountId));
     const pubKeyHashHex = pubKeyHash.replace("sync:", "").toLowerCase();
     const message =
         `Register zkSync pubkey:\n\n` +
@@ -550,10 +544,10 @@ export function serializeNonce(nonce: number): Uint8Array {
 }
 
 function numberToBytes(number, bytes): Uint8Array {
-        const result = new Uint8Array(bytes);
-        for (let i = bytes - 1; i >= 0; i--) {
-            result[i] = number & 0xff;
-            number >>= 8;
-        }
-        return result;
+    const result = new Uint8Array(bytes);
+    for (let i = bytes - 1; i >= 0; i--) {
+        result[i] = number & 0xff;
+        number >>= 8;
+    }
+    return result;
 }

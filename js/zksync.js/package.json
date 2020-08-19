@@ -10,7 +10,7 @@
     "bn.js": "^5.0.0",
     "websocket": "^1.0.30",
     "websocket-as-promised": "^0.10.1",
-    "zksync-crypto": "^0.3.0"
+    "zksync-crypto": "^0.3.1"
   },
   "peerDependencies": {
     "ethers": "^5.0.0"
