@@ -43,7 +43,7 @@ export class Wallet {
         public signer?: Signer,
         public accountId?: number,
         public ethSignerType?: EthSignerType
-    ) {}
+    ) { }
 
     connect(provider: Provider) {
         this.provider = provider;
@@ -199,6 +199,60 @@ export class Wallet {
         );
     }
 
+    async syncForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee?: utils.BigNumberish;
+        nonce?: Nonce;
+    }): Promise<Transaction> {
+        if (!this.signer) {
+            throw new Error(
+                "ZKSync signer is required for sending zksync transactions."
+            );
+        }
+
+        await this.setRequiredAccountIdFromServer("perform a Forced Exit");
+
+        const tokenId = await this.provider.tokenSet.resolveTokenId(
+            forcedExit.token
+        );
+        const nonce =
+            forcedExit.nonce != null
+                ? await this.getNonce(forcedExit.nonce)
+                : await this.getNonce();
+
+        if (forcedExit.fee == null) {
+            // Fee for forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw).
+            const fullFee = await this.provider.getTransactionFee(
+                "Withdraw",
+                forcedExit.target,
+                forcedExit.token
+            );
+            forcedExit.fee = fullFee.totalFee;
+        }
+
+        const transactionData = {
+            initiatorAccountId: this.accountId,
+            target: forcedExit.target,
+            tokenId,
+            fee: forcedExit.fee,
+            nonce
+        };
+
+        const signedForcedExitTransaction = this.signer.signSyncForcedExit(
+            transactionData
+        );
+
+        const transactionHash = await this.provider.submitTx(
+            signedForcedExitTransaction
+        );
+        return new Transaction(
+            signedForcedExitTransaction,
+            transactionHash,
+            this.provider
+        );
+    }
+
     async withdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
@@ -317,7 +371,7 @@ export class Wallet {
         const ethSignature = onchainAuth
             ? null
             : (await this.getEthMessageSignature(changePubKeyMessage))
-                  .signature;
+                .signature;
 
         const txData: ChangePubKey = {
             type: "ChangePubKey",

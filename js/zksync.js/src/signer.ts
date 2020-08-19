@@ -17,7 +17,8 @@ import {
     EthSignerType,
     PubKeyHash,
     Transfer,
-    Withdraw
+    Withdraw,
+    ForcedExit
 } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -114,6 +115,39 @@ export class Signer {
             amount: utils.bigNumberify(withdraw.amount).toString(),
             fee: utils.bigNumberify(withdraw.fee).toString(),
             nonce: withdraw.nonce,
+            signature
+        };
+    }
+
+    signSyncForcedExit(forcedExit: {
+        initiatorAccountId: number;
+        target: Address;
+        tokenId: number;
+        fee: utils.BigNumberish;
+        nonce: number;
+    }): ForcedExit {
+        const typeBytes = Buffer.from([8]);
+        const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
+        const targetBytes = serializeAddress(forcedExit.target);
+        const tokenIdBytes = serializeTokenId(forcedExit.tokenId);
+        const feeBytes = serializeFeePacked(forcedExit.fee);
+        const nonceBytes = serializeNonce(forcedExit.nonce);
+        const msgBytes = Buffer.concat([
+            typeBytes,
+            initiatorAccountIdBytes,
+            targetBytes,
+            tokenIdBytes,
+            feeBytes,
+            nonceBytes
+        ]);
+        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        return {
+            type: "ForcedExit",
+            initiatorAccountId: forcedExit.initiatorAccountId,
+            target: forcedExit.target,
+            token: forcedExit.tokenId,
+            fee: utils.bigNumberify(forcedExit.fee).toString(),
+            nonce: forcedExit.nonce,
             signature
         };
     }

@@ -88,6 +88,16 @@ export interface Withdraw {
     signature: Signature;
 }
 
+export interface ForcedExit {
+    type: "ForcedExit";
+    initiatorAccountId: number;
+    target: Address;
+    token: number;
+    fee: utils.BigNumberish;
+    nonce: number;
+    signature: Signature;
+}
+
 export interface ChangePubKey {
     type: "ChangePubKey";
     accountId: number;
