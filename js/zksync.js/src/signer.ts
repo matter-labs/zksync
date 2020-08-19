@@ -1,8 +1,4 @@
-import {
-    privateKeyFromSeed,
-    signTransactionBytes,
-    privateKeyToPubKeyHash
-} from "./crypto";
+import { privateKeyFromSeed, signTransactionBytes, privateKeyToPubKeyHash } from "./crypto";
 import { BigNumber, BigNumberish, ethers } from "ethers";
 import {
     getEthSignatureType,
@@ -16,13 +12,7 @@ import {
     serializeNonce,
     serializeAmountFull
 } from "./utils";
-import {
-    Address,
-    EthSignerType,
-    PubKeyHash,
-    Transfer,
-    Withdraw
-} from "./types";
+import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw } from "./types";
 
 export class Signer {
     readonly privateKey: Uint8Array;
@@ -52,16 +42,7 @@ export class Signer {
         const amount = serializeAmountPacked(transfer.amount);
         const fee = serializeFeePacked(transfer.fee);
         const nonce = serializeNonce(transfer.nonce);
-        const msgBytes = ethers.utils.concat([
-            type,
-            accountId,
-            from,
-            to,
-            token,
-            amount,
-            fee,
-            nonce
-        ]);
+        const msgBytes = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
 
         const signature = signTransactionBytes(this.privateKey, msgBytes);
 
@@ -133,19 +114,11 @@ export class Signer {
         signer: Signer;
         ethSignatureType: EthSignerType;
     }> {
-        const message =
-            "Access zkSync account.\n" +
-            "\n" +
-            "Only sign this message for a trusted client!";
+        const message = "Access zkSync account.\n" + "\n" + "Only sign this message for a trusted client!";
         const signedBytes = getSignedBytesFromMessage(message, false);
         const signature = await signMessagePersonalAPI(ethSigner, signedBytes);
         const address = await ethSigner.getAddress();
-        const ethSignatureType = await getEthSignatureType(
-            ethSigner.provider,
-            message,
-            signature,
-            address
-        );
+        const ethSignatureType = await getEthSignatureType(ethSigner.provider, message, signature, address);
         const seed = ethers.utils.arrayify(signature);
         const signer = Signer.fromSeed(seed);
         return { signer, ethSignatureType };

@@ -1,8 +1,4 @@
-import {
-    AbstractJSONRPCTransport,
-    HTTPTransport,
-    WSTransport
-} from "./transport";
+import { AbstractJSONRPCTransport, HTTPTransport, WSTransport } from "./transport";
 import { ethers, Contract, BigNumber } from "ethers";
 import {
     AccountState,
@@ -16,13 +12,7 @@ import {
     TxEthSignature,
     Fee
 } from "./types";
-import {
-    isTokenETH,
-    sleep,
-    SYNC_GOV_CONTRACT_INTERFACE,
-    SYNC_MAIN_CONTRACT_INTERFACE,
-    TokenSet
-} from "./utils";
+import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from "./utils";
 
 export async function getDefaultProvider(
     network: "localhost" | "rinkeby" | "ropsten" | "mainnet",
@@ -36,33 +26,21 @@ export async function getDefaultProvider(
         }
     } else if (network === "ropsten") {
         if (transport === "WS") {
-            return await Provider.newWebsocketProvider(
-                "wss://ropsten-api.zksync.io/jsrpc-ws"
-            );
+            return await Provider.newWebsocketProvider("wss://ropsten-api.zksync.io/jsrpc-ws");
         } else if (transport === "HTTP") {
-            return await Provider.newHttpProvider(
-                "https://ropsten-api.zksync.io/jsrpc"
-            );
+            return await Provider.newHttpProvider("https://ropsten-api.zksync.io/jsrpc");
         }
     } else if (network === "rinkeby") {
         if (transport === "WS") {
-            return await Provider.newWebsocketProvider(
-                "wss://rinkeby-api.zksync.io/jsrpc-ws"
-            );
+            return await Provider.newWebsocketProvider("wss://rinkeby-api.zksync.io/jsrpc-ws");
         } else if (transport === "HTTP") {
-            return await Provider.newHttpProvider(
-                "https://rinkeby-api.zksync.io/jsrpc"
-            );
+            return await Provider.newHttpProvider("https://rinkeby-api.zksync.io/jsrpc");
         }
     } else if (network === "mainnet") {
         if (transport === "WS") {
-            return await Provider.newWebsocketProvider(
-                "wss://api.zksync.io/jsrpc-ws"
-            );
+            return await Provider.newWebsocketProvider("wss://api.zksync.io/jsrpc-ws");
         } else if (transport === "HTTP") {
-            return await Provider.newHttpProvider(
-                "https://api.zksync.io/jsrpc"
-            );
+            return await Provider.newHttpProvider("https://api.zksync.io/jsrpc");
         }
     } else {
         throw new Error(`Ethereum network ${network} is not supported`);
@@ -122,23 +100,15 @@ export class Provider {
         return await this.transport.request("tx_info", [txHash]);
     }
 
-    async getPriorityOpStatus(
-        serialId: number
-    ): Promise<PriorityOperationReceipt> {
+    async getPriorityOpStatus(serialId: number): Promise<PriorityOperationReceipt> {
         return await this.transport.request("ethop_info", [serialId]);
     }
 
     async getConfirmationsForEthOpAmount(): Promise<number> {
-        return await this.transport.request(
-            "get_confirmations_for_eth_op_amount",
-            []
-        );
+        return await this.transport.request("get_confirmations_for_eth_op_amount", []);
     }
 
-    async notifyPriorityOp(
-        serialId: number,
-        action: "COMMIT" | "VERIFY"
-    ): Promise<PriorityOperationReceipt> {
+    async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
                 const subscribe = this.transport.subscribe(
@@ -167,31 +137,21 @@ export class Provider {
         }
     }
 
-    async notifyTransaction(
-        hash: string,
-        action: "COMMIT" | "VERIFY"
-    ): Promise<TransactionReceipt> {
+    async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<TransactionReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
-                const subscribe = this.transport.subscribe(
-                    "tx_subscribe",
-                    [hash, action],
-                    "tx_unsubscribe",
-                    resp => {
-                        subscribe.then(sub => sub.unsubscribe());
-                        resolve(resp);
-                    }
-                );
+                const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", resp => {
+                    subscribe.then(sub => sub.unsubscribe());
+                    resolve(resp);
+                });
             });
         } else {
             while (true) {
                 const transactionStatus = await this.getTxReceipt(hash);
                 const notifyDone =
                     action == "COMMIT"
-                        ? transactionStatus.block &&
-                          transactionStatus.block.committed
-                        : transactionStatus.block &&
-                          transactionStatus.block.verified;
+                        ? transactionStatus.block && transactionStatus.block.committed
+                        : transactionStatus.block && transactionStatus.block.verified;
                 if (notifyDone) {
                     return transactionStatus;
                 } else {
@@ -201,16 +161,8 @@ export class Provider {
         }
     }
 
-    async getTransactionFee(
-        txType: "Withdraw" | "Transfer",
-        address: Address,
-        tokenLike: TokenLike
-    ): Promise<Fee> {
-        const transactionFee = await this.transport.request("get_tx_fee", [
-            txType,
-            address.toString(),
-            tokenLike
-        ]);
+    async getTransactionFee(txType: "Withdraw" | "Transfer", address: Address, tokenLike: TokenLike): Promise<Fee> {
+        const transactionFee = await this.transport.request("get_tx_fee", [txType, address.toString(), tokenLike]);
         return {
             feeType: transactionFee.feeType,
             gasTxAmount: BigNumber.from(transactionFee.gasTxAmount),
@@ -222,9 +174,7 @@ export class Provider {
     }
 
     async getTokenPrice(tokenLike: TokenLike): Promise<number> {
-        const tokenPrice = await this.transport.request("get_token_price", [
-            tokenLike
-        ]);
+        const tokenPrice = await this.transport.request("get_token_price", [tokenLike]);
         return parseFloat(tokenPrice);
     }
 
@@ -237,10 +187,7 @@ export class ETHProxy {
     private governanceContract: Contract;
     private mainContract: Contract;
 
-    constructor(
-        private ethersProvider: ethers.providers.Provider,
-        public contractAddress: ContractAddress
-    ) {
+    constructor(private ethersProvider: ethers.providers.Provider, public contractAddress: ContractAddress) {
         this.governanceContract = new Contract(
             this.contractAddress.govContract,
             SYNC_GOV_CONTRACT_INTERFACE,

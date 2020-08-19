@@ -6,10 +6,7 @@ import { utils } from "ethers";
 
 export { privateKeyFromSeed } from "zksync-crypto";
 
-export function signTransactionBytes(
-    privKey: Uint8Array,
-    bytes: Uint8Array
-): Signature {
+export function signTransactionBytes(privKey: Uint8Array, bytes: Uint8Array): Signature {
     const signaturePacked = sign_musig(privKey, bytes);
     const pubKey = utils.hexlify(signaturePacked.slice(0, 32)).substr(2);
     const signature = utils.hexlify(signaturePacked.slice(32)).substr(2);
@@ -20,9 +17,7 @@ export function signTransactionBytes(
 }
 
 export function privateKeyToPubKeyHash(privateKey: Uint8Array): string {
-    return `sync:${utils
-        .hexlify(private_key_to_pubkey_hash(privateKey))
-        .substr(2)}`;
+    return `sync:${utils.hexlify(private_key_to_pubkey_hash(privateKey)).substr(2)}`;
 }
 
 let zksyncCryptoLoaded = false;

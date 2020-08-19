@@ -1,37 +1,20 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from "ethers";
-import {
-    PubKeyHash,
-    TokenAddress,
-    TokenLike,
-    Tokens,
-    TokenSymbol,
-    EthSignerType,
-    Address
-} from "./types";
+import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 128;
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
-export const IERC20_INTERFACE = new utils.Interface(
-    require("../abi/IERC20.json").abi
-);
-export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(
-    require("../abi/SyncMain.json").abi
-);
+export const IERC20_INTERFACE = new utils.Interface(require("../abi/IERC20.json").abi);
+export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require("../abi/SyncMain.json").abi);
 
-export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
-    require("../abi/SyncGov.json").abi
-);
+export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require("../abi/SyncGov.json").abi);
 
-export const IEIP1271_INTERFACE = new utils.Interface(
-    require("../abi/IEIP1271.json").abi
-);
+export const IEIP1271_INTERFACE = new utils.Interface(require("../abi/IEIP1271.json").abi);
 
 export const MAX_ERC20_APPROVE_AMOUNT =
     "115792089237316195423570985008687907853269984665640564039457584007913129639935"; // 2^256 - 1
 
-export const ERC20_APPROVE_TRESHOLD =
-    "57896044618658097711785492504343953926634992332820282019728792003956564819968"; // 2^255
+export const ERC20_APPROVE_TRESHOLD = "57896044618658097711785492504343953926634992332820282019728792003956564819968"; // 2^255
 
 export const ERC20_DEPOSIT_GAS_LIMIT = BigNumber.from("300000"); // 300k
 
@@ -166,42 +149,22 @@ export function reverseBits(buffer: Uint8Array): Uint8Array {
 }
 
 function packAmount(amount: BigNumber): Uint8Array {
-    return reverseBits(
-        integerToFloat(
-            amount,
-            AMOUNT_EXPONENT_BIT_WIDTH,
-            AMOUNT_MANTISSA_BIT_WIDTH,
-            10
-        )
-    );
+    return reverseBits(integerToFloat(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10));
 }
 
 function packFee(amount: BigNumber): Uint8Array {
-    return reverseBits(
-        integerToFloat(
-            amount,
-            FEE_EXPONENT_BIT_WIDTH,
-            FEE_MANTISSA_BIT_WIDTH,
-            10
-        )
-    );
+    return reverseBits(integerToFloat(amount, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10));
 }
 
 export function packAmountChecked(amount: BigNumber): Uint8Array {
-    if (
-        closestPackableTransactionAmount(amount.toString()).toString() !==
-        amount.toString()
-    ) {
+    if (closestPackableTransactionAmount(amount.toString()).toString() !== amount.toString()) {
         throw new Error("Transaction Amount is not packable");
     }
     return packAmount(amount);
 }
 
 export function packFeeChecked(amount: BigNumber): Uint8Array {
-    if (
-        closestPackableTransactionFee(amount.toString()).toString() !==
-        amount.toString()
-    ) {
+    if (closestPackableTransactionFee(amount.toString()).toString() !== amount.toString()) {
         throw new Error("Fee Amount is not packable");
     }
     return packFee(amount);
@@ -212,16 +175,9 @@ export function packFeeChecked(amount: BigNumber): Uint8Array {
  * e.g 1000000003 => 1000000000
  * @param amount
  */
-export function closestPackableTransactionAmount(
-    amount: BigNumberish
-): BigNumber {
+export function closestPackableTransactionAmount(amount: BigNumberish): BigNumber {
     const packedAmount = packAmount(BigNumber.from(amount));
-    return floatToInteger(
-        packedAmount,
-        AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH,
-        10
-    );
+    return floatToInteger(packedAmount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);
 }
 
 export function isTransactionAmountPackable(amount: BigNumberish): boolean {
@@ -235,12 +191,7 @@ export function isTransactionAmountPackable(amount: BigNumberish): boolean {
  */
 export function closestPackableTransactionFee(fee: BigNumberish): BigNumber {
     const packedFee = packFee(BigNumber.from(fee));
-    return floatToInteger(
-        packedFee,
-        FEE_EXPONENT_BIT_WIDTH,
-        FEE_MANTISSA_BIT_WIDTH,
-        10
-    );
+    return floatToInteger(packedFee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10);
 }
 
 export function isTransactionFeePackable(amount: BigNumberish): boolean {
@@ -282,28 +233,19 @@ export class TokenSet {
         }
 
         for (const token of Object.values(this.tokensBySymbol)) {
-            if (
-                token.address.toLocaleLowerCase() ==
-                tokenLike.toLocaleLowerCase()
-            ) {
+            if (token.address.toLocaleLowerCase() == tokenLike.toLocaleLowerCase()) {
                 return token;
             }
         }
         throw new Error(`Token ${tokenLike} is not supported`);
     }
 
-    public isTokenTransferAmountPackable(
-        tokenLike: TokenLike,
-        amount: string
-    ): boolean {
+    public isTokenTransferAmountPackable(tokenLike: TokenLike, amount: string): boolean {
         const parsedAmount = this.parseToken(tokenLike, amount);
         return isTransactionAmountPackable(parsedAmount);
     }
 
-    public isTokenTransactionFeePackable(
-        tokenLike: TokenLike,
-        amount: string
-    ): boolean {
+    public isTokenTransactionFeePackable(tokenLike: TokenLike, amount: string): boolean {
         const parsedAmount = this.parseToken(tokenLike, amount);
         return isTransactionFeePackable(parsedAmount);
     }
@@ -335,11 +277,7 @@ export class TokenSet {
     }
 }
 
-export function getChangePubkeyMessage(
-    pubKeyHash: PubKeyHash,
-    nonce: number,
-    accountId: number
-): string {
+export function getChangePubkeyMessage(pubKeyHash: PubKeyHash, nonce: number, accountId: number): string {
     const msgNonce = utils.hexlify(serializeNonce(nonce));
     const msgAccId = utils.hexlify(serializeAccountId(accountId));
     const pubKeyHashHex = pubKeyHash.replace("sync:", "").toLowerCase();
@@ -352,47 +290,31 @@ export function getChangePubkeyMessage(
     return message;
 }
 
-export function getSignedBytesFromMessage(
-    message: utils.BytesLike | string,
-    addPrefix: boolean
-): Uint8Array {
-    let messageBytes =
-        typeof message === "string"
-            ? utils.toUtf8Bytes(message)
-            : utils.arrayify(message);
+export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
+    let messageBytes = typeof message === "string" ? utils.toUtf8Bytes(message) : utils.arrayify(message);
     if (addPrefix) {
         messageBytes = utils.concat([
-            utils.toUtf8Bytes(
-                `\x19Ethereum Signed Message:\n${messageBytes.length}`
-            ),
+            utils.toUtf8Bytes(`\x19Ethereum Signed Message:\n${messageBytes.length}`),
             messageBytes
         ]);
     }
     return messageBytes;
 }
 
-export async function signMessagePersonalAPI(
-    signer: ethers.Signer,
-    message: Uint8Array
-): Promise<string> {
+export async function signMessagePersonalAPI(signer: ethers.Signer, message: Uint8Array): Promise<string> {
     if (signer instanceof ethers.providers.JsonRpcSigner) {
-        return signer.provider
-            .send("personal_sign", [
-                utils.hexlify(message),
-                await signer.getAddress()
-            ])
-            .then(
-                sign => sign,
-                err => {
-                    // We check for method name in the error string because error messages about invalid method name
-                    // often contain method name.
-                    if (err.message.includes("personal_sign")) {
-                        // If no "personal_sign", use "eth_sign"
-                        return signer.signMessage(message);
-                    }
-                    throw err;
+        return signer.provider.send("personal_sign", [utils.hexlify(message), await signer.getAddress()]).then(
+            sign => sign,
+            err => {
+                // We check for method name in the error string because error messages about invalid method name
+                // often contain method name.
+                if (err.message.includes("personal_sign")) {
+                    // If no "personal_sign", use "eth_sign"
+                    return signer.signMessage(message);
                 }
-            );
+                throw err;
+            }
+        );
     } else {
         return signer.signMessage(message);
     }
@@ -405,15 +327,8 @@ export async function verifyERC1271Signature(
     signerOrProvider: ethers.Signer | ethers.providers.Provider
 ): Promise<boolean> {
     const EIP1271_SUCCESS_VALUE = "0x20c13b0b";
-    const eip1271 = new ethers.Contract(
-        address,
-        IEIP1271_INTERFACE,
-        signerOrProvider
-    );
-    const eipRetVal = await eip1271.isValidSignature(
-        utils.hexlify(message),
-        signature
-    );
+    const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
+    const eipRetVal = await eip1271.isValidSignature(utils.hexlify(message), signature);
     return eipRetVal === EIP1271_SUCCESS_VALUE;
 }
 
@@ -426,10 +341,7 @@ export async function getEthSignatureType(
     const messageNoPrefix = getSignedBytesFromMessage(message, false);
     const messageWithPrefix = getSignedBytesFromMessage(message, true);
 
-    const prefixedECDSASigner = utils.recoverAddress(
-        utils.keccak256(messageWithPrefix),
-        signature
-    );
+    const prefixedECDSASigner = utils.recoverAddress(utils.keccak256(messageWithPrefix), signature);
     if (prefixedECDSASigner.toLowerCase() === address.toLowerCase()) {
         return {
             verificationMethod: "ECDSA",
@@ -437,10 +349,7 @@ export async function getEthSignatureType(
         };
     }
 
-    const notPrefixedMsgECDSASigner = utils.recoverAddress(
-        utils.keccak256(messageNoPrefix),
-        signature
-    );
+    const notPrefixedMsgECDSASigner = utils.recoverAddress(utils.keccak256(messageNoPrefix), signature);
     if (notPrefixedMsgECDSASigner.toLowerCase() === address.toLowerCase()) {
         return {
             verificationMethod: "ECDSA",
@@ -459,9 +368,7 @@ function removeAddressPrefix(address: Address | PubKeyHash): string {
 
     if (address.startsWith("sync:")) return address.substr(5);
 
-    throw new Error(
-        "ETH address must start with '0x' and PubKeyHash must start with 'sync:'"
-    );
+    throw new Error("ETH address must start with '0x' and PubKeyHash must start with 'sync:'");
 }
 
 // PubKeyHash or eth address
