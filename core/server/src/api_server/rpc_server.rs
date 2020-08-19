@@ -825,6 +825,12 @@ impl Rpc for RpcApp {
                 withdraw.to,
                 withdraw.fee.clone(),
             )),
+            FranklinTx::ForcedExit(forced_exit) => Some((
+                TxFeeTypes::Withdraw,
+                TokenLike::Id(forced_exit.token),
+                forced_exit.target,
+                forced_exit.fee.clone(),
+            )),
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
