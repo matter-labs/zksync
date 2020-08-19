@@ -330,26 +330,19 @@ pub struct ForcedExitOp {
 }
 
 impl ForcedExitOp {
-    pub const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 2;
     pub const OP_CODE: u8 = 0x09;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     fn get_public_data(&self) -> Vec<u8> {
+        let amount = self.withdraw_amount.clone().unwrap_or_default().0;
+
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.tx.initiator_account_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.target.as_bytes());
+        data.extend_from_slice(&self.target_account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(
-            &self
-                .withdraw_amount
-                .clone()
-                .unwrap_or_default()
-                .0
-                .to_u128()
-                .unwrap()
-                .to_be_bytes(),
-        );
+        data.extend_from_slice(&pack_token_amount(&amount));
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
@@ -377,17 +370,22 @@ impl ForcedExitOp {
             "Wrong bytes length for forced exit pubdata"
         );
 
-        let account_id_offset = 1;
-        let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
+        let initiator_account_id_offset = 1;
+        let target_account_id_offset = initiator_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let token_offset = target_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
         let fee_offset = amount_offset + BALANCE_BIT_WIDTH / 8;
         let fee_end = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
         let initiator_account_id =
-            bytes_slice_to_uint32(&bytes[account_id_offset..eth_address_offset])
-                .ok_or_else(|| format_err!("Cant get account id from forced exit pubdata"))?;
-        let target = Address::from_slice(&bytes[eth_address_offset..token_offset]);
+            bytes_slice_to_uint32(&bytes[initiator_account_id_offset..target_account_id_offset])
+                .ok_or_else(|| {
+                    format_err!("Cant get initiator account id from forced exit pubdata")
+                })?;
+        let target_account_id = bytes_slice_to_uint32(
+            &bytes[target_account_id_offset..token_offset],
+        )
+        .ok_or_else(|| format_err!("Cant get target account id from forced exit pubdata"))?;
         let token = bytes_slice_to_uint16(&bytes[token_offset..amount_offset])
             .ok_or_else(|| format_err!("Cant get token id from forced exit pubdata"))?;
         let amount = BigUint::from_u128(
@@ -398,7 +396,7 @@ impl ForcedExitOp {
         let fee = unpack_fee_amount(&bytes[fee_offset..fee_end])
             .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
 
-        let target_account_id = 0; // From pubdata it is unknown
+        let target = Address::default(); // From pubdata it is unknown
         let nonce = 0; // From pubdata it is unknown
 
         Ok(Self {

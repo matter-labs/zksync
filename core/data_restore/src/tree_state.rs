@@ -195,13 +195,15 @@ impl TreeState {
                         .ok_or_else(|| {
                             format_err!("ForcedExit fail: Nonexistent initiator account")
                         })?;
-                    let (target_account_id, _) = self
+                    let (_, target_account) = self
                         .state
                         .get_account_by_address(&op.tx.target)
                         .ok_or_else(|| {
-                        format_err!("ForcedExit fail: Nonexistent target account")
-                    })?;
-                    op.target_account_id = target_account_id;
+                            format_err!("ForcedExit fail: Nonexistent target account")
+                        })?;
+
+                    // Set the fields unknown from the pubdata.
+                    op.tx.target = target_account.address;
                     op.tx.nonce = initiator_account.nonce;
 
                     let tx = FranklinTx::ForcedExit(Box::new(op.tx.clone()));
