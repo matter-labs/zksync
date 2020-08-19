@@ -397,14 +397,14 @@ impl ForcedExit {
 
     /// Creates signed transaction using private key, checks for correcteness
     pub fn new_signed(
-        account_id: AccountId,
-        from: Address,
+        initiator_account_id: AccountId,
+        target: Address,
         token: TokenId,
         fee: BigUint,
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
-        let mut tx = Self::new(account_id, from, token, fee, nonce, None);
+        let mut tx = Self::new(initiator_account_id, target, token, fee, nonce, None);
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
             bail!("Transfer is incorrect, check amounts");

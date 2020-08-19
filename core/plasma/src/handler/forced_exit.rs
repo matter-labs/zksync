@@ -103,8 +103,8 @@ impl TxHandler<ForcedExit> for PlasmaState {
         // this check is added for additional safety).
         let target_old_balance = target_account.get_balance(op.tx.token);
         ensure!(
-            initiator_old_balance >= amount,
-            "Target account: Not enough balance to cover fees"
+            target_old_balance == amount,
+            "Target account: Target account balance is not equal to the withdrawal amount"
         );
 
         // Take fees from the initiator account (and update initiator account nonce).

@@ -34,6 +34,7 @@ use crate::{
 
 mod change_pubkey_offchain;
 mod deposit;
+mod forced_exit;
 mod full_exit;
 mod noop;
 pub(crate) mod test_utils;

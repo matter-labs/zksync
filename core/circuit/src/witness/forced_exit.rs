@@ -31,7 +31,6 @@ use crate::{
     },
 };
 
-// TODO: This was copy-pasted, must be adapted.
 pub struct ForcedExitData {
     pub amount: u128,
     pub fee: u128,

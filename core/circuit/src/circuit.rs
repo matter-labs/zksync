@@ -2197,8 +2197,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_signer_valid);
 
-        // lhs_valid_flags.push(_is_signer_valid);
-
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
         let updated_balance = Expression::from(&cur.balance.get_number()) - fee_expr;
@@ -2247,24 +2245,13 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_rhs_signing_key_unset);
 
-        // Check that rhs has enough balance.
-        let diff_balance_withdraw = Expression::from(&rhs.balance.get_number())
-            - Expression::from(&op_data.amount_unpacked.get_number());
-
-        let diff_balance_withdraw_bits = diff_balance_withdraw.into_bits_le_fixed(
-            cs.namespace(|| "rhs balance-amount bits"),
-            params::BALANCE_BIT_WIDTH,
+        // Check that the withdraw amount is equal to the rhs account balance.
+        let is_rhs_balance_eq_amount = CircuitElement::equals(
+            cs.namespace(|| "is_rhs_balance_eq_amount_correct"),
+            &op_data.amount_unpacked,
+            &cur.balance,
         )?;
-
-        let diff_balance_withdraw_repacked =
-            Expression::from_le_bits::<CS>(&diff_balance_withdraw_bits);
-
-        let is_balance_geq_amount = Boolean::from(Expression::equals(
-            cs.namespace(|| "RHS is_balance_geq_amount: diff equal to repacked"),
-            diff_balance_withdraw,
-            diff_balance_withdraw_repacked,
-        )?);
-        rhs_valid_flags.push(is_balance_geq_amount);
+        rhs_valid_flags.push(is_rhs_balance_eq_amount);
 
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
@@ -2272,7 +2259,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let updated_balance = Expression::from(&cur.balance.get_number())
             - Expression::from(&op_data.amount_unpacked.get_number());
 
-        //update balance
+        // update balance
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "updated_balance rhs"),
             updated_balance,
