@@ -11,14 +11,13 @@ use num::ToPrimitive;
 use models::{
     circuit::{
         account::CircuitAccountTree,
-        utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
+        utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
     node::operations::ForcedExitOp,
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
-        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
+        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::convert_to_float,
 };
@@ -37,15 +36,20 @@ pub struct ForcedExitData {
     pub amount: u128,
     pub fee: u128,
     pub token: u32,
-    pub account_address: u32,
-    pub eth_address: Fr,
+    pub initiator_account_address: u32,
+    pub target_account_address: u32,
 }
 
 pub struct ForcedExitWitness<E: RescueEngine> {
-    pub before: OperationBranch<E>,
-    pub after: OperationBranch<E>,
+    pub initiator_before: OperationBranch<E>,
+    pub initiator_intermediate: OperationBranch<E>,
+    pub initiator_after: OperationBranch<E>,
+    pub target_before: OperationBranch<E>,
+    pub target_intermediate: OperationBranch<E>,
+    pub target_after: OperationBranch<E>,
     pub args: OperationArguments<E>,
     pub before_root: Option<E::Fr>,
+    pub intermediate_root: Option<E::Fr>,
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
@@ -54,42 +58,47 @@ impl Witness for ForcedExitWitness<Bn256> {
     type OperationType = ForcedExitOp;
     type CalculateOpsInput = SigDataInput;
 
-    fn apply_tx(tree: &mut CircuitAccountTree, withdraw: &ForcedExitOp) -> Self {
-        let withdraw_data = ForcedExitData {
-            amount: withdraw
+    fn apply_tx(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitOp) -> Self {
+        let forced_exit_data = ForcedExitData {
+            amount: forced_exit
                 .withdraw_amount
                 .clone()
                 .map(|v| v.0)
                 .unwrap_or_default()
                 .to_u128()
                 .unwrap(),
-            fee: withdraw.tx.fee.to_u128().unwrap(),
-            token: u32::from(withdraw.tx.token),
-            account_address: withdraw.target_account_id,
-            eth_address: eth_address_to_fr(&withdraw.tx.target),
+            fee: forced_exit.tx.fee.to_u128().unwrap(),
+            token: u32::from(forced_exit.tx.token),
+            initiator_account_address: forced_exit.tx.initiator_account_id,
+            target_account_address: forced_exit.target_account_id,
         };
-        // le_bit_vector_into_field_element()
-        Self::apply_data(tree, &withdraw_data)
+        Self::apply_data(tree, &forced_exit_data)
     }
 
     fn get_pubdata(&self) -> Vec<bool> {
+        // construct pubdata
         let mut pubdata_bits = vec![];
         append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.before.address.unwrap(),
+            &self.initiator_before.address.unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.before.token.unwrap(),
+            &self.target_before.address.unwrap(),
+            ACCOUNT_ID_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.initiator_before.token.unwrap(),
             TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.full_amount.unwrap(),
-            BALANCE_BIT_WIDTH,
+            &self.args.amount_packed.unwrap(),
+            AMOUNT_MANTISSA_BIT_WIDTH + AMOUNT_EXPONENT_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -97,17 +106,11 @@ impl Witness for ForcedExitWitness<Bn256> {
             &self.args.fee.unwrap(),
             FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.args.eth_address.unwrap(),
-            ETH_ADDRESS_BIT_WIDTH,
-        );
         resize_grow_only(
             &mut pubdata_bits,
-            Self::OperationType::CHUNKS * CHUNK_BIT_WIDTH,
+            ForcedExitOp::CHUNKS * CHUNK_BIT_WIDTH,
             false,
-        );
+        ); //TODO verify if right padding is okay
         pubdata_bits
     }
 
@@ -119,7 +122,7 @@ impl Witness for ForcedExitWitness<Bn256> {
             .collect();
 
         let operation_zero = Operation {
-            new_root: self.after_root,
+            new_root: self.intermediate_root,
             tx_type: self.tx_type,
             chunk: Some(Fr::from_str("0").unwrap()),
             pubdata_chunk: Some(pubdata_chunks[0]),
@@ -129,27 +132,25 @@ impl Witness for ForcedExitWitness<Bn256> {
             signature_data: input.signature.clone(),
             signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
-            lhs: self.before.clone(),
-            rhs: self.before.clone(),
+            lhs: self.initiator_before.clone(),
+            rhs: self.target_before.clone(),
         };
 
-        let rest_operations = (1..Self::OperationType::CHUNKS).map(|chunk| Operation {
+        let operation_one = Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str(&chunk.to_string()).unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[chunk]),
+            chunk: Some(Fr::from_str("1").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[1]),
             first_sig_msg: Some(input.first_sig_msg),
             second_sig_msg: Some(input.second_sig_msg),
             third_sig_msg: Some(input.third_sig_msg),
             signature_data: input.signature.clone(),
             signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
-            lhs: self.after.clone(),
-            rhs: self.after.clone(),
-        });
-        std::iter::once(operation_zero)
-            .chain(rest_operations)
-            .collect()
+            lhs: self.initiator_intermediate.clone(),
+            rhs: self.target_intermediate.clone(),
+        };
+        vec![operation_zero, operation_one]
     }
 }
 
@@ -158,24 +159,39 @@ impl<E: RescueEngine> ForcedExitWitness<E> {
         let mut sig_bits = vec![];
         append_be_fixed_width(
             &mut sig_bits,
-            &Fr::from_str("3").unwrap(), //Corresponding tx_type
+            &Fr::from_str("9").unwrap(), //Corresponding tx_type
             TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.before.witness.account_witness.pub_key_hash.unwrap(),
+            &self
+                .initiator_before
+                .witness
+                .account_witness
+                .pub_key_hash
+                .unwrap(),
             NEW_PUBKEY_HASH_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.eth_address.unwrap(),
-            ETH_ADDRESS_BIT_WIDTH,
+            &self
+                .target_before
+                .witness
+                .account_witness
+                .pub_key_hash
+                .unwrap(),
+            NEW_PUBKEY_HASH_WIDTH,
         );
-        append_be_fixed_width(&mut sig_bits, &self.before.token.unwrap(), TOKEN_BIT_WIDTH);
+
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.full_amount.unwrap(),
-            BALANCE_BIT_WIDTH,
+            &self.initiator_before.token.unwrap(),
+            TOKEN_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.amount_packed.unwrap(),
+            AMOUNT_MANTISSA_BIT_WIDTH + AMOUNT_EXPONENT_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -184,7 +200,7 @@ impl<E: RescueEngine> ForcedExitWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
+            &self.initiator_before.witness.account_witness.nonce.unwrap(),
             NONCE_BIT_WIDTH,
         );
         sig_bits
@@ -192,21 +208,30 @@ impl<E: RescueEngine> ForcedExitWitness<E> {
 }
 
 impl ForcedExitWitness<Bn256> {
-    fn apply_data(tree: &mut CircuitAccountTree, withdraw: &ForcedExitData) -> Self {
+    fn apply_data(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
         debug!("Initial root = {}", before_root);
-        let (audit_path_before, audit_balance_path_before) =
-            get_audits(tree, withdraw.account_address, withdraw.token);
+        let (audit_path_initiator_before, audit_balance_path_initiator_before) = get_audits(
+            tree,
+            forced_exit.initiator_account_address,
+            forced_exit.token,
+        );
+
+        let (audit_path_target_before, audit_balance_path_target_before) =
+            get_audits(tree, forced_exit.target_account_address, forced_exit.token);
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let account_address_fe = Fr::from_str(&withdraw.account_address.to_string()).unwrap();
-        let token_fe = Fr::from_str(&withdraw.token.to_string()).unwrap();
-        let amount_as_field_element = Fr::from_str(&withdraw.amount.to_string()).unwrap();
+        let account_address_initiator_fe =
+            Fr::from_str(&forced_exit.initiator_account_address.to_string()).unwrap();
+        let account_address_target_fe =
+            Fr::from_str(&forced_exit.target_account_address.to_string()).unwrap();
+        let token_fe = Fr::from_str(&forced_exit.token.to_string()).unwrap();
+        let amount_as_field_element = Fr::from_str(&forced_exit.amount.to_string()).unwrap();
 
         let amount_bits = convert_to_float(
-            withdraw.amount,
+            forced_exit.amount,
             AMOUNT_EXPONENT_BIT_WIDTH,
             AMOUNT_MANTISSA_BIT_WIDTH,
             10,
@@ -215,10 +240,10 @@ impl ForcedExitWitness<Bn256> {
 
         let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-        let fee_as_field_element = Fr::from_str(&withdraw.fee.to_string()).unwrap();
+        let fee_as_field_element = Fr::from_str(&forced_exit.fee.to_string()).unwrap();
 
         let fee_bits = convert_to_float(
-            withdraw.fee,
+            forced_exit.fee,
             FEE_EXPONENT_BIT_WIDTH,
             FEE_MANTISSA_BIT_WIDTH,
             10,
@@ -227,56 +252,124 @@ impl ForcedExitWitness<Bn256> {
 
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
-        //calculate a and b
+        //applying first forced_exit part
+        let (
+            account_witness_initiator_before,
+            account_witness_initiator_intermediate,
+            balance_initiator_before,
+            balance_initiator_intermediate,
+        ) = apply_leaf_operation(
+            tree,
+            forced_exit.initiator_account_address,
+            forced_exit.token,
+            |acc| {
+                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
+            },
+            |bal| bal.value.sub_assign(&fee_as_field_element),
+        );
 
-        //applying withdraw
+        let intermediate_root = tree.root_hash();
+        debug!("Intermediate root = {}", intermediate_root);
 
-        let (account_witness_before, account_witness_after, balance_before, balance_after) =
-            apply_leaf_operation(
+        let (audit_path_initiator_intermediate, audit_balance_path_initiator_intermediate) =
+            get_audits(
                 tree,
-                withdraw.account_address,
-                withdraw.token,
-                |acc| {
-                    acc.nonce.add_assign(&Fr::from_str("1").unwrap());
-                },
-                |bal| {
-                    bal.value.sub_assign(&amount_as_field_element);
-                    bal.value.sub_assign(&fee_as_field_element);
-                },
+                forced_exit.initiator_account_address,
+                forced_exit.token,
             );
 
-        let after_root = tree.root_hash();
-        debug!("After root = {}", after_root);
-        let (audit_path_after, audit_balance_path_after) =
-            get_audits(tree, withdraw.account_address, withdraw.token);
+        let (audit_path_target_intermediate, audit_balance_path_target_intermediate) =
+            get_audits(tree, forced_exit.target_account_address, forced_exit.token);
 
-        let a = balance_before;
-        let mut b = amount_as_field_element;
-        b.add_assign(&fee_as_field_element);
+        let (
+            account_witness_target_intermediate,
+            account_witness_target_after,
+            balance_target_intermediate,
+            balance_target_after,
+        ) = apply_leaf_operation(
+            tree,
+            forced_exit.target_account_address,
+            forced_exit.token,
+            |_| {},
+            |bal| bal.value.sub_assign(&amount_as_field_element),
+        );
+        let after_root = tree.root_hash();
+        let (audit_path_initiator_after, audit_balance_path_initiator_after) = get_audits(
+            tree,
+            forced_exit.initiator_account_address,
+            forced_exit.token,
+        );
+
+        let (audit_path_target_after, audit_balance_path_target_after) =
+            get_audits(tree, forced_exit.target_account_address, forced_exit.token);
+
+        //calculate a and b
+        let a = balance_initiator_before;
+        let b = fee_as_field_element;
 
         ForcedExitWitness {
-            before: OperationBranch {
-                address: Some(account_address_fe),
+            initiator_before: OperationBranch {
+                address: Some(account_address_initiator_fe),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
-                    account_witness: account_witness_before,
-                    account_path: audit_path_before,
-                    balance_value: Some(balance_before),
-                    balance_subtree_path: audit_balance_path_before,
+                    account_witness: account_witness_initiator_before,
+                    account_path: audit_path_initiator_before,
+                    balance_value: Some(balance_initiator_before),
+                    balance_subtree_path: audit_balance_path_initiator_before,
                 },
             },
-            after: OperationBranch {
-                address: Some(account_address_fe),
+            initiator_intermediate: OperationBranch {
+                address: Some(account_address_initiator_fe),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
-                    account_witness: account_witness_after,
-                    account_path: audit_path_after,
-                    balance_value: Some(balance_after),
-                    balance_subtree_path: audit_balance_path_after,
+                    account_witness: account_witness_initiator_intermediate.clone(),
+                    account_path: audit_path_initiator_intermediate,
+                    balance_value: Some(balance_initiator_intermediate),
+                    balance_subtree_path: audit_balance_path_initiator_intermediate,
+                },
+            },
+            initiator_after: OperationBranch {
+                address: Some(account_address_initiator_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_initiator_intermediate,
+                    account_path: audit_path_initiator_after,
+                    balance_value: Some(balance_initiator_intermediate),
+                    balance_subtree_path: audit_balance_path_initiator_after,
+                },
+            },
+            target_before: OperationBranch {
+                address: Some(account_address_target_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_target_intermediate.clone(),
+                    account_path: audit_path_target_before,
+                    balance_value: Some(balance_target_intermediate),
+                    balance_subtree_path: audit_balance_path_target_before,
+                },
+            },
+            target_intermediate: OperationBranch {
+                address: Some(account_address_target_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_target_intermediate,
+                    account_path: audit_path_target_intermediate,
+                    balance_value: Some(balance_target_intermediate),
+                    balance_subtree_path: audit_balance_path_target_intermediate,
+                },
+            },
+            target_after: OperationBranch {
+                address: Some(account_address_target_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_target_after,
+                    account_path: audit_path_target_after,
+                    balance_value: Some(balance_target_after),
+                    balance_subtree_path: audit_balance_path_target_after,
                 },
             },
             args: OperationArguments {
-                eth_address: Some(withdraw.eth_address),
+                eth_address: Some(Fr::zero()),
                 amount_packed: Some(amount_encoded),
                 full_amount: Some(amount_as_field_element),
                 fee: Some(fee_encoded),
@@ -286,8 +379,9 @@ impl ForcedExitWitness<Bn256> {
                 new_pub_key_hash: Some(Fr::zero()),
             },
             before_root: Some(before_root),
+            intermediate_root: Some(intermediate_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("3").unwrap()),
+            tx_type: Some(Fr::from_str("9").unwrap()),
         }
     }
 }
