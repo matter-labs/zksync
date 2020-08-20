@@ -17,7 +17,8 @@ library Operations {
         _CloseAccount, // used for correct op id offset
         Transfer,
         FullExit,
-        ChangePubKey
+        ChangePubKey,
+        ForcedExit
     }
 
     // Byte lengths
@@ -31,6 +32,9 @@ library Operations {
     uint8 constant PUBKEY_HASH_BYTES = 20;
 
     uint8 constant ADDRESS_BYTES = 20;
+
+    /// @notice Packet amount bytes length
+    uint constant PACKED_AMOUNT_BYTES = 5;
 
     /// @notice Packed fee bytes lengths
     uint8 constant FEE_BYTES = 2;
@@ -156,6 +160,37 @@ library Operations {
             op.amount,  // amount
             bytes2(0),  // fee (ignored)  (update when FEE_BYTES is changed)
             op.owner    // owner
+        );
+    }
+
+    // ForcedExit pubdata
+    
+    struct ForcedExit {
+        //uint32 initiatorAccountId; -- present in pubdata, ignored at serialization
+        uint16 tokenId;
+        uint128 amount;
+        //uint16 fee; -- present in pubdata, ignored at serialization
+        address target;
+    }
+
+    function readForcedExitPubdata(bytes memory _data, uint _offset) internal pure
+        returns (ForcedExit memory parsed)
+    {
+        // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
+        uint offset = _offset + ACCOUNT_ID_BYTES;                   // initiatorAccountId (ignored)
+        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
+        (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
+        offset += FEE_BYTES;                                        // fee (ignored)
+        (offset, parsed.target) = Bytes.readAddress(_data, offset); // target
+    }
+
+    function writeForcedExitPubdata(ForcedExit memory op) internal pure returns (bytes memory buf) {
+        buf = abi.encodePacked(
+            bytes4(0),  // initiatorAccountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            op.tokenId, // tokenId
+            op.amount,  // amount
+            bytes2(0),  // fee (ignored)  (update when FEE_BYTES is changed)
+            op.target   // target
         );
     }
 
