@@ -177,7 +177,7 @@ async function testForcedExit(syncWallet1: Wallet, token: types.TokenLike, amoun
 
     let testPassed = true;
     try {
-        const forcedExitHandle = await syncWallet1.syncForcedExit({
+        await syncWallet1.syncForcedExit({
             target: targetWallet.address(),
             token,
             fee
