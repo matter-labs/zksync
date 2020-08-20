@@ -33,9 +33,6 @@ library Operations {
 
     uint8 constant ADDRESS_BYTES = 20;
 
-    /// @notice Packet amount bytes length
-    uint constant PACKED_AMOUNT_BYTES = 5;
-
     /// @notice Packed fee bytes lengths
     uint8 constant FEE_BYTES = 2;
 
