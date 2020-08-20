@@ -2074,11 +2074,6 @@ bn.js@^4.4.0:
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.11.9.tgz#26d556829458f9d1e81fc48952493d0ba3507828"
   integrity sha512-E6QoYqCKZfgatHTdHzs1RRKP7ip4vvm+EyRUeE2RF0NblwVvb0p6jSVeNTOFxPn26QXN2o6SMfNxKp6kU8zQaw==
 
-bn.js@^5.0.0:
-  version "5.1.1"
-  resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-5.1.1.tgz#48efc4031a9c4041b9c99c6941d903463ab62eb5"
-  integrity sha512-IUTD/REb78Z2eodka1QZyyEk66pciRcP6Sroka0aI3tG/iwIdYLrBD62RsubR7vqdt3WyX8p4jxeatzmRSphtA==
-
 body-parser@1.19.0:
   version "1.19.0"
   resolved "https://registry.yarnpkg.com/body-parser/-/body-parser-1.19.0.tgz#96b2709e57c9c4e09a6fd66a8fd979844f69f08a"
@@ -9343,9 +9338,10 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
-"zksync-crypto@link:../zksync-crypto":
-  version "0.0.0"
-  uid ""
+zksync-crypto@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.3.1.tgz#ad0c1d299246de6fdd7907532387466599787edd"
+  integrity sha512-9BbIxVPIKXAAT+TUiMJXuoaVcNJqBZ23CNEHWOSJrQNJHUGkaHUQ426xAw/bNjNbRn4UTkM/AhyyqAUMnVX6nA==
 
 "zksync@link:../zksync.js":
   version "0.0.0"
