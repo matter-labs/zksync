@@ -11,7 +11,9 @@ import {
     PubKeyHash,
     TxEthSignature,
     ChangePubKey,
-    EthSignerType
+    EthSignerType,
+    Transfer,
+    SignedTransaction
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -94,13 +96,13 @@ export class Wallet {
         };
     }
 
-    async syncTransfer(transfer: {
+    async signSyncTransfer(transfer: {
         to: Address;
         token: TokenLike;
         amount: BigNumberish;
         fee?: BigNumberish;
         nonce?: Nonce;
-    }): Promise<Transaction> {
+    }): Promise<SignedTransaction> {
         if (!this.signer) {
             throw new Error("ZKSync signer is required for sending zksync transactions.");
         }
@@ -136,20 +138,31 @@ export class Wallet {
             `Account Id: ${this.accountId}`;
 
         const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
-
         const signedTransferTransaction = this.signer.signSyncTransfer(transactionData);
-
-        const transactionHash = await this.provider.submitTx(signedTransferTransaction, txMessageEthSignature);
-        return new Transaction(signedTransferTransaction, transactionHash, this.provider);
+        return {
+            tx: signedTransferTransaction,
+            ethereumSignature: txMessageEthSignature
+        };
     }
 
-    async withdrawFromSyncToEthereum(withdraw: {
-        ethAddress: string;
+    async syncTransfer(transfer: {
+        to: Address;
         token: TokenLike;
         amount: BigNumberish;
         fee?: BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
+        const signedTransferTransaction = await this.signSyncTransfer(transfer);
+        return submitSignedTransaction(signedTransferTransaction, this.provider);
+    }
+
+    async signWithdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+    }): Promise<SignedTransaction> {
         if (!this.signer) {
             throw new Error("ZKSync signer is required for sending zksync transactions.");
         }
@@ -187,8 +200,22 @@ export class Wallet {
 
         const signedWithdrawTransaction = this.signer.signSyncWithdraw(transactionData);
 
-        const submitResponse = await this.provider.submitTx(signedWithdrawTransaction, txMessageEthSignature);
-        return new Transaction(signedWithdrawTransaction, submitResponse, this.provider);
+        return {
+            tx: signedWithdrawTransaction,
+            ethereumSignature: txMessageEthSignature
+        };
+    }
+
+    async withdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+    }): Promise<Transaction> {
+        const signedWithdrawTransaction = await this.signWithdrawFromSyncToEthereum(withdraw);
+
+        return submitSignedTransaction(signedWithdrawTransaction, this.provider);
     }
 
     async isSigningKeySet(): Promise<boolean> {
@@ -200,17 +227,12 @@ export class Wallet {
         return currentPubKeyHash === signerPubKeyHash;
     }
 
-    async setSigningKey(nonce: Nonce = "committed", onchainAuth = false): Promise<Transaction> {
+    async signSetSigningKey(nonce: Nonce = "committed", onchainAuth = false): Promise<SignedTransaction> {
         if (!this.signer) {
             throw new Error("ZKSync signer is required for current pubkey calculation.");
         }
 
-        const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
-
-        if (currentPubKeyHash === newPubKeyHash) {
-            throw new Error("Current signing key is already set");
-        }
 
         await this.setRequiredAccountIdFromServer("Set Signing Key");
 
@@ -219,7 +241,7 @@ export class Wallet {
         const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, numNonce, this.accountId);
         const ethSignature = onchainAuth ? null : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
-        const txData: ChangePubKey = {
+        const changePubKeyTx: ChangePubKey = {
             type: "ChangePubKey",
             accountId: this.accountId,
             account: this.address(),
@@ -228,8 +250,20 @@ export class Wallet {
             ethSignature
         };
 
-        const transactionHash = await this.provider.submitTx(txData);
-        return new Transaction(txData, transactionHash, this.provider);
+        return {
+            tx: changePubKeyTx
+        };
+    }
+
+    async setSigningKey(nonce: Nonce = "committed", onchainAuth = false): Promise<Transaction> {
+        const txData = await this.signSetSigningKey(nonce, onchainAuth);
+
+        const currentPubKeyHash = await this.getCurrentPubKeyHash();
+        if (currentPubKeyHash === (txData.tx as ChangePubKey).newPkHash) {
+            throw new Error("Current signing key is already set");
+        }
+
+        return submitSignedTransaction(txData, this.provider);
     }
 
     async isOnchainAuthSigningKeySet(nonce: Nonce = "committed"): Promise<boolean> {
@@ -571,6 +605,11 @@ class Transaction {
     }
 
     private throwErrorIfFailedState() {
-        if (this.state == "Failed") throw this.error;
+        if (this.state === "Failed") throw this.error;
     }
+}
+
+export async function submitSignedTransaction(signedTx: SignedTransaction, provider: Provider): Promise<Transaction> {
+    const transactionHash = await provider.submitTx(signedTx.tx, signedTx.ethereumSignature);
+    return new Transaction(signedTx, transactionHash, provider);
 }

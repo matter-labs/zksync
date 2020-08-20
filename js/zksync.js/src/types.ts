@@ -104,6 +104,11 @@ export interface CloseAccount {
     signature: Signature;
 }
 
+export interface SignedTransaction {
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount;
+    ethereumSignature?: TxEthSignature;
+}
+
 export interface BlockInfo {
     blockNumber: number;
     committed: boolean;
