@@ -5,10 +5,10 @@ import {
 } from "zksync";
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/ZkSync.json');
-import {ethers, utils, Contract} from "ethers";
-import {BigNumber, bigNumberify, parseEther} from "ethers/utils";
-import {IERC20_INTERFACE, sleep} from "zksync/src/utils";
-import {TokenLike} from "zksync/build/types";
+import { ethers, utils, Contract } from "ethers";
+import { BigNumber, bigNumberify, parseEther } from "ethers/utils";
+import { IERC20_INTERFACE, sleep } from "zksync/src/utils";
+import { TokenLike } from "zksync/build/types";
 import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
@@ -154,6 +154,46 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
+async function testForcedExit(syncWallet1: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+    const targetEthWallet = ethers.Wallet.createRandom().connect(ethersProvider);
+    const targetWallet = await Wallet.fromEthSigner(
+        targetEthWallet,
+        syncProvider,
+    );
+
+    // Do a transfer to new operation.
+    const transferFullFee = await syncProvider.getTransactionFee("Transfer", targetWallet.address(), token);
+    const transferFee = transferFullFee.totalFee;
+
+    const transferToNewHandle = await syncWallet1.syncTransfer({
+        to: targetWallet.address(),
+        token,
+        amount,
+        fee: transferFee
+    });
+    await transferToNewHandle.awaitReceipt();
+
+    // Then do a ForcedExit operation.
+    const fullFee = await syncProvider.getTransactionFee("Withdraw", targetWallet.address(), token);
+    const fee = fullFee.totalFee;
+
+    let testPassed = true;
+    try {
+        const forcedExitHandle = await syncWallet1.syncForcedExit({
+            target: targetWallet.address(),
+            token,
+            fee
+        });
+        testPassed = false;
+    } catch (err) {
+        console.log('Error (expected) of ForcedExit: ', err.message);
+    }
+
+    if (!testPassed) {
+        throw new Error("ForcedExit was accepted for a fresh account");
+    }
+}
+
 async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
     const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
     const fee = fullFee.totalFee;
@@ -269,6 +309,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Forever approved deposit ok, Token: ${token}`);
     await testChangePubkeyOnchain(syncWallet1);
     console.log(`Change pubkey onchain ok`);
+    await testForcedExit(syncWallet1, token, transfersAmount);
+    console.log(`ForcedExit OK`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount);
     console.log(`Transfer to new ok, Token: ${token}`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount,);
@@ -280,7 +322,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
     await apitype.checkBlockResponseType(1);
     const blocks = await apitype.checkBlocksResponseType();
-    for (const {block_number} of blocks.slice(-10)) {
+    for (const { block_number } of blocks.slice(-10)) {
         await apitype.checkBlockTransactionsResponseType(block_number);
     }
     await apitype.checkTxHistoryResponseType(syncWallet1.address());
@@ -342,19 +384,19 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
 }
 
 function promiseTimeout(ms, promise) {
-  // Create a promise that rejects in <ms> milliseconds
-  let timeout = new Promise((resolve, reject) => {
-    let id = setTimeout(() => {
-      clearTimeout(id);
-      reject('Timed out in '+ ms + 'ms.')
-    }, ms)
-  })
+    // Create a promise that rejects in <ms> milliseconds
+    let timeout = new Promise((resolve, reject) => {
+        let id = setTimeout(() => {
+            clearTimeout(id);
+            reject('Timed out in ' + ms + 'ms.')
+        }, ms)
+    })
 
-  // Returns a race between our timeout and the passed in promise
-  return Promise.race([
-    promise,
-    timeout
-  ])
+    // Returns a race between our timeout and the passed in promise
+    return Promise.race([
+        promise,
+        timeout
+    ])
 }
 
 async function checkFailedTransactionResending(contract: Contract, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
@@ -400,12 +442,12 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
             ethWallet,
         );
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("6.0")})).wait();
+        await (await ethWallet.sendTransaction({ to: syncDepositorWallet.address, value: parseEther("6.0") })).wait();
         await (await erc20.transfer(syncDepositorWallet.address, parseEther("110.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("6.0")}));
+        await (await ethWallet.sendTransaction({ to: syncWalletSigner.address, value: parseEther("6.0") }));
         const syncWallet = await Wallet.fromEthSigner(
             syncWalletSigner,
             syncProvider,
@@ -418,14 +460,14 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
         );
 
         const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("6.0")}));
+        await (await ethWallet.sendTransaction({ to: ethWallet2.address, value: parseEther("6.0") }));
         const syncWallet2 = await Wallet.fromEthSigner(
             ethWallet2,
             syncProvider,
         );
 
         const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet3.address, value: parseEther("6.0")}));
+        await (await ethWallet.sendTransaction({ to: ethWallet3.address, value: parseEther("6.0") }));
         const syncWallet3 = await Wallet.fromEthSigner(
             ethWallet3,
             syncProvider,
@@ -439,13 +481,13 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
 
         // Check that transaction can be successfully executed after previous failure.
         const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet4.address, value: parseEther("6.0")}));
+        await (await ethWallet.sendTransaction({ to: ethWallet4.address, value: parseEther("6.0") }));
         const syncWallet4 = await Wallet.fromEthSigner(
             ethWallet4,
             syncProvider,
         );
         const ethWallet5 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet5.address, value: parseEther("6.0")}));
+        await (await ethWallet.sendTransaction({ to: ethWallet5.address, value: parseEther("6.0") }));
         const syncWallet5 = await Wallet.fromEthSigner(
             ethWallet5,
             syncProvider,
