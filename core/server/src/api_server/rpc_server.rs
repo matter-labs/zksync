@@ -543,14 +543,7 @@ impl RpcApp {
                     .operations_schema()
                     .get_executed_priority_operation(serial_id)
                     .map_err(|err| {
-                        log::warn!(
-                            "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                            file!(),
-                            line!(),
-                            column!(),
-                            err,
-                            serial_id,
-                        );
+                        vlog::warn!("Internal Server Error: '{}'; input: {}", err, serial_id,);
                         Error::internal_error()
                     })?;
 

@@ -29,7 +29,7 @@ impl CommitCost {
     pub const TRANSFER_TO_NEW_COST: u64 = 862;
     pub const FULL_EXIT_COST: u64 = 10_165;
     pub const WITHDRAW_COST: u64 = 2_167;
-    pub const FORCED_EXIT_COST: u64 = 2_167; // TODO: Verify value
+    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -68,7 +68,7 @@ impl VerifyCost {
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 2_499;
     pub const WITHDRAW_COST: u64 = 45_668;
-    pub const FORCED_EXIT_COST: u64 = 45_668; // TODO: Verify value
+    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
