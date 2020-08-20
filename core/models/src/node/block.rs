@@ -16,6 +16,7 @@ pub struct PendingBlock {
     pub unprocessed_priority_op_before: u64,
     pub pending_block_iteration: usize,
     pub success_operations: Vec<ExecutedOperations>,
+    pub failed_txs: Vec<ExecutedTx>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -312,10 +312,12 @@ impl PlasmaStateKeeper {
             }
 
             log::info!(
-                "Executed restored proposed block: {} transactions, {} priority operations",
+                "Executed restored proposed block: {} transactions, {} priority operations, {} failed transactions",
                 txs_count,
-                priority_op_count
+                priority_op_count,
+                pending_block.failed_txs.len()
             );
+            self.pending_block.failed_txs = pending_block.failed_txs;
         } else {
             log::info!("There is no pending block to restore");
         }
@@ -478,19 +480,20 @@ impl PlasmaStateKeeper {
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
-
-            // If pending block contains withdrawals we seal it faster
-            let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
-                self.max_miniblock_iterations_withdraw_block
-            } else {
-                self.max_miniblock_iterations
-            };
-            if self.pending_block.pending_block_iteration > max_miniblock_iterations {
-                self.seal_pending_block().await;
-            } else {
-                self.store_pending_block().await;
-            }
         }
+
+        // If pending block contains withdrawals we seal it faster
+        let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
+            self.max_miniblock_iterations_withdraw_block
+        } else {
+            self.max_miniblock_iterations
+        };
+        if self.pending_block.pending_block_iteration > max_miniblock_iterations {
+            self.seal_pending_block().await;
+        } else {
+            self.store_pending_block().await;
+        }
+
         self.notify_executed_ops(&mut executed_ops).await;
     }
 
@@ -713,12 +716,14 @@ impl PlasmaStateKeeper {
             unprocessed_priority_op_before: self.pending_block.unprocessed_priority_op_before,
             pending_block_iteration: self.pending_block.pending_block_iteration,
             success_operations: self.pending_block.success_operations.clone(),
+            failed_txs: self.pending_block.failed_txs.clone(),
         };
 
         log::trace!(
-            "Persisting mini block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
+            "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
             pending_block.number,
             pending_block.success_operations.len(),
+            pending_block.failed_txs.len(),
             pending_block.chunks_left,
             pending_block.pending_block_iteration
         );

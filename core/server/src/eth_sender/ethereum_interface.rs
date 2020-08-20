@@ -11,6 +11,10 @@ use super::ExecutedTxStatus;
 use eth_client::{ETHClient, SignedCallResult};
 use models::abi::zksync_contract;
 use models::config_options::ConfigurationOptions;
+use std::time::Duration;
+
+/// Sleep time between consecutive requests.
+const SLEEP_DURATION: Duration = Duration::from_millis(250);
 
 /// Ethereum Interface module provides an abstract interface to
 /// interact with the Ethereum blockchain.
@@ -82,10 +86,16 @@ impl EthereumHttpClient {
             _event_loop,
         })
     }
+
+    /// Sleep is required before each Ethereum query because infura blocks requests that are made too often
+    fn sleep(&self) {
+        std::thread::sleep(SLEEP_DURATION);
+    }
 }
 
 impl EthereumInterface for EthereumHttpClient {
     fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
+        self.sleep();
         let receipt = block_on(
             self.eth_client
                 .web3
@@ -123,10 +133,12 @@ impl EthereumInterface for EthereumHttpClient {
     }
 
     fn block_number(&self) -> Result<u64, failure::Error> {
+        self.sleep();
         Ok(block_on(self.eth_client.web3.eth().block_number().compat()).map(|n| n.as_u64())?)
     }
 
     fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
+        self.sleep();
         let hash = block_on(self.eth_client.send_raw_tx(signed_tx.raw_tx.clone()))?;
         ensure!(
             hash == signed_tx.hash,
@@ -136,6 +148,7 @@ impl EthereumInterface for EthereumHttpClient {
     }
 
     fn gas_price(&self) -> Result<U256, failure::Error> {
+        self.sleep();
         block_on(self.eth_client.get_gas_price())
     }
 
@@ -148,6 +161,7 @@ impl EthereumInterface for EthereumHttpClient {
         data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
+        self.sleep();
         block_on(self.eth_client.sign_prepared_tx(data, options))
     }
 }

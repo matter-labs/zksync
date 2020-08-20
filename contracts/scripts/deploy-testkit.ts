@@ -1,7 +1,6 @@
 import {ethers, Wallet} from "ethers";
 import {Deployer, readContractCode, readTestContracts} from "../src.ts/deploy";
 import {deployContract} from "ethereum-waffle";
-import {parseEther} from "ethers/utils";
 
 (async () => {
     if (process.env.ETH_NETWORK !== "test") {

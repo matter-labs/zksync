@@ -4,11 +4,9 @@ import {
     ETHProxy, types, utils as zkutils
 } from "zksync";
 // HACK: using require as type system work-around
-const franklin_abi = require('../../contracts/build/ZkSync.json');
-import { ethers, utils, Contract } from "ethers";
-import { BigNumber, bigNumberify, parseEther } from "ethers/utils";
+const franklin_abi = require('../../contracts/build/ZkSync.json').abi;
+import { ethers, Contract, BigNumber, BigNumberish, utils } from "ethers";
 import { IERC20_INTERFACE, sleep } from "zksync/src/utils";
-import { TokenLike } from "zksync/build/types";
 import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
@@ -34,10 +32,10 @@ async function getOperatorBalance(token: types.TokenLike, type: "committed" | "v
     } else {
         balance = accountState.verified.balances[tokenSymbol] || "0";
     }
-    return utils.bigNumberify(balance);
+    return BigNumber.from(balance);
 }
 
-async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumberish) {
+async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: BigNumberish) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
 
     const startTime = new Date().getTime();
@@ -59,7 +57,7 @@ async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet
     }
 }
 
-async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
 
     const startTime = new Date().getTime();
@@ -96,7 +94,7 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
     }
 }
 
-async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet.address(), token);
     const fee = fullFee.totalFee;
 
@@ -123,7 +121,7 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
     }
 }
 
-async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber, timeoutBeforeReceipt = 0) {
+async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber, timeoutBeforeReceipt = 0) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
     const fee = fullFee.totalFee;
 
@@ -194,7 +192,7 @@ async function testForcedExit(syncWallet1: Wallet, token: types.TokenLike, amoun
     }
 }
 
-async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
     const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
     const fee = fullFee.totalFee;
 
@@ -262,6 +260,7 @@ async function testChangePubkeyOffchain(syncWallet: Wallet) {
 }
 
 async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
+    console.log("testThrowingErrorOnTxFail")
     let testPassed = true;
 
     const ethWallet = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -294,6 +293,7 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
     if (!testPassed) {
         throw new Error("testThrowingErrorOnTxFail failed");
     }
+    console.log("Test ok")
 }
 
 async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, depositAmountETH: string) {
@@ -319,15 +319,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer to self with fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
-
-    await apitype.checkBlockResponseType(1);
-    const blocks = await apitype.checkBlocksResponseType();
-    for (const { block_number } of blocks.slice(-10)) {
-        await apitype.checkBlockTransactionsResponseType(block_number);
-    }
-    await apitype.checkTxHistoryResponseType(syncWallet1.address());
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
-
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount);
     console.log(`Withdraw ok, Token: ${token}`);
 }
@@ -411,7 +403,7 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
     try {
         await testTransfer(syncWallet1, syncWallet2, "ETH", amount);
     } catch (e) {
-        assert(e.value.failReason == `Not enough balance`);
+        assert(e?.value?.failReason == `Not enough balance`);
         console.log('Transfer failed (expected)');
     }
 
@@ -427,7 +419,13 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
 
 (async () => {
     try {
-        syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
+        if (process.argv[2] === "http") {
+            console.log("Testing with http provider");
+            syncProvider = await Provider.newHttpProvider(process.env.HTTP_API_ADDR, 50);
+        } else {
+            console.log("Testing with websocket provider");
+            syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
+        }
         const ERC20_SYMBOL = "DAI";
         const ERC20_ADDRESS = syncProvider.tokenSet.resolveTokenAddress(ERC20_SYMBOL);
 
@@ -442,12 +440,12 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
             ethWallet,
         );
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({ to: syncDepositorWallet.address, value: parseEther("6.0") })).wait();
-        await (await erc20.transfer(syncDepositorWallet.address, parseEther("110.0"))).wait();
+        await (await ethWallet.sendTransaction({ to: syncDepositorWallet.address, value: utils.parseEther("6.0") })).wait();
+        await (await erc20.transfer(syncDepositorWallet.address, utils.parseEther("110.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({ to: syncWalletSigner.address, value: parseEther("6.0") }));
+        await (await ethWallet.sendTransaction({ to: syncWalletSigner.address, value: utils.parseEther("6.0") }));
         const syncWallet = await Wallet.fromEthSigner(
             syncWalletSigner,
             syncProvider,
@@ -455,19 +453,19 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
 
         const contract = new Contract(
             syncProvider.contractAddress.mainContract,
-            franklin_abi.interface,
+            franklin_abi,
             ethWallet,
         );
 
         const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({ to: ethWallet2.address, value: parseEther("6.0") }));
+        await (await ethWallet.sendTransaction({ to: ethWallet2.address, value: utils.parseEther("6.0") }));
         const syncWallet2 = await Wallet.fromEthSigner(
             ethWallet2,
             syncProvider,
         );
 
         const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({ to: ethWallet3.address, value: parseEther("6.0") }));
+        await (await ethWallet.sendTransaction({ to: ethWallet3.address, value: utils.parseEther("6.0") }));
         const syncWallet3 = await Wallet.fromEthSigner(
             ethWallet3,
             syncProvider,
@@ -481,20 +479,19 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
 
         // Check that transaction can be successfully executed after previous failure.
         const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({ to: ethWallet4.address, value: parseEther("6.0") }));
+        await (await ethWallet.sendTransaction({ to: ethWallet4.address, value: utils.parseEther("6.0") }));
         const syncWallet4 = await Wallet.fromEthSigner(
             ethWallet4,
             syncProvider,
         );
         const ethWallet5 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({ to: ethWallet5.address, value: parseEther("6.0") }));
+        await (await ethWallet.sendTransaction({ to: ethWallet5.address, value: utils.parseEther("6.0") }));
         const syncWallet5 = await Wallet.fromEthSigner(
             ethWallet5,
             syncProvider,
         );
         await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "50.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
 

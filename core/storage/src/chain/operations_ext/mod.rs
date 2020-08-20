@@ -44,19 +44,6 @@ impl<'a> OperationsExtSchema<'a> {
         let tx = OperationsSchema(self.0).get_executed_operation(hash)?;
 
         if let Some(tx) = tx {
-            // Check whether transaction was committed.
-            let committed = operations::table
-                .filter(operations::block_number.eq(tx.block_number))
-                .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
-                .first::<StoredOperation>(self.0.conn())
-                .optional()?
-                .is_some();
-
-            // We can't provide a receipt for non-committed transaction.
-            if !committed {
-                return Ok(None);
-            }
-
             // Check whether transaction was verified.
             let verified = operations::table
                 .filter(operations::block_number.eq(tx.block_number))
@@ -97,12 +84,6 @@ impl<'a> OperationsExtSchema<'a> {
                     .first::<ProverRun>(self.0.conn())
                     .optional()?;
 
-                let commit = operations::table
-                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
-                    .first::<StoredOperation>(self.0.conn())
-                    .optional()?;
-
                 let confirm = operations::table
                     .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
                     .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
@@ -110,7 +91,7 @@ impl<'a> OperationsExtSchema<'a> {
                     .optional()?;
 
                 Ok(PriorityOpReceiptResponse {
-                    committed: commit.is_some(),
+                    committed: true,
                     verified: confirm.is_some(),
                     prover_run,
                 })

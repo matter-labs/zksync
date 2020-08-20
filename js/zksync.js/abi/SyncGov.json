@@ -1,5 +1,5 @@
 {
-  "interface": [
+  "abi": [
     {
       "inputs": [],
       "payable": false,

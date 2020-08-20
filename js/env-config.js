@@ -29,4 +29,16 @@ export default {
         WS_API_ADDR: "wss://api.zksync.io/jsrpc-ws",
         HTTP_RPC_API_ADDR: "https://api.zksync.io/jsrpc",
     },
+    "https://dev.zksync.dev": {
+        API_SERVER: "https://dev-api.zksync.dev",
+        ETH_NETWORK: "rinkeby",
+        WS_API_ADDR: "wss://dev-api.zksync.dev/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://dev-api.zksync.dev/jsrpc",
+    },
+    "https://breaking.zksync.dev": {
+        API_SERVER: "https://breaking-api.zksync.dev",
+        ETH_NETWORK: "rinkeby",
+        WS_API_ADDR: "wss://breaking-api.zksync.dev/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://breaking-api.zksync.dev/jsrpc",
+    },
 }[`${location.protocol}//${location.hostname}`];

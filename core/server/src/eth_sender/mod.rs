@@ -293,23 +293,22 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     self.tx_queue.report_commitment();
 
                     if current_op.is_verify() {
-                        self.current_zksync_info.set_new_verified_block(
-                            current_op
-                                .op
-                                .as_ref()
-                                .expect("Should be verify operation")
-                                .block
-                                .block_number,
-                        );
+                        let sync_op = current_op.op.expect("Should be verify operation");
+                        self.current_zksync_info
+                            .set_new_verified_block(sync_op.block.block_number);
+
+                        let contains_withdrawals = !sync_op.block.get_withdrawals_data().is_empty();
 
                         // We notify about verify only when it's confirmed on the Ethereum.
                         self.op_notify
-                            .try_send(current_op.op.expect("Should be verify operation"))
+                            .try_send(sync_op)
                             .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
                             .unwrap_or_default();
 
-                        // Complete pending withdrawals after each verify.
-                        self.add_complete_withdrawals_to_queue();
+                        if contains_withdrawals {
+                            // Complete pending withdrawals after each verify.
+                            self.add_complete_withdrawals_to_queue();
+                        }
                     }
                 }
                 OperationCommitment::Pending => {

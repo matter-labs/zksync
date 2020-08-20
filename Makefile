@@ -167,7 +167,7 @@ integration-testkit:
 	@bin/integration-testkit.sh
 
 integration-simple:
-	@cd js/tests && yarn && yarn simple
+	@cd js/tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
 
 integration-full-exit:
 	@cd js/tests && yarn && yarn full-exit

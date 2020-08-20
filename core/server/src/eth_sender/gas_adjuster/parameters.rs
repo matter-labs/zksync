@@ -88,7 +88,7 @@ mod parameters_impl {
     /// enough to match the current network price.
     pub fn sample_adding_interval() -> Duration {
         if std::env::var(GAS_PRICE_LIMIT_SAMPLE_INTERVAL).is_err() {
-            log::warn!(
+            log::trace!(
                 "No value provided for `ETH_GAS_PRICE_LIMIT_SAMPLE_INTERVAL` env variable, \
                  using the default: {} seconds",
                 DEFAULT_GAS_PRICE_LIMIT_SAMPLE_INTERVAL.as_secs()

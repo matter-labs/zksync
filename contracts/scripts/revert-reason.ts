@@ -1,12 +1,12 @@
 import { ethers } from "ethers";
-import { Interface } from "ethers/utils";
 import { readContractCode, readProductionContracts } from "../src.ts/deploy";
+import { Interface } from "ethers/lib/utils";
 import * as chalk from "chalk";
 const contracts = readProductionContracts();
-const franklinInterface = new Interface(contracts.zkSync.interface);
-const governanceInterface = new Interface(contracts.governance.interface);
-const verifierInterface = new Interface(contracts.governance.interface);
-const deployFactoryInterface = new Interface(readContractCode("DeployFactory").interface);
+const franklinInterface = new Interface(contracts.zkSync.abi);
+const governanceInterface = new Interface(contracts.governance.abi);
+const verifierInterface = new Interface(contracts.governance.abi);
+const deployFactoryInterface = new Interface(readContractCode("DeployFactory").abi);
 
 function hex_to_ascii(str1) {
     const hex = str1.toString();
@@ -68,21 +68,23 @@ async function reason() {
         }
 
         for (const log of receipt.logs) {
-            let parsedLog = franklinInterface.parseLog(log);
-            if (!parsedLog) {
-                parsedLog = governanceInterface.parseLog(log);
-            }
-            if (!parsedLog) {
-                parsedLog = verifierInterface.parseLog(log);
-            }
-            if (!parsedLog) {
-                parsedLog = deployFactoryInterface.parseLog(log);
-            }
-            if (parsedLog) {
-                console.log(parsedLog);
-            } else {
-                console.log(log);
-            }
+            try {
+                let parsedLog = franklinInterface.parseLog(log);
+                if (!parsedLog) {
+                    parsedLog = governanceInterface.parseLog(log);
+                }
+                if (!parsedLog) {
+                    parsedLog = verifierInterface.parseLog(log);
+                }
+                if (!parsedLog) {
+                    parsedLog = deployFactoryInterface.parseLog(log);
+                }
+                if (parsedLog) {
+                    console.log(parsedLog);
+                } else {
+                    console.log(log);
+                }
+            } catch { }
         }
 
     }
