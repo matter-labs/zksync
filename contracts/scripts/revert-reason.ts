@@ -1,6 +1,7 @@
-import {ethers} from "ethers";
-import {Interface} from "ethers/utils";
-import {readContractCode, readProductionContracts} from "../src.ts/deploy";
+import { ethers } from "ethers";
+import { Interface } from "ethers/utils";
+import { readContractCode, readProductionContracts } from "../src.ts/deploy";
+import * as chalk from "chalk";
 const contracts = readProductionContracts();
 const franklinInterface = new Interface(contracts.zkSync.interface);
 const governanceInterface = new Interface(contracts.governance.interface);
@@ -8,13 +9,13 @@ const verifierInterface = new Interface(contracts.governance.interface);
 const deployFactoryInterface = new Interface(readContractCode("DeployFactory").interface);
 
 function hex_to_ascii(str1) {
-	const hex  = str1.toString();
-	let str = "";
-	for (let n = 0; n < hex.length; n += 2) {
-		str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
-	}
-	return str;
- }
+    const hex = str1.toString();
+    let str = "";
+    for (let n = 0; n < hex.length; n += 2) {
+        str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
+    }
+    return str;
+}
 
 async function reason() {
     const args = process.argv.slice(2);
@@ -30,19 +31,31 @@ async function reason() {
     if (!tx) {
         console.log("tx not found");
     } else {
-        const parsedTransaction = franklinInterface.parseTransaction({data: tx.data});
+        const parsedTransaction = franklinInterface.parseTransaction({ data: tx.data });
         if (parsedTransaction) {
             console.log("parsed tx: ", parsedTransaction);
         } else {
             console.log("tx:", tx);
         }
 
+        const transaction = await provider.getTransaction(hash);
         const receipt = await provider.getTransactionReceipt(hash);
         console.log("receipt:", receipt);
         console.log("\n \n ");
 
         if (receipt.gasUsed) {
+            const gasLimit = transaction.gasLimit;
+            const gasUsed = receipt.gasUsed;
+            console.log("Gas limit: ", transaction.gasLimit.toString());
             console.log("Gas used: ", receipt.gasUsed.toString());
+
+            // If more than 90% of gas was used, report it as an error.
+            const threshold = gasLimit.mul(90).div(100);
+            if (gasUsed >= threshold) {
+                const error = chalk.bold.red;
+                console.log(error("More than 90% of gas limit was used!"));
+                console.log(error("It may be the reason of the transaction failure"));
+            }
         }
 
         if (receipt.status) {

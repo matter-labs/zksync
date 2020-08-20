@@ -9,6 +9,7 @@
     "argparse": "^1.0.10",
     "axios": "^0.19.0",
     "chai": "^4.2.0",
+    "chalk": "^4.1.0",
     "ethereum-waffle": "2.0.12",
     "ethereumjs-abi": "^0.6.8",
     "ethers": "4.0.47",
