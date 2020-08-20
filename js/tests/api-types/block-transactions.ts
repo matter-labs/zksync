@@ -83,4 +83,22 @@ type FullExit = {
     "created_at": string,
 };
 
-export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit)[];
+type ForcedExit = {
+    "tx_hash": string,
+    "block_number": number,
+    "op": {
+        "type": "ForcedExit",
+        "initiatorAccountId": number,
+        "target": string,
+        "token": number,
+        "fee": string,
+        "nonce": number,
+        "signature": {
+            "pubKey": string,
+            "signature": string,
+        }
+    },
+    "created_at": string,
+};
+
+export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit | ForcedExit)[];
