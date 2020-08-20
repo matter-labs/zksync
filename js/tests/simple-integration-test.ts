@@ -361,7 +361,7 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
     try {
         await testTransfer(syncWallet1, syncWallet2, "ETH", amount);
     } catch (e) {
-        assert(e.value.failReason == `Not enough balance`);
+        assert(e?.value?.failReason == `Not enough balance`);
         console.log('Transfer failed (expected)');
     }
 

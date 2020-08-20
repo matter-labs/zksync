@@ -39,7 +39,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[wasm_bindgen]
 /// This method initializes params for current thread, otherwise they will be initialized when signing
 /// first message.
-pub fn init() {
+pub fn zksync_crypto_init() {
     JUBJUB_PARAMS.with(|_| {});
     RESCUE_PARAMS.with(|_| {});
     set_panic_hook();
