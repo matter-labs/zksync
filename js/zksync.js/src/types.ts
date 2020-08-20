@@ -115,7 +115,7 @@ export interface CloseAccount {
 }
 
 export interface SignedTransaction {
-    tx: Transfer | Withdraw | ChangePubKey | CloseAccount;
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit;
     ethereumSignature?: TxEthSignature;
 }
 
