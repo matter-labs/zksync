@@ -11,13 +11,14 @@ use num::ToPrimitive;
 use models::{
     circuit::{
         account::CircuitAccountTree,
-        utils::{append_be_fixed_width, le_bit_vector_into_field_element},
+        utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
     node::operations::ForcedExitOp,
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
-        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        AMOUNT_MANTISSA_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::convert_to_float,
 };
@@ -37,6 +38,7 @@ pub struct ForcedExitData {
     pub token: u32,
     pub initiator_account_address: u32,
     pub target_account_address: u32,
+    pub target_account_eth_address: Fr,
 }
 
 pub struct ForcedExitWitness<E: RescueEngine> {
@@ -70,12 +72,12 @@ impl Witness for ForcedExitWitness<Bn256> {
             token: u32::from(forced_exit.tx.token),
             initiator_account_address: forced_exit.tx.initiator_account_id,
             target_account_address: forced_exit.target_account_id,
+            target_account_eth_address: eth_address_to_fr(&forced_exit.tx.target),
         };
         Self::apply_data(tree, &forced_exit_data)
     }
 
     fn get_pubdata(&self) -> Vec<bool> {
-        // construct pubdata
         let mut pubdata_bits = vec![];
         append_be_fixed_width(&mut pubdata_bits, &self.tx_type.unwrap(), TX_TYPE_BIT_WIDTH);
 
@@ -86,30 +88,29 @@ impl Witness for ForcedExitWitness<Bn256> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.target_before.address.unwrap(),
-            ACCOUNT_ID_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
             &self.initiator_before.token.unwrap(),
             TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.amount_packed.unwrap(),
-            AMOUNT_MANTISSA_BIT_WIDTH + AMOUNT_EXPONENT_BIT_WIDTH,
+            &self.args.full_amount.unwrap(),
+            BALANCE_BIT_WIDTH,
         );
-
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.fee.unwrap(),
             FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.eth_address.unwrap(),
+            ETH_ADDRESS_BIT_WIDTH,
+        );
         resize_grow_only(
             &mut pubdata_bits,
             ForcedExitOp::CHUNKS * CHUNK_BIT_WIDTH,
             false,
-        ); //TODO verify if right padding is okay
+        );
         pubdata_bits
     }
 
@@ -149,7 +150,25 @@ impl Witness for ForcedExitWitness<Bn256> {
             lhs: self.initiator_intermediate.clone(),
             rhs: self.target_intermediate.clone(),
         };
+
+        let rest_operations = (2..ForcedExitOp::CHUNKS).map(|chunk| Operation {
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str(&chunk.to_string()).unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[chunk]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.initiator_after.clone(),
+            rhs: self.target_after.clone(),
+        });
         vec![operation_zero, operation_one]
+            .into_iter()
+            .chain(rest_operations)
+            .collect()
     }
 }
 
@@ -368,7 +387,7 @@ impl ForcedExitWitness<Bn256> {
                 },
             },
             args: OperationArguments {
-                eth_address: Some(Fr::zero()),
+                eth_address: Some(forced_exit.target_account_eth_address),
                 amount_packed: Some(amount_encoded),
                 full_amount: Some(amount_as_field_element),
                 fee: Some(fee_encoded),

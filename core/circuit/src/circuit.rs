@@ -168,7 +168,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 1];
+            data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
 
             // this operation is disabled for now
             // data[CloseOp::OP_CODE as usize] = vec![];
@@ -2089,10 +2089,10 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
         pubdata_bits.extend(lhs.account_id.get_bits_be());
-        pubdata_bits.extend(rhs.account_id.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
-        pubdata_bits.extend(op_data.amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.full_amount.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+        pubdata_bits.extend(op_data.eth_address.get_bits_be());
 
         resize_grow_only(
             &mut pubdata_bits,
@@ -2124,7 +2124,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            TransferOp::CHUNKS,
+            ForcedExitOp::CHUNKS,
         )?;
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_pubdata_correct"),
@@ -2159,7 +2159,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(pubdata_properly_copied.clone());
 
-        lhs_valid_flags.push(is_first_chunk);
+        lhs_valid_flags.push(is_first_chunk.clone());
 
         // check operation arguments
         let is_a_correct =
@@ -2223,18 +2223,18 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         // rhs
         let mut rhs_valid_flags = vec![];
-        rhs_valid_flags.push(pubdata_properly_copied);
-        rhs_valid_flags.push(is_forced_exit);
+        rhs_valid_flags.push(pubdata_properly_copied.clone());
+        rhs_valid_flags.push(is_forced_exit.clone());
 
-        let is_chunk_second = Boolean::from(Expression::equals(
+        let is_second_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
             &chunk_data.chunk_number,
             Expression::u64::<CS>(1),
         )?);
-        rhs_valid_flags.push(is_chunk_second);
+        rhs_valid_flags.push(is_second_chunk.clone());
         rhs_valid_flags.push(is_account_empty.not());
 
-        rhs_valid_flags.push(is_pubdata_chunk_correct);
+        rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
 
         let empty_pubkey_hash =
             CircuitElement::from_fe(cs.namespace(|| "zero pubkey hash"), || Ok(E::Fr::zero()))?;
@@ -2253,7 +2253,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_rhs_balance_eq_amount);
 
-        let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
+        let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
         let updated_balance = Expression::from(&cur.balance.get_number())
@@ -2264,17 +2264,24 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "updated_balance rhs"),
             updated_balance,
             &cur.balance,
-            &is_rhs_valid,
+            &rhs_valid,
         )?;
 
-        // Either LHS or RHS are correct (due to chunking at least)
-        let correct = Boolean::xor(
-            cs.namespace(|| "lhs_valid XOR rhs_valid"),
-            &lhs_valid,
-            &is_rhs_valid,
-        )?;
+        // Remaining chunks
+        let mut ohs_valid_flags = vec![];
+        ohs_valid_flags.push(is_pubdata_chunk_correct);
+        ohs_valid_flags.push(is_first_chunk.not());
+        ohs_valid_flags.push(is_second_chunk.not());
+        ohs_valid_flags.push(is_forced_exit);
+        ohs_valid_flags.push(pubdata_properly_copied);
 
-        Ok(correct)
+        let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
+
+        let is_op_valid = multi_or(
+            cs.namespace(|| "is_op_valid"),
+            &[is_ohs_valid, lhs_valid, rhs_valid],
+        )?;
+        Ok(is_op_valid)
     }
 }
 
