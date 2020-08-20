@@ -146,7 +146,7 @@ export class Wallet {
     async syncForcedExit(forcedExit: {
         target: Address;
         token: TokenLike;
-        fee?: utils.BigNumberish;
+        fee?: BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
         if (!this.signer) {

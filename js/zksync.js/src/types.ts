@@ -93,7 +93,7 @@ export interface ForcedExit {
     initiatorAccountId: number;
     target: Address;
     token: number;
-    fee: utils.BigNumberish;
+    fee: BigNumberish;
     nonce: number;
     signature: Signature;
 }

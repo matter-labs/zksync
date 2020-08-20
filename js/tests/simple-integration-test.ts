@@ -152,7 +152,7 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
-async function testForcedExit(syncWallet1: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+async function testForcedExit(syncWallet1: Wallet, token: types.TokenLike, amount: BigNumber) {
     const targetEthWallet = ethers.Wallet.createRandom().connect(ethersProvider);
     const targetWallet = await Wallet.fromEthSigner(
         targetEthWallet,
