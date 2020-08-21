@@ -133,6 +133,7 @@ pub struct ConfigurationOptions {
     /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
     pub max_miniblock_iterations_withdraw_block: usize,
     pub prometheus_export_port: u16,
+    pub forced_exit_minimum_account_age: Duration,
 }
 
 impl ConfigurationOptions {
@@ -148,6 +149,13 @@ impl ConfigurationOptions {
             } else {
                 parse_env("MINIBLOCKS_ITERATIONS")
             };
+
+        let forced_exit_minimum_account_age =
+            Duration::from_secs(parse_env::<u64>("FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS"));
+
+        if forced_exit_minimum_account_age.as_secs() == 0 {
+            log::error!("Forced exit minimum account age is set to 0, this is an incorrect value for production");
+        }
 
         Self {
             rest_api_server_address: parse_env("REST_API_BIND"),
@@ -179,6 +187,7 @@ impl ConfigurationOptions {
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
             max_miniblock_iterations_withdraw_block,
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
+            forced_exit_minimum_account_age,
         }
     }
 }

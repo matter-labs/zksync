@@ -337,6 +337,9 @@ pub struct RpcApp {
 
     /// Counter for ChangePubKey operations to filter the spam.
     ops_counter: Arc<RwLock<ChangePubKeyOpsCounter>>,
+
+    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
+    forced_exit_minimum_account_age: chrono::Duration,
 }
 
 impl RpcApp {
@@ -356,6 +359,10 @@ impl RpcApp {
         let api_requests_caches_size = config_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
 
+        let forced_exit_minimum_account_age =
+            chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
+                .expect("Unable to convert std::Duration to chrono::Duration");
+
         RpcApp {
             cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
@@ -374,6 +381,8 @@ impl RpcApp {
             current_zksync_info,
 
             ops_counter: Arc::new(RwLock::new(ChangePubKeyOpsCounter::new())),
+
+            forced_exit_minimum_account_age,
         }
     }
 
@@ -436,13 +445,15 @@ impl RpcApp {
 
         match account_age {
             Some(age) => {
-                if (chrono::Utc::now() - age).num_days() >= 1 {
-                    // Account exists longer than 24 hours, everything is OK.
+                if (chrono::Utc::now() - age) >= self.forced_exit_minimum_account_age {
+                    // Account does exist long enough, everything is OK.
                     Ok(())
                 } else {
-                    Err(Error::invalid_params(
-                        "Target account exists less than 24 hours",
-                    ))
+                    let err = format!(
+                        "Target account exists less than required minimum amount ({} hours)",
+                        self.forced_exit_minimum_account_age.num_hours()
+                    );
+                    Err(Error::invalid_params(err))
                 }
             }
             None => Err(Error::invalid_params("Target account does not exist")),
