@@ -2248,16 +2248,24 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         // Check that the withdraw amount is equal to the rhs account balance.
         let is_rhs_balance_eq_amount = CircuitElement::equals(
             cs.namespace(|| "is_rhs_balance_eq_amount_correct"),
-            &op_data.amount_unpacked,
+            &op_data.full_amount,
             &cur.balance,
         )?;
         rhs_valid_flags.push(is_rhs_balance_eq_amount);
+
+        // Check that `eth_address` corresponds to the rhs account Ethereum address.
+        let is_address_correct = CircuitElement::equals(
+            cs.namespace(|| "is_address_correct"),
+            &rhs.account.address,
+            &op_data.eth_address,
+        )?;
+        rhs_valid_flags.push(is_address_correct);
 
         let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
         let updated_balance = Expression::from(&cur.balance.get_number())
-            - Expression::from(&op_data.amount_unpacked.get_number());
+            - Expression::from(&op_data.full_amount.get_number());
 
         // update balance
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
