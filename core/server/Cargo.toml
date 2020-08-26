@@ -36,7 +36,6 @@ tokio_old = { package = "tokio", version = "0.1.22" }
 futures = { version = "0.3", features = ["compat"] }
 actix-rt = "0.2.5"
 actix-cors = "0.1.0"
-actix-web = "1.0.8"
 
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
@@ -54,5 +53,14 @@ rand = "0.7"
 
 lru-cache = "0.1.2"
 
-[dev-dependencies]
+actix-web = "1.0.8"
+actix-web-httpauth = "0.3.2"
+derive_more = "0.99.2"
+diesel = { version = "1.4.2", features = ["postgres","uuidv07", "r2d2", "chrono"] }
+dotenv = "0.15.0"
+r2d2 = "0.8.8"
+actix-service = "1.0.1"
+jsonwebtoken = "7"
+# reqwest = "0.9.22"
 lazy_static = "1.4"
+
