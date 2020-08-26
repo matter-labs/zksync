@@ -41,6 +41,8 @@
     "lint:solidity": "solhint contracts/**/*.sol",
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
-    "prettier:solidity": "prettier --write contracts/**/*.sol"
+    "prettier:solidity": "prettier --write contracts/**/*.sol",
+    "deploy-dev-detailed-erc20": "ts-node scripts/deploy-dev-detailed-erc20.ts $NAME $SYMBOL $DECIMALS",
+    "add_test_erc20_to_governance": "ts-node scripts/add_test_erc20_to_governance.ts $ADDRESS $PRIVATE_KEY"
   }
 }
