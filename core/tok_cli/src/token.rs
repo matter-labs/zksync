@@ -41,7 +41,7 @@ impl Token {
         })
     }
 
-    pub async fn get_info_about_token(address: Address, mut eth: Eth<Http>) -> Result<Self> {
+    pub async fn get_info_about_token(address: Address, eth: Eth<Http>) -> Result<Self> {
         let contract =
             web3::contract::Contract::from_json(eth, address, include_bytes!("./../erc20.json"))
                 .expect("Error create contract ABI for ERC20");
