@@ -390,6 +390,9 @@ pub struct ChangePubKey {
     pub account_id: AccountId,
     pub account: Address,
     pub new_pk_hash: PubKeyHash,
+    pub fee_token: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub fee: BigUint,
     pub nonce: Nonce,
     pub eth_signature: Option<PackedEthSignature>,
 }
@@ -404,6 +407,8 @@ impl ChangePubKey {
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
+        out.extend_from_slice(&self.fee_token.to_be_bytes());
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         if let Some(sign) = &self.eth_signature {
             out.extend_from_slice(&sign.serialize_packed())
@@ -411,23 +416,19 @@ impl ChangePubKey {
         out
     }
 
-    pub fn get_eth_signed_data(
-        account_id: AccountId,
-        nonce: Nonce,
-        new_pubkey_hash: &PubKeyHash,
-    ) -> Result<Vec<u8>, failure::Error> {
+    pub fn get_eth_signed_data(&self) -> Result<Vec<u8>, failure::Error> {
         const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 152;
         let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
         eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");
         eth_signed_msg.extend_from_slice(
             format!(
-                "{}\n\
-                 nonce: 0x{}\n\
-                 account id: 0x{}\
+                "{pubkey}\n\
+                 nonce: 0x{nonce}\n\
+                 account id: 0x{account_id}\
                  \n\n",
-                hex::encode(&new_pubkey_hash.data).to_ascii_lowercase(),
-                hex::encode(&nonce.to_be_bytes()).to_ascii_lowercase(),
-                hex::encode(&account_id.to_be_bytes()).to_ascii_lowercase()
+                pubkey = hex::encode(&self.new_pk_hash.data).to_ascii_lowercase(),
+                nonce = hex::encode(&self.nonce.to_be_bytes()).to_ascii_lowercase(),
+                account_id = hex::encode(&self.account_id.to_be_bytes()).to_ascii_lowercase()
             )
             .as_bytes(),
         );
@@ -443,7 +444,7 @@ impl ChangePubKey {
 
     pub fn verify_eth_signature(&self) -> Option<Address> {
         self.eth_signature.as_ref().and_then(|sign| {
-            Self::get_eth_signed_data(self.account_id, self.nonce, &self.new_pk_hash)
+            self.get_eth_signed_data()
                 .ok()
                 .and_then(|msg| sign.signature_recover_signer(&msg).ok())
         })
@@ -452,6 +453,7 @@ impl ChangePubKey {
     pub fn check_correctness(&self) -> bool {
         (self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account))
             && self.account_id <= max_account_id()
+            && is_fee_amount_packable(&self.fee)
     }
 }
 
