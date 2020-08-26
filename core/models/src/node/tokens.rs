@@ -76,4 +76,5 @@ pub struct TokenPrice {
 pub enum TxFeeTypes {
     Withdraw,
     Transfer,
+    ChangePubKey,
 }

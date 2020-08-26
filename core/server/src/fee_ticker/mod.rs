@@ -24,8 +24,8 @@ use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace deps
 use models::{
     node::{
-        pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp,
-        TransferToNewOp, TxFeeTypes, WithdrawOp,
+        pack_fee_amount, unpack_fee_amount, Address, ChangePubKeyOp, TokenId, TokenLike,
+        TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
     },
     primitives::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str},
 };
@@ -43,11 +43,18 @@ use crate::{
 mod ticker_api;
 mod ticker_info;
 
-// Base operation costs estimated via `gas_price` test.
-const BASE_TRANSFER_COST: u32 = 350;
-/// TODO: change to real value after lauch settles: issue #743
-const BASE_TRANSFER_TO_NEW_COST: u32 = 350;
-const BASE_WITHDRAW_COST: u32 = 90_000;
+/// Transfer gas cost estimated via `gas_price` test.
+const BASE_TRANSFER_COST: u64 =
+    crate::gas_counter::CommitCost::TRANSFER_COST + crate::gas_counter::VerifyCost::TRANSFER_COST;
+/// Transfer to new gas cost estimated via `gas_price` test.
+const BASE_TRANSFER_TO_NEW_COST: u64 = crate::gas_counter::CommitCost::TRANSFER_TO_NEW_COST
+    + crate::gas_counter::VerifyCost::TRANSFER_TO_NEW_COST;
+/// ChangePubKey operation gas cost estimated via `gas_price` test.
+const BASE_CHANGE_PUBKEY_TO_NEW_COST: u64 = crate::gas_counter::CommitCost::CHANGE_PUBKEY_COST
+    + crate::gas_counter::VerifyCost::CHANGE_PUBKEY_COST;
+/// Withdraw operation will trigger `completeWithdrawals` method to be called, thus this operation is pretty expensive.
+const BASE_WITHDRAW_COST: u64 = crate::gas_counter::GasCounter::COMPLETE_WITHDRAWALS_BASE_COST
+    + crate::gas_counter::GasCounter::COMPLETE_WITHDRAWALS_COST;
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
@@ -60,6 +67,7 @@ pub enum OutputFeeType {
     Transfer,
     TransferToNew,
     Withdraw,
+    ChangePubKey,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -149,6 +157,10 @@ pub fn run_ticker_task(
                 BASE_TRANSFER_TO_NEW_COST.into(),
             ),
             (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
+            (
+                OutputFeeType::ChangePubKey,
+                BASE_CHANGE_PUBKEY_TO_NEW_COST.into(),
+            ),
         ]
         .into_iter()
         .collect(),
@@ -230,6 +242,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
+            TxFeeTypes::ChangePubKey => (OutputFeeType::ChangePubKey, ChangePubKeyOp::CHUNKS),
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
@@ -333,6 +346,10 @@ mod test {
                     BigUint::from(BASE_TRANSFER_TO_NEW_COST),
                 ),
                 (OutputFeeType::Withdraw, BigUint::from(BASE_WITHDRAW_COST)),
+                (
+                    OutputFeeType::ChangePubKey,
+                    BASE_CHANGE_PUBKEY_TO_NEW_COST.into(),
+                ),
             ]
             .into_iter()
             .collect(),
