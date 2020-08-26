@@ -13,7 +13,7 @@ struct Claims {
 pub fn encode_token(secret: &str, sub: &str, exp: usize) -> Result<String, Error> {
     let claim = Claims {
         sub: sub.to_string(),
-        exp
+        exp,
     };
     encode(
         &Header::default(),
