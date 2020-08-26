@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     let (_event_loop, transport) =
         Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
 
-    let mut eth = Eth::new(transport);
+    let eth = Eth::new(transport);
 
     let cmd_info = SubCommand::with_name("info")
         .about("Shows 'name', 'symbol', 'decimal' parameters for ERC20 token")
