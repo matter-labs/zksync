@@ -13,7 +13,7 @@ struct Claims {
 pub fn encode_token(secret: &str, sub: &str, exp: usize) -> Result<String, Error> {
     let claim = Claims {
         sub: sub.to_string(),
-        exp: exp,
+        exp
     };
     encode(
         &Header::default(),
@@ -31,9 +31,8 @@ pub fn validate_token(token: &str) -> Result<bool, Error> {
         &Validation::default(),
     );
 
-    let is_valid = match token {
+    match token {
         Ok(data) => Ok(true),
         Err(err) => Err(err),
-    };
-    is_valid
+    }
 }

@@ -73,7 +73,7 @@ fn validator(req: ServiceRequest, credentials: BearerAuth) -> Result<ServiceRequ
         .map(|data| data.get_ref().clone())
         .unwrap_or_else(Default::default);
 
-    let is_valid = match auth::validate_token(credentials.token()) {
+    match auth::validate_token(credentials.token()) {
         Ok(res) => {
             if res {
                 Ok(req)
@@ -82,8 +82,7 @@ fn validator(req: ServiceRequest, credentials: BearerAuth) -> Result<ServiceRequ
             }
         }
         Err(_) => Err(AuthenticationError::from(config).into()),
-    };
-    is_valid
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
