@@ -32,7 +32,7 @@ pub fn validate_token(token: &str) -> Result<bool, Error> {
     );
 
     match token {
-        Ok(data) => Ok(true),
+        Ok(_data) => Ok(true),
         Err(err) => Err(err),
     }
 }
