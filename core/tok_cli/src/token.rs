@@ -34,10 +34,10 @@ impl Token {
             return Err(anyhow::anyhow!("Invalid 'decimals' attribute"));
         }
         Ok(Self {
-            address: address,
+            address,
             name: name.to_string(),
             symbol: symbol.to_string(),
-            decimals: decimals,
+            decimals,
         })
     }
 

@@ -19,6 +19,8 @@ use crate::{
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 
+pub mod auth;
+mod endpoint_server;
 mod event_notify;
 mod loggers;
 mod ops_counter;
@@ -69,6 +71,12 @@ pub fn start_api_server(
         panic_notify.clone(),
         config_options.api_requests_caches_size,
         current_zksync_info.clone(),
+    );
+
+    endpoint_server::start_endpoint_server(
+        &config_options,
+        connection_pool.clone(),
+        panic_notify.clone(),
     );
 
     rpc_server::start_rpc_server(

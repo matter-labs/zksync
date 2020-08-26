@@ -4,7 +4,6 @@ mod utils;
 // External uses
 use anyhow::{Context, Result};
 use clap::{App, Arg, SubCommand};
-use futures::executor::block_on;
 use web3::{
     api::{Eth, Namespace},
     transports::Http,
