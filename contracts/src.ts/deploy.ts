@@ -36,7 +36,11 @@ export interface DeployerConfig {
 }
 
 export function readContractCode(name: string) {
-    if (name === "TEST-ERC20") {
+    if (name === "TEST-FULL-ERC20") {
+        const contract = require("openzeppelin-solidity/build/contracts/ERC20DetailedMock");
+        contract.evm = {bytecode: contract.bytecode};
+        return contract;
+    } else if (name === "TEST-ERC20") {
         const contract = require("openzeppelin-solidity/build/contracts/ERC20Mintable");
         contract.evm = {bytecode: contract.bytecode};
         return contract;
