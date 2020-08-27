@@ -810,6 +810,12 @@ impl Rpc for RpcApp {
                 transfer.to,
                 transfer.fee.clone(),
             )),
+            FranklinTx::ChangePubKey(change_pubkey) => Some((
+                TxFeeTypes::ChangePubKey,
+                TokenLike::Id(change_pubkey.fee_token),
+                change_pubkey.account,
+                change_pubkey.fee.clone(),
+            )),
             _ => None,
         };
 
