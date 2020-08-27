@@ -299,6 +299,10 @@ fn commit_cost_of_transfers(
     let mut tranfers_amount = Vec::new();
     let mut tranfers_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);
+
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
     for _ in 0..n_transfers {
         let amount = gen_packable_amount(rng);
         let fee = gen_packable_fee(rng);
@@ -322,7 +326,7 @@ fn commit_cost_of_transfers(
         Token(0),
         BigUint::from(0u32),
     );
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), change_pk_fee);
     test_setup
         .execute_commit_and_verify_block()
         .expect("Block execution failed");
@@ -358,6 +362,10 @@ fn commit_cost_of_transfers_to_new(
     let mut tranfers_amount = Vec::new();
     let mut tranfers_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);
+
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
     for _ in 0..n_transfers {
         let amount = gen_packable_amount(rng);
         let fee = gen_packable_fee(rng);
@@ -373,7 +381,7 @@ fn commit_cost_of_transfers_to_new(
         Token(0),
         deposit_amount,
     );
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), change_pk_fee);
     test_setup
         .execute_commit_and_verify_block()
         .expect("Block execution failed");
@@ -415,6 +423,10 @@ fn commit_cost_of_withdrawals(
     let mut withdraws_fee = Vec::new();
     let mut withdrawals_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);
+
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
     for _ in 0..n_withdrawals {
         let amount = gen_unpacked_amount(rng);
         let fee = gen_packable_fee(rng);
@@ -425,7 +437,7 @@ fn commit_cost_of_withdrawals(
 
     test_setup.start_block();
     test_setup.deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount);
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), token, change_pk_fee);
     test_setup
         .execute_commit_and_verify_block()
         .expect("Block execution failed");
@@ -550,18 +562,19 @@ fn commit_cost_of_change_pubkey(
     n_change_pubkeys: usize,
 ) -> CostsSample {
     let token = Token(0);
-    let deposit_amount = 10u32.into();
+    let fee_amount = 100u32;
+    let deposit_amount = (fee_amount * (n_change_pubkeys + 1) as u32).into();
 
     test_setup.start_block();
     test_setup.deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount);
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), token, BigUint::from(fee_amount));
     test_setup
         .execute_commit_and_verify_block()
         .expect("Block execution failed");
 
     test_setup.start_block();
     for _ in 0..n_change_pubkeys {
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), token, BigUint::from(fee_amount));
     }
     let change_pubkey_execute_result = test_setup
         .execute_commit_and_verify_block()

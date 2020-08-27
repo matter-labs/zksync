@@ -56,6 +56,8 @@ fn franklin_txs() -> Vec<SignedFranklinTx> {
         account_id: 123,
         account: Address::random(),
         new_pk_hash: Default::default(),
+        fee_token: 0,
+        fee: Default::default(),
         nonce: 13,
         eth_signature: None,
     };

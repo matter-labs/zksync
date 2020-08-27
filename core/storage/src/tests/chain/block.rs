@@ -534,7 +534,8 @@ fn pending_block_workflow() {
     to_zksync_account.set_account_id(Some(to_account_id));
 
     let (tx_1, executed_tx_1) = {
-        let tx = from_zksync_account.create_change_pubkey_tx(None, false, false);
+        let tx =
+            from_zksync_account.create_change_pubkey_tx(None, false, 0, Default::default(), false);
 
         let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
             tx: tx.clone(),

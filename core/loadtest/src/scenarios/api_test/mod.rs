@@ -151,8 +151,11 @@ impl TestExecutor {
 
     /// Runs the initial deposit of the money onto the main account.
     async fn deposit(&mut self) -> Result<(), failure::Error> {
+        let change_pubkey_fee = self.change_pubkey_fee(&self.main_account.zk_acc).await;
+
         let mut amount_to_deposit = 100u32.into();
-        amount_to_deposit += self.estimated_fee_for_op.clone();
+        amount_to_deposit += &self.estimated_fee_for_op;
+        amount_to_deposit += &change_pubkey_fee;
 
         let account_balance = self.main_account.eth_acc.eth_balance().await?;
         log::info!(
@@ -185,7 +188,10 @@ impl TestExecutor {
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (self.main_account.sign_change_pubkey(), None);
+        let (change_pubkey_tx, eth_sign) = (
+            self.main_account.sign_change_pubkey(change_pubkey_fee),
+            None,
+        );
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
@@ -200,6 +206,17 @@ impl TestExecutor {
 
     async fn finish(&mut self) -> Result<(), failure::Error> {
         Ok(())
+    }
+
+    /// Obtains a fee required for the ChangePubKey operation.
+    async fn change_pubkey_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+        let fee = self
+            .rpc_client
+            .get_tx_fee("ChangePubKey", to_acc.address, "ETH")
+            .await
+            .expect("Can't get tx fee");
+
+        closest_packable_fee_amount(&fee)
     }
 
     /// Obtains a fee required for the transfer operation.

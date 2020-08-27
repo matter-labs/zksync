@@ -9,6 +9,8 @@ use crate::witness::{
     tests::test_utils::{generic_test_scenario, incorrect_op_test_scenario, WitnessTestAccount},
 };
 
+const FEE_TOKEN: u16 = 0; // ETH
+
 /// Basic check for execution of `ChangePubKeyOp` in circuit.
 /// Here we generate an empty account and change its public key.
 #[test]
@@ -18,9 +20,13 @@ fn test_change_pubkey_offchain_success() {
     let accounts = vec![WitnessTestAccount::new_empty(0xc1)];
     let account = &accounts[0];
     let change_pkhash_op = ChangePubKeyOp {
-        tx: account
-            .zksync_account
-            .create_change_pubkey_tx(None, true, false),
+        tx: account.zksync_account.create_change_pubkey_tx(
+            None,
+            true,
+            FEE_TOKEN,
+            Default::default(),
+            false,
+        ),
         account_id: account.id,
     };
 
@@ -57,7 +63,7 @@ fn test_incorrect_change_pubkey_account() {
     let change_pkhash_op = ChangePubKeyOp {
         tx: incorrect_from_account
             .zksync_account
-            .create_change_pubkey_tx(None, true, false),
+            .create_change_pubkey_tx(None, true, FEE_TOKEN, Default::default(), false),
         account_id: account.id,
     };
 
