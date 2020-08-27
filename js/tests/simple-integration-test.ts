@@ -1,12 +1,8 @@
-import {
-    Wallet,
-    Provider,
-    ETHProxy, types, utils as zkutils
-} from "zksync";
+import { Wallet, Provider, ETHProxy, types, utils as zkutils } from "zksync";
 // HACK: using require as type system work-around
-const franklin_abi = require('../../contracts/build/ZkSync.json').abi;
-import {ethers, Contract, BigNumber, BigNumberish, utils} from "ethers";
-import {IERC20_INTERFACE, sleep} from "zksync/src/utils";
+const franklin_abi = require("../../contracts/build/ZkSync.json").abi;
+import { ethers, Contract, BigNumber, BigNumberish, utils } from "ethers";
+import { IERC20_INTERFACE, sleep } from "zksync/src/utils";
 import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
@@ -35,21 +31,25 @@ async function getOperatorBalance(token: types.TokenLike, type: "committed" | "v
     return BigNumber.from(balance);
 }
 
-async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: BigNumberish) {
+async function testAutoApprovedDeposit(
+    depositWallet: Wallet,
+    syncWallet: Wallet,
+    token: types.TokenLike,
+    amount: BigNumberish
+) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
 
     const startTime = new Date().getTime();
-    const depositHandle = await depositWallet.depositToSyncFromEthereum(
-        {
-            depositTo: syncWallet.address(),
-            token: token,
-            amount,
-            approveDepositAmountForERC20: true,
-        });
-    console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
+    const depositHandle = await depositWallet.depositToSyncFromEthereum({
+        depositTo: syncWallet.address(),
+        token: token,
+        amount,
+        approveDepositAmountForERC20: true,
+    });
+    console.log(`Deposit posted: ${new Date().getTime() - startTime} ms`);
 
     await depositHandle.awaitReceipt();
-    console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Deposit committed: ${new Date().getTime() - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);
 
     if (!balanceAfterDep.sub(balanceBeforeDep).eq(amount)) {
@@ -67,24 +67,23 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
         }
         const approveERC20 = await depositWallet.approveERC20TokenDeposits(token);
         await approveERC20.wait();
-        console.log(`Deposit approved: ${(new Date().getTime()) - startTime} ms`);
-        if (!await depositWallet.isERC20DepositsApproved(token)) {
+        console.log(`Deposit approved: ${new Date().getTime() - startTime} ms`);
+        if (!(await depositWallet.isERC20DepositsApproved(token))) {
             throw new Error("Token be approved");
         }
     }
-    const depositHandle = await depositWallet.depositToSyncFromEthereum(
-        {
-            depositTo: syncWallet.address(),
-            token: token,
-            amount,
-        });
-    console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
+    const depositHandle = await depositWallet.depositToSyncFromEthereum({
+        depositTo: syncWallet.address(),
+        token: token,
+        amount,
+    });
+    console.log(`Deposit posted: ${new Date().getTime() - startTime} ms`);
     await depositHandle.awaitReceipt();
-    console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Deposit committed: ${new Date().getTime() - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);
 
     if (!zkutils.isTokenETH(token)) {
-        if (!await depositWallet.isERC20DepositsApproved(token)) {
+        if (!(await depositWallet.isERC20DepositsApproved(token))) {
             throw new Error("Token should still be approved");
         }
     }
@@ -105,11 +104,11 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
         to: syncWallet.address(),
         token,
         amount,
-        fee
+        fee,
     });
-    console.log(`Transfer to self posted: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Transfer to self posted: ${new Date().getTime() - startTime} ms`);
     await transferToNewHandle.awaitReceipt();
-    console.log(`Transfer to self committed: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Transfer to self committed: ${new Date().getTime() - startTime} ms`);
     const walletAfterTransfer = await syncWallet.getBalance(token);
     const operatorAfterTransfer = await getOperatorBalance(token);
 
@@ -121,7 +120,13 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
     }
 }
 
-async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber, timeoutBeforeReceipt = 0) {
+async function testTransfer(
+    syncWallet1: Wallet,
+    syncWallet2: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber,
+    timeoutBeforeReceipt = 0
+) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
     const fee = fullFee.totalFee;
 
@@ -133,12 +138,12 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
         to: syncWallet2.address(),
         token,
         amount,
-        fee
+        fee,
     });
-    console.log(`Transfer posted: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Transfer posted: ${new Date().getTime() - startTime} ms`);
     await sleep(timeoutBeforeReceipt);
     await transferToNewHandle.awaitReceipt();
-    console.log(`Transfer committed: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Transfer committed: ${new Date().getTime() - startTime} ms`);
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
     const wallet2AfterTransfer = await syncWallet2.getBalance(token);
     const operatorAfterTransfer = await getOperatorBalance(token);
@@ -152,7 +157,72 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
-async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
+async function testForcedExit(contract: Contract, syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
+    const targetEthWallet = ethers.Wallet.createRandom().connect(ethersProvider);
+    const targetWallet = await Wallet.fromEthSigner(targetEthWallet, syncProvider);
+
+    // Do a transfer to new operation.
+    const transferFullFee = await syncProvider.getTransactionFee("Transfer", targetWallet.address(), token);
+    const transferFee = transferFullFee.totalFee;
+
+    const transferToNewHandle = await syncWallet.syncTransfer({
+        to: targetWallet.address(),
+        token,
+        amount,
+        fee: transferFee,
+    });
+    await transferToNewHandle.awaitReceipt();
+
+    const initiatorBeforeWithdraw = await syncWallet.getBalance(token);
+    const targetBeforeWithdraw = await targetWallet.getBalance(token);
+    const operatorBeforeWithdraw = await getOperatorBalance(token);
+    const onchainBalanceBeforeWithdraw = await targetWallet.getEthereumBalance(token);
+
+    // Then do a ForcedExit operation.
+    const fullFee = await syncProvider.getTransactionFee("Withdraw", targetWallet.address(), token);
+    const fee = fullFee.totalFee;
+
+    const startTime = new Date().getTime();
+    const forcedExitHandle = await syncWallet.syncForcedExit({
+        target: targetWallet.address(),
+        token,
+        fee,
+    });
+    console.log(`ForcedExit posted: ${new Date().getTime() - startTime} ms`);
+
+    // Await for verification with a timeout set.
+    await promiseTimeout(VERIFY_TIMEOUT, forcedExitHandle.awaitVerifyReceipt());
+    console.log(`ForcedExit verified: ${new Date().getTime() - startTime} ms`);
+
+    const initiatorAfterWithdraw = await syncWallet.getBalance(token);
+    const targetAfterWithdraw = await targetWallet.getBalance(token);
+    const operatorAfterWithdraw = await getOperatorBalance(token);
+    const onchainBalanceAfterWithdraw = await targetWallet.getEthereumBalance(token);
+
+    const tokenId = await targetWallet.provider.tokenSet.resolveTokenId(token);
+    const pendingToBeOnchainBalance = await contract.getBalanceToWithdraw(await targetWallet.address(), tokenId);
+
+    if (!initiatorBeforeWithdraw.sub(initiatorAfterWithdraw).eq(fee)) {
+        throw new Error("Wrong amount on initiator wallet after ForcedExit");
+    }
+    if (!targetBeforeWithdraw.sub(targetAfterWithdraw).eq(amount)) {
+        throw new Error("Wrong amount on target wallet after ForcedExit");
+    }
+    if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
+        throw new Error("Wrong amount of operator fees after ForcedExit");
+    }
+    if (!onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
+        throw new Error("Wrong amount onchain after ForcedExit");
+    }
+}
+
+async function testWithdraw(
+    contract: Contract,
+    withdrawTo: Wallet,
+    syncWallet: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber
+) {
     const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
     const fee = fullFee.totalFee;
 
@@ -164,22 +234,19 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
         ethAddress: withdrawTo.address(),
         token,
         amount,
-        fee
+        fee,
     });
-    console.log(`Withdraw posted: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Withdraw posted: ${new Date().getTime() - startTime} ms`);
 
     // Await for verification with a timeout set.
     await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
-    console.log(`Withdraw verified: ${(new Date().getTime()) - startTime} ms`);
+    console.log(`Withdraw verified: ${new Date().getTime() - startTime} ms`);
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const operatorAfterWithdraw = await getOperatorBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
     const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
-    const pendingToBeOnchainBalance = (await contract.getBalanceToWithdraw(
-        await withdrawTo.address(),
-        tokenId,
-    ));
+    const pendingToBeOnchainBalance = await contract.getBalanceToWithdraw(await withdrawTo.address(), tokenId);
 
     if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
         throw new Error("Wrong amount on wallet after WITHDRAW");
@@ -187,53 +254,50 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
     if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
         throw new Error("Wrong amount of operator fees after WITHDRAW");
     }
-    if (!(onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance)).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
+    if (!onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
         throw new Error("Wrong amount onchain after WITHDRAW");
     }
 }
 
 async function testChangePubkeyOnchain(syncWallet: Wallet) {
-    if (!await syncWallet.isSigningKeySet()) {
+    if (!(await syncWallet.isSigningKeySet())) {
         const startTime = new Date().getTime();
         await (await syncWallet.onchainAuthSigningKey("committed")).wait();
         const changePubkeyHandle = await syncWallet.setSigningKey("committed", true);
-        console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
+        console.log(`Change pubkey onchain posted: ${new Date().getTime() - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
-        console.log(`Change pubkey onchain committed: ${(new Date().getTime()) - startTime} ms`);
-        if (!await syncWallet.isSigningKeySet()) {
+        console.log(`Change pubkey onchain committed: ${new Date().getTime() - startTime} ms`);
+        if (!(await syncWallet.isSigningKeySet())) {
             throw new Error("Change pubkey onchain failed");
         }
     }
 }
 
 async function testChangePubkeyOffchain(syncWallet: Wallet) {
-    if (!await syncWallet.isSigningKeySet()) {
+    if (!(await syncWallet.isSigningKeySet())) {
         const startTime = new Date().getTime();
         const changePubkeyHandle = await syncWallet.setSigningKey();
-        console.log(`Change pubkey offchain posted: ${(new Date().getTime()) - startTime} ms`);
+        console.log(`Change pubkey offchain posted: ${new Date().getTime() - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
-        console.log(`Change pubkey offchain committed: ${(new Date().getTime()) - startTime} ms`);
-        if (!await syncWallet.isSigningKeySet()) {
+        console.log(`Change pubkey offchain committed: ${new Date().getTime() - startTime} ms`);
+        if (!(await syncWallet.isSigningKeySet())) {
             throw new Error("Change pubkey offchain failed");
         }
     }
 }
 
 async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
-    console.log("testThrowingErrorOnTxFail")
+    console.log("testThrowingErrorOnTxFail");
     let testPassed = true;
 
     const ethWallet = ethers.Wallet.createRandom().connect(ethersProvider);
-    const syncWallet = await Wallet.fromEthSigner(
-        ethWallet,
-        syncProvider,
-    );
+    const syncWallet = await Wallet.fromEthSigner(ethWallet, syncProvider);
 
     // Create account so transfer would fail while tx is being executed
     const initialDeposit = await zksyncDepositorWallet.depositToSyncFromEthereum({
         depositTo: ethWallet.address,
         token: "ETH",
-        amount: "1"
+        amount: "1",
     });
     await initialDeposit.awaitReceipt();
 
@@ -241,22 +305,30 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
         const tx = await syncWallet.syncTransfer({
             to: zksyncDepositorWallet.address(),
             token: "ETH",
-            amount: utils.parseEther('0.01'),
-            fee: utils.parseEther('10'),
+            amount: utils.parseEther("0.01"),
+            fee: utils.parseEther("10"),
         });
         await tx.awaitVerifyReceipt();
         testPassed = false;
     } catch (e) {
-        console.log('Error (expected) on sync tx fail:', e);
+        console.log("Error (expected) on sync tx fail:", e);
     }
 
     if (!testPassed) {
         throw new Error("testThrowingErrorOnTxFail failed");
     }
-    console.log("Test ok")
+    console.log("Test ok");
 }
 
-async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, depositAmountETH: string) {
+async function moveFunds(
+    contract: Contract,
+    ethProxy: ETHProxy,
+    depositWallet: Wallet,
+    syncWallet1: Wallet,
+    syncWallet2: Wallet,
+    token: types.TokenLike,
+    depositAmountETH: string
+) {
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
@@ -269,9 +341,11 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Forever approved deposit ok, Token: ${token}`);
     await testChangePubkeyOnchain(syncWallet1);
     console.log(`Change pubkey onchain ok`);
+    await testForcedExit(contract, syncWallet1, token, transfersAmount);
+    console.log(`ForcedExit OK`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount);
     console.log(`Transfer to new ok, Token: ${token}`);
-    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount,);
+    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount);
     console.log(`Transfer ok, Token: ${token}`);
     await testTransferToSelf(syncWallet1, token, transfersAmount);
     console.log(`Transfer to self with fee ok, Token: ${token}`);
@@ -288,15 +362,15 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         from: syncWallet1.address(),
         to: syncWallet2.address(),
         tokenId: 0,
-        amount: utils.parseEther('0.001'),
-        fee: utils.parseEther('0.001'),
+        amount: utils.parseEther("0.001"),
+        fee: utils.parseEther("0.001"),
         nonce: await syncWallet1.getNonce(),
     });
 
     const ETH_SIGNATURE_LENGTH_PREFIXED = 132;
     const fakeEthSignature: types.TxEthSignature = {
-        signature: "0x".padEnd(ETH_SIGNATURE_LENGTH_PREFIXED, '0'),
-        type: "EthereumSignature"
+        signature: "0x".padEnd(ETH_SIGNATURE_LENGTH_PREFIXED, "0"),
+        type: "EthereumSignature",
     };
 
     try {
@@ -304,7 +378,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         assert(false, "sending tx with incorrect eth signature must throw");
     } catch (e) {
         assert(
-            e.jrpcError.message == 'Eth signature is incorrect',
+            e.jrpcError.message == "Eth signature is incorrect",
             "sending tx with incorrect eth signature must fail"
         );
     }
@@ -317,40 +391,42 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         from: syncWallet1.address(),
         ethAddress: syncWallet1.address(),
         tokenId: 0,
-        amount: utils.parseEther('0.001'),
+        amount: utils.parseEther("0.001"),
         fee: fee,
         nonce: await syncWallet1.getNonce(),
-    })
+    });
 
     try {
         await syncWallet1.provider.submitTx(signedWithdraw, fakeEthSignature);
         assert(false, "sending tx with incorrect eth signature must throw");
     } catch (e) {
         assert(
-            e.jrpcError.message == 'Eth signature is incorrect',
+            e.jrpcError.message == "Eth signature is incorrect",
             `sending tx with incorrect eth signature must fail, got message: ${e.jrpcError.message}`
         );
     }
 }
 
 function promiseTimeout(ms, promise) {
-  // Create a promise that rejects in <ms> milliseconds
-  let timeout = new Promise((resolve, reject) => {
-    let id = setTimeout(() => {
-      clearTimeout(id);
-      reject('Timed out in '+ ms + 'ms.')
-    }, ms)
-  })
+    // Create a promise that rejects in <ms> milliseconds
+    let timeout = new Promise((resolve, reject) => {
+        let id = setTimeout(() => {
+            clearTimeout(id);
+            reject("Timed out in " + ms + "ms.");
+        }, ms);
+    });
 
-  // Returns a race between our timeout and the passed in promise
-  return Promise.race([
-    promise,
-    timeout
-  ])
+    // Returns a race between our timeout and the passed in promise
+    return Promise.race([promise, timeout]);
 }
 
-async function checkFailedTransactionResending(contract: Contract, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
-    console.log('Checking invalid transaction resending');
+async function checkFailedTransactionResending(
+    contract: Contract,
+    depositWallet: Wallet,
+    syncWallet1: Wallet,
+    syncWallet2: Wallet
+) {
+    console.log("Checking invalid transaction resending");
     const amount = utils.parseEther("0.2");
 
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
@@ -362,7 +438,7 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
         await testTransfer(syncWallet1, syncWallet2, "ETH", amount);
     } catch (e) {
         assert(e?.value?.failReason == `Not enough balance`);
-        console.log('Transfer failed (expected)');
+        console.log("Transfer failed (expected)");
     }
 
     await testDeposit(depositWallet, syncWallet1, "ETH", amount.div(2));
@@ -389,45 +465,30 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
 
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
-        const ethWallet = ethers.Wallet.fromMnemonic(
-            process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0"
-        ).connect(ethersProvider);
-        const erc20 = new Contract(
-            ERC20_ADDRESS,
-            IERC20_INTERFACE,
-            ethWallet,
+        const ethWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(
+            ethersProvider
         );
+        const erc20 = new Contract(ERC20_ADDRESS, IERC20_INTERFACE, ethWallet);
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: utils.parseEther("6.0")})).wait();
+        await (
+            await ethWallet.sendTransaction({ to: syncDepositorWallet.address, value: utils.parseEther("6.0") })
+        ).wait();
         await (await erc20.transfer(syncDepositorWallet.address, utils.parseEther("110.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: utils.parseEther("6.0")}));
-        const syncWallet = await Wallet.fromEthSigner(
-            syncWalletSigner,
-            syncProvider,
-        );
+        await await ethWallet.sendTransaction({ to: syncWalletSigner.address, value: utils.parseEther("6.0") });
+        const syncWallet = await Wallet.fromEthSigner(syncWalletSigner, syncProvider);
 
-        const contract = new Contract(
-            syncProvider.contractAddress.mainContract,
-            franklin_abi,
-            ethWallet,
-        );
+        const contract = new Contract(syncProvider.contractAddress.mainContract, franklin_abi, ethWallet);
 
         const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet2.address, value: utils.parseEther("6.0")}));
-        const syncWallet2 = await Wallet.fromEthSigner(
-            ethWallet2,
-            syncProvider,
-        );
+        await await ethWallet.sendTransaction({ to: ethWallet2.address, value: utils.parseEther("6.0") });
+        const syncWallet2 = await Wallet.fromEthSigner(ethWallet2, syncProvider);
 
         const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet3.address, value: utils.parseEther("6.0")}));
-        const syncWallet3 = await Wallet.fromEthSigner(
-            ethWallet3,
-            syncProvider,
-        );
+        await await ethWallet.sendTransaction({ to: ethWallet3.address, value: utils.parseEther("6.0") });
+        const syncWallet3 = await Wallet.fromEthSigner(ethWallet3, syncProvider);
 
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
@@ -437,17 +498,11 @@ async function checkFailedTransactionResending(contract: Contract, depositWallet
 
         // Check that transaction can be successfully executed after previous failure.
         const ethWallet4 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet4.address, value: utils.parseEther("6.0")}));
-        const syncWallet4 = await Wallet.fromEthSigner(
-            ethWallet4,
-            syncProvider,
-        );
+        await await ethWallet.sendTransaction({ to: ethWallet4.address, value: utils.parseEther("6.0") });
+        const syncWallet4 = await Wallet.fromEthSigner(ethWallet4, syncProvider);
         const ethWallet5 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet5.address, value: utils.parseEther("6.0")}));
-        const syncWallet5 = await Wallet.fromEthSigner(
-            ethWallet5,
-            syncProvider,
-        );
+        await await ethWallet.sendTransaction({ to: ethWallet5.address, value: utils.parseEther("6.0") });
+        const syncWallet5 = await Wallet.fromEthSigner(ethWallet5, syncProvider);
         await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");

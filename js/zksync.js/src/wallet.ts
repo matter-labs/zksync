@@ -12,7 +12,7 @@ import {
     TxEthSignature,
     ChangePubKey,
     EthSignerType,
-    SignedTransaction
+    SignedTransaction,
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -23,7 +23,7 @@ import {
     SYNC_MAIN_CONTRACT_INTERFACE,
     getSignedBytesFromMessage,
     signMessagePersonalAPI,
-    ERC20_DEPOSIT_GAS_LIMIT
+    ERC20_DEPOSIT_GAS_LIMIT,
 } from "./utils";
 
 class ZKSyncTxError extends Error {
@@ -91,7 +91,7 @@ export class Wallet {
 
         return {
             type: this.ethSignerType.verificationMethod === "ECDSA" ? "EthereumSignature" : "EIP1271Signature",
-            signature
+            signature,
         };
     }
 
@@ -117,7 +117,7 @@ export class Wallet {
             tokenId,
             amount: transfer.amount,
             fee: transfer.fee,
-            nonce: transfer.nonce
+            nonce: transfer.nonce,
         };
 
         const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
@@ -134,8 +134,53 @@ export class Wallet {
         const signedTransferTransaction = this.signer.signSyncTransfer(transactionData);
         return {
             tx: signedTransferTransaction,
-            ethereumSignature: txMessageEthSignature
+            ethereumSignature: txMessageEthSignature,
         };
+    }
+
+    async signSyncForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<SignedTransaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for sending zksync transactions.");
+        }
+        await this.setRequiredAccountIdFromServer("perform a Forced Exit");
+
+        const tokenId = await this.provider.tokenSet.resolveTokenId(forcedExit.token);
+
+        const transactionData = {
+            initiatorAccountId: this.accountId,
+            target: forcedExit.target,
+            tokenId,
+            fee: forcedExit.fee,
+            nonce: forcedExit.nonce,
+        };
+
+        const signedForcedExitTransaction = this.signer.signSyncForcedExit(transactionData);
+
+        return {
+            tx: signedForcedExitTransaction,
+        };
+    }
+
+    async syncForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+    }): Promise<Transaction> {
+        forcedExit.nonce = forcedExit.nonce != null ? await this.getNonce(forcedExit.nonce) : await this.getNonce();
+        if (forcedExit.fee == null) {
+            // Fee for forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw).
+            const fullFee = await this.provider.getTransactionFee("Withdraw", forcedExit.target, forcedExit.token);
+            forcedExit.fee = fullFee.totalFee;
+        }
+
+        const signedForcedExitTransaction = await this.signSyncForcedExit(forcedExit as any);
+        return submitSignedTransaction(signedForcedExitTransaction, this.provider);
     }
 
     async syncTransfer(transfer: {
@@ -175,7 +220,7 @@ export class Wallet {
             tokenId,
             amount: withdraw.amount,
             fee: withdraw.fee,
-            nonce: withdraw.nonce
+            nonce: withdraw.nonce,
         };
 
         const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
@@ -194,7 +239,7 @@ export class Wallet {
 
         return {
             tx: signedWithdrawTransaction,
-            ethereumSignature: txMessageEthSignature
+            ethereumSignature: txMessageEthSignature,
         };
     }
 
@@ -244,11 +289,11 @@ export class Wallet {
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
             nonce,
-            ethSignature
+            ethSignature,
         };
 
         return {
-            tx: changePubKeyTx
+            tx: changePubKeyTx,
         };
     }
 
@@ -301,7 +346,7 @@ export class Wallet {
 
         return mainZkSyncContract.setAuthPubkeyHash(newPubKeyHash.replace("sync:", "0x"), numNonce, {
             gasLimit: BigNumber.from("200000"),
-            ...ethTxOptions
+            ...ethTxOptions,
         });
     }
 
@@ -401,7 +446,7 @@ export class Wallet {
                 value: BigNumber.from(deposit.amount),
                 gasLimit: BigNumber.from("200000"),
                 gasPrice,
-                ...deposit.ethTxOptions
+                ...deposit.ethTxOptions,
             });
         } else {
             const tokenAddress = this.provider.tokenSet.resolveTokenAddress(deposit.token);
@@ -422,8 +467,8 @@ export class Wallet {
                 {
                     nonce,
                     gasPrice,
-                    ...deposit.ethTxOptions
-                } as ethers.providers.TransactionRequest
+                    ...deposit.ethTxOptions,
+                } as ethers.providers.TransactionRequest,
             ];
 
             // We set gas limit only if user does not set it using ethTxOptions.
@@ -431,7 +476,7 @@ export class Wallet {
             if (txRequest.gasLimit == null) {
                 const gasEstimate = await mainZkSyncContract.estimateGas
                     .depositERC20(...args)
-                    .then(estimate => estimate, _err => BigNumber.from("0"));
+                    .then((estimate) => estimate, (_err) => BigNumber.from("0"));
                 txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT) ? gasEstimate : ERC20_DEPOSIT_GAS_LIMIT;
                 args[args.length - 1] = txRequest;
             }
@@ -473,7 +518,7 @@ export class Wallet {
         const ethTransaction = await mainZkSyncContract.fullExit(accountId, tokenAddress, {
             gasLimit: BigNumber.from("500000"),
             gasPrice,
-            ...withdraw.ethTxOptions
+            ...withdraw.ethTxOptions,
         });
 
         return new ETHOperation(ethTransaction, this.provider);
@@ -510,7 +555,6 @@ class ETHOperation {
                 if (priorityQueueLog && priorityQueueLog.args.serialId != null) {
                     this.priorityOpId = priorityQueueLog.args.serialId;
                 }
-                // tslint:disable-next-line:no-empty
             } catch {}
         }
         if (!this.priorityOpId) {

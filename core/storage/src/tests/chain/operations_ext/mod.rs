@@ -32,6 +32,7 @@ fn commit_schema_data(
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn get_account_transactions_history() {
     let mut setup = TransactionsHistoryTestSetup::new();
+    let setup_initial_time = setup.next_tx_time;
     setup.add_block(1);
 
     let from_account_address_string = format!("{:?}", setup.from_zksync_account.address);
@@ -72,7 +73,27 @@ fn get_account_transactions_history() {
     // execute_operation
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
+        // Before we did anything, account should not be considered created.
+        assert_eq!(
+            conn.chain()
+                .operations_ext_schema()
+                .account_created_on(&setup.from_zksync_account.address)?,
+            None
+        );
+
         commit_schema_data(&conn, &setup)?;
+
+        // After we committed state, account should have a creation timestamp.
+        // We apply `timestamp_millis` here, because minor datetime parts can be lost
+        // after inserting them into the database.
+        assert_eq!(
+            conn.chain()
+                .operations_ext_schema()
+                .account_created_on(&setup.from_zksync_account.address)?
+                .expect("Timestamp should exist")
+                .timestamp_millis(),
+            setup_initial_time.timestamp_millis()
+        );
 
         let from_history = conn
             .chain()

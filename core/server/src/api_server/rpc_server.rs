@@ -337,6 +337,9 @@ pub struct RpcApp {
 
     /// Counter for ChangePubKey operations to filter the spam.
     ops_counter: Arc<RwLock<ChangePubKeyOpsCounter>>,
+
+    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
+    forced_exit_minimum_account_age: chrono::Duration,
 }
 
 impl RpcApp {
@@ -356,6 +359,10 @@ impl RpcApp {
         let api_requests_caches_size = config_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
 
+        let forced_exit_minimum_account_age =
+            chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
+                .expect("Unable to convert std::Duration to chrono::Duration");
+
         RpcApp {
             cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
@@ -374,6 +381,8 @@ impl RpcApp {
             current_zksync_info,
 
             ops_counter: Arc::new(RwLock::new(ChangePubKeyOpsCounter::new())),
+
+            forced_exit_minimum_account_age,
         }
     }
 
@@ -414,6 +423,40 @@ impl RpcApp {
                 ))
             }
             _ => Ok(None),
+        }
+    }
+
+    /// For forced exits, we must check that target account exists for more
+    /// than 24 hours in order to give new account owners give an opportunity
+    /// to set the signing key. While `ForcedExit` operation doesn't do anything
+    /// bad to the account, it's more user-friendly to only allow this operation
+    /// after we're somewhat sure that zkSync account is not owned by anybody.
+    fn check_forced_exit(&self, forced_exit: &models::node::ForcedExit) -> Result<()> {
+        let target_account_address = forced_exit.target;
+        let storage = self.access_storage()?;
+        let account_age = storage
+            .chain()
+            .operations_ext_schema()
+            .account_created_on(&target_account_address)
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, forced_exit);
+                Error::internal_error()
+            })?;
+
+        match account_age {
+            Some(age) => {
+                if (chrono::Utc::now() - age) >= self.forced_exit_minimum_account_age {
+                    // Account does exist long enough, everything is OK.
+                    Ok(())
+                } else {
+                    let err = format!(
+                        "Target account exists less than required minimum amount ({} hours)",
+                        self.forced_exit_minimum_account_age.num_hours()
+                    );
+                    Err(Error::invalid_params(err))
+                }
+            }
+            None => Err(Error::invalid_params("Target account does not exist")),
         }
     }
 }
@@ -511,14 +554,7 @@ impl RpcApp {
                     .operations_schema()
                     .get_executed_priority_operation(serial_id)
                     .map_err(|err| {
-                        log::warn!(
-                            "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                            file!(),
-                            line!(),
-                            column!(),
-                            err,
-                            serial_id,
-                        );
+                        vlog::warn!("Internal Server Error: '{}'; input: {}", err, serial_id,);
                         Error::internal_error()
                     })?;
 
@@ -567,11 +603,8 @@ impl RpcApp {
                 .operations_ext_schema()
                 .tx_receipt(tx_hash.as_ref())
                 .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                        file!(),
-                        line!(),
-                        column!(),
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: {}",
                         err,
                         tx_hash.to_string(),
                     );
@@ -608,11 +641,8 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: {:?}, {:?}",
                 err,
                 tx_type,
                 token,
@@ -635,14 +665,7 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}",
-                file!(),
-                line!(),
-                column!(),
-                err,
-                token,
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
             Error::internal_error()
         })
     }
@@ -686,26 +709,12 @@ impl Rpc for RpcApp {
                 ))
                 .await
                 .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                        file!(),
-                        line!(),
-                        column!(),
-                        err,
-                        address,
-                    );
+                    vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
                     Error::internal_error()
                 })?;
 
             let committed_account_state = state_keeper_response.1.await.map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    address,
-                );
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
                 Error::internal_error()
             })?;
 
@@ -802,6 +811,12 @@ impl Rpc for RpcApp {
             }));
         }
 
+        if let FranklinTx::ForcedExit(forced_exit) = &*tx {
+            if let Err(error) = self.check_forced_exit(&forced_exit) {
+                return Box::new(futures01::future::err(error));
+            }
+        }
+
         let msg_to_sign = match self.get_tx_info_message_to_sign(&tx) {
             Ok(res) => res,
             Err(e) => return Box::new(futures01::future::err(e)),
@@ -813,6 +828,12 @@ impl Rpc for RpcApp {
                 TokenLike::Id(withdraw.token),
                 withdraw.to,
                 withdraw.fee.clone(),
+            )),
+            FranklinTx::ForcedExit(forced_exit) => Some((
+                TxFeeTypes::Withdraw,
+                TokenLike::Id(forced_exit.token),
+                forced_exit.target,
+                forced_exit.fee.clone(),
             )),
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
@@ -877,11 +898,8 @@ impl Rpc for RpcApp {
                 .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
                 .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
-                        file!(),
-                        line!(),
-                        column!(),
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
                         err,
                         tx,
                         signature,
@@ -903,13 +921,7 @@ impl Rpc for RpcApp {
     fn contract_address(&self) -> Result<ContractAddressResp> {
         let storage = self.access_storage()?;
         let config = storage.config_schema().load_config().map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                file!(),
-                line!(),
-                column!(),
-                err
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
 
@@ -930,13 +942,7 @@ impl Rpc for RpcApp {
     fn tokens(&self) -> Result<HashMap<String, Token>> {
         let storage = self.access_storage()?;
         let mut tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                file!(),
-                line!(),
-                column!(),
-                err
-            );
+            vlog::warn!(" Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
         Ok(tokens
@@ -1055,13 +1061,7 @@ async fn verify_tx_info_message_signature(
 
     // Send the check request.
     req_channel.send(request).await.map_err(|err| {
-        log::warn!(
-            "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-            file!(),
-            line!(),
-            column!(),
-            err
-        );
+        vlog::warn!(" Internal Server Error: '{}'; input: N/A", err);
         Error::internal_error()
     })?;
 
@@ -1069,13 +1069,7 @@ async fn verify_tx_info_message_signature(
     resp.1
         .await
         .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                file!(),
-                line!(),
-                column!(),
-                err
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?
         .map_err(rpc_message)
