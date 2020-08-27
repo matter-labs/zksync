@@ -2117,7 +2117,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(rhs.account.address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.nonce.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_FORCED_EXIT_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
@@ -2137,7 +2137,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let is_forced_exit = Boolean::from(Expression::equals(
             cs.namespace(|| "is_forced_exit"),
             &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(u64::from(ForcedExitOp::OP_CODE)), // transfer tx_type
+            Expression::u64::<CS>(u64::from(ForcedExitOp::OP_CODE)),
         )?);
 
         let mut lhs_valid_flags = vec![];
