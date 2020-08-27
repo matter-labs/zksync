@@ -106,6 +106,24 @@ impl ProverOptions {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum TokenPriceSource {
+    CoinMarketCap { base_url: Url },
+    CoinGecko,
+}
+
+impl TokenPriceSource {
+    fn from_env() -> Self {
+        match get_env("TOKEN_PRICE_SOURCE").to_lowercase().as_str() {
+            "coinmarketcap" => Self::CoinMarketCap {
+                base_url: parse_env("COINMARKETCAP_BASE_URL"),
+            },
+            "coingecko" => Self::CoinGecko,
+            source => panic!("Unknown token price source: {}", source),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
@@ -126,13 +144,13 @@ pub struct ConfigurationOptions {
     pub available_block_chunk_sizes: Vec<usize>,
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
-    pub ticker_url: Url,
     pub idle_provers: u32,
     /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
     pub max_miniblock_iterations: usize,
     /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
     pub max_miniblock_iterations_withdraw_block: usize,
     pub prometheus_export_port: u16,
+    pub token_price_source: TokenPriceSource,
 }
 
 impl ConfigurationOptions {
@@ -174,11 +192,11 @@ impl ConfigurationOptions {
                 "ETH_WATCH_POLL_INTERVAL",
             )),
             eth_network: parse_env("ETH_NETWORK"),
-            ticker_url: parse_env("TICKER_URL"),
             idle_provers: parse_env("IDLE_PROVERS"),
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
             max_miniblock_iterations_withdraw_block,
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
+            token_price_source: TokenPriceSource::from_env(),
         }
     }
 }
