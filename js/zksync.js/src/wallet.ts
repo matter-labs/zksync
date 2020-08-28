@@ -271,24 +271,34 @@ export class Wallet {
         return currentPubKeyHash === signerPubKeyHash;
     }
 
-    async signSetSigningKey(nonce: number, onchainAuth = false): Promise<SignedTransaction> {
+    async signSetSigningKey(changePubKey: {
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        onchainAuth: boolean;
+    }): Promise<SignedTransaction> {
         if (!this.signer) {
             throw new Error("ZKSync signer is required for current pubkey calculation.");
         }
 
+        const feeTokenId = await this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
         const newPubKeyHash = this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer("Set Signing Key");
 
-        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, nonce, this.accountId);
-        const ethSignature = onchainAuth ? null : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
+        const ethSignature = changePubKey.onchainAuth
+            ? null
+            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
         const changePubKeyTx: ChangePubKey = {
             type: "ChangePubKey",
             accountId: this.accountId,
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
-            nonce,
+            nonce: changePubKey.nonce,
+            feeToken: feeTokenId,
+            fee: changePubKey.fee,
             ethSignature,
         };
 
@@ -297,9 +307,29 @@ export class Wallet {
         };
     }
 
-    async setSigningKey(nonce: Nonce = "committed", onchainAuth = false): Promise<Transaction> {
-        const numNonce = await this.getNonce(nonce);
-        const txData = await this.signSetSigningKey(numNonce, onchainAuth);
+    async setSigningKey(changePubKey: {
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        onchainAuth?: boolean;
+    }): Promise<Transaction> {
+        changePubKey.nonce =
+            changePubKey.nonce != null ? await this.getNonce(changePubKey.nonce) : await this.getNonce();
+
+        if (changePubKey.onchainAuth == null) {
+            changePubKey.onchainAuth = false;
+        }
+
+        if (changePubKey.fee == null) {
+            const fullFee = await this.provider.getTransactionFee(
+                "ChangePubKey",
+                this.address(),
+                changePubKey.feeToken
+            );
+            changePubKey.fee = fullFee.totalFee;
+        }
+
+        const txData = await this.signSetSigningKey(changePubKey as any);
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         if (currentPubKeyHash === (txData.tx as ChangePubKey).newPkHash) {

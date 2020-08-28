@@ -103,6 +103,8 @@ export interface ChangePubKey {
     accountId: number;
     account: Address;
     newPkHash: PubKeyHash;
+    feeToken: number;
+    fee: BigNumberish;
     nonce: number;
     ethSignature: string;
 }
