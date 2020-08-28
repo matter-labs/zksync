@@ -198,6 +198,8 @@ library Operations {
         bytes20 pubKeyHash;
         address owner;
         uint32 nonce;
+        //uint16 tokenId; -- present in pubdata, ignored at serialization
+        //uint16 fee; -- present in pubdata, ignored at serialization
     }
 
     function readChangePubKeyPubdata(bytes memory _data, uint _offset) internal pure
