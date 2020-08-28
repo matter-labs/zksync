@@ -109,7 +109,7 @@ impl ProverOptions {
 #[derive(Clone, Debug)]
 pub enum TokenPriceSource {
     CoinMarketCap { base_url: Url },
-    CoinGecko,
+    CoinGecko { base_url: Url },
 }
 
 impl TokenPriceSource {
@@ -118,7 +118,9 @@ impl TokenPriceSource {
             "coinmarketcap" => Self::CoinMarketCap {
                 base_url: parse_env("COINMARKETCAP_BASE_URL"),
             },
-            "coingecko" => Self::CoinGecko,
+            "coingecko" => Self::CoinGecko {
+                base_url: parse_env("COINGECKO_BASE_URL"),
+            },
             source => panic!("Unknown token price source: {}", source),
         }
     }

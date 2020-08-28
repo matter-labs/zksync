@@ -8,24 +8,21 @@ use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::time::Duration;
 
 /// The limit of time we are willing to wait for response.
-const REQUEST_TIMEOUT: Duration = Duration::from_millis(5000);
-
-const COINGECKO_API_BASE_URL: &str = "https://api.coingecko.com/api/v3/";
+const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub struct CoinGeckoAPI {
+    base_url: Url,
     client: reqwest::Client,
     token_ids: HashMap<String, String>,
 }
 
 impl CoinGeckoAPI {
-    pub fn new(client: reqwest::Client) -> Result<Self, Error> {
-        let token_list_url = Url::from_str(COINGECKO_API_BASE_URL)
-            .unwrap()
-            .join("coins/list")
+    pub fn new(client: reqwest::Client, base_url: Url) -> Result<Self, Error> {
+        let token_list_url = base_url
+            .join("api/v3/coins/list")
             .expect("failed to join URL path");
 
         let token_list = reqwest::blocking::get(token_list_url)
@@ -37,7 +34,11 @@ impl CoinGeckoAPI {
             token_ids.insert(token.symbol, token.id);
         }
 
-        Ok(Self { client, token_ids })
+        Ok(Self {
+            base_url,
+            client,
+            token_ids,
+        })
     }
 }
 
@@ -51,9 +52,9 @@ impl TokenPriceAPI for CoinGeckoAPI {
                 failure::format_err!("Token '{}' is not listed on CoinGecko", token_symbol)
             })?;
 
-        let market_chart_url = Url::from_str(COINGECKO_API_BASE_URL)
-            .unwrap()
-            .join(format!("coins/{}/market_chart", token_id).as_str())
+        let market_chart_url = self
+            .base_url
+            .join(format!("api/v3/coins/{}/market_chart", token_id).as_str())
             .expect("failed to join URL path");
 
         let request = self

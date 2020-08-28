@@ -168,9 +168,9 @@ pub fn run_ticker_task(
 
             runtime.spawn(fee_ticker.run())
         }
-        TokenPriceSource::CoinGecko => {
-            let token_price_api =
-                CoinGeckoAPI::new(reqwest::Client::new()).expect("failed to init CoinGecko client");
+        TokenPriceSource::CoinGecko { base_url } => {
+            let token_price_api = CoinGeckoAPI::new(reqwest::Client::new(), base_url)
+                .expect("failed to init CoinGecko client");
 
             let ticker_api = TickerApi::new(db_pool, eth_sender_request_sender, token_price_api);
             let ticker_info = TickerInfo::new(state_keeper_request_sender);
