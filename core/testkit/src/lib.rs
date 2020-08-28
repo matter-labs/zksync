@@ -208,6 +208,30 @@ impl<T: Transport> AccountSet<T> {
         ))
     }
 
+    /// Create forced exit for zksync account
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
+    #[allow(clippy::too_many_arguments)]
+    fn forced_exit(
+        &self,
+        initiator: ZKSyncAccountId,
+        target: ZKSyncAccountId,
+        token_id: Token,
+        fee: BigUint,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> FranklinTx {
+        let from = &self.zksync_accounts[initiator.0];
+        let target = &self.zksync_accounts[target.0];
+        FranklinTx::ForcedExit(Box::new(from.sign_forced_exit(
+            token_id.0,
+            fee,
+            &target.address,
+            nonce,
+            increment_nonce,
+        )))
+    }
+
     /// Create withdraw from zksync account to random eth account
     /// `nonce` optional nonce override
     /// `increment_nonce` - flag for `from` account nonce increment
@@ -400,14 +424,8 @@ pub fn perform_basic_operations(
         Token(token),
         deposit_amount.clone(),
     );
-    if blocks_processing == BlockProcessing::CommitAndVerify {
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Block execution failed");
-        println!("Deposit to other account test success, token_id: {}", token);
-    } else {
-        test_setup.execute_commit_block().expect_success();
-    }
+    finalize_block(test_setup, blocks_processing);
+    println!("Deposit to other account (token {}) OK", token);
 
     // test two deposits
     test_setup.start_block();
@@ -423,14 +441,8 @@ pub fn perform_basic_operations(
         Token(token),
         deposit_amount.clone(),
     );
-    if blocks_processing == BlockProcessing::CommitAndVerify {
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Block execution failed");
-        println!("Deposit test success, token_id: {}", token);
-    } else {
-        test_setup.execute_commit_block().expect_success();
-    }
+    finalize_block(test_setup, blocks_processing);
+    println!("Two deposits in one block (token {}) OK", token);
 
     // test transfers
     test_setup.start_block();
@@ -502,22 +514,49 @@ pub fn perform_basic_operations(
         &deposit_amount / BigUint::from(4u32),
         &deposit_amount / BigUint::from(4u32),
     );
-    if blocks_processing == BlockProcessing::CommitAndVerify {
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Block execution failed");
-        println!("Transfer test success, token_id: {}", token);
-    } else {
-        test_setup.execute_commit_block().expect_success();
-    }
+    finalize_block(test_setup, blocks_processing);
+
+    println!("Transfers + withdraw (token {}) OK", token);
 
     test_setup.start_block();
     test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
+    finalize_block(test_setup, blocks_processing);
+
+    println!("Full exit (token {}) OK", token);
+
+    // Finally, check the `ForcedExit` operation.
+    let initiator_id = ZKSyncAccountId(2);
+    // Use tha last account as a target.
+    let target_id = ZKSyncAccountId(test_setup.accounts.zksync_accounts.len() - 1);
+    let eth_target_id = ETHAccountId(test_setup.accounts.eth_accounts.len() - 1);
+
+    // Deposit funds.
+    test_setup.start_block();
+    let fee = &deposit_amount / BigUint::from(4u32);
+    // Deposit some money on initiator account to cover fee.
+    test_setup.deposit(
+        ETHAccountId(1),
+        ZKSyncAccountId(2),
+        Token(token),
+        fee.clone(),
+    );
+    test_setup.deposit(eth_target_id, target_id, Token(token), deposit_amount);
+    finalize_block(test_setup, blocks_processing);
+
+    // Apply forced exit.
+    test_setup.start_block();
+    test_setup.forced_exit(initiator_id, target_id, eth_target_id, Token(token), fee);
+    finalize_block(test_setup, blocks_processing);
+
+    println!("Forced exit (token {}) OK", token);
+}
+
+/// Depending on the `BlockProcessing` mode either just commits or commits and verifies block.
+fn finalize_block(test_setup: &mut TestSetup, blocks_processing: BlockProcessing) {
     if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .expect("Block execution failed");
-        println!("Full exit test success, token_id: {}", token);
     } else {
         test_setup.execute_commit_block().expect_success();
     }
@@ -1084,6 +1123,48 @@ impl TestSetup {
             .withdraw_to_random(from, token, amount, fee, None, true, rng);
 
         self.execute_tx(withdraw);
+    }
+
+    pub fn forced_exit(
+        &mut self,
+        initiator: ZKSyncAccountId,
+        target: ZKSyncAccountId,
+        target_eth_id: ETHAccountId,
+        token_id: Token,
+        fee: BigUint,
+    ) {
+        self.increase_block_withdraws_amount();
+
+        let mut initiator_old = self.get_expected_zksync_account_balance(target, token_id.0);
+        initiator_old -= &fee;
+
+        let target_old = self.get_expected_zksync_account_balance(target, token_id.0);
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((target, token_id.0), 0u64.into());
+
+        let mut target_eth_balance =
+            self.get_expected_eth_account_balance(target_eth_id, token_id.0);
+        target_eth_balance += &target_old;
+        self.expected_changes_for_current_block
+            .eth_accounts_state
+            .insert((target_eth_id, token_id.0), target_eth_balance);
+
+        let mut fee_account_balance =
+            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, token_id.0);
+        fee_account_balance += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert(
+                (self.accounts.fee_account_id, token_id.0),
+                fee_account_balance,
+            );
+
+        let forced_exit = self
+            .accounts
+            .forced_exit(initiator, target, token_id, fee, None, true);
+
+        self.execute_tx(forced_exit);
     }
 
     /// Waits for `CommitRequest::Block` to appear on proposed blocks receiver, ignoring

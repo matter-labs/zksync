@@ -9,6 +9,7 @@ pub use self::{
     change_pubkey_offchain::ChangePubkeyOffChainWitness,
     close_account::CloseAccountWitness,
     deposit::DepositWitness,
+    forced_exit::ForcedExitWitness,
     full_exit::FullExitWitness,
     transfer::TransferWitness,
     transfer_to_new::TransferToNewWitness,
@@ -19,6 +20,7 @@ pub use self::{
 pub mod change_pubkey_offchain;
 pub mod close_account;
 pub mod deposit;
+pub mod forced_exit;
 pub mod full_exit;
 pub mod noop;
 pub mod transfer;

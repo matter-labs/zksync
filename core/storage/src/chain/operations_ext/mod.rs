@@ -1,12 +1,14 @@
 // Built-in deps
 // External imports
+use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 // Workspace imports
 use models::node::{Address, TokenId};
 use models::ActionType;
 // Local imports
 use self::records::{
-    PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
+    AccountCreatedAt, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,
+    TxReceiptResponse,
 };
 use crate::schema::*;
 use crate::tokens::TokensSchema;
@@ -259,6 +261,63 @@ impl<'a> OperationsExtSchema<'a> {
         };
 
         Ok(None)
+    }
+
+    /// Loads the date and time of the moment when the first transaction for the account was executed.
+    /// Can be `None` if there were no transactions associated with provided address.
+    pub fn account_created_on(&self, address: &Address) -> QueryResult<Option<DateTime<Utc>>> {
+        // This query loads the `committed_at` field from both `executed_transactions` and
+        // `executed_priority_operations` tables and returns the oldest result.
+        let query = format!(
+            "
+            select 
+                created_at
+            from (
+                    with vars (address_bytes) as ( select decode('{address}', 'hex') )
+                    select
+                        created_at
+                    from
+                        executed_transactions, vars
+                    where
+                        from_account = address_bytes
+                        or
+                        to_account = address_bytes
+                        or
+                        primary_account_address = address_bytes
+                    union all
+                    select
+                        created_at
+                    from 
+                        executed_priority_operations, vars
+                    where 
+                        from_account = address_bytes
+                        or
+                        to_account = address_bytes
+            ) t
+            order by
+                created_at asc
+            limit 
+                1
+            ",
+            address = hex::encode(address.as_ref().to_vec()),
+        );
+        let tx_history: Vec<AccountCreatedAt> = diesel::sql_query(query).load(self.0.conn())?;
+
+        match tx_history.len() {
+            0 => Ok(None),
+            1 => {
+                let naive_created_at = tx_history[0].created_at;
+                let created_at = DateTime::from_utc(naive_created_at, Utc);
+
+                Ok(Some(created_at))
+            }
+            other => {
+                panic!(
+                    "Query was limited to 1 entry at max, but returned {} results",
+                    other
+                );
+            }
+        }
     }
 
     /// Loads the range of the transactions applied to the account starting

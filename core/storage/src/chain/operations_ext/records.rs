@@ -18,6 +18,12 @@ pub struct AccountTransaction {
 }
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq)]
+pub struct AccountCreatedAt {
+    #[sql_type = "Timestamp"]
+    pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq)]
 pub struct TransactionsHistoryItem {
     #[sql_type = "Text"]
     pub tx_id: String,

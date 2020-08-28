@@ -9,8 +9,8 @@ use log::info;
 // Workspace deps
 use circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
-    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
+    FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use models::params::CHUNK_BIT_WIDTH;
 use models::{
@@ -333,6 +333,20 @@ impl Maintainer {
                         amount: withdraw.tx.fee,
                     });
                     pub_data.extend(withdraw_witness.get_pubdata());
+                }
+                FranklinOp::ForcedExit(forced_exit) => {
+                    let forced_exit_witness =
+                        ForcedExitWitness::apply_tx(&mut witness_accum.account_tree, &forced_exit);
+
+                    let input = SigDataInput::from_forced_exit_op(&forced_exit)?;
+                    let forced_exit_operations = forced_exit_witness.calculate_operations(input);
+
+                    operations.extend(forced_exit_operations);
+                    fees.push(CollectedFee {
+                        token: forced_exit.tx.token,
+                        amount: forced_exit.tx.fee,
+                    });
+                    pub_data.extend(forced_exit_witness.get_pubdata());
                 }
                 FranklinOp::Close(close) => {
                     let close_account_witness =

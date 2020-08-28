@@ -20,7 +20,7 @@ use models::{
     },
     merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
     node::{
-        operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
+        operations::{CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp},
         tx::PackedPublicKey,
         AccountId, BlockNumber, Engine,
     },
@@ -403,10 +403,7 @@ pub fn get_audits(
     (audit_account, audit_balance)
 }
 
-pub fn apply_leaf_operation<
-    Fa: Fn(&mut CircuitAccount<Bn256>) -> (),
-    Fb: Fn(&mut Balance<Bn256>) -> (),
->(
+pub fn apply_leaf_operation<Fa: Fn(&mut CircuitAccount<Bn256>), Fb: Fn(&mut Balance<Bn256>)>(
     tree: &mut CircuitAccountTree,
     account_address: u32,
     token: u32,
@@ -580,6 +577,20 @@ impl SigDataInput {
             &sign_packed,
             &withdraw_op.tx.get_bytes(),
             &withdraw_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_forced_exit_op(forced_exit_op: &ForcedExitOp) -> Result<Self, String> {
+        let sign_packed = forced_exit_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &forced_exit_op.tx.get_bytes(),
+            &forced_exit_op.tx.signature.pub_key,
         )
     }
 

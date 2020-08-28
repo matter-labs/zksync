@@ -7,8 +7,8 @@ use web3::types::H256;
 use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    priv_key_from_fs, AccountId, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer,
-    Withdraw,
+    priv_key_from_fs, AccountId, Address, Close, ForcedExit, Nonce, PrivateKey, PubKeyHash,
+    TokenId, Transfer, Withdraw,
 };
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
@@ -115,7 +115,7 @@ impl ZksyncAccount {
             self.account_id
                 .lock()
                 .unwrap()
-                .expect("can't sign tx withoud account id"),
+                .expect("can't sign tx without account id"),
             self.address,
             *to,
             token_id,
@@ -140,6 +140,35 @@ impl ZksyncAccount {
         (transfer, eth_signature)
     }
 
+    pub fn sign_forced_exit(
+        &self,
+        token_id: TokenId,
+        fee: BigUint,
+        target: &Address,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> ForcedExit {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let forced_exit = ForcedExit::new_signed(
+            self.account_id
+                .lock()
+                .unwrap()
+                .expect("can't sign tx without account id"),
+            *target,
+            token_id,
+            fee,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            &self.private_key,
+        )
+        .expect("Failed to sign forced exit");
+
+        if increment_nonce {
+            *stored_nonce += 1;
+        }
+
+        forced_exit
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn sign_withdraw(
         &self,
@@ -156,7 +185,7 @@ impl ZksyncAccount {
             self.account_id
                 .lock()
                 .unwrap()
-                .expect("can't sign tx withoud account id"),
+                .expect("can't sign tx without account id"),
             self.address,
             *eth_address,
             token_id,

@@ -5,9 +5,12 @@ use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
 use models::node::priority_ops::PriorityOp;
-use models::node::tx::FranklinTx;
+use models::node::tx::{ChangePubKey, Close, ForcedExit, FranklinTx, Transfer, Withdraw};
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
-use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
+use plasma::{
+    handler::TxHandler,
+    state::{CollectedFee, OpSuccess, PlasmaState, TransferOutcome},
+};
 use web3::types::Address;
 
 /// Rollup accounts states
@@ -104,72 +107,17 @@ impl TreeState {
                     op.tx.nonce = from.nonce;
                     let tx = FranklinTx::Transfer(Box::new(op.tx.clone()));
 
-                    let (fee, updates) = self
-                        .state
-                        .apply_transfer_to_new_op(&op)
-                        .map_err(|e| format_err!("TransferToNew fail: {}", e))?;
+                    let raw_op = TransferOutcome::TransferToNew(*op.clone());
+
+                    let (fee, updates) =
+                        <PlasmaState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
+                            .map_err(|e| format_err!("TransferToNew fail: {}", e))?;
                     let tx_result = OpSuccess {
-                        fee: Some(fee),
+                        fee,
                         updates,
                         executed_op: FranklinOp::TransferToNew(op),
                     };
 
-                    current_op_block_index = self.update_from_tx(
-                        tx,
-                        tx_result,
-                        &mut fees,
-                        &mut accounts_updated,
-                        current_op_block_index,
-                        &mut ops,
-                    );
-                }
-                FranklinOp::Withdraw(mut op) => {
-                    // Withdraw op comes with empty Account Address and Nonce fields
-                    let account = self
-                        .state
-                        .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Withdraw fail: Nonexistent account"))?;
-                    op.tx.from = account.address;
-                    op.tx.nonce = account.nonce;
-
-                    let tx = FranklinTx::Withdraw(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_withdraw_op(&op)
-                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
-                    let tx_result = OpSuccess {
-                        fee: Some(fee),
-                        updates,
-                        executed_op: FranklinOp::Withdraw(op),
-                    };
-                    current_op_block_index = self.update_from_tx(
-                        tx,
-                        tx_result,
-                        &mut fees,
-                        &mut accounts_updated,
-                        current_op_block_index,
-                        &mut ops,
-                    );
-                }
-                FranklinOp::Close(mut op) => {
-                    // Close op comes with empty Account Address and Nonce fields
-                    let account = self
-                        .state
-                        .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Close fail: Nonexistent account"))?;
-                    op.tx.account = account.address;
-                    op.tx.nonce = account.nonce;
-
-                    let tx = FranklinTx::Close(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_close_op(&op)
-                        .map_err(|e| format_err!("Close fail: {}", e))?;
-                    let tx_result = OpSuccess {
-                        fee: Some(fee),
-                        updates,
-                        executed_op: FranklinOp::Close(op),
-                    };
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -192,15 +140,107 @@ impl TreeState {
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
 
+                    let raw_op = TransferOutcome::Transfer(*op.clone());
+
                     let tx = FranklinTx::Transfer(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_transfer_op(&op)
-                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let (fee, updates) =
+                        <PlasmaState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
+                            .map_err(|e| format_err!("Withdraw fail: {}", e))?;
                     let tx_result = OpSuccess {
-                        fee: Some(fee),
+                        fee,
                         updates,
                         executed_op: FranklinOp::Transfer(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                FranklinOp::Withdraw(mut op) => {
+                    // Withdraw op comes with empty Account Address and Nonce fields
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Withdraw fail: Nonexistent account"))?;
+                    op.tx.from = account.address;
+                    op.tx.nonce = account.nonce;
+
+                    let tx = FranklinTx::Withdraw(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <PlasmaState as TxHandler<Withdraw>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: FranklinOp::Withdraw(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                FranklinOp::ForcedExit(mut op) => {
+                    // Withdraw op comes with empty Account Address and Nonce fields
+                    let initiator_account = self
+                        .state
+                        .get_account(op.tx.initiator_account_id)
+                        .ok_or_else(|| {
+                            format_err!("ForcedExit fail: Nonexistent initiator account")
+                        })?;
+                    let (target_account_id, _) = self
+                        .state
+                        .get_account_by_address(&op.tx.target)
+                        .ok_or_else(|| {
+                        format_err!("ForcedExit fail: Nonexistent target account")
+                    })?;
+
+                    // Set the fields unknown from the pubdata.
+                    op.target_account_id = target_account_id;
+                    op.tx.nonce = initiator_account.nonce;
+
+                    let tx = FranklinTx::ForcedExit(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <PlasmaState as TxHandler<ForcedExit>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("ForcedExit fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: FranklinOp::ForcedExit(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                FranklinOp::Close(mut op) => {
+                    // Close op comes with empty Account Address and Nonce fields
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Close fail: Nonexistent account"))?;
+                    op.tx.account = account.address;
+                    op.tx.nonce = account.nonce;
+
+                    let tx = FranklinTx::Close(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <PlasmaState as TxHandler<Close>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("Close fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: FranklinOp::Close(op),
                     };
                     current_op_block_index = self.update_from_tx(
                         tx,
@@ -231,12 +271,11 @@ impl TreeState {
                     op.tx.nonce = account.nonce;
 
                     let tx = FranklinTx::ChangePubKey(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_change_pubkey_op(&op)
-                        .map_err(|e| format_err!("ChangePubKeyOffChain fail: {}", e))?;
+                    let (fee, updates) =
+                        <PlasmaState as TxHandler<ChangePubKey>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("ChangePubKeyOffChain fail: {}", e))?;
                     let tx_result = OpSuccess {
-                        fee: Some(fee),
+                        fee,
                         updates,
                         executed_op: FranklinOp::ChangePubKeyOffchain(op),
                     };

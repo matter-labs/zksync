@@ -518,6 +518,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
 
                     pubDataPtr += PARTIAL_EXIT_BYTES;
+                } else if (opType == Operations.OpType.ForcedExit) {
+                    Operations.ForcedExit memory data = Operations.readForcedExitPubdata(_publicData, pubdataOffset + 1);
+
+                    bool addToPendingWithdrawalsQueue = true;
+                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.target, data.tokenId, data.amount));
+
+                    pubDataPtr += FORCED_EXIT_BYTES;
                 } else if (opType == Operations.OpType.FullExit) {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
 
