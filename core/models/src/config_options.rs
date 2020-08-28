@@ -108,7 +108,7 @@ impl ProverOptions {
 
 #[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
-    pub endpoint_http_server_address: SocketAddr,
+    pub admin_http_server_address: SocketAddr,
     pub secret_auth: String,
     pub rest_api_server_address: SocketAddr,
     pub json_rpc_http_server_address: SocketAddr,
@@ -152,7 +152,7 @@ impl ConfigurationOptions {
             };
 
         Self {
-            endpoint_http_server_address: parse_env("HTTP_ENDPOINT_API_BIND"),
+            admin_http_server_address: parse_env("HTTP_ADMIN_API_BIND"),
             secret_auth: parse_env("SECRET_AUTH"),
             rest_api_server_address: parse_env("REST_API_BIND"),
             json_rpc_http_server_address: parse_env("HTTP_RPC_API_BIND"),

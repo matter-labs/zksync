@@ -19,8 +19,7 @@ use crate::{
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 
-pub mod auth;
-mod endpoint_server;
+pub mod admin_server;
 mod event_notify;
 mod loggers;
 mod ops_counter;
@@ -73,8 +72,9 @@ pub fn start_api_server(
         current_zksync_info.clone(),
     );
 
-    endpoint_server::start_endpoint_server(
-        &config_options,
+    admin_server::start_admin_server(
+        config_options.admin_http_server_address,
+        config_options.secret_auth.clone(),
         connection_pool.clone(),
         panic_notify.clone(),
     );

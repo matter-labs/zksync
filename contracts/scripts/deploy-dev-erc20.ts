@@ -8,23 +8,22 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 async function main() {
     const wallet = Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
-    const result = [];
+    let name = process.argv[2];
+    let symbol = process.argv[3];
+    let decimals = Number(process.argv[4]);
 
-    for (const token of [{symbol: "DAI", decimals: 18}, {symbol: "wBTC", decimals: 8}, {symbol: "BAT", decimals: 18}, {symbol: "MLTT", decimals: 18}]) {
-        const erc20 = await deployContract(
-            wallet,
-            readContractCode("TEST-ERC20"), [],
-            {gasLimit: 5000000},
-        );
+    const erc20 = await deployContract(
+       wallet,
+       readContractCode("TestnetERC20Token"), [name, symbol, decimals],
+       {gasLimit: 5000000},
+    );
 
-        await erc20.mint(wallet.address, parseEther("3000000000"));
-        for (let i = 0; i < 10; ++i) {
-            const testWallet = Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).connect(provider);
-            await erc20.mint(testWallet.address, parseEther("3000000000"));
-        }
-        result.push({address: erc20.address, decimals: token.decimals, symbol: token.symbol});
+    await erc20.mint(wallet.address, parseEther("3000000000"));
+    for (let i = 0; i < 10; ++i) {
+        const testWallet = Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).connect(provider);
+        await erc20.mint(testWallet.address, parseEther("3000000000"));
     }
-
+    const result = {address: erc20.address, name: name, decimals: decimals, symbol: symbol};
     console.log(JSON.stringify(result, null, 2));
 }
 

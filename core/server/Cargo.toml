@@ -55,12 +55,7 @@ lru-cache = "0.1.2"
 
 actix-web = "1.0.8"
 actix-web-httpauth = "0.3.2"
-derive_more = "0.99.2"
-diesel = { version = "1.4.2", features = ["postgres","uuidv07", "r2d2", "chrono"] }
-dotenv = "0.15.0"
-r2d2 = "0.8.8"
-actix-service = "1.0.1"
 jsonwebtoken = "7"
-# reqwest = "0.9.22"
-lazy_static = "1.4"
 
+[dev-dependencies]
+lazy_static = "1.4"

@@ -147,9 +147,9 @@ async fn main() -> Result<()> {
                 .parse::<u8>()?;
             let symbol = sub_m.value_of("symbol").context("Error 'symbol' value")?;
 
-            let token = Token::new(addr, name, symbol, decimals)?;
+            let token = Token::new(addr, name, symbol, decimals);
 
-            let endpoint_addr = config_opts.endpoint_http_server_address;
+            let endpoint_addr = config_opts.admin_http_server_address;
             let secret_auth = config_opts.secret_auth;
 
             let token_from_server = token.add_to_server(endpoint_addr, &secret_auth).await?;

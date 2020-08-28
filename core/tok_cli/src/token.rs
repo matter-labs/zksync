@@ -2,12 +2,12 @@ use crate::get_matches_from_lines;
 use crate::run_external_command;
 
 // Built-in deps
-use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // External uses
-use anyhow::{Context, Result};
+use anyhow::Result;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use web3::{
     api::Eth,
     contract::Options,
@@ -18,9 +18,9 @@ use web3::{
 
 // Local uses
 use models::node::tokens;
-use server::api_server::auth::encode_token;
+use server::api_server::admin_server::encode_token;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Token {
     pub address: Address,
     pub name: String,
@@ -29,58 +29,50 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(address: Address, name: &str, symbol: &str, decimals: u8) -> Result<Self> {
-        if decimals > 18 {
-            return Err(anyhow::anyhow!("Invalid 'decimals' attribute"));
-        }
-        Ok(Self {
+    pub fn new(address: Address, name: &str, symbol: &str, decimals: u8) -> Self {
+        Self {
             address,
             name: name.to_string(),
             symbol: symbol.to_string(),
             decimals,
-        })
+        }
     }
 
     pub async fn get_info_about_token(address: Address, eth: Eth<Http>) -> Result<Self> {
         let contract =
             web3::contract::Contract::from_json(eth, address, include_bytes!("./../erc20.json"))
-                .expect("Error create contract ABI for ERC20");
+                .map_err(|_e| anyhow::anyhow!("Error create contract ABI for ERC20"))?;
 
         let name: String = contract
             .query("name", (), None, Options::default(), None)
             .wait()
-            .expect("Token does not support the 'name' field");
+            .map_err(|_e| anyhow::anyhow!("Token does not support the 'name' field"))?;
 
         let decimals: u8 = contract
             .query("decimals", (), None, Options::default(), None)
             .wait()
-            .expect("Token does not support the 'decimals' field");
+            .map_err(|_e| anyhow::anyhow!("Token does not support the 'decimals' field"))?;
 
         let symbol: String = contract
             .query("symbol", (), None, Options::default(), None)
             .wait()
-            .expect("Token does not support the 'symbol' field");
+            .map_err(|_e| anyhow::anyhow!("Token does not support the 'symbol' field"))?;
 
-        Self::new(address, &name, &symbol, decimals)
+        Ok(Self::new(address, &name, &symbol, decimals))
     }
 
     pub async fn deploy_test_token(name: &str, decimals: u8, symbol: &str) -> Result<Token> {
         let stdout = run_external_command(
-            "deploy-detailed-test-erc20.sh",
-            &[name, symbol, &decimals.to_string()],
+            "deploy-erc20.sh",
+            &["test", name, symbol, &decimals.to_string()],
         )?;
 
-        let line = get_matches_from_lines(&stdout, "TEST_FULL_ERC20=0x")?;
-
-        let address = Address::from_str(&line["TEST_FULL_ERC20=0x".len()..])
-            .context("Invalid address type")?;
-
-        Self::new(address, name, symbol, decimals)
+        serde_json::from_str(&stdout).map_err(|_e| anyhow::anyhow!("Error decode token from json"))
     }
 
     pub async fn add_to_governance(address: Address, key: H256) -> Result<()> {
         let stdout = run_external_command(
-            "add_test_erc20_to_governance.sh",
+            "governance-add-erc20.sh",
             &[&address.to_string()["0x".len()..], &key.to_string()],
         )?;
 

@@ -3,4 +3,18 @@
 . .setup_env
 cd contracts/
 echo "Deploying ERC20 token for localhost"
-yarn --silent deploy-dev-erc20 > $ZKSYNC_HOME/etc/tokens/localhost.json
+
+echo "[" > $ZKSYNC_HOME/etc/tokens/localhost.json
+
+NAME=DAI SYMBOL=DAI DECIMALS=18 yarn --silent deploy-dev-erc20 >> $ZKSYNC_HOME/etc/tokens/localhost.json
+echo -n "," >> $ZKSYNC_HOME/etc/tokens/localhost.json
+
+NAME=wBTC SYMBOL=wBTC DECIMALS=8 yarn --silent deploy-dev-erc20 >> $ZKSYNC_HOME/etc/tokens/localhost.json
+echo -n "," >> $ZKSYNC_HOME/etc/tokens/localhost.json
+
+NAME=BAT SYMBOL=BAT DECIMALS=18 yarn --silent deploy-dev-erc20 >> $ZKSYNC_HOME/etc/tokens/localhost.json
+echo -n "," >> $ZKSYNC_HOME/etc/tokens/localhost.json
+
+NAME=MLTT SYMBOL=MLTT DECIMALS=18 yarn --silent deploy-dev-erc20 >> $ZKSYNC_HOME/etc/tokens/localhost.json
+
+echo "]" >> $ZKSYNC_HOME/etc/tokens/localhost.json
