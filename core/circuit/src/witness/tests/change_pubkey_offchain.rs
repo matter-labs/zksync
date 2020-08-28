@@ -47,6 +47,35 @@ fn test_change_pubkey_offchain_success() {
         },
     );
 }
+/// Same as `test_change_pubkey_offchain_success`, but uses a nonzero fee value.
+#[test]
+#[ignore]
+fn test_change_pubkey_offchain_nonzero_fee() {
+    // Input data.
+    let fee = 150u64.into();
+    let accounts = vec![WitnessTestAccount::new(0xc1, 500u64)];
+    let account = &accounts[0];
+    let change_pkhash_op = ChangePubKeyOp {
+        tx: account
+            .zksync_account
+            .create_change_pubkey_tx(None, true, FEE_TOKEN, fee, false),
+        account_id: account.id,
+    };
+
+    generic_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+        &accounts,
+        change_pkhash_op,
+        (),
+        |plasma_state, op| {
+            let fee = <PlasmaState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
+                .expect("Operation failed")
+                .0
+                .unwrap();
+
+            vec![fee]
+        },
+    );
+}
 
 /// Checks that executing a change pubkey operation with incorrect
 /// data (account `from` ID) results in an error.
