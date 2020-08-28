@@ -298,7 +298,7 @@ export class Wallet {
             newPkHash: this.signer.pubKeyHash(),
             nonce: changePubKey.nonce,
             feeToken: feeTokenId,
-            fee: changePubKey.fee,
+            fee: BigNumber.from(changePubKey.fee).toString(),
             ethSignature,
         };
 
