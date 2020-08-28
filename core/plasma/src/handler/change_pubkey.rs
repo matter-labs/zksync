@@ -7,7 +7,6 @@ use models::{
     },
     params,
 };
-use num::BigUint;
 
 use crate::{
     handler::TxHandler,
@@ -56,15 +55,25 @@ impl TxHandler<ChangePubKey> for PlasmaState {
         let mut updates = Vec::new();
         let mut account = self.get_account(op.account_id).unwrap();
 
+        let old_balance = account.get_balance(op.tx.fee_token);
+
         let old_pub_key_hash = account.pub_key_hash.clone();
         let old_nonce = account.nonce;
 
+        // Update nonce.
         ensure!(op.tx.nonce == account.nonce, "Nonce mismatch");
-        account.pub_key_hash = op.tx.new_pk_hash.clone();
         account.nonce += 1;
+
+        // Update pubkey hash.
+        account.pub_key_hash = op.tx.new_pk_hash.clone();
+
+        // Subract fees.
+        ensure!(old_balance >= op.tx.fee, "Not enough balance");
+        account.sub_balance(op.tx.fee_token, &op.tx.fee);
 
         let new_pub_key_hash = account.pub_key_hash.clone();
         let new_nonce = account.nonce;
+        let new_balance = account.get_balance(op.tx.fee_token);
 
         self.insert_account(op.account_id, account);
 
@@ -78,9 +87,18 @@ impl TxHandler<ChangePubKey> for PlasmaState {
             },
         ));
 
+        updates.push((
+            op.account_id,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.fee_token, old_balance, new_balance),
+                old_nonce,
+                new_nonce,
+            },
+        ));
+
         let fee = CollectedFee {
             token: params::ETH_TOKEN_ID,
-            amount: BigUint::from(0u32),
+            amount: op.tx.fee.clone(),
         };
 
         Ok((Some(fee), updates))
