@@ -259,11 +259,14 @@ async function testWithdraw(
     }
 }
 
-async function testChangePubkeyOnchain(syncWallet: Wallet) {
+async function testChangePubkeyOnchain(syncWallet: Wallet, token: types.TokenLike) {
     if (!(await syncWallet.isSigningKeySet())) {
         const startTime = new Date().getTime();
         await (await syncWallet.onchainAuthSigningKey("committed")).wait();
-        const changePubkeyHandle = await syncWallet.setSigningKey("committed", true);
+        const changePubkeyHandle = await syncWallet.setSigningKey({
+            feeToken: token,
+            onchainAuth: true,
+        });
         console.log(`Change pubkey onchain posted: ${new Date().getTime() - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey onchain committed: ${new Date().getTime() - startTime} ms`);
@@ -273,10 +276,12 @@ async function testChangePubkeyOnchain(syncWallet: Wallet) {
     }
 }
 
-async function testChangePubkeyOffchain(syncWallet: Wallet) {
+async function testChangePubkeyOffchain(syncWallet: Wallet, token: types.TokenLike) {
     if (!(await syncWallet.isSigningKeySet())) {
         const startTime = new Date().getTime();
-        const changePubkeyHandle = await syncWallet.setSigningKey();
+        const changePubkeyHandle = await syncWallet.setSigningKey({
+            feeToken: token,
+        });
         console.log(`Change pubkey offchain posted: ${new Date().getTime() - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey offchain committed: ${new Date().getTime() - startTime} ms`);
@@ -322,7 +327,6 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
 
 async function moveFunds(
     contract: Contract,
-    ethProxy: ETHProxy,
     depositWallet: Wallet,
     syncWallet1: Wallet,
     syncWallet2: Wallet,
@@ -339,7 +343,7 @@ async function moveFunds(
     console.log(`Auto approved deposit ok, Token: ${token}`);
     await testDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Forever approved deposit ok, Token: ${token}`);
-    await testChangePubkeyOnchain(syncWallet1);
+    await testChangePubkeyOnchain(syncWallet1, token);
     console.log(`Change pubkey onchain ok`);
     await testForcedExit(contract, syncWallet1, token, transfersAmount);
     console.log(`ForcedExit OK`);
@@ -349,7 +353,7 @@ async function moveFunds(
     console.log(`Transfer ok, Token: ${token}`);
     await testTransferToSelf(syncWallet1, token, transfersAmount);
     console.log(`Transfer to self with fee ok, Token: ${token}`);
-    await testChangePubkeyOffchain(syncWallet2);
+    await testChangePubkeyOffchain(syncWallet2, token);
     console.log(`Change pubkey offchain ok`);
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount);
@@ -420,20 +424,23 @@ function promiseTimeout(ms, promise) {
     return Promise.race([promise, timeout]);
 }
 
-async function checkFailedTransactionResending(
-    contract: Contract,
-    depositWallet: Wallet,
-    syncWallet1: Wallet,
-    syncWallet2: Wallet
-) {
+async function checkFailedTransactionResending(depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
     console.log("Checking invalid transaction resending");
     const amount = utils.parseEther("0.2");
 
-    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
-    const fee = fullFee.totalFee;
+    const transferFullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
+    const transferFee = transferFullFee.totalFee;
 
-    await testAutoApprovedDeposit(depositWallet, syncWallet1, "ETH", amount.div(2).add(fee));
-    await testChangePubkeyOnchain(syncWallet1);
+    const changePubKeyFullFee = await syncProvider.getTransactionFee("ChangePubKey", syncWallet1.address(), "ETH");
+    const changePubKeyFee = changePubKeyFullFee.totalFee;
+
+    await testAutoApprovedDeposit(
+        depositWallet,
+        syncWallet1,
+        "ETH",
+        amount.div(2).add(transferFee).add(changePubKeyFee)
+    );
+    await testChangePubkeyOnchain(syncWallet1, "ETH");
     try {
         await testTransfer(syncWallet1, syncWallet2, "ETH", amount);
     } catch (e) {
@@ -503,10 +510,15 @@ async function checkFailedTransactionResending(
         const ethWallet5 = ethers.Wallet.createRandom().connect(ethersProvider);
         await await ethWallet.sendTransaction({ to: ethWallet5.address, value: utils.parseEther("6.0") });
         const syncWallet5 = await Wallet.fromEthSigner(ethWallet5, syncProvider);
-        await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
+        await checkFailedTransactionResending(zksyncDepositorWallet, syncWallet4, syncWallet5);
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
+        console.log("Move funds ERC-20 start");
+        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
+        console.log("Move funds ERC-20 OK");
+
+        console.log("Move funds ETH start");
+        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
+        console.log("Move funds ETH OK");
 
         await syncProvider.disconnect();
     } catch (e) {
