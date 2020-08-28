@@ -13,6 +13,7 @@ use std::time::Duration;
 /// The limit of time we are willing to wait for response.
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
 
+#[derive(Debug)]
 pub struct CoinGeckoAPI {
     base_url: Url,
     client: reqwest::Client,

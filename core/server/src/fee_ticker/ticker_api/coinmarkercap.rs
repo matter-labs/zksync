@@ -17,6 +17,7 @@ use models::{
 /// The limit of time we are willing to wait for response.
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
 
+#[derive(Debug)]
 pub struct CoinMarketCapAPI {
     client: reqwest::Client,
     base_url: Url,
@@ -31,7 +32,6 @@ impl CoinMarketCapAPI {
 #[async_trait]
 impl TokenPriceAPI for CoinMarketCapAPI {
     async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, failure::Error> {
-        dbg!("COINMARKETCAP", token_symbol);
         let request_url = self
             .base_url
             .join(&format!(
