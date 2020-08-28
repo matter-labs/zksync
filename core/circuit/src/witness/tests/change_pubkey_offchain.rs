@@ -47,6 +47,7 @@ fn test_change_pubkey_offchain_success() {
         },
     );
 }
+
 /// Same as `test_change_pubkey_offchain_success`, but uses a nonzero fee value.
 #[test]
 #[ignore]

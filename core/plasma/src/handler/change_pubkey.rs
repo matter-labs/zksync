@@ -97,7 +97,7 @@ impl TxHandler<ChangePubKey> for PlasmaState {
         ));
 
         let fee = CollectedFee {
-            token: params::ETH_TOKEN_ID,
+            token: op.tx.fee_token,
             amount: op.tx.fee.clone(),
         };
 

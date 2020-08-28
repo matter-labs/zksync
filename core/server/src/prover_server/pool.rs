@@ -381,6 +381,10 @@ impl Maintainer {
                     let change_pkhash_operations = change_pkhash_witness.calculate_operations(());
 
                     operations.extend(change_pkhash_operations);
+                    fees.push(CollectedFee {
+                        token: change_pkhash_op.tx.fee_token,
+                        amount: change_pkhash_op.tx.fee,
+                    });
                     pub_data.extend(change_pkhash_witness.get_pubdata());
                 }
                 FranklinOp::Noop(_) => {} // Noops are handled below
