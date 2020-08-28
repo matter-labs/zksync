@@ -120,6 +120,7 @@ struct CoinGeckoMarketChart {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use models::config_options::parse_env;
 
     #[test]
     fn test_coingecko_api() {
@@ -128,8 +129,9 @@ mod tests {
             .enable_all()
             .build()
             .expect("tokio runtime");
+        let ticker_url = parse_env("COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
-        let api = CoinGeckoAPI::new(client).expect("coingecko init");
+        let api = CoinGeckoAPI::new(client, ticker_url).expect("coingecko init");
         runtime
             .block_on(api.get_price("ETH"))
             .expect("Failed to get data from ticker");
