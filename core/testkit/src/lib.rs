@@ -937,19 +937,36 @@ impl TestSetup {
 
     pub fn change_pubkey_with_tx(
         &mut self,
-        zksync_signer: ZKSyncAccountId,
+        account: ZKSyncAccountId,
         fee_token: Token,
         fee: BigUint,
     ) {
+        // Subtract fee from the account
+        let mut account_balance = self.get_expected_zksync_account_balance(account, fee_token.0);
+        account_balance -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((account, fee_token.0), account_balance);
+
+        // Add fee to the fee collector account
+        let mut fee_account =
+            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0);
+        fee_account += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), fee_account);
+
+        // Update account pubkey
         let account_id = self
-            .get_zksync_account_committed_state(zksync_signer)
+            .get_zksync_account_committed_state(account)
             .expect("can't change pubkey, account does not exist")
             .0;
-        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
+        self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
+        // Execute transaction
         let tx = self
             .accounts
-            .change_pubkey_with_tx(zksync_signer, fee_token.0, fee, None, true);
+            .change_pubkey_with_tx(account, fee_token.0, fee, None, true);
 
         self.execute_tx(tx);
     }
@@ -957,19 +974,36 @@ impl TestSetup {
     pub fn change_pubkey_with_onchain_auth(
         &mut self,
         eth_account: ETHAccountId,
-        zksync_signer: ZKSyncAccountId,
+        account: ZKSyncAccountId,
         fee_token: Token,
         fee: BigUint,
     ) {
+        // Subtract fee from the account
+        let mut account_balance = self.get_expected_zksync_account_balance(account, fee_token.0);
+        account_balance -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((account, fee_token.0), account_balance);
+
+        // Add fee to the fee collector account
+        let mut fee_account =
+            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0);
+        fee_account += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), fee_account);
+
+        // Update account pubkey
         let account_id = self
-            .get_zksync_account_committed_state(zksync_signer)
+            .get_zksync_account_committed_state(account)
             .expect("can't change pubkey, account does not exist")
             .0;
-        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
+        self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
+        // Execute transaction
         let tx = self.accounts.change_pubkey_with_onchain_auth(
             eth_account,
-            zksync_signer,
+            account,
             fee_token.0,
             fee,
             None,
