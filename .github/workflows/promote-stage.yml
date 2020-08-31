@@ -2,7 +2,7 @@ name: Promote to stage
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ dev, master, breaking ]
 
 jobs:
   build-images:
