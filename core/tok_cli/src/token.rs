@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use url::Url;
 use web3::{
     api::Eth,
     contract::Options,
@@ -86,7 +87,7 @@ impl Token {
 
     pub async fn add_to_server(
         &self,
-        endpoint_addr: std::net::SocketAddr,
+        endpoint_addr: Url,
         secret_auth: &str,
     ) -> Result<tokens::Token> {
         let client = Client::new();
@@ -95,8 +96,8 @@ impl Token {
         let seconds_active = 15 * 60; // 15 minute
         let active_to = start.duration_since(UNIX_EPOCH)?.as_secs() + seconds_active;
 
-        let query_to_tokens = format!("http://{}/tokens", endpoint_addr.to_string());
-        let query_to_count = format!("http://{}/count", endpoint_addr.to_string());
+        let query_to_tokens = format!("{}tokens", endpoint_addr.to_string());
+        let query_to_count = format!("{}count", endpoint_addr.to_string());
 
         let auth_token = encode_token(secret_auth, "Authorization", active_to as usize)?;
 

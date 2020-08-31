@@ -29,3 +29,4 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 reqwest = { version = "0.10", features = ["json"] }
 jsonwebtoken = "7"
 serde = "1.0.90"
+url = "2.1"

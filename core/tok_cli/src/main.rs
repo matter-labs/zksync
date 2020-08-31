@@ -149,7 +149,7 @@ async fn main() -> Result<()> {
 
             let token = Token::new(addr, name, symbol, decimals);
 
-            let endpoint_addr = config_opts.admin_http_server_address;
+            let endpoint_addr = config_opts.admin_http_server_url;
             let secret_auth = config_opts.secret_auth;
 
             let token_from_server = token.add_to_server(endpoint_addr, &secret_auth).await?;
