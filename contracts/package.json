@@ -28,6 +28,7 @@
     "zksync": "link:../js/zksync.js"
   },
   "scripts": {
+    "build-dev": "waffle .waffle-dev.json",
     "build": "waffle .waffle.json",
     "test": "yarn build && f mocha -r ts-node/register test/**/*.ts",
     "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
