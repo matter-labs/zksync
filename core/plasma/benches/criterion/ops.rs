@@ -225,15 +225,16 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
 
     let nonce = 0;
 
-    let mut change_pubkey = ChangePubKey {
-        account_id: 0,
-        account: to_change.address,
-        new_pk_hash: PubKeyHash::from_privkey(&new_sk),
-        fee_token: 0,
-        fee: Default::default(),
+    let mut change_pubkey = ChangePubKey::new(
+        0,
+        to_change.address,
+        PubKeyHash::from_privkey(&new_sk),
+        0,
+        Default::default(),
         nonce,
-        eth_signature: None,
-    };
+        None,
+        None,
+    );
 
     change_pubkey.eth_signature = {
         let sign_bytes = change_pubkey

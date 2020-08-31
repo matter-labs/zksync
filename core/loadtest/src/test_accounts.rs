@@ -103,7 +103,7 @@ impl TestAccount {
         let fee_token = 0; // ETH
         FranklinTx::ChangePubKey(Box::new(
             self.zk_acc
-                .create_change_pubkey_tx(None, true, fee_token, fee, false),
+                .sign_change_pubkey_tx(None, true, fee_token, fee, false),
         ))
     }
 

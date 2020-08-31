@@ -225,7 +225,7 @@ impl ZksyncAccount {
         close
     }
 
-    pub fn create_change_pubkey_tx(
+    pub fn sign_change_pubkey_tx(
         &self,
         nonce: Option<Nonce>,
         increment_nonce: bool,
@@ -241,15 +241,17 @@ impl ZksyncAccount {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let nonce = nonce.unwrap_or_else(|| *stored_nonce);
 
-        let mut change_pubkey = ChangePubKey {
+        let mut change_pubkey = ChangePubKey::new_signed(
             account_id,
-            account: self.address,
-            new_pk_hash: self.pubkey_hash.clone(),
+            self.address,
+            self.pubkey_hash.clone(),
             fee_token,
             fee,
             nonce,
-            eth_signature: None,
-        };
+            None,
+            &self.private_key,
+        )
+        .expect("Can't sign ChangePubKey operation");
         change_pubkey.eth_signature = if auth_onchain {
             None
         } else {

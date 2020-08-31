@@ -181,15 +181,16 @@ mod tests {
     #[test]
     fn commit_cost() {
         let change_pubkey_op = ChangePubKeyOp {
-            tx: ChangePubKey {
-                account_id: 1,
-                account: Default::default(),
-                new_pk_hash: Default::default(),
-                fee_token: 0,
-                fee: Default::default(),
-                nonce: Default::default(),
-                eth_signature: None,
-            },
+            tx: ChangePubKey::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                None,
+                None,
+            ),
             account_id: 1,
         };
 
@@ -208,15 +209,16 @@ mod tests {
     #[test]
     fn verify_cost() {
         let change_pubkey_op = ChangePubKeyOp {
-            tx: ChangePubKey {
-                account_id: 1,
-                account: Default::default(),
-                new_pk_hash: Default::default(),
-                fee_token: 0,
-                fee: Default::default(),
-                nonce: Default::default(),
-                eth_signature: None,
-            },
+            tx: ChangePubKey::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                None,
+                None,
+            ),
             account_id: 1,
         };
 
@@ -235,15 +237,16 @@ mod tests {
     #[test]
     fn gas_counter() {
         let change_pubkey_op = ChangePubKeyOp {
-            tx: ChangePubKey {
-                account_id: 1,
-                account: Default::default(),
-                new_pk_hash: Default::default(),
-                fee_token: 0,
-                fee: Default::default(),
-                nonce: Default::default(),
-                eth_signature: None,
-            },
+            tx: ChangePubKey::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                None,
+                None,
+            ),
             account_id: 1,
         };
         let franklin_op = FranklinOp::from(change_pubkey_op);

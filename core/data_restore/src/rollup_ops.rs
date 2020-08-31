@@ -264,16 +264,16 @@ mod test {
 
     #[test]
     fn test_change_pubkey_offchain() {
-        let tx = ChangePubKey {
-            account_id: 11,
-            account: "7777777777777777777777777777777777777777".parse().unwrap(),
-            new_pk_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
-                .unwrap(),
-            fee_token: 0,
-            fee: Default::default(),
-            nonce: 3,
-            eth_signature: None,
-        };
+        let tx = ChangePubKey::new(
+            11,
+            "7777777777777777777777777777777777777777".parse().unwrap(),
+            PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f").unwrap(),
+            0,
+            Default::default(),
+            3,
+            None,
+            None,
+        );
         let op1 = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp { tx, account_id: 11 }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)

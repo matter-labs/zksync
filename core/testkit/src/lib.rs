@@ -294,7 +294,7 @@ impl<T: Transport> AccountSet<T> {
             block_on(eth_account.auth_fact(&zksync_account.pubkey_hash.data, auth_nonce))
                 .expect("Auth pubkey fail");
         assert_eq!(tx_receipt.status, Some(U64::from(1)), "Auth pubkey fail");
-        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+        FranklinTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
             nonce,
             increment_nonce,
             fee_token,
@@ -312,7 +312,7 @@ impl<T: Transport> AccountSet<T> {
         increment_nonce: bool,
     ) -> FranklinTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+        FranklinTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
             nonce,
             increment_nonce,
             fee_token,

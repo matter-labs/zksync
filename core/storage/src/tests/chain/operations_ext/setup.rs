@@ -252,7 +252,7 @@ impl TransactionsHistoryTestSetup {
 
     fn create_change_pubkey_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
         let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
-            tx: self.from_zksync_account.create_change_pubkey_tx(
+            tx: self.from_zksync_account.sign_change_pubkey_tx(
                 None,
                 false,
                 0,

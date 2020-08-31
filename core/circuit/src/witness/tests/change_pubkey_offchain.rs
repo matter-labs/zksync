@@ -23,7 +23,7 @@ fn test_change_pubkey_offchain_success() {
     let accounts = vec![WitnessTestAccount::new_empty(0xc1)];
     let account = &accounts[0];
     let change_pkhash_op = ChangePubKeyOp {
-        tx: account.zksync_account.create_change_pubkey_tx(
+        tx: account.zksync_account.sign_change_pubkey_tx(
             None,
             true,
             FEE_TOKEN,
@@ -59,7 +59,7 @@ fn test_change_pubkey_offchain_nonzero_fee() {
     let change_pkhash_op = ChangePubKeyOp {
         tx: account
             .zksync_account
-            .create_change_pubkey_tx(None, true, FEE_TOKEN, fee, false),
+            .sign_change_pubkey_tx(None, true, FEE_TOKEN, fee, false),
         account_id: account.id,
     };
 
@@ -94,9 +94,13 @@ fn test_incorrect_change_pubkey_account() {
     let accounts = vec![WitnessTestAccount::new_empty(0xc1)];
     let account = &accounts[0];
     let change_pkhash_op = ChangePubKeyOp {
-        tx: incorrect_from_account
-            .zksync_account
-            .create_change_pubkey_tx(None, true, FEE_TOKEN, Default::default(), false),
+        tx: incorrect_from_account.zksync_account.sign_change_pubkey_tx(
+            None,
+            true,
+            FEE_TOKEN,
+            Default::default(),
+            false,
+        ),
         account_id: account.id,
     };
 

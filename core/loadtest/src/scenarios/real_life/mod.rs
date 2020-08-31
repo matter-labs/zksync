@@ -445,7 +445,7 @@ impl ScenarioExecutor {
 
             let fee_token = 0; // ETH
             let change_pubkey_tx =
-                FranklinTx::ChangePubKey(Box::new(account.create_change_pubkey_tx(
+                FranklinTx::ChangePubKey(Box::new(account.sign_change_pubkey_tx(
                     None,
                     true,
                     fee_token,

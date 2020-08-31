@@ -502,15 +502,16 @@ impl ChangePubKeyOp {
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get fee"))?;
 
         Ok(ChangePubKeyOp {
-            tx: ChangePubKey {
+            tx: ChangePubKey::new(
                 account_id,
                 account,
                 new_pk_hash,
                 fee_token,
                 fee,
                 nonce,
-                eth_signature: None,
-            },
+                None,
+                None,
+            ),
             account_id,
         })
     }
