@@ -1514,12 +1514,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let is_a_correct =
             CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &lhs.balance)?;
 
-        let is_amount_zero = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_amount_zero"),
-            &op_data.amount_unpacked.get_number(),
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?);
-
         let fee_expr = Expression::from(&op_data.fee.get_number());
         let is_b_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_b_correct"),
@@ -1528,7 +1522,6 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         is_valid_flags.push(is_a_correct);
-        is_valid_flags.push(is_amount_zero);
         is_valid_flags.push(is_b_correct);
         is_valid_flags.push(is_a_geq_b.clone());
 
