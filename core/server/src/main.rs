@@ -227,7 +227,7 @@ fn main() {
     );
 
     let ticker_task = run_ticker_task(
-        config_opts.ticker_url.clone(),
+        config_opts.token_price_source.clone(),
         connection_pool.clone(),
         eth_send_request_sender,
         state_keeper_req_sender,
