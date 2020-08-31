@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 
-import "../contracts/generated/ZkSyncTest.sol";
+import "generated/ZkSyncTest.sol";
 
 
 contract ZKSyncSignatureUnitTest is ZkSyncTest {
