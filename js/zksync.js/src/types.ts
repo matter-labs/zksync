@@ -106,6 +106,7 @@ export interface ChangePubKey {
     feeToken: number;
     fee: BigNumberish;
     nonce: number;
+    signature: Signature;
     ethSignature: string;
 }
 

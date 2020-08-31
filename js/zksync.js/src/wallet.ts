@@ -24,6 +24,7 @@ import {
     getSignedBytesFromMessage,
     signMessagePersonalAPI,
     ERC20_DEPOSIT_GAS_LIMIT,
+    getEthSignatureType,
 } from "./utils";
 
 class ZKSyncTxError extends Error {
@@ -291,16 +292,16 @@ export class Wallet {
             ? null
             : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
-        const changePubKeyTx: ChangePubKey = {
-            type: "ChangePubKey",
+        const changePubKeyTx: ChangePubKey = this.signer.signSyncChangePubKey({
             accountId: this.accountId,
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
             nonce: changePubKey.nonce,
-            feeToken: feeTokenId,
+            feeTokenId,
             fee: BigNumber.from(changePubKey.fee).toString(),
-            ethSignature,
-        };
+        });
+
+        changePubKeyTx.ethSignature = ethSignature;
 
         return {
             tx: changePubKeyTx,
