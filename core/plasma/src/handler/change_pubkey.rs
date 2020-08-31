@@ -22,7 +22,11 @@ impl TxHandler<ChangePubKey> for PlasmaState {
             .ok_or_else(|| format_err!("Account does not exist"))?;
         ensure!(
             tx.eth_signature.is_none() || tx.verify_eth_signature() == Some(account.address),
-            "ChangePubKey signature is incorrect"
+            "ChangePubKey Ethereum signature is incorrect"
+        );
+        ensure!(
+            tx.verify_signature() == Some(tx.new_pk_hash.clone()),
+            "ChangePubKey zkSync signature is incorrect"
         );
         ensure!(
             account_id == tx.account_id,
