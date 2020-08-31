@@ -863,6 +863,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &ext_pubdata_chunk,
             &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
             &is_a_geq_b,
+            &signature_data.is_verified,
         )?);
         op_flags.push(self.noop(
             cs.namespace(|| "noop"),
@@ -1438,6 +1439,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         is_a_geq_b: &Boolean,
+        is_sig_verified: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -1460,6 +1462,28 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             ChangePubKeyOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
+
+        // Construct serialized tx
+        let mut serialized_tx_bits = vec![];
+
+        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits.extend(cur.token.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+
+        assert_eq!(
+            serialized_tx_bits.len(),
+            params::SIGNED_CHANGE_PUBKEY_BIT_WIDTH
+        );
+
+        let is_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            serialized_tx_bits,
+            &op_data,
+        )?;
 
         let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
             cs.namespace(|| "compare pubdata"),
@@ -1538,6 +1562,19 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         is_valid_flags.push(is_address_correct);
+
+        // Verify zkSync signature.
+        let is_signed_correctly = multi_and(
+            cs.namespace(|| "is_signed_correctly"),
+            &[is_serialized_tx_correct, is_sig_verified.clone()],
+        )?;
+
+        let is_sig_correct = multi_or(
+            cs.namespace(|| "sig is valid or not first chunk"),
+            &[is_signed_correctly, is_first_chunk.not()],
+        )?;
+
+        is_valid_flags.push(is_sig_correct);
 
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 

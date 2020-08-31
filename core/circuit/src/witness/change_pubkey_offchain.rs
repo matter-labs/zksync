@@ -23,12 +23,10 @@ use models::{
 };
 // Local deps
 use crate::{
-    operation::{
-        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
-    },
+    operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits},
+        utils::{apply_leaf_operation, get_audits, SigDataInput},
         Witness,
     },
 };
@@ -53,7 +51,7 @@ pub struct ChangePubkeyOffChainWitness<E: RescueEngine> {
 
 impl Witness for ChangePubkeyOffChainWitness<Bn256> {
     type OperationType = ChangePubKeyOp;
-    type CalculateOpsInput = ();
+    type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, change_pubkey_offchain: &ChangePubKeyOp) -> Self {
         let change_pubkey_data = ChangePubkeyOffChainData {
@@ -110,7 +108,7 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
         pubdata_bits
     }
 
-    fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
+    fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         self.get_pubdata()
             .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
@@ -120,11 +118,11 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
                 tx_type: self.tx_type,
                 chunk: Some(Fr::from_str(&chunk_n.to_string()).unwrap()),
                 pubdata_chunk: Some(pubdata_chunk),
-                first_sig_msg: Some(Fr::zero()),
-                second_sig_msg: Some(Fr::zero()),
-                third_sig_msg: Some(Fr::zero()),
-                signature_data: SignatureData::init_empty(),
-                signer_pub_key_packed: vec![Some(false); 256],
+                first_sig_msg: Some(input.first_sig_msg),
+                second_sig_msg: Some(input.second_sig_msg),
+                third_sig_msg: Some(input.third_sig_msg),
+                signature_data: input.signature.clone(),
+                signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
                 args: self.args.clone(),
                 lhs: self.before.clone(),
                 rhs: self.after.clone(),

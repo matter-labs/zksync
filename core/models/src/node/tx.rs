@@ -567,7 +567,6 @@ impl ChangePubKey {
         }
     }
 
-    /// GetBytes for this transaction is used for hashing.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -577,9 +576,6 @@ impl ChangePubKey {
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        if let Some(sign) = &self.eth_signature {
-            out.extend_from_slice(&sign.serialize_packed())
-        }
         out
     }
 

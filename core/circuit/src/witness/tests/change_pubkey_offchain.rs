@@ -10,6 +10,7 @@ use plasma::{
 use crate::witness::{
     change_pubkey_offchain::ChangePubkeyOffChainWitness,
     tests::test_utils::{generic_test_scenario, incorrect_op_test_scenario, WitnessTestAccount},
+    utils::SigDataInput,
 };
 
 const FEE_TOKEN: u16 = 0; // ETH
@@ -33,10 +34,13 @@ fn test_change_pubkey_offchain_success() {
         account_id: account.id,
     };
 
+    let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
+        .expect("SigDataInput creation failed");
+
     generic_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
         &accounts,
         change_pkhash_op,
-        (),
+        input,
         |plasma_state, op| {
             let fee = <PlasmaState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
                 .expect("Operation failed")
@@ -63,10 +67,13 @@ fn test_change_pubkey_offchain_nonzero_fee() {
         account_id: account.id,
     };
 
+    let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
+        .expect("SigDataInput creation failed");
+
     generic_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
         &accounts,
         change_pkhash_op,
-        (),
+        input,
         |plasma_state, op| {
             let fee = <PlasmaState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
                 .expect("Operation failed")
@@ -104,10 +111,13 @@ fn test_incorrect_change_pubkey_account() {
         account_id: account.id,
     };
 
+    let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
+        .expect("SigDataInput creation failed");
+
     incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
         &accounts,
         change_pkhash_op,
-        (),
+        input,
         ERR_MSG,
         || {
             vec![CollectedFee {

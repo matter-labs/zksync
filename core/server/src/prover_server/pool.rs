@@ -378,7 +378,9 @@ impl Maintainer {
                         &change_pkhash_op,
                     );
 
-                    let change_pkhash_operations = change_pkhash_witness.calculate_operations(());
+                    let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)?;
+                    let change_pkhash_operations =
+                        change_pkhash_witness.calculate_operations(input);
 
                     operations.extend(change_pkhash_operations);
                     fees.push(CollectedFee {
