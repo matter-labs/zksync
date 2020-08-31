@@ -625,6 +625,7 @@ impl ChangePubKey {
         (self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account))
             && self.verify_signature() == Some(self.new_pk_hash.clone())
             && self.account_id <= max_account_id()
+            && self.fee_token <= max_token_id()
             && is_fee_amount_packable(&self.fee)
     }
 }
