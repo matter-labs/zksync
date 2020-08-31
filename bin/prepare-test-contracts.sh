@@ -17,8 +17,6 @@ cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
 cp $IN_DIR/UpgradeGatekeeper.sol $OUT_DIR/UpgradeGatekeeperTest.sol
 cp $IN_DIR/ZkSync.sol $OUT_DIR/ZkSyncTestUpgradeTarget.sol
 
-# Change dependencies
-ssed 's/import "\.\./import "\.\.\/\.\./' -i $OUT_DIR/*.sol
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
 ssed 's/\bVerifier\b/VerifierTest/' -i $OUT_DIR/*.sol
