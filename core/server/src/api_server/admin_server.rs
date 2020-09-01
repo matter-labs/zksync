@@ -128,6 +128,7 @@ pub fn start_admin_server(
                     .route("/count", web::get().to(get_number_of_token))
                     .route("/tokens", web::post().to(add_token))
             })
+            .workers(1)
             .bind(&bind_to)
             .expect("failed to bind")
             .run()
