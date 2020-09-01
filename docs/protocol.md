@@ -859,25 +859,27 @@ with ethereum keys for which address is the same as account address.
 
 | Chunks | Significant bytes |
 | ------ | ----------------- |
-| 6      | 49                |
+| 6      | 53                |
 
 ##### Structure
 
-| Field           | Byte len | Value/type       | Description                             |
-| --------------- | -------- | ---------------- | --------------------------------------- |
-| opcode          | 1        | `0x07`           | Operation code                          |
-| account_id      | 4        | AccountId        | Unique identifier of the rollup account |
-| new_pubkey_hash | 20       | RollupPubkeyHash | Hash of the new rollup public key       |
-| account_address | 20       | ETHAddress       | Address of the account                  |
-| nonce           | 4        | Nonce            | Account nonce                           |
+| Field           | Byte len | Value/type       | Description                                           |
+| --------------- | -------- | ---------------- | ----------------------------------------------------- |
+| opcode          | 1        | `0x07`           | Operation code                                        |
+| account_id      | 4        | AccountId        | Unique identifier of the rollup account               |
+| new_pubkey_hash | 20       | RollupPubkeyHash | Hash of the new rollup public key                     |
+| account_address | 20       | ETHAddress       | Address of the account                                |
+| nonce           | 4        | Nonce            | Account nonce                                         |
+| fee_token       | 2        | TokenId          | Unique token identifier in the rollup used to pay fee |
+| packed_fee      | 2        | PackedFee        | Packed amount of fee paid                             |
 
 ##### Example
 
 ```
-0700000411036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce3300000003
+0700000411036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330000000300010012
 ```
 
-Reads as: change pubkey, account #4, new pubkey hash 0x11036945fcc11c349c3a300f19cd87cb03c4f2ef, address: 0x03e69588c1f4155dec60da3bf5113e029911ce33, nonce: 3.
+Reads as: change pubkey, account #4, new pubkey hash 0x11036945fcc11c349c3a300f19cd87cb03c4f2ef, address: 0x03e69588c1f4155dec60da3bf5113e029911ce33, nonce: 3, fee paid in token #0x0001, fee amount is 0x0012.
 
 #### Auth
 
@@ -905,14 +907,19 @@ function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
 
 ##### Structure
 
-| Field                | Value/type    | Description                                                                                    |
-| -------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| type                 | `0x07`        | Operation code                                                                                 |
-| account_id           | AccountId     | Unique id of the rollup account                                                                |
-| account              | ETHAddress    | Address of the rollup account                                                                  |
-| new_pubkey_hash      | 20            | RollupPubkeyHash                                                                               | Hash of the new rollup public key |
-| nonce                | Nonce         | A one-time code that specifies the order of transactions                                       |
-| signature (optional) | ETHSignanture | Ethereum signature of the message defined above. Null if operation was authorized on contract. |
+| Field                    | Value/type       | Description                                                                                    |
+| ------------------------ | ---------------- | ---------------------------------------------------------------------------------------------- |
+| type                     | `0x07`           | Operation code                                                                                 |
+| account_id               | AccountId        | Unique id of the rollup account                                                                |
+| account                  | ETHAddress       | Address of the rollup account                                                                  |
+| new_pubkey_hash          | RollupPubkeyHash | Hash of the new rollup public key                                                              |
+| fee_token                | TokenId          | Unique token identifier in the rollup used to pay fee                                          |
+| fee                      | PackedFee        | Packed amount of fee paid                                                                      |
+| nonce                    | Nonce            | A one-time code that specifies the order of transactions                                       |
+| signature                | Signanture       | [Signature](#Transaction-Singature) of previous fields, see the spec below                     |
+| eth_signature (optional) | ETHSignanture    | Ethereum signature of the message defined above. Null if operation was authorized on contract. |
+
+Note that signature for this message must correspond to the `new_pubkey_hash` field in the transaction.
 
 ##### Example
 
@@ -921,10 +928,34 @@ function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
     "type": "ChangePubKey",
     "accountId": 5,
     "account": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
-    "newPkHash": "sync:4a38f08c06ac48328029485e07d6d9a3c29155e7",
+    "newPkHash": "sync:63aa2a0efb97064e0e52a6adb63a42018bd6e72b",
+    "feeToken": 100,
+    "fee": "56700000000",
     "nonce": 0,
+    "signature": {
+        "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+        "signature": "4da3c53a246a0237f295baa4349e0c659edbf29e458709d9f48f9e04af168da09c5fc08ecaf5ee5b808d35806ea6043285ef10dc1d0bdd24ee6abad1918ada02"
+    },
     "ethSignature": "0x40875b0ad3c5520093c8222acf293f34016c4fea9596ca02b37cc6e5c7cf007170cfa1195d3461ad17296ff80721762e6f783f195db19dbf40cf6ae58057172b1b"
 }
+```
+
+Signed transaction representation.
+
+```
+Signed using:
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
+
+type: 0x07,
+account_id: 0x00000005,
+account: 0x11742517336ae1b09ca275bb6cafc6b341b6e324,
+new_pk_hash: 0x63aa2a0efb97064e0e52a6adb63a42018bd6e72b,
+fee_token: 0x0064,
+fee: 0x46e8,
+nonce: 0x00000000,
+
+Signed bytes: 0x070000000511742517336ae1b09ca275bb6cafc6b341b6e32463aa2a0efb97064e0e52a6adb63a42018bd6e72b006446e800000000
 ```
 
 #### Rollup operation
@@ -942,16 +973,23 @@ function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
 # OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
 account = get_account_tree(ChankgePkOp.tx.account_id)
+fee_account = get_tree_account(Block.fee_account)
+
+fee = unpack_fee(WithdrawOp.tx.packed_fee)
 
 def tree_invariants():
     account.id == ChangePkOp.tx.id
     account.address == ChangePkOp.tx.account
     account.nonce < MAX_NONCE
     account.nonce == ChangPkOp.tx.nonce
+    account.balance[ChangPkOp.tx.fee_token] >= fee
 
 def tree_updates():
+    account.balance[ChangPkOp.tx.fee_token] -= fee
     account.pubkey_hash = ChangePkOp.tx.new_pubkey_hash
     account.nonce += 1
+
+    fee_account.balance[WithdrawOp.token] += fee
 
 def pubdata_invariants():
     OnhcainOp.opcode == 0x07
@@ -959,11 +997,16 @@ def pubdata_invariants():
     OnhcainOp.new_pubkey_hash == ChangePkOp.tx.new_pubkey_hash
     OnchainOp.account_address == ChangePkOp.tx.account
     OnchainOp.nonce == ChangePkOp.tx.nonce
+    OnchainOp.fee_token == ChangePkOp.tx.fee_token
+    OnhcainOp.packed_fee == ChangePkOp.tx.packed_fee
 ```
 
 #### Signature validity
 
-Signature validity is verified when transaction is committed to the Ethereum.
+Signature validity is verified twice:
+
+1. Rollup signature is verified in circuit.
+2. Ethereum signature is verified when transaction is committed to the Ethereum.
 
 ### 8. Forced exit
 
