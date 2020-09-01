@@ -126,6 +126,38 @@ impl TokenPriceSource {
     }
 }
 
+/// Configuration options related to generating blocks by state keeper.
+/// Each block is generated after a certain amount of miniblock iterations.
+/// Miniblock iteration is a routine of processing transactions received so far.
+#[derive(Debug, Clone)]
+pub struct MiniblockTimings {
+    /// Miniblock iteration interval.
+    pub miniblock_iteration_interval: Duration,
+    /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
+    pub max_miniblock_iterations: usize,
+    /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
+    pub max_miniblock_iterations_withdraw_block: usize,
+}
+
+impl MiniblockTimings {
+    pub fn from_env() -> Self {
+        let max_miniblock_iterations_withdraw_block =
+            if env::var("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS").is_ok() {
+                parse_env("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS")
+            } else {
+                parse_env("MINIBLOCKS_ITERATIONS")
+            };
+
+        Self {
+            miniblock_iteration_interval: Duration::from_millis(parse_env::<u64>(
+                "MINIBLOCK_ITERATION_INTERVAL",
+            )),
+            max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
+            max_miniblock_iterations_withdraw_block,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
@@ -147,10 +179,7 @@ pub struct ConfigurationOptions {
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
     pub idle_provers: u32,
-    /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
-    pub max_miniblock_iterations: usize,
-    /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
-    pub max_miniblock_iterations_withdraw_block: usize,
+    pub miniblock_timings: MiniblockTimings,
     pub prometheus_export_port: u16,
     pub token_price_source: TokenPriceSource,
 }
@@ -161,13 +190,6 @@ impl ConfigurationOptions {
     pub fn from_env() -> Self {
         let mut available_block_chunk_sizes = block_chunk_sizes().to_vec();
         available_block_chunk_sizes.sort();
-
-        let max_miniblock_iterations_withdraw_block =
-            if env::var("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS").is_ok() {
-                parse_env("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS")
-            } else {
-                parse_env("MINIBLOCKS_ITERATIONS")
-            };
 
         Self {
             rest_api_server_address: parse_env("REST_API_BIND"),
@@ -195,8 +217,7 @@ impl ConfigurationOptions {
             )),
             eth_network: parse_env("ETH_NETWORK"),
             idle_provers: parse_env("IDLE_PROVERS"),
-            max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
-            max_miniblock_iterations_withdraw_block,
+            miniblock_timings: MiniblockTimings::from_env(),
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
             token_price_source: TokenPriceSource::from_env(),
         }
