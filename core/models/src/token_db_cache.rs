@@ -73,6 +73,14 @@ use crate::config_options::parse_env;
 //use storage::recoverable_connection::RecoverableConnection;
 //use storage::StorageProcessor;
 
+use diesel::connection::{AnsiTransactionManager, Connection, SimpleConnection};
+pub struct RecoverableConnection<Conn: Connection> {
+    database_url: String,
+    connection: RefCell<Conn>,
+    transaction_manager: AnsiTransactionManager,
+    retrying_enabled: Cell<bool>,
+}
+
 /// `ConnectionPool` is a wrapper over a `diesel`s `Pool`, encapsulating
 /// the fixed size pool of connection to the database.
 ///

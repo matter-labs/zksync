@@ -4,7 +4,7 @@ extern crate serde_derive;
 extern crate log;
 
 pub mod abi;
-pub mod accountinforesp;
+pub mod account_info_resp;
 pub mod circuit;
 pub mod config_options;
 pub mod ethereum;
@@ -15,6 +15,7 @@ pub mod params;
 pub mod primitives;
 pub mod prover_utils;
 pub mod serialization;
+pub mod token_db_cache;
 // TODO: refactor, find new home for all this stuff
 
 pub use crypto_exports::franklin_crypto;
