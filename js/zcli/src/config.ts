@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Network } from './commands';
+import { Network, ALL_NETWORKS } from './commands';
 import assert from 'assert';
 
 interface Config {
@@ -35,8 +35,7 @@ export function loadConfig() {
     const unparsed = fs.readFileSync(config_path);
     try {
         const parsed = JSON.parse(unparsed.toString());
-        const networks = ['localhost', 'ropsten', 'rinkeby', 'mainnet'];
-        assert(networks.includes(parsed.network));
+        assert(ALL_NETWORKS.includes(parsed.network));
         assert(Array.isArray(parsed.wallets));
         return parsed;
     } catch (err) {

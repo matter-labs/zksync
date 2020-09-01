@@ -13,6 +13,7 @@
     "dependencies": {
         "commander": "^6.0.0",
         "ethers": "^5.0.9",
+        "isomorphic-fetch": "^2.2.1",
         "zksync": "^0.6.4"
     },
     "devDependencies": {
@@ -25,7 +26,6 @@
         "chai-as-promised": "^7.1.1",
         "faker": "^5.1.0",
         "fetch-mock": "^9.10.7",
-        "isomorphic-fetch": "^2.2.1",
         "mocha": "^8.1.2",
         "ts-node": "^9.0.0",
         "typescript": "^4.0.2"

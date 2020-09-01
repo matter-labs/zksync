@@ -2,6 +2,12 @@ import 'isomorphic-fetch';
 import * as zksync from 'zksync';
 
 export type Network = "localhost" | "mainnet" | "ropsten" | "rinkeby";
+export const ALL_NETWORKS: Network[] = [
+    'localhost',
+    'mainnet',
+    'ropsten',
+    'rinkeby',
+];
 
 async function tokenInfo(id: number, provider: zksync.Provider) {
     const tokens = await provider.getTokens();
@@ -32,7 +38,7 @@ export async function txInfo(tx_hash: string, network: Network) {
     const response = await fetch(api_url);
     const tx = await response.json();
     if (tx === null) {
-        return { 
+        return {
             network,
             transaction: null
         };
@@ -56,3 +62,16 @@ export async function txInfo(tx_hash: string, network: Network) {
         }
     };
 }
+
+export async function availableNetworks() {
+    let networks: Network[] = [];
+    for (const network of ALL_NETWORKS) {
+        try {
+            const provider = await zksync.getDefaultProvider(network);
+            provider.disconnect();
+            networks.push(network);
+        } catch (err) { /* could not connect to provider */ }
+    }
+    return networks;
+}
+
