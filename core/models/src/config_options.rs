@@ -135,25 +135,24 @@ pub struct MiniblockTimings {
     pub miniblock_iteration_interval: Duration,
     /// Max number of miniblocks (produced every period of `TX_MINIBATCH_CREATE_TIME`) if one block.
     pub max_miniblock_iterations: usize,
-    /// Max number of miniblocks for block with withdraw operations (defaults to `max_minblock_iterations`).
-    pub max_miniblock_iterations_withdraw_block: usize,
+    /// Max number of miniblocks for block with fast withdraw operations (defaults to `max_minblock_iterations`).
+    pub fast_miniblock_iterations: usize,
 }
 
 impl MiniblockTimings {
     pub fn from_env() -> Self {
-        let max_miniblock_iterations_withdraw_block =
-            if env::var("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS").is_ok() {
-                parse_env("WITHDRAW_BLOCK_MINIBLOCKS_ITERATIONS")
-            } else {
-                parse_env("MINIBLOCKS_ITERATIONS")
-            };
+        let fast_miniblock_iterations = if env::var("FAST_BLOCK_MINIBLOCKS_ITERATIONS").is_ok() {
+            parse_env("FAST_BLOCK_MINIBLOCKS_ITERATIONS")
+        } else {
+            parse_env("MINIBLOCKS_ITERATIONS")
+        };
 
         Self {
             miniblock_iteration_interval: Duration::from_millis(parse_env::<u64>(
                 "MINIBLOCK_ITERATION_INTERVAL",
             )),
             max_miniblock_iterations: parse_env("MINIBLOCKS_ITERATIONS"),
-            max_miniblock_iterations_withdraw_block,
+            fast_miniblock_iterations,
         }
     }
 }
