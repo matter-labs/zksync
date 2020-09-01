@@ -24,6 +24,9 @@ use std::time::Instant;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
+///
+/// This will generate and store in db witnesses for blocks with indexes
+/// start_block, start_block + block_step, start_block + 2*block_step, ...
 pub struct WitnessGenerator {
     /// Connection to the database.
     conn_pool: storage::ConnectionPool,
