@@ -244,7 +244,7 @@ pub struct Withdraw {
     cached_signer: VerifiedSignatureCache,
     /// Optional setting signalizing state keeper to speed up creation
     /// of the block with provided transaction.
-    #[serde(skip)]
+    #[serde(default)]
     pub fast: bool,
 }
 
