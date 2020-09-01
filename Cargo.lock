@@ -3861,9 +3861,9 @@ checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
 name = "structopt"
-version = "0.3.14"
+version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "863246aaf5ddd0d6928dfeb1a9ca65f505599e4e1b399935ef7e75107516b4ef"
+checksum = "6cc388d94ffabf39b5ed5fadddc40147cb21e605f53db6f8f36a625d27489ac5"
 dependencies = [
  "clap",
  "lazy_static",
@@ -3872,9 +3872,9 @@ dependencies = [
 
 [[package]]
 name = "structopt-derive"
-version = "0.4.7"
+version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d239ca4b13aee7a2142e6795cbd69e457665ff8037aed33b3effdc430d2f927a"
+checksum = "5e2513111825077552a6751dfad9e11ce0fba07d7276a3943a037d7e93e64c5f"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -4056,13 +4056,13 @@ name = "tok_cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap",
  "env_logger 0.6.2",
  "jsonwebtoken",
  "models",
  "reqwest",
  "serde",
  "serde_json",
+ "structopt",
  "tokio 0.2.21",
  "url 2.1.1",
  "web3",
