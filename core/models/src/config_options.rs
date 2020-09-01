@@ -153,6 +153,7 @@ pub struct ConfigurationOptions {
     pub max_miniblock_iterations_withdraw_block: usize,
     pub prometheus_export_port: u16,
     pub token_price_source: TokenPriceSource,
+    pub witness_generators: usize,
 }
 
 impl ConfigurationOptions {
@@ -199,6 +200,7 @@ impl ConfigurationOptions {
             max_miniblock_iterations_withdraw_block,
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
             token_price_source: TokenPriceSource::from_env(),
+            witness_generators: parse_env("WITNESS_GENERATORS"),
         }
     }
 }
