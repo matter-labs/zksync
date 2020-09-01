@@ -1,28 +1,25 @@
 // Built-in
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::{
-    net,
-    time::{self, Duration},
-};
+use std::time::{self, Duration};
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{info, trace};
 // Workspace deps
-use models::{circuit::CircuitAccountTree, config_options::ThreadPanicNotify, node::BlockNumber};
+use models::config_options::ConfigurationOptions;
+use models::{config_options::ThreadPanicNotify, node::BlockNumber};
 use prover::client;
 use storage::ConnectionPool;
 // Local deps
 use crate::prover_server::scaler::ScalerOracle;
 
-mod pool;
 mod scaler;
+mod witness_generator;
 
 #[derive(Debug)]
 struct AppState {
     connection_pool: storage::ConnectionPool,
-    preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
     scaler_oracle: Arc<RwLock<ScalerOracle>>,
     prover_timeout: Duration,
 }
@@ -30,7 +27,6 @@ struct AppState {
 impl AppState {
     pub fn new(
         connection_pool: ConnectionPool,
-        preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
         prover_timeout: Duration,
         idle_provers: u32,
     ) -> Self {
@@ -41,7 +37,6 @@ impl AppState {
 
         Self {
             connection_pool,
-            preparing_data_pool,
             scaler_oracle,
             prover_timeout,
         }
@@ -116,15 +111,20 @@ fn prover_data(
     block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
     trace!("Got request for prover_data for block {}", *block);
-    let data_pool = data
-        .preparing_data_pool
-        .read()
-        .expect("failed to get read lock on data");
-    let res = data_pool.get(*block);
-    if res.is_some() {
+    let storage = data
+        .access_storage()
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+    let witness = match storage.prover_schema().get_witness(block.0) {
+        Ok(witness) => witness,
+        Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
+    };
+    if witness.is_some() {
         info!("Sent prover_data for block {}", *block);
+    } else {
+        // No witness, we should just wait
+        warn!("No witness for block {}", *block);
     }
-    Ok(HttpResponse::Ok().json(res))
+    Ok(HttpResponse::Ok().json(witness))
 }
 
 fn working_on(
@@ -155,14 +155,7 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     match storage.prover_schema().store_proof(r.block, &r.proof) {
-        Ok(_) => {
-            let mut data_pool = data
-                .preparing_data_pool
-                .write()
-                .expect("failed to get write lock on data");
-            data_pool.clean_up(r.block);
-            Ok(())
-        }
+        Ok(_) => Ok(()),
         Err(e) => {
             vlog::error!("failed to store received proof: {}", e);
             let message = if e.to_string().contains("duplicate key") {
@@ -240,41 +233,38 @@ fn required_replicas(
 #[allow(clippy::too_many_arguments)]
 pub fn start_prover_server(
     connection_pool: storage::ConnectionPool,
-    bind_to: net::SocketAddr,
     prover_timeout: time::Duration,
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
-    account_tree: CircuitAccountTree,
-    tree_block_number: BlockNumber,
-    idle_provers: u32,
+    config_options: ConfigurationOptions,
 ) {
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new(
-                tree_block_number,
-                10,
-            )));
 
-            // Start pool maintainer thread.
-            let pool_maintainer = pool::Maintainer::new(
-                connection_pool.clone(),
-                Arc::clone(&data_pool),
-                rounds_interval,
-                account_tree,
-                tree_block_number,
-            );
-            pool_maintainer.start(panic_notify);
+            // Start pool maintainer threads.
+            for offset in 0..config_options.witness_generators {
+                let start_block = 1 + offset as u32;
+                let block_step = config_options.witness_generators as u32;
+                info!(
+                    "Starting witness generator ({},{})",
+                    start_block, block_step
+                );
+                let pool_maintainer = witness_generator::WitnessGenerator::new(
+                    connection_pool.clone(),
+                    rounds_interval,
+                    start_block,
+                    block_step,
+                );
+                pool_maintainer.start(panic_notify.clone());
+            }
 
             // Start HTTP server.
+            let idle_provers = config_options.idle_provers;
             HttpServer::new(move || {
-                let app_state = AppState::new(
-                    connection_pool.clone(),
-                    data_pool.clone(),
-                    prover_timeout,
-                    idle_provers,
-                );
+                let app_state =
+                    AppState::new(connection_pool.clone(), prover_timeout, idle_provers);
 
                 // By calling `register_data` instead of `data` we're avoiding double
                 // `Arc` wrapping of the object.
@@ -293,7 +283,7 @@ pub fn start_prover_server(
                         web::post().to(required_replicas),
                     )
             })
-            .bind(&bind_to)
+            .bind(&config_options.prover_server_address)
             .expect("failed to bind")
             .run()
             .expect("failed to run server");
