@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{net, thread, time, time::Duration};
+use std::{net, str::FromStr, thread, time, time::Duration};
 // External deps
 use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
