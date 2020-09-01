@@ -36,6 +36,8 @@ tokio_old = { package = "tokio", version = "0.1.22" }
 futures = { version = "0.3", features = ["compat"] }
 actix-rt = "0.2.5"
 actix-cors = "0.1.0"
+actix-web = "1.0.8"
+actix-web-httpauth = "0.3.2"
 
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
@@ -53,8 +55,7 @@ rand = "0.7"
 
 lru-cache = "0.1.2"
 
-actix-web = "1.0.8"
-actix-web-httpauth = "0.3.2"
+
 jsonwebtoken = "7"
 
 [dev-dependencies]

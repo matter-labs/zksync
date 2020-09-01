@@ -12,35 +12,21 @@ use actix_web_httpauth::extractors::{
 use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::channel::mpsc;
 use jsonwebtoken::errors::Error as JwtError;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 // Local uses
 use models::config_options::ThreadPanicNotify;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    sub: String,
-    exp: usize,
-}
-
-/// Encode JsonWebToken with shared secret - secret,
-/// sub - message and exp - time until token will be valid
-pub fn encode_token(secret: &str, sub: &str, exp: usize) -> Result<String, JwtError> {
-    let claim = Claims {
-        sub: sub.to_string(),
-        exp,
-    };
-    encode(
-        &Header::default(),
-        &claim,
-        &EncodingKey::from_secret(secret.as_ref()),
-    )
+struct PayloadAuthToken {
+    sub: String, // Subject (whom auth token refers to)
+    exp: usize,  // Expiration time (as UTC timestamp)
 }
 
 /// Validate JsonWebToken
-pub fn validate_token(token: &str, secret: &str) -> Result<bool, JwtError> {
-    let token = decode::<Claims>(
+pub fn validate_auth_token(token: &str, secret: &str) -> Result<bool, JwtError> {
+    let token = decode::<PayloadAuthToken>(
         token,
         &DecodingKey::from_secret(secret.as_ref()),
         &Validation::default(),
@@ -102,7 +88,7 @@ fn validator(
         .map(|data| data.get_ref().clone())
         .unwrap_or_else(Default::default);
 
-    match validate_token(credentials.token(), secret_auth) {
+    match validate_auth_token(credentials.token(), secret_auth) {
         Ok(res) => {
             if res {
                 Ok(req)

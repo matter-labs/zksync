@@ -10,7 +10,7 @@ use web3::{
 };
 
 // Local uses
-use models::config_options::ConfigurationOptions;
+use models::config_options::{AdminServerOptions, ConfigurationOptions};
 use token::Token;
 use utils::{get_matches_from_lines, run_external_command, str_to_address};
 
@@ -149,8 +149,10 @@ async fn main() -> Result<()> {
 
             let token = Token::new(addr, name, symbol, decimals);
 
-            let endpoint_addr = config_opts.admin_http_server_url;
-            let secret_auth = config_opts.secret_auth;
+            let admin_server_opts = AdminServerOptions::from_env();
+
+            let endpoint_addr = admin_server_opts.admin_http_server_url;
+            let secret_auth = admin_server_opts.secret_auth;
 
             let token_from_server = token.add_to_server(endpoint_addr, &secret_auth).await?;
 

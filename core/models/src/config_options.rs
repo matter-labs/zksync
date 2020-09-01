@@ -106,11 +106,28 @@ impl ProverOptions {
     }
 }
 
+/// Configuration options for `admin server`.
 #[derive(Debug, Clone)]
-pub struct ConfigurationOptions {
+pub struct AdminServerOptions {
     pub admin_http_server_url: Url,
     pub admin_http_server_address: SocketAddr,
     pub secret_auth: String,
+}
+
+impl AdminServerOptions {
+    /// Parses the configuration options values from the environment variables.
+    /// Panics if any of options is missing or has inappropriate value.
+    pub fn from_env() -> Self {
+        Self {
+            admin_http_server_url: parse_env("HTTP_ADMIN_API_URL"),
+            admin_http_server_address: parse_env("HTTP_ADMIN_API_BIND"),
+            secret_auth: parse_env("SECRET_AUTH"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
     pub json_rpc_http_server_address: SocketAddr,
     pub json_rpc_ws_server_address: SocketAddr,
@@ -153,9 +170,6 @@ impl ConfigurationOptions {
             };
 
         Self {
-            admin_http_server_url: parse_env("HTTP_ADMIN_API_URL"),
-            admin_http_server_address: parse_env("HTTP_ADMIN_API_BIND"),
-            secret_auth: parse_env("SECRET_AUTH"),
             rest_api_server_address: parse_env("REST_API_BIND"),
             json_rpc_http_server_address: parse_env("HTTP_RPC_API_BIND"),
             json_rpc_ws_server_address: parse_env("WS_API_BIND"),

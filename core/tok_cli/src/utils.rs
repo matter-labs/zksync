@@ -1,4 +1,7 @@
 use anyhow::{Context, Result};
+use jsonwebtoken::errors::Error as JwtError;
+use jsonwebtoken::{encode, EncodingKey, Header};
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 use web3::types::Address;
 
@@ -39,4 +42,24 @@ pub fn get_matches_from_lines(stream: &str, pattern: &str) -> Result<String> {
         "error of finding the pattern '{}' in stream",
         pattern
     ))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PayloadAuthToken {
+    sub: String, // Subject (whom auth token refers to)
+    exp: usize,  // Expiration time (as UTC timestamp)
+}
+
+/// Encode JsonWebToken with shared secret - secret,
+/// sub - message and exp - time until token will be valid
+pub fn encode_auth_token(secret: &str, sub: &str, exp: usize) -> Result<String, JwtError> {
+    let payload = PayloadAuthToken {
+        sub: sub.to_string(),
+        exp,
+    };
+    encode(
+        &Header::default(),
+        &payload,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
 }

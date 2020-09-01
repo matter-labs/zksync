@@ -1,5 +1,6 @@
 use crate::get_matches_from_lines;
 use crate::run_external_command;
+use crate::utils::encode_auth_token;
 
 // Built-in deps
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,7 +20,6 @@ use web3::{
 
 // Local uses
 use models::node::tokens;
-use server::api_server::admin_server::encode_token;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Token {
@@ -99,7 +99,7 @@ impl Token {
         let query_to_tokens = format!("{}tokens", endpoint_addr.to_string());
         let query_to_count = format!("{}count", endpoint_addr.to_string());
 
-        let auth_token = encode_token(secret_auth, "Authorization", active_to as usize)?;
+        let auth_token = encode_auth_token(secret_auth, "Authorization", active_to as usize)?;
 
         let id = client
             .get(&query_to_count)
