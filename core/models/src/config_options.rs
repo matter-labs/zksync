@@ -181,6 +181,7 @@ pub struct ConfigurationOptions {
     pub miniblock_timings: MiniblockTimings,
     pub prometheus_export_port: u16,
     pub token_price_source: TokenPriceSource,
+    pub witness_generators: usize,
     /// Fee increase coefficient for fast processing of withdrawal.
     pub ticker_fast_processing_coeff: f64,
 }
@@ -221,6 +222,7 @@ impl ConfigurationOptions {
             miniblock_timings: MiniblockTimings::from_env(),
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
             token_price_source: TokenPriceSource::from_env(),
+            witness_generators: parse_env("WITNESS_GENERATORS"),
             ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
         }
     }
