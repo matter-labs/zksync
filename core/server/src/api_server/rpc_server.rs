@@ -793,7 +793,7 @@ impl Rpc for RpcApp {
 
     fn tx_submit(
         &self,
-        tx: Box<FranklinTx>,
+        mut tx: Box<FranklinTx>,
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
@@ -814,6 +814,13 @@ impl Rpc for RpcApp {
                     .to_string(),
                 data: None,
             }));
+        }
+
+        if let FranklinTx::Withdraw(withdraw) = tx.as_mut() {
+            // `fast` field is not used in serializing (as it's an internal server option,
+            // not the actual transaction part), so we have to set it manually depending on
+            // the RPC method input.
+            withdraw.fast = fast_processing;
         }
 
         let msg_to_sign = match self.get_tx_info_message_to_sign(&tx) {
