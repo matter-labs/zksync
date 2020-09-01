@@ -1,11 +1,12 @@
 {
     "compilerOptions": {
-        "target": "es5",
+        "target": "es2019",
         "module": "commonjs",
+        "outDir": "build",
         "strict": true,
         "esModuleInterop": true,
+        "noEmitOnError": true,
         "skipLibCheck": true,
-        "outDir": "build",
         "declaration": true
     },
     "files": [
