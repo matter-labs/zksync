@@ -137,13 +137,16 @@ struct FeeTicker<API, INFO> {
 #[must_use]
 pub fn run_ticker_task(
     token_price_source: TokenPriceSource,
+    fast_processing_coeff: f64,
     db_pool: ConnectionPool,
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
     runtime: &Runtime,
 ) -> JoinHandle<()> {
-    let fast_withdrawal_cost = BASE_WITHDRAW_COST * 10_u32; // TODO: Make it configurable.
+    // We increase gas price for fast withdrawals, since it will induce generating a smaller block
+    // size, resulting in us paying more gas than for bigger block.
+    let fast_withdrawal_cost = (BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
 
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
