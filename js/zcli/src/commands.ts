@@ -1,6 +1,5 @@
 import 'isomorphic-fetch';
 import * as zksync from 'zksync';
-import fs from 'fs';
 
 export type Network = "localhost" | "mainnet" | "ropsten" | "rinkeby";
 
@@ -56,21 +55,4 @@ export async function txInfo(tx_hash: string, network: Network) {
             nonce: tx.nonce
         }
     };
-}
-
-export function loadConfig() {
-    const CONFIG_FILE = '.zcli-config.json';
-    let config: Buffer | string;
-    if (fs.existsSync('./' + CONFIG_FILE)) {
-        config = fs.readFileSync('./' + CONFIG_FILE);
-    } else {
-        const config_path = process.env.ZCLI_HOME;
-        const config_file = `${config_path}/${CONFIG_FILE}`;
-        if (config_path && fs.existsSync(config_file)) {
-            config = fs.readFileSync(config_file);
-        } else {
-            config = '{}';
-        }
-    }
-    return JSON.parse(config as string);
 }

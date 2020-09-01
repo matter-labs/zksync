@@ -1,5 +1,5 @@
 import fetchMock from 'fetch-mock';
-import { txInfo, accountInfo, Network } from '../src/utils';
+import { txInfo, accountInfo, Network } from '../src/commands';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 const faker = require('faker');

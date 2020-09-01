@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { loadConfig, accountInfo, txInfo } from './utils';
+import { accountInfo, txInfo } from './commands';
+import { loadConfig, saveConfig } from './config';
 
 async function main() {
 
