@@ -95,7 +95,7 @@ impl WitnessGenerator {
             .state_schema()
             .load_committed_state(Some(block.block_number - 1))
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
-        info!(
+        trace!(
             "Witness generator get state account {}s",
             timer.elapsed().as_secs()
         );
@@ -106,14 +106,14 @@ impl WitnessGenerator {
         for (id, account) in accounts.drain() {
             circuit_account_tree.insert(id, account.into());
         }
-        info!(
+        trace!(
             "Witness generator circuit tree insert {}s",
             timer.elapsed().as_secs()
         );
 
         let timer = Instant::now();
         let witness = build_prover_block_data(&mut circuit_account_tree, &storage, &block)?;
-        info!(
+        trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
