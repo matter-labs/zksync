@@ -157,7 +157,7 @@ table! {
 }
 
 table! {
-    executed_priority_operations (eth_hash) {
+    executed_priority_operations (priority_op_serialid) {
         block_number -> Int8,
         block_index -> Int4,
         operation -> Jsonb,
