@@ -58,13 +58,15 @@ impl TransactionsHistoryTestSetup {
     }
 
     pub fn add_block(&mut self, block_id: u32) {
-        let executed_deposit_op = self.create_deposit_op(block_id, 0);
+        let prior_op_unique_serial_id = u64::from(block_id * 2);
+        let executed_deposit_op = self.create_deposit_op(prior_op_unique_serial_id, block_id, 0);
         let executed_transfer_to_new_op = self.create_transfer_to_new_op(Some(1));
         let executed_transfer_op = self.create_transfer_tx(Some(2));
         let executed_close_op = self.create_close_tx(Some(3));
         let executed_change_pubkey_op = self.create_change_pubkey_tx(Some(4));
         let executed_withdraw_op = self.create_withdraw_tx(Some(5));
-        let executed_full_exit_op = self.create_full_exit_op(block_id, 6);
+        let executed_full_exit_op =
+            self.create_full_exit_op(prior_op_unique_serial_id + 1, block_id, 6);
 
         let operations = vec![
             executed_deposit_op,
@@ -90,7 +92,12 @@ impl TransactionsHistoryTestSetup {
         self.blocks.push(block);
     }
 
-    fn create_deposit_op(&mut self, block: u32, block_index: u32) -> ExecutedOperations {
+    fn create_deposit_op(
+        &mut self,
+        serial_id: u64,
+        block: u32,
+        block_index: u32,
+    ) -> ExecutedOperations {
         let deposit_op = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op: Deposit {
                 from: self.from_zksync_account.address,
@@ -103,7 +110,7 @@ impl TransactionsHistoryTestSetup {
 
         let executed_op = ExecutedPriorityOp {
             priority_op: PriorityOp {
-                serial_id: 0,
+                serial_id,
                 data: deposit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
                 eth_hash: hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
@@ -117,7 +124,12 @@ impl TransactionsHistoryTestSetup {
         ExecutedOperations::PriorityOp(Box::new(executed_op))
     }
 
-    fn create_full_exit_op(&mut self, block: u32, block_index: u32) -> ExecutedOperations {
+    fn create_full_exit_op(
+        &mut self,
+        serial_id: u64,
+        block: u32,
+        block_index: u32,
+    ) -> ExecutedOperations {
         let full_exit_op = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op: FullExit {
                 account_id: self.from_zksync_account.get_account_id().unwrap(),
@@ -129,7 +141,7 @@ impl TransactionsHistoryTestSetup {
 
         let executed_op = ExecutedPriorityOp {
             priority_op: PriorityOp {
-                serial_id: 0,
+                serial_id,
                 data: full_exit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
                 eth_hash: hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
