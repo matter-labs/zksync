@@ -141,8 +141,8 @@ export class Wallet {
     async syncMultiTransfer(transfers: {
         to: Address;
         token: TokenLike;
-        amount: utils.BigNumberish;
-        fee?: utils.BigNumberish;
+        amount: BigNumberish;
+        fee?: BigNumberish;
         nonce?: Nonce;
     }[]): Promise<Transaction[]> {
         if (!this.signer) {

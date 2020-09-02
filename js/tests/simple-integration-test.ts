@@ -152,7 +152,7 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
-async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: utils.BigNumber) {
+async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
     const fee = fullFee.totalFee;
 
