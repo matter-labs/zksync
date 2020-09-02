@@ -119,8 +119,8 @@ impl AdminServerOptions {
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
         Self {
-            admin_http_server_url: parse_env("HTTP_ADMIN_API_URL"),
-            admin_http_server_address: parse_env("HTTP_ADMIN_API_BIND"),
+            admin_http_server_url: parse_env("ADMIN_SERVER_API_URL"),
+            admin_http_server_address: parse_env("ADMIN_SERVER_API_BIND"),
             secret_auth: parse_env("SECRET_AUTH"),
         }
     }

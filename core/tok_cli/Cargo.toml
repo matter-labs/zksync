@@ -9,11 +9,11 @@ models = { path = "../models", version = "0.0.1" }
 
 anyhow = "1.0"
 tokio = { version = "0.2", features = ["full"] }
-web3 = "0.10.0"
-serde_json = "1.0.0"
-env_logger = "0.6"
+web3 = "0.13.0"
+serde_json = "1.0"
+env_logger = "0.7"
 structopt = "0.3.17"
 reqwest = { version = "0.10", features = ["json"] }
 jsonwebtoken = "7"
-serde = "1.0.90"
-url = "2.1"
+serde = "1"
+url = "2"

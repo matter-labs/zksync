@@ -1,4 +1,6 @@
 // Built-in deps
+use models::node::Address;
+use models::node::TokenId;
 use std::net::SocketAddr;
 use std::thread;
 
@@ -17,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 // Local uses
 use models::config_options::ThreadPanicNotify;
+use models::node::tokens;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {
@@ -25,7 +28,7 @@ struct PayloadAuthToken {
 }
 
 /// Validate JsonWebToken
-pub fn validate_auth_token(token: &str, secret: &str) -> Result<bool, JwtError> {
+pub fn validate_auth_token(token: &str, secret: &str) -> Result<(), JwtError> {
     let token = decode::<PayloadAuthToken>(
         token,
         &DecodingKey::from_secret(secret.as_ref()),
@@ -33,7 +36,7 @@ pub fn validate_auth_token(token: &str, secret: &str) -> Result<bool, JwtError> 
     );
 
     match token {
-        Ok(_data) => Ok(true),
+        Ok(_data) => Ok(()),
         Err(err) => Err(err),
     }
 }
@@ -54,28 +57,38 @@ impl AppState {
 
 fn add_token(
     data: web::Data<AppState>,
-    r: web::Json<models::node::tokens::Token>,
-) -> actix_web::Result<()> {
+    r: web::Json<tokens::AddTokenRequest>,
+) -> actix_web::Result<HttpResponse> {
     let storage = data.access_storage()?;
 
-    storage.tokens_schema().store_token(r.0).map_err(|e| {
-        vlog::warn!("failed add token to database in progress request: {}", e);
-        actix_web::error::ErrorInternalServerError("storage layer error")
-    })
-}
+    // if id is None then set it to next available ID from server.
+    let id = match r.id {
+        Some(id) => id,
+        None => storage.tokens_schema().get_count().map_err(|e| {
+            vlog::warn!(
+                "failed get number of token from database in progress request: {}",
+                e
+            );
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })? as u16,
+    };
 
-fn get_number_of_token(data: web::Data<AppState>) -> actix_web::Result<HttpResponse> {
-    let storage = data.access_storage()?;
+    let token = tokens::Token {
+        id,
+        address: r.address,
+        symbol: r.symbol.clone(),
+        decimals: r.decimals,
+    };
 
-    let res = storage.tokens_schema().get_count().map_err(|e| {
-        vlog::warn!(
-            "failed get number of token from database in progress request: {}",
-            e
-        );
-        actix_web::error::ErrorInternalServerError("storage layer error")
-    })?;
+    storage
+        .tokens_schema()
+        .store_token(token.clone())
+        .map_err(|e| {
+            vlog::warn!("failed add token to database in progress request: {}", e);
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })?;
 
-    Ok(HttpResponse::Ok().json(res))
+    Ok(HttpResponse::Ok().json(token))
 }
 
 fn validator(
@@ -88,16 +101,9 @@ fn validator(
         .map(|data| data.get_ref().clone())
         .unwrap_or_else(Default::default);
 
-    match validate_auth_token(credentials.token(), secret_auth) {
-        Ok(res) => {
-            if res {
-                Ok(req)
-            } else {
-                Err(AuthenticationError::from(config).into())
-            }
-        }
-        Err(_) => Err(AuthenticationError::from(config).into()),
-    }
+    validate_auth_token(credentials.token(), secret_auth)
+        .map(|_| req)
+        .map_err(|_| AuthenticationError::from(config).into())
 }
 
 pub fn start_admin_server(
@@ -119,13 +125,12 @@ pub fn start_admin_server(
                 };
 
                 let auth = HttpAuthentication::bearer(move |req, credentials| {
-                    validator(req, credentials, secret_auth)
+                    validator(req, credentials, &secret_auth)
                 });
 
                 App::new()
                     .wrap(auth)
                     .register_data(web::Data::new(app_state))
-                    .route("/count", web::get().to(get_number_of_token))
                     .route("/tokens", web::post().to(add_token))
             })
             .workers(1)

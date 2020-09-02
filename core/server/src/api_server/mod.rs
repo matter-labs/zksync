@@ -22,7 +22,7 @@ use crate::{
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 
-pub mod admin_server;
+mod admin_server;
 mod event_notify;
 mod loggers;
 mod ops_counter;

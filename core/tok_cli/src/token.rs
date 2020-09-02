@@ -97,26 +97,10 @@ impl Token {
         let active_to = start.duration_since(UNIX_EPOCH)?.as_secs() + seconds_active;
 
         let query_to_tokens = format!("{}tokens", endpoint_addr.to_string());
-        let query_to_count = format!("{}count", endpoint_addr.to_string());
 
         let auth_token = encode_auth_token(secret_auth, "Authorization", active_to as usize)?;
 
-        let id = client
-            .get(&query_to_count)
-            .bearer_auth(&auth_token)
-            .send()
-            .await?;
-
-        if id.status() != reqwest::StatusCode::OK {
-            return Err(anyhow::anyhow!(
-                "Get query for get 'id' responded with a non-OK response: {}",
-                id.status()
-            ));
-        }
-
-        let id = id.text().await?.parse::<u16>()?;
-
-        let erc20 = tokens::Token::new(id, self.address, &self.symbol, self.decimals);
+        let erc20 = tokens::AddTokenRequest::new(None, self.address, &self.symbol, self.decimals);
 
         let res = client
             .post(&query_to_tokens)
@@ -132,6 +116,6 @@ impl Token {
             ));
         }
 
-        Ok(erc20)
+        Ok(res.json::<tokens::Token>().await?)
     }
 }
