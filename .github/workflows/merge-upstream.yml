@@ -1,0 +1,20 @@
+name: Merge
+on:
+  repository_dispatch:
+    type: [merge-upstream]
+
+jobs:
+  merge-upstream:
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.client_payload.stage }}
+      - name: Merge Upstream (@${{ github.event.client_payload.stage }})
+        uses: exions/merge-upstream@v1
+        with:
+          upstream: matter-labs/zksync-dev
+          upstream-branch: ${{ github.event.client_payload.stage }}
+          branch: ${{ github.event.client_payload.stage }}
+          token: ${{ secrets.GH_TOKEN }}
