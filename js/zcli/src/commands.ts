@@ -1,13 +1,8 @@
 import 'isomorphic-fetch';
 import * as zksync from 'zksync';
-
-export type Network = "localhost" | "mainnet" | "ropsten" | "rinkeby";
-export const ALL_NETWORKS: Network[] = [
-    'localhost',
-    'mainnet',
-    'ropsten',
-    'rinkeby',
-];
+import { Wallet as EthWallet } from 'ethers';
+import { saveConfig } from './config';
+import { ALL_NETWORKS, Network, Wallet, Config } from './common';
 
 async function tokenInfo(id: number, provider: zksync.Provider) {
     const tokens = await provider.getTokens();
@@ -50,7 +45,7 @@ export async function txInfo(tx_hash: string, network: Network) {
     return {
         network,
         transaction: {
-            status: tx.fail_reason ? 'failed' : 'success',
+            status: tx.fail_reason ? 'fail' : 'success',
             from: tx.from,
             to: tx.to,
             hash: tx_hash,
@@ -73,5 +68,36 @@ export async function availableNetworks() {
         } catch (err) { /* could not connect to provider */ }
     }
     return networks;
+}
+
+export function addWallet(config: Config, privkey?: string) {
+    const wallet = privkey ? new EthWallet(privkey) : EthWallet.createRandom();
+    config.wallets.push({
+        privkey: wallet.privateKey,
+        address: wallet.address
+    });
+    if (!config.defaultWallet) {
+        config.defaultWallet = wallet.address;
+    }
+    saveConfig(config);
+    return wallet.address;
+}
+
+export function listWallets(config: Config) {
+    let wallets: string[] = [];
+    for (const { address } of config.wallets) {
+        wallets.push(address);
+    }
+    return wallets;
+}
+
+export function removeWallet(config: Config, address: string) {
+    const address_lower = address.toLowerCase();
+    config.wallets = config.wallets
+        .filter((w: Wallet) => w.address.toLowerCase() != address_lower);
+    if (config.defaultWallet?.toLowerCase() === address_lower) {
+        config.defaultWallet = null;
+    }
+    saveConfig(config);
 }
 

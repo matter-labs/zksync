@@ -14,7 +14,7 @@
         "commander": "^6.0.0",
         "ethers": "^5.0.9",
         "isomorphic-fetch": "^2.2.1",
-        "zksync": "^0.6.4"
+        "zksync": "file:../zksync.js"
     },
     "devDependencies": {
         "@types/chai": "^4.2.12",

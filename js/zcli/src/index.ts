@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import * as commands from './commands';
 import { loadConfig, saveConfig } from './config';
+import { Network, Wallet, ALL_NETWORKS } from './common';
 
 function print(object: any) {
     console.log(JSON.stringify(object, null, 4));
@@ -43,9 +44,9 @@ async function main() {
     networks
         .command('default [network]')
         .description('print or set default network')
-        .action((network?: commands.Network) => {
+        .action((network?: Network) => {
             if (network) {
-                if (commands.ALL_NETWORKS.includes(network)) {
+                if (ALL_NETWORKS.includes(network)) {
                     config.network = network;
                     saveConfig(config);
                 } else {
@@ -56,6 +57,48 @@ async function main() {
         });
 
     program.addCommand(networks);
+
+    const wallets = new Command('wallets');
+
+    wallets
+        .description('view saved wallets')
+        .action(() => {
+            print(commands.listWallets(config));
+        });
+
+    wallets
+        .command('add [private_key]')
+        .description('create or import a wallet')
+        .action((privkey?: string) => {
+            print(commands.addWallet(config, privkey));
+        });
+
+    wallets
+        .command('default [address]')
+        .description('print or set default wallet')
+        .action((address?: string) => {
+            if (address) {
+                const addresses = config.wallets
+                    .map((w: Wallet) => w.address.toLowerCase());
+                if (addresses.includes(address.toLowerCase())) {
+                    config.defaultWallet = address;
+                    saveConfig(config);
+                } else {
+                    throw Error('address is not present');
+                }
+            }
+            print(config.defaultWallet);
+        });
+
+    wallets
+        .command('delete <address>')
+        .description('delete a wallet')
+        .action((address: string) => {
+            commands.removeWallet(config, address);
+            print(commands.listWallets(config));
+        });
+
+    program.addCommand(wallets);
 
     await program.parseAsync(process.argv);
 }
