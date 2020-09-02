@@ -15,5 +15,6 @@ jobs:
       - name: Merge Upstream (@${{ github.event.client_payload.stage }})
         run: |
           git remote add upstream https://${{ secrets.GH_USER }}:${{ secrets.GH_TOKEN }}@github.com/matter-labs/zksync-dev.git
+          git remote -v | sed -E 's/\/.*@/\/\/xxx@/'
           git fetch upstream ${{ github.event.client_payload.stage }}
           git merge --ff-only upstream ${{ github.event.client_payload.stage }}
