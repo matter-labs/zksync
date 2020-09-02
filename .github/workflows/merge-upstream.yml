@@ -16,5 +16,6 @@ jobs:
         run: |
           git remote add upstream https://${{ secrets.GH_USER }}:${{ secrets.GH_TOKEN }}@github.com/matter-labs/zksync.git
           git fetch upstream ${{ github.event.client_payload.stage }}
-          git merge --ff-only upstream/${{ github.event.client_payload.stage }}
-          git push upstream ${{ github.event.client_payload.stage }}
+          git checkout -b _propagate-${{ github.event.client_payload.stage }} upstream/${{ github.event.client_payload.stage }}
+          git merge --ff-only ${{ github.event.client_payload.stage }}
+          git push upstream _propagate-${{ github.event.client_payload.stage }}:${{ github.event.client_payload.stage }}
