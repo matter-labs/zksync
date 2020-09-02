@@ -85,7 +85,7 @@ impl OperationNotifier {
     async fn check_op_executed_current_block(
         &self,
         op_id: ExecutedOpId,
-    ) -> Result<Option<(BlockNumber, bool)>, failure::Error> {
+    ) -> Result<Option<(BlockNumber, bool, Option<String>)>, failure::Error> {
         let response = oneshot::channel();
         self.state_keeper_requests
             .clone()
@@ -257,7 +257,7 @@ impl OperationNotifier {
 
         // Maybe it was executed already
         if action == ActionType::COMMIT {
-            if let Some((block_number, _)) = self
+            if let Some((block_number, _, _)) = self
                 .check_op_executed_current_block(ExecutedOpId::PriorityOp(serial_id))
                 .await?
             {
@@ -373,7 +373,7 @@ impl OperationNotifier {
 
         // Maybe tx was executed already.
         if action == ActionType::COMMIT {
-            if let Some((block_number, success)) = self
+            if let Some((block_number, success, fail_reason)) = self
                 .check_op_executed_current_block(ExecutedOpId::Transaction(hash.clone()))
                 .await?
             {
@@ -383,7 +383,7 @@ impl OperationNotifier {
                     TransactionInfoResp {
                         executed: true,
                         success: Some(success),
-                        fail_reason: None,
+                        fail_reason,
                         block: Some(BlockInfo {
                             block_number: i64::from(block_number),
                             committed: true,

@@ -138,6 +138,99 @@ export class Wallet {
         };
     }
 
+    async syncMultiTransfer(transfers: {
+        to: Address;
+        token: TokenLike;
+        amount: utils.BigNumberish;
+        fee?: utils.BigNumberish;
+        nonce?: Nonce;
+    }[]): Promise<Transaction[]> {
+        if (!this.signer) {
+            throw new Error(
+                "ZKSync signer is required for sending zksync transactions."
+            );
+        }
+
+        if (transfers.length < 2) {
+            throw new Error("Transactions batch must contain at least two transactions");
+        }
+
+        await this.setRequiredAccountIdFromServer("Transfer funds");
+
+        let signedTransfers = [];
+
+        let nextNonce = transfers[0].nonce != null
+            ? await this.getNonce(transfers[0].nonce)
+            : await this.getNonce();
+
+        for (let i = 0; i < transfers.length; i++) {
+            const transfer = transfers[i];
+
+            const tokenId = await this.provider.tokenSet.resolveTokenId(
+                transfer.token
+            );
+            const nonce = nextNonce;
+            nextNonce += 1;
+
+            if (transfer.fee == null) {
+                const fullFee = await this.provider.getTransactionFee(
+                    "Transfer",
+                    transfer.to,
+                    transfer.token
+                );
+                transfer.fee = fullFee.totalFee;
+            }
+
+            const transactionData = {
+                accountId: this.accountId,
+                from: this.address(),
+                to: transfer.to,
+                tokenId,
+                amount: transfer.amount,
+                fee: transfer.fee,
+                nonce
+            };
+
+            const stringAmount = this.provider.tokenSet.formatToken(
+                transfer.token,
+                transfer.amount
+            );
+            const stringFee = this.provider.tokenSet.formatToken(
+                transfer.token,
+                transfer.fee
+            );
+            const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
+                transfer.token
+            );
+            const humanReadableTxInfo =
+                `Transfer ${stringAmount} ${stringToken}\n` +
+                `To: ${transfer.to.toLowerCase()}\n` +
+                `Nonce: ${nonce}\n` +
+                `Fee: ${stringFee} ${stringToken}\n` +
+                `Account Id: ${this.accountId}`;
+
+            const txMessageEthSignature = await this.getEthMessageSignature(
+                humanReadableTxInfo
+            );
+
+            const signedTransferTransaction = this.signer.signSyncTransfer(
+                transactionData
+            );
+
+            signedTransfers.push({tx: signedTransferTransaction, signature: txMessageEthSignature});
+        }
+
+        const transactionHashes = await this.provider.submitTxsBatch(signedTransfers);
+        return transactionHashes.map(function(txHash, idx) {
+                return new Transaction(
+                    signedTransfers[idx],
+                    txHash,
+                    this.provider
+                )
+            }, this
+        );
+    }
+
     async syncTransfer(transfer: {
         to: Address;
         token: TokenLike;

@@ -11,8 +11,9 @@ use futures::{
 };
 use models::config_options::ConfigurationOptions;
 use models::node::{
-    Account, AccountId, AccountMap, Address, DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp,
-    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
+    DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
 use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
@@ -733,7 +734,7 @@ impl TestSetup {
     fn execute_tx(&mut self, tx: FranklinTx) {
         let block = ProposedBlock {
             priority_ops: Vec::new(),
-            txs: vec![tx.into()],
+            txs: vec![SignedTxVariant::from(SignedFranklinTx::from(tx))],
         };
         let block_sender = async {
             self.state_keeper_request_sender
