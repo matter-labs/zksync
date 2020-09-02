@@ -16,4 +16,7 @@ jobs:
         run: |
           git remote add upstream https://${{ secrets.GH_USER }}:${{ secrets.GH_TOKEN }}@github.com/matter-labs/zksync-dev.git
           git remote -v | sed -E 's/\/.*@/\/\/xxx@/'
+          # force https
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          git config --global url."https://".insteadOf git://
           git fetch upstream ${{ github.event.client_payload.stage }}
