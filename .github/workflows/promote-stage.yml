@@ -38,4 +38,4 @@ jobs:
          -F "variables[PROVER_TAG]=$IMAGE_TAG" \
          -F "variables[EXPLORER_TAG]=$IMAGE_TAG" \
          -F "variables[GITHUB_REF]=$GITHUB_REF" \
-         https://gitlab.com/api/v4/projects/19165314/trigger/pipeline
+         https://gitlab.com/api/v4/projects/19173848/trigger/pipeline
