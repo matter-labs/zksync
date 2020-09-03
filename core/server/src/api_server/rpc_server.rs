@@ -817,6 +817,16 @@ impl Rpc for RpcApp {
         }
 
         if let FranklinTx::Withdraw(withdraw) = tx.as_mut() {
+            if withdraw.fast {
+                // We set `fast` field ourselves, so we have to check that user did not set it themselves.
+                return Box::new(futures01::future::err(Error {
+                    code: RpcErrorCodes::IncorrectTx.into(),
+                    message: "'fast' field of Withdraw transaction must not be set manually."
+                        .to_string(),
+                    data: None,
+                }));
+            }
+
             // `fast` field is not used in serializing (as it's an internal server option,
             // not the actual transaction part), so we have to set it manually depending on
             // the RPC method input.
