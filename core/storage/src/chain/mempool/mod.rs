@@ -92,7 +92,7 @@ impl<'a> MempoolSchema<'a> {
                 .iter()
                 .map(|tx_data| {
                     let tx_hash = hex::encode(tx_data.hash().as_ref());
-                    let tx = serde_json::to_value(tx_data)
+                    let tx = serde_json::to_value(&tx_data.tx)
                         .expect("Unserializable TX provided to the database");
 
                     NewMempoolTx {
