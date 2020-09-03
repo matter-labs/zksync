@@ -89,10 +89,8 @@ impl Token {
     }
 
     pub async fn deploy_test_token(name: &str, decimals: u8, symbol: &str) -> Result<Token> {
-        let stdout = run_external_command(
-            "deploy-erc20.sh",
-            &["test", name, symbol, &decimals.to_string()],
-        )?;
+        let stdout =
+            run_external_command("deploy-erc20.sh", &[name, symbol, &decimals.to_string()])?;
 
         serde_json::from_str(&stdout).map_err(|_e| anyhow::anyhow!("Error decode token from json"))
     }

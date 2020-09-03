@@ -8,11 +8,4 @@
 
 cd $ZKSYNC_HOME/contracts
 
-if [ $1 == "test"]; then 
-  export ETH_NETWORK="test"
-
-if [ -n "$3" ]; then
-  npx ts-node scripts/add-erc20-token.ts --tokenAddress $2 --deployerPrivateKey $3
-else
-  npx ts-node scripts/add-erc20-token.ts --tokenAddress $2
-fi
+npx ts-node scripts/add-erc20-token.ts --tokenAddress $1 --deployerPrivateKey $2
