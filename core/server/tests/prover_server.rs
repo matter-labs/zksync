@@ -6,10 +6,9 @@ use futures::channel::mpsc;
 // Workspace deps
 use circuit::witness::{deposit::DepositWitness, Witness};
 use models::{
-    circuit::CircuitAccountTree,
     config_options::ConfigurationOptions,
     node::{block::Block, Address},
-    params::{account_tree_depth, total_tokens},
+    params::total_tokens,
     prover_utils::EncodedProofPlonk,
 };
 use num::BigUint;
@@ -21,20 +20,19 @@ use server::prover_server;
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
     // TODO: make single server spawn for all tests
     let bind_to = "127.0.0.1:8088";
+    let mut config_opt = ConfigurationOptions::from_env();
+    config_opt.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();
+
     let conn_pool = storage::ConnectionPool::new(Some(1));
-    let addr = net::SocketAddr::from_str(bind_to).unwrap();
     let (tx, _rx) = mpsc::channel(1);
-    let tree = CircuitAccountTree::new(account_tree_depth());
+
     thread::spawn(move || {
         prover_server::start_prover_server(
             conn_pool,
-            addr,
             prover_timeout,
             rounds_interval,
             tx,
-            tree,
-            0,
-            0,
+            config_opt,
         );
     });
     bind_to.to_string()

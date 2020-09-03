@@ -47,3 +47,10 @@ pub struct IntegerNumber {
     #[sql_type = "BigInt"]
     pub integer_value: i64,
 }
+
+#[derive(Debug, Clone, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
+#[table_name = "block_witness"]
+pub struct StorageBlockWitness {
+    pub block: i64,
+    pub witness: serde_json::Value,
+}

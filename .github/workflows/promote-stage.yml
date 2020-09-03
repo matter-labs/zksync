@@ -2,7 +2,7 @@ name: Promote to stage
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ dev, master, breaking ]
 
 jobs:
   build-images:
@@ -37,4 +37,5 @@ jobs:
          -F "variables[SERVER_TAG]=$IMAGE_TAG" \
          -F "variables[PROVER_TAG]=$IMAGE_TAG" \
          -F "variables[EXPLORER_TAG]=$IMAGE_TAG" \
-         https://gitlab.com/api/v4/projects/19165314/trigger/pipeline
+         -F "variables[GITHUB_REF]=$GITHUB_REF" \
+         https://gitlab.com/api/v4/projects/19173848/trigger/pipeline
