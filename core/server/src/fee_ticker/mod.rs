@@ -49,9 +49,14 @@ const BASE_TRANSFER_COST: u64 =
 /// Transfer to new gas cost estimated via `gas_price` test.
 const BASE_TRANSFER_TO_NEW_COST: u64 = crate::gas_counter::CommitCost::TRANSFER_TO_NEW_COST
     + crate::gas_counter::VerifyCost::TRANSFER_TO_NEW_COST;
-/// ChangePubKey operation gas cost estimated via `gas_price` test.
-const BASE_CHANGE_PUBKEY_TO_NEW_COST: u64 = crate::gas_counter::CommitCost::CHANGE_PUBKEY_COST
-    + crate::gas_counter::VerifyCost::CHANGE_PUBKEY_COST;
+/// ChangePubKey with offchain auth operation gas cost estimated via `gas_price` test.
+const BASE_CHANGE_PUBKEY_OFFCHAIN_COST: u64 =
+    crate::gas_counter::CommitCost::CHANGE_PUBKEY_COST_OFFCHAIN
+        + crate::gas_counter::VerifyCost::CHANGE_PUBKEY_COST;
+/// ChangePubKey with onchain auth operation gas cost estimated via `gas_price` test.
+const BASE_CHANGE_PUBKEY_ONCHAIN_COST: u64 =
+    crate::gas_counter::CommitCost::CHANGE_PUBKEY_COST_ONCHAIN
+        + crate::gas_counter::VerifyCost::CHANGE_PUBKEY_COST;
 /// Withdraw operation will trigger `completeWithdrawals` method to be called, thus this operation is pretty expensive.
 const BASE_WITHDRAW_COST: u64 = crate::gas_counter::GasCounter::COMPLETE_WITHDRAWALS_BASE_COST
     + crate::gas_counter::GasCounter::COMPLETE_WITHDRAWALS_COST;
@@ -67,7 +72,7 @@ pub enum OutputFeeType {
     Transfer,
     TransferToNew,
     Withdraw,
-    ChangePubKey,
+    ChangePubKey { onchain_pubkey_auth: bool },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -158,8 +163,16 @@ pub fn run_ticker_task(
             ),
             (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
             (
-                OutputFeeType::ChangePubKey,
-                BASE_CHANGE_PUBKEY_TO_NEW_COST.into(),
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: false,
+                },
+                BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: true,
+                },
+                BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
         ]
         .into_iter()
@@ -242,7 +255,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
-            TxFeeTypes::ChangePubKey => (OutputFeeType::ChangePubKey, ChangePubKeyOp::CHUNKS),
+            TxFeeTypes::ChangePubKey {
+                onchain_pubkey_auth,
+            } => (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth,
+                },
+                ChangePubKeyOp::CHUNKS,
+            ),
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
@@ -347,8 +367,16 @@ mod test {
                 ),
                 (OutputFeeType::Withdraw, BigUint::from(BASE_WITHDRAW_COST)),
                 (
-                    OutputFeeType::ChangePubKey,
-                    BASE_CHANGE_PUBKEY_TO_NEW_COST.into(),
+                    OutputFeeType::ChangePubKey {
+                        onchain_pubkey_auth: false,
+                    },
+                    BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                ),
+                (
+                    OutputFeeType::ChangePubKey {
+                        onchain_pubkey_auth: true,
+                    },
+                    BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
                 ),
             ]
             .into_iter()

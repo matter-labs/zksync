@@ -831,12 +831,18 @@ impl Rpc for RpcApp {
                 transfer.to,
                 transfer.fee.clone(),
             )),
-            FranklinTx::ChangePubKey(change_pubkey) => Some((
-                TxFeeTypes::ChangePubKey,
-                TokenLike::Id(change_pubkey.fee_token),
-                change_pubkey.account,
-                change_pubkey.fee.clone(),
-            )),
+            FranklinTx::ChangePubKey(change_pubkey) => {
+                // If there is no Ethereum signature in the transaction, it is assumed that auth is performed on-chain.
+                let onchain_pubkey_auth = change_pubkey.eth_signature.is_none();
+                Some((
+                    TxFeeTypes::ChangePubKey {
+                        onchain_pubkey_auth,
+                    },
+                    TokenLike::Id(change_pubkey.fee_token),
+                    change_pubkey.account,
+                    change_pubkey.fee.clone(),
+                ))
+            }
             _ => None,
         };
 

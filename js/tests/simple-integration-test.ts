@@ -431,7 +431,10 @@ async function checkFailedTransactionResending(depositWallet: Wallet, syncWallet
     const transferFullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
     const transferFee = transferFullFee.totalFee;
 
-    const changePubKeyFullFee = await syncProvider.getTransactionFee("ChangePubKey", syncWallet1.address(), "ETH");
+    const changePubkeyFeeType = {
+        ChangePubKey: { onchainPubkeyAuth: false },
+    };
+    const changePubKeyFullFee = await syncProvider.getTransactionFee(changePubkeyFeeType, syncWallet1.address(), "ETH");
     const changePubKeyFee = changePubKeyFullFee.totalFee;
 
     await testAutoApprovedDeposit(

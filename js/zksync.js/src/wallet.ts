@@ -322,11 +322,12 @@ export class Wallet {
         }
 
         if (changePubKey.fee == null) {
-            const fullFee = await this.provider.getTransactionFee(
-                "ChangePubKey",
-                this.address(),
-                changePubKey.feeToken
-            );
+            const feeType = {
+                ChangePubKey: {
+                    onchainPubkeyAuth: changePubKey.onchainAuth,
+                },
+            };
+            const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
             changePubKey.fee = fullFee.totalFee;
         }
 
