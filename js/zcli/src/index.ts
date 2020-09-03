@@ -78,9 +78,10 @@ async function main() {
         .description('print or set default wallet')
         .action((address?: string) => {
             if (address) {
+                address = address.toLowerCase();
                 const addresses = config.wallets
-                    .map((w: Wallet) => w.address.toLowerCase());
-                if (addresses.includes(address.toLowerCase())) {
+                    .map((w: Wallet) => w.address);
+                if (addresses.includes(address)) {
                     config.defaultWallet = address;
                     saveConfig(config);
                 } else {
@@ -94,7 +95,7 @@ async function main() {
         .command('delete <address>')
         .description('delete a wallet')
         .action((address: string) => {
-            commands.removeWallet(config, address);
+            commands.removeWallet(config, address.toLowerCase());
             print(commands.listWallets(config));
         });
 

@@ -72,12 +72,13 @@ export async function availableNetworks() {
 
 export function addWallet(config: Config, privkey?: string) {
     const wallet = privkey ? new EthWallet(privkey) : EthWallet.createRandom();
+    const address = wallet.address.toLowerCase();
     config.wallets.push({
-        privkey: wallet.privateKey,
-        address: wallet.address
+        address,
+        privkey: wallet.privateKey
     });
     if (!config.defaultWallet) {
-        config.defaultWallet = wallet.address;
+        config.defaultWallet = address;
     }
     saveConfig(config);
     return wallet.address;
@@ -92,10 +93,9 @@ export function listWallets(config: Config) {
 }
 
 export function removeWallet(config: Config, address: string) {
-    const address_lower = address.toLowerCase();
     config.wallets = config.wallets
-        .filter((w: Wallet) => w.address.toLowerCase() != address_lower);
-    if (config.defaultWallet?.toLowerCase() === address_lower) {
+        .filter((w: Wallet) => w.address != address);
+    if (config.defaultWallet === address) {
         config.defaultWallet = null;
     }
     saveConfig(config);
