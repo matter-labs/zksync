@@ -33,7 +33,7 @@ jobs:
       run: |
         curl -X POST \
          -F token=${{ secrets.GITLAB_TOKEN }} \
-         -F "ref=gitlab-deploy" \
+         -F "ref=master" \
          -F "variables[SERVER_TAG]=$IMAGE_TAG" \
          -F "variables[PROVER_TAG]=$IMAGE_TAG" \
          -F "variables[EXPLORER_TAG]=$IMAGE_TAG" \
