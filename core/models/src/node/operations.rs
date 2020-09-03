@@ -378,16 +378,15 @@ impl ForcedExitOp {
         let eth_address_end = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
 
         let initiator_account_id =
-            bytes_slice_to_uint32(&bytes[initiator_account_id_offset..token_id_offset])
+            bytes_slice_to_uint32(&bytes[initiator_account_id_offset..target_account_id_offset])
                 .ok_or_else(|| {
                     format_err!("Cant get initiator account id from forced exit pubdata")
                 })?;
-        let target_account_id =
-            bytes_slice_to_uint32(&bytes[initiator_account_id_offset..target_account_id_offset])
-                .ok_or_else(|| {
-                    format_err!("Cant get target account id from forced exit pubdata")
-                })?;
-        let token = bytes_slice_to_uint16(&bytes[target_account_id_offset..amount_offset])
+        let target_account_id = bytes_slice_to_uint32(
+            &bytes[target_account_id_offset..token_id_offset],
+        )
+        .ok_or_else(|| format_err!("Cant get target account id from forced exit pubdata"))?;
+        let token = bytes_slice_to_uint16(&bytes[token_id_offset..amount_offset])
             .ok_or_else(|| format_err!("Cant get token id from forced exit pubdata"))?;
         let amount = BigUint::from_u128(
             bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
