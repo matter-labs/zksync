@@ -1,6 +1,4 @@
 // Built-in deps
-use models::node::Address;
-use models::node::TokenId;
 use std::net::SocketAddr;
 use std::thread;
 
@@ -112,13 +110,12 @@ pub fn start_admin_server(
     connection_pool: storage::ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let secret_auth: &'static _ = Box::leak(Box::new(secret_auth));
-
     thread::Builder::new()
         .name("admin_server".to_string())
         .spawn(move || {
             HttpServer::new(move || {
                 let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+                let secret_auth = secret_auth.clone();
 
                 let app_state = AppState {
                     connection_pool: connection_pool.clone(),
