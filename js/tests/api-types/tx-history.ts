@@ -107,6 +107,7 @@ type Withdraw = {
         to: string;
         token: string;
         type: "Withdraw";
+        fast?: boolean;
     };
     success: boolean;
     fail_reason?: string;

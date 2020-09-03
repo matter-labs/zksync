@@ -250,17 +250,20 @@ export class Wallet {
         amount: BigNumberish;
         fee?: BigNumberish;
         nonce?: Nonce;
+        fastProcessing?: boolean;
     }): Promise<Transaction> {
         withdraw.nonce = withdraw.nonce != null ? await this.getNonce(withdraw.nonce) : await this.getNonce();
 
         if (withdraw.fee == null) {
-            const fullFee = await this.provider.getTransactionFee("Withdraw", withdraw.ethAddress, withdraw.token);
+            const feeType = withdraw.fastProcessing === true ? "FastWithdraw" : "Withdraw";
+
+            const fullFee = await this.provider.getTransactionFee(feeType, withdraw.ethAddress, withdraw.token);
             withdraw.fee = fullFee.totalFee;
         }
 
         const signedWithdrawTransaction = await this.signWithdrawFromSyncToEthereum(withdraw as any);
 
-        return submitSignedTransaction(signedWithdrawTransaction, this.provider);
+        return submitSignedTransaction(signedWithdrawTransaction, this.provider, withdraw.fastProcessing);
     }
 
     async isSigningKeySet(): Promise<boolean> {
@@ -676,7 +679,11 @@ class Transaction {
     }
 }
 
-export async function submitSignedTransaction(signedTx: SignedTransaction, provider: Provider): Promise<Transaction> {
-    const transactionHash = await provider.submitTx(signedTx.tx, signedTx.ethereumSignature);
+export async function submitSignedTransaction(
+    signedTx: SignedTransaction,
+    provider: Provider,
+    fastProcessing?: boolean
+): Promise<Transaction> {
+    const transactionHash = await provider.submitTx(signedTx.tx, signedTx.ethereumSignature, fastProcessing);
     return new Transaction(signedTx, transactionHash, provider);
 }

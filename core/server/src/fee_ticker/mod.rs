@@ -19,7 +19,6 @@ use num::{
     traits::{Inv, Pow},
     BigUint,
 };
-use reqwest::Url;
 use tokio::{runtime::Runtime, task::JoinHandle};
 // Workspace deps
 use models::{
@@ -31,6 +30,8 @@ use models::{
 };
 use storage::ConnectionPool;
 // Local deps
+use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
+use crate::fee_ticker::ticker_api::coinmarkercap::CoinMarketCapAPI;
 use crate::{
     eth_sender::ETHSenderRequest,
     fee_ticker::{
@@ -39,6 +40,7 @@ use crate::{
     },
     state_keeper::StateKeeperRequest,
 };
+use models::config_options::TokenPriceSource;
 
 mod ticker_api;
 mod ticker_info;
@@ -72,6 +74,7 @@ pub enum OutputFeeType {
     Transfer,
     TransferToNew,
     Withdraw,
+    FastWithdraw,
     ChangePubKey { onchain_pubkey_auth: bool },
 }
 
@@ -146,13 +149,18 @@ struct FeeTicker<API, INFO> {
 
 #[must_use]
 pub fn run_ticker_task(
-    api_base_url: Url,
+    token_price_source: TokenPriceSource,
+    fast_processing_coeff: f64,
     db_pool: ConnectionPool,
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
     runtime: &Runtime,
 ) -> JoinHandle<()> {
+    // We increase gas price for fast withdrawals, since it will induce generating a smaller block
+    // size, resulting in us paying more gas than for bigger block.
+    let fast_withdrawal_cost = (BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
+
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: vec![
@@ -162,6 +170,7 @@ pub fn run_ticker_task(
                 BASE_TRANSFER_TO_NEW_COST.into(),
             ),
             (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
+            (OutputFeeType::FastWithdraw, fast_withdrawal_cost.into()),
             (
                 OutputFeeType::ChangePubKey {
                     onchain_pubkey_auth: false,
@@ -180,11 +189,29 @@ pub fn run_ticker_task(
         tokens_risk_factors: HashMap::new(),
     };
 
-    let ticker_api = TickerApi::new(api_base_url, db_pool, eth_sender_request_sender);
-    let ticker_info = TickerInfo::new(state_keeper_request_sender);
-    let fee_ticker = FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
+    match token_price_source {
+        TokenPriceSource::CoinMarketCap { base_url } => {
+            let token_price_api = CoinMarketCapAPI::new(reqwest::Client::new(), base_url);
 
-    runtime.spawn(fee_ticker.run())
+            let ticker_api = TickerApi::new(db_pool, eth_sender_request_sender, token_price_api);
+            let ticker_info = TickerInfo::new(state_keeper_request_sender);
+            let fee_ticker =
+                FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
+
+            runtime.spawn(fee_ticker.run())
+        }
+        TokenPriceSource::CoinGecko { base_url } => {
+            let token_price_api = CoinGeckoAPI::new(reqwest::Client::new(), base_url)
+                .expect("failed to init CoinGecko client");
+
+            let ticker_api = TickerApi::new(db_pool, eth_sender_request_sender, token_price_api);
+            let ticker_info = TickerInfo::new(state_keeper_request_sender);
+            let fee_ticker =
+                FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
+
+            runtime.spawn(fee_ticker.run())
+        }
+    }
 }
 
 impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
@@ -248,6 +275,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
 
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
+            TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::Transfer => {
                 if self.is_account_new(recipient).await {
                     (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)

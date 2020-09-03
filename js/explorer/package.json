@@ -32,9 +32,5 @@
     "node-sass": "^4.13.0",
     "sass-loader": "^8.0.0",
     "vue-template-compiler": "^2.6.10"
-  },
-  "resolutions": {
-    "websocket-extensions": "0.1.4",
-    "lodash": "4.17.20"
   }
 }

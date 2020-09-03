@@ -156,6 +156,17 @@ export async function checkStatusResponseType(): Promise<StatusInterface> {
 }
 
 /**
+ * Check `/withdrawal_processing_time` method of our rest api
+ */
+export async function checkWithdrawalProcessingTimeResponseType(): Promise<StatusInterface> {
+    const url = `${process.env.REST_API_ADDR}/api/v0.1/withdrawal_processing_time`;
+    const typeFilePath = `${apiTypesFolder}/withdrawal-processing.ts`;
+    const data: StatusInterface = await validateResponseFromUrl(typeFilePath, url);
+
+    return data;
+}
+
+/**
  * Check `/account/${address}/history/${offset}/${limit}` method of our rest api
  */
 export async function checkTxHistoryResponseType(address: string): Promise<TxHistoryInterface> {
@@ -330,9 +341,10 @@ async function test() {
 
     deleteUnusedGenFiles();
 
-    console.log("Checking status and testnet config");
+    console.log("Checking status, testnet config and withdrawal processing time endpoints");
     await checkStatusResponseType();
     await checkTestnetConfigResponseType();
+    await checkWithdrawalProcessingTimeResponseType();
 
     console.log("Checking tx history");
     await checkTxHistoryResponseType(syncWallet.address());

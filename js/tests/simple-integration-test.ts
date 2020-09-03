@@ -259,6 +259,50 @@ async function testWithdraw(
     }
 }
 
+async function testFastWithdraw(
+    contract: Contract,
+    withdrawTo: Wallet,
+    syncWallet: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber
+) {
+    const fullFee = await syncProvider.getTransactionFee("FastWithdraw", withdrawTo.address(), token);
+    const fee = fullFee.totalFee;
+
+    const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
+    const operatorBeforeWithdraw = await getOperatorBalance(token);
+    const onchainBalanceBeforeWithdraw = await withdrawTo.getEthereumBalance(token);
+    const startTime = new Date().getTime();
+    const withdrawHandle = await syncWallet.withdrawFromSyncToEthereum({
+        ethAddress: withdrawTo.address(),
+        token,
+        amount,
+        fee,
+        fastProcessing: true,
+    });
+    console.log(`Fast withdraw posted: ${new Date().getTime() - startTime} ms`);
+
+    // Await for verification with a timeout set.
+    await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
+    console.log(`Fast withdraw verified: ${new Date().getTime() - startTime} ms`);
+    const wallet2AfterWithdraw = await syncWallet.getBalance(token);
+    const operatorAfterWithdraw = await getOperatorBalance(token);
+    const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
+
+    const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
+    const pendingToBeOnchainBalance = await contract.getBalanceToWithdraw(await withdrawTo.address(), tokenId);
+
+    if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
+        throw new Error("Wrong amount on wallet after fast withdraw");
+    }
+    if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
+        throw new Error("Wrong amount of operator fees after fast withdraw");
+    }
+    if (!onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
+        throw new Error("Wrong amount onchain after fast withdraw");
+    }
+}
+
 async function testChangePubkeyOnchain(syncWallet: Wallet, token: types.TokenLike) {
     if (!(await syncWallet.isSigningKeySet())) {
         const startTime = new Date().getTime();
@@ -358,6 +402,9 @@ async function moveFunds(
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount);
     console.log(`Withdraw ok, Token: ${token}`);
+    // Note that wallet is different from `testWithdraw` to not interfere with previous withdrawal.
+    await testFastWithdraw(contract, syncWallet1, syncWallet1, token, withdrawAmount);
+    console.log(`Fast withdraw ok, Token: ${token}`);
 }
 
 async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: Wallet) {
@@ -424,7 +471,8 @@ function promiseTimeout(ms, promise) {
     return Promise.race([promise, timeout]);
 }
 
-async function checkFailedTransactionResending(depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
+async function checkFailedTransactionResending(
+    depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
     console.log("Checking invalid transaction resending");
     const amount = utils.parseEther("0.2");
 
@@ -483,7 +531,7 @@ async function checkFailedTransactionResending(depositWallet: Wallet, syncWallet
         await (
             await ethWallet.sendTransaction({ to: syncDepositorWallet.address, value: utils.parseEther("6.0") })
         ).wait();
-        await (await erc20.transfer(syncDepositorWallet.address, utils.parseEther("110.0"))).wait();
+        await (await erc20.transfer(syncDepositorWallet.address, utils.parseEther("210.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -516,11 +564,11 @@ async function checkFailedTransactionResending(depositWallet: Wallet, syncWallet
         await checkFailedTransactionResending(zksyncDepositorWallet, syncWallet4, syncWallet5);
 
         console.log("Move funds ERC-20 start");
-        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "50.0");
+        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "200.0");
         console.log("Move funds ERC-20 OK");
 
         console.log("Move funds ETH start");
-        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.5");
+        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "1.0");
         console.log("Move funds ETH OK");
 
         await syncProvider.disconnect();

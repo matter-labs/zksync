@@ -80,8 +80,8 @@ export class Provider {
     }
 
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTx(tx: any, signature?: TxEthSignature): Promise<string> {
-        return await this.transport.request("tx_submit", [tx, signature]);
+    async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
+        return await this.transport.request("tx_submit", [tx, signature, fastProcessing]);
     }
 
     async getContractAddress(): Promise<ContractAddress> {
@@ -163,7 +163,7 @@ export class Provider {
     }
 
     async getTransactionFee(
-        txType: "Withdraw" | "Transfer" | ChangePubKeyFee,
+        txType: "Withdraw" | "Transfer" | "FastWithdraw" | ChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {

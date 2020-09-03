@@ -10,7 +10,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::config_options::ThreadPanicNotify;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::{
     Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
 };
@@ -104,6 +104,7 @@ struct AppState {
     contract_address: String,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+    config_options: ConfigurationOptions,
 }
 
 impl AppState {
@@ -326,6 +327,26 @@ fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<HttpRespo
 fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let network_status = data.network_status.read();
     Ok(HttpResponse::Ok().json(network_status))
+}
+
+#[derive(Debug, Serialize)]
+struct WithdrawalProcessingTimeResponse {
+    normal: u64,
+    fast: u64,
+}
+
+fn handle_get_withdrawal_processing_time(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+    let miniblock_timings = &data.config_options.miniblock_timings;
+    let processing_time = WithdrawalProcessingTimeResponse {
+        normal: (miniblock_timings.miniblock_iteration_interval
+            * miniblock_timings.max_miniblock_iterations as u32)
+            .as_secs(),
+        fast: (miniblock_timings.miniblock_iteration_interval
+            * miniblock_timings.fast_miniblock_iterations as u32)
+            .as_secs(),
+    };
+
+    Ok(HttpResponse::Ok().json(processing_time))
 }
 
 #[derive(Debug, Serialize)]
@@ -983,7 +1004,11 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/blocks/{block_id}", web::get().to(handle_get_block_by_id))
                     .route("/blocks", web::get().to(handle_get_blocks))
-                    .route("/search", web::get().to(handle_block_explorer_search)),
+                    .route("/search", web::get().to(handle_block_explorer_search))
+                    .route(
+                        "/withdrawal_processing_time",
+                        web::get().to(handle_get_withdrawal_processing_time),
+                    ),
             )
             // Endpoint needed for js isReachable
             .route(
@@ -1005,7 +1030,7 @@ pub(super) fn start_server_thread_detached(
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
-    api_requests_caches_size: usize,
+    config_options: ConfigurationOptions,
 ) {
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
@@ -1015,12 +1040,13 @@ pub(super) fn start_server_thread_detached(
             let runtime = actix_rt::System::new("api-server");
 
             let state = AppState {
-                caches: Caches::new(api_requests_caches_size),
+                caches: Caches::new(config_options.api_requests_caches_size),
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{:?}", contract_address),
                 mempool_request_sender,
                 eth_watcher_request_sender,
+                config_options,
             };
             state.spawn_network_status_updater(panic_notify);
 
