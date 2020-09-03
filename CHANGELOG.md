@@ -1,5 +1,11 @@
 # zkSync changelog
 
+### Contracts v3 and protocol (4.09.2020)
+
+- Change pubkey operation requires fee for processing.
+- Added support for the force exit operation when user can force withdrawal from another account
+  that does not have signing key set and is older than 24h.
+
 ### zksync.js 0.6.3
 
 - Bundled version for browsers added. File `dist/main.js` can be used in `<script>` html tag.
