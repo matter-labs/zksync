@@ -8,4 +8,8 @@
 
 cd $ZKSYNC_HOME/contracts
 
-npx ts-node scripts/add-erc20-token.ts --tokenAddress $1 --deployerPrivateKey $2
+if [ -n "$2" ]; then
+  npx ts-node scripts/add-erc20-token.ts --tokenAddress $1 --deployerPrivateKey $2
+else
+  npx ts-node scripts/add-erc20-token.ts --tokenAddress $1
+fi
