@@ -34,20 +34,6 @@ pub struct Token {
     pub decimals: u8,
 }
 
-/// Token that contains information to add to the server
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct AddTokenRequest {
-    /// id is used for tx signature and serialization
-    /// is optional because when adding the server will assign the next available ID
-    pub id: Option<TokenId>,
-    /// Contract address of ERC20 token or Address::zero() for "ETH"
-    pub address: Address,
-    /// Token symbol (e.g. "ETH" or "USDC")
-    pub symbol: String,
-    /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
-    pub decimals: u8,
-}
-
 /// Tokens that added when deploying contract
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenGenesisListItem {
@@ -61,17 +47,6 @@ pub struct TokenGenesisListItem {
 
 impl Token {
     pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
-        Self {
-            id,
-            address,
-            symbol: symbol.to_string(),
-            decimals,
-        }
-    }
-}
-
-impl AddTokenRequest {
-    pub fn new(id: Option<TokenId>, address: Address, symbol: &str, decimals: u8) -> Self {
         Self {
             id,
             address,

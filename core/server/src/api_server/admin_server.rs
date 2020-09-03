@@ -17,26 +17,12 @@ use serde::{Deserialize, Serialize};
 
 // Local uses
 use models::config_options::ThreadPanicNotify;
-use models::node::tokens;
+use models::node::{tokens, Address, TokenId};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {
     sub: String, // Subject (whom auth token refers to)
     exp: usize,  // Expiration time (as UTC timestamp)
-}
-
-/// Validate JsonWebToken
-pub fn validate_auth_token(token: &str, secret: &str) -> Result<(), JwtError> {
-    let token = decode::<PayloadAuthToken>(
-        token,
-        &DecodingKey::from_secret(secret.as_ref()),
-        &Validation::default(),
-    );
-
-    match token {
-        Ok(_data) => Ok(()),
-        Err(err) => Err(err),
-    }
 }
 
 #[derive(Debug)]
@@ -53,14 +39,62 @@ impl AppState {
     }
 }
 
+/// Token that contains information to add to the server
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+struct AddTokenRequest {
+    /// id is used for tx signature and serialization
+    /// is optional because when adding the server will assign the next available ID
+    pub id: Option<TokenId>,
+    /// Contract address of ERC20 token or Address::zero() for "ETH"
+    pub address: Address,
+    /// Token symbol (e.g. "ETH" or "USDC")
+    pub symbol: String,
+    /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
+    pub decimals: u8,
+}
+
+struct AuthTokenValidator<'a> {
+    decoding_key: DecodingKey<'a>,
+}
+
+impl<'a> AuthTokenValidator<'a> {
+    fn new(secret: &'a str) -> Self {
+        Self {
+            decoding_key: DecodingKey::from_secret(secret.as_ref()),
+        }
+    }
+
+    /// Validate JsonWebToken
+    fn validate_auth_token(&self, token: &str) -> Result<(), JwtError> {
+        let token = decode::<PayloadAuthToken>(token, &self.decoding_key, &Validation::default());
+
+        token.map(drop)
+    }
+
+    fn validator(
+        &self,
+        req: ServiceRequest,
+        credentials: BearerAuth,
+    ) -> Result<ServiceRequest, Error> {
+        let config = req
+            .app_data::<Config>()
+            .map(|data| data.get_ref().clone())
+            .unwrap_or_default();
+
+        self.validate_auth_token(credentials.token())
+            .map(|_| req)
+            .map_err(|_| AuthenticationError::from(config).into())
+    }
+}
+
 fn add_token(
     data: web::Data<AppState>,
-    r: web::Json<tokens::AddTokenRequest>,
+    token_request: web::Json<AddTokenRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let storage = data.access_storage()?;
 
     // if id is None then set it to next available ID from server.
-    let id = match r.id {
+    let id = match token_request.id {
         Some(id) => id,
         None => storage.tokens_schema().get_count().map_err(|e| {
             vlog::warn!(
@@ -73,9 +107,9 @@ fn add_token(
 
     let token = tokens::Token {
         id,
-        address: r.address,
-        symbol: r.symbol.clone(),
-        decimals: r.decimals,
+        address: token_request.address,
+        symbol: token_request.symbol.clone(),
+        decimals: token_request.decimals,
     };
 
     storage
@@ -87,21 +121,6 @@ fn add_token(
         })?;
 
     Ok(HttpResponse::Ok().json(token))
-}
-
-fn validator(
-    req: ServiceRequest,
-    credentials: BearerAuth,
-    secret_auth: &str,
-) -> Result<ServiceRequest, Error> {
-    let config = req
-        .app_data::<Config>()
-        .map(|data| data.get_ref().clone())
-        .unwrap_or_else(Default::default);
-
-    validate_auth_token(credentials.token(), secret_auth)
-        .map(|_| req)
-        .map_err(|_| AuthenticationError::from(config).into())
 }
 
 pub fn start_admin_server(
@@ -122,7 +141,7 @@ pub fn start_admin_server(
                 };
 
                 let auth = HttpAuthentication::bearer(move |req, credentials| {
-                    validator(req, credentials, &secret_auth)
+                    AuthTokenValidator::new(&secret_auth).validator(req, credentials)
                 });
 
                 App::new()
