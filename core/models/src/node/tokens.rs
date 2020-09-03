@@ -76,4 +76,26 @@ pub struct TokenPrice {
 pub enum TxFeeTypes {
     Withdraw,
     Transfer,
+    ChangePubKey {
+        #[serde(rename = "onchainPubkeyAuth")]
+        onchain_pubkey_auth: bool,
+    },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tx_fee_type_deserialize() {
+        let deserialized: TxFeeTypes =
+            serde_json::from_str(r#"{ "ChangePubKey": { "onchainPubkeyAuth": true }}"#).unwrap();
+
+        assert_eq!(
+            deserialized,
+            TxFeeTypes::ChangePubKey {
+                onchain_pubkey_auth: true,
+            }
+        );
+    }
 }

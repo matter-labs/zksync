@@ -856,12 +856,15 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         op_flags.push(self.change_pubkey_offchain(
             cs.namespace(|| "change_pubkey_offchain"),
+            &lhs,
             &mut cur,
             &chunk_data,
             &op_data,
             &ext_pubdata_chunk,
             &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
-            explicit_zero,
+            &is_a_geq_b,
+            &signature_data.is_verified,
+            &signer_key,
         )?);
         op_flags.push(self.noop(
             cs.namespace(|| "noop"),
@@ -1430,12 +1433,15 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
     fn change_pubkey_offchain<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
+        lhs: &AllocatedOperationBranch<E>,
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
-        explicit_zero: &AllocatedNum<E>,
+        is_a_geq_b: &Boolean,
+        is_sig_verified: &Boolean,
+        signer_key: &AllocatedSignerPubkey<E>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -1449,12 +1455,37 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
                                                                 // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
-        pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
+        pubdata_bits.extend(op_data.pub_nonce.get_bits_be());
+        pubdata_bits.extend(cur.token.get_bits_be());
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+
         resize_grow_only(
             &mut pubdata_bits,
             ChangePubKeyOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
+
+        // Construct serialized tx
+        let mut serialized_tx_bits = vec![];
+
+        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits.extend(cur.token.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+
+        assert_eq!(
+            serialized_tx_bits.len(),
+            params::SIGNED_CHANGE_PUBKEY_BIT_WIDTH
+        );
+
+        let is_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            serialized_tx_bits,
+            &op_data,
+        )?;
 
         let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
             cs.namespace(|| "compare pubdata"),
@@ -1481,13 +1512,20 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         is_valid_flags.push(pubdata_properly_copied);
 
-        let fee_is_zero = AllocatedNum::equals(
-            cs.namespace(|| "fee is zero for change pubkey op"),
-            &op_data.fee.get_number(),
-            &explicit_zero,
-        )?;
+        // check operation arguments
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &lhs.balance)?;
 
-        is_valid_flags.push(Boolean::from(fee_is_zero));
+        let fee_expr = Expression::from(&op_data.fee.get_number());
+        let is_b_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            fee_expr.clone(),
+        )?);
+
+        is_valid_flags.push(is_a_correct);
+        is_valid_flags.push(is_b_correct);
+        is_valid_flags.push(is_a_geq_b.clone());
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -1520,6 +1558,29 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         is_valid_flags.push(is_address_correct);
 
+        let is_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "signer_key_correect"),
+            &signer_key.pubkey.get_hash(),
+            &op_data.new_pubkey_hash,
+        )?;
+
+        // Verify that zkSync signature corresponds to the public key in pubdata.
+        let is_signed_correctly = multi_and(
+            cs.namespace(|| "is_signed_correctly"),
+            &[
+                is_serialized_tx_correct,
+                is_sig_verified.clone(),
+                is_signer_valid,
+            ],
+        )?;
+
+        let is_sig_correct = multi_or(
+            cs.namespace(|| "sig is valid or not first chunk"),
+            &[is_signed_correctly, is_first_chunk.not()],
+        )?;
+
+        is_valid_flags.push(is_sig_correct);
+
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
         let is_pub_nonce_valid = CircuitElement::equals(
@@ -1541,6 +1602,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             ],
         )?;
 
+        let updated_balance = Expression::from(&cur.balance.get_number()) - fee_expr;
+
         // update pub_key
         cur.account.pub_key_hash = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey_hash"),
@@ -1554,6 +1617,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "update cur nonce"),
             Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1),
             &cur.account.nonce,
+            &is_valid_first,
+        )?;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance"),
+            updated_balance,
+            &cur.balance,
             &is_valid_first,
         )?;
 
@@ -2089,6 +2160,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
         pubdata_bits.extend(lhs.account_id.get_bits_be());
+        pubdata_bits.extend(rhs.account_id.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
         pubdata_bits.extend(op_data.full_amount.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());

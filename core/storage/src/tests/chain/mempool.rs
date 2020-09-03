@@ -52,13 +52,16 @@ fn franklin_txs() -> Vec<SignedFranklinTx> {
         None,
     );
 
-    let change_pubkey = ChangePubKey {
-        account_id: 123,
-        account: Address::random(),
-        new_pk_hash: Default::default(),
-        nonce: 13,
-        eth_signature: None,
-    };
+    let change_pubkey = ChangePubKey::new(
+        123,
+        Address::random(),
+        Default::default(),
+        0,
+        Default::default(),
+        13,
+        None,
+        None,
+    );
 
     let txs = [
         FranklinTx::Transfer(Box::new(transfer_1)),

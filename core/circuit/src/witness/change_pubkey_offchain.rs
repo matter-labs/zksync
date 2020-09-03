@@ -6,6 +6,7 @@ use crypto_exports::franklin_crypto::{
     },
     rescue::RescueEngine,
 };
+use num::ToPrimitive;
 // Workspace deps
 use models::{
     circuit::{
@@ -15,17 +16,17 @@ use models::{
     node::operations::ChangePubKeyOp,
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
-        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
+    primitives::convert_to_float,
 };
 // Local deps
 use crate::{
-    operation::{
-        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
-    },
+    operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits},
+        utils::{apply_leaf_operation, get_audits, SigDataInput},
         Witness,
     },
 };
@@ -34,6 +35,8 @@ pub struct ChangePubkeyOffChainData {
     pub account_id: u32,
     pub address: Fr,
     pub new_pubkey_hash: Fr,
+    pub fee_token: u32,
+    pub fee: u128,
     pub nonce: Fr,
 }
 
@@ -48,13 +51,15 @@ pub struct ChangePubkeyOffChainWitness<E: RescueEngine> {
 
 impl Witness for ChangePubkeyOffChainWitness<Bn256> {
     type OperationType = ChangePubKeyOp;
-    type CalculateOpsInput = ();
+    type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, change_pubkey_offchain: &ChangePubKeyOp) -> Self {
         let change_pubkey_data = ChangePubkeyOffChainData {
             account_id: change_pubkey_offchain.account_id,
             address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
             new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
+            fee_token: u32::from(change_pubkey_offchain.tx.fee_token),
+            fee: change_pubkey_offchain.tx.fee.to_u128().unwrap(),
             nonce: Fr::from_str(&change_pubkey_offchain.tx.nonce.to_string()).unwrap(),
         };
 
@@ -84,6 +89,16 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             &self.before.witness.account_witness.nonce.unwrap(),
             NONCE_BIT_WIDTH,
         );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.before.token.unwrap(),
+            TOKEN_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.fee.unwrap(),
+            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
+        );
 
         resize_grow_only(
             &mut pubdata_bits,
@@ -93,7 +108,7 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
         pubdata_bits
     }
 
-    fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
+    fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         self.get_pubdata()
             .chunks(CHUNK_BIT_WIDTH)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
@@ -103,11 +118,11 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
                 tx_type: self.tx_type,
                 chunk: Some(Fr::from_str(&chunk_n.to_string()).unwrap()),
                 pubdata_chunk: Some(pubdata_chunk),
-                first_sig_msg: Some(Fr::zero()),
-                second_sig_msg: Some(Fr::zero()),
-                third_sig_msg: Some(Fr::zero()),
-                signature_data: SignatureData::init_empty(),
-                signer_pub_key_packed: vec![Some(false); 256],
+                first_sig_msg: Some(input.first_sig_msg),
+                second_sig_msg: Some(input.second_sig_msg),
+                third_sig_msg: Some(input.third_sig_msg),
+                signature_data: input.signature.clone(),
+                signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
                 args: self.args.clone(),
                 lhs: self.before.clone(),
                 rhs: self.after.clone(),
@@ -130,16 +145,25 @@ impl ChangePubkeyOffChainWitness<Bn256> {
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
         let account_id_fe = Fr::from_str(&change_pubkey_offcahin.account_id.to_string()).unwrap();
-        //calculate a and b
-        let a = Fr::zero();
-        let b = Fr::zero();
+
+        let fee_token_fe = Fr::from_str(&change_pubkey_offcahin.fee_token.to_string()).unwrap();
+        let fee_as_field_element = Fr::from_str(&change_pubkey_offcahin.fee.to_string()).unwrap();
+
+        let fee_bits = convert_to_float(
+            change_pubkey_offcahin.fee,
+            FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH,
+            10,
+        )
+        .unwrap();
+        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
         //applying deposit
         let (account_witness_before, account_witness_after, balance_before, balance_after) =
             apply_leaf_operation(
                 tree,
                 change_pubkey_offcahin.account_id,
-                0,
+                change_pubkey_offcahin.fee_token,
                 |acc| {
                     assert_eq!(
                         acc.address, change_pubkey_offcahin.address,
@@ -148,8 +172,14 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                     acc.pub_key_hash = change_pubkey_offcahin.new_pubkey_hash;
                     acc.nonce.add_assign(&Fr::from_str("1").unwrap());
                 },
-                |_| {},
+                |bal| {
+                    bal.value.sub_assign(&fee_as_field_element);
+                },
             );
+
+        //calculate a and b
+        let a = balance_before;
+        let b = fee_as_field_element;
 
         let after_root = tree.root_hash();
         debug!("After root = {}", after_root);
@@ -159,7 +189,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
         ChangePubkeyOffChainWitness {
             before: OperationBranch {
                 address: Some(account_id_fe),
-                token: Some(Fr::zero()),
+                token: Some(fee_token_fe),
                 witness: OperationBranchWitness {
                     account_witness: account_witness_before,
                     account_path: audit_path_before,
@@ -169,7 +199,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
             },
             after: OperationBranch {
                 address: Some(account_id_fe),
-                token: Some(Fr::zero()),
+                token: Some(fee_token_fe),
                 witness: OperationBranchWitness {
                     account_witness: account_witness_after,
                     account_path: audit_path_after,
@@ -181,7 +211,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                 eth_address: Some(change_pubkey_offcahin.address),
                 amount_packed: Some(Fr::zero()),
                 full_amount: Some(Fr::zero()),
-                fee: Some(Fr::zero()),
+                fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
                 pub_nonce: Some(change_pubkey_offcahin.nonce),

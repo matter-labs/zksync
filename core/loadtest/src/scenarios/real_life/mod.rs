@@ -271,6 +271,8 @@ impl ScenarioExecutor {
         // the fee in such a way that it will always be sufficient).
         // Withdraw operation has more chunks, so we estimate fee for it.
         let mut fee = self.withdraw_fee(&self.main_account.zk_acc).await;
+        // Change pubkey fee is different, so we calculate it separately.
+        let change_pubkey_fee = self.change_pubkey_fee(&self.main_account.zk_acc).await;
 
         // To be sure that we will have enough funds for all the transfers,
         // we will request 1.2x of the suggested fees. All the unspent funds
@@ -283,7 +285,7 @@ impl ScenarioExecutor {
         self.estimated_fee_for_op = fee.clone();
 
         if let Some(scenario) = self.satellite_scenario.as_mut() {
-            scenario.set_estimated_fee(fee);
+            scenario.set_estimated_fee(fee, change_pubkey_fee);
         };
 
         Ok(())
@@ -291,6 +293,8 @@ impl ScenarioExecutor {
 
     /// Runs the initial deposit of the money onto the main account.
     async fn deposit(&mut self) -> Result<(), failure::Error> {
+        let change_pubkey_fee = self.change_pubkey_fee(&self.main_account.zk_acc).await;
+
         // Amount of money we need to deposit.
         // Initialize it with the raw amount: only sum of transfers per account.
         // Fees are taken into account below.
@@ -306,8 +310,10 @@ impl ScenarioExecutor {
         // Total amount of cycles is amount of funds rotation cycles + one for initial transfers +
         // one for collecting funds back to the main account.
         amount_to_deposit += fee_for_all_accounts * (self.cycles_amount + 2);
-        // Also the fee is required to perform a final withdraw
-        amount_to_deposit += self.estimated_fee_for_op.clone();
+        // Also we must add fee for every `ChangePubKey` operation (1 per each account).
+        amount_to_deposit += &change_pubkey_fee * BigUint::from(self.n_accounts as u64);
+        // Also the fee is required to perform a final withdraw and change pubkey op.
+        amount_to_deposit += &self.estimated_fee_for_op + &change_pubkey_fee;
 
         let account_balance = self.main_account.eth_acc.eth_balance().await?;
         log::info!(
@@ -340,7 +346,10 @@ impl ScenarioExecutor {
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (self.main_account.sign_change_pubkey(), None);
+        let (change_pubkey_tx, eth_sign) = (
+            self.main_account.sign_change_pubkey(change_pubkey_fee),
+            None,
+        );
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
@@ -362,6 +371,8 @@ impl ScenarioExecutor {
             self.n_accounts
         );
 
+        let change_pubkey_fee = self.change_pubkey_fee(&self.main_account.zk_acc).await;
+
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
 
         for to_idx in 0..self.n_accounts {
@@ -369,9 +380,10 @@ impl ScenarioExecutor {
             let to_acc = &self.accounts[to_idx];
 
             // Transfer size is (transfer_amount) + (fee for every tx to be sent) + (fee for final transfer
-            // back to the main account).
-            let transfer_amount = self.transfer_size.clone()
-                + self.estimated_fee_for_op.clone() * (self.cycles_amount + 1);
+            // back to the main account) + (fee for ChangePubKey op).
+            let transfer_amount = &self.transfer_size
+                + &self.estimated_fee_for_op * (self.cycles_amount + 1)
+                + &change_pubkey_fee;
 
             // Make amount packable.
             let packable_transfer_amount = closest_packable_fee_amount(&transfer_amount);
@@ -431,9 +443,15 @@ impl ScenarioExecutor {
             assert!(resp.id.is_some(), "Account ID is none for new account");
             account.set_account_id(resp.id);
 
-            let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
-                account.create_change_pubkey_tx(None, true, false),
-            ));
+            let fee_token = 0; // ETH
+            let change_pubkey_tx =
+                FranklinTx::ChangePubKey(Box::new(account.sign_change_pubkey_tx(
+                    None,
+                    true,
+                    fee_token,
+                    change_pubkey_fee.clone(),
+                    false,
+                )));
 
             let tx_future = self.rpc_client.send_tx(change_pubkey_tx, None);
 
@@ -658,6 +676,17 @@ impl ScenarioExecutor {
 
         log::info!("ETH funds received");
         Ok(())
+    }
+
+    /// Obtains a fee required for the ChangePubKey operation.
+    async fn change_pubkey_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+        let fee = self
+            .rpc_client
+            .get_tx_fee("ChangePubKey", to_acc.address, "ETH")
+            .await
+            .expect("Can't get tx fee");
+
+        closest_packable_fee_amount(&fee)
     }
 
     /// Obtains a fee required for the transfer operation.

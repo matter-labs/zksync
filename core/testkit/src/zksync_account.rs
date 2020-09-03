@@ -225,10 +225,12 @@ impl ZksyncAccount {
         close
     }
 
-    pub fn create_change_pubkey_tx(
+    pub fn sign_change_pubkey_tx(
         &self,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        fee_token: TokenId,
+        fee: BigUint,
         auth_onchain: bool,
     ) -> ChangePubKey {
         let account_id = self
@@ -238,22 +240,27 @@ impl ZksyncAccount {
             .expect("can't sign tx withoud account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let nonce = nonce.unwrap_or_else(|| *stored_nonce);
-        let eth_signature = if auth_onchain {
+
+        let mut change_pubkey = ChangePubKey::new_signed(
+            account_id,
+            self.address,
+            self.pubkey_hash.clone(),
+            fee_token,
+            fee,
+            nonce,
+            None,
+            &self.private_key,
+        )
+        .expect("Can't sign ChangePubKey operation");
+        change_pubkey.eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes =
-                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                    .expect("Failed to construct change pubkey signed message.");
+            let sign_bytes = change_pubkey
+                .get_eth_signed_data()
+                .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)
-        };
-        let change_pubkey = ChangePubKey {
-            account_id,
-            account: self.address,
-            new_pk_hash: self.pubkey_hash.clone(),
-            nonce,
-            eth_signature,
         };
 
         if !auth_onchain {

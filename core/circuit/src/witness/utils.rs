@@ -20,7 +20,9 @@ use models::{
     },
     merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
     node::{
-        operations::{CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp},
+        operations::{
+            ChangePubKeyOp, CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+        },
         tx::PackedPublicKey,
         AccountId, BlockNumber, Engine,
     },
@@ -563,6 +565,20 @@ impl SigDataInput {
             &sign_packed,
             &transfer_op.tx.get_bytes(),
             &transfer_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_change_pubkey_op(change_pubkey_op: &ChangePubKeyOp) -> Result<Self, String> {
+        let sign_packed = change_pubkey_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &change_pubkey_op.tx.get_bytes(),
+            &change_pubkey_op.tx.signature.pub_key,
         )
     }
 

@@ -99,9 +99,11 @@ impl TestAccount {
         failure::bail!("failed to update account_id: timeout")
     }
 
-    pub fn sign_change_pubkey(&self) -> FranklinTx {
+    pub fn sign_change_pubkey(&self, fee: BigUint) -> FranklinTx {
+        let fee_token = 0; // ETH
         FranklinTx::ChangePubKey(Box::new(
-            self.zk_acc.create_change_pubkey_tx(None, true, false),
+            self.zk_acc
+                .sign_change_pubkey_tx(None, true, fee_token, fee, false),
         ))
     }
 

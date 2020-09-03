@@ -24,7 +24,8 @@ impl CommitCost {
 
     pub const BASE_COST: u64 = 141_595;
     pub const DEPOSIT_COST: u64 = 10_397;
-    pub const CHANGE_PUBKEY_COST: u64 = 15_866;
+    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_866;
+    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 3_929;
     pub const TRANSFER_COST: u64 = 334;
     pub const TRANSFER_TO_NEW_COST: u64 = 862;
     pub const FULL_EXIT_COST: u64 = 10_165;
@@ -39,7 +40,13 @@ impl CommitCost {
         let cost = match op {
             FranklinOp::Noop(_) => 0,
             FranklinOp::Deposit(_) => Self::DEPOSIT_COST,
-            FranklinOp::ChangePubKeyOffchain(_) => Self::CHANGE_PUBKEY_COST,
+            FranklinOp::ChangePubKeyOffchain(change_pubkey) => {
+                if change_pubkey.tx.eth_signature.is_some() {
+                    Self::CHANGE_PUBKEY_COST_OFFCHAIN
+                } else {
+                    Self::CHANGE_PUBKEY_COST_ONCHAIN
+                }
+            }
             FranklinOp::Transfer(_) => Self::TRANSFER_COST,
             FranklinOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
             FranklinOp::FullExit(_) => Self::FULL_EXIT_COST,
@@ -118,9 +125,10 @@ impl Default for GasCounter {
 }
 
 impl GasCounter {
+    /// Base cost of `completeWithdrawals` contract method call.
+    pub const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
-    const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
-    const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
+    pub const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
 
     pub fn new() -> Self {
         Self::default()
@@ -180,13 +188,16 @@ mod tests {
     #[test]
     fn commit_cost() {
         let change_pubkey_op = ChangePubKeyOp {
-            tx: ChangePubKey {
-                account_id: 1,
-                account: Default::default(),
-                new_pk_hash: Default::default(),
-                nonce: Default::default(),
-                eth_signature: None,
-            },
+            tx: ChangePubKey::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                None,
+                None,
+            ),
             account_id: 1,
         };
 
@@ -194,7 +205,7 @@ mod tests {
 
         let test_vector = vec![(
             FranklinOp::from(change_pubkey_op),
-            CommitCost::CHANGE_PUBKEY_COST,
+            CommitCost::CHANGE_PUBKEY_COST_ONCHAIN,
         )];
 
         for (op, expected_cost) in test_vector {
@@ -205,13 +216,16 @@ mod tests {
     #[test]
     fn verify_cost() {
         let change_pubkey_op = ChangePubKeyOp {
-            tx: ChangePubKey {
-                account_id: 1,
-                account: Default::default(),
-                new_pk_hash: Default::default(),
-                nonce: Default::default(),
-                eth_signature: None,
-            },
+            tx: ChangePubKey::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                None,
+                None,
+            ),
             account_id: 1,
         };
 
@@ -230,13 +244,16 @@ mod tests {
     #[test]
     fn gas_counter() {
         let change_pubkey_op = ChangePubKeyOp {
-            tx: ChangePubKey {
-                account_id: 1,
-                account: Default::default(),
-                new_pk_hash: Default::default(),
-                nonce: Default::default(),
-                eth_signature: None,
-            },
+            tx: ChangePubKey::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                None,
+                None,
+            ),
             account_id: 1,
         };
         let franklin_op = FranklinOp::from(change_pubkey_op);
@@ -249,7 +266,7 @@ mod tests {
         // Verify cost is 0, thus amount of operations is determined by the commit cost.
         let amount_ops_in_block = (U256::from(TX_GAS_LIMIT)
             - GasCounter::scale_up(gas_counter.commit_cost))
-            / GasCounter::scale_up(U256::from(CommitCost::CHANGE_PUBKEY_COST));
+            / GasCounter::scale_up(U256::from(CommitCost::CHANGE_PUBKEY_COST_ONCHAIN));
 
         for _ in 0..amount_ops_in_block.as_u64() {
             gas_counter
@@ -259,7 +276,7 @@ mod tests {
 
         // Expected gas limit is (base_cost + n_ops * op_cost) * 1.3
         let expected_commit_limit = (U256::from(CommitCost::BASE_COST)
-            + amount_ops_in_block * U256::from(CommitCost::CHANGE_PUBKEY_COST))
+            + amount_ops_in_block * U256::from(CommitCost::CHANGE_PUBKEY_COST_ONCHAIN))
             * U256::from(130)
             / U256::from(100);
         let expected_verify_limit = (U256::from(VerifyCost::BASE_COST)

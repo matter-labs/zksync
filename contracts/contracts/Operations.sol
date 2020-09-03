@@ -164,6 +164,7 @@ library Operations {
     
     struct ForcedExit {
         //uint32 initiatorAccountId; -- present in pubdata, ignored at serialization
+        //uint32 targetAccountId; -- present in pubdata, ignored at serialization
         uint16 tokenId;
         uint128 amount;
         //uint16 fee; -- present in pubdata, ignored at serialization
@@ -174,7 +175,7 @@ library Operations {
         returns (ForcedExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES;                   // initiatorAccountId (ignored)
+        uint offset = _offset + ACCOUNT_ID_BYTES * 2;               // initiatorAccountId + targetAccountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES;                                        // fee (ignored)
@@ -184,6 +185,7 @@ library Operations {
     function writeForcedExitPubdata(ForcedExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
             bytes4(0),  // initiatorAccountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            bytes4(0),  // targetAccountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
             op.tokenId, // tokenId
             op.amount,  // amount
             bytes2(0),  // fee (ignored)  (update when FEE_BYTES is changed)
@@ -198,6 +200,8 @@ library Operations {
         bytes20 pubKeyHash;
         address owner;
         uint32 nonce;
+        //uint16 tokenId; -- present in pubdata, ignored at serialization
+        //uint16 fee; -- present in pubdata, ignored at serialization
     }
 
     function readChangePubKeyPubdata(bytes memory _data, uint _offset) internal pure

@@ -281,6 +281,8 @@ impl<T: Transport> AccountSet<T> {
         &self,
         eth_account: ETHAccountId,
         zksync_signer: ZKSyncAccountId,
+        fee_token: TokenId,
+        fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> FranklinTx {
@@ -292,9 +294,11 @@ impl<T: Transport> AccountSet<T> {
             block_on(eth_account.auth_fact(&zksync_account.pubkey_hash.data, auth_nonce))
                 .expect("Auth pubkey fail");
         assert_eq!(tx_receipt.status, Some(U64::from(1)), "Auth pubkey fail");
-        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+        FranklinTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
             nonce,
             increment_nonce,
+            fee_token,
+            fee,
             true,
         )))
     }
@@ -302,13 +306,17 @@ impl<T: Transport> AccountSet<T> {
     fn change_pubkey_with_tx(
         &self,
         zksync_signer: ZKSyncAccountId,
+        fee_token: TokenId,
+        fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> FranklinTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+        FranklinTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
             nonce,
             increment_nonce,
+            fee_token,
+            fee,
             false,
         )))
     }
@@ -440,9 +448,18 @@ pub fn perform_basic_operations(
     test_setup.start_block();
 
     if blocks_processing == BlockProcessing::CommitAndVerify {
-        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+        test_setup.change_pubkey_with_onchain_auth(
+            ETHAccountId(0),
+            ZKSyncAccountId(1),
+            Token(token),
+            &deposit_amount / BigUint::from(8u32),
+        );
     } else {
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+        test_setup.change_pubkey_with_tx(
+            ZKSyncAccountId(1),
+            Token(token),
+            &deposit_amount / BigUint::from(8u32),
+        );
     }
 
     //transfer to self should work
@@ -484,7 +501,11 @@ pub fn perform_basic_operations(
         &deposit_amount / BigUint::from(4u32),
     );
 
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
+    test_setup.change_pubkey_with_tx(
+        ZKSyncAccountId(2),
+        Token(token),
+        &deposit_amount / BigUint::from(4u32),
+    );
 
     test_setup.withdraw(
         ZKSyncAccountId(2),
@@ -914,16 +935,38 @@ impl TestSetup {
         receipt
     }
 
-    pub fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
+    pub fn change_pubkey_with_tx(
+        &mut self,
+        account: ZKSyncAccountId,
+        fee_token: Token,
+        fee: BigUint,
+    ) {
+        // Subtract fee from the account
+        let mut account_balance = self.get_expected_zksync_account_balance(account, fee_token.0);
+        account_balance -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((account, fee_token.0), account_balance);
+
+        // Add fee to the fee collector account
+        let mut fee_account =
+            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0);
+        fee_account += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), fee_account);
+
+        // Update account pubkey
         let account_id = self
-            .get_zksync_account_committed_state(zksync_signer)
+            .get_zksync_account_committed_state(account)
             .expect("can't change pubkey, account does not exist")
             .0;
-        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
+        self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
+        // Execute transaction
         let tx = self
             .accounts
-            .change_pubkey_with_tx(zksync_signer, None, true);
+            .change_pubkey_with_tx(account, fee_token.0, fee, None, true);
 
         self.execute_tx(tx);
     }
@@ -931,17 +974,41 @@ impl TestSetup {
     pub fn change_pubkey_with_onchain_auth(
         &mut self,
         eth_account: ETHAccountId,
-        zksync_signer: ZKSyncAccountId,
+        account: ZKSyncAccountId,
+        fee_token: Token,
+        fee: BigUint,
     ) {
+        // Subtract fee from the account
+        let mut account_balance = self.get_expected_zksync_account_balance(account, fee_token.0);
+        account_balance -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((account, fee_token.0), account_balance);
+
+        // Add fee to the fee collector account
+        let mut fee_account =
+            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0);
+        fee_account += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), fee_account);
+
+        // Update account pubkey
         let account_id = self
-            .get_zksync_account_committed_state(zksync_signer)
+            .get_zksync_account_committed_state(account)
             .expect("can't change pubkey, account does not exist")
             .0;
-        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
+        self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
-        let tx =
-            self.accounts
-                .change_pubkey_with_onchain_auth(eth_account, zksync_signer, None, true);
+        // Execute transaction
+        let tx = self.accounts.change_pubkey_with_onchain_auth(
+            eth_account,
+            account,
+            fee_token.0,
+            fee,
+            None,
+            true,
+        );
 
         self.execute_tx(tx);
     }

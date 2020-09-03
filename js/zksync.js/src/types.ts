@@ -103,7 +103,10 @@ export interface ChangePubKey {
     accountId: number;
     account: Address;
     newPkHash: PubKeyHash;
+    feeToken: number;
+    fee: BigNumberish;
     nonce: number;
+    signature: Signature;
     ethSignature: string;
 }
 
@@ -152,9 +155,20 @@ export interface Tokens {
     };
 }
 
+export interface ChangePubKeyFee {
+    // Note: Ignore, since it just looks more intuitive if `"ChangePubKey"` is kept as a string literal)
+    // prettier-ignore
+    "ChangePubKey": {
+        // Denotes how authorization of operation is performed:
+        // 'true' if it's done by sending an Ethereum transaction,
+        // 'false' if it's done by providing an Ethereum signature in zkSync transaction.
+        onchainPubkeyAuth: boolean;
+    };
+}
+
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: "Withdraw" | "Transfer" | "TransferToNew";
+    feeType: "Withdraw" | "Transfer" | "TransferToNew" | ChangePubKeyFee;
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)
