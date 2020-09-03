@@ -106,7 +106,6 @@ impl ProverOptions {
     }
 }
 
-
 /// Configuration options for `admin server`.
 #[derive(Debug, Clone)]
 pub struct AdminServerOptions {
