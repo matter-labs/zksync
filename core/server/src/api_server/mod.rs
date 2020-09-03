@@ -54,7 +54,7 @@ pub fn start_api_server(
         mempool_request_sender.clone(),
         eth_watcher_request_sender.clone(),
         panic_notify.clone(),
-        config_options.api_requests_caches_size,
+        config_options.clone(),
     );
     rpc_subscriptions::start_ws_server(
         &config_options,

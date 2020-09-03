@@ -247,6 +247,7 @@ pub enum RpcErrorCodes {
     Other = 300,
     AccountCloseDisabled = 301,
     OperationsLimitReached = 302,
+    UnsupportedFastProcessing = 303,
 }
 
 impl From<TxAddError> for RpcErrorCodes {
@@ -290,6 +291,7 @@ pub trait Rpc {
         &self,
         tx: Box<FranklinTx>,
         signature: Box<Option<TxEthSignature>>,
+        fast_processing: Option<bool>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
 
     #[rpc(name = "contract_address")]
@@ -791,8 +793,9 @@ impl Rpc for RpcApp {
 
     fn tx_submit(
         &self,
-        tx: Box<FranklinTx>,
+        mut tx: Box<FranklinTx>,
         signature: Box<Option<TxEthSignature>>,
+        fast_processing: Option<bool>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
         if tx.is_close() {
             return Box::new(futures01::future::err(Error {
@@ -802,18 +805,54 @@ impl Rpc for RpcApp {
             }));
         }
 
+        let fast_processing = fast_processing.unwrap_or_default(); // `None` => false
+
+        if fast_processing && !tx.is_withdraw() {
+            return Box::new(futures01::future::err(Error {
+                code: RpcErrorCodes::UnsupportedFastProcessing.into(),
+                message: "Fast processing available only for 'withdraw' operation type."
+                    .to_string(),
+                data: None,
+            }));
+        }
+
+        if let FranklinTx::Withdraw(withdraw) = tx.as_mut() {
+            if withdraw.fast {
+                // We set `fast` field ourselves, so we have to check that user did not set it themselves.
+                return Box::new(futures01::future::err(Error {
+                    code: RpcErrorCodes::IncorrectTx.into(),
+                    message: "'fast' field of Withdraw transaction must not be set manually."
+                        .to_string(),
+                    data: None,
+                }));
+            }
+
+            // `fast` field is not used in serializing (as it's an internal server option,
+            // not the actual transaction part), so we have to set it manually depending on
+            // the RPC method input.
+            withdraw.fast = fast_processing;
+        }
+
         let msg_to_sign = match self.get_tx_info_message_to_sign(&tx) {
             Ok(res) => res,
             Err(e) => return Box::new(futures01::future::err(e)),
         };
 
         let tx_fee_info = match tx.as_ref() {
-            FranklinTx::Withdraw(withdraw) => Some((
-                TxFeeTypes::Withdraw,
-                TokenLike::Id(withdraw.token),
-                withdraw.to,
-                withdraw.fee.clone(),
-            )),
+            FranklinTx::Withdraw(withdraw) => {
+                let fee_type = if fast_processing {
+                    TxFeeTypes::FastWithdraw
+                } else {
+                    TxFeeTypes::Withdraw
+                };
+
+                Some((
+                    fee_type,
+                    TokenLike::Id(withdraw.token),
+                    withdraw.to,
+                    withdraw.fee.clone(),
+                ))
+            }
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
