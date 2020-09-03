@@ -209,7 +209,9 @@ export class Wallet {
         withdraw.nonce = withdraw.nonce != null ? await this.getNonce(withdraw.nonce) : await this.getNonce();
 
         if (withdraw.fee == null) {
-            const fullFee = await this.provider.getTransactionFee("Withdraw", withdraw.ethAddress, withdraw.token);
+            const feeType = withdraw.fastProcessing === true ? "FastWithdraw" : "Withdraw";
+
+            const fullFee = await this.provider.getTransactionFee(feeType, withdraw.ethAddress, withdraw.token);
             withdraw.fee = fullFee.totalFee;
         }
 
