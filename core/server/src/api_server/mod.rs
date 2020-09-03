@@ -78,7 +78,7 @@ pub fn start_api_server(
 
     admin_server::start_admin_server(
         admin_server_opts.admin_http_server_address,
-        admin_server_opts.secret_auth.clone(),
+        admin_server_opts.secret_auth,
         connection_pool.clone(),
         panic_notify.clone(),
     );
