@@ -2,8 +2,8 @@
 
 import { Command } from 'commander';
 import * as commands from './commands';
-import { loadConfig, saveConfig } from './config';
-import { Network, Wallet, ALL_NETWORKS } from './common';
+import { loadConfig } from './config';
+import { Network } from './common';
 
 function print(object: any) {
     console.log(JSON.stringify(object, null, 4));
@@ -45,14 +45,7 @@ async function main() {
         .command('default [network]')
         .description('print or set default network')
         .action((network?: Network) => {
-            if (network) {
-                if (ALL_NETWORKS.includes(network)) {
-                    config.network = network;
-                    saveConfig(config);
-                } else {
-                    throw Error('invalid network name');
-                }
-            }
+            commands.defaultNetwork(config, network);
             print(config.network);
         });
 
@@ -77,17 +70,7 @@ async function main() {
         .command('default [address]')
         .description('print or set default wallet')
         .action((address?: string) => {
-            if (address) {
-                address = address.toLowerCase();
-                const addresses = config.wallets
-                    .map((w: Wallet) => w.address);
-                if (addresses.includes(address)) {
-                    config.defaultWallet = address;
-                    saveConfig(config);
-                } else {
-                    throw Error('address is not present');
-                }
-            }
+            commands.defaultWallet(config, address);
             print(config.defaultWallet);
         });
 
@@ -95,7 +78,7 @@ async function main() {
         .command('delete <address>')
         .description('delete a wallet')
         .action((address: string) => {
-            commands.removeWallet(config, address.toLowerCase());
+            commands.removeWallet(config, address);
             print(commands.listWallets(config));
         });
 

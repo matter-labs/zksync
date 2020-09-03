@@ -18,3 +18,27 @@ export interface Config {
     wallets: Wallet[]
 }
 
+export interface AccountInfo {
+    address: string,
+    network: Network,
+    account_id?: number,
+    nonce: number,
+    balances: {
+        [token: string]: string
+    }
+}
+
+export interface TxInfo {
+    network: Network,
+    transaction: null | {
+        status: "error" | "success",
+        from: string,
+        to: string,
+        hash: string,
+        operation: string,
+        token: string,
+        amount: string,
+        fee: string,
+        nonce: number
+    }
+}

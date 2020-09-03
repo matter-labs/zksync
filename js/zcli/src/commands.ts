@@ -2,7 +2,7 @@ import 'isomorphic-fetch';
 import * as zksync from 'zksync';
 import { Wallet as EthWallet } from 'ethers';
 import { saveConfig } from './config';
-import { ALL_NETWORKS, Network, Wallet, Config } from './common';
+import { ALL_NETWORKS, Network, Wallet, Config, AccountInfo, TxInfo } from './common';
 
 async function tokenInfo(id: number, provider: zksync.Provider) {
     const tokens = await provider.getTokens();
@@ -10,12 +10,12 @@ async function tokenInfo(id: number, provider: zksync.Provider) {
     return tokenInfo;
 }
 
-export async function accountInfo(address: string, network: Network) {
+export async function accountInfo(address: string, network: Network): Promise<AccountInfo> {
     const provider = await zksync.getDefaultProvider(network);
     const state = await provider.getState(address);
-    const balances = state.verified.balances;
-    for (const token in balances) {
-        balances[token] = provider.tokenSet.formatToken(token, balances[token]);
+    let balances: { [token: string]: string } = {};
+    for (const token in state.verified.balances) {
+        balances[token] = provider.tokenSet.formatToken(token, state.verified.balances[token]);
     }
     await provider.disconnect();
     return {
@@ -27,7 +27,7 @@ export async function accountInfo(address: string, network: Network) {
     };
 }
 
-export async function txInfo(tx_hash: string, network: Network) {
+export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo> {
     const subdomain = network === 'mainnet' ? 'api' : `${network}-api`
     const api_url = `https://${subdomain}.zksync.io/api/v0.1/transactions_all/${tx_hash}`;
     const response = await fetch(api_url);
@@ -45,7 +45,7 @@ export async function txInfo(tx_hash: string, network: Network) {
     return {
         network,
         transaction: {
-            status: tx.fail_reason ? 'fail' : 'success',
+            status: tx.fail_reason ? 'error' : 'success',
             from: tx.from,
             to: tx.to,
             hash: tx_hash,
@@ -68,6 +68,17 @@ export async function availableNetworks() {
         } catch (err) { /* could not connect to provider */ }
     }
     return networks;
+}
+
+export function defaultNetwork(config: Config, network?: Network) {
+    if (network) {
+        if (ALL_NETWORKS.includes(network)) {
+            config.network = network;
+            saveConfig(config);
+        } else {
+            throw Error('invalid network name');
+        }
+    }
 }
 
 export function addWallet(config: Config, privkey?: string) {
@@ -93,6 +104,7 @@ export function listWallets(config: Config) {
 }
 
 export function removeWallet(config: Config, address: string) {
+    address = address.toLowerCase();
     config.wallets = config.wallets
         .filter((w: Wallet) => w.address != address);
     if (config.defaultWallet === address) {
@@ -101,3 +113,16 @@ export function removeWallet(config: Config, address: string) {
     saveConfig(config);
 }
 
+export function defaultWallet(config: Config, address?: string) {
+    if (address) {
+        address = address.toLowerCase();
+        const addresses = config.wallets
+            .map((w: Wallet) => w.address);
+        if (addresses.includes(address)) {
+            config.defaultWallet = address;
+            saveConfig(config);
+        } else {
+            throw Error('address is not present');
+        }
+    }
+}
