@@ -459,7 +459,7 @@ async function checkFailedTransactionResending(
         await (
             await ethWallet.sendTransaction({ to: syncDepositorWallet.address, value: utils.parseEther("6.0") })
         ).wait();
-        await (await erc20.transfer(syncDepositorWallet.address, utils.parseEther("110.0"))).wait();
+        await (await erc20.transfer(syncDepositorWallet.address, utils.parseEther("210.0"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -491,7 +491,7 @@ async function checkFailedTransactionResending(
         const syncWallet5 = await Wallet.fromEthSigner(ethWallet5, syncProvider);
         await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "100.0");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "200.0");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "1.0");
 
         await syncProvider.disconnect();
