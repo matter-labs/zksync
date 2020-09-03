@@ -2148,6 +2148,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
         pubdata_bits.extend(lhs.account_id.get_bits_be());
+        pubdata_bits.extend(rhs.account_id.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
         pubdata_bits.extend(op_data.full_amount.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());

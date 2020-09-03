@@ -88,6 +88,11 @@ impl Witness for ForcedExitWitness<Bn256> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
+            &self.target_before.address.unwrap(),
+            ACCOUNT_ID_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut pubdata_bits,
             &self.initiator_before.token.unwrap(),
             TOKEN_BIT_WIDTH,
         );
