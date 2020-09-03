@@ -864,6 +864,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
             &is_a_geq_b,
             &signature_data.is_verified,
+            &signer_key,
         )?);
         op_flags.push(self.noop(
             cs.namespace(|| "noop"),
@@ -1440,6 +1441,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         is_a_geq_b: &Boolean,
         is_sig_verified: &Boolean,
+        signer_key: &AllocatedSignerPubkey<E>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -1556,10 +1558,20 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         is_valid_flags.push(is_address_correct);
 
-        // Verify zkSync signature.
+        let is_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "signer_key_correect"),
+            &signer_key.pubkey.get_hash(),
+            &op_data.new_pubkey_hash,
+        )?;
+
+        // Verify that zkSync signature corresponds to the public key in pubdata.
         let is_signed_correctly = multi_and(
             cs.namespace(|| "is_signed_correctly"),
-            &[is_serialized_tx_correct, is_sig_verified.clone()],
+            &[
+                is_serialized_tx_correct,
+                is_sig_verified.clone(),
+                is_signer_valid,
+            ],
         )?;
 
         let is_sig_correct = multi_or(

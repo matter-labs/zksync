@@ -1,7 +1,10 @@
 // External deps
 use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::node::{tx::ChangePubKey, ChangePubKeyOp};
+use models::node::{
+    tx::{ChangePubKey, TxSignature},
+    ChangePubKeyOp,
+};
 use plasma::{
     handler::TxHandler,
     state::{CollectedFee, PlasmaState},
@@ -123,6 +126,67 @@ fn test_incorrect_change_pubkey_account() {
             vec![CollectedFee {
                 token: 0,
                 amount: 0u32.into(),
+            }]
+        },
+    );
+}
+
+/// Checks that executing a change pubkey operation with incorrect
+/// signature (account `from` ID) results in an error.
+///
+/// In this test we attempt the following attack scenario:
+/// dishonest operator changes a fee in the transaction and signs it with a random key.
+/// The pubkey hash inside of operation remains correct, so that there will be no rules
+/// violation in contract. Circuit must detect that signature doesn't correspond to the
+/// pubkey hash set inside of transaction.
+#[test]
+#[ignore]
+fn test_incorrect_change_pubkey_signature() {
+    // Error message is not important, since we expect code to panic.
+    const ERR_MSG: &str = "chunk number 0/execute_op/op_valid is true/enforce equal to one";
+    const ACCOUNT_ID: u32 = 0xc1;
+    const HIJACK_FEE_AMOUNT: u32 = 100;
+
+    // Input data: account with the same ID, but different key..
+    let incorrect_account = WitnessTestAccount::new_empty(ACCOUNT_ID);
+
+    let accounts = vec![WitnessTestAccount::new(0xc1, 1000)];
+    let account = &accounts[0];
+
+    // Create a signed message and replace its signature.
+    let mut hijacked_tx = account.zksync_account.sign_change_pubkey_tx(
+        None,
+        true,
+        FEE_TOKEN,
+        Default::default(),
+        false,
+    );
+
+    // Change fee.
+    hijacked_tx.fee += HIJACK_FEE_AMOUNT;
+    // And now sign this message again with a different key.
+    hijacked_tx.signature = TxSignature::sign_musig(
+        &incorrect_account.zksync_account.private_key,
+        &hijacked_tx.get_bytes(),
+    );
+
+    let change_pkhash_op = ChangePubKeyOp {
+        tx: hijacked_tx,
+        account_id: account.id,
+    };
+
+    let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
+        .expect("SigDataInput creation failed");
+
+    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+        &accounts,
+        change_pkhash_op,
+        input,
+        ERR_MSG,
+        || {
+            vec![CollectedFee {
+                token: 0,
+                amount: HIJACK_FEE_AMOUNT.into(),
             }]
         },
     );
