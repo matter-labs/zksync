@@ -7,6 +7,8 @@ Used to generate server-env-custom configmap in the k8s cluster from etc/env fil
 
 . .setup_env
 
+set -e
+
 echo "Update server-env-custom configmap for zskync env: $ZKSYNC_ENV"
 
 update_configmap() {
