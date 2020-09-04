@@ -10,7 +10,6 @@ crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
 ethabi = "9.0.0"
 web3 = "0.10.0"
-diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono", "numeric"] }
 serde = "1.0.90"
 serde_derive = "1.0.90"
 serde_bytes = "0.11.1"
@@ -30,10 +29,6 @@ handlebars = "3.0.1"
 url = "2.1"
 reqwest = { version = "0.10.6", features = ["blocking"] }
 backoff = "0.1.6"
-
-jsonrpc-core = "14.0.3"
-jsonrpc-http-server = "14.0.3"
-jsonrpc-derive = "14.0.3"
 
 [dev-dependencies]
 criterion = "0.3.0"

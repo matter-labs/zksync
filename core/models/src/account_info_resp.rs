@@ -12,7 +12,7 @@ use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use num::{BigUint, ToPrimitive};
 // Workspace uses
-use crate::{
+use models::{
     config_options::{ConfigurationOptions, ThreadPanicNotify},
     node::{
         tx::{TxEthSignature, TxHash},
@@ -21,8 +21,29 @@ use crate::{
     },
     primitives::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper},
 };
+use storage::{
+    chain::{
+        block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
+        operations_ext::records::TxReceiptResponse,
+    },
+    ConnectionPool, StorageProcessor,
+};
 
-use crate::node::tx::EthSignData;
+// Local uses
+use crate::{
+    api_server::ops_counter::ChangePubKeyOpsCounter,
+    eth_watch::{EthBlockId, EthWatchRequest},
+    fee_ticker::{Fee, TickerRequest},
+    mempool::{MempoolRequest, TxAddError},
+    signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
+    state_keeper::StateKeeperRequest,
+    utils::{
+        current_zksync_info::CurrentZksyncInfo, shared_lru_cache::SharedLruCache,
+        token_db_cache::TokenDBCache,
+    },
+};
+use bigdecimal::BigDecimal;
+use models::node::tx::EthSignData;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -116,67 +137,4 @@ pub struct AccountInfoResp {
     depositing: DepositingAccountBalances,
     pub committed: ResponseAccountState,
     pub verified: ResponseAccountState,
-}
-
-/// Flattened `PriorityOp` object representing a deposit operation.
-/// Used in the `OngoingDepositsResp`.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OngoingDeposit {
-    received_on_block: u64,
-    token_id: u16,
-    amount: u128,
-    eth_tx_hash: String,
-}
-
-impl OngoingDeposit {
-    pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
-        let (token_id, amount) = match priority_op.data {
-            FranklinPriorityOp::Deposit(deposit) => (
-                deposit.token,
-                deposit
-                    .amount
-                    .to_u128()
-                    .expect("Deposit amount should be less then u128::max()"),
-            ),
-            other => {
-                panic!("Incorrect input for OngoingDeposit: {:?}", other);
-            }
-        };
-
-        let eth_tx_hash = hex::encode(&priority_op.eth_hash);
-
-        Self {
-            received_on_block,
-            token_id,
-            amount,
-            eth_tx_hash,
-        }
-    }
-}
-
-/// Information about ongoing deposits for certain recipient address.
-///
-/// Please note that since this response is based on the events that are
-/// currently awaiting confirmations, this information is approximate:
-/// blocks on Ethereum can be reverted, and final list of executed deposits
-/// can differ from the this estimation.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OngoingDepositsResp {
-    /// Address for which response is served.
-    address: Address,
-    /// List of tuples (Eth block number, Deposit operation) of ongoing
-    /// deposit operations.
-    deposits: Vec<OngoingDeposit>,
-
-    /// Amount of confirmations required for every deposit to be processed.
-    confirmations_for_eth_event: u64,
-
-    /// Estimated block number for deposits completions:
-    /// all the deposit operations for provided address are expected to be
-    /// accepted in the zkSync network upon reaching this blocks.
-    ///
-    /// Can be `None` if there are no ongoing deposits.
-    estimated_deposits_approval_block: Option<u64>,
 }

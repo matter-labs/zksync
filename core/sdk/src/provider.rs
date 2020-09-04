@@ -10,12 +10,9 @@ use jsonrpc_core::types::response::Output;
 use num::BigUint;
 
 // Workspace uses
-use models::{
-    account_info_resp::AccountInfoResp,
-    node::{
-        tx::{FranklinTx, PackedEthSignature, TxHash},
-        Address,
-    },
+use models::node::{
+    tx::{FranklinTx, PackedEthSignature, TxHash},
+    Address,
 };
 use server::api_server::rpc_server::AccountInfoResp;
 
