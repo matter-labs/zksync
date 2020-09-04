@@ -23,7 +23,10 @@ case $ZKSYNC_ENV in
     development)
         update_configmap dev
         ;;
-    stage | prod | rinkeby | ropsten | breaking)
+    prod)
+        update_configmap zksync
+        ;;
+    stage | rinkeby | ropsten | breaking)
         update_configmap $ZKSYNC_ENV
         ;;
     -h|--h)
