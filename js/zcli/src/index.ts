@@ -7,28 +7,27 @@ import { Network } from './common';
 
 function print(object: any) {
     console.log(JSON.stringify(object, null, 4));
-};
+}
 
 async function main() {
-
     const config = loadConfig();
     const program = new Command();
 
     program
-        .version("0.1.0")
-        .name("zcli")
-        .option("-n, --network <network>", "select network", config.network)
+        .version('0.1.0')
+        .name('zcli')
+        .option('-n, --network <network>', 'select network', config.network);
 
     program
-        .command("account <address>")
-        .description("view account info")
+        .command('account <address>')
+        .description('view account info')
         .action(async (address: string) => {
             print(await commands.accountInfo(address, program.network));
         });
 
     program
-        .command("transaction <tx_hash>")
-        .description("view transaction info")
+        .command('transaction <tx_hash>')
+        .description('view transaction info')
         .action(async (tx_hash: string) => {
             print(await commands.txInfo(tx_hash, program.network));
         });
@@ -39,9 +38,7 @@ async function main() {
         .description('view configured networks')
         .action(async () => {
             print(await commands.availableNetworks());
-        });
-
-    networks
+        })
         .command('default [network]')
         .description('print or set default network')
         .action((network?: Network) => {
@@ -57,9 +54,7 @@ async function main() {
         .description('view saved wallets')
         .action(() => {
             print(commands.listWallets(config));
-        });
-
-    wallets
+        })
         .command('add [private_key]')
         .description('create or import a wallet')
         .action((privkey?: string) => {
@@ -93,4 +88,3 @@ main()
         console.error(err);
         process.exit(1);
     });
-

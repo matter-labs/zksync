@@ -34,10 +34,8 @@ export function loadConfig(): Config {
         assert(ALL_NETWORKS.includes(parsed.network));
         assert(Array.isArray(parsed.wallets));
         assert(
-            parsed.defaultWallet === null
-            || parsed.wallets
-                .map((w: Wallet) => w.address)
-                .includes(parsed.defaultWallet)
+            parsed.defaultWallet === null ||
+                parsed.wallets.map((w: Wallet) => w.address).includes(parsed.defaultWallet)
         );
         return parsed;
     } catch (err) {
@@ -51,4 +49,3 @@ export function saveConfig(config: Config) {
     const config_string = JSON.stringify(config, null, 4);
     fs.writeFileSync(config_path, config_string);
 }
-

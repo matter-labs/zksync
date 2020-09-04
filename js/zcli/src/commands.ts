@@ -6,8 +6,16 @@ import { ALL_NETWORKS, Network, Wallet, Config, AccountInfo, TxInfo } from './co
 
 async function tokenInfo(id: number, provider: zksync.Provider) {
     const tokens = await provider.getTokens();
-    const tokenInfo = Object.values(tokens).find(value => value.id == id);
+    const tokenInfo = Object.values(tokens).find((value) => value.id == id);
     return tokenInfo;
+}
+
+function apiServer(network: Network) {
+    if (network === 'localhost') {
+        return 'http://localhost:3001';
+    }
+    const subdomain = network === 'mainnet' ? 'api' : `${network}-api`;
+    return `https://${subdomain}.zksync.io`;
 }
 
 export async function accountInfo(address: string, network: Network): Promise<AccountInfo> {
@@ -28,8 +36,7 @@ export async function accountInfo(address: string, network: Network): Promise<Ac
 }
 
 export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo> {
-    const subdomain = network === 'mainnet' ? 'api' : `${network}-api`
-    const api_url = `https://${subdomain}.zksync.io/api/v0.1/transactions_all/${tx_hash}`;
+    const api_url = `${apiServer(network)}/api/v0.1/transactions_all/${tx_hash}`;
     const response = await fetch(api_url);
     const tx = await response.json();
     if (tx === null) {
@@ -65,7 +72,9 @@ export async function availableNetworks() {
             const provider = await zksync.getDefaultProvider(network);
             provider.disconnect();
             networks.push(network);
-        } catch (err) { /* could not connect to provider */ }
+        } catch (err) {
+            /* could not connect to provider */
+        }
     }
     return networks;
 }
@@ -105,8 +114,7 @@ export function listWallets(config: Config) {
 
 export function removeWallet(config: Config, address: string) {
     address = address.toLowerCase();
-    config.wallets = config.wallets
-        .filter((w: Wallet) => w.address != address);
+    config.wallets = config.wallets.filter((w: Wallet) => w.address != address);
     if (config.defaultWallet === address) {
         config.defaultWallet = null;
     }
@@ -116,8 +124,7 @@ export function removeWallet(config: Config, address: string) {
 export function defaultWallet(config: Config, address?: string) {
     if (address) {
         address = address.toLowerCase();
-        const addresses = config.wallets
-            .map((w: Wallet) => w.address);
+        const addresses = config.wallets.map((w: Wallet) => w.address);
         if (addresses.includes(address)) {
             config.defaultWallet = address;
             saveConfig(config);

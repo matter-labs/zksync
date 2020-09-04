@@ -20,7 +20,9 @@ describe('Transaction Info', () => {
         nonce: faker.random.number(1000),
         created_at: faker.date.past(),
         fail_reason: null,
-        tx: { /* does not matter */ }
+        tx: {
+            /* does not matter */
+        }
     };
 
     afterEach('uninstall mock fetch', () => {
@@ -31,7 +33,9 @@ describe('Transaction Info', () => {
         fetchMock.getOnce(/.*api\.zksync\.io.*/, fake_tx);
         await txInfo(tx_hash, 'ropsten');
         expect(fetchMock.done()).to.be.true;
-        expect(fetchMock.lastUrl()).to.equal(`https://ropsten-api.zksync.io/api/v0.1/transactions_all/${tx_hash}`);
+        expect(fetchMock.lastUrl()).to.equal(
+            `https://ropsten-api.zksync.io/api/v0.1/transactions_all/${tx_hash}`
+        );
     });
 
     it('should format token amounts', async () => {
@@ -70,13 +74,11 @@ describe('Account Info', () => {
         expect(info.network).to.equal('ropsten');
         expect(info.nonce).to.be.a('number');
         expect(info.balances).to.be.an('object');
-        expect(info.account_id).to.satisfy(
-            (id: any) => id === null || typeof id === 'number'
-        );
+        expect(info.account_id).to.satisfy((id: any) => id === null || typeof id === 'number');
     });
 
     it('should fail on invalid network', () => {
         const invalid_network = 'random' as Network;
         expect(accountInfo(fake_address, invalid_network)).to.be.rejected;
-    })
+    });
 });
