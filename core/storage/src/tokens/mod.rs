@@ -52,9 +52,7 @@ impl<'a> TokensSchema<'a> {
 
     /// Get the number of tokens from Database
     pub fn get_count(&self) -> QueryResult<i64> {
-        let count: i64 = tokens::table.count().get_result(self.0.conn())?;
-
-        Ok(count)
+        tokens::table.count().get_result(self.0.conn())
     }
 
     /// Given the numeric token ID, symbol or address, returns token.

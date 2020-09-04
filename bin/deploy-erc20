@@ -10,7 +10,7 @@ where:
     new [-n --name] [-s --symbol] [-d --decimals]
             deploy token with given fields
     dev     
-            deploy preparatory tokens for development'
+            deploy prepared tokens for initialization of the local network token list'
 
 . .setup_env
 cd contracts/
