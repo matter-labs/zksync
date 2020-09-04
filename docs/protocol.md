@@ -20,7 +20,7 @@
     + [4. Withdraw (Partial Exit)](#4-withdraw-partial-exit)
     + [5. Deposit](#5-deposit)
     + [7. Change pubkey](#7-change-pubkey)
-    + [8. Forced exit](#6-forced-exit)
+    + [8. Forced exit](#8-forced-exit)
   * [Smart contracts API](#smart-contracts-api)
     + [Rollup contract](#rollup-contract)
       - [Deposit Ether](#deposit-ether)
