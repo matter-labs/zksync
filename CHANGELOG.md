@@ -1,9 +1,7 @@
 # zkSync changelog
 
-### zksync.js 0.7.0
+### zksync.js 0.6.4
 
-- `setSigningKey` method now accepts object (similarly to other transaction submitting methods) and require an optionally set fee field.
-- Support of a new operation -- `ForcedExit` -- was added.
 - Support of fast withdrawals was added. Corresponding optional field was added to the object passed to the `withdrawFromSyncToEthereum` method
   and `getTransactionFee` now accepts `FastWithdraw` fee type.
 
