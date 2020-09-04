@@ -42,6 +42,7 @@ use crate::{
     state_keeper::StateKeeperRequest,
 };
 use models::config_options::TokenPriceSource;
+use models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
 
 mod ticker_api;
 mod ticker_info;
@@ -58,7 +59,8 @@ const BASE_TRANSFER_TO_NEW_COST: u64 = VerifyCost::TRANSFER_TO_NEW_COST
 const BASE_WITHDRAW_COST: u64 = VerifyCost::WITHDRAW_COST
     + CommitCost::WITHDRAW_COST
     + GasCounter::COMPLETE_WITHDRAWALS_COST
-    + 1000 * (WithdrawOp::CHUNKS as u64);
+    + 1000 * (WithdrawOp::CHUNKS as u64)
+    + (GasCounter::COMPLETE_WITHDRAWALS_BASE_COST / MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL);
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
