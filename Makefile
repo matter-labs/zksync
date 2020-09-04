@@ -1,4 +1,4 @@
-export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
+export IMAGE_TAG = $(shell git rev-parse --short HEAD)
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
 export SERVER_DOCKER_IMAGE_LATEST ?=matterlabs/server:latest
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)

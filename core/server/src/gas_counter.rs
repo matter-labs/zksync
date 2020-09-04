@@ -115,8 +115,8 @@ impl Default for GasCounter {
 
 impl GasCounter {
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
-    const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
-    const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
+    pub const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
+    pub const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
 
     pub fn new() -> Self {
         Self::default()
