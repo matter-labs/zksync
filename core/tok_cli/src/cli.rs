@@ -2,7 +2,7 @@
 
 use structopt::StructOpt;
 
-/// cli parameters.
+/// CLI parameters.
 #[derive(Debug, StructOpt)]
 #[structopt(name = "tok_cli", about = "Tool for token addition")]
 pub enum App {

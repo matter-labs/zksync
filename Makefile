@@ -160,8 +160,6 @@ prepare-test-contracts:
 build-contracts: confirm_action
 	@cargo run --release --bin gen_token_add_contract
 	@cd contracts && yarn build
-
-
 	
 # testing
 

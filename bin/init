@@ -11,7 +11,7 @@ zksync plonk-setup check || zksync plonk-setup download
 zksync verify-keys unpack
 zksync db-setup
 zksync build-dev-contracts
-zksync deploy-dev-erc20
+zksync deploy-erc20 dev
 zksync build-contracts
 zksync genesis
 zksync redeploy

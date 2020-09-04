@@ -1,0 +1,33 @@
+#!/bin/bash
+
+USAGE='Usage: zksync deploy-ec20'
+
+. .setup_env
+cd contracts/
+
+COMMAND=$1
+
+case $COMMAND in 
+  new)
+       yarn --silent deploy-erc20 add --name $2 --symbol $3 --decimals $4
+      ;;
+  dev)
+      echo "Deploying ERC20 token for localhost"
+      yarn --silent deploy-erc20 add-multi '
+      [
+        {"name":"DAI","symbol":"DAI","decimals":18},
+        {"name":"wBTC","symbol":"wBTC","decimals":8},
+        {"name": "BAT", "symbol": "BAT", "decimals": 18},
+        {"name": "MLTT", "symbol": "MLTT", "decimals": 18}
+      ]' > $ZKSYNC_HOME/etc/tokens/localhost.json >> $ZKSYNC_HOME/etc/tokens/localhost.json
+      ;;
+  -h | --help)
+      echo "$USAGE"
+      exit 0
+    ;;
+  *)
+      echo Unknown commands
+      echo "$USAGE"
+      exit 1
+    ;;
+esac

@@ -18,9 +18,8 @@ use web3::{
     types::{Address, H256},
 };
 
-// Local uses
-use models::node::tokens;
-use models::node::TokenId;
+// Workspace uses
+use models::node::{tokens, TokenId};
 
 /// Token that contains information to add to the server
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -89,8 +88,10 @@ impl Token {
     }
 
     pub async fn deploy_test_token(name: &str, decimals: u8, symbol: &str) -> Result<Token> {
-        let stdout =
-            run_external_command("deploy-erc20.sh", &[name, symbol, &decimals.to_string()])?;
+        let stdout = run_external_command(
+            "deploy-erc20",
+            &["new", name, symbol, &decimals.to_string()],
+        )?;
 
         serde_json::from_str(&stdout).map_err(|_e| anyhow::anyhow!("Error decode token from json"))
     }
@@ -117,7 +118,7 @@ impl Token {
         let client = Client::new();
 
         let start = SystemTime::now();
-        let seconds_active = 15 * 60; // 15 minute
+        let seconds_active = 15 * 60; // 15 minutes
         let active_to = start.duration_since(UNIX_EPOCH)?.as_secs() + seconds_active;
 
         let query_to_tokens = format!("{}tokens", endpoint_addr.to_string());
