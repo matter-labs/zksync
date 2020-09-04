@@ -32,6 +32,7 @@ use storage::ConnectionPool;
 // Local deps
 use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
 use crate::fee_ticker::ticker_api::coinmarkercap::CoinMarketCapAPI;
+use crate::gas_counter::{CommitCost, GasCounter, VerifyCost};
 use crate::{
     eth_sender::ETHSenderRequest,
     fee_ticker::{
@@ -46,10 +47,18 @@ mod ticker_api;
 mod ticker_info;
 
 // Base operation costs estimated via `gas_price` test.
-const BASE_TRANSFER_COST: u32 = 350;
-/// TODO: change to real value after lauch settles: issue #743
-const BASE_TRANSFER_TO_NEW_COST: u32 = 350;
-const BASE_WITHDRAW_COST: u32 = 90_000;
+//
+// Factor of 1000 * CHUNKS accounts for constant overhead of the commit and verify for block of 680 chunks
+// (140k + 530k) / 680. Should be removed after recursion is introduced to mainnet.
+const BASE_TRANSFER_COST: u64 =
+    VerifyCost::TRANSFER_COST + CommitCost::TRANSFER_COST + 1000 * (TransferOp::CHUNKS as u64);
+const BASE_TRANSFER_TO_NEW_COST: u64 = VerifyCost::TRANSFER_TO_NEW_COST
+    + CommitCost::TRANSFER_TO_NEW_COST
+    + 1000 * (TransferToNewOp::CHUNKS as u64);
+const BASE_WITHDRAW_COST: u64 = VerifyCost::WITHDRAW_COST
+    + CommitCost::WITHDRAW_COST
+    + GasCounter::COMPLETE_WITHDRAWALS_COST
+    + 1000 * (WithdrawOp::CHUNKS as u64);
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
