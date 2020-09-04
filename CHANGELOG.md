@@ -6,6 +6,11 @@
 - Added support for the forced exit operation which allows user to force a withdrawal from another account
   that does not have signing key set and is older than 24h.
 
+### zksync.js 0.6.5
+
+- Support of fast withdrawals was added. Corresponding optional field was added to the object passed to the `withdrawFromSyncToEthereum` method
+  and `getTransactionFee` now accepts `FastWithdraw` fee type.
+
 ### zksync.js 0.6.3
 
 - Bundled version for browsers added. File `dist/main.js` can be used in `<script>` html tag.

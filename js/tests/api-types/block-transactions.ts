@@ -51,23 +51,24 @@ type ChangePubKey = {
 };
 
 type Withdraw = {
-    tx_hash: string;
-    block_number: number;
-    op: {
-        amount: string;
-        fee: string;
-        from: string;
-        accountId: number;
-        nonce: number;
-        signature: {
-            pubKey: string;
-            signature: string;
-        };
-        to: string;
-        token: number;
-        type: "Withdraw";
-    };
-    created_at: string;
+    "tx_hash": string,
+    "block_number": number,
+    "op": {
+        "amount": string,
+        "fee": string,
+        "from": string,
+        "accountId": number,
+        "nonce": number,
+        "signature": {
+            "pubKey": string,
+            "signature": string,
+        },
+        "to": string,
+        "token": number,
+        "type": "Withdraw",
+        "fast": boolean
+    },
+    "created_at": string,
 };
 
 type FullExit = {

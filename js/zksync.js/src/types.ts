@@ -168,7 +168,7 @@ export interface ChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: "Withdraw" | "Transfer" | "TransferToNew" | ChangePubKeyFee;
+    feeType: "Withdraw" | "Transfer" | "TransferToNew" | "FastWithdraw" | ChangePubKeyFee;
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)
