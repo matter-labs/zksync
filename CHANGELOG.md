@@ -1,6 +1,6 @@
 # zkSync changelog
 
-### zksync.js 0.6.4
+### zksync.js 0.6.5
 
 - Support of fast withdrawals was added. Corresponding optional field was added to the object passed to the `withdrawFromSyncToEthereum` method
   and `getTransactionFee` now accepts `FastWithdraw` fee type.
