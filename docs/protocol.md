@@ -989,7 +989,7 @@ def tree_updates():
     account.pubkey_hash = ChangePkOp.tx.new_pubkey_hash
     account.nonce += 1
 
-    fee_account.balance[WithdrawOp.token] += fee
+    fee_account.balance[ChangePkOp.token] += fee
 
 def pubdata_invariants():
     OnhcainOp.opcode == 0x07
