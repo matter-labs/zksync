@@ -17,7 +17,9 @@ pub struct MempoolSchema<'a>(pub &'a StorageProcessor);
 impl<'a> MempoolSchema<'a> {
     /// Loads all the transactions stored in the mempool schema.
     pub fn load_txs(&self) -> Result<VecDeque<SignedFranklinTx>, failure::Error> {
-        let txs: Vec<MempoolTx> = mempool_txs::table.load(self.0.conn())?;
+        let txs: Vec<MempoolTx> = mempool_txs::table
+            .order_by(mempool_txs::created_at)
+            .load(self.0.conn())?;
 
         let txs = txs
             .into_iter()
