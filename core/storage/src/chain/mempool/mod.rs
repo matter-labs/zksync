@@ -21,7 +21,7 @@ impl<'a> MempoolSchema<'a> {
             .order_by(mempool_txs::created_at)
             .load(self.0.conn())?;
 
-        let txs = txs
+        let mut txs = txs
             .into_iter()
             .map(|tx_object| -> Result<SignedFranklinTx, failure::Error> {
                 let tx = serde_json::from_value(tx_object.tx)?;
@@ -35,8 +35,9 @@ impl<'a> MempoolSchema<'a> {
                     eth_sign_data: sign_data,
                 })
             })
-            .collect::<Result<VecDeque<SignedFranklinTx>, _>>()?;
-        Ok(txs)
+            .collect::<Result<Vec<SignedFranklinTx>, _>>()?;
+        txs.sort_by_key(|signed_tx| signed_tx.tx.nonce());
+        Ok(txs.into())
     }
 
     /// Adds a new transaction to the mempool schema.
