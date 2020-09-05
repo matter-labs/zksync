@@ -36,7 +36,7 @@ case $COMMAND in
       exit 0
     ;;
   *)
-      echo Unknown commands
+      echo Unknown command
       echo "$USAGE"
       exit 1
     ;;
