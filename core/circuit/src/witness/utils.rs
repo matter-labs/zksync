@@ -106,7 +106,7 @@ impl<'a> WitnessBuilder<'a> {
     /// After operations are added, collect fees.
     pub fn collect_fees(&mut self, fees: &[CollectedFee]) {
         self.root_before_fees = Some(self.account_tree.root_hash());
-
+        println!("root be fore fee {:?}", self.root_before_fees );
         let fee_circuit_account = self
             .account_tree
             .get(self.fee_account_id)

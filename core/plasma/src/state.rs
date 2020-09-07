@@ -700,11 +700,11 @@ impl PlasmaState {
 
         ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
-            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            from_old_balance >= op.tx.amount ,
             "Not enough balance"
         );
 
-        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
+        from_account.sub_balance(op.tx.token, &op.tx.amount);
         from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(op.tx.token);
@@ -712,8 +712,6 @@ impl PlasmaState {
 
         let to_old_balance = to_account.get_balance(op.tx.token);
         let to_account_nonce = to_account.nonce;
-
-        to_account.add_balance(op.tx.token, &op.tx.amount);
 
         let to_new_balance = to_account.get_balance(op.tx.token);
 
@@ -740,7 +738,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: op.tx.token,
-            amount: op.tx.fee.clone(),
+            amount:  BigUint::from(0 as u64),
         };
 
         Ok((fee, updates))
@@ -767,11 +765,10 @@ impl PlasmaState {
 
         ensure!(op.tx.nonce == old_nonce, "Nonce mismatch");
         ensure!(
-            old_balance >= &op.tx.amount + &op.tx.fee,
+            old_balance >= op.tx.amount ,
             "Not enough balance"
         );
 
-        account.sub_balance(op.tx.token, &op.tx.fee);
         account.nonce += 1;
 
         let new_balance = account.get_balance(op.tx.token);
@@ -790,7 +787,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: op.tx.token,
-            amount: op.tx.fee.clone(),
+            amount:  BigUint::from(0 as u64),
         };
 
         Ok((fee, updates))

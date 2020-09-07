@@ -110,7 +110,7 @@ pub struct TransferToNewOp {
 }
 
 impl TransferToNewOp {
-    pub const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 5;
     pub const OP_CODE: u8 = 0x02;
 
     fn get_public_data(&self) -> Vec<u8> {
@@ -182,7 +182,7 @@ pub struct TransferOp {
 }
 
 impl TransferOp {
-    pub const CHUNKS: usize = 2;
+    pub const CHUNKS: usize = 1;
     pub const OP_CODE: u8 = 0x05;
 
     fn get_public_data(&self) -> Vec<u8> {

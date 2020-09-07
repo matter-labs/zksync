@@ -42,7 +42,7 @@ fn test_transfer_success() {
                     0,
                     "",
                     BigUint::from(transfer_amount),
-                    BigUint::from(fee_amount),
+                    BigUint::from(0 as u64),
                     &account_to.account.address,
                     None,
                     true,

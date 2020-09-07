@@ -6,6 +6,7 @@ use std::{thread, time};
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use futures::channel::mpsc;
 use log::info;
+use num::BigUint;
 // Workspace deps
 use circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
@@ -299,7 +300,7 @@ impl Maintainer {
                     operations.extend(transfer_operations);
                     fees.push(CollectedFee {
                         token: transfer.tx.token,
-                        amount: transfer.tx.fee,
+                        amount: BigUint::from(0 as u64),
                     });
                     pub_data.extend(transfer_witness.get_pubdata());
                 }

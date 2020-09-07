@@ -29,7 +29,6 @@ use crate::{
         Witness,
     },
 };
-use models::node::operations::ChangePubKeyOp;
 
 pub struct TransferToNewData {
     pub amount: u128,
@@ -153,7 +152,7 @@ impl Witness for TransferToNewWitness<Bn256> {
             rhs: self.to_intermediate.clone(),
         };
 
-        let rest_operations = (2..ChangePubKeyOp::CHUNKS).map(|chunk| Operation {
+        let rest_operations = (2..TransferToNewOp::CHUNKS).map(|chunk| Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
             chunk: Some(Fr::from_str(&chunk.to_string()).unwrap()),

@@ -44,10 +44,10 @@ mod ticker_api;
 mod ticker_info;
 
 // Base operation costs estimated via `gas_price` test.
-const BASE_TRANSFER_COST: u32 = 350;
+const BASE_TRANSFER_COST: u32 = 0;
 /// TODO: change to real value after lauch settles: issue #743
-const BASE_TRANSFER_TO_NEW_COST: u32 = 350;
-const BASE_WITHDRAW_COST: u32 = 90_000;
+const BASE_TRANSFER_TO_NEW_COST: u32 = 0;
+const BASE_WITHDRAW_COST: u32 = 0;
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee

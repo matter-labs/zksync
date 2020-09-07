@@ -56,6 +56,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
         &self,
         start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
     ) -> Result<(), BabyProverError> {
+        println!{"starting next round \n\n\n"};
         // first we try last proved block, since we have precomputations for it
         let block_size_idx_to_try_first =
             if let Some(precomp) = self.prepared_computations.lock().unwrap().as_ref() {

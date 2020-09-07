@@ -86,10 +86,11 @@ struct PreviousData<E: RescueEngine> {
 // Implementation of our circuit:
 impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+        log::info!("Start Synthezie block.");
+        println!("start synthesize \n\n\n");
         let zero = AllocatedNum::alloc(cs.namespace(|| "allocate element equal to zero"), || {
             Ok(E::Fr::zero())
         })?;
-
         zero.assert_zero(cs.namespace(|| "enforce zero on the zero element"))?;
 
         // we only need this for consistency of first operation
@@ -179,6 +180,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
+            println!("operation: type{:?}, chunk{:?}, pubChunk{:?}", operation.tx_type, operation.chunk, operation.pubdata_chunk);
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
@@ -1875,9 +1877,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
         pubdata_bits.extend(lhs.account_id.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
-        pubdata_bits.extend(rhs.account_id.get_bits_be());
-        pubdata_bits.extend(op_data.amount_packed.get_bits_be());
-        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+        // pubdata_bits.extend(rhs.account_id.get_bits_be());
+        // pubdata_bits.extend(op_data.amount_packed.get_bits_be());
+        // pubdata_bits.extend(op_data.fee_packed.get_bits_be());
 
         resize_grow_only(
             &mut pubdata_bits,
