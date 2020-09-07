@@ -32,6 +32,7 @@ use storage::ConnectionPool;
 // Local deps
 use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
 use crate::fee_ticker::ticker_api::coinmarkercap::CoinMarketCapAPI;
+use crate::gas_counter::{CommitCost, GasCounter, VerifyCost};
 use crate::{
     eth_sender::ETHSenderRequest,
     fee_ticker::{
@@ -41,15 +42,25 @@ use crate::{
     state_keeper::StateKeeperRequest,
 };
 use models::config_options::TokenPriceSource;
+use models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
 
 mod ticker_api;
 mod ticker_info;
 
 // Base operation costs estimated via `gas_price` test.
-const BASE_TRANSFER_COST: u32 = 350;
-/// TODO: change to real value after lauch settles: issue #743
-const BASE_TRANSFER_TO_NEW_COST: u32 = 350;
-const BASE_WITHDRAW_COST: u32 = 90_000;
+//
+// Factor of 1000 * CHUNKS accounts for constant overhead of the commit and verify for block of 680 chunks
+// (140k + 530k) / 680. Should be removed after recursion is introduced to mainnet.
+const BASE_TRANSFER_COST: u64 =
+    VerifyCost::TRANSFER_COST + CommitCost::TRANSFER_COST + 1000 * (TransferOp::CHUNKS as u64);
+const BASE_TRANSFER_TO_NEW_COST: u64 = VerifyCost::TRANSFER_TO_NEW_COST
+    + CommitCost::TRANSFER_TO_NEW_COST
+    + 1000 * (TransferToNewOp::CHUNKS as u64);
+const BASE_WITHDRAW_COST: u64 = VerifyCost::WITHDRAW_COST
+    + CommitCost::WITHDRAW_COST
+    + GasCounter::COMPLETE_WITHDRAWALS_COST
+    + 1000 * (WithdrawOp::CHUNKS as u64)
+    + (GasCounter::COMPLETE_WITHDRAWALS_BASE_COST / MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL);
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
@@ -62,6 +73,7 @@ pub enum OutputFeeType {
     Transfer,
     TransferToNew,
     Withdraw,
+    FastWithdraw,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -136,12 +148,17 @@ struct FeeTicker<API, INFO> {
 #[must_use]
 pub fn run_ticker_task(
     token_price_source: TokenPriceSource,
+    fast_processing_coeff: f64,
     db_pool: ConnectionPool,
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
     runtime: &Runtime,
 ) -> JoinHandle<()> {
+    // We increase gas price for fast withdrawals, since it will induce generating a smaller block
+    // size, resulting in us paying more gas than for bigger block.
+    let fast_withdrawal_cost = (BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
+
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: vec![
@@ -151,6 +168,7 @@ pub fn run_ticker_task(
                 BASE_TRANSFER_TO_NEW_COST.into(),
             ),
             (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
+            (OutputFeeType::FastWithdraw, fast_withdrawal_cost.into()),
         ]
         .into_iter()
         .collect(),
@@ -243,6 +261,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
 
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
+            TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::Transfer => {
                 if self.is_account_new(recipient).await {
                     (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)

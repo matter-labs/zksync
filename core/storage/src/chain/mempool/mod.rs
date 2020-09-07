@@ -17,9 +17,11 @@ pub struct MempoolSchema<'a>(pub &'a StorageProcessor);
 impl<'a> MempoolSchema<'a> {
     /// Loads all the transactions stored in the mempool schema.
     pub fn load_txs(&self) -> Result<VecDeque<SignedFranklinTx>, failure::Error> {
-        let txs: Vec<MempoolTx> = mempool_txs::table.load(self.0.conn())?;
+        let txs: Vec<MempoolTx> = mempool_txs::table
+            .order_by(mempool_txs::created_at)
+            .load(self.0.conn())?;
 
-        let txs = txs
+        let mut txs = txs
             .into_iter()
             .map(|tx_object| -> Result<SignedFranklinTx, failure::Error> {
                 let tx = serde_json::from_value(tx_object.tx)?;
@@ -33,8 +35,9 @@ impl<'a> MempoolSchema<'a> {
                     eth_sign_data: sign_data,
                 })
             })
-            .collect::<Result<VecDeque<SignedFranklinTx>, _>>()?;
-        Ok(txs)
+            .collect::<Result<Vec<SignedFranklinTx>, _>>()?;
+        txs.sort_by_key(|signed_tx| signed_tx.tx.nonce());
+        Ok(txs.into())
     }
 
     /// Adds a new transaction to the mempool schema.

@@ -12,7 +12,7 @@ use futures::{
 };
 use tokio::{runtime::Runtime, task::JoinHandle, time};
 // Workspace deps
-use models::node::config::TX_MINIBATCH_CREATE_TIME;
+use models::config_options::ConfigurationOptions;
 // Local deps
 use crate::{
     mempool::{GetBlockRequest, MempoolRequest, ProposedBlock},
@@ -64,12 +64,16 @@ impl BlockProposer {
 // driving engine of the application
 #[must_use]
 pub fn run_block_proposer_task(
+    config_options: &ConfigurationOptions,
     mempool_requests: mpsc::Sender<MempoolRequest>,
     mut statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
     runtime: &Runtime,
 ) -> JoinHandle<()> {
+    let miniblock_interval = config_options
+        .miniblock_timings
+        .miniblock_iteration_interval;
     runtime.spawn(async move {
-        let mut timer = time::interval(TX_MINIBATCH_CREATE_TIME);
+        let mut timer = time::interval(miniblock_interval);
 
         let last_unprocessed_prior_op_chan = oneshot::channel();
         statekeeper_requests

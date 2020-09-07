@@ -164,8 +164,8 @@ fn main() {
         proposed_blocks_sender,
         executed_tx_notify_sender,
         config_opts.available_block_chunk_sizes.clone(),
-        config_opts.max_miniblock_iterations,
-        config_opts.max_miniblock_iterations_withdraw_block,
+        config_opts.miniblock_timings.max_miniblock_iterations,
+        config_opts.miniblock_timings.fast_miniblock_iterations,
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block, &main_runtime);
 
@@ -218,6 +218,7 @@ fn main() {
         &main_runtime,
     );
     let proposer_task = run_block_proposer_task(
+        &config_opts,
         mempool_request_sender,
         state_keeper_req_sender.clone(),
         &main_runtime,
@@ -225,6 +226,7 @@ fn main() {
 
     let ticker_task = run_ticker_task(
         config_opts.token_price_source.clone(),
+        config_opts.ticker_fast_processing_coeff,
         connection_pool.clone(),
         eth_send_request_sender,
         state_keeper_req_sender,
