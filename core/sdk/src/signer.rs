@@ -1,4 +1,5 @@
 // Signer. TODO: describe what's here.
+// NOTE: From: https://github.com/matter-labs/zksync-dev/blob/dev/core/testkit/src/zksync_account.rs
 
 // Built-in imports
 use std::{fmt, sync::Mutex};
@@ -6,20 +7,16 @@ use std::{fmt, sync::Mutex};
 use num::BigUint;
 use web3::types::H256;
 // Workspace uses
-use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    priv_key_from_fs, AccountId, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer,
-    Withdraw,
+    AccountId, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
-
-/// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct Signer {
     pub private_key: PrivateKey,
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
     pub eth_private_key: H256,
-    account_id: Mutex<Option<AccountId>>,
+    account_id: Mutex<Option<AccountId>>, // NOTE: this field is never used. Should I remove it?
     nonce: Mutex<Nonce>,
 }
 
@@ -30,7 +27,6 @@ impl fmt::Debug for Signer {
         self.private_key
             .write(&mut pk_contents)
             .expect("Failed writing the private key contents");
-
         f.debug_struct("Signer")
             .field("private_key", &pk_contents)
             .field("pubkey_hash", &self.pubkey_hash)
@@ -41,26 +37,8 @@ impl fmt::Debug for Signer {
     }
 }
 
+// TODO: I don't understand what nonce is doing in this context, so it's possible/likely I've done something silly here, setting to zero
 impl Signer {
-    /// Note: probably not secure, use for testing.
-    pub fn rand() -> Self {
-        let rng = &mut thread_rng();
-
-        let pk = priv_key_from_fs(rng.gen());
-        let (eth_pk, eth_address) = {
-            let eth_pk = rng.gen::<[u8; 32]>().into();
-            let eth_address;
-            loop {
-                if let Ok(address) = PackedEthSignature::address_from_private_key(&eth_pk) {
-                    eth_address = address;
-                    break;
-                }
-            }
-            (eth_pk, eth_address)
-        };
-        Self::new(pk, 0, eth_address, eth_pk)
-    }
-
     pub fn new(
         private_key: PrivateKey,
         nonce: Nonce,
@@ -75,30 +53,50 @@ impl Signer {
             "address should correspond to private key"
         );
         Self {
-            account_id: Mutex::new(None),
-            address,
             private_key,
             pubkey_hash,
-            eth_private_key,
+            address,
+            eth_private_key: eth_private_key,
+            account_id: Mutex::new(None),
             nonce: Mutex::new(nonce),
         }
     }
 
-    pub fn nonce(&self) -> Nonce {
-        let n = self.nonce.lock().unwrap();
-        *n
+    pub fn new_from_seed(
+        seed: &[u8],
+        nonce: Nonce,
+        address: Address,
+        eth_private_key: H256,
+    ) -> Signer {
+        let private_key = PrivateKey::read(seed).unwrap(); // TODO: refactor unwrap
+        Self::new(private_key, nonce, address, eth_private_key)
     }
+    // NOTE: Do I need to refactor the above to something more like below?
+    /*
+            pub fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
+                let sha256_bytes = |input: &[u8]| -> Vec<u8> {
+                    let mut hasher = Sha256::new();
+                    hasher.input(input);
+                    hasher.result().to_vec()
+                };
 
-    pub fn set_nonce(&self, new_nonce: Nonce) {
-        *self.nonce.lock().unwrap() = new_nonce;
-    }
+                let mut effective_seed = sha256_bytes(seed);
 
-    pub fn set_account_id(&self, account_id: Option<AccountId>) {
-        *self.account_id.lock().unwrap() = account_id;
-    }
-
-    pub fn get_account_id(&self) -> Option<AccountId> {
-        *self.account_id.lock().unwrap()
+                loop {
+                    let raw_priv_key = sha256_bytes(&effective_seed);
+                    let mut fs_repr = FsRepr::default();
+                    fs_repr
+                        .read_be(&raw_priv_key[..])
+                        .expect("failed to read raw_priv_key");
+                    if Fs::from_repr(fs_repr).is_ok() {
+                        return raw_priv_key;
+                    } else {
+                        effective_seed = raw_priv_key;
+                    }
+                }
+    }*/
+    pub fn pubkey_hash(&self) -> &PubKeyHash {
+        &self.pubkey_hash
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -140,6 +138,24 @@ impl Signer {
         )
         .expect("Signing the transfer unexpectedly failed");
         (transfer, eth_signature)
+    }
+
+    // NOTE: the rest of these aren't in the spec, but I kept them in. Possibly change their public scope?
+    pub fn nonce(&self) -> Nonce {
+        let n = self.nonce.lock().unwrap();
+        *n
+    }
+
+    pub fn set_nonce(&self, new_nonce: Nonce) {
+        *self.nonce.lock().unwrap() = new_nonce;
+    }
+
+    pub fn set_account_id(&self, account_id: Option<AccountId>) {
+        *self.account_id.lock().unwrap() = account_id;
+    }
+
+    pub fn get_account_id(&self) -> Option<AccountId> {
+        *self.account_id.lock().unwrap()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -243,19 +259,3 @@ impl Signer {
         change_pubkey
     }
 }
-
-/*
-struct Signer {
-    private_key
-}
-
-impl Signer {
-    fn new(private_key) -> Signer;
-    fn new_from_seed(seed: &[u8]) -> Signer; // not implemented
-
-    // See models::node::tx::Transfer
-    fn sign_transfer(&self, ...args) -> Transfer;
-
-    fn pubkey_hash(&self) -> PubKeyHash;
-}
-*/
