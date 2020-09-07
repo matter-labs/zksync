@@ -1,7 +1,7 @@
 [package]
 name = "sdk"
 version = "0.1.0"
-authors = ["Thor Kamphefner <thor@matterlab.dev>"]
+authors = ["Thor Kamphefner <thor@matterlabs.dev>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,6 +9,15 @@ edition = "2018"
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
 server = { path = "../server", version = "0.0.1" }
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
+
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
+
+#zks_crypto = { package = "zks-crypto", git = "https://github.com/matter-labs/zks-crypto.git"}
+bellman = { package = "bellman_ce", git = "https://github.com/matter-labs/bellman", branch = "plonk_release" }
+sha2 = "0.8"
+
+web3 = "0.10.0"
 
 serde = "1.0.90"
 serde_derive = "1.0.90"

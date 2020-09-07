@@ -3071,6 +3071,9 @@ name = "sdk"
 version = "0.1.0"
 dependencies = [
  "anyhow 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bellman_ce 0.3.2 (git+https://github.com/matter-labs/bellman?branch=plonk_release)",
+ "crypto_exports 0.1.0",
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile)",
  "jsonrpc-core 14.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "models 0.0.1",
  "num 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3079,6 +3082,8 @@ dependencies = [
  "serde_derive 1.0.112 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.55 (registry+https://github.com/rust-lang/crates.io-index)",
  "server 0.0.1",
+ "sha2 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "web3 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

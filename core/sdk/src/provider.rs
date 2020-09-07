@@ -26,16 +26,16 @@ pub struct OperationState {
     pub verified: bool,
 }
 
-/// `RpcClient` is capable of interacting with the ZKSync node via its
+/// `Provider` is capable of interacting with the ZKSync node via its
 /// JSON RPC interface.
 #[derive(Debug, Clone)]
-pub struct RpcClient {
+pub struct Provider {
     rpc_addr: String,
     client: reqwest::Client,
 }
 
-impl RpcClient {
-    /// Creates a new `RpcClient` object.
+impl Provider {
+    /// Creates a new `Provider` object.
     pub fn new(rpc_addr: impl Into<String>) -> Self {
         Self {
             rpc_addr: rpc_addr.into(),
