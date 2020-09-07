@@ -1,8 +1,8 @@
 import 'isomorphic-fetch';
 import * as zksync from 'zksync';
-import { Wallet as EthWallet } from 'ethers';
+import * as ethers from 'ethers';
 import { saveConfig } from './config';
-import { ALL_NETWORKS, Network, Wallet, Config, AccountInfo, TxInfo } from './common';
+import { ALL_NETWORKS, Network, Wallet, Config, AccountInfo, TxInfo, TransferInfo } from './common';
 
 async function tokenInfo(id: number, provider: zksync.Provider) {
     const tokens = await provider.getTokens();
@@ -10,33 +10,35 @@ async function tokenInfo(id: number, provider: zksync.Provider) {
     return tokenInfo;
 }
 
-function apiServer(network: Network) {
-    if (network === 'localhost') {
-        return 'http://localhost:3001';
-    }
-    const subdomain = network === 'mainnet' ? 'api' : `${network}-api`;
-    return `https://${subdomain}.zksync.io`;
+export function apiServer(network: Network) {
+    const servers = {
+        localhost: 'http://localhost:3001',
+        ropsten: 'https://ropsten-api.zksync.io',
+        rinkeby: 'https://rinkeby-api.zksync.io',
+        mainnet: 'https://api.zksync.io'
+    };
+    return `${servers[network]}/api/v0.1`;
 }
 
 export async function accountInfo(address: string, network: Network): Promise<AccountInfo> {
-    const provider = await zksync.getDefaultProvider(network);
+    const provider = await zksync.getDefaultProvider(network, 'HTTP');
     const state = await provider.getState(address);
     let balances: { [token: string]: string } = {};
-    for (const token in state.verified.balances) {
-        balances[token] = provider.tokenSet.formatToken(token, state.verified.balances[token]);
+    for (const token in state.committed.balances) {
+        balances[token] = provider.tokenSet.formatToken(token, state.committed.balances[token]);
     }
     await provider.disconnect();
     return {
         address,
         network,
         account_id: state.id,
-        nonce: state.verified.nonce,
+        nonce: state.committed.nonce,
         balances
     };
 }
 
 export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo> {
-    const api_url = `${apiServer(network)}/api/v0.1/transactions_all/${tx_hash}`;
+    const api_url = `${apiServer(network)}/transactions_all/${tx_hash}`;
     const response = await fetch(api_url);
     const tx = await response.json();
     if (tx === null) {
@@ -45,7 +47,7 @@ export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo>
             transaction: null
         };
     }
-    const provider = await zksync.getDefaultProvider(network);
+    const provider = await zksync.getDefaultProvider(network, 'HTTP');
     const token = await tokenInfo(tx.token, provider);
     await provider.disconnect();
     const tokenSymbol = token?.symbol as string;
@@ -56,7 +58,7 @@ export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo>
             from: tx.from,
             to: tx.to,
             hash: tx_hash,
-            operation: tx.tx_type.toLowerCase(),
+            operation: tx.tx_type,
             token: tokenSymbol,
             amount: provider.tokenSet.formatToken(tokenSymbol, tx.amount),
             fee: provider.tokenSet.formatToken(tokenSymbol, tx.fee),
@@ -69,7 +71,7 @@ export async function availableNetworks() {
     let networks: Network[] = [];
     for (const network of ALL_NETWORKS) {
         try {
-            const provider = await zksync.getDefaultProvider(network);
+            const provider = await zksync.getDefaultProvider(network, 'HTTP');
             provider.disconnect();
             networks.push(network);
         } catch (err) {
@@ -91,7 +93,7 @@ export function defaultNetwork(config: Config, network?: Network) {
 }
 
 export function addWallet(config: Config, privkey?: string) {
-    const wallet = privkey ? new EthWallet(privkey) : EthWallet.createRandom();
+    const wallet = privkey ? new ethers.Wallet(privkey) : ethers.Wallet.createRandom();
     const address = wallet.address.toLowerCase();
     config.wallets.push({
         address,
@@ -132,4 +134,8 @@ export function defaultWallet(config: Config, address?: string) {
             throw Error('address is not present');
         }
     }
+}
+
+export async function transfer(transferInfo: TransferInfo, network: Network) {
+    // TODO
 }

@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import * as commands from './commands';
 import { loadConfig } from './config';
-import { Network } from './common';
+import type { Network } from './common';
 
 function print(object: any) {
     console.log(JSON.stringify(object, null, 4));
@@ -30,6 +30,20 @@ async function main() {
         .description('view transaction info')
         .action(async (tx_hash: string) => {
             print(await commands.txInfo(tx_hash, program.network));
+        });
+
+    program
+        .command('transfer [amount] [token] [recipient]')
+        .description('make a transfer')
+        .option('--json <string>', 'supply transfer info as json string')
+        .action(async (amount: string, token: string, recipient: string, cmd: Command) => {
+            const transferInfo = cmd.json ? JSON.parse(cmd.json) : {
+                from: config.defaultWallet,
+                to: recipient,
+                amount,
+                token
+            };
+            print(await commands.transfer(transferInfo, program.network));
         });
 
     const networks = new Command('networks');
@@ -82,9 +96,7 @@ async function main() {
     await program.parseAsync(process.argv);
 }
 
-main()
-    .then(() => process.exit(0))
-    .catch((err: Error) => {
-        console.error(err);
-        process.exit(1);
-    });
+main().catch((err: Error) => {
+    console.error(err);
+    process.exit(1);
+});

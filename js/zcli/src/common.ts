@@ -37,3 +37,10 @@ export interface TxInfo {
         nonce: number;
     };
 }
+
+export interface TransferInfo {
+    from: string;
+    to: string;
+    token: string;
+    amount: string;
+}
