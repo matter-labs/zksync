@@ -31,9 +31,9 @@ export interface TxInfo {
         to: string;
         hash: string;
         operation: string;
-        token: string;
-        amount: string;
-        fee: string;
+        token?: string;
+        amount?: string;
+        fee?: string;
         nonce: number;
     };
 }

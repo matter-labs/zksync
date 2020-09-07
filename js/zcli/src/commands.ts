@@ -4,12 +4,6 @@ import * as ethers from 'ethers';
 import { saveConfig } from './config';
 import { ALL_NETWORKS, Network, Wallet, Config, AccountInfo, TxInfo, TransferInfo } from './common';
 
-async function tokenInfo(id: number, provider: zksync.Provider) {
-    const tokens = await provider.getTokens();
-    const tokenInfo = Object.values(tokens).find((value) => value.id == id);
-    return tokenInfo;
-}
-
 export function apiServer(network: Network) {
     const servers = {
         localhost: 'http://localhost:3001',
@@ -47,11 +41,7 @@ export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo>
             transaction: null
         };
     }
-    const provider = await zksync.getDefaultProvider(network, 'HTTP');
-    const token = await tokenInfo(tx.token, provider);
-    await provider.disconnect();
-    const tokenSymbol = token?.symbol as string;
-    return {
+    const info: TxInfo = {
         network,
         transaction: {
             status: tx.fail_reason ? 'error' : 'success',
@@ -59,12 +49,29 @@ export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo>
             to: tx.to,
             hash: tx_hash,
             operation: tx.tx_type,
-            token: tokenSymbol,
-            amount: provider.tokenSet.formatToken(tokenSymbol, tx.amount),
-            fee: provider.tokenSet.formatToken(tokenSymbol, tx.fee),
             nonce: tx.nonce
         }
     };
+    if (tx.token === -1) {
+        return info;
+    }
+    const provider = await zksync.getDefaultProvider(network, 'HTTP');
+    const tokens = await provider.getTokens();
+    const tokenInfo = Object.values(tokens).find((value) => value.id == tx.token);
+    if (tokenInfo) {
+        const token = tokenInfo.symbol;
+        // @ts-ignore
+        info.transaction.amount = provider.tokenSet.formatToken(token, tx.amount);
+        if (tx.fee) {
+            // @ts-ignore
+            info.transaction.fee = provider.tokenSet.formatToken(token, tx.fee);
+        }
+        // @ts-ignore
+        info.transaction.token = token;
+    } else {
+        throw Error('token not found');
+    }
+    return info
 }
 
 export async function availableNetworks() {
