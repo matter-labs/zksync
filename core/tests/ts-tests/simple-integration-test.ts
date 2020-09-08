@@ -1,6 +1,6 @@
 import { Wallet, Provider, ETHProxy, types, utils as zkutils } from "zksync";
 // HACK: using require as type system work-around
-const franklin_abi = require("../../contracts/build/ZkSync.json").abi;
+const franklin_abi = require("../../../contracts/build/ZkSync.json").abi;
 import { ethers, Contract, BigNumber, BigNumberish, utils } from "ethers";
 import { IERC20_INTERFACE, sleep } from "zksync/src/utils";
 import * as apitype from "./api-type-validate";
