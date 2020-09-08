@@ -19,7 +19,7 @@ export async function publishSourceCodeToEtherscan(address: string, contractName
         action: "verifysourcecode", // Do not change
         apikey: process.env.ETHERSCAN_API_KEY,  // A valid API-Key is required
         codeformat: "solidity-standard-json-input",
-        compilerversion: "v0.5.16+commit.9c3226ce", // from http://etherscan.io/solcversions
+        compilerversion: "v0.5.17+commit.d19bba13", // from http://etherscan.io/solcversions
         constructorArguements: constructorArguments, // if applicable. How nice, they have a typo in their api
         contractaddress: address, // Contract Address starts with 0x...
         contractname: `${contractPath}:${contractName}`,

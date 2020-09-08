@@ -25,7 +25,9 @@ impl<'a> MempoolSchema<'a> {
     /// Loads all the transactions stored in the mempool schema.
     pub fn load_txs(&self) -> Result<VecDeque<SignedTxVariant>, failure::Error> {
         // Load the transactions from mempool along with corresponding batch IDs.
-        let txs: Vec<MempoolTx> = mempool_txs::table.load(self.0.conn())?;
+        let txs: Vec<MempoolTx> = mempool_txs::table
+            .order_by(mempool_txs::created_at)
+            .load(self.0.conn())?;
 
         let mut prev_batch_id = txs.first().map(|tx| tx.batch_id).flatten();
 
@@ -35,7 +37,7 @@ impl<'a> MempoolSchema<'a> {
             prev_batch_id
         });
 
-        let mut txs = VecDeque::new();
+        let mut txs = Vec::new();
 
         for (batch_id, group) in grouped_txs.into_iter() {
             let deserialized_txs: Vec<SignedFranklinTx> = group
@@ -57,7 +59,7 @@ impl<'a> MempoolSchema<'a> {
                 Some(_) => {
                     // Group of batched transactions.
                     let variant = SignedTxVariant::from(deserialized_txs);
-                    txs.push_back(variant);
+                    txs.push(variant);
                 }
                 None => {
                     // Group of non-batched transactions.
@@ -70,7 +72,19 @@ impl<'a> MempoolSchema<'a> {
             }
         }
 
-        Ok(txs)
+        // Now transactions should be sorted by the nonce (transaction natural order)
+        // According to our convention in batch `fee transaction` would be the last one, so we would use nonce from it as a key for sort
+        txs.sort_by_key(|tx| match tx {
+            SignedTxVariant::Tx(tx) => tx.tx.nonce(),
+            SignedTxVariant::Batch(batch) => batch
+                .0
+                .last()
+                .expect("batch must contain at least one transaction")
+                .tx
+                .nonce(),
+        });
+
+        Ok(txs.into())
     }
 
     /// Adds a new transactions batch to the mempool schema.

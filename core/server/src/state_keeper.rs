@@ -66,6 +66,8 @@ struct PendingBlock {
     pending_block_iteration: usize,
     withdrawals_amount: u32,
     gas_counter: GasCounter,
+    /// Option denoting if this block should be generated faster than usual.
+    fast_processing_required: bool,
 }
 
 impl PendingBlock {
@@ -80,6 +82,7 @@ impl PendingBlock {
             pending_block_iteration: 0,
             withdrawals_amount: 0,
             gas_counter: GasCounter::new(),
+            fast_processing_required: false,
         }
     }
 }
@@ -100,7 +103,7 @@ pub struct PlasmaStateKeeper {
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
-    max_miniblock_iterations_withdraw_block: usize,
+    fast_miniblock_iterations: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -247,7 +250,7 @@ impl PlasmaStateKeeper {
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
-        max_miniblock_iterations_withdraw_block: usize,
+        fast_miniblock_iterations: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -279,7 +282,7 @@ impl PlasmaStateKeeper {
             executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
-            max_miniblock_iterations_withdraw_block,
+            fast_miniblock_iterations,
         };
 
         let root = keeper.state.root_hash();
@@ -507,8 +510,8 @@ impl PlasmaStateKeeper {
         }
 
         // If pending block contains withdrawals we seal it faster
-        let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
-            self.max_miniblock_iterations_withdraw_block
+        let max_miniblock_iterations = if self.pending_block.fast_processing_required {
+            self.fast_miniblock_iterations
         } else {
             self.max_miniblock_iterations
         };
@@ -698,9 +701,14 @@ impl PlasmaStateKeeper {
             }
         }
 
-        if matches!(tx.tx, FranklinTx::Withdraw(_)) {
+        if let FranklinTx::Withdraw(tx) = &tx.tx {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
+
+            // Check if we should mark this block as requiring fast processing.
+            if tx.fast {
+                self.pending_block.fast_processing_required = true;
+            }
         }
 
         // Check if we've reached the withdraw operations amount limit.

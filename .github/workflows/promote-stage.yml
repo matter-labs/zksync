@@ -27,15 +27,15 @@ jobs:
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zksync update-images
-        echo "::set-env name=IMAGE_TAG::$(f sh -c 'echo $IMAGE_TAG')"
+        echo "::set-env name=IMAGE_TAG::$(git rev-parse --short HEAD)"
 
     - name: promote-to-gitlab
       run: |
         curl -X POST \
          -F token=${{ secrets.GITLAB_TOKEN }} \
-         -F "ref=gitlab-deploy" \
+         -F "ref=master" \
          -F "variables[SERVER_TAG]=$IMAGE_TAG" \
          -F "variables[PROVER_TAG]=$IMAGE_TAG" \
          -F "variables[EXPLORER_TAG]=$IMAGE_TAG" \
          -F "variables[GITHUB_REF]=$GITHUB_REF" \
-         https://gitlab.com/api/v4/projects/19165314/trigger/pipeline
+         https://gitlab.com/api/v4/projects/19173848/trigger/pipeline

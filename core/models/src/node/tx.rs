@@ -242,6 +242,10 @@ pub struct Withdraw {
     pub signature: TxSignature,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
+    /// Optional setting signalizing state keeper to speed up creation
+    /// of the block with provided transaction.
+    #[serde(default)]
+    pub fast: bool,
 }
 
 impl Withdraw {
@@ -270,6 +274,7 @@ impl Withdraw {
             nonce,
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
+            fast: false,
         };
         if signature.is_some() {
             tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
