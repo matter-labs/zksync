@@ -256,6 +256,7 @@ async function testFailedMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet,
         console.log(`  Batched transfer committed: ${(new Date().getTime()) - startTime} ms`);
         testPassed = false;
     } catch (e) {
+        assert(e.jrpcError.message == 'Transactions batch summary fee is too low');
         console.log('  Error (expected) on tx batch fail:', e.jrpcError.message);
     }
 
