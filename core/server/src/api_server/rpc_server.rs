@@ -1044,7 +1044,7 @@ impl Rpc for RpcApp {
                 }
             }
             // We allow fee to be 5% off the required fee
-            let scaled_provided_fee_in_usd = BigDecimal::from(total_provided_fee_in_usd.clone())
+            let scaled_provided_fee_in_usd = total_provided_fee_in_usd.clone()
                 * BigDecimal::from(105u32)
                 / BigDecimal::from(100u32);
             if total_required_fee_in_usd >= scaled_provided_fee_in_usd {
