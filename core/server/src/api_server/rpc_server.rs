@@ -955,16 +955,6 @@ impl Rpc for RpcApp {
         &self,
         txs: Vec<TxWithSignature>,
     ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send> {
-        if txs.len() != 2 {
-            let error = Error {
-                code: RpcErrorCodes::from(TxAddError::Other).into(),
-                message: "Only batches of size 2 are currently supported".to_string(),
-                data: None,
-            };
-
-            return Box::new(futures01::future::err(error));
-        }
-
         for tx in txs.iter() {
             // `ChangePubKey` operation is not expected to be bundled with any other transaction,
             // and since it has the execution limitations (due to lack of fee), it is not allowed
