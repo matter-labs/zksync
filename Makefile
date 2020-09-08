@@ -24,12 +24,11 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/zksync-crypto
-	@cd js/zksync.js && yarn && yarn build
-	@cd js/client && yarn
-	@cd js/explorer && yarn
+	@cd sdk/zksync-crypto
+	@cd sdk/zksync.js && yarn && yarn build
+	@cd explorer && yarn
 	@cd contracts && yarn
-	@cd js/tests && yarn
+	@cd core/tests/ts-tests && yarn
 
 
 # Helpers
@@ -167,10 +166,10 @@ integration-testkit:
 	@bin/integration-testkit.sh
 
 integration-simple:
-	@cd js/tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
+	@cd core/tests/ts-tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
 
 integration-full-exit:
-	@cd js/tests && yarn && yarn full-exit
+	@cd core/tests/ts-tests && yarn && yarn full-exit
 
 price:
 	@node contracts/scripts/check-price.js
@@ -283,4 +282,4 @@ push-image-dev-ticker: image-dev-ticker
 	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
 api-type-validate:
-	@cd js/tests && yarn && yarn api-type-validate --test
+	@cd core/tests/ts-tests && yarn && yarn api-type-validate --test
