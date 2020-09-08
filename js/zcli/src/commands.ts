@@ -14,7 +14,10 @@ export function apiServer(network: Network) {
     return `${servers[network]}/api/v0.1`;
 }
 
-export async function accountInfo(address: string, network: Network): Promise<AccountInfo> {
+export async function accountInfo(
+    address: string,
+    network: Network = 'localhost'
+): Promise<AccountInfo> {
     const provider = await zksync.getDefaultProvider(network, 'HTTP');
     const state = await provider.getState(address);
     let balances: { [token: string]: string } = {};
@@ -31,7 +34,7 @@ export async function accountInfo(address: string, network: Network): Promise<Ac
     };
 }
 
-export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo> {
+export async function txInfo(tx_hash: string, network: Network = 'localhost'): Promise<TxInfo> {
     const api_url = `${apiServer(network)}/transactions_all/${tx_hash}`;
     const response = await fetch(api_url);
     const tx = await response.json();
@@ -41,7 +44,7 @@ export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo>
             transaction: null
         };
     }
-    const info: TxInfo = {
+    let info: TxInfo = {
         network,
         transaction: {
             status: tx.fail_reason ? 'error' : 'success',
@@ -59,19 +62,17 @@ export async function txInfo(tx_hash: string, network: Network): Promise<TxInfo>
     const tokens = await provider.getTokens();
     const tokenInfo = Object.values(tokens).find((value) => value.id == tx.token);
     if (tokenInfo) {
-        const token = tokenInfo.symbol;
-        // @ts-ignore
+        const token = tokenInfo.symbol; // @ts-ignore
         info.transaction.amount = provider.tokenSet.formatToken(token, tx.amount);
         if (tx.fee) {
             // @ts-ignore
             info.transaction.fee = provider.tokenSet.formatToken(token, tx.fee);
-        }
-        // @ts-ignore
+        } // @ts-ignore
         info.transaction.token = token;
     } else {
-        throw Error('token not found');
+        throw new Error('token not found');
     }
-    return info
+    return info;
 }
 
 export async function availableNetworks() {
@@ -79,7 +80,7 @@ export async function availableNetworks() {
     for (const network of ALL_NETWORKS) {
         try {
             const provider = await zksync.getDefaultProvider(network, 'HTTP');
-            provider.disconnect();
+            await provider.disconnect();
             networks.push(network);
         } catch (err) {
             /* could not connect to provider */
@@ -94,9 +95,10 @@ export function defaultNetwork(config: Config, network?: Network) {
             config.network = network;
             saveConfig(config);
         } else {
-            throw Error('invalid network name');
+            throw new Error('invalid network name');
         }
     }
+    return config.network;
 }
 
 export function addWallet(config: Config, privkey?: string) {
@@ -138,11 +140,71 @@ export function defaultWallet(config: Config, address?: string) {
             config.defaultWallet = address;
             saveConfig(config);
         } else {
-            throw Error('address is not present');
+            throw new Error('address is not present');
         }
     }
+    return config.defaultWallet;
 }
 
-export async function transfer(transferInfo: TransferInfo, network: Network) {
-    // TODO
+export async function transfer(
+    config: Config,
+    transferInfo: TransferInfo,
+    network: Network = 'localhost'
+): Promise<string> {
+    const { token, amount, to, from } = transferInfo;
+    const ethProvider =
+        network == 'localhost'
+            ? new ethers.providers.JsonRpcProvider()
+            : ethers.getDefaultProvider(network);
+    const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
+    const privkey = config.wallets.find((w: Wallet) => w.address == from)?.privkey;
+    if (!privkey) {
+        throw new Error('address is not present');
+    }
+    const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
+    const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
+    if (!(await syncWallet.isSigningKeySet())) {
+        const changePubkey = await syncWallet.setSigningKey();
+        await changePubkey.awaitReceipt();
+    }
+    const txHandle = await syncWallet.syncTransfer({
+        to,
+        token,
+        amount: syncProvider.tokenSet.parseToken(token, amount)
+    });
+    await txHandle.awaitReceipt();
+    await syncProvider.disconnect();
+    const response = await fetch(`${apiServer(network)}/account/${to}/history/0/1`);
+    const txList = await response.json();
+    return txList[0].hash;
+}
+
+export async function deposit(
+    config: Config,
+    transferInfo: TransferInfo,
+    network: Network = 'localhost'
+): Promise<string> {
+    const { token, amount, to, from } = transferInfo;
+    const ethProvider =
+        network == 'localhost'
+            ? new ethers.providers.JsonRpcProvider()
+            : ethers.getDefaultProvider(network);
+    const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
+    const privkey = config.wallets.find((w: Wallet) => w.address == from)?.privkey;
+    if (!privkey) {
+        throw new Error('address is not present');
+    }
+    const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
+    const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
+    const depositHandle = await syncWallet.depositToSyncFromEthereum({
+        depositTo: to,
+        token,
+        amount: syncProvider.tokenSet.parseToken(token, amount),
+        approveDepositAmountForERC20: !zksync.utils.isTokenETH(token)
+    });
+    await depositHandle.awaitReceipt();
+    await syncProvider.disconnect();
+    const response = await fetch(`${apiServer(network)}/account/${to}/history/0/1`);
+    const txList = await response.json();
+    return txList[0].hash;
 }

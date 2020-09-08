@@ -3,13 +3,13 @@ import { Config, Wallet, ALL_NETWORKS } from './common';
 import assert from 'assert';
 
 const CONFIG_FILE = '.zcli-config.json';
-const DEFAULT_CONFIG: Config = {
+export const DEFAULT_CONFIG: Config = {
     network: 'ropsten',
     defaultWallet: null,
     wallets: []
 };
 
-function configLocation() {
+export function configLocation() {
     const in_pwd = './' + CONFIG_FILE;
     const zcli_home = process.env.ZCLI_HOME;
     if (fs.existsSync(in_pwd) || !zcli_home) {

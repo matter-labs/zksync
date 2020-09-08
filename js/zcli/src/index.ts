@@ -37,13 +37,31 @@ async function main() {
         .description('make a transfer')
         .option('--json <string>', 'supply transfer info as json string')
         .action(async (amount: string, token: string, recipient: string, cmd: Command) => {
+            // prettier-ignore
             const transferInfo = cmd.json ? JSON.parse(cmd.json) : {
                 from: config.defaultWallet,
                 to: recipient,
                 amount,
                 token
             };
-            print(await commands.transfer(transferInfo, program.network));
+            const hash = await commands.transfer(config, transferInfo, program.network);
+            print(await commands.txInfo(hash, program.network));
+        });
+
+    program
+        .command('deposit [amount] [token] [recipient]')
+        .description('make a deposit')
+        .option('--json <string>', 'supply deposit info as json string')
+        .action(async (amount: string, token: string, recipient: string, cmd: Command) => {
+            // prettier-ignore
+            const depositInfo = cmd.json ? JSON.parse(cmd.json) : {
+                from: config.defaultWallet,
+                to: recipient,
+                amount,
+                token
+            };
+            const hash = await commands.deposit(config, depositInfo, program.network);
+            print(await commands.txInfo(hash, program.network));
         });
 
     const networks = new Command('networks');
@@ -56,8 +74,7 @@ async function main() {
         .command('default [network]')
         .description('print or set default network')
         .action((network?: Network) => {
-            commands.defaultNetwork(config, network);
-            print(config.network);
+            print(commands.defaultNetwork(config, network));
         });
 
     program.addCommand(networks);
@@ -79,8 +96,7 @@ async function main() {
         .command('default [address]')
         .description('print or set default wallet')
         .action((address?: string) => {
-            commands.defaultWallet(config, address);
-            print(config.defaultWallet);
+            print(commands.defaultWallet(config, address));
         });
 
     wallets
@@ -97,6 +113,6 @@ async function main() {
 }
 
 main().catch((err: Error) => {
-    console.error(err);
+    console.error('Error:', err.message);
     process.exit(1);
 });
