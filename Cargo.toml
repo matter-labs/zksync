@@ -1,17 +1,18 @@
 [workspace]
 members = [
-    "core/data_restore",
-    "core/key_generator",
-    "core/eth_client",
-    "core/plasma",
-    "core/server",
-    "core/storage",
-    "core/circuit",
-    "core/models",
-    "core/prover",
-    "core/key_generator",
-    "core/spec_test",
-    "core/testkit",
-    "core/loadtest",
-    "core/crypto_exports",
+    "core/bin/data_restore",
+    "core/bin/key_generator",
+    "core/bin/server",
+    "core/bin/prover",
+
+    "core/lib/circuit",
+    "core/lib/crypto_exports",
+    "core/lib/eth_client",
+    "core/lib/models",
+    "core/lib/plasma",
+    "core/lib/storage",
+    "core/lib/vlog",
+
+    "core/tests/testkit",
+    "core/tests/loadtest",
 ]

@@ -8,6 +8,7 @@ default = []
 db_test = []
 
 [dependencies]
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 models = { path = "../models", version = "0.0.1" }
 
 fnv = "1.0.6"
@@ -18,7 +19,6 @@ web3 = "0.10.0"
 diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono", "numeric"] }
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "=0.1.0", features = ["serde"]} #hard fix version to avoid cargo bug
-crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 failure = "0.1"
@@ -27,6 +27,6 @@ hex = "0.4"
 
 [dev-dependencies]
 env_logger = "0.6"
-testkit = { path = "../testkit" }
+testkit = { path = "../../tests/testkit" }
 parity-crypto = {version = "0.5.0", features = ["publickey"] }
 

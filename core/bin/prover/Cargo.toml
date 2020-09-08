@@ -4,10 +4,10 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-plasma = { path = "../plasma", version = "0.1.1" }
-models = { path = "../models", version = "0.0.1" }
-circuit = { path = "../circuit", version = "0.1.1"}
-crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
+plasma = { path = "../../lib/plasma", version = "0.1.1" }
+models = { path = "../../lib/models", version = "0.0.1" }
+circuit = { path = "../../lib/circuit", version = "0.1.1"}
+crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
 
 hex = "0.4"
 rust-crypto = "0.2"
