@@ -45,6 +45,9 @@ pub enum TxAddError {
     #[fail(display = "Transaction fee is too low")]
     TxFeeTooLow,
 
+    #[fail(display = "Transactions batch summary fee is too low")]
+    TxBatchFeeTooLow,
+
     #[fail(display = "EIP1271 signature could not be verified")]
     EIP1271SignatureVerificationFail,
 

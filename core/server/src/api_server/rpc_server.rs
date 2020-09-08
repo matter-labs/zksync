@@ -10,7 +10,7 @@ use futures::{
 use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
-use num::{BigUint, ToPrimitive};
+use num::{bigint::ToBigInt, BigUint, ToPrimitive};
 // Workspace uses
 use models::{
     config_options::{ConfigurationOptions, ThreadPanicNotify},
@@ -255,6 +255,7 @@ impl From<TxAddError> for RpcErrorCodes {
             TxAddError::NonceMismatch => Self::NonceMismatch,
             TxAddError::IncorrectTx => Self::IncorrectTx,
             TxAddError::TxFeeTooLow => Self::FeeTooLow,
+            TxAddError::TxBatchFeeTooLow => Self::FeeTooLow,
             TxAddError::MissingEthSignature => Self::MissingEthSignature,
             TxAddError::EIP1271SignatureVerificationFail => Self::EIP1271SignatureVerificationFail,
             TxAddError::IncorrectEthSignature => Self::IncorrectEthSignature,
@@ -952,9 +953,72 @@ impl Rpc for RpcApp {
 
         let sign_verify_channel = self.sign_verify_request_sender.clone();
         let mut mempool_sender = self.mempool_request_sender.clone();
+        let ticker_request_sender = self.ticker_request_sender.clone();
 
         let response = async move {
-            // TODO: Check fees data
+            // Checking fees data
+            let mut total_required_fee_in_usd = BigDecimal::from(0);
+            let mut total_provided_fee_in_usd = BigDecimal::from(0);
+            for tx in &txs {
+                let tx_fee_info = match &tx.tx {
+                    FranklinTx::Withdraw(withdraw) => Some((
+                        TxFeeTypes::Withdraw,
+                        TokenLike::Id(withdraw.token),
+                        withdraw.to,
+                        withdraw.fee.clone(),
+                    )),
+                    FranklinTx::Transfer(transfer) => Some((
+                        TxFeeTypes::Transfer,
+                        TokenLike::Id(transfer.token),
+                        transfer.to,
+                        transfer.fee.clone(),
+                    )),
+                    // Cause `ChangePubKey` will have fee we must add this check
+                    FranklinTx::ChangePubKey(_) => {
+                        // Now `ChangePubKey` operations are not allowed in batches
+                        return Err(Error {
+                            code: RpcErrorCodes::from(TxAddError::Other).into(),
+                            message: "ChangePubKey operations are not allowed in batches"
+                                .to_string(),
+                            data: None,
+                        });
+                    }
+                    _ => None,
+                };
+                if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                    let required_fee = Self::ticker_request(
+                        ticker_request_sender.clone(),
+                        tx_type,
+                        address,
+                        token.clone(),
+                    )
+                    .await?;
+                    let token_price_in_usd =
+                        Self::ticker_price_request(ticker_request_sender.clone(), token.clone())
+                            .await?;
+                    total_required_fee_in_usd +=
+                        BigDecimal::from(required_fee.total_fee.to_bigint().unwrap())
+                            * &token_price_in_usd;
+                    total_provided_fee_in_usd +=
+                        BigDecimal::from(provided_fee.clone().to_bigint().unwrap())
+                            * &token_price_in_usd;
+                }
+            }
+            // We allow fee to be 5% off the required fee
+            let scaled_provided_fee_in_usd = BigDecimal::from(total_provided_fee_in_usd.clone())
+                * BigDecimal::from(105u32)
+                / BigDecimal::from(100u32);
+            if total_required_fee_in_usd >= scaled_provided_fee_in_usd {
+                vlog::warn!(
+                        "User total provided batch fee is too low, required: {:?}, provided: {} (scaled: {}) (USD)",
+                        total_required_fee_in_usd, total_provided_fee_in_usd, scaled_provided_fee_in_usd
+                    );
+                return Err(Error {
+                    code: RpcErrorCodes::from(TxAddError::TxBatchFeeTooLow).into(),
+                    message: TxAddError::TxBatchFeeTooLow.to_string(),
+                    data: None,
+                });
+            }
 
             let mut verified_txs = Vec::new();
             for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {

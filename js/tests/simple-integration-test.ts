@@ -234,6 +234,37 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
     }
 }
 
+async function testFailedMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber) {
+    let testPassed = true;
+    try {
+        const startTime = new Date().getTime();
+        const transferHandles = await syncWallet1.syncMultiTransfer([{
+            to: syncWallet2.address(),
+            token,
+            amount,
+            fee: utils.parseEther('0'),
+        }, {
+            to: syncWallet2.address(),
+            token,
+            amount,
+            fee: utils.parseEther('0'),
+        }]);
+        console.log(`  Batched transfers posted: ${(new Date().getTime()) - startTime} ms`);
+        for (let i = 0; i < transferHandles.length; i++) {
+            await transferHandles[i].awaitVerifyReceipt();
+        }
+        console.log(`  Batched transfer committed: ${(new Date().getTime()) - startTime} ms`);
+        testPassed = false;
+    } catch (e) {
+        console.log('  Error (expected) on tx batch fail:', e.jrpcError.message);
+    }
+
+    if (!testPassed) {
+        throw new Error("testFailedMultiTransfer failed !!!");
+    }
+    console.log("testFailedMultiTransfer ok")
+}
+
 
 async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
     const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
@@ -361,10 +392,14 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
 
+
     // TODO: Not executed, since it requires block sizes greater than 6, and sizes greater than 6 cause
     // server to crash in `integration-full-exit`. Issue: #831
+
     // await testMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
     // console.log(`Batched transfers ok, Token: ${token}`);
+    // await testFailedMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
+
 
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount);
