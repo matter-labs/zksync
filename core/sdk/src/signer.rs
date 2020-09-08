@@ -1,16 +1,18 @@
 // Signer. TODO: describe what's here.
 // NOTE: From: https://github.com/matter-labs/zksync-dev/blob/dev/core/testkit/src/zksync_account.rs
-
 // Built-in imports
 use std::{fmt, sync::Mutex};
 // External uses
 use num::BigUint;
 use web3::types::H256;
 // Workspace uses
+use franklin_crypto::alt_babyjubjub::fs::FsRepr;
+use franklin_crypto::bellman::{pairing::ff::PrimeField, PrimeFieldRepr};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    AccountId, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
+    AccountId, Address, Close, Fs, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
+use sha2::{Digest, Sha256};
 pub struct Signer {
     pub private_key: PrivateKey,
     pub pubkey_hash: PubKeyHash,
@@ -37,7 +39,6 @@ impl fmt::Debug for Signer {
     }
 }
 
-// TODO: I don't understand what nonce is doing in this context, so it's possible/likely I've done something silly here, setting to zero
 impl Signer {
     pub fn new(
         private_key: PrivateKey,
@@ -68,33 +69,34 @@ impl Signer {
         address: Address,
         eth_private_key: H256,
     ) -> Signer {
-        let private_key = PrivateKey::read(seed).unwrap(); // TODO: refactor unwrap
+        let pk = Self::private_key_from_seed(seed);
+        let pk_array: &[u8] = &pk;
+        let private_key = PrivateKey::read(pk_array).unwrap(); // TODO: refactor unwrap
         Self::new(private_key, nonce, address, eth_private_key)
     }
-    // NOTE: Do I need to refactor the above to something more like below?
-    /*
-            pub fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
-                let sha256_bytes = |input: &[u8]| -> Vec<u8> {
-                    let mut hasher = Sha256::new();
-                    hasher.input(input);
-                    hasher.result().to_vec()
-                };
 
-                let mut effective_seed = sha256_bytes(seed);
+    pub fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
+        let sha256_bytes = |input: &[u8]| -> Vec<u8> {
+            let mut hasher = Sha256::new();
+            hasher.input(input);
+            hasher.result().to_vec()
+        };
 
-                loop {
-                    let raw_priv_key = sha256_bytes(&effective_seed);
-                    let mut fs_repr = FsRepr::default();
-                    fs_repr
-                        .read_be(&raw_priv_key[..])
-                        .expect("failed to read raw_priv_key");
-                    if Fs::from_repr(fs_repr).is_ok() {
-                        return raw_priv_key;
-                    } else {
-                        effective_seed = raw_priv_key;
-                    }
-                }
-    }*/
+        let mut effective_seed = sha256_bytes(seed);
+
+        loop {
+            let raw_priv_key = sha256_bytes(&effective_seed);
+            let mut fs_repr = FsRepr::default();
+            fs_repr
+                .read_be(&raw_priv_key[..])
+                .expect("failed to read raw_priv_key");
+            if Fs::from_repr(fs_repr).is_ok() {
+                return raw_priv_key;
+            } else {
+                effective_seed = raw_priv_key;
+            }
+        }
+    }
     pub fn pubkey_hash(&self) -> &PubKeyHash {
         &self.pubkey_hash
     }
