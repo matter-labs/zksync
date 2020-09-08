@@ -6,10 +6,10 @@ use models::node::operations::{
 };
 use models::node::tx::ChangePubKey;
 use models::node::Address;
-use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
+    reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
+use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
 use models::params;
 use models::params::max_account_id;
@@ -140,9 +140,64 @@ impl PlasmaState {
         }
     }
 
-    pub fn execute_txs_batch(&mut self, txs: &[SignedFranklinTx]) -> Vec<Result<OpSuccess, Error>> {
-        let old_state = self.clone();
+    /// Applies account updates.
+    /// Assumes that all updates are correct, panics otherwise.
+    pub fn apply_account_updates(&mut self, updates: &AccountUpdates) {
+        for (account_id, account_update) in updates {
+            match account_update {
+                AccountUpdate::Create { address, nonce } => {
+                    assert!(self.get_account_by_address(address).is_none());
 
+                    let mut account = Account::default();
+                    account.address = *address;
+                    account.nonce = *nonce;
+                    self.insert_account(*account_id, account);
+                }
+                AccountUpdate::Delete { address, nonce } => {
+                    let account = self
+                        .get_account(*account_id)
+                        .expect("account to delete must exist");
+                    assert_eq!(account.address, *address);
+                    assert_eq!(account.nonce, *nonce);
+
+                    self.remove_account(*account_id);
+                }
+                AccountUpdate::UpdateBalance {
+                    old_nonce,
+                    new_nonce,
+                    balance_update: (token_id, old_balance, new_balance),
+                } => {
+                    let mut account = self
+                        .get_account(*account_id)
+                        .expect("account to update balance must exist");
+                    assert_eq!(account.get_balance(*token_id), *old_balance);
+                    assert_eq!(account.nonce, *old_nonce);
+
+                    account.set_balance(*token_id, new_balance.clone());
+                    account.nonce = *new_nonce;
+                    self.insert_account(*account_id, account);
+                }
+                AccountUpdate::ChangePubKeyHash {
+                    old_pub_key_hash,
+                    new_pub_key_hash,
+                    old_nonce,
+                    new_nonce,
+                } => {
+                    let mut account = self
+                        .get_account(*account_id)
+                        .expect("account to change pubkey must exist");
+                    assert_eq!(account.pub_key_hash, *old_pub_key_hash);
+                    assert_eq!(account.nonce, *old_nonce);
+
+                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.nonce = *new_nonce;
+                    self.insert_account(*account_id, account);
+                }
+            }
+        }
+    }
+
+    pub fn execute_txs_batch(&mut self, txs: &[SignedFranklinTx]) -> Vec<Result<OpSuccess, Error>> {
         let mut successes = Vec::new();
 
         for (id, tx) in txs.iter().enumerate() {
@@ -152,7 +207,14 @@ impl PlasmaState {
                 }
                 Err(error) => {
                     // Restore the state that was observed before the batch execution.
-                    *self = old_state;
+                    successes.reverse();
+                    for success in successes {
+                        let mut updates = success
+                            .expect("successes should not contain an error")
+                            .updates;
+                        reverse_updates(&mut updates);
+                        self.apply_account_updates(&updates);
+                    }
 
                     // Create message for an error.
                     let error_msg = format!(
@@ -853,5 +915,95 @@ impl PlasmaState {
             FranklinPriorityOp::Deposit(op) => self.create_deposit_op(op).into(),
             FranklinPriorityOp::FullExit(op) => self.create_full_exit_op(op).into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+
+    #[test]
+    fn plasma_state_reversing_updates() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+        let token_id = 10;
+
+        let mut random_addresses = Vec::new();
+        for _ in 0..20 {
+            random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        }
+
+        // Create two accounts: 0, 1
+        // Delete 0, update balance of 1, create account 2
+        // Reverse updates
+
+        let initial_plasma_state = PlasmaState::from_acc_map(AccountMap::default(), 0);
+
+        let updates = {
+            let mut updates = AccountUpdates::new();
+            updates.push((
+                0,
+                AccountUpdate::Create {
+                    address: random_addresses[0],
+                    nonce: 0,
+                },
+            ));
+            updates.push((
+                1,
+                AccountUpdate::Create {
+                    address: random_addresses[1],
+                    nonce: 0,
+                },
+            ));
+            updates.push((
+                0,
+                AccountUpdate::Delete {
+                    address: random_addresses[0],
+                    nonce: 0,
+                },
+            ));
+            updates.push((
+                1,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 0,
+                    new_nonce: 1,
+                    balance_update: (token_id, 0u32.into(), 256u32.into()),
+                },
+            ));
+            updates.push((
+                2,
+                AccountUpdate::Create {
+                    address: random_addresses[2],
+                    nonce: 0,
+                },
+            ));
+            updates
+        };
+
+        let plasma_state_updated = {
+            let mut plasma_state = initial_plasma_state.clone();
+            plasma_state.apply_account_updates(&updates);
+            plasma_state
+        };
+        assert_eq!(
+            plasma_state_updated
+                .get_account(1)
+                .unwrap()
+                .get_balance(token_id),
+            256u32.into()
+        );
+
+        let plasma_state_updated_back = {
+            let mut plasma_state = plasma_state_updated;
+            let mut reversed_updates = updates;
+            reverse_updates(&mut reversed_updates);
+            plasma_state.apply_account_updates(&reversed_updates);
+            plasma_state
+        };
+        assert_eq!(
+            plasma_state_updated_back.root_hash(),
+            initial_plasma_state.root_hash()
+        );
     }
 }
