@@ -142,7 +142,7 @@ impl PlasmaState {
 
     /// Applies account updates.
     /// Assumes that all updates are correct, panics otherwise.
-    pub fn apply_account_updates(&mut self, updates: &AccountUpdates) {
+    pub fn apply_account_updates(&mut self, updates: AccountUpdates) {
         for (account_id, account_update) in updates {
             match account_update {
                 AccountUpdate::Create { address, nonce } => {
@@ -213,7 +213,7 @@ impl PlasmaState {
                             .expect("successes should not contain an error")
                             .updates;
                         reverse_updates(&mut updates);
-                        self.apply_account_updates(&updates);
+                        self.apply_account_updates(updates);
                     }
 
                     // Create message for an error.
@@ -983,7 +983,7 @@ mod tests {
 
         let plasma_state_updated = {
             let mut plasma_state = initial_plasma_state.clone();
-            plasma_state.apply_account_updates(&updates);
+            plasma_state.apply_account_updates(updates);
             plasma_state
         };
         assert_eq!(
@@ -998,7 +998,7 @@ mod tests {
             let mut plasma_state = plasma_state_updated;
             let mut reversed_updates = updates;
             reverse_updates(&mut reversed_updates);
-            plasma_state.apply_account_updates(&reversed_updates);
+            plasma_state.apply_account_updates(reversed_updates);
             plasma_state
         };
         assert_eq!(
