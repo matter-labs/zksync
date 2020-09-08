@@ -92,6 +92,23 @@ pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn private_key_to_pubkey(private_key: &[u8]) -> Vec<u8> {
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+
+    let sk = read_signing_key(private_key);
+    
+    let mut public_key_buf = Vec::with_capacity(PACKED_POINT_SIZE);
+    
+    let public_key = JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params));
+
+    public_key
+    .write(&mut public_key_buf)
+    .expect("failed to write pubkey to buffer");
+
+    public_key_buf
+}
+
+#[wasm_bindgen]
 /// We use musig Schnorr signature scheme.
 /// It is impossible to restore signer for signature, that is why we provide public key of the signer
 /// along with signature.
