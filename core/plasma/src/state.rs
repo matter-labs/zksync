@@ -146,21 +146,21 @@ impl PlasmaState {
         for (account_id, account_update) in updates {
             match account_update {
                 AccountUpdate::Create { address, nonce } => {
-                    assert!(self.get_account_by_address(address).is_none());
+                    assert!(self.get_account_by_address(&address).is_none());
 
                     let mut account = Account::default();
-                    account.address = *address;
-                    account.nonce = *nonce;
-                    self.insert_account(*account_id, account);
+                    account.address = address;
+                    account.nonce = nonce;
+                    self.insert_account(account_id, account);
                 }
                 AccountUpdate::Delete { address, nonce } => {
                     let account = self
-                        .get_account(*account_id)
+                        .get_account(account_id)
                         .expect("account to delete must exist");
-                    assert_eq!(account.address, *address);
-                    assert_eq!(account.nonce, *nonce);
+                    assert_eq!(account.address, address);
+                    assert_eq!(account.nonce, nonce);
 
-                    self.remove_account(*account_id);
+                    self.remove_account(account_id);
                 }
                 AccountUpdate::UpdateBalance {
                     old_nonce,
@@ -168,14 +168,14 @@ impl PlasmaState {
                     balance_update: (token_id, old_balance, new_balance),
                 } => {
                     let mut account = self
-                        .get_account(*account_id)
+                        .get_account(account_id)
                         .expect("account to update balance must exist");
-                    assert_eq!(account.get_balance(*token_id), *old_balance);
-                    assert_eq!(account.nonce, *old_nonce);
+                    assert_eq!(account.get_balance(token_id), old_balance);
+                    assert_eq!(account.nonce, old_nonce);
 
-                    account.set_balance(*token_id, new_balance.clone());
-                    account.nonce = *new_nonce;
-                    self.insert_account(*account_id, account);
+                    account.set_balance(token_id, new_balance.clone());
+                    account.nonce = new_nonce;
+                    self.insert_account(account_id, account);
                 }
                 AccountUpdate::ChangePubKeyHash {
                     old_pub_key_hash,
@@ -184,14 +184,14 @@ impl PlasmaState {
                     new_nonce,
                 } => {
                     let mut account = self
-                        .get_account(*account_id)
+                        .get_account(account_id)
                         .expect("account to change pubkey must exist");
-                    assert_eq!(account.pub_key_hash, *old_pub_key_hash);
-                    assert_eq!(account.nonce, *old_nonce);
+                    assert_eq!(account.pub_key_hash, old_pub_key_hash);
+                    assert_eq!(account.nonce, old_nonce);
 
                     account.pub_key_hash = new_pub_key_hash.clone();
-                    account.nonce = *new_nonce;
-                    self.insert_account(*account_id, account);
+                    account.nonce = new_nonce;
+                    self.insert_account(account_id, account);
                 }
             }
         }
@@ -983,7 +983,7 @@ mod tests {
 
         let plasma_state_updated = {
             let mut plasma_state = initial_plasma_state.clone();
-            plasma_state.apply_account_updates(updates);
+            plasma_state.apply_account_updates(updates.clone());
             plasma_state
         };
         assert_eq!(
