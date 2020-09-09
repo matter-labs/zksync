@@ -1,17 +1,21 @@
 // Built-in deps
 use std::env;
 use std::fmt;
-use std::ops::Deref;
+// use std::ops::Deref;
 // External imports
-use diesel::pg::PgConnection;
-use diesel::r2d2::{ConnectionManager, Pool, PoolError};
+// use diesel::pg::PgConnection;
+// use diesel::r2d2::{ConnectionManager, Pool, PoolError};
+use sqlx::{
+    postgres::{PgPool, PgPoolOptions},
+    Error as SqlxError,
+};
 // Local imports
-use self::recoverable_connection::RecoverableConnection;
+// use self::recoverable_connection::RecoverableConnection;
 use crate::StorageProcessor;
 use models::config_options::parse_env;
 
 pub mod holder;
-pub mod recoverable_connection;
+// pub mod recoverable_connection;
 
 /// `ConnectionPool` is a wrapper over a `diesel`s `Pool`, encapsulating
 /// the fixed size pool of connection to the database.
@@ -20,7 +24,8 @@ pub mod recoverable_connection;
 /// variables `DB_POOL_SIZE` and `DATABASE_URL` respectively.
 #[derive(Clone)]
 pub struct ConnectionPool {
-    pool: Pool<ConnectionManager<RecoverableConnection<PgConnection>>>,
+    // pool: Pool<ConnectionManager<RecoverableConnection<PgConnection>>>,
+    pool: PgPool,
 }
 
 impl fmt::Debug for ConnectionPool {
@@ -33,13 +38,19 @@ impl ConnectionPool {
     /// Establishes a pool of the connections to the database and
     /// creates a new `ConnectionPool` object.
     /// pool_max_size - number of connections in pool, if not set env variable "DB_POOL_SIZE" is going to be used.
-    pub fn new(pool_max_size: Option<u32>) -> Self {
+    pub async fn new(pool_max_size: Option<u32>) -> Self {
         let database_url = Self::get_database_url();
         let max_size = pool_max_size.unwrap_or_else(|| parse_env("DB_POOL_SIZE"));
-        let manager = ConnectionManager::<RecoverableConnection<PgConnection>>::new(database_url);
-        let pool = Pool::builder()
-            .max_size(max_size)
-            .build(manager)
+        // let manager = ConnectionManager::<RecoverableConnection<PgConnection>>::new(database_url);
+        // let pool = Pool::builder()
+        //     .max_size(max_size)
+        //     .build(manager)
+        //     .expect("Failed to create connection pool");
+
+        let pool = PgPoolOptions::new()
+            .max_connections(max_size)
+            .connect(&database_url)
+            .await
             .expect("Failed to create connection pool");
 
         Self { pool }
@@ -53,9 +64,9 @@ impl ConnectionPool {
     ///
     /// This method is intended to be used in crucial contexts, where the
     /// database access is must-have (e.g. block committer).
-    pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
-        let connection = self.pool.get()?;
-        connection.deref().enable_retrying();
+    pub async fn access_storage(&self) -> Result<StorageProcessor, SqlxError> {
+        let connection = self.pool.acquire().await?;
+        // connection.deref().enable_retrying();
 
         Ok(StorageProcessor::from_pool(connection))
     }
@@ -63,11 +74,9 @@ impl ConnectionPool {
     /// Creates a `StorageProcessor` entity using non-recoverable connection, which
     /// will not handle the database outages. This method is intended to be used in
     /// non-crucial contexts, such as API endpoint handlers.
-    pub fn access_storage_fragile(&self) -> Result<StorageProcessor, PoolError> {
-        let connection = self.pool.get()?;
-        connection.deref().disable_retrying();
-
-        Ok(StorageProcessor::from_pool(connection))
+    pub async fn access_storage_fragile(&self) -> Result<StorageProcessor, SqlxError> {
+        // TODO: Remove this method
+        self.access_storage().await
     }
 
     /// Obtains the database URL from the environment variable.

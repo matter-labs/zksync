@@ -1,99 +1,122 @@
 // Built-in deps
 use std::time;
 // External imports
-use diesel::{
-    dsl::{insert_into, now, sql_query},
-    prelude::*,
-};
+use sqlx::{Acquire, Done};
 // Workspace imports
 use models::node::BlockNumber;
 use models::prover_utils::EncodedProofPlonk;
 // Local imports
-use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
+use self::records::{ActiveProver, IntegerNumber, ProverRun, StoredProof};
 use crate::prover::records::StorageBlockWitness;
-use crate::{chain::block::BlockSchema, StorageProcessor};
+use crate::{chain::block::BlockSchema, QueryResult, StorageProcessor};
 
 pub mod records;
 
 /// Prover schema is capable of handling the prover-related informations,
 /// such as started prover jobs, registered provers and proofs for blocks.
 #[derive(Debug)]
-pub struct ProverSchema<'a>(pub &'a StorageProcessor);
+pub struct ProverSchema<'a>(pub &'a mut StorageProcessor);
 
 impl<'a> ProverSchema<'a> {
     /// Returns the amount of blocks which await for proof, but have
     /// no assigned prover run.
-    pub fn unstarted_jobs_count(&self) -> QueryResult<u64> {
-        use crate::schema::prover_runs::dsl::*;
+    pub async fn unstarted_jobs_count(&mut self) -> QueryResult<u64> {
+        // TODO: Ensure that runs in a transaction.
+        // let connection = self.0.conn();
+        // let mut transaction = connection.begin().await?;
 
-        self.0.conn().transaction(|| {
-            let mut last_committed_block = BlockSchema(&self.0).get_last_committed_block()? as u64;
+        let mut last_committed_block =
+            BlockSchema(&mut self.0).get_last_committed_block().await? as u64;
 
-            if BlockSchema(&self.0).pending_block_exists()? {
-                // Existence of the pending block means that soon there will be one more block.
-                last_committed_block += 1;
-            }
+        if BlockSchema(&mut self.0).pending_block_exists().await? {
+            // Existence of the pending block means that soon there will be one more block.
+            last_committed_block += 1;
+        }
 
-            let last_verified_block = BlockSchema(&self.0).get_last_verified_block()? as u64;
+        let last_verified_block = BlockSchema(&mut self.0).get_last_verified_block().await? as u64;
 
-            let num_ongoing_jobs = prover_runs
-                .filter(block_number.gt(last_verified_block as i64))
-                .count()
-                .first::<i64>(self.0.conn())? as u64;
+        let num_ongoing_jobs = sqlx::query!(
+            "SELECT COUNT(*) FROM prover_runs WHERE block_number > $1",
+            last_verified_block as i64
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count
+        .unwrap_or(0) as u64;
 
-            assert!(
-                last_verified_block + num_ongoing_jobs <= last_committed_block,
-                "There are more ongoing prover jobs than blocks without proofs. \
+        assert!(
+            last_verified_block + num_ongoing_jobs <= last_committed_block,
+            "There are more ongoing prover jobs than blocks without proofs. \
                 Last verifier block: {}, last committed block: {}, amount of ongoing \
                 prover runs: {}",
-                last_verified_block,
-                last_committed_block,
-                num_ongoing_jobs,
-            );
+            last_verified_block,
+            last_committed_block,
+            num_ongoing_jobs,
+        );
 
-            let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
+        let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
 
-            Ok(result)
-        })
+        // transaction.commit().await?;
+        Ok(result)
     }
 
     /// Returns the amount of blocks which await for proof (committed but not verified)
-    pub fn pending_jobs_count(&self) -> QueryResult<u32> {
-        self.0.conn().transaction(|| {
-            let query = "\
+    pub async fn pending_jobs_count(&mut self) -> QueryResult<u32> {
+        let block_without_proofs = sqlx::query!(
+                "\
             SELECT COUNT(*) as integer_value FROM operations o \
                WHERE action_type = 'COMMIT' \
                    AND block_number > \
                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
                    AND NOT EXISTS \
-                       (SELECT * FROM proofs WHERE block_number = o.block_number);";
+                       (SELECT * FROM proofs WHERE block_number = o.block_number);"
+            )
+            .fetch_one(self.0.conn())
+            .await?
+            .integer_value
+            .unwrap_or(0) as u64;
 
-            let block_without_proofs = diesel::sql_query(query).get_result::<IntegerNumber>(self.0.conn())?;
-            Ok(block_without_proofs.integer_value as u32)
-        })
+        Ok(block_without_proofs as u32)
+    }
+
+    /// Attempts to obtain an existing prover run given block number.
+    pub async fn get_existing_prover_run(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<ProverRun>> {
+        let prover_run = sqlx::query_as!(
+            ProverRun,
+            "SELECT * FROM prover_runs WHERE block_number = $1",
+            i64::from(block_number),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        Ok(prover_run)
     }
 
     /// Given the block size, chooses the next block to prove for the certain prover.
     /// Returns `None` if either there are no blocks of given size to prove, or
     /// there is already an ongoing job for non-proved block.
-    pub fn prover_run_for_next_commit(
-        &self,
+    pub async fn prover_run_for_next_commit(
+        &mut self,
         worker_: &str,
         prover_timeout: time::Duration,
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         // Select the block to prove.
-        self
-            .0
-            .conn()
-            .transaction(|| {
-                sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.0.conn())?;
+        let connection = self.0.conn();
+        let mut transaction = connection.begin().await?;
 
-                // Find the block that satisfies the following criteria:
-                // - Block number is greater than the index of last verified block.
-                // - There is no proof for block.
-                // - Either there is no ongoing job for the block, or the job exceeded the timeout.
-                let query = format!(" \
+        sqlx::query!("LOCK TABLE prover_runs IN EXCLUSIVE MODE")
+            .execute(&mut transaction)
+            .await?;
+
+        // Find the block that satisfies the following criteria:
+        // - Block number is greater than the index of last verified block.
+        // - There is no proof for block.
+        // - Either there is no ongoing job for the block, or the job exceeded the timeout.
+        let query = format!(" \
                     WITH unsized_blocks AS ( \
                         SELECT * FROM operations o \
                         WHERE action_type = 'COMMIT' \
@@ -112,120 +135,174 @@ impl<'a> ProverSchema<'a> {
                     prover_timeout_secs=prover_timeout.as_secs(), block_size=block_size
                 );
 
-                // Return the index of such a block.
-                let job = diesel::sql_query(query).get_result::<Option<IntegerNumber>>(self.0.conn())?
-                .map(|i| i.integer_value as BlockNumber);
+        // Return the index of such a block.
+        let job = sqlx::query_as::<_, IntegerNumber>(&query)
+            .fetch_optional(&mut transaction)
+            .await?
+            .map(|value| value.integer_value);
 
-                // If there is a block to prove, create a job and store it
-                // in the `prover_runs` table; otherwise do nothing and return `None`.
-                if let Some(block_number_) = job {
-                    use crate::schema::prover_runs::dsl::*;
-                    let inserted: ProverRun = insert_into(prover_runs)
-                        .values(&vec![(
-                            block_number.eq(i64::from(block_number_)),
-                            worker.eq(worker_.to_string()),
-                        )])
-                        .get_result(self.0.conn())?;
-                    Ok(Some(inserted))
-                } else {
-                    Ok(None)
-                }
-            })
+        // If there is a block to prove, create a job and store it
+        // in the `prover_runs` table; otherwise do nothing and return `None`.
+        let result = if let Some(block_number) = job {
+            let inserted_id = sqlx::query!(
+                r#"
+                INSERT INTO prover_runs ( block_number, worker )
+                VALUES ( $1, $2 )
+                RETURNING (id)
+                "#,
+                i64::from(block_number),
+                worker_.to_string(),
+            )
+            .fetch_one(&mut transaction)
+            .await?
+            .id;
+
+            let prover_run = sqlx::query_as!(
+                ProverRun,
+                "SELECT * FROM prover_runs WHERE id = $1",
+                inserted_id
+            )
+            .fetch_one(&mut transaction)
+            .await?;
+
+            Some(prover_run)
+        } else {
+            None
+        };
+
+        transaction.commit().await?;
+
+        Ok(result)
     }
 
     /// Updates the state of ongoing prover job.
-    pub fn record_prover_is_working(&self, job_id: i32) -> QueryResult<()> {
-        use crate::schema::prover_runs::dsl::*;
+    pub async fn record_prover_is_working(&mut self, job_id: i32) -> QueryResult<()> {
+        sqlx::query!(
+            "UPDATE prover_runs 
+            SET updated_at = now()
+            WHERE id = $1",
+            job_id
+        )
+        .execute(self.0.conn())
+        .await?;
 
-        let target = prover_runs.filter(id.eq(job_id));
-        diesel::update(target)
-            .set(updated_at.eq(now))
-            .execute(self.0.conn())
-            .map(|_| ())
+        Ok(())
     }
 
     /// Adds a prover to the database.
-    pub fn register_prover(&self, worker_: &str, block_size_: usize) -> QueryResult<i32> {
-        use crate::schema::active_provers::dsl::*;
-        let inserted: ActiveProver = insert_into(active_provers)
-            .values(&vec![(
-                worker.eq(worker_.to_string()),
-                block_size.eq(block_size_ as i64),
-            )])
-            .get_result(self.0.conn())?;
-        Ok(inserted.id)
+    pub async fn register_prover(&mut self, worker_: &str, block_size_: usize) -> QueryResult<i32> {
+        let inserted_id = sqlx::query!(
+            "INSERT INTO active_provers (worker, block_size)
+            VALUES ($1, $2)
+            RETURNING id",
+            worker_.to_string(),
+            block_size_ as i64
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .id;
+
+        Ok(inserted_id)
     }
 
     /// Gets a prover descriptor by its numeric ID.
-    pub fn prover_by_id(&self, prover_id: i32) -> QueryResult<ActiveProver> {
-        use crate::schema::active_provers::dsl::*;
+    pub async fn prover_by_id(&mut self, prover_id: i32) -> QueryResult<ActiveProver> {
+        let prover = sqlx::query_as!(
+            ActiveProver,
+            "SELECT * FROM active_provers WHERE id = $1",
+            prover_id
+        )
+        .fetch_one(self.0.conn())
+        .await?;
 
-        let ret: ActiveProver = active_provers
-            .filter(id.eq(prover_id))
-            .get_result(self.0.conn())?;
-        Ok(ret)
+        Ok(prover)
     }
 
     /// Marks the prover as stopped.
-    pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
+    pub async fn record_prover_stop(&mut self, prover_id: i32) -> QueryResult<()> {
         // FIXME(popzxc): It seems that it isn't actually checked if the prover has been stopped
         // anywhere. And also it doesn't seem that prover can be restored from the stopped
         // state.
+        sqlx::query!(
+            "UPDATE active_provers 
+            SET stopped_at = now()
+            WHERE id = $1",
+            prover_id
+        )
+        .execute(self.0.conn())
+        .await?;
 
-        use crate::schema::active_provers::dsl::*;
-
-        let target = active_provers.filter(id.eq(prover_id));
-        diesel::update(target)
-            .set(stopped_at.eq(now))
-            .execute(self.0.conn())
-            .map(|_| ())
+        Ok(())
     }
 
     /// Stores the proof for a block.
-    pub fn store_proof(
-        &self,
+    pub async fn store_proof(
+        &mut self,
         block_number: BlockNumber,
         proof: &EncodedProofPlonk,
     ) -> QueryResult<usize> {
-        let to_store = NewProof {
-            block_number: i64::from(block_number),
-            proof: serde_json::to_value(proof).unwrap(),
-        };
-        use crate::schema::proofs::dsl::proofs;
-        insert_into(proofs).values(&to_store).execute(self.0.conn())
+        let updated_rows = sqlx::query!(
+            "INSERT INTO proofs (block_number, proof)
+            VALUES ($1, $2)",
+            i64::from(block_number),
+            serde_json::to_value(proof).unwrap()
+        )
+        .execute(self.0.conn())
+        .await?
+        .rows_affected() as usize;
+
+        Ok(updated_rows)
     }
 
     /// Gets the stored proof for a block.
-    pub fn load_proof(&self, block_number: BlockNumber) -> QueryResult<EncodedProofPlonk> {
-        use crate::schema::proofs::dsl;
-        let stored: StoredProof = dsl::proofs
-            .filter(dsl::block_number.eq(i64::from(block_number)))
-            .get_result(self.0.conn())?;
-        Ok(serde_json::from_value(stored.proof).unwrap())
+    pub async fn load_proof(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<EncodedProofPlonk>> {
+        let proof = sqlx::query_as!(
+            StoredProof,
+            "SELECT * FROM proofs WHERE block_number = $1",
+            i64::from(block_number),
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|stored| serde_json::from_value(stored.proof).unwrap());
+
+        Ok(proof)
     }
 
     /// Stores witness for a block
-    pub fn store_witness(&self, block: BlockNumber, witness: serde_json::Value) -> QueryResult<()> {
-        use crate::schema::*;
+    pub async fn store_witness(
+        &mut self,
+        block: BlockNumber,
+        witness: serde_json::Value,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "INSERT INTO block_witness (block, witness)
+            VALUES ($1, $2)
+            ON CONFLICT (block)
+            DO NOTHING",
+            i64::from(block),
+            witness
+        )
+        .execute(self.0.conn())
+        .await?;
 
-        insert_into(block_witness::table)
-            .values(&StorageBlockWitness {
-                block: block as i64,
-                witness,
-            })
-            .on_conflict(block_witness::block)
-            .do_nothing()
-            .execute(self.0.conn())
-            .map(drop)
+        Ok(())
     }
 
     /// Gets stored witness for a block
-    pub fn get_witness(&self, block_number: BlockNumber) -> QueryResult<Option<serde_json::Value>> {
-        use crate::schema::*;
-        let block_witness = block_witness::table
-            .filter(block_witness::block.eq(block_number as i64))
-            .first::<StorageBlockWitness>(self.0.conn())
-            .optional()?;
+    pub async fn get_witness(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<serde_json::Value>> {
+        let block_witness = sqlx::query_as!(
+            StorageBlockWitness,
+            "SELECT * FROM block_witness WHERE block = $1",
+            i64::from(block_number),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
 
         Ok(block_witness.map(|w| w.witness))
     }

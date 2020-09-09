@@ -1,17 +1,17 @@
 // Built-in deps
 use std::fmt;
 // External imports
-use diesel::pg::PgConnection;
-use diesel::r2d2::{ConnectionManager, PooledConnection};
+// use diesel::r2d2::{ConnectionManager, PooledConnection};
+use sqlx::{pool::PoolConnection, postgres::Postgres, PgConnection};
 // Workspace imports
 // Local imports
-use crate::connection::recoverable_connection::RecoverableConnection;
+// use crate::connection::recoverable_connection::RecoverableConnection;
 
 /// Connection holder unifies the type of underlying connection, which
 /// can be either pooled or direct.
 pub enum ConnectionHolder {
-    Pooled(PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>),
-    Direct(RecoverableConnection<PgConnection>),
+    Pooled(PoolConnection<Postgres>),
+    Direct(PgConnection),
 }
 
 impl fmt::Debug for ConnectionHolder {

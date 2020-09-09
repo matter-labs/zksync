@@ -1,11 +1,12 @@
 //! Utils used in storage crate
 
-use bigdecimal::BigDecimal;
-use diesel::deserialize::{self, FromSql};
-use diesel::pg::Pg;
-use diesel::serialize::{self, Output, ToSql};
-use diesel::sql_types::Numeric;
-use num::bigint::ToBigInt;
+use sqlx::{
+    database::{HasArguments, HasValueRef},
+    encode::IsNull,
+    types::{BigDecimal, Type},
+    Database, Decode, Encode, Postgres,
+};
+// use num::bigint::ToBigInt;
 use num::{BigInt, BigUint};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::io::Write;
@@ -120,35 +121,46 @@ impl<P: Prefix> OptionBytesToHexSerde<P> {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, FromSqlRow, AsExpression)]
-#[sql_type = "Numeric"]
-pub struct StoredBigUint(pub BigUint);
+// #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+// pub struct StoredBigUint(pub BigUint);
 
-impl From<BigUint> for StoredBigUint {
-    fn from(val: BigUint) -> Self {
-        Self(val)
-    }
-}
+// impl From<BigUint> for StoredBigUint {
+//     fn from(val: BigUint) -> Self {
+//         Self(val)
+//     }
+// }
 
-impl ToSql<Numeric, Pg> for StoredBigUint {
-    fn to_sql<W: Write>(&self, out: &mut Output<W, Pg>) -> serialize::Result {
-        let bigdecimal = BigDecimal::from(BigInt::from(self.0.clone()));
-        ToSql::<Numeric, Pg>::to_sql(&bigdecimal, out)
-    }
-}
+// impl Type<Postgres> for StoredBigUint {
+//     fn type_info() -> <Postgres as Database>::TypeInfo {
+//         BigDecimal::type_info()
+//     }
+// }
 
-impl FromSql<Numeric, Pg> for StoredBigUint {
-    fn from_sql(bytes: Option<&[u8]>) -> deserialize::Result<Self> {
-        let big_decimal = BigDecimal::from_sql(bytes)?;
-        if big_decimal.is_integer() {
-            big_decimal
-                .to_bigint()
-                .as_ref()
-                .and_then(BigInt::to_biguint)
-                .map(StoredBigUint)
-                .ok_or_else(|| "Not unsigned integer".into())
-        } else {
-            Err("Decimal number stored as BigUint".into())
-        }
-    }
-}
+// impl<'r> Encode<'r, Postgres> for StoredBigUint {
+//     fn encode_by_ref(&self, buf: &mut <Postgres as HasArguments<'r>>::ArgumentBuffer) -> IsNull {
+//         let bigdecimal = BigDecimal::from(BigInt::from(self.0.clone()));
+
+//         <BigDecimal as Encode<Postgres>>::encode_by_ref(&bigdecimal, buf)
+//     }
+// }
+
+// impl<'r> Decode<'r, Postgres> for StoredBigUint {
+//     fn decode(
+//         value: <Postgres as HasValueRef<'r>>::ValueRef,
+//     ) -> Result<StoredBigUint, Box<dyn std::error::Error + 'static + Send + Sync>> {
+//         let big_decimal = <BigDecimal as Decode<Postgres>>::decode(value)?;
+
+//         if big_decimal.is_integer() {
+//             let big_int = big_decimal.as_bigint_and_exponent().0;
+
+//             let big_uint = big_int
+//                 .to_biguint()
+//                 .map(StoredBigUint)
+//                 .ok_or_else(|| failure::format_err!("Not unsigned integer"))?;
+
+//             Ok(big_uint)
+//         } else {
+//             Err("Decimal number stored as BigUint".into())
+//         }
+//     }
+// }

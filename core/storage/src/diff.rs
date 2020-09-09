@@ -50,14 +50,24 @@ impl From<StorageAccountPubkeyUpdate> for StorageAccountDiff {
 impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
     fn into(self) -> (u32, AccountUpdate) {
         match self {
-            StorageAccountDiff::BalanceUpdate(upd) => (
-                upd.account_id as u32,
-                AccountUpdate::UpdateBalance {
-                    old_nonce: upd.old_nonce as u32,
-                    new_nonce: upd.new_nonce as u32,
-                    balance_update: (upd.coin_id as TokenId, upd.old_balance.0, upd.new_balance.0),
-                },
-            ),
+            StorageAccountDiff::BalanceUpdate(upd) => {
+                let (old_balance, exponent) = upd.old_balance.into_bigint_and_exponent();
+                assert_eq!(exponent, 0, "Stored balance is not an integer");
+                let old_balance = old_balance.to_biguint().unwrap();
+
+                let (new_balance, exponent) = upd.new_balance.into_bigint_and_exponent();
+                assert_eq!(exponent, 0, "Stored balance is not an integer");
+                let new_balance = new_balance.to_biguint().unwrap();
+
+                (
+                    upd.account_id as u32,
+                    AccountUpdate::UpdateBalance {
+                        old_nonce: upd.old_nonce as u32,
+                        new_nonce: upd.new_nonce as u32,
+                        balance_update: (upd.coin_id as TokenId, old_balance, new_balance),
+                    },
+                )
+            }
             StorageAccountDiff::Create(upd) => (
                 upd.account_id as u32,
                 AccountUpdate::Create {

@@ -11,7 +11,7 @@ use super::StorageProcessor;
 /// `ChainIntermediator` is a structure providing methods to
 /// obtain schemas declared in the `chain` module.
 #[derive(Debug)]
-pub struct ChainIntermediator<'a>(pub &'a StorageProcessor);
+pub struct ChainIntermediator<'a>(pub &'a mut StorageProcessor);
 
 impl<'a> ChainIntermediator<'a> {
     pub fn account_schema(self) -> account::AccountSchema<'a> {

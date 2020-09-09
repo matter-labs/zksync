@@ -1,14 +1,12 @@
 // Built-in deps
 // External imports
-use diesel::prelude::*;
 use web3::types::Address;
 // Workspace imports
 use models::node::{Account, AccountId, AccountUpdates};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;
-use crate::schema::*;
-use crate::StorageProcessor;
+use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
 mod restore_account;
@@ -20,18 +18,31 @@ pub use self::stored_state::StoredAccountState;
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
 #[derive(Debug)]
-pub struct AccountSchema<'a>(pub &'a StorageProcessor);
+pub struct AccountSchema<'a>(pub &'a mut StorageProcessor);
 
 impl<'a> AccountSchema<'a> {
     /// Obtains both committed and verified state for the account by its address.
-    pub fn account_state_by_address(&self, address: &Address) -> QueryResult<StoredAccountState> {
+    pub async fn account_state_by_address(
+        &mut self,
+        address: &Address,
+    ) -> QueryResult<StoredAccountState> {
         // Find the account in `account_creates` table.
-        let account_create_record = account_creates::table
-            .filter(account_creates::address.eq(address.as_bytes().to_vec()))
-            .filter(account_creates::is_create.eq(true))
-            .order(account_creates::block_number.desc())
-            .first::<StorageAccountCreation>(self.0.conn())
-            .optional()?;
+        let mut results = sqlx::query_as!(
+            StorageAccountCreation,
+            "
+                SELECT * FROM account_creates
+                WHERE address = $1 AND is_create = $2
+                ORDER BY block_number desc
+                LIMIT 1
+            ",
+            address.as_bytes(),
+            true
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        assert!(results.len() <= 1, "LIMIT 1 is in query");
+        let account_create_record = results.pop();
 
         // If account wasn't found, we return no state for it.
         // Otherwise we obtain the account ID for the state lookup.
@@ -46,10 +57,12 @@ impl<'a> AccountSchema<'a> {
 
         // Load committed & verified states, and return them.
         let committed = self
-            .last_committed_state_for_account(account_id)?
+            .last_committed_state_for_account(account_id)
+            .await?
             .map(|a| (account_id, a));
         let verified = self
-            .last_verified_state_for_account(account_id)?
+            .last_verified_state_for_account(account_id)
+            .await?
             .map(|a| (account_id, a));
         Ok(StoredAccountState {
             committed,
@@ -59,39 +72,38 @@ impl<'a> AccountSchema<'a> {
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
     /// account given its ID.
-    pub fn last_committed_state_for_account(
-        &self,
+    pub async fn last_committed_state_for_account(
+        &mut self,
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
         // Get the last certain state of the account.
         // Note that `account` can be `None` here (if it wasn't verified yet), since
         // we will update the committed changes below.
-        let (last_block, account) = self.get_account_and_last_block(account_id)?;
+        let (last_block, account) = self.get_account_and_last_block(account_id).await?;
 
-        // Collect the diffs that we have to apply to the account.
-        let (account_balance_diff, account_creation_diff) = self
-            .0
-            .conn()
-            .transaction::<_, diesel::result::Error, _>(|| {
-                // From `account_balance_updates` load entries with the same ID and height
-                // greater than for the last verified block.
-                let account_balance_diff: Vec<StorageAccountUpdate> = {
-                    account_balance_updates::table
-                        .filter(account_balance_updates::account_id.eq(&(i64::from(account_id))))
-                        .filter(account_balance_updates::block_number.gt(&last_block))
-                        .load::<StorageAccountUpdate>(self.0.conn())?
-                };
+        let account_balance_diff = sqlx::query_as!(
+            StorageAccountUpdate,
+            "
+                SELECT * FROM account_balance_updates
+                WHERE account_id = $1 AND block_number > $2
+            ",
+            i64::from(account_id),
+            last_block
+        )
+        .fetch_all(self.0.conn())
+        .await?;
 
-                // The same as above, but for `account_creates` table.
-                let account_creation_diff: Vec<StorageAccountCreation> = {
-                    account_creates::table
-                        .filter(account_creates::account_id.eq(&(i64::from(account_id))))
-                        .filter(account_creates::block_number.gt(&last_block))
-                        .load::<StorageAccountCreation>(self.0.conn())?
-                };
-
-                Ok((account_balance_diff, account_creation_diff))
-            })?;
+        let account_creation_diff = sqlx::query_as!(
+            StorageAccountCreation,
+            "
+                SELECT * FROM account_creates
+                WHERE account_id = $1 AND block_number > $2
+            ",
+            i64::from(account_id),
+            last_block
+        )
+        .fetch_all(self.0.conn())
+        .await?;
 
         // Chain the diffs, converting them into `StorageAccountDiff`.
         let account_diff = {
@@ -124,30 +136,53 @@ impl<'a> AccountSchema<'a> {
 
     /// Loads the last verified state for the account (e.g. the one obtained in the last block
     /// which was both committed and verified).
-    pub fn last_verified_state_for_account(
-        &self,
+    pub async fn last_verified_state_for_account(
+        &mut self,
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
-        let (_, account) = self.get_account_and_last_block(account_id)?;
+        let (_, account) = self.get_account_and_last_block(account_id).await?;
         Ok(account)
     }
 
     /// Obtains the last verified state of the account.
-    fn get_account_and_last_block(
-        &self,
+    async fn get_account_and_last_block(
+        &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
         // `accounts::table` is updated only after the block verification, so we should
         // just load the account with the provided ID.
-        let maybe_account = self.0.conn().transaction(|| {
-            accounts::table
-                .find(i64::from(account_id))
-                .first::<StorageAccount>(self.0.conn())
-                .optional()
-        })?;
+        let mut results = sqlx::query_as!(
+            StorageAccount,
+            "
+                SELECT * FROM accounts
+                WHERE id = $1
+                LIMIT 1
+            ",
+            i64::from(account_id)
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        assert!(results.len() <= 1, "LIMIT 1 is in query");
+        let maybe_account = results.pop();
+
+        // let maybe_account = self.0.conn().transaction(|| {
+        //     accounts::table
+        //         .find(i64::from(account_id))
+        //         .first::<StorageAccount>(self.0.conn())
+        //         .optional()
+        // })?;
         if let Some(account) = maybe_account {
-            let balances: Vec<StorageBalance> =
-                StorageBalance::belonging_to(&account).load(self.0.conn())?;
+            let balances = sqlx::query_as!(
+                StorageBalance,
+                "
+                    SELECT * FROM balances
+                    WHERE account_id = $1
+                ",
+                i64::from(account_id)
+            )
+            .fetch_all(self.0.conn())
+            .await?;
 
             let last_block = account.last_block;
             let (_, account) = restore_account(account, balances);

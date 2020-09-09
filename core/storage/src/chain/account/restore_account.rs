@@ -14,7 +14,10 @@ pub(crate) fn restore_account(
     let mut account = Account::default();
     for b in stored_balances.into_iter() {
         assert_eq!(b.account_id, stored_account.id);
-        account.set_balance(b.coin_id as TokenId, b.balance.0);
+        let (balance_bigint, exponent) = b.balance.into_bigint_and_exponent();
+        assert_eq!(exponent, 0, "Stored balance is not an integer");
+        let balance = balance_bigint.to_biguint().unwrap();
+        account.set_balance(b.coin_id as TokenId, balance);
     }
     account.nonce = stored_account.nonce as u32;
     account.address = Address::from_slice(&stored_account.address);
