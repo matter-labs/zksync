@@ -11,9 +11,9 @@ pub mod records;
 
 /// Schema for TODO
 #[derive(Debug)]
-pub struct MempoolSchema<'a>(pub &'a mut StorageProcessor);
+pub struct MempoolSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> MempoolSchema<'a> {
+impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Loads all the transactions stored in the mempool schema.
     pub async fn load_txs(&mut self) -> QueryResult<VecDeque<SignedFranklinTx>> {
         let txs: Vec<MempoolTx> = sqlx::query_as!(

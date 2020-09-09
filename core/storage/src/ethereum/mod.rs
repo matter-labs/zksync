@@ -20,9 +20,9 @@ pub mod records;
 /// interaction with the Ethereum blockchain (mainly the list of sent
 /// Ethereum transactions).
 #[derive(Debug)]
-pub struct EthereumSchema<'a>(pub &'a mut StorageProcessor);
+pub struct EthereumSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> EthereumSchema<'a> {
+impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Loads the list of operations that were not confirmed on Ethereum,
     /// each operation has a list of sent Ethereum transactions.
     pub async fn load_unconfirmed_operations(&mut self) -> QueryResult<VecDeque<ETHOperation>> {

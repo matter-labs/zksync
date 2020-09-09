@@ -39,9 +39,9 @@ use crate::{QueryResult, StorageProcessor};
 /// - Easy access to state for any block (useful for provers which work on different blocks)
 /// - We can rewind any `committed` state (which is not final)
 #[derive(Debug)]
-pub struct StateSchema<'a>(pub &'a mut StorageProcessor);
+pub struct StateSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> StateSchema<'a> {
+impl<'a, 'c> StateSchema<'a, 'c> {
     /// Stores the list of updates to the account map in the database.
     /// At this step, the changes are not verified yet, and thus are not applied.
     pub async fn commit_state_update(

@@ -15,9 +15,9 @@ pub mod records;
 /// Prover schema is capable of handling the prover-related informations,
 /// such as started prover jobs, registered provers and proofs for blocks.
 #[derive(Debug)]
-pub struct ProverSchema<'a>(pub &'a mut StorageProcessor);
+pub struct ProverSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> ProverSchema<'a> {
+impl<'a, 'c> ProverSchema<'a, 'c> {
     /// Returns the amount of blocks which await for proof, but have
     /// no assigned prover run.
     pub async fn unstarted_jobs_count(&mut self) -> QueryResult<u64> {

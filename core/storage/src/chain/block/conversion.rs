@@ -29,7 +29,7 @@ use crate::{
 use models::node::SignedFranklinTx;
 
 impl StoredOperation {
-    pub async fn into_op(self, conn: &mut StorageProcessor) -> QueryResult<Operation> {
+    pub async fn into_op<'a>(self, conn: &mut StorageProcessor<'a>) -> QueryResult<Operation> {
         let block_number = self.block_number as BlockNumber;
         let id = Some(self.id);
 

@@ -18,9 +18,9 @@ pub use self::stored_state::StoredAccountState;
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
 #[derive(Debug)]
-pub struct AccountSchema<'a>(pub &'a mut StorageProcessor);
+pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> AccountSchema<'a> {
+impl<'a, 'c> AccountSchema<'a, 'c> {
     /// Obtains both committed and verified state for the account by its address.
     pub async fn account_state_by_address(
         &mut self,

@@ -23,9 +23,9 @@ pub mod records;
 ///
 /// This schema is used exclusively by the `data_restore` crate.
 #[derive(Debug)]
-pub struct DataRestoreSchema<'a>(pub &'a mut StorageProcessor);
+pub struct DataRestoreSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> DataRestoreSchema<'a> {
+impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     pub async fn save_block_transactions(&mut self, block: Block) -> QueryResult<()> {
         BlockSchema(self.0)
             .save_block_transactions(block.block_number, block.block_transactions)

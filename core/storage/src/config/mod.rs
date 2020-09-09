@@ -14,9 +14,9 @@ pub mod records;
 ///
 /// Currently config is added to ZKSync by the `db-insert-contract.sh` script.
 #[derive(Debug)]
-pub struct ConfigSchema<'a>(pub &'a mut StorageProcessor);
+pub struct ConfigSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> ConfigSchema<'a> {
+impl<'a, 'c> ConfigSchema<'a, 'c> {
     /// Loads the server configuration.
     pub async fn load_config(&mut self) -> QueryResult<ServerConfig> {
         let config = sqlx::query_as!(ServerConfig, "SELECT * FROM server_config",)

@@ -18,9 +18,9 @@ const STORED_USD_PRICE_PRECISION: usize = 6;
 /// Tokens schema handles the `tokens` table, providing methods to
 /// get and store new tokens.
 #[derive(Debug)]
-pub struct TokensSchema<'a>(pub &'a mut StorageProcessor);
+pub struct TokensSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> TokensSchema<'a> {
+impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Persists the token in the database.
     pub async fn store_token(&mut self, token: Token) -> QueryResult<()> {
         sqlx::query!(

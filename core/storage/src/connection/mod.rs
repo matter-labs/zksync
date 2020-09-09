@@ -64,7 +64,7 @@ impl ConnectionPool {
     ///
     /// This method is intended to be used in crucial contexts, where the
     /// database access is must-have (e.g. block committer).
-    pub async fn access_storage(&self) -> Result<StorageProcessor, SqlxError> {
+    pub async fn access_storage(&self) -> Result<StorageProcessor<'_>, SqlxError> {
         let connection = self.pool.acquire().await?;
         // connection.deref().enable_retrying();
 
@@ -74,7 +74,7 @@ impl ConnectionPool {
     /// Creates a `StorageProcessor` entity using non-recoverable connection, which
     /// will not handle the database outages. This method is intended to be used in
     /// non-crucial contexts, such as API endpoint handlers.
-    pub async fn access_storage_fragile(&self) -> Result<StorageProcessor, SqlxError> {
+    pub async fn access_storage_fragile(&self) -> Result<StorageProcessor<'_>, SqlxError> {
         // TODO: Remove this method
         self.access_storage().await
     }

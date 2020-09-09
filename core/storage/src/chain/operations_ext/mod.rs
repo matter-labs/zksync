@@ -31,9 +31,9 @@ pub enum SearchDirection {
 /// While `Operations` getters are very basic, `OperationsExt` schema can transform
 /// the data to be convenient for the caller.
 #[derive(Debug)]
-pub struct OperationsExtSchema<'a>(pub &'a mut StorageProcessor);
+pub struct OperationsExtSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> OperationsExtSchema<'a> {
+impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     pub async fn tx_receipt(&mut self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
         let tx = OperationsSchema(self.0)
             .get_executed_operation(hash)

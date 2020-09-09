@@ -15,9 +15,9 @@ pub mod records;
 /// Every kind of transaction (non-executed, executed, and executed priority tx)
 /// can be either saved or loaded from the database.
 #[derive(Debug)]
-pub struct OperationsSchema<'a>(pub &'a mut StorageProcessor);
+pub struct OperationsSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> OperationsSchema<'a> {
+impl<'a, 'c> OperationsSchema<'a, 'c> {
     pub async fn get_last_block_by_action(
         &mut self,
         action_type: ActionType,

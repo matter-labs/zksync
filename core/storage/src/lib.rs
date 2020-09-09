@@ -75,7 +75,7 @@
 // use diesel::pg::PgConnection;
 // use diesel::prelude::*;
 // use diesel::r2d2::{ConnectionManager, PooledConnection};
-use sqlx::{pool::PoolConnection, postgres::Postgres, Connection};
+use sqlx::{pool::PoolConnection, postgres::Postgres, Connection, PgConnection};
 // Workspace imports
 // Local imports
 use crate::connection::holder::ConnectionHolder;
@@ -102,19 +102,26 @@ pub type QueryResult<T> = Result<T, failure::Error>;
 /// It holds down the connection (either direct or pooled) to the database
 /// and provide methods to obtain different storage schemas.
 #[derive(Debug)]
-pub struct StorageProcessor {
-    conn: ConnectionHolder,
+pub struct StorageProcessor<'a> {
+    conn: ConnectionHolder<'a>,
+    in_transaction: bool,
 }
 
-impl StorageProcessor {
-    // /// Creates a `StorageProcessor` using an unique sole connection to the database.
-    // pub fn establish_connection() -> Result<Self, SqlxError> {
-    //     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    //     let connection = RecoverableConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
-    //     Ok(Self {
-    //         conn: ConnectionHolder::Direct(connection),
-    //     })
-    // }
+impl<'a> StorageProcessor<'a> {
+    /// Creates a `StorageProcessor` using an unique sole connection to the database.
+    pub async fn establish_connection<'b>() -> QueryResult<StorageProcessor<'b>> {
+        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let connection = PgConnection::connect(&database_url).await?;
+        Ok(StorageProcessor {
+            conn: ConnectionHolder::Direct(connection),
+            in_transaction: false,
+        })
+    }
+
+    /// Checks if the `StorageProcessor` is currently within database transaction.
+    pub fn in_transaction(&self) -> bool {
+        self.in_transaction
+    }
 
     /// Creates a `StorageProcessor` using a pool of connections.
     /// This method borrows one of the connections from the pool, and releases it
@@ -122,57 +129,71 @@ impl StorageProcessor {
     pub fn from_pool(conn: PoolConnection<Postgres>) -> Self {
         Self {
             conn: ConnectionHolder::Pooled(conn),
+            in_transaction: false,
+        }
+    }
+
+    pub fn from_ref<'b>(conn: &'b mut PgConnection) -> StorageProcessor<'b> {
+        StorageProcessor {
+            conn: ConnectionHolder::ConnectionRef(conn),
+            in_transaction: false,
         }
     }
 
     /// Gains access to the `Chain` schemas.
-    pub fn chain(&mut self) -> chain::ChainIntermediator<'_> {
+    pub fn chain(&mut self) -> chain::ChainIntermediator<'_, 'a> {
         chain::ChainIntermediator(self)
     }
 
     /// Gains access to the `Config` schema.
-    pub fn config_schema(&mut self) -> config::ConfigSchema<'_> {
+    pub fn config_schema(&mut self) -> config::ConfigSchema<'_, 'a> {
         config::ConfigSchema(self)
     }
 
     /// Gains access to the `DataRestore` schema.
-    pub fn data_restore_schema(&mut self) -> data_restore::DataRestoreSchema<'_> {
+    pub fn data_restore_schema(&mut self) -> data_restore::DataRestoreSchema<'_, 'a> {
         data_restore::DataRestoreSchema(self)
     }
 
     /// Gains access to the `Ethereum` schema.
-    pub fn ethereum_schema(&mut self) -> ethereum::EthereumSchema<'_> {
+    pub fn ethereum_schema(&mut self) -> ethereum::EthereumSchema<'_, 'a> {
         ethereum::EthereumSchema(self)
     }
 
     /// Gains access to the `Prover` schema.
-    pub fn prover_schema(&mut self) -> prover::ProverSchema<'_> {
+    pub fn prover_schema(&mut self) -> prover::ProverSchema<'_, 'a> {
         prover::ProverSchema(self)
     }
 
     /// Gains access to the `Tokens` schema.
-    pub fn tokens_schema(&mut self) -> tokens::TokensSchema<'_> {
+    pub fn tokens_schema(&mut self) -> tokens::TokensSchema<'_, 'a> {
         tokens::TokensSchema(self)
     }
 
     /// Performs several database operations within one database transaction.
     pub async fn transaction<F, T, Fut>(&mut self, f: F) -> Result<T, failure::Error>
     where
-        F: FnOnce() -> Fut,
-        Fut: std::future::Future<Output = Result<T, failure::Error>>,
+        T: Send,
+        F: FnOnce(StorageProcessor<'_>) -> Fut + Send,
+        Fut: std::future::Future<Output = Result<T, failure::Error>> + Send,
     {
-        // self.conn().transaction(|| f())
-        // TODO: It won't work, we have to wrap into `self.conn().transaction(|conn| { ...  }).await?`.
-        let transaction = self.conn().begin().await?;
-        let result = f().await?;
-        transaction.commit().await?;
+        let conn = self.conn();
+        let result = conn
+            .transaction(|conn| {
+                let mut processor = StorageProcessor::from_ref(conn);
+                processor.in_transaction = true;
+                f(processor)
+            })
+            .await?;
+
         Ok(result)
     }
 
-    fn conn(&mut self) -> &mut PoolConnection<Postgres> {
-        match self.conn {
-            ConnectionHolder::Pooled(ref mut conn) => conn,
-            ConnectionHolder::Direct(ref _conn) => panic!("Direct connections are not supported"),
+    fn conn(&mut self) -> &mut PgConnection {
+        match &mut self.conn {
+            ConnectionHolder::Pooled(conn) => conn,
+            ConnectionHolder::ConnectionRef(conn) => conn,
+            ConnectionHolder::Direct(conn) => conn,
         }
     }
 }

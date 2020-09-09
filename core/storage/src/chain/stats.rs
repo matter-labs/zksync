@@ -7,9 +7,9 @@ use crate::{QueryResult, StorageProcessor};
 
 /// Auxiliary schema encapsulating the stats counting logic for the storage tables.
 #[derive(Debug)]
-pub struct StatsSchema<'a>(pub &'a mut StorageProcessor);
+pub struct StatsSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> StatsSchema<'a> {
+impl<'a, 'c> StatsSchema<'a, 'c> {
     /// Returns the amount of blocks that don't have proofs yet.
     pub async fn count_outstanding_proofs(&mut self, after_block: BlockNumber) -> QueryResult<u32> {
         let count = sqlx::query!(
