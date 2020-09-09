@@ -1,4 +1,3 @@
-import 'isomorphic-fetch';
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import fs from 'fs';
@@ -53,12 +52,10 @@ describe('Fetching Information', () => {
             amount: ethers.utils.parseEther('0.7')
         });
         await txHandle.awaitReceipt();
-        const response = await fetch(
-            `${commands.apiServer('localhost')}/account/${alice.address}/history/0/3`
-        );
-        const transactions = await response.json();
-        [transfer_hash, setkey_hash, deposit_hash] = transactions.map((tx: any) => tx.hash);
         await syncProvider.disconnect();
+        deposit_hash = daiDeposit.ethTx.hash;
+        setkey_hash = changePubkey.txHash;
+        transfer_hash = txHandle.txHash;
     });
 
     describe('Account Info', () => {
@@ -358,13 +355,12 @@ describe('Making Transactions', () => {
 
     it('should fail if not enough tokens', () => {
         const random_address = ethers.Wallet.createRandom().address;
-        expect(
-            commands.transfer(config, {
-                to: random_address,
-                from: poor.address,
-                token: 'MLTT',
-                amount: '73.0'
-            })
-        ).to.be.rejected;
+        // prettier-ignore
+        expect(commands.transfer(config, {
+            to: random_address,
+            from: poor.address,
+            token: 'MLTT',
+            amount: '73.0'
+        })).to.be.rejected;
     });
 });

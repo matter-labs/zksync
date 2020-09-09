@@ -174,9 +174,7 @@ export async function transfer(
     });
     await txHandle.awaitReceipt();
     await syncProvider.disconnect();
-    const response = await fetch(`${apiServer(network)}/account/${to}/history/0/1`);
-    const txList = await response.json();
-    return txList[0].hash;
+    return txHandle.txHash;
 }
 
 export async function deposit(
@@ -204,7 +202,5 @@ export async function deposit(
     });
     await depositHandle.awaitReceipt();
     await syncProvider.disconnect();
-    const response = await fetch(`${apiServer(network)}/account/${to}/history/0/1`);
-    const txList = await response.json();
-    return txList[0].hash;
+    return depositHandle.ethTx.hash;
 }
