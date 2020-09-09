@@ -33,6 +33,9 @@ jobs:
     - name: init
       run: zksync init
 
+    - name: js-tests
+      run: zksync js-tests
+
     - name: integration-simple-full-exit
       run: ci-integration-simple-fullexit.sh
 

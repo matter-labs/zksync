@@ -34,7 +34,7 @@
     "scripts": {
         "lint:ts": "tslint -c tslint.json {examples,test,src}/**/*.ts",
         "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
-        "test": "mocha -r ts-node/register tests/**/*.test.ts",
+        "tests": "mocha -r ts-node/register tests/**/*.test.ts",
         "fmt": "prettier --tab-width 4 --print-width 120 --parser typescript --write \"{src,tests,examples}/*.ts\"",
         "build": "tsc",
         "watch": "tsc --watch",
