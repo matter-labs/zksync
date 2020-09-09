@@ -6,8 +6,10 @@ use std::{fmt, sync::Mutex};
 use num::BigUint;
 use web3::types::H256;
 // Workspace uses
+use crypto_exports::rand::{thread_rng, Rng};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::bellman::{pairing::ff::PrimeField, PrimeFieldRepr};
+use models::node::priv_key_from_fs;
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
     AccountId, Address, Close, Fs, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
@@ -18,13 +20,12 @@ pub struct Signer {
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
     pub eth_private_key: H256,
-    account_id: Mutex<Option<AccountId>>, // NOTE: this field is never used. Should I remove it?
+    account_id: Mutex<Option<AccountId>>,
     nonce: Mutex<Nonce>,
 }
 
 impl fmt::Debug for Signer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // It is OK to disclose the private key contents for a testkit account.
         let mut pk_contents = Vec::new();
         self.private_key
             .write(&mut pk_contents)
@@ -40,6 +41,24 @@ impl fmt::Debug for Signer {
 }
 
 impl Signer {
+    pub fn rand() -> Self {
+        // NOTE: possibly unnecessary function to include
+        let rng = &mut thread_rng();
+        let pk = priv_key_from_fs(rng.gen());
+        let (eth_pk, eth_address) = {
+            let eth_pk = rng.gen::<[u8; 32]>().into();
+            let eth_address;
+            loop {
+                if let Ok(address) = PackedEthSignature::address_from_private_key(&eth_pk) {
+                    eth_address = address;
+                    break;
+                }
+            }
+            (eth_pk, eth_address)
+        };
+        Self::new(pk, 0, eth_address, eth_pk)
+    }
+
     pub fn new(
         private_key: PrivateKey,
         nonce: Nonce,
@@ -257,7 +276,6 @@ impl Signer {
         if increment_nonce {
             *stored_nonce += 1;
         }
-
         change_pubkey
     }
 }
