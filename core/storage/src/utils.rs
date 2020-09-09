@@ -1,15 +1,7 @@
 //! Utils used in storage crate
 
-use sqlx::{
-    database::{HasArguments, HasValueRef},
-    encode::IsNull,
-    types::{BigDecimal, Type},
-    Database, Decode, Encode, Postgres,
-};
 // use num::bigint::ToBigInt;
-use num::{BigInt, BigUint};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::io::Write;
 
 /// Trait for specifying prefix for bytes to hex serialization
 pub trait Prefix {
@@ -120,47 +112,3 @@ impl<P: Prefix> OptionBytesToHexSerde<P> {
             .transpose()
     }
 }
-
-// #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-// pub struct StoredBigUint(pub BigUint);
-
-// impl From<BigUint> for StoredBigUint {
-//     fn from(val: BigUint) -> Self {
-//         Self(val)
-//     }
-// }
-
-// impl Type<Postgres> for StoredBigUint {
-//     fn type_info() -> <Postgres as Database>::TypeInfo {
-//         BigDecimal::type_info()
-//     }
-// }
-
-// impl<'r> Encode<'r, Postgres> for StoredBigUint {
-//     fn encode_by_ref(&self, buf: &mut <Postgres as HasArguments<'r>>::ArgumentBuffer) -> IsNull {
-//         let bigdecimal = BigDecimal::from(BigInt::from(self.0.clone()));
-
-//         <BigDecimal as Encode<Postgres>>::encode_by_ref(&bigdecimal, buf)
-//     }
-// }
-
-// impl<'r> Decode<'r, Postgres> for StoredBigUint {
-//     fn decode(
-//         value: <Postgres as HasValueRef<'r>>::ValueRef,
-//     ) -> Result<StoredBigUint, Box<dyn std::error::Error + 'static + Send + Sync>> {
-//         let big_decimal = <BigDecimal as Decode<Postgres>>::decode(value)?;
-
-//         if big_decimal.is_integer() {
-//             let big_int = big_decimal.as_bigint_and_exponent().0;
-
-//             let big_uint = big_int
-//                 .to_biguint()
-//                 .map(StoredBigUint)
-//                 .ok_or_else(|| failure::format_err!("Not unsigned integer"))?;
-
-//             Ok(big_uint)
-//         } else {
-//             Err("Decimal number stored as BigUint".into())
-//         }
-//     }
-// }

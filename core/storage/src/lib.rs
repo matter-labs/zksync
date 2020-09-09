@@ -165,14 +165,14 @@ impl StorageProcessor {
         // TODO: It won't work, we have to wrap into `self.conn().transaction(|conn| { ...  }).await?`.
         let transaction = self.conn().begin().await?;
         let result = f().await?;
-        transaction.commit();
+        transaction.commit().await?;
         Ok(result)
     }
 
     fn conn(&mut self) -> &mut PoolConnection<Postgres> {
         match self.conn {
             ConnectionHolder::Pooled(ref mut conn) => conn,
-            ConnectionHolder::Direct(ref conn) => panic!("Direct connections are not supported"),
+            ConnectionHolder::Direct(ref _conn) => panic!("Direct connections are not supported"),
         }
     }
 }
