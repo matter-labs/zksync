@@ -2,7 +2,7 @@ import 'isomorphic-fetch';
 import * as zksync from 'zksync';
 import * as ethers from 'ethers';
 import { saveConfig } from './config';
-import { ALL_NETWORKS, Network, Wallet, Config, AccountInfo, TxInfo, TransferInfo } from './common';
+import { ALL_NETWORKS, Network, Config, AccountInfo, TxInfo, TransferInfo } from './common';
 
 export function apiServer(network: Network) {
     const servers = {
@@ -104,10 +104,7 @@ export function defaultNetwork(config: Config, network?: Network) {
 export function addWallet(config: Config, privkey?: string) {
     const wallet = privkey ? new ethers.Wallet(privkey) : ethers.Wallet.createRandom();
     const address = wallet.address.toLowerCase();
-    config.wallets.push({
-        address,
-        privkey: wallet.privateKey
-    });
+    config.wallets[address] = wallet.privateKey;
     if (!config.defaultWallet) {
         config.defaultWallet = address;
     }
@@ -116,16 +113,12 @@ export function addWallet(config: Config, privkey?: string) {
 }
 
 export function listWallets(config: Config) {
-    let wallets: string[] = [];
-    for (const { address } of config.wallets) {
-        wallets.push(address);
-    }
-    return wallets;
+    return Object.keys(config.wallets);
 }
 
 export function removeWallet(config: Config, address: string) {
     address = address.toLowerCase();
-    config.wallets = config.wallets.filter((w: Wallet) => w.address != address);
+    delete config.wallets[address];
     if (config.defaultWallet === address) {
         config.defaultWallet = null;
     }
@@ -135,8 +128,7 @@ export function removeWallet(config: Config, address: string) {
 export function defaultWallet(config: Config, address?: string) {
     if (address) {
         address = address.toLowerCase();
-        const addresses = config.wallets.map((w: Wallet) => w.address);
-        if (addresses.includes(address)) {
+        if (config.wallets.hasOwnProperty(address)) {
             config.defaultWallet = address;
             saveConfig(config);
         } else {
@@ -147,20 +139,15 @@ export function defaultWallet(config: Config, address?: string) {
 }
 
 export async function transfer(
-    config: Config,
     transferInfo: TransferInfo,
     network: Network = 'localhost'
 ): Promise<string> {
-    const { token, amount, to, from } = transferInfo;
+    const { token, amount, to, privkey } = transferInfo;
     const ethProvider =
         network == 'localhost'
             ? new ethers.providers.JsonRpcProvider()
             : ethers.getDefaultProvider(network);
     const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
-    const privkey = config.wallets.find((w: Wallet) => w.address == from)?.privkey;
-    if (!privkey) {
-        throw new Error('address is not present');
-    }
     const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
     if (!(await syncWallet.isSigningKeySet())) {
@@ -178,20 +165,15 @@ export async function transfer(
 }
 
 export async function deposit(
-    config: Config,
     transferInfo: TransferInfo,
     network: Network = 'localhost'
 ): Promise<string> {
-    const { token, amount, to, from } = transferInfo;
+    const { token, amount, to, privkey } = transferInfo;
     const ethProvider =
         network == 'localhost'
             ? new ethers.providers.JsonRpcProvider()
             : ethers.getDefaultProvider(network);
     const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
-    const privkey = config.wallets.find((w: Wallet) => w.address == from)?.privkey;
-    if (!privkey) {
-        throw new Error('address is not present');
-    }
     const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
     const depositHandle = await syncWallet.depositToSyncFromEthereum({

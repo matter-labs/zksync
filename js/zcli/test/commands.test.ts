@@ -88,26 +88,26 @@ describe('Fetching Information', () => {
         it('should fetch correct info - transfer', async () => {
             const info = await commands.txInfo(transfer_hash);
             const tx = info.transaction;
-            expect(info.network).to.be.equal('localhost');
-            expect(tx?.status).to.be.equal('success');
-            expect(tx?.hash).to.be.equal(transfer_hash);
-            expect(tx?.operation).to.be.equal('Transfer');
-            expect(tx?.from).to.be.equal(alice.address.toLowerCase());
-            expect(tx?.to).to.be.equal(bob.address.toLowerCase());
-            expect(tx?.nonce).to.be.equal(1);
-            expect(tx?.token).to.be.equal('ETH');
-            expect(tx?.amount).to.be.equal('0.7');
+            expect(info.network).to.equal('localhost');
+            expect(tx?.status).to.equal('success');
+            expect(tx?.hash).to.equal(transfer_hash);
+            expect(tx?.operation).to.equal('Transfer');
+            expect(tx?.from).to.equal(alice.address.toLowerCase());
+            expect(tx?.to).to.equal(bob.address.toLowerCase());
+            expect(tx?.nonce).to.equal(1);
+            expect(tx?.token).to.equal('ETH');
+            expect(tx?.amount).to.equal('0.7');
             expect(tx?.fee).to.exist;
         });
 
         it('should fetch correct info - setkey', async () => {
             const info = await commands.txInfo(setkey_hash);
             const tx = info.transaction;
-            expect(info.network).to.be.equal('localhost');
-            expect(tx?.status).to.be.equal('success');
-            expect(tx?.hash).to.be.equal(setkey_hash);
-            expect(tx?.operation).to.be.equal('ChangePubKey');
-            expect(tx?.from).to.be.equal(alice.address.toLowerCase());
+            expect(info.network).to.equal('localhost');
+            expect(tx?.status).to.equal('success');
+            expect(tx?.hash).to.equal(setkey_hash);
+            expect(tx?.operation).to.equal('ChangePubKey');
+            expect(tx?.from).to.equal(alice.address.toLowerCase());
             expect(tx?.to).to.be.a('string');
             expect(tx?.nonce).to.equal(0);
             expect(tx?.token).to.not.exist;
@@ -118,15 +118,15 @@ describe('Fetching Information', () => {
         it('should fetch correct info - deposit', async () => {
             const info = await commands.txInfo(deposit_hash);
             const tx = info.transaction;
-            expect(info.network).to.be.equal('localhost');
-            expect(tx?.status).to.be.equal('success');
-            expect(tx?.hash).to.be.equal(deposit_hash);
-            expect(tx?.operation).to.be.equal('Deposit');
-            expect(tx?.from).to.be.equal(ethDepositor.toLowerCase());
-            expect(tx?.to).to.be.equal(alice.address.toLowerCase());
-            expect(tx?.nonce).to.be.equal(-1);
-            expect(tx?.token).to.be.equal('DAI');
-            expect(tx?.amount).to.be.equal('18.0');
+            expect(info.network).to.equal('localhost');
+            expect(tx?.status).to.equal('success');
+            expect(tx?.hash).to.equal(deposit_hash);
+            expect(tx?.operation).to.equal('Deposit');
+            expect(tx?.from).to.equal(ethDepositor.toLowerCase());
+            expect(tx?.to).to.equal(alice.address.toLowerCase());
+            expect(tx?.nonce).to.equal(-1);
+            expect(tx?.token).to.equal('DAI');
+            expect(tx?.amount).to.equal('18.0');
             expect(tx?.fee).to.not.exist;
         });
 
@@ -160,15 +160,15 @@ describe('Config Management', () => {
     const config1: Config = {
         network: 'ropsten',
         defaultWallet: alice.address.toLowerCase(),
-        wallets: [
-            { address: alice.address.toLowerCase(), privkey: alice.privateKey },
-            { address: bob.address.toLowerCase(), privkey: bob.privateKey }
-        ]
+        wallets: {
+            [alice.address.toLowerCase()]: alice.privateKey,
+            [bob.address.toLowerCase()]: bob.privateKey
+        }
     };
     const config2: Config = {
         network: 'mainnet',
         defaultWallet: eve.address.toLowerCase(),
-        wallets: [{ address: eve.address.toLowerCase(), privkey: eve.privateKey }]
+        wallets: { [eve.address.toLowerCase()]: eve.privateKey }
     };
 
     beforeEach('create mock fs', () => {
@@ -223,11 +223,11 @@ describe('Config Management', () => {
     describe('Wallets', () => {
         it('should properly get/set default wallet', () => {
             const config = loadConfig();
-            const new_wallet = config.wallets[1].address;
+            const new_wallet = bob.address;
             const invalid_wallet = '0x8888888888888888888888888888888888888888';
             expect(commands.defaultWallet(config)).to.equal(config1.defaultWallet);
             expect(commands.defaultWallet(config, new_wallet))
-                .to.equal(new_wallet)
+                .to.equal(new_wallet.toLowerCase())
                 .to.equal(config.defaultWallet);
             expect(() => commands.defaultWallet(config, invalid_wallet)).to.throw();
         });
@@ -236,17 +236,16 @@ describe('Config Management', () => {
             const config = loadConfig();
             const wallet = ethers.Wallet.createRandom();
             expect(commands.addWallet(config, wallet.privateKey)).to.equal(wallet.address);
-            expect(config.wallets).to.deep.include({
-                address: wallet.address.toLowerCase(),
-                privkey: wallet.privateKey
-            });
+            expect(config.wallets).to.have.property(
+                wallet.address.toLowerCase(),
+                wallet.privateKey
+            );
         });
 
         it('should properly remove a wallet', () => {
             const config = loadConfig();
-            const wallet = config.wallets[0];
-            commands.removeWallet(config, wallet.address);
-            expect(config.wallets).to.not.deep.include(wallet);
+            commands.removeWallet(config, alice.address);
+            expect(config.wallets).to.not.have.key(alice.address.toLowerCase());
             expect(config.defaultWallet).to.be.null;
         });
 
@@ -254,8 +253,8 @@ describe('Config Management', () => {
             const config = loadConfig();
             const wallet_list = commands.listWallets(config);
             expect(wallet_list).to.be.an('array').with.lengthOf(2);
-            expect(wallet_list).to.include(config.wallets[0].address);
             expect(wallet_list).to.include(config.defaultWallet);
+            expect(wallet_list).to.include(bob.address.toLowerCase());
         });
     });
 });
@@ -265,21 +264,13 @@ describe('Making Transactions', () => {
         process.env.TEST_MNEMONIC as string,
         "m/44'/60'/0'/0/0"
     );
-    const poor = ethers.Wallet.createRandom();
-
-    const config: Config = {
-        network: 'localhost',
-        defaultWallet: rich.address,
-        wallets: [
-            { address: rich.address, privkey: rich.privateKey },
-            { address: poor.address, privkey: poor.privateKey }
-        ]
-    };
+    const poor1 = ethers.Wallet.createRandom();
+    const poor2 = ethers.Wallet.createRandom();
 
     it('should make a deposit - ETH', async () => {
-        const hash = await commands.deposit(config, {
-            to: poor.address,
-            from: rich.address,
+        const hash = await commands.deposit({
+            to: poor1.address,
+            privkey: rich.privateKey,
             token: 'ETH',
             amount: '3.1415'
         });
@@ -289,7 +280,7 @@ describe('Making Transactions', () => {
             transaction: {
                 status: 'success',
                 from: rich.address.toLowerCase(),
-                to: poor.address.toLowerCase(),
+                to: poor1.address.toLowerCase(),
                 hash,
                 operation: 'Deposit',
                 nonce: -1,
@@ -300,9 +291,9 @@ describe('Making Transactions', () => {
     });
 
     it('should make a deposit - DAI', async () => {
-        const hash = await commands.deposit(config, {
-            to: poor.address,
-            from: rich.address,
+        const hash = await commands.deposit({
+            to: poor1.address,
+            privkey: rich.privateKey,
             token: 'DAI',
             amount: '2.7182'
         });
@@ -312,7 +303,7 @@ describe('Making Transactions', () => {
             transaction: {
                 status: 'success',
                 from: rich.address.toLowerCase(),
-                to: poor.address.toLowerCase(),
+                to: poor1.address.toLowerCase(),
                 hash,
                 operation: 'Deposit',
                 nonce: -1,
@@ -323,42 +314,40 @@ describe('Making Transactions', () => {
     });
 
     it('should transfer tokens', async () => {
-        const random_address = ethers.Wallet.createRandom().address;
-        await commands.deposit(config, {
-            to: poor.address,
-            from: rich.address,
+        await commands.deposit({
+            to: poor1.address,
+            privkey: rich.privateKey,
             token: 'DAI',
             amount: '1.4142'
         });
-        const hash = await commands.transfer(config, {
-            to: random_address,
-            from: poor.address,
+        const hash = await commands.transfer({
+            to: poor2.address,
+            privkey: poor1.privateKey,
             token: 'DAI',
             amount: '1.0'
         });
         const info = await commands.txInfo(hash);
         const tx = info.transaction;
-        expect(info.network).to.be.equal('localhost');
+        expect(info.network).to.equal('localhost');
         expect(tx?.status).to.equal('success');
-        expect(tx?.from).to.equal(poor.address.toLowerCase());
-        expect(tx?.to).to.equal(random_address.toLowerCase());
+        expect(tx?.from).to.equal(poor1.address.toLowerCase());
+        expect(tx?.to).to.equal(poor2.address.toLowerCase());
         expect(tx?.hash).to.equal(hash);
         expect(tx?.operation).to.equal('Transfer');
         expect(tx?.amount).to.equal('1.0');
         expect(tx?.token).to.equal('DAI');
         expect(tx?.nonce).to.equal(1);
         expect(tx?.fee).to.exist;
-        const account = await commands.accountInfo(random_address);
-        expect(account.address).to.equal(random_address);
+        const account = await commands.accountInfo(poor2.address);
+        expect(account.address).to.equal(poor2.address);
         expect(account.balances.DAI).to.equal('1.0');
     });
 
     it('should fail if not enough tokens', () => {
-        const random_address = ethers.Wallet.createRandom().address;
         // prettier-ignore
-        expect(commands.transfer(config, {
-            to: random_address,
-            from: poor.address,
+        expect(commands.transfer({
+            to: poor2.address,
+            privkey: poor1.privateKey,
             token: 'MLTT',
             amount: '73.0'
         })).to.be.rejected;

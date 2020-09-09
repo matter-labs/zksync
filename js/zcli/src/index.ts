@@ -37,14 +37,18 @@ async function main() {
         .description('make a transfer')
         .option('--json <string>', 'supply transfer info as json string')
         .action(async (amount: string, token: string, recipient: string, cmd: Command) => {
+            if (!config.defaultWallet && !cmd.json) {
+                throw new Error('default wallet is not set');
+            }
             // prettier-ignore
             const transferInfo = cmd.json ? JSON.parse(cmd.json) : {
-                from: config.defaultWallet,
+                // @ts-ignore
+                privkey: config.wallets[config.defaultWallet],
                 to: recipient,
                 amount,
                 token
             };
-            const hash = await commands.transfer(config, transferInfo, program.network);
+            const hash = await commands.transfer(transferInfo, program.network);
             print(await commands.txInfo(hash, program.network));
         });
 
@@ -53,14 +57,18 @@ async function main() {
         .description('make a deposit')
         .option('--json <string>', 'supply deposit info as json string')
         .action(async (amount: string, token: string, recipient: string, cmd: Command) => {
+            if (!config.defaultWallet && !cmd.json) {
+                throw new Error('default wallet is not set');
+            }
             // prettier-ignore
             const depositInfo = cmd.json ? JSON.parse(cmd.json) : {
-                from: config.defaultWallet,
+                // @ts-ignore
+                privkey: config.wallets[config.defaultWallet],
                 to: recipient,
                 amount,
                 token
             };
-            const hash = await commands.deposit(config, depositInfo, program.network);
+            const hash = await commands.deposit(depositInfo, program.network);
             print(await commands.txInfo(hash, program.network));
         });
 

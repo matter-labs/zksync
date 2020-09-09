@@ -1,12 +1,12 @@
 import fs from 'fs';
-import { Config, Wallet, ALL_NETWORKS } from './common';
+import { Config, ALL_NETWORKS } from './common';
 import assert from 'assert';
 
 const CONFIG_FILE = '.zcli-config.json';
 export const DEFAULT_CONFIG: Config = {
-    network: 'ropsten',
+    network: 'localhost',
     defaultWallet: null,
-    wallets: []
+    wallets: {}
 };
 
 export function configLocation() {
@@ -32,11 +32,7 @@ export function loadConfig(): Config {
     try {
         const parsed = JSON.parse(unparsed.toString());
         assert(ALL_NETWORKS.includes(parsed.network));
-        assert(Array.isArray(parsed.wallets));
-        assert(
-            parsed.defaultWallet === null ||
-                parsed.wallets.map((w: Wallet) => w.address).includes(parsed.defaultWallet)
-        );
+        assert(!parsed.defaultWallet || parsed.wallets.hasOwnProperty(parsed.defaultWallet));
         return parsed;
     } catch (err) {
         console.warn('Invalid .zcli-config.json; ignoring...');

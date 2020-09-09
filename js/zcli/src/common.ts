@@ -2,15 +2,13 @@ export type Network = 'localhost' | 'mainnet' | 'ropsten' | 'rinkeby';
 
 export const ALL_NETWORKS: Network[] = ['localhost', 'mainnet', 'ropsten', 'rinkeby'];
 
-export interface Wallet {
-    privkey: string;
-    address: string;
-}
-
 export interface Config {
     network: Network;
     defaultWallet: string | null;
-    wallets: Wallet[];
+    wallets: {
+        // address -> privkey
+        [address: string]: string;
+    };
 }
 
 export interface AccountInfo {
@@ -39,7 +37,7 @@ export interface TxInfo {
 }
 
 export interface TransferInfo {
-    from: string;
+    privkey: string;
     to: string;
     token: string;
     amount: string;
