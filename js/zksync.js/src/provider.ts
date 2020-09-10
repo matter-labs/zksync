@@ -183,6 +183,15 @@ export class Provider {
         };
     }
 
+    async getTransactionsBatchFee(
+        txTypes: ("Withdraw" | "Transfer" | "FastWithdraw")[],
+        addresses: Address[],
+        tokenLike: TokenLike
+    ): Promise<BigNumber> {
+        const totalFee = await this.transport.request("get_txs_batch_fee_in_wei", [txTypes, addresses, tokenLike]);
+        return BigNumber.from(totalFee);
+    }
+
     async getTokenPrice(tokenLike: TokenLike): Promise<number> {
         const tokenPrice = await this.transport.request("get_token_price", [tokenLike]);
         return parseFloat(tokenPrice);

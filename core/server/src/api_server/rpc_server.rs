@@ -325,6 +325,14 @@ pub trait Rpc {
         token_like: TokenLike,
     ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send>;
 
+    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "BigUint")]
+    fn get_txs_batch_fee_in_wei(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token_like: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send>;
+
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(
         &self,
@@ -1106,6 +1114,43 @@ impl Rpc for RpcApp {
                 .boxed()
                 .compat(),
         )
+    }
+
+    fn get_txs_batch_fee_in_wei(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send> {
+        if tx_types.len() != addresses.len() {
+            return Box::new(futures01::future::err(Error {
+                code: RpcErrorCodes::IncorrectTx.into(),
+                message: "Number of tx_types must be equal to the number of addresses".to_string(),
+                data: None,
+            }));
+        }
+
+        let ticker_request_sender = self.ticker_request_sender.clone();
+
+        let total_fee_resp = async move {
+            let mut total_fee = BigUint::from(0u32);
+
+            for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
+                total_fee = total_fee
+                    + Self::ticker_request(
+                        ticker_request_sender.clone(),
+                        tx_type.clone(),
+                        *address,
+                        token.clone(),
+                    )
+                    .await?
+                    .total_fee;
+            }
+
+            Ok(res)
+        };
+
+        Box::new(total_fee_resp.boxed().compat())
     }
 
     fn get_token_price(
