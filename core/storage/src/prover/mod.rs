@@ -6,7 +6,7 @@ use sqlx::{Acquire, Done};
 use models::node::BlockNumber;
 use models::prover_utils::EncodedProofPlonk;
 // Local imports
-use self::records::{ActiveProver, IntegerNumber, ProverRun, StoredProof};
+use self::records::{ActiveProver, ProverRun, StoredProof};
 use crate::prover::records::StorageBlockWitness;
 use crate::{chain::block::BlockSchema, QueryResult, StorageProcessor};
 
@@ -101,7 +101,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     pub async fn prover_run_for_next_commit(
         &mut self,
         worker_: &str,
-        prover_timeout: time::Duration,
+        _prover_timeout: time::Duration,
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         // Select the block to prove.
@@ -116,30 +116,31 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         // - Block number is greater than the index of last verified block.
         // - There is no proof for block.
         // - Either there is no ongoing job for the block, or the job exceeded the timeout.
-        let query = format!(" \
-                    WITH unsized_blocks AS ( \
-                        SELECT * FROM operations o \
-                        WHERE action_type = 'COMMIT' \
-                            AND block_number > \
-                                (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
-                            AND NOT EXISTS \
-                                (SELECT * FROM proofs WHERE block_number = o.block_number) \
-                            AND NOT EXISTS \
-                                (SELECT * FROM prover_runs \
-                                    WHERE block_number = o.block_number AND (now() - updated_at) < interval '{prover_timeout_secs} seconds') \
-                    ) \
-                    SELECT min(block_number) AS integer_value FROM unsized_blocks \
-                    INNER JOIN blocks \
-                        ON unsized_blocks.block_number = blocks.number AND blocks.block_size = {block_size} \
-                    ",
-                    prover_timeout_secs=prover_timeout.as_secs(), block_size=block_size
-                );
-
         // Return the index of such a block.
-        let job = sqlx::query_as::<_, IntegerNumber>(&query)
-            .fetch_optional(&mut transaction)
+
+        // TODO: Prover gone interval is hard-coded. Is it critical?
+        let job = sqlx::query!(
+            r#"
+                WITH unsized_blocks AS (
+                    SELECT * FROM operations o
+                    WHERE action_type = 'COMMIT'
+                        AND block_number >
+                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
+                        AND NOT EXISTS
+                            (SELECT * FROM proofs WHERE block_number = o.block_number)
+                        AND NOT EXISTS
+                            (SELECT * FROM prover_runs
+                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '120 seconds')
+                )
+                SELECT min(block_number) FROM unsized_blocks
+                INNER JOIN blocks
+                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $1
+            "#,
+            block_size as i64
+            )
+            .fetch_one(&mut transaction)
             .await?
-            .map(|value| value.integer_value);
+            .min;
 
         // If there is a block to prove, create a job and store it
         // in the `prover_runs` table; otherwise do nothing and return `None`.
