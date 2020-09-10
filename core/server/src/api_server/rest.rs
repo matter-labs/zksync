@@ -1091,7 +1091,7 @@ pub(super) fn start_server_thread_detached(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
-            let runtime = actix_rt::System::new("api-server").block_on(async move {
+            actix_rt::System::new("api-server").block_on(async move {
                 let state = AppState {
                     caches: Caches::new(config_options.api_requests_caches_size),
                     connection_pool,
