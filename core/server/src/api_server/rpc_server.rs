@@ -30,6 +30,7 @@ use storage::{
 };
 
 // Local uses
+use crate::fee_ticker::TokenPriceRequestType;
 use crate::{
     api_server::ops_counter::ChangePubKeyOpsCounter,
     eth_watch::{EthBlockId, EthWatchRequest},
@@ -641,12 +642,14 @@ impl RpcApp {
     async fn ticker_price_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         token: TokenLike,
+        req_type: TokenPriceRequestType,
     ) -> Result<BigDecimal> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTokenPrice {
                 token: token.clone(),
                 response: req.0,
+                req_type,
             })
             .await
             .expect("ticker receiver dropped");
@@ -974,9 +977,12 @@ impl Rpc for RpcApp {
                         token.clone(),
                     )
                     .await?;
-                    let token_price_in_usd =
-                        Self::ticker_price_request(ticker_request_sender.clone(), token.clone())
-                            .await?;
+                    let token_price_in_usd = Self::ticker_price_request(
+                        ticker_request_sender.clone(),
+                        token.clone(),
+                        TokenPriceRequestType::USDForOneWei,
+                    )
+                    .await?;
                     required_total_usd_fee +=
                         BigDecimal::from(required_fee.total_fee.to_bigint().unwrap())
                             * &token_price_in_usd;
@@ -1107,9 +1113,13 @@ impl Rpc for RpcApp {
         token: TokenLike,
     ) -> Box<dyn futures01::Future<Item = BigDecimal, Error = Error> + Send> {
         Box::new(
-            Self::ticker_price_request(self.ticker_request_sender.clone(), token)
-                .boxed()
-                .compat(),
+            Self::ticker_price_request(
+                self.ticker_request_sender.clone(),
+                token,
+                TokenPriceRequestType::USDForOneToken,
+            )
+            .boxed()
+            .compat(),
         )
     }
 }
