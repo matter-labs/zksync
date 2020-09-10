@@ -154,7 +154,7 @@ async fn working_on(
         .map_err(|e| {
             vlog::warn!("failed to record prover work in progress request: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
-        });
+        })?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -216,7 +216,7 @@ async fn stopped(
         .map_err(|e| {
             vlog::warn!("failed to record prover stop: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
-        });
+        })?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -264,9 +264,9 @@ pub fn start_prover_server(
         .name("prover_server".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            let actix_runtime = actix_rt::System::new("prover-server");
+            let mut actix_runtime = actix_rt::System::new("prover-server");
 
-            actix_runtime.block_on(async {
+            actix_runtime.block_on(async move {
                 // Start pool maintainer threads.
                 for offset in 0..config_options.witness_generators {
                     let start_block = 1 + offset as u32;

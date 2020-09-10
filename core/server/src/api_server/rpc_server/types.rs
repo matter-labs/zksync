@@ -47,14 +47,14 @@ impl ResponseAccountState {
 #[serde(rename_all = "camelCase")]
 pub struct DepositingFunds {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
-    amount: BigUint,
-    expected_accept_block: u64,
+    pub amount: BigUint,
+    pub expected_accept_block: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositingAccountBalances {
-    balances: HashMap<String, DepositingFunds>,
+    pub balances: HashMap<String, DepositingFunds>,
 }
 
 impl DepositingAccountBalances {
@@ -101,7 +101,7 @@ impl DepositingAccountBalances {
 pub struct AccountInfoResp {
     pub address: Address,
     pub id: Option<AccountId>,
-    depositing: DepositingAccountBalances,
+    pub depositing: DepositingAccountBalances,
     pub committed: ResponseAccountState,
     pub verified: ResponseAccountState,
 }
@@ -142,10 +142,10 @@ pub struct ContractAddressResp {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OngoingDeposit {
-    received_on_block: u64,
-    token_id: u16,
-    amount: u128,
-    eth_tx_hash: String,
+    pub received_on_block: u64,
+    pub token_id: u16,
+    pub amount: u128,
+    pub eth_tx_hash: String,
 }
 
 impl OngoingDeposit {
@@ -184,18 +184,18 @@ impl OngoingDeposit {
 #[serde(rename_all = "camelCase")]
 pub struct OngoingDepositsResp {
     /// Address for which response is served.
-    address: Address,
+    pub address: Address,
     /// List of tuples (Eth block number, Deposit operation) of ongoing
     /// deposit operations.
-    deposits: Vec<OngoingDeposit>,
+    pub deposits: Vec<OngoingDeposit>,
 
     /// Amount of confirmations required for every deposit to be processed.
-    confirmations_for_eth_event: u64,
+    pub confirmations_for_eth_event: u64,
 
     /// Estimated block number for deposits completions:
     /// all the deposit operations for provided address are expected to be
     /// accepted in the zkSync network upon reaching this blocks.
     ///
     /// Can be `None` if there are no ongoing deposits.
-    estimated_deposits_approval_block: Option<u64>,
+    pub estimated_deposits_approval_block: Option<u64>,
 }

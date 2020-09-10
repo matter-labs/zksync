@@ -11,7 +11,7 @@ use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
 };
-use tokio::{runtime::Runtime, task::JoinHandle, time};
+use tokio::{task::JoinHandle, time};
 use web3::{
     contract::Options,
     types::{TransactionReceipt, H256, U256},
@@ -142,7 +142,7 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
-    pub fn new(
+    pub async fn new(
         options: EthSenderOptions,
         db: DB,
         ethereum: ETH,
@@ -150,10 +150,11 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         op_notify: mpsc::Sender<Operation>,
         current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
-        let (ongoing_ops, unprocessed_ops) = db.restore_state().expect("Can't restore state");
+        let (ongoing_ops, unprocessed_ops) = db.restore_state().await.expect("Can't restore state");
 
         let stats = db
             .load_stats()
+            .await
             .expect("Failed loading ETH operations stats");
 
         let tx_queue = TxQueueBuilder::new(options.max_txs_in_flight as usize)
@@ -163,7 +164,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .with_withdraw_operations_count(stats.withdraw_ops)
             .build();
 
-        let gas_adjuster = GasAdjuster::new(&db);
+        let gas_adjuster = GasAdjuster::new(&db).await;
 
         let mut sender = Self {
             ethereum,
@@ -202,7 +203,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 // ...and proceed them.
                 self.proceed_next_operations().await;
                 // Update the gas adjuster to maintain the up-to-date max gas price limit.
-                self.gas_adjuster.keep_updated(&self.ethereum, &self.db);
+                self.gas_adjuster
+                    .keep_updated(&self.ethereum, &self.db)
+                    .await;
             }
         }
     }
@@ -238,7 +241,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let mut new_ongoing_ops = VecDeque::new();
 
         while let Some(tx) = self.tx_queue.pop_front() {
-            if let Err(e) = self.initialize_operation(tx.clone()) {
+            if let Err(e) = self.initialize_operation(tx.clone()).await {
                 warn!(
                     "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
                     file!(),
@@ -266,7 +269,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             // network issue which won't appear the next time, so we report the situation to the
             // log and consider the operation pending (meaning that we won't process it on this
             // step, but will try to do so on the next one).
-            let commitment = match self.perform_commitment_step(&mut current_op) {
+            let commitment = match self.perform_commitment_step(&mut current_op).await {
                 Ok(commitment) => commitment,
                 Err(e) => {
                     warn!(
@@ -328,21 +331,26 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
+    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
         let current_block = self.ethereum.block_number()?;
         let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self.gas_adjuster.get_gas_price(&self.ethereum, None)?;
 
-        let (new_op, signed_tx) = self.db.transaction(|| {
+        // TODO: Support transactions here!
+        // let (new_op, signed_tx) = self.db.transaction(|| {
+        let (new_op, signed_tx) = {
             // First, we should store the operation in the database and obtain the assigned
             // operation ID and nonce. Without them we won't be able to sign the transaction.
-            let assigned_data = self.db.save_new_eth_tx(
-                tx.op_type,
-                tx.operation.clone(),
-                deadline_block as i64,
-                gas_price,
-                tx.raw.clone(),
-            )?;
+            let assigned_data = self
+                .db
+                .save_new_eth_tx(
+                    tx.op_type,
+                    tx.operation.clone(),
+                    deadline_block as i64,
+                    gas_price,
+                    tx.raw.clone(),
+                )
+                .await?;
 
             let mut new_op = ETHOperation {
                 id: assigned_data.id,
@@ -362,10 +370,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
             // With signed tx, update the hash in the operation entry and in the db.
             new_op.used_tx_hashes.push(signed_tx.hash);
-            self.db.add_hash_entry(new_op.id, &signed_tx.hash)?;
+            self.db.add_hash_entry(new_op.id, &signed_tx.hash).await?;
 
-            Ok((new_op, signed_tx))
-        })?;
+            (new_op, signed_tx)
+        };
 
         // We should store the operation as `ongoing` **before** sending it as well,
         // so if sending will fail, we won't forget about it.
@@ -419,7 +427,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// - If the transaction is stuck, sends a supplement transaction for it.
     /// - If the transaction is failed, handles the failure according to the failure
     ///   processing policy.
-    fn perform_commitment_step(
+    async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
     ) -> Result<OperationCommitment, failure::Error> {
@@ -450,7 +458,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         "Confirmed: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
                         op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
-                    self.db.confirm_operation(tx_hash)?;
+                    self.db.confirm_operation(tx_hash).await?;
                     return Ok(OperationCommitment::Committed);
                 }
                 TxCheckOutcome::Stuck => {
@@ -478,12 +486,15 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         // create a new one from the old one with updated parameters.
         let new_tx = self.create_supplement_tx(deadline_block, op)?;
         // New transaction should be persisted in the DB *before* sending it.
-        self.db.transaction(|| {
-            self.db
-                .update_eth_tx(op.id, deadline_block as i64, new_tx.gas_price)?;
-            self.db.add_hash_entry(op.id, &new_tx.hash)?;
-            Ok(())
-        })?;
+
+        // TODO: Restore transaction here!
+        // self.db.transaction(|| {
+        self.db
+            .update_eth_tx(op.id, deadline_block as i64, new_tx.gas_price)
+            .await?;
+        self.db.add_hash_entry(op.id, &new_tx.hash).await?;
+        //     Ok(())
+        // })?;
 
         info!(
             "Stuck tx processing: sending tx for op, eth_op_id: {}; ETH tx: {}",
@@ -752,7 +763,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
 #[must_use]
 pub fn start_eth_sender(
-    runtime: &Runtime,
     pool: ConnectionPool,
     op_notify_sender: mpsc::Sender<Operation>,
     send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
@@ -765,14 +775,18 @@ pub fn start_eth_sender(
     let db = Database::new(pool);
 
     let eth_sender_options = EthSenderOptions::from_env();
-    let eth_sender = ETHSender::new(
-        eth_sender_options,
-        db,
-        ethereum,
-        send_request_receiver,
-        op_notify_sender,
-        current_zksync_info,
-    );
 
-    runtime.spawn(eth_sender.run())
+    tokio::spawn(async move {
+        let eth_sender = ETHSender::new(
+            eth_sender_options,
+            db,
+            ethereum,
+            send_request_receiver,
+            op_notify_sender,
+            current_zksync_info,
+        )
+        .await;
+
+        eth_sender.run().await
+    })
 }

@@ -65,7 +65,14 @@ impl WitnessGenerator {
             .name("prover_server_pool".to_string())
             .spawn(move || {
                 let _panic_sentinel = ThreadPanicNotify(panic_notify);
-                self.maintain();
+                let mut runtime = tokio::runtime::Builder::new()
+                    .basic_scheduler()
+                    .build()
+                    .expect("Unable to build runtime for a witness generator");
+
+                runtime.block_on(async move {
+                    self.maintain().await;
+                });
             })
             .expect("failed to start provers server");
     }

@@ -20,7 +20,7 @@ use bigdecimal::BigDecimal;
 use super::{error::*, types::*, verify_tx_info_message_signature, RpcApp};
 
 impl RpcApp {
-    pub async fn _impl_account_info(&self, address: Address) -> Result<AccountInfoResp> {
+    pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         // TODO: this method now has a lot debug output, to be removed as soon as problem is detected.
         use std::time::Instant;
 
@@ -66,15 +66,6 @@ impl RpcApp {
             (None, Default::default())
         };
 
-        // committed_account_state
-        //     .map(|(id, account)| {
-        //         let restored_state =
-        //             ResponseAccountState::try_restore(account, &self.token_cache).await?;
-        //         Ok((Some(id), restored_state))
-        //     })
-        //     .transpose()?
-        //     .unwrap_or_default();
-
         let verified = self.get_verified_account_state(&address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
@@ -96,7 +87,7 @@ impl RpcApp {
         })
     }
 
-    pub async fn _impl_ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
+    pub async fn _impl_ethop_info(self, serial_id: u32) -> Result<ETHOpInfoResp> {
         let executed_op = self.get_executed_priority_operation(serial_id).await?;
         Ok(if let Some(executed_op) = executed_op {
             let block = self.get_block_info(executed_op.block_number).await?;
@@ -116,11 +107,11 @@ impl RpcApp {
         })
     }
 
-    pub async fn _impl_get_confirmations_for_eth_op_amount(&self) -> Result<u64> {
+    pub async fn _impl_get_confirmations_for_eth_op_amount(self) -> Result<u64> {
         Ok(self.confirmations_for_eth_event)
     }
 
-    pub async fn _impl_tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
+    pub async fn _impl_tx_info(self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
         let stored_receipt = self.get_tx_receipt(tx_hash).await?;
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
@@ -144,7 +135,7 @@ impl RpcApp {
     }
 
     pub async fn _impl_tx_submit(
-        &self,
+        self,
         mut tx: Box<FranklinTx>,
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
@@ -285,7 +276,7 @@ impl RpcApp {
         })
     }
 
-    pub async fn _impl_contract_address(&self) -> Result<ContractAddressResp> {
+    pub async fn _impl_contract_address(self) -> Result<ContractAddressResp> {
         let mut storage = self.access_storage().await?;
         let config = storage.config_schema().load_config().await.map_err(|err| {
             log::warn!(
@@ -312,7 +303,7 @@ impl RpcApp {
         })
     }
 
-    pub async fn _impl_tokens(&self) -> Result<HashMap<String, Token>> {
+    pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {
         let mut storage = self.access_storage().await?;
         let mut tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
             log::warn!(
@@ -337,7 +328,7 @@ impl RpcApp {
     }
 
     pub async fn _impl_get_tx_fee(
-        &self,
+        self,
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
@@ -345,7 +336,7 @@ impl RpcApp {
         Self::ticker_request(self.ticker_request_sender.clone(), tx_type, address, token).await
     }
 
-    pub async fn _impl_get_token_price(&self, token: TokenLike) -> Result<BigDecimal> {
+    pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {
         Self::ticker_price_request(self.ticker_request_sender.clone(), token).await
     }
 }

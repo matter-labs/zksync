@@ -3,7 +3,7 @@ use std::time::Duration;
 // External uses
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
-use tokio::{runtime::Runtime, task::JoinHandle, time};
+use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
@@ -220,14 +220,13 @@ pub fn run_committer(
     op_notify_sender: Sender<Operation>,
     mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
-    runtime.spawn(handle_new_commit_task(
+    tokio::spawn(handle_new_commit_task(
         rx_for_ops,
         tx_for_eth.clone(),
         op_notify_sender,
         mempool_req_sender,
         pool.clone(),
     ));
-    runtime.spawn(poll_for_new_proofs_task(tx_for_eth, pool))
+    tokio::spawn(poll_for_new_proofs_task(tx_for_eth, pool))
 }

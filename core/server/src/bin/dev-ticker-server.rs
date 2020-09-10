@@ -16,7 +16,7 @@ struct CoinMarketCapTokenQuery {
     symbol: String,
 }
 
-fn handle_coinmarketcap_token_price_query(
+async fn handle_coinmarketcap_token_price_query(
     query: web::Query<CoinMarketCapTokenQuery>,
 ) -> Result<HttpResponse> {
     let symbol = query.symbol.clone();
@@ -48,7 +48,7 @@ fn handle_coinmarketcap_token_price_query(
     Ok(HttpResponse::Ok().json(resp))
 }
 
-fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> {
+async fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> {
     let resp = json!([
         {"id": "ethereum", "symbol": "eth", "name": "Ethereum"},
         {"id": "dai", "symbol":"dai", "name": "Dai"},
@@ -59,7 +59,7 @@ fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(resp))
 }
 
-fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResponse> {
+async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResponse> {
     let coin_id = req.match_info().get("coin_id");
     let base_price = match coin_id {
         Some("ethereum") => BigDecimal::from(200),
@@ -84,32 +84,34 @@ fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResponse> 
 fn main() {
     env_logger::init();
 
-    let runtime = actix_rt::System::new("dev-ticker");
+    let mut runtime = actix_rt::System::new("dev-ticker");
 
-    HttpServer::new(move || {
-        App::new()
-            .wrap(middleware::Logger::default())
-            .wrap(Cors::new().send_wildcard().max_age(3600))
-            .service(
-                web::scope("/")
-                    .route(
-                        "/cryptocurrency/quotes/latest",
-                        web::get().to(handle_coinmarketcap_token_price_query),
-                    )
-                    .route(
-                        "/api/v3/coins/list",
-                        web::get().to(handle_coingecko_token_list),
-                    )
-                    .route(
-                        "/api/v3/coins/{coin_id}/market_chart",
-                        web::get().to(handle_coingecko_token_price_query),
-                    ),
-            )
-    })
-    .bind("0.0.0.0:9876")
-    .unwrap()
-    .shutdown_timeout(1)
-    .start();
-
-    runtime.run().unwrap_or_default();
+    runtime.block_on(async {
+        HttpServer::new(move || {
+            App::new()
+                .wrap(middleware::Logger::default())
+                .wrap(Cors::new().send_wildcard().max_age(3600).finish())
+                .service(
+                    web::scope("/")
+                        .route(
+                            "/cryptocurrency/quotes/latest",
+                            web::get().to(handle_coinmarketcap_token_price_query),
+                        )
+                        .route(
+                            "/api/v3/coins/list",
+                            web::get().to(handle_coingecko_token_list),
+                        )
+                        .route(
+                            "/api/v3/coins/{coin_id}/market_chart",
+                            web::get().to(handle_coingecko_token_price_query),
+                        ),
+                )
+        })
+        .bind("0.0.0.0:9876")
+        .unwrap()
+        .shutdown_timeout(1)
+        .run()
+        .await
+        .expect("Server crashed");
+    });
 }

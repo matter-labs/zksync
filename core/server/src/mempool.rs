@@ -22,7 +22,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 // Workspace uses
 use models::node::{
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
@@ -341,10 +341,9 @@ pub fn run_mempool_task(
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     config: &ConfigurationOptions,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
     let config = config.clone();
-    runtime.spawn(async move {
+    tokio::spawn(async move {
         let mempool_state = MempoolState::restore_from_db(&db_pool).await;
 
         let mempool = Mempool {

@@ -32,9 +32,10 @@ pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
-    pub fn new(db: &DB) -> Self {
+    pub async fn new(db: &DB) -> Self {
         let gas_price_limit = db
             .load_gas_price_limit()
+            .await
             .expect("Can't load the gas price limit");
         Self {
             statistics: GasStatistics::new(gas_price_limit),
@@ -83,7 +84,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     /// Performs an actualization routine for `GasAdjuster`:
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
-    pub fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
+    pub async fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
         if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
             // Report the current price to be gathered by the statistics module.
             match ethereum.gas_price() {
@@ -105,7 +106,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
             self.last_price_renewal = Instant::now();
 
             // Update the value in the database as well.
-            let result = db.update_gas_price_limit(self.statistics.get_limit());
+            let result = db.update_gas_price_limit(self.statistics.get_limit()).await;
 
             if let Err(err) = result {
                 // Inability of update the value in the DB is not critical as it's not

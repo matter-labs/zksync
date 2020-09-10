@@ -5,7 +5,7 @@ use futures::{
     stream::StreamExt,
     SinkExt,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 use web3::types::Address;
 // Workspace uses
 use crypto_exports::ff;
@@ -813,7 +813,6 @@ impl PlasmaStateKeeper {
 pub fn start_state_keeper(
     sk: PlasmaStateKeeper,
     pending_block: Option<SendablePendingBlock>,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
-    runtime.spawn(sk.run(pending_block))
+    tokio::spawn(sk.run(pending_block))
 }

@@ -161,27 +161,34 @@ impl AppState {
                             .get_last_verified_block()
                             .await
                             .unwrap_or(0);
+
+                        let last_committed = transaction
+                            .chain()
+                            .block_schema()
+                            .get_last_committed_block()
+                            .await
+                            .unwrap_or(0);
+
+                        let total_transactions = transaction
+                            .chain()
+                            .stats_schema()
+                            .count_total_transactions()
+                            .await
+                            .unwrap_or(0);
+
+                        let outstanding_txs = transaction
+                            .chain()
+                            .stats_schema()
+                            .count_outstanding_proofs(last_verified)
+                            .await
+                            .unwrap_or(0);
+
                         let status = NetworkStatus {
                             next_block_at_max: None,
-                            last_committed: storage
-                                .chain()
-                                .block_schema()
-                                .get_last_committed_block()
-                                .await
-                                .unwrap_or(0),
+                            last_committed,
                             last_verified,
-                            total_transactions: storage
-                                .chain()
-                                .stats_schema()
-                                .count_total_transactions()
-                                .await
-                                .unwrap_or(0),
-                            outstanding_txs: storage
-                                .chain()
-                                .stats_schema()
-                                .count_outstanding_proofs(last_verified)
-                                .await
-                                .unwrap_or(0),
+                            total_transactions,
+                            outstanding_txs,
                         };
 
                         transaction.commit().await.unwrap_or_default();
@@ -1073,7 +1080,8 @@ async fn start_server(state: AppState, bind_to: SocketAddr) {
     .unwrap()
     .shutdown_timeout(1)
     .run()
-    .await;
+    .await
+    .expect("REST API server has crashed");
 }
 
 /// Start HTTP REST API
@@ -1103,7 +1111,7 @@ pub(super) fn start_server_thread_detached(
                 };
                 state.spawn_network_status_updater(panic_notify);
 
-                start_server(state, listen_addr);
+                start_server(state, listen_addr).await;
             });
         })
         .expect("Api server thread");

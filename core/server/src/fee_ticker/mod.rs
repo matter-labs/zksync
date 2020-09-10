@@ -19,7 +19,7 @@ use num::{
     traits::{Inv, Pow},
     BigUint,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 // Workspace deps
 use models::{
     node::{
@@ -153,7 +153,6 @@ pub fn run_ticker_task(
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
     // We increase gas price for fast withdrawals, since it will induce generating a smaller block
     // size, resulting in us paying more gas than for bigger block.
@@ -184,7 +183,7 @@ pub fn run_ticker_task(
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
-            runtime.spawn(fee_ticker.run())
+            tokio::spawn(fee_ticker.run())
         }
         TokenPriceSource::CoinGecko { base_url } => {
             let token_price_api = CoinGeckoAPI::new(reqwest::Client::new(), base_url)
@@ -195,7 +194,7 @@ pub fn run_ticker_task(
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
-            runtime.spawn(fee_ticker.run())
+            tokio::spawn(fee_ticker.run())
         }
     }
 }

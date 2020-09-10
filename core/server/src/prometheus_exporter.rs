@@ -6,21 +6,19 @@ use prometheus_exporter_base::{render_prometheus, MetricType, PrometheusMetric};
 use models::config_options::ConfigurationOptions;
 use models::ActionType;
 use storage::ConnectionPool;
-use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
 #[must_use]
 pub fn start_prometheus_exporter(
     connection_pool: ConnectionPool,
     config: &ConfigurationOptions,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
     let addr = ([0, 0, 0, 0], config.prometheus_export_port).into();
 
-    runtime.spawn(render_prometheus(addr, (), |_, _| async move {
+    tokio::spawn(render_prometheus(addr, (), |_, _| async move {
         let mut storage = connection_pool.access_storage_fragile().await?;
         let mut transaction = storage.start_transaction().await?;
-        let block_schema = transaction.chain().block_schema();
+        let mut block_schema = transaction.chain().block_schema();
 
         let pc = PrometheusMetric::new(
             "block_commit_unconfirmed",
