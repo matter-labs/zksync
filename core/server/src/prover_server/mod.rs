@@ -256,7 +256,7 @@ pub fn start_prover_server(
 
             // Start pool maintainer threads.
             for offset in 0..config_options.witness_generators {
-                let start_block = (last_verified_block + offset) as u32;
+                let start_block = (last_verified_block + offset + 1) as u32;
                 let block_step = config_options.witness_generators as u32;
                 info!(
                     "Starting witness generator ({},{})",
