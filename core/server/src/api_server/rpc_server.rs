@@ -1147,7 +1147,7 @@ impl Rpc for RpcApp {
                     .total_fee;
             }
 
-            Ok(res)
+            Ok(total_fee)
         };
 
         Box::new(total_fee_resp.boxed().compat())
