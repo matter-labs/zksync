@@ -2,7 +2,7 @@ use super::{Nonce, TokenId};
 
 use crate::node::{
     is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
-    public_key_from_private, AccountId, CloseOp, TransferOp, WithdrawOp,
+    public_key_from_private, AccountId, CloseOp, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
 use crypto::{digest::Digest, sha2::Sha256};
 use num::{BigUint, ToPrimitive};
@@ -570,6 +570,32 @@ impl FranklinTx {
         match self {
             FranklinTx::Close(_) => true,
             _ => false,
+        }
+    }
+
+    pub fn get_fee_info(&self) -> Option<(TxFeeTypes, TokenLike, Address, BigUint)> {
+        match self {
+            FranklinTx::Withdraw(withdraw) => {
+                let fee_type = if withdraw.fast {
+                    TxFeeTypes::FastWithdraw
+                } else {
+                    TxFeeTypes::Withdraw
+                };
+
+                Some((
+                    fee_type,
+                    TokenLike::Id(withdraw.token),
+                    withdraw.to,
+                    withdraw.fee.clone(),
+                ))
+            }
+            FranklinTx::Transfer(transfer) => Some((
+                TxFeeTypes::Transfer,
+                TokenLike::Id(transfer.token),
+                transfer.to,
+                transfer.fee.clone(),
+            )),
+            _ => None,
         }
     }
 }

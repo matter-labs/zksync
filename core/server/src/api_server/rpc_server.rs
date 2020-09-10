@@ -853,29 +853,7 @@ impl Rpc for RpcApp {
             Err(e) => return Box::new(futures01::future::err(e)),
         };
 
-        let tx_fee_info = match tx.as_ref() {
-            FranklinTx::Withdraw(withdraw) => {
-                let fee_type = if fast_processing {
-                    TxFeeTypes::FastWithdraw
-                } else {
-                    TxFeeTypes::Withdraw
-                };
-
-                Some((
-                    fee_type,
-                    TokenLike::Id(withdraw.token),
-                    withdraw.to,
-                    withdraw.fee.clone(),
-                ))
-            }
-            FranklinTx::Transfer(transfer) => Some((
-                TxFeeTypes::Transfer,
-                TokenLike::Id(transfer.token),
-                transfer.to,
-                transfer.fee.clone(),
-            )),
-            _ => None,
-        };
+        let tx_fee_info = tx.get_fee_info();
 
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
@@ -975,19 +953,8 @@ impl Rpc for RpcApp {
             let mut provided_total_usd_fee = BigDecimal::from(0);
             for tx in &txs {
                 let tx_fee_info = match &tx.tx {
-                    FranklinTx::Withdraw(withdraw) => Some((
-                        TxFeeTypes::Withdraw,
-                        TokenLike::Id(withdraw.token),
-                        withdraw.to,
-                        withdraw.fee.clone(),
-                    )),
-                    FranklinTx::Transfer(transfer) => Some((
-                        TxFeeTypes::Transfer,
-                        TokenLike::Id(transfer.token),
-                        transfer.to,
-                        transfer.fee.clone(),
-                    )),
                     // Cause `ChangePubKey` will have fee we must add this check
+                    // TODO: should be removed after merging with a branch that contains a fee on ChangePubKey
                     FranklinTx::ChangePubKey(_) => {
                         // Now `ChangePubKey` operations are not allowed in batches
                         return Err(Error {
@@ -997,7 +964,7 @@ impl Rpc for RpcApp {
                             data: None,
                         });
                     }
-                    _ => None,
+                    _ => tx.tx.get_fee_info(),
                 };
                 if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
                     let required_fee = Self::ticker_request(
