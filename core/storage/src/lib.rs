@@ -75,7 +75,7 @@
 // use diesel::pg::PgConnection;
 // use diesel::prelude::*;
 // use diesel::r2d2::{ConnectionManager, PooledConnection};
-use sqlx::{pool::PoolConnection, postgres::Postgres, Connection, PgConnection};
+use sqlx::{pool::PoolConnection, postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
 // Local imports
 use crate::connection::holder::ConnectionHolder;
@@ -95,6 +95,7 @@ pub mod tokens;
 pub mod utils;
 
 pub use crate::connection::ConnectionPool;
+// pub use sqlx::Acquire;
 
 pub type QueryResult<T> = Result<T, failure::Error>;
 
@@ -118,9 +119,43 @@ impl<'a> StorageProcessor<'a> {
         })
     }
 
+    pub async fn start_transaction<'c: 'b, 'b>(
+        &'c mut self,
+    ) -> Result<StorageProcessor<'b>, failure::Error> {
+        let transaction = self.conn().begin().await?;
+
+        let mut processor = StorageProcessor::from_transaction(transaction);
+        processor.in_transaction = true;
+
+        Ok(processor)
+    }
+
     /// Checks if the `StorageProcessor` is currently within database transaction.
     pub fn in_transaction(&self) -> bool {
         self.in_transaction
+    }
+
+    /// Checks if the `StorageProcessor` is currently within database transaction and panics otherwise.
+    pub fn assert_in_transaction(&self) {
+        if !self.in_transaction() {
+            panic!("Schema expected to be in transaction in order to execute required operation.");
+        }
+    }
+
+    pub fn from_transaction<'b>(conn: Transaction<'b, Postgres>) -> StorageProcessor<'b> {
+        StorageProcessor {
+            conn: ConnectionHolder::Transaction(conn),
+            in_transaction: true,
+        }
+    }
+
+    pub async fn commit(self) -> QueryResult<()> {
+        if let ConnectionHolder::Transaction(transaction) = self.conn {
+            transaction.commit().await?;
+            Ok(())
+        } else {
+            panic!("StorageProcessor::commit can only be invoked after calling StorageProcessor::begin_transaction");
+        }
     }
 
     /// Creates a `StorageProcessor` using a pool of connections.
@@ -171,20 +206,23 @@ impl<'a> StorageProcessor<'a> {
     }
 
     /// Performs several database operations within one database transaction.
-    pub async fn transaction<F, T, Fut>(&mut self, f: F) -> Result<T, failure::Error>
+    pub async fn transaction<'s: 'b, 'b, F, T, Fut>(&'s mut self, f: F) -> Result<T, failure::Error>
     where
-        T: Send,
-        F: FnOnce(StorageProcessor<'_>) -> Fut + Send,
-        Fut: std::future::Future<Output = Result<T, failure::Error>> + Send,
+        // T,
+        F: FnOnce(&mut StorageProcessor<'b>) -> Fut,
+        Fut: std::future::Future<Output = Result<T, failure::Error>>,
     {
-        let conn = self.conn();
-        let result = conn
-            .transaction(|conn| {
-                let mut processor = StorageProcessor::from_ref(conn);
-                processor.in_transaction = true;
-                f(processor)
-            })
-            .await?;
+        let transaction = self.conn().begin().await?;
+
+        let mut processor = StorageProcessor::from_transaction(transaction);
+        processor.in_transaction = true;
+
+        // let processor_pin = Box::pin(processor);
+        let result = f(&mut processor).await?;
+
+        processor.commit().await?;
+
+        // transaction.commit().await?;
 
         Ok(result)
     }
@@ -194,6 +232,7 @@ impl<'a> StorageProcessor<'a> {
             ConnectionHolder::Pooled(conn) => conn,
             ConnectionHolder::ConnectionRef(conn) => conn,
             ConnectionHolder::Direct(conn) => conn,
+            ConnectionHolder::Transaction(conn) => conn,
         }
     }
 }

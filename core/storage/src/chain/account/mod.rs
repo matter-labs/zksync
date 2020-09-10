@@ -76,6 +76,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
+        self.0.assert_in_transaction();
         // Get the last certain state of the account.
         // Note that `account` can be `None` here (if it wasn't verified yet), since
         // we will update the committed changes below.
@@ -149,6 +150,8 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
+        self.0.assert_in_transaction();
+
         // `accounts::table` is updated only after the block verification, so we should
         // just load the account with the provided ID.
         let mut results = sqlx::query_as!(
