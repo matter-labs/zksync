@@ -108,13 +108,19 @@ struct AppState {
 }
 
 impl AppState {
-    fn access_storage(&self) -> ActixResult<StorageProcessor> {
+    async fn access_storage(&self) -> ActixResult<StorageProcessor<'_>> {
         self.connection_pool
             .access_storage_fragile()
+            .await
             .map_err(|err| {
                 vlog::warn!("DB await timeout: '{}';", err);
                 HttpResponse::RequestTimeout().finish().into()
             })
+    }
+
+    fn db_error(error: failure::Error) -> HttpResponse {
+        vlog::warn!("DB error: '{}';", error);
+        HttpResponse::InternalServerError().finish().into()
     }
 
     // Spawns future updating SharedNetworkStatus in the current `actix::System`
@@ -133,7 +139,7 @@ impl AppState {
                     loop {
                         timer.tick().await;
 
-                        let storage = match state.connection_pool.access_storage() {
+                        let mut storage = match state.connection_pool.access_storage().await {
                             Ok(storage) => storage,
                             Err(err) => {
                                 log::warn!("Unable to update the network status. Storage access failed: {}", err);
@@ -141,10 +147,19 @@ impl AppState {
                             }
                         };
 
-                        let last_verified = storage
+                        let mut transaction =  match storage.start_transaction().await {
+                            Ok(transaction) => transaction,
+                            Err(err) => {
+                                log::warn!("Unable to update the network status. Storage access failed: {}", err);
+                                continue;
+                            }
+                        };
+
+                        let last_verified = transaction
                             .chain()
                             .block_schema()
                             .get_last_verified_block()
+                            .await
                             .unwrap_or(0);
                         let status = NetworkStatus {
                             next_block_at_max: None,
@@ -152,19 +167,24 @@ impl AppState {
                                 .chain()
                                 .block_schema()
                                 .get_last_committed_block()
+                                .await
                                 .unwrap_or(0),
                             last_verified,
                             total_transactions: storage
                                 .chain()
                                 .stats_schema()
                                 .count_total_transactions()
+                                .await
                                 .unwrap_or(0),
                             outstanding_txs: storage
                                 .chain()
                                 .stats_schema()
                                 .count_outstanding_proofs(last_verified)
+                                .await
                                 .unwrap_or(0),
                         };
+
+                        transaction.commit().await.unwrap_or_default();
 
                         // save status to state
                         *state.network_status.0.as_ref().write().unwrap() = status;
@@ -176,7 +196,7 @@ impl AppState {
     }
 
     // cache access functions
-    fn get_tx_receipt(
+    async fn get_tx_receipt(
         &self,
         transaction_hash: Vec<u8>,
     ) -> Result<Option<TxReceiptResponse>, actix_web::error::Error> {
@@ -184,11 +204,12 @@ impl AppState {
             return Ok(Some(tx_receipt));
         }
 
-        let storage = self.access_storage()?;
+        let mut storage = self.access_storage().await?;
         let tx_receipt = storage
             .chain()
             .operations_ext_schema()
             .tx_receipt(transaction_hash.as_slice())
+            .await
             .unwrap_or(None);
 
         if let Some(tx_receipt) = tx_receipt.clone() {
@@ -203,7 +224,7 @@ impl AppState {
         Ok(tx_receipt)
     }
 
-    fn get_priority_op_receipt(
+    async fn get_priority_op_receipt(
         &self,
         id: u32,
     ) -> Result<PriorityOpReceiptResponse, actix_web::error::Error> {
@@ -211,11 +232,12 @@ impl AppState {
             return Ok(receipt);
         }
 
-        let storage = self.access_storage()?;
+        let mut storage = self.access_storage().await?;
         let receipt = storage
             .chain()
             .operations_ext_schema()
             .get_priority_op_receipt(id)
+            .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, id);
                 HttpResponse::InternalServerError().finish()
@@ -229,7 +251,7 @@ impl AppState {
         Ok(receipt)
     }
 
-    fn get_block_executed_ops(
+    async fn get_block_executed_ops(
         &self,
         block_id: u32,
     ) -> Result<Vec<ExecutedOperations>, actix_web::error::Error> {
@@ -237,17 +259,24 @@ impl AppState {
             return Ok(executed_ops);
         }
 
-        let storage = self.access_storage()?;
-        let executed_ops = storage
+        let mut storage = self.access_storage().await?;
+        let mut transaction = storage.start_transaction().await.map_err(Self::db_error)?;
+        let executed_ops = transaction
             .chain()
             .block_schema()
             .get_block_executed_ops(block_id)
+            .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
                 HttpResponse::InternalServerError().finish()
             })?;
 
-        if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
+        if let Ok(block_details) = transaction
+            .chain()
+            .block_schema()
+            .load_block_range(block_id, 1)
+            .await
+        {
             // Unverified blocks can still change, so we can't cache them.
             if !block_details.is_empty() && block_verified(&block_details[0]) {
                 self.caches
@@ -255,11 +284,12 @@ impl AppState {
                     .insert(block_id, executed_ops.clone());
             }
         }
+        transaction.commit().await.unwrap_or_default();
 
         Ok(executed_ops)
     }
 
-    fn get_block_info(
+    async fn get_block_info(
         &self,
         block_id: u32,
     ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
@@ -267,11 +297,12 @@ impl AppState {
             return Ok(Some(block));
         }
 
-        let storage = self.access_storage()?;
+        let mut storage = self.access_storage().await?;
         let mut blocks = storage
             .chain()
             .block_schema()
             .load_block_range(block_id, 1)
+            .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
                 HttpResponse::InternalServerError().finish()
@@ -289,7 +320,7 @@ impl AppState {
         Ok(blocks.pop())
     }
 
-    fn get_block_by_height_or_hash(
+    async fn get_block_by_height_or_hash(
         &self,
         query: String,
     ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
@@ -297,11 +328,12 @@ impl AppState {
             return Ok(Some(block));
         }
 
-        let storage = self.access_storage()?;
+        let mut storage = self.access_storage().await?;
         let block = storage
             .chain()
             .block_schema()
-            .find_block_by_height_or_hash(query.clone());
+            .find_block_by_height_or_hash(query.clone())
+            .await;
 
         if let Some(block) = block.clone() {
             if block_verified(&block) {
@@ -319,12 +351,12 @@ struct TestnetConfigResponse {
     contract_address: String,
 }
 
-fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+async fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let contract_address = data.contract_address.clone();
     Ok(HttpResponse::Ok().json(TestnetConfigResponse { contract_address }))
 }
 
-fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+async fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let network_status = data.network_status.read();
     Ok(HttpResponse::Ok().json(network_status))
 }
@@ -335,7 +367,9 @@ struct WithdrawalProcessingTimeResponse {
     fast: u64,
 }
 
-fn handle_get_withdrawal_processing_time(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+async fn handle_get_withdrawal_processing_time(
+    data: web::Data<AppState>,
+) -> ActixResult<HttpResponse> {
     let miniblock_timings = &data.config_options.miniblock_timings;
     let processing_time = WithdrawalProcessingTimeResponse {
         normal: (miniblock_timings.miniblock_iteration_interval
@@ -357,12 +391,13 @@ struct AccountStateResponse {
     verified: Account,
 }
 
-fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-    let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-        vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
-        HttpResponse::InternalServerError().finish()
-    })?;
+async fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+    let mut storage = data.access_storage().await?;
+    let tokens = storage
+        .tokens_schema()
+        .load_tokens()
+        .await
+        .map_err(AppState::db_error)?;
 
     let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
     vec_tokens.sort_by_key(|t| t.id);
@@ -499,7 +534,6 @@ fn priority_op_to_tx_history(
 
     // As the time of creation is indefinite, we always will provide the current time.
     let current_time = chrono::Utc::now();
-    let naive_current_time = chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
 
     TransactionsHistoryItem {
         tx_id: "-".into(),
@@ -511,11 +545,11 @@ fn priority_op_to_tx_history(
         fail_reason: None,
         commited: false,
         verified: false,
-        created_at: naive_current_time,
+        created_at: current_time,
     }
 }
 
-fn handle_get_account_transactions_history(
+async fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
     request_path: web::Path<(Address, u64, u64)>,
 ) -> ActixResult<HttpResponse> {
@@ -526,8 +560,8 @@ fn handle_get_account_transactions_history(
         return Err(HttpResponse::BadRequest().finish().into());
     }
 
-    let storage = data.access_storage()?;
-    let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+    let mut storage = data.access_storage().await?;
+    let tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
         vlog::warn!(
             "Internal Server Error: '{}'; input: ({}, {}, {})",
             err,
@@ -540,19 +574,18 @@ fn handle_get_account_transactions_history(
 
     let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
     // Fetch ongoing deposits, since they must be reported within the transactions history.
-    let mut ongoing_ops = futures::executor::block_on(async move {
-        get_ongoing_priority_ops(&eth_watcher_request_sender, address).await
-    })
-    .map_err(|err| {
-        vlog::warn!(
-            "Internal Server Error: '{}'; input: ({}, {}, {})",
-            err,
-            address,
-            offset,
-            limit,
-        );
-        HttpResponse::InternalServerError().finish()
-    })?;
+    let mut ongoing_ops = get_ongoing_priority_ops(&eth_watcher_request_sender, address)
+        .await
+        .map_err(|err| {
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {}, {})",
+                err,
+                address,
+                offset,
+                limit,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
 
     // Sort operations by block number from smaller (older) to greater (newer).
     ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
@@ -585,6 +618,7 @@ fn handle_get_account_transactions_history(
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
+        .await
         .map_err(|err| {
             vlog::warn!(
                 "Internal Server Error: '{}'; input: ({}, {}, {})",
@@ -609,12 +643,13 @@ struct TxHistoryQuery {
     limit: Option<u64>,
 }
 
-fn parse_tx_id(data: &str, storage: &StorageProcessor) -> ActixResult<(u64, u64)> {
+async fn parse_tx_id(data: &str, storage: &mut StorageProcessor<'_>) -> ActixResult<(u64, u64)> {
     if data.is_empty() || data == "-" {
         let last_block_id = storage
             .chain()
             .block_schema()
             .get_last_committed_block()
+            .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: ({})", err, data,);
                 HttpResponse::InternalServerError().finish()
@@ -637,7 +672,7 @@ fn parse_tx_id(data: &str, storage: &StorageProcessor) -> ActixResult<(u64, u64)
     Ok((parts[0], parts[1]))
 }
 
-fn handle_get_account_transactions_history_older_than(
+async fn handle_get_account_transactions_history_older_than(
     data: web::Data<AppState>,
     request_path: web::Path<Address>,
     request_query: web::Query<TxHistoryQuery>,
@@ -654,15 +689,20 @@ fn handle_get_account_transactions_history_older_than(
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
-    let storage = data.access_storage()?;
+    let mut storage = data.access_storage().await?;
+    let mut transaction = storage
+        .start_transaction()
+        .await
+        .map_err(AppState::db_error)?;
 
-    let tx_id = parse_tx_id(&tx_id, &storage)?;
+    let tx_id = parse_tx_id(&tx_id, &mut transaction).await?;
 
     let direction = SearchDirection::Older;
-    let transactions_history = storage
+    let transactions_history = transaction
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history_from(&address, tx_id, direction, limit)
+        .await
         .map_err(|err| {
             vlog::warn!(
                 "Internal Server Error: '{}'; input: ({}, {:?}, {})",
@@ -674,10 +714,12 @@ fn handle_get_account_transactions_history_older_than(
             HttpResponse::InternalServerError().finish()
         })?;
 
+    transaction.commit().await.map_err(AppState::db_error)?;
+
     Ok(HttpResponse::Ok().json(transactions_history))
 }
 
-fn handle_get_account_transactions_history_newer_than(
+async fn handle_get_account_transactions_history_newer_than(
     data: web::Data<AppState>,
     request_path: web::Path<Address>,
     request_query: web::Query<TxHistoryQuery>,
@@ -694,15 +736,20 @@ fn handle_get_account_transactions_history_newer_than(
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
-    let storage = data.access_storage()?;
+    let mut storage = data.access_storage().await?;
+    let mut transaction = storage
+        .start_transaction()
+        .await
+        .map_err(AppState::db_error)?;
 
-    let tx_id = parse_tx_id(&tx_id, &storage)?;
+    let tx_id = parse_tx_id(&tx_id, &mut transaction).await?;
 
     let direction = SearchDirection::Newer;
-    let mut transactions_history = storage
+    let mut transactions_history = transaction
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history_from(&address, tx_id, direction, limit)
+        .await
         .map_err(|err| {
             vlog::warn!(
                 "Internal Server Error: '{}'; input: ({}, {:?}, {})",
@@ -721,32 +768,34 @@ fn handle_get_account_transactions_history_newer_than(
         // fill the rest of the limit.
 
         let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
-        let storage = data.access_storage()?;
-        let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-            vlog::warn!(
-                "Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                err,
-                address,
-                tx_id,
-                limit,
-            );
-            HttpResponse::InternalServerError().finish()
-        })?;
+        let tokens = transaction
+            .tokens_schema()
+            .load_tokens()
+            .await
+            .map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                    err,
+                    address,
+                    tx_id,
+                    limit,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
 
         // Fetch ongoing deposits, since they must be reported within the transactions history.
-        let mut ongoing_ops = futures::executor::block_on(async move {
-            get_ongoing_priority_ops(&eth_watcher_request_sender, address).await
-        })
-        .map_err(|err| {
-            vlog::warn!(
-                "Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                err,
-                address,
-                tx_id,
-                limit,
-            );
-            HttpResponse::InternalServerError().finish()
-        })?;
+        let mut ongoing_ops = get_ongoing_priority_ops(&eth_watcher_request_sender, address)
+            .await
+            .map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                    err,
+                    address,
+                    tx_id,
+                    limit,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
 
         // Sort operations by block number from smaller (older) to greater (newer).
         ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
@@ -765,10 +814,12 @@ fn handle_get_account_transactions_history_newer_than(
         transactions_history.append(&mut txs);
     }
 
+    transaction.commit().await.map_err(AppState::db_error)?;
+
     Ok(HttpResponse::Ok().json(transactions_history))
 }
 
-fn handle_get_executed_transaction_by_hash(
+async fn handle_get_executed_transaction_by_hash(
     data: web::Data<AppState>,
     tx_hash_hex: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
@@ -778,7 +829,7 @@ fn handle_get_executed_transaction_by_hash(
     let transaction_hash = hex::decode(&tx_hash_hex.into_inner()[2..])
         .map_err(|_| HttpResponse::BadRequest().finish())?;
 
-    let tx_receipt = data.get_tx_receipt(transaction_hash)?;
+    let tx_receipt = data.get_tx_receipt(transaction_hash).await?;
 
     if let Some(tx) = tx_receipt {
         Ok(HttpResponse::Ok().json(tx))
@@ -787,13 +838,13 @@ fn handle_get_executed_transaction_by_hash(
     }
 }
 
-fn handle_get_tx_by_hash(
+async fn handle_get_tx_by_hash(
     data: web::Data<AppState>,
     hash_hex_with_prefix: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
     let hash =
         try_parse_hash(&hash_hex_with_prefix).ok_or_else(|| HttpResponse::BadRequest().finish())?;
-    let storage = data.access_storage()?;
+    let mut storage = data.access_storage().await?;
 
     let mut res;
 
@@ -801,6 +852,7 @@ fn handle_get_tx_by_hash(
         .chain()
         .operations_ext_schema()
         .get_tx_by_hash(hash.as_slice())
+        .await
         .map_err(|err| {
             vlog::warn!(
                 "Internal Server Error: '{}'; input: {}",
@@ -817,22 +869,21 @@ fn handle_get_tx_by_hash(
 
     // Or try to find this priority op in eth_watcher
     let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
-    let unconfirmed_op = futures::executor::block_on(async {
-        get_unconfirmed_op_by_hash(&eth_watcher_request_sender, &hash).await
-    })
-    .map_err(|err| {
-        vlog::warn!(
-            "Internal Server Error: '{}'; input({})",
-            err,
-            hex::encode(&hash)
-        );
-        HttpResponse::InternalServerError().finish()
-    })?;
+    let unconfirmed_op = get_unconfirmed_op_by_hash(&eth_watcher_request_sender, &hash)
+        .await
+        .map_err(|err| {
+            vlog::warn!(
+                "Internal Server Error: '{}'; input({})",
+                err,
+                hex::encode(&hash)
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
 
     // If eth watcher has a priority op with given hash, transform it
     // to TxByHashResponse and assign it to res.
     if let Some((eth_block, priority_op)) = unconfirmed_op {
-        let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+        let tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
             vlog::warn!("Internal Server Error: '{}';", err);
             HttpResponse::InternalServerError().finish()
         })?;
@@ -844,23 +895,23 @@ fn handle_get_tx_by_hash(
     Ok(HttpResponse::Ok().json(res))
 }
 
-fn handle_get_priority_op_receipt(
+async fn handle_get_priority_op_receipt(
     data: web::Data<AppState>,
     id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
     let id = id.into_inner();
-    let receipt = data.get_priority_op_receipt(id)?;
+    let receipt = data.get_priority_op_receipt(id).await?;
 
     Ok(HttpResponse::Ok().json(receipt))
 }
 
-fn handle_get_transaction_by_id(
+async fn handle_get_transaction_by_id(
     data: web::Data<AppState>,
     path: web::Path<(u32, u32)>,
 ) -> ActixResult<HttpResponse> {
     let (block_id, tx_id) = path.into_inner();
 
-    let exec_ops = data.get_block_executed_ops(block_id)?;
+    let exec_ops = data.get_block_executed_ops(block_id).await?;
 
     if let Some(exec_op) = exec_ops.get(tx_id as usize) {
         Ok(HttpResponse::Ok().json(exec_op))
@@ -875,7 +926,7 @@ struct HandleBlocksQuery {
     limit: Option<u32>,
 }
 
-fn handle_get_blocks(
+async fn handle_get_blocks(
     data: web::Data<AppState>,
     query: web::Query<HandleBlocksQuery>,
 ) -> ActixResult<HttpResponse> {
@@ -884,12 +935,13 @@ fn handle_get_blocks(
     if limit > 100 {
         return Err(HttpResponse::BadRequest().finish().into());
     }
-    let storage = data.access_storage()?;
+    let mut storage = data.access_storage().await?;
 
     let resp = storage
         .chain()
         .block_schema()
         .load_block_range(max_block, limit)
+        .await
         .map_err(|err| {
             vlog::warn!(
                 "Internal Server Error: '{}'; input: ({}, {})",
@@ -902,12 +954,12 @@ fn handle_get_blocks(
     Ok(HttpResponse::Ok().json(resp))
 }
 
-fn handle_get_block_by_id(
+async fn handle_get_block_by_id(
     data: web::Data<AppState>,
     block_id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
     let block_id = block_id.into_inner();
-    let block = data.get_block_info(block_id)?;
+    let block = data.get_block_info(block_id).await?;
     if let Some(block) = block {
         Ok(HttpResponse::Ok().json(block))
     } else {
@@ -915,18 +967,19 @@ fn handle_get_block_by_id(
     }
 }
 
-fn handle_get_block_transactions(
+async fn handle_get_block_transactions(
     data: web::Data<AppState>,
     path: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
     let block_number = path.into_inner();
 
-    let storage = data.access_storage()?;
+    let mut storage = data.access_storage().await?;
 
     let txs = storage
         .chain()
         .block_schema()
         .get_block_transactions(block_number)
+        .await
         .map_err(|err| {
             vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_number);
             HttpResponse::InternalServerError().finish()
@@ -940,12 +993,12 @@ struct BlockExplorerSearchQuery {
     query: String,
 }
 
-fn handle_block_explorer_search(
+async fn handle_block_explorer_search(
     data: web::Data<AppState>,
     query: web::Query<BlockExplorerSearchQuery>,
 ) -> ActixResult<HttpResponse> {
     let query = query.into_inner().query;
-    let block = data.get_block_by_height_or_hash(query)?;
+    let block = data.get_block_by_height_or_hash(query).await?;
 
     if let Some(block) = block {
         Ok(HttpResponse::Ok().json(block))
@@ -954,13 +1007,13 @@ fn handle_block_explorer_search(
     }
 }
 
-fn start_server(state: AppState, bind_to: SocketAddr) {
+async fn start_server(state: AppState, bind_to: SocketAddr) {
     let logger_format = crate::api_server::loggers::rest::get_logger_format();
     HttpServer::new(move || {
         App::new()
             .data(state.clone())
             .wrap(middleware::Logger::new(&logger_format))
-            .wrap(Cors::new().send_wildcard().max_age(3600))
+            .wrap(Cors::new().send_wildcard().max_age(3600).finish())
             .service(
                 web::scope("/api/v0.1")
                     .route(
@@ -1019,7 +1072,8 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
     .bind(bind_to)
     .unwrap()
     .shutdown_timeout(1)
-    .start();
+    .run()
+    .await;
 }
 
 /// Start HTTP REST API
@@ -1037,21 +1091,20 @@ pub(super) fn start_server_thread_detached(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
-            let runtime = actix_rt::System::new("api-server");
+            let runtime = actix_rt::System::new("api-server").block_on(async move {
+                let state = AppState {
+                    caches: Caches::new(config_options.api_requests_caches_size),
+                    connection_pool,
+                    network_status: SharedNetworkStatus::default(),
+                    contract_address: format!("{:?}", contract_address),
+                    mempool_request_sender,
+                    eth_watcher_request_sender,
+                    config_options,
+                };
+                state.spawn_network_status_updater(panic_notify);
 
-            let state = AppState {
-                caches: Caches::new(config_options.api_requests_caches_size),
-                connection_pool,
-                network_status: SharedNetworkStatus::default(),
-                contract_address: format!("{:?}", contract_address),
-                mempool_request_sender,
-                eth_watcher_request_sender,
-                config_options,
-            };
-            state.spawn_network_status_updater(panic_notify);
-
-            start_server(state, listen_addr);
-            runtime.run().unwrap_or_default();
+                start_server(state, listen_addr);
+            });
         })
         .expect("Api server thread");
 }

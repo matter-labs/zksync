@@ -251,7 +251,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         recipient: Address,
     ) -> Result<Fee, failure::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
-        let token = self.api.get_token(token)?;
+        let token = self.api.get_token(token).await?;
         let token_risk_factor = self
             .config
             .tokens_risk_factors
@@ -406,7 +406,7 @@ mod test {
             Ok(BigUint::from(10u32).pow(7u32)) // 10 GWei
         }
 
-        fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+        async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
             for test_token in TestToken::all_tokens() {
                 if TokenLike::Id(test_token.id) == token {
                     return Ok(Token::new(
@@ -441,7 +441,9 @@ mod test {
                 let fee_in_token =
                     block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
                         .expect("failed to get fee in token");
-                let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
+                let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+                    .unwrap()
+                    .decimals;
 
                 // Fee in usd
                 (block_on(MockApiProvider.get_last_quote(token))

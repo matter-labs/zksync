@@ -34,9 +34,9 @@ jsonrpc-derive = "14.0.3"
 tokio = { version = "0.2", features = ["full"] }
 tokio_old = { package = "tokio", version = "0.1.22" }
 futures = { version = "0.3", features = ["compat"] }
-actix-rt = "0.2.5"
-actix-cors = "0.1.0"
-actix-web = "1.0.8"
+actix-rt = "1.1.1"
+actix-cors = "0.3.0-alpha.1"
+actix-web = "3.0.0-beta.4"
 
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}

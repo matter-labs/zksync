@@ -35,7 +35,7 @@ pub trait FeeTickerAPI {
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, failure::Error>;
 
-    fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error>;
+    async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error>;
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +100,31 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         }
     }
 
+    // Version of `update_stored_value` which returns a `Result` for convenient error handling.
+    async fn _update_stored_value(
+        &self,
+        token_id: TokenId,
+        price: TokenPrice,
+    ) -> Result<(), failure::Error> {
+        let mut storage = self
+            .db_pool
+            .access_storage_fragile()
+            .await
+            .map_err(|e| format_err!("Can't access storage: {}", e))?;
+
+        let mut transaction = storage.start_transaction().await?;
+
+        transaction
+            .tokens_schema()
+            .update_historical_ticker_price(token_id, price)
+            .await
+            .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))?;
+
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
     async fn update_stored_value(
         &self,
         token_id: TokenId,
@@ -112,17 +137,8 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         );
 
         if !is_price_historical {
-            self.db_pool
-                .access_storage_fragile()
-                .map_err(|e| format_err!("Can't access storage: {}", e))
-                .and_then(|storage| {
-                    storage
-                        .tokens_schema()
-                        .update_historical_ticker_price(token_id, price)
-                        .map_err(|e| {
-                            format_err!("Can't update historical ticker price from storage: {}", e)
-                        })
-                })
+            self._update_stored_value(token_id, price)
+                .await
                 .map_err(|e| warn!("Failed to update historical ticker price: {}", e))
                 .unwrap_or_default();
         }
@@ -142,6 +158,23 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         }
         None
     }
+
+    async fn get_historical_ticker_price(
+        &self,
+        token_id: TokenId,
+    ) -> Result<Option<TokenPrice>, failure::Error> {
+        let mut storage = self
+            .db_pool
+            .access_storage_fragile()
+            .await
+            .map_err(|e| format_err!("Can't access storage: {}", e))?;
+
+        storage
+            .tokens_schema()
+            .get_historical_ticker_price(token_id)
+            .await
+            .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))
+    }
 }
 
 #[async_trait]
@@ -150,7 +183,8 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
     async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, failure::Error> {
         let token = self
             .token_db_cache
-            .get_token(token.clone())?
+            .get_token(token.clone())
+            .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
 
         // TODO: remove hardcode for Matter Labs Trial Token (issue #738)
@@ -177,17 +211,8 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         }
 
         let historical_price = self
-            .db_pool
-            .access_storage_fragile()
-            .map_err(|e| format_err!("Can't access storage: {}", e))
-            .and_then(|storage| {
-                storage
-                    .tokens_schema()
-                    .get_historical_ticker_price(token.id)
-                    .map_err(|e| {
-                        format_err!("Can't get historical ticker price from storage: {}", e)
-                    })
-            })
+            .get_historical_ticker_price(token.id)
+            .await
             .map_err(|e| warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
@@ -223,9 +248,10 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         Ok(eth_sender_resp)
     }
 
-    fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+    async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
         self.token_db_cache
-            .get_token(token.clone())?
+            .get_token(token.clone())
+            .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))
     }
 }
