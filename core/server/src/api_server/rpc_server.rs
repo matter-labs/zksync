@@ -1136,15 +1136,14 @@ impl Rpc for RpcApp {
             let mut total_fee = BigUint::from(0u32);
 
             for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
-                total_fee = total_fee
-                    + Self::ticker_request(
-                        ticker_request_sender.clone(),
-                        tx_type.clone(),
-                        *address,
-                        token.clone(),
-                    )
-                    .await?
-                    .total_fee;
+                total_fee += Self::ticker_request(
+                    ticker_request_sender.clone(),
+                    tx_type.clone(),
+                    *address,
+                    token.clone(),
+                )
+                .await?
+                .total_fee;
             }
 
             Ok(total_fee)
