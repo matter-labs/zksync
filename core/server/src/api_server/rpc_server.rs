@@ -955,21 +955,6 @@ impl Rpc for RpcApp {
         &self,
         txs: Vec<TxWithSignature>,
     ) -> Box<dyn futures01::Future<Item = Vec<TxHash>, Error = Error> + Send> {
-        for tx in txs.iter() {
-            // `ChangePubKey` operation is not expected to be bundled with any other transaction,
-            // and since it has the execution limitations (due to lack of fee), it is not allowed
-            // to appear in batches.
-            if matches!(tx.tx, FranklinTx::ChangePubKey(_)) {
-                let error = Error {
-                    code: RpcErrorCodes::from(TxAddError::Other).into(),
-                    message: "ChangePubKey operations are not allowed in batches".to_string(),
-                    data: None,
-                };
-
-                return Box::new(futures01::future::err(error));
-            }
-        }
-
         let messages_to_sign: Result<Vec<Option<String>>> = txs
             .iter()
             .map(|tx| self.get_tx_info_message_to_sign(&tx.tx))
@@ -986,8 +971,8 @@ impl Rpc for RpcApp {
 
         let response = async move {
             // Checking fees data
-            let mut total_required_fee_in_usd = BigDecimal::from(0);
-            let mut total_provided_fee_in_usd = BigDecimal::from(0);
+            let mut required_total_usd_fee = BigDecimal::from(0);
+            let mut provided_total_usd_fee = BigDecimal::from(0);
             for tx in &txs {
                 let tx_fee_info = match &tx.tx {
                     FranklinTx::Withdraw(withdraw) => Some((
@@ -1025,23 +1010,19 @@ impl Rpc for RpcApp {
                     let token_price_in_usd =
                         Self::ticker_price_request(ticker_request_sender.clone(), token.clone())
                             .await?;
-                    total_required_fee_in_usd +=
+                    required_total_usd_fee +=
                         BigDecimal::from(required_fee.total_fee.to_bigint().unwrap())
                             * &token_price_in_usd;
-                    total_provided_fee_in_usd +=
+                    provided_total_usd_fee +=
                         BigDecimal::from(provided_fee.clone().to_bigint().unwrap())
                             * &token_price_in_usd;
                 }
             }
             // We allow fee to be 5% off the required fee
-            let scaled_provided_fee_in_usd = total_provided_fee_in_usd.clone()
+            let scaled_provided_fee_in_usd = provided_total_usd_fee.clone()
                 * BigDecimal::from(105u32)
                 / BigDecimal::from(100u32);
-            if total_required_fee_in_usd >= scaled_provided_fee_in_usd {
-                vlog::warn!(
-                        "User total provided batch fee is too low, required: {:?}, provided: {} (scaled: {}) (USD)",
-                        total_required_fee_in_usd, total_provided_fee_in_usd, scaled_provided_fee_in_usd
-                    );
+            if required_total_usd_fee >= scaled_provided_fee_in_usd {
                 return Err(Error {
                     code: RpcErrorCodes::from(TxAddError::TxBatchFeeTooLow).into(),
                     message: TxAddError::TxBatchFeeTooLow.to_string(),
