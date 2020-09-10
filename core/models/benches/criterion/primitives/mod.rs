@@ -1,6 +1,8 @@
 // External uses
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 // Local uses
+use models::circuit::account::CircuitAccount;
+use models::node::{Account, Address, PubKeyHash};
 use models::primitives::{
     bytes_into_be_bits, get_bits_le_fixed_u128, pack_bits_into_bytes,
     pack_bits_into_bytes_in_order, BitIteratorLe, GetBits,
@@ -80,6 +82,28 @@ fn bench_bit_iterator_le_next(b: &mut Bencher<'_>) {
     );
 }
 
+fn bench_circuit_account_transform(b: &mut Bencher<'_>) {
+    let setup = || {
+        let mut account = Account::default_with_address(&Address::from_slice(
+            &hex::decode("0102030405060708091011121314151617181920").unwrap(),
+        ));
+        account.set_balance(1, 1u32.into());
+        account.set_balance(2, 2u32.into());
+        account.nonce = 3;
+        account.pub_key_hash =
+            PubKeyHash::from_hex("sync:0102030405060708091011121314151617181920").unwrap();
+        account
+    };
+
+    b.iter_batched(
+        setup,
+        |account| {
+            let _ = CircuitAccount::from(black_box(account));
+        },
+        BatchSize::SmallInput,
+    );
+}
+
 pub fn bench_primitives(c: &mut Criterion) {
     c.bench_function("u64_get_bits_le", bench_u64_get_bits_le);
     c.bench_function("get_bits_le_fixed_u128", bench_get_bits_le_fixed_u128);
@@ -96,6 +120,11 @@ pub fn bench_primitives(c: &mut Criterion) {
     group.bench_function("BitIterator::next", bench_bit_iterator_le_next);
 
     group.finish();
+
+    c.bench_function(
+        "bench_circuit_account_transform",
+        bench_circuit_account_transform,
+    );
 }
 
 criterion_group!(primitives_benches, bench_primitives);
