@@ -30,6 +30,7 @@ yarn:
 	@cd js/explorer && yarn
 	@cd contracts && yarn
 	@cd js/tests && yarn
+	@cd js/zcli && yarn
 
 
 # Helpers
