@@ -450,14 +450,9 @@ async function moveFunds(
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
 
-
-    // TODO: Not executed, since it requires block sizes greater than 6, and sizes greater than 6 cause
-    // server to crash in `integration-full-exit`. Issue: #831
-
-    // await testMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
-    // console.log(`Batched transfers ok, Token: ${token}`);
-    // await testFailedMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
-
+    await testMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
+    console.log(`Batched transfers ok, Token: ${token}`);
+    await testFailedMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
 
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount);

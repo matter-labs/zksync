@@ -258,7 +258,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         self.api
             .get_last_quote(token)
             .await
-            .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 10))
+            .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.
