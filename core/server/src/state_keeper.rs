@@ -125,14 +125,15 @@ impl PlasmaStateInitParams {
         }
     }
 
-    pub fn get_pending_block(
+    pub async fn get_pending_block(
         &self,
-        storage: &storage::StorageProcessor,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Option<SendablePendingBlock> {
         let pending_block = storage
             .chain()
             .block_schema()
             .load_pending_block()
+            .await
             .unwrap_or_default()?;
 
         if pending_block.number <= self.last_block_number {
@@ -151,24 +152,31 @@ impl PlasmaStateInitParams {
         Some(pending_block)
     }
 
-    pub fn restore_from_db(storage: &storage::StorageProcessor) -> Result<Self, failure::Error> {
+    pub async fn restore_from_db(
+        storage: &mut storage::StorageProcessor<'_>,
+    ) -> Result<Self, failure::Error> {
         let mut init_params = Self::new();
-        init_params.load_from_db(&storage)?;
+        init_params.load_from_db(storage).await?;
 
         Ok(init_params)
     }
 
-    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
+    async fn load_from_db(
+        &mut self,
+        storage: &mut storage::StorageProcessor<'_>,
+    ) -> Result<(), failure::Error> {
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
             .load_committed_state(None)
+            .await
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
         for (account_id, account) in accounts.into_iter() {
             self.insert_account(account_id, account);
         }
         self.last_block_number = block_number;
-        self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, block_number)?;
+        self.unprocessed_priority_op =
+            Self::unprocessed_priority_op_id(storage, block_number).await?;
 
         info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
@@ -177,14 +185,15 @@ impl PlasmaStateInitParams {
         Ok(())
     }
 
-    pub fn load_state_diff(
+    pub async fn load_state_diff(
         &mut self,
-        storage: &storage::StorageProcessor,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Result<(), failure::Error> {
         let state_diff = storage
             .chain()
             .state_schema()
             .load_state_diff(self.last_block_number, None)
+            .await
             .map_err(|e| failure::format_err!("failed to load committed state: {}", e))?;
 
         if let Some((block_number, updates)) = state_diff {
@@ -195,7 +204,7 @@ impl PlasmaStateInitParams {
                 }
             }
             self.unprocessed_priority_op =
-                Self::unprocessed_priority_op_id(&storage, block_number)?;
+                Self::unprocessed_priority_op_id(storage, block_number).await?;
             self.last_block_number = block_number;
         }
         Ok(())
@@ -215,17 +224,19 @@ impl PlasmaStateInitParams {
         }
     }
 
-    fn unprocessed_priority_op_id(
-        storage: &storage::StorageProcessor,
+    async fn unprocessed_priority_op_id(
+        storage: &mut storage::StorageProcessor<'_>,
         block_number: BlockNumber,
     ) -> Result<u64, failure::Error> {
         let storage_op = storage
             .chain()
             .operations_schema()
-            .get_operation(block_number, ActionType::COMMIT);
+            .get_operation(block_number, ActionType::COMMIT)
+            .await;
         if let Some(storage_op) = storage_op {
             Ok(storage_op
-                .into_op(&storage)
+                .into_op(storage)
+                .await
                 .map_err(|e| failure::format_err!("could not convert storage_op: {}", e))?
                 .block
                 .processed_priority_ops
@@ -326,15 +337,21 @@ impl PlasmaStateKeeper {
         }
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
-        let storage = pool
+    pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
+        let mut storage = pool
             .access_storage()
+            .await
             .expect("db connection failed for statekeeper");
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .expect("unable to create db transaction in statekeeper");
 
-        let (last_committed, mut accounts) = storage
+        let (last_committed, mut accounts) = transaction
             .chain()
             .state_schema()
             .load_committed_state(None)
+            .await
             .expect("db failed");
         // TODO: move genesis block creation to separate routine.
         assert!(
@@ -348,16 +365,23 @@ impl PlasmaStateKeeper {
             nonce: fee_account.nonce,
         };
         accounts.insert(0, fee_account);
-        storage
+        transaction
             .chain()
             .state_schema()
             .commit_state_update(0, &[(0, db_account_update)])
+            .await
             .expect("db fail");
-        storage
+        transaction
             .chain()
             .state_schema()
             .apply_state_update(0)
+            .await
             .expect("db fail");
+
+        transaction
+            .commit()
+            .await
+            .expect("Unable to commit transaction in statekeeper");
         let state = PlasmaState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());
