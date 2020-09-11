@@ -5,7 +5,7 @@
 cd $ZKSYNC_HOME
 
 IN_DIR=./contracts/contracts
-OUT_DIR=./contracts/contracts/generated
+OUT_DIR=./contracts/dev-contracts/generated
 
 rm -rf $OUT_DIR
 mkdir -p $OUT_DIR
@@ -17,8 +17,6 @@ cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
 cp $IN_DIR/UpgradeGatekeeper.sol $OUT_DIR/UpgradeGatekeeperTest.sol
 cp $IN_DIR/ZkSync.sol $OUT_DIR/ZkSyncTestUpgradeTarget.sol
 
-# Change dependencies
-ssed 's/import "\.\./import "\.\.\/\.\./' -i $OUT_DIR/*.sol
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
 ssed 's/\bVerifier\b/VerifierTest/' -i $OUT_DIR/*.sol
