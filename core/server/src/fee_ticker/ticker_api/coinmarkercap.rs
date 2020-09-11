@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 // External deps
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -8,14 +8,11 @@ use num::{rational::Ratio, BigUint};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
-use super::TokenPriceAPI;
+use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use models::{
     node::{TokenLike, TokenPrice},
     primitives::UnsignedRatioSerializeAsDecimal,
 };
-
-/// The limit of time we are willing to wait for response.
-const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(Debug)]
 pub struct CoinMarketCapAPI {

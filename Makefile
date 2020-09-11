@@ -150,14 +150,14 @@ publish-contracts:
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
-build-dev-contracts: confirm_action prepare-test-contracts
+build-dev-contracts: confirm_action prepare-verify-contracts
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build-dev
 
-prepare-test-contracts: 
+prepare-verify-contracts:
 	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
-build-contracts: confirm_action
+build-contracts: confirm_action prepare-verify-contracts
 	@cargo run --release --bin gen_token_add_contract
 	@cd contracts && yarn build
 	
