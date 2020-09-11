@@ -142,15 +142,25 @@ async function main() {
         .description('await for transaction commitment / verification')
         .command('commit <tx_hash>')
         .description('await for transaction commitment')
-        .action(async (tx_hash: string) => {
-            print(await commands.txInfo(tx_hash, program.network, 'COMMIT'));
+        .option('-t, --timeout <sec>', 'set a timeout', '60')
+        .action(async (tx_hash: string, cmd: Command) => {
+            const timeout = Number.parseFloat(cmd.timeout) * 1000;
+            print(await Promise.race([
+                commands.txInfo(tx_hash, program.network, 'COMMIT'),
+                new Promise(resolve => setTimeout(resolve, timeout, null))
+            ]));
         });
 
     awaitCmd
         .command('verify <tx_hash>')
         .description('await for transaction verification')
-        .action(async (tx_hash: string) => {
-            print(await commands.txInfo(tx_hash, program.network, 'VERIFY'));
+        .option('-t, --timeout <sec>', 'set a timeout', '60')
+        .action(async (tx_hash: string, cmd: Command) => {
+            const timeout = Number.parseFloat(cmd.timeout) * 1000;
+            print(await Promise.race([
+                commands.txInfo(tx_hash, program.network, 'VERIFY'),
+                new Promise(resolve => setTimeout(resolve, timeout, null))
+            ]));
         });
 
     program.addCommand(awaitCmd);
@@ -158,7 +168,9 @@ async function main() {
     await program.parseAsync(process.argv);
 }
 
-main().catch((err: Error) => {
-    console.error('Error:', err.message);
-    process.exit(1);
-});
+main()
+    .then(() => process.exit(0))
+    .catch((err: Error) => {
+        console.error('Error:', err.message);
+        process.exit(1);
+    });

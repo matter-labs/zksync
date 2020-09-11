@@ -66,9 +66,9 @@ zcli account [ADDRESS]
 zcli transaction TX_HASH
 
 # same as transaction, but first waits until it's commited/verified
-# WARNING: may wait indefinetely for non-existent transactions
-zcli await commit TX_HASH
-zcli await verify TX_HASH
+# -t flag supplies timeout, after which the command returns null (default: 60)
+zcli await commit [-t SECONDS] TX_HASH
+zcli await verify [-t SECONDS] TX_HASH
 ```
 
 ### Creating transactions
