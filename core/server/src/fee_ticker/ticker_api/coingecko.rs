@@ -1,4 +1,4 @@
-use crate::fee_ticker::ticker_api::TokenPriceAPI;
+use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use failure::Error;
@@ -8,10 +8,6 @@ use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
 use std::collections::HashMap;
-use std::time::Duration;
-
-/// The limit of time we are willing to wait for response.
-const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(Debug)]
 pub struct CoinGeckoAPI {
