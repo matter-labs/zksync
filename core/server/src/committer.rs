@@ -50,21 +50,12 @@ async fn save_pending_block(pending_block: PendingBlock, pool: &ConnectionPool) 
 
     log::trace!("persist pending block #{}", pending_block.number);
 
-    let mut transaction = storage
-        .start_transaction()
-        .await
-        .expect("Failed initializing a DB transaction");
-    transaction
+    storage
         .chain()
         .block_schema()
         .save_pending_block(pending_block)
         .await
         .expect("committer must commit the pending block into db");
-
-    transaction
-        .commit()
-        .await
-        .expect("Unable to commit a DB transaction");
 }
 
 async fn commit_block(
