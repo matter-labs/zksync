@@ -156,3 +156,8 @@ export interface Fee {
     // Total fee amount (in wei)
     totalFee: BigNumber;
 }
+
+export interface BatchFee {
+    // Total fee amount (in wei)
+    totalFee: BigNumber;
+}

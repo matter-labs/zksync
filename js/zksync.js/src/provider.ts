@@ -188,8 +188,8 @@ export class Provider {
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {
-        const totalFee = await this.transport.request("get_txs_batch_fee_in_wei", [txTypes, addresses, tokenLike]);
-        return BigNumber.from(totalFee);
+        const batchFee = await this.transport.request("get_txs_batch_fee_in_wei", [txTypes, addresses, tokenLike]);
+        return BigNumber.from(batchFee.totalFee);
     }
 
     async getTokenPrice(tokenLike: TokenLike): Promise<number> {

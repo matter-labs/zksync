@@ -30,11 +30,10 @@ use storage::{
 };
 
 // Local uses
-use crate::fee_ticker::TokenPriceRequestType;
 use crate::{
     api_server::ops_counter::ChangePubKeyOpsCounter,
     eth_watch::{EthBlockId, EthWatchRequest},
-    fee_ticker::{Fee, TickerRequest},
+    fee_ticker::{BatchFee, Fee, TickerRequest, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
@@ -325,13 +324,13 @@ pub trait Rpc {
         token_like: TokenLike,
     ) -> Box<dyn futures01::Future<Item = Fee, Error = Error> + Send>;
 
-    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "BigUint")]
+    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "BatchFee")]
     fn get_txs_batch_fee_in_wei(
         &self,
         tx_types: Vec<TxFeeTypes>,
         addresses: Vec<Address>,
         token_like: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send>;
+    ) -> Box<dyn futures01::Future<Item = BatchFee, Error = Error> + Send>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(
@@ -1121,7 +1120,7 @@ impl Rpc for RpcApp {
         tx_types: Vec<TxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
-    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send> {
+    ) -> Box<dyn futures01::Future<Item = BatchFee, Error = Error> + Send> {
         if tx_types.len() != addresses.len() {
             return Box::new(futures01::future::err(Error {
                 code: RpcErrorCodes::IncorrectTx.into(),
@@ -1146,7 +1145,7 @@ impl Rpc for RpcApp {
                 .total_fee;
             }
 
-            Ok(total_fee)
+            Ok(BatchFee { total_fee })
         };
 
         Box::new(total_fee_resp.boxed().compat())

@@ -158,8 +158,7 @@ async function testTransfer(
 }
 
 async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber) {
-    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
-    const fee = fullFee.totalFee;
+    const fee = await syncProvider.getTransactionsBatchFee(["Transfer", "Transfer"], [syncWallet2.address(), syncWallet2.address()], token);
 
     // First, execute batched transfers successfully.
 
@@ -172,12 +171,12 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
             to: syncWallet2.address(),
             token,
             amount,
-            fee
+            fee: fee.div(2),
         }, {
             to: syncWallet2.address(),
             token,
             amount,
-            fee
+            fee: fee.div(2),
         }]);
         console.log(`Batched transfers posted: ${(new Date().getTime()) - startTime} ms`);
         for (let i = 0; i < transferHandles.length; i++) {
@@ -189,9 +188,9 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
         const operatorAfterTransfer = await getOperatorBalance(token);
 
         let transferCorrect = true;
-        transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.add(fee).mul(2));
+        transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.mul(2).add(fee));
         transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount.mul(2));
-        transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee.mul(2));
+        transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
         if (!transferCorrect) {
             throw new Error("Batched transfer checks failed");
         }
@@ -209,12 +208,12 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
             to: syncWallet2.address(),
             token,
             amount,
-            fee
+            fee: fee.div(2),
         }, {
             to: syncWallet2.address(),
             token,
             amount: amount.mul(10000), // Set too big amount for the 2nd transaction.
-            fee
+            fee: fee.div(2),
         }]);
         console.log(`Batched transfers (that should fail) posted: ${(new Date().getTime()) - startTime} ms`);
         for (let i = 0; i < transferHandles.length; i++) {
