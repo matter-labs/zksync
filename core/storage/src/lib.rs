@@ -72,9 +72,6 @@
 // Built-in deps
 // use std::env;
 // External imports
-// use diesel::pg::PgConnection;
-// use diesel::prelude::*;
-// use diesel::r2d2::{ConnectionManager, PooledConnection};
 use sqlx::{pool::PoolConnection, postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
 // Local imports
@@ -95,8 +92,6 @@ pub mod tokens;
 pub mod utils;
 
 pub use crate::connection::ConnectionPool;
-// pub use sqlx::Acquire;
-
 pub type QueryResult<T> = Result<T, failure::Error>;
 
 /// Storage processor is the main storage interaction point.
@@ -161,13 +156,6 @@ impl<'a> StorageProcessor<'a> {
         }
     }
 
-    pub fn from_ref<'b>(conn: &'b mut PgConnection) -> StorageProcessor<'b> {
-        StorageProcessor {
-            conn: ConnectionHolder::ConnectionRef(conn),
-            in_transaction: false,
-        }
-    }
-
     /// Gains access to the `Chain` schemas.
     pub fn chain(&mut self) -> chain::ChainIntermediator<'_, 'a> {
         chain::ChainIntermediator(self)
@@ -198,32 +186,9 @@ impl<'a> StorageProcessor<'a> {
         tokens::TokensSchema(self)
     }
 
-    /// Performs several database operations within one database transaction.
-    pub async fn transaction<'s: 'b, 'b, F, T, Fut>(&'s mut self, f: F) -> Result<T, failure::Error>
-    where
-        // T,
-        F: FnOnce(&mut StorageProcessor<'b>) -> Fut,
-        Fut: std::future::Future<Output = Result<T, failure::Error>>,
-    {
-        let transaction = self.conn().begin().await?;
-
-        let mut processor = StorageProcessor::from_transaction(transaction);
-        processor.in_transaction = true;
-
-        // let processor_pin = Box::pin(processor);
-        let result = f(&mut processor).await?;
-
-        processor.commit().await?;
-
-        // transaction.commit().await?;
-
-        Ok(result)
-    }
-
     fn conn(&mut self) -> &mut PgConnection {
         match &mut self.conn {
             ConnectionHolder::Pooled(conn) => conn,
-            ConnectionHolder::ConnectionRef(conn) => conn,
             ConnectionHolder::Direct(conn) => conn,
             ConnectionHolder::Transaction(conn) => conn,
         }

@@ -24,7 +24,6 @@ pub mod holder;
 /// variables `DB_POOL_SIZE` and `DATABASE_URL` respectively.
 #[derive(Clone)]
 pub struct ConnectionPool {
-    // pool: Pool<ConnectionManager<RecoverableConnection<PgConnection>>>,
     pool: PgPool,
 }
 
@@ -41,11 +40,6 @@ impl ConnectionPool {
     pub async fn new(pool_max_size: Option<u32>) -> Self {
         let database_url = Self::get_database_url();
         let max_size = pool_max_size.unwrap_or_else(|| parse_env("DB_POOL_SIZE"));
-        // let manager = ConnectionManager::<RecoverableConnection<PgConnection>>::new(database_url);
-        // let pool = Pool::builder()
-        //     .max_size(max_size)
-        //     .build(manager)
-        //     .expect("Failed to create connection pool");
 
         let pool = PgPoolOptions::new()
             .max_connections(max_size)
@@ -66,7 +60,6 @@ impl ConnectionPool {
     /// database access is must-have (e.g. block committer).
     pub async fn access_storage(&self) -> Result<StorageProcessor<'_>, SqlxError> {
         let connection = self.pool.acquire().await?;
-        // connection.deref().enable_retrying();
 
         Ok(StorageProcessor::from_pool(connection))
     }
