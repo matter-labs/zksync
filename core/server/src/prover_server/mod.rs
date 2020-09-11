@@ -267,9 +267,23 @@ pub fn start_prover_server(
             let mut actix_runtime = actix_rt::System::new("prover-server");
 
             actix_runtime.block_on(async move {
+                let last_verified_block = {
+                    let storage = connection_pool
+                        .access_storage()
+                        .await
+                        .expect("Failed to access storage");
+                    storage
+                        .chain()
+                        .block_schema()
+                        .get_last_verified_block()
+                        .await
+                        .expect("Failed to get last verified block number")
+                        as usize
+                };
+
                 // Start pool maintainer threads.
                 for offset in 0..config_options.witness_generators {
-                    let start_block = 1 + offset as u32;
+                    let start_block = (last_verified_block + offset + 1) as u32;
                     let block_step = config_options.witness_generators as u32;
                     info!(
                         "Starting witness generator ({},{})",

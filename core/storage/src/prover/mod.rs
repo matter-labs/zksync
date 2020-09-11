@@ -69,6 +69,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                WHERE action_type = 'COMMIT' \
                    AND block_number > \
                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
+                   AND EXISTS \
+                       (SELECT * FROM block_witness WHERE block = o.block_number) \
                    AND NOT EXISTS \
                        (SELECT * FROM proofs WHERE block_number = o.block_number);"
             )

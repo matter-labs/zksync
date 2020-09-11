@@ -10,7 +10,9 @@ use models::{
     fe_from_bytes, fe_to_bytes, node::block::PendingBlock, Action, ActionType, Operation,
 };
 // Local imports
-use self::records::{BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock};
+use self::records::{
+    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
+};
 use crate::{
     chain::{
         operations::{
@@ -632,5 +634,53 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         transaction.commit().await?;
 
         Ok(())
+    }
+
+    /// Stores account tree cache for a block
+    pub fn store_account_tree_cache(
+        &self,
+        block: BlockNumber,
+        tree_cache: serde_json::Value,
+    ) -> QueryResult<()> {
+        use crate::schema::*;
+
+        if block == 0 {
+            return Ok(());
+        }
+
+        diesel::insert_into(account_tree_cache::table)
+            .values(&AccountTreeCache {
+                block: block as i64,
+                tree_cache,
+            })
+            .on_conflict(account_tree_cache::block)
+            .do_nothing()
+            .execute(self.0.conn())
+            .map(drop)
+    }
+
+    /// Gets stored account tree cache for a block
+    pub fn get_account_tree_cache(&self) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
+        use crate::schema::*;
+        let account_tree_cache = account_tree_cache::table
+            .order_by(account_tree_cache::block.desc())
+            .first::<AccountTreeCache>(self.0.conn())
+            .optional()?;
+
+        Ok(account_tree_cache.map(|w| (w.block as BlockNumber, w.tree_cache)))
+    }
+
+    /// Gets stored account tree cache for a block
+    pub fn get_account_tree_cache_block(
+        &self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<serde_json::Value>> {
+        use crate::schema::*;
+        let account_tree_cache = account_tree_cache::table
+            .filter(account_tree_cache::block.eq(block as i64))
+            .first::<AccountTreeCache>(self.0.conn())
+            .optional()?;
+
+        Ok(account_tree_cache.map(|w| w.tree_cache))
     }
 }
