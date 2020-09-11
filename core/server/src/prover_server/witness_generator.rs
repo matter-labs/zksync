@@ -21,6 +21,7 @@ use models::{
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
 use std::time::Instant;
+use storage::StorageProcessor;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
@@ -87,27 +88,89 @@ impl WitnessGenerator {
         Ok(block_info)
     }
 
+    fn load_account_tree(
+        &self,
+        block: BlockNumber,
+        storage: &StorageProcessor,
+    ) -> Result<CircuitAccountTree, failure::Error> {
+        let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
+
+        if let Some((cached_block, account_tree_cache)) =
+            storage.chain().block_schema().get_account_tree_cache()?
+        {
+            let (_, accounts) = storage
+                .chain()
+                .state_schema()
+                .load_committed_state(Some(block))?;
+            for (id, account) in accounts {
+                circuit_account_tree.insert(id, account.into());
+            }
+            circuit_account_tree.set_internals(serde_json::from_value(account_tree_cache)?);
+            if block != cached_block {
+                let (_, accounts) = storage
+                    .chain()
+                    .state_schema()
+                    .load_committed_state(Some(block))?;
+                if let Some((_, account_updates)) = storage
+                    .chain()
+                    .state_schema()
+                    .load_state_diff(block, Some(cached_block))?
+                {
+                    let mut updated_accounts = account_updates
+                        .into_iter()
+                        .map(|(id, _)| id)
+                        .collect::<Vec<_>>();
+                    updated_accounts.sort();
+                    updated_accounts.dedup();
+                    for idx in updated_accounts {
+                        circuit_account_tree
+                            .insert(idx, accounts.get(&idx).cloned().unwrap_or_default().into());
+                    }
+                }
+                circuit_account_tree.root_hash();
+                let account_tree_cache = circuit_account_tree.get_internals();
+                storage
+                    .chain()
+                    .block_schema()
+                    .store_account_tree_cache(block, serde_json::to_value(account_tree_cache)?)?;
+            }
+        } else {
+            let (_, accounts) = storage
+                .chain()
+                .state_schema()
+                .load_committed_state(Some(block))?;
+            for (id, account) in accounts {
+                circuit_account_tree.insert(id, account.into());
+            }
+            circuit_account_tree.root_hash();
+            let account_tree_cache = circuit_account_tree.get_internals();
+            storage
+                .chain()
+                .block_schema()
+                .store_account_tree_cache(block, serde_json::to_value(account_tree_cache)?)?;
+        }
+
+        if block != 0 {
+            let storage_block = storage
+                .chain()
+                .block_schema()
+                .get_block(block)?
+                .expect("Block for witness generator must exist");
+            assert_eq!(
+                storage_block.new_root_hash,
+                circuit_account_tree.root_hash(),
+                "account tree root hash restored incorrectly"
+            );
+        }
+        Ok(circuit_account_tree)
+    }
+
     fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), failure::Error> {
         let timer = Instant::now();
         let storage = self.conn_pool.access_storage_fragile()?;
-        let (storage_block_number, mut accounts) = storage
-            .chain()
-            .state_schema()
-            .load_committed_state(Some(block.block_number - 1))
-            .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
+        let mut circuit_account_tree = self.load_account_tree(block.block_number - 1, &storage)?;
         trace!(
-            "Witness generator get state account {}s",
-            timer.elapsed().as_secs()
-        );
-        failure::ensure!(block.block_number == storage_block_number + 1);
-
-        let timer = Instant::now();
-        let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
-        for (id, account) in accounts.drain() {
-            circuit_account_tree.insert(id, account.into());
-        }
-        trace!(
-            "Witness generator circuit tree insert {}s",
+            "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
 
