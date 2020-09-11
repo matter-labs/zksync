@@ -23,6 +23,7 @@ jobs:
 
     - name: lints
       run: |
+        zksync db-setup # So database will be created for compilation.
         zksync dummy-prover ensure-disabled
         cargo fmt -- --check
         cargo clippy --tests --benches -- -D warnings
