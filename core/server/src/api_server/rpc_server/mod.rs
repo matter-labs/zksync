@@ -37,7 +37,7 @@ use crate::{
 use bigdecimal::BigDecimal;
 use models::node::tx::EthSignData;
 
-mod error;
+pub mod error;
 mod rpc_impl;
 mod rpc_trait;
 pub mod types;
