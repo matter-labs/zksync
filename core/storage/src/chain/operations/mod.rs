@@ -184,7 +184,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         sqlx::query!(
             "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            ON CONFLICT (eth_hash)
+            ON CONFLICT (priority_op_serialid)
             DO NOTHING",
             operation.block_number,
             operation.block_index,

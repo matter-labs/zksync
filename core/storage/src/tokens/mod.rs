@@ -27,6 +27,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             r#"
             INSERT INTO tokens ( id, address, symbol, decimals )
             VALUES ( $1, $2, $3, $4 )
+            ON CONFLICT (id)
+            DO
+              UPDATE SET id = $1, address = $2, symbol = $3, decimals = $4
             "#,
             i32::from(token.id),
             address_to_stored_string(&token.address),

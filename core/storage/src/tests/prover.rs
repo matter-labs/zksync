@@ -13,7 +13,11 @@ use models::prover_utils::EncodedProofPlonk;
 #[db_test]
 async fn test_store_proof(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Attempt to load the proof that was not stored should result in an error.
-    assert!(ProverSchema(&mut storage).load_proof(1).await.is_err());
+    assert!(ProverSchema(&mut storage)
+        .load_proof(1)
+        .await
+        .expect("Error while obtaining proof")
+        .is_none());
 
     // Store the proof.
     let proof = EncodedProofPlonk::default();
