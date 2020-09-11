@@ -1311,6 +1311,7 @@ dependencies = [
  "signal-hook 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "storage 0.0.1",
  "tiny-keccak 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "web3 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
