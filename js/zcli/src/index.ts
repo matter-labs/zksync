@@ -91,6 +91,22 @@ async function main() {
             await handler('deposit', cmd.fast, cmd.json, amount, token, recipient);
         });
 
+    program
+        .command('await <type> <tx_hash>')
+        .description('await for transaction commitment/verification')
+        .option('-t, --timeout <sec>', 'set a timeout', '60')
+        .action(async (type: string, tx_hash: string, cmd: Command) => {
+            if (type !== 'verify' && type !== 'commit') {
+                throw new Error('can only "await commit" or "await verify"');
+            }
+            const timeout = Number.parseFloat(cmd.timeout) * 1000;
+            // prettier-ignore
+            print(await Promise.race([
+                commands.txInfo(tx_hash, program.network, type.toUpperCase() as any),
+                new Promise((resolve) => setTimeout(resolve, timeout, null))
+            ]));
+        });
+
     const networks = new Command('networks');
 
     networks
@@ -135,35 +151,6 @@ async function main() {
         });
 
     program.addCommand(wallets);
-
-    const awaitCmd = new Command('await');
-
-    awaitCmd
-        .description('await for transaction commitment / verification')
-        .command('commit <tx_hash>')
-        .description('await for transaction commitment')
-        .option('-t, --timeout <sec>', 'set a timeout', '60')
-        .action(async (tx_hash: string, cmd: Command) => {
-            const timeout = Number.parseFloat(cmd.timeout) * 1000;
-            print(await Promise.race([
-                commands.txInfo(tx_hash, program.network, 'COMMIT'),
-                new Promise(resolve => setTimeout(resolve, timeout, null))
-            ]));
-        });
-
-    awaitCmd
-        .command('verify <tx_hash>')
-        .description('await for transaction verification')
-        .option('-t, --timeout <sec>', 'set a timeout', '60')
-        .action(async (tx_hash: string, cmd: Command) => {
-            const timeout = Number.parseFloat(cmd.timeout) * 1000;
-            print(await Promise.race([
-                commands.txInfo(tx_hash, program.network, 'VERIFY'),
-                new Promise(resolve => setTimeout(resolve, timeout, null))
-            ]));
-        });
-
-    program.addCommand(awaitCmd);
 
     await program.parseAsync(process.argv);
 }
