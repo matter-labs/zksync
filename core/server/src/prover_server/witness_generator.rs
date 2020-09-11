@@ -67,6 +67,7 @@ impl WitnessGenerator {
                 let _panic_sentinel = ThreadPanicNotify(panic_notify);
                 let mut runtime = tokio::runtime::Builder::new()
                     .basic_scheduler()
+                    .enable_all()
                     .build()
                     .expect("Unable to build runtime for a witness generator");
 

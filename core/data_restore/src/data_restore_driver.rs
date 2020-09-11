@@ -317,6 +317,7 @@ impl<T: Transport> DataRestoreDriver<T> {
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
             )
+            .await
             .expect("Updating events state: cant update events state");
 
         storage_interactor::save_events_state(

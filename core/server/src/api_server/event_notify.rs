@@ -4,11 +4,10 @@ use super::rpc_server::types::{
 use crate::state_keeper::{ExecutedOpId, ExecutedOpsNotify, StateKeeperRequest};
 use crate::utils::token_db_cache::TokenDBCache;
 use failure::{bail, format_err};
-use futures::task::LocalSpawnExt;
 use futures::{
     channel::{mpsc, oneshot},
     compat::Future01CompatExt,
-    executor, select,
+    select,
     stream::StreamExt,
     FutureExt, SinkExt,
 };
@@ -17,7 +16,6 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use lru_cache::LruCache;
-use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::BlockNumber;
 use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
@@ -72,15 +70,11 @@ struct OperationNotifier {
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
     prior_op_subs: BTreeMap<(u64, ActionType), Vec<SubscriptionSender<ETHOpInfoResp>>>,
     account_subs: BTreeMap<(AccountId, ActionType), Vec<SubscriptionSender<ResponseAccountState>>>,
-
-    spawner: executor::LocalSpawner,
 }
 
 impl OperationNotifier {
     fn send_once<T: serde::Serialize>(&self, sink: &Sink<T>, val: T) {
-        self.spawner
-            .spawn_local(sink.notify(Ok(val)).compat().map(drop))
-            .expect("future local_spawn");
+        tokio::spawn(sink.notify(Ok(val)).compat().map(drop));
     }
 
     async fn check_op_executed_current_block(
@@ -635,66 +629,50 @@ pub fn start_sub_notifier(
     mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
     mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
-    panic_notify: mpsc::Sender<bool>,
     api_requests_caches_size: usize,
-) {
-    std::thread::Builder::new()
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+) -> tokio::task::JoinHandle<()> {
+    let tokens_cache = TokenDBCache::new(db_pool.clone());
 
-            let mut local_pool = executor::LocalPool::new();
+    let mut notifier = OperationNotifier {
+        cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
+        cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
+        cache_of_blocks_info: LruCache::new(api_requests_caches_size),
+        tokens_cache,
+        db_pool,
+        state_keeper_requests,
+        tx_subs: BTreeMap::new(),
+        prior_op_subs: BTreeMap::new(),
+        account_subs: BTreeMap::new(),
+    };
 
-            let tokens_cache = TokenDBCache::new(db_pool.clone());
-
-            let mut notifier = OperationNotifier {
-                cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
-                cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
-                cache_of_blocks_info: LruCache::new(api_requests_caches_size),
-                tokens_cache,
-                db_pool,
-                state_keeper_requests,
-                tx_subs: BTreeMap::new(),
-                prior_op_subs: BTreeMap::new(),
-                account_subs: BTreeMap::new(),
-                spawner: local_pool.spawner(),
-            };
-
-            let sub_notifier_task = async move {
-                loop {
-                    select! {
-                        new_block = new_block_stream.next() => {
-                            if let Some(new_block) = new_block {
-                                notifier.handle_new_block(new_block)
-                                    .await
-                                    .map_err(|e| warn!("Failed to handle new block: {}",e))
-                                    .unwrap_or_default();
-                            }
-                        },
-                        new_exec_batch = executed_tx_stream.next() => {
-                            if let Some(new_exec_batch) = new_exec_batch {
-                                notifier.handle_new_executed_batch(new_exec_batch)
-                                    .map_err(|e| warn!("Failed to handle new exec batch: {}",e))
-                                    .unwrap_or_default();
-                            }
-                        },
-                        new_sub = subscription_stream.next() => {
-                            if let Some(new_sub) = new_sub {
-                                notifier.handle_notify_req(new_sub)
-                                    .await
-                                    .map_err(|e| warn!("Failed to handle notify request: {}",e))
-                                    .unwrap_or_default();
-                            }
-                        },
-                        complete => break,
+    tokio::spawn(async move {
+        loop {
+            select! {
+                new_block = new_block_stream.next() => {
+                    if let Some(new_block) = new_block {
+                        notifier.handle_new_block(new_block)
+                            .await
+                            .map_err(|e| warn!("Failed to handle new block: {}",e))
+                            .unwrap_or_default();
                     }
-                }
-            };
-
-            local_pool
-                .spawner()
-                .spawn_local(sub_notifier_task)
-                .expect("sub notify future spawn");
-            local_pool.run();
-        })
-        .expect("thread start");
+                },
+                new_exec_batch = executed_tx_stream.next() => {
+                    if let Some(new_exec_batch) = new_exec_batch {
+                        notifier.handle_new_executed_batch(new_exec_batch)
+                            .map_err(|e| warn!("Failed to handle new exec batch: {}",e))
+                            .unwrap_or_default();
+                    }
+                },
+                new_sub = subscription_stream.next() => {
+                    if let Some(new_sub) = new_sub {
+                        notifier.handle_notify_req(new_sub)
+                            .await
+                            .map_err(|e| warn!("Failed to handle notify request: {}",e))
+                            .unwrap_or_default();
+                    }
+                },
+                complete => break,
+            }
+        }
+    })
 }

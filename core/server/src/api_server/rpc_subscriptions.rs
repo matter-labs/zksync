@@ -223,7 +223,6 @@ pub fn start_ws_server(
         event_sub_receiver,
         executed_tx_receiver,
         state_keeper_request_sender,
-        panic_notify.clone(),
         each_cache_size,
     );
 
