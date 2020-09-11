@@ -122,20 +122,7 @@ $ zcli deposit 3.14 ETH
     }
 }
 $ zcli transfer --fast 3.0 ETH 0x36615cf349d7f6344891b1e7ca7c72883f5dc049
-{
-    "network": "ropsten",
-    "transaction": {
-        "status": "success",
-        "from": "0x62f94E9AC9349BCCC61Bfe66ddAdE6292702EcB6",
-        "to": "0x36615cf349d7f6344891b1e7ca7c72883f5dc049",
-        "hash": "sync-tx:f945ace556a6576e05c38a0fcca29f40674ea9a14d49c099b51a12737d9dac7b",
-        "operation": "Transfer",
-        "nonce": 1,
-        "amount": "3.0",
-        "fee": "0.0000319",
-        "token": "ETH"
-    }
-}
+"sync-tx:f945ace556a6576e05c38a0fcca29f40674ea9a14d49c099b51a12737d9dac7b"
 $ zcli account 0x36615cf349d7f6344891b1e7ca7c72883f5dc049
 {
     "network": "ropsten",
