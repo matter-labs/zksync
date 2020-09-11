@@ -27,11 +27,16 @@ pub struct DataRestoreSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     pub async fn save_block_transactions(&mut self, block: Block) -> QueryResult<()> {
-        BlockSchema(self.0)
+        let new_state = self.new_storage_state("None");
+        let mut transaction = self.0.start_transaction().await?;
+
+        BlockSchema(&mut transaction)
             .save_block_transactions(block.block_number, block.block_transactions)
             .await?;
-        self.update_storage_state(self.new_storage_state("None"))
+        DataRestoreSchema(&mut transaction)
+            .update_storage_state(new_state)
             .await?;
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -40,8 +45,15 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         commit_op: Operation,
         verify_op: Operation,
     ) -> QueryResult<()> {
-        let commit_op = BlockSchema(self.0).execute_operation(commit_op).await?;
-        let verify_op = BlockSchema(self.0).execute_operation(verify_op).await?;
+        let new_state = self.new_storage_state("None");
+        let mut transaction = self.0.start_transaction().await?;
+
+        let commit_op = BlockSchema(&mut transaction)
+            .execute_operation(commit_op)
+            .await?;
+        let verify_op = BlockSchema(&mut transaction)
+            .execute_operation(verify_op)
+            .await?;
         sqlx::query!(
             "UPDATE operations
             SET confirmed = $1
@@ -50,11 +62,13 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             commit_op.id.unwrap(),
             verify_op.id.unwrap()
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
-        self.update_storage_state(self.new_storage_state("None"))
+        DataRestoreSchema(&mut transaction)
+            .update_storage_state(new_state)
             .await?;
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -62,10 +76,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         genesis_acc_update: AccountUpdate,
     ) -> QueryResult<()> {
-        StateSchema(self.0)
+        let mut transaction = self.0.start_transaction().await?;
+        StateSchema(&mut transaction)
             .commit_state_update(0, &[(0, genesis_acc_update)])
             .await?;
-        StateSchema(self.0).apply_state_update(0).await?;
+        StateSchema(&mut transaction).apply_state_update(0).await?;
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -112,16 +128,18 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         block_number: &str,
     ) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_last_watched_eth_block")
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
         sqlx::query!(
             "INSERT INTO data_restore_last_watched_eth_block (block_number) VALUES ($1)",
             block_number
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -152,20 +170,28 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         token_events: &[NewTokenEvent],
         last_watched_eth_number: &str,
     ) -> QueryResult<()> {
-        self.update_block_events(block_events).await?;
+        let new_state = self.new_storage_state("Events");
+        let mut transaction = self.0.start_transaction().await?;
+        DataRestoreSchema(&mut transaction)
+            .update_block_events(block_events)
+            .await?;
 
         for &NewTokenEvent { id, address } in token_events.iter() {
             // The only way to know decimals is to query ERC20 contract 'decimals' function
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
             let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
-            TokensSchema(self.0).store_token(token).await?;
+            TokensSchema(&mut transaction).store_token(token).await?;
         }
 
-        self.update_last_watched_block_number(last_watched_eth_number)
+        DataRestoreSchema(&mut transaction)
+            .update_last_watched_block_number(last_watched_eth_number)
             .await?;
-        self.update_storage_state(self.new_storage_state("Events"))
+        DataRestoreSchema(&mut transaction)
+            .update_storage_state(new_state)
             .await?;
+
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -174,8 +200,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         ops: &[(BlockNumber, &FranklinOp, AccountId)],
     ) -> QueryResult<()> {
+        let new_state = self.new_storage_state("Operations");
+        let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_rollup_ops")
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
         for op in ops.iter() {
@@ -184,11 +212,13 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             sqlx::query!(
                 "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account) VALUES ($1, $2, $3)",
                 stored_op.block_num, stored_op.operation, stored_op.fee_account
-            ).execute(self.0.conn())
+            ).execute(transaction.conn())
                 .await?;
         }
-        self.update_storage_state(self.new_storage_state("Operations"))
+        DataRestoreSchema(&mut transaction)
+            .update_storage_state(new_state)
             .await?;
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -251,16 +281,18 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     }
 
     pub(crate) async fn update_storage_state(&mut self, state: NewStorageState) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_storage_state_update")
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
         sqlx::query!(
             "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
             state.storage_state,
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -269,8 +301,9 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         events: &[NewBlockEvent],
     ) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_events_state")
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
         for event in events.iter() {
@@ -278,9 +311,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num) VALUES ($1, $2, $3)",
                 event.block_type, event.transaction_hash, event.block_num
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
         }
+        transaction.commit().await?;
         Ok(())
     }
 }

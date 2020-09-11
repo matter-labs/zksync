@@ -1,5 +1,6 @@
 // Built-in deps
 // External imports
+use sqlx::Acquire;
 use web3::types::Address;
 // Workspace imports
 use models::node::{Account, AccountId, AccountUpdates};
@@ -76,11 +77,14 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
-        self.0.assert_in_transaction();
+        let mut transaction = self.0.start_transaction().await?;
+
         // Get the last certain state of the account.
         // Note that `account` can be `None` here (if it wasn't verified yet), since
         // we will update the committed changes below.
-        let (last_block, account) = self.get_account_and_last_block(account_id).await?;
+        let (last_block, account) = AccountSchema(&mut transaction)
+            .get_account_and_last_block(account_id)
+            .await?;
 
         let account_balance_diff = sqlx::query_as!(
             StorageAccountUpdate,
@@ -91,7 +95,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             i64::from(account_id),
             last_block
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?;
 
         let account_creation_diff = sqlx::query_as!(
@@ -103,7 +107,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             i64::from(account_id),
             last_block
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?;
 
         // Chain the diffs, converting them into `StorageAccountDiff`.
@@ -132,6 +136,8 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .map(|(_, upd)| upd)
             .fold(account, Account::apply_update);
 
+        transaction.commit().await?;
+
         Ok(account_state)
     }
 
@@ -150,7 +156,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
-        self.0.assert_in_transaction();
+        let mut transaction = self.0.conn().begin().await?;
 
         // `accounts::table` is updated only after the block verification, so we should
         // just load the account with the provided ID.
@@ -163,7 +169,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             ",
             i64::from(account_id)
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(&mut transaction)
         .await?;
 
         assert!(results.len() <= 1, "LIMIT 1 is in query");
@@ -175,7 +181,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         //         .first::<StorageAccount>(self.0.conn())
         //         .optional()
         // })?;
-        if let Some(account) = maybe_account {
+        let result = if let Some(account) = maybe_account {
             let balances = sqlx::query_as!(
                 StorageBalance,
                 "
@@ -184,7 +190,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 ",
                 i64::from(account_id)
             )
-            .fetch_all(self.0.conn())
+            .fetch_all(&mut transaction)
             .await?;
 
             let last_block = account.last_block;
@@ -192,6 +198,9 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             Ok((last_block, Some(account)))
         } else {
             Ok((0, None))
-        }
+        };
+
+        transaction.commit().await?;
+        result
     }
 }

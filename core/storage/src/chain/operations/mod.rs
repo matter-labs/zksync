@@ -117,7 +117,9 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         operation: NewExecutedTransaction,
     ) -> QueryResult<()> {
-        MempoolSchema(&mut self.0)
+        let mut transaction = self.0.start_transaction().await?;
+
+        MempoolSchema(&mut transaction)
             .remove_tx(&operation.tx_hash)
             .await?;
 
@@ -148,7 +150,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 operation.created_at,
                 operation.eth_sign_data,
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
         } else {
             // If transaction failed, we do nothing on conflict.
@@ -171,9 +173,11 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 operation.created_at,
                 operation.eth_sign_data,
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
         };
+
+        transaction.commit().await?;
         Ok(())
     }
 

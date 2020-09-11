@@ -1,7 +1,7 @@
 // Built-in deps
 use std::time;
 // External imports
-use sqlx::{Acquire, Done};
+use sqlx::Done;
 // Workspace imports
 use models::node::BlockNumber;
 use models::prover_utils::EncodedProofPlonk;
@@ -21,25 +21,26 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     /// Returns the amount of blocks which await for proof, but have
     /// no assigned prover run.
     pub async fn unstarted_jobs_count(&mut self) -> QueryResult<u64> {
-        // TODO: Ensure that runs in a transaction.
-        // let connection = self.0.conn();
-        // let mut transaction = connection.begin().await?;
+        let mut transaction = self.0.start_transaction().await?;
 
-        let mut last_committed_block =
-            BlockSchema(&mut self.0).get_last_committed_block().await? as u64;
+        let mut last_committed_block = BlockSchema(&mut transaction)
+            .get_last_committed_block()
+            .await? as u64;
 
-        if BlockSchema(&mut self.0).pending_block_exists().await? {
+        if BlockSchema(&mut transaction).pending_block_exists().await? {
             // Existence of the pending block means that soon there will be one more block.
             last_committed_block += 1;
         }
 
-        let last_verified_block = BlockSchema(&mut self.0).get_last_verified_block().await? as u64;
+        let last_verified_block = BlockSchema(&mut transaction)
+            .get_last_verified_block()
+            .await? as u64;
 
         let num_ongoing_jobs = sqlx::query!(
             "SELECT COUNT(*) FROM prover_runs WHERE block_number > $1",
             last_verified_block as i64
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .count
         .unwrap_or(0) as u64;
@@ -56,7 +57,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
         let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
 
-        // transaction.commit().await?;
+        transaction.commit().await?;
         Ok(result)
     }
 
@@ -105,11 +106,10 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         // Select the block to prove.
-        let connection = self.0.conn();
-        let mut transaction = connection.begin().await?;
+        let mut transaction = self.0.start_transaction().await?;
 
         sqlx::query!("LOCK TABLE prover_runs IN EXCLUSIVE MODE")
-            .execute(&mut transaction)
+            .execute(transaction.conn())
             .await?;
 
         // Find the block that satisfies the following criteria:
@@ -138,7 +138,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             "#,
             block_size as i64
             )
-            .fetch_one(&mut transaction)
+            .fetch_one(transaction.conn())
             .await?
             .min;
 
@@ -154,7 +154,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                 i64::from(block_number),
                 worker_.to_string(),
             )
-            .fetch_one(&mut transaction)
+            .fetch_one(transaction.conn())
             .await?
             .id;
 
@@ -163,7 +163,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                 "SELECT * FROM prover_runs WHERE id = $1",
                 inserted_id
             )
-            .fetch_one(&mut transaction)
+            .fetch_one(transaction.conn())
             .await?;
 
             Some(prover_run)

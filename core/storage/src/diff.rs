@@ -1,6 +1,7 @@
 // Built-in deps
 use std::cmp::Ordering;
 // External imports
+use num::bigint::ToBigInt;
 use web3::types::Address;
 // Workspace imports
 use models::node::PubKeyHash;
@@ -51,12 +52,10 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
     fn into(self) -> (u32, AccountUpdate) {
         match self {
             StorageAccountDiff::BalanceUpdate(upd) => {
-                let (old_balance, exponent) = upd.old_balance.into_bigint_and_exponent();
-                assert_eq!(exponent, 0, "Stored balance is not an integer");
+                let old_balance = upd.old_balance.to_bigint().unwrap();
                 let old_balance = old_balance.to_biguint().unwrap();
 
-                let (new_balance, exponent) = upd.new_balance.into_bigint_and_exponent();
-                assert_eq!(exponent, 0, "Stored balance is not an integer");
+                let new_balance = upd.new_balance.to_bigint().unwrap();
                 let new_balance = new_balance.to_biguint().unwrap();
 
                 (

@@ -34,6 +34,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         // be ETH transactions without an operation (e.g. `completeWithdrawals` call), but for
         // every operation always there is an ETH transaction.
 
+        let mut transaction = self.0.start_transaction().await?;
+
         // TODO: Currently `sqlx` doesn't work well with joins, thus we will perform one additional query
         // for each loaded operation. This is not crucial, as this operation is done once per node launch,
         // but not effective and must be fixed as soon as `sqlx` 0.5 is released.
@@ -44,27 +46,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             WHERE confirmed = false
             ORDER BY id ASC"
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?;
-        // let raw_ops = sqlx::query_as!(
-        //     Test,
-        //     "SELECT * FROM eth_operations
-        //     LEFT JOIN eth_ops_binding ON eth_operations.id = eth_op_id
-        //     LEFT JOIN operations on operations.id = op_id"
-        // )
-        // .fetch_all(self.0.conn())
-        // .await?;
-
-        // let raw_ops: Vec<(
-        //     StorageETHOperation,
-        //     Option<ETHBinding>,
-        //     Option<StoredOperation>,
-        // )> = eth_operations::table
-        //     .left_join(eth_ops_binding::table.on(eth_operations::id.eq(eth_ops_binding::eth_op_id)))
-        //     .left_join(operations::table.on(operations::id.eq(eth_ops_binding::op_id)))
-        //     .filter(eth_operations::confirmed.eq(false))
-        //     .order(eth_operations::id.asc())
-        //     .load(self.0.conn())?;
 
         // Create a vector for the expected output.
         let mut ops: VecDeque<ETHOperation> = VecDeque::with_capacity(eth_ops.len());
@@ -78,7 +61,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 WHERE eth_op_id = $1",
                 eth_op.id
             )
-            .fetch_optional(self.0.conn())
+            .fetch_optional(transaction.conn())
             .await?;
 
             // Load the stored txs hashes ordered by their ID,
@@ -90,7 +73,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 ORDER BY id ASC",
                 eth_op.id
             )
-            .fetch_all(self.0.conn())
+            .fetch_all(transaction.conn())
             .await?;
             assert!(
                 !eth_tx_hashes.is_empty(),
@@ -99,7 +82,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
             // If there is an operation, convert it to the `Operation` type.
             let op = if let Some(raw_op) = raw_op {
-                Some(raw_op.into_op(self.0).await?)
+                Some(raw_op.into_op(&mut transaction).await?)
             } else {
                 None
             };
@@ -131,6 +114,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             ops.push_back(eth_op);
         }
 
+        transaction.commit().await?;
+
         Ok(ops)
     }
 
@@ -139,13 +124,15 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// to synchronize `eth_sender` state, as operations are sent to the `eth_sender`
     /// only once.
     pub async fn load_unprocessed_operations(&mut self) -> QueryResult<Vec<Operation>> {
+        let mut transaction = self.0.start_transaction().await?;
+
         let raw_ops = sqlx::query_as!(
             StoredOperation,
             "SELECT * FROM operations
             WHERE confirmed = false
             ORDER BY id ASC",
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?;
 
         let mut operations: Vec<Operation> = Vec::new();
@@ -157,18 +144,20 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 WHERE op_id = $1",
                 raw_op.id
             )
-            .fetch_optional(self.0.conn())
+            .fetch_optional(transaction.conn())
             .await?;
 
             // We are only interested in operations unknown to `eth_operations` table.
             if maybe_binding.is_some() {
                 let op = raw_op
-                    .into_op(self.0)
+                    .into_op(&mut transaction)
                     .await
                     .expect("Can't convert the operation");
                 operations.push(op);
             }
         }
+
+        transaction.commit().await?;
 
         Ok(operations)
     }
@@ -183,9 +172,11 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         last_used_gas_price: BigUint,
         raw_tx: Vec<u8>,
     ) -> QueryResult<InsertedOperationResponse> {
+        let mut transaction = self.0.start_transaction().await?;
+
         // It's important to assign nonce within the same db transaction
         // as saving the operation to avoid the state divergence.
-        let nonce = self.get_next_nonce().await?;
+        let nonce = EthereumSchema(&mut transaction).get_next_nonce().await?;
 
         // Create and insert the operation.
 
@@ -199,7 +190,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             ",
             op_type.to_string(), nonce, last_deadline_block, last_used_gas_price, raw_tx,
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .id;
 
@@ -223,18 +214,22 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 op_id,
                 eth_op_id
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
         }
 
         // Update the stored stats.
-        self.report_created_operation(op_type).await?;
+        EthereumSchema(&mut transaction)
+            .report_created_operation(op_type)
+            .await?;
 
         // Return the assigned ID and nonce.
         let response = InsertedOperationResponse {
             id: eth_op_id,
             nonce: nonce.into(),
         };
+
+        transaction.commit().await?;
 
         Ok(response)
     }
@@ -298,7 +293,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// stats values. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     async fn report_created_operation(&mut self, operation_type: OperationType) -> QueryResult<()> {
-        let mut current_stats = self.load_eth_params().await?;
+        let mut transaction = self.0.start_transaction().await?;
+
+        let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
 
         // Increase the only one type of operations.
         match operation_type {
@@ -322,8 +319,10 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             current_stats.verify_ops,
             current_stats.withdraw_ops
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
+
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -376,7 +375,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Marks the stored Ethereum transaction as confirmed (and thus the associated `Operation`
     /// is marked as confirmed as well).
     pub async fn confirm_eth_tx(&mut self, hash: &H256) -> QueryResult<()> {
-        let eth_op_id = self.get_eth_op_id(hash).await?;
+        let mut transaction = self.0.start_transaction().await?;
+
+        let eth_op_id = EthereumSchema(&mut transaction).get_eth_op_id(hash).await?;
 
         // Set the `confirmed` and `final_hash` field of the entry.
         let eth_op_id: i64 = sqlx::query!(
@@ -388,7 +389,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             hash.as_bytes(),
             eth_op_id
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .id;
 
@@ -401,8 +402,10 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             true,
             eth_op_id,
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
+
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -414,7 +417,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     pub(crate) async fn get_next_nonce(&mut self) -> QueryResult<i64> {
-        let old_nonce: ETHParams = self.load_eth_params().await?;
+        let mut transaction = self.0.start_transaction().await?;
+
+        let old_nonce: ETHParams = EthereumSchema(&mut transaction).load_eth_params().await?;
 
         let new_nonce_value = old_nonce.nonce + 1;
 
@@ -424,10 +429,12 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             WHERE id = true",
             new_nonce_value
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         let old_nonce_value = old_nonce.nonce;
+
+        transaction.commit().await?;
 
         Ok(old_nonce_value)
     }

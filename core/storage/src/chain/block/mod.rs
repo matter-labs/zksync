@@ -43,26 +43,32 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     ///   - Commit => store account updates.
     ///   - Verify => apply account updates.
     pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
+        let mut transaction = self.0.start_transaction().await?;
+
         let block_number = op.block.block_number;
 
         match &op.action {
             Action::Commit => {
-                StateSchema(self.0)
+                StateSchema(&mut transaction)
                     .commit_state_update(block_number, &op.accounts_updated)
                     .await?;
-                self.save_block(op.block).await?;
+                BlockSchema(&mut transaction).save_block(op.block).await?;
             }
             Action::Verify { proof } => {
-                let stored_proof = ProverSchema(self.0).load_proof(block_number).await?;
+                let stored_proof = ProverSchema(&mut transaction)
+                    .load_proof(block_number)
+                    .await?;
                 match stored_proof {
                     None => {
-                        ProverSchema(self.0)
+                        ProverSchema(&mut transaction)
                             .store_proof(block_number, proof)
                             .await?;
                     }
                     Some(_) => {}
                 };
-                StateSchema(self.0).apply_state_update(block_number).await?
+                StateSchema(&mut transaction)
+                    .apply_state_update(block_number)
+                    .await?
             }
         };
 
@@ -70,10 +76,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             block_number: i64::from(block_number),
             action_type: op.action.to_string(),
         };
-        let stored: StoredOperation = OperationsSchema(self.0)
+        let stored: StoredOperation = OperationsSchema(&mut transaction)
             .store_operation(new_operation)
             .await?;
-        stored.into_op(self.0).await
+        let result = stored.into_op(&mut transaction).await;
+
+        transaction.commit().await?;
+        result
     }
 
     /// Given a block, stores its transactions in the database.
@@ -469,14 +478,20 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub async fn load_pending_block(&mut self) -> QueryResult<Option<PendingBlock>> {
-        let pending_block_result = self.load_storage_pending_block().await?;
+        let mut transaction = self.0.start_transaction().await?;
+
+        let pending_block_result = BlockSchema(&mut transaction)
+            .load_storage_pending_block()
+            .await?;
 
         let block = match pending_block_result {
             Some(block) => block,
             None => return Ok(None),
         };
 
-        let executed_ops = self.get_block_executed_ops(block.number as u32).await?;
+        let executed_ops = BlockSchema(&mut transaction)
+            .get_block_executed_ops(block.number as u32)
+            .await?;
 
         let mut success_operations = Vec::new();
         let mut failed_txs = Vec::new();
@@ -496,6 +511,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             failed_txs,
         };
 
+        transaction.commit().await?;
+
         Ok(Some(result))
     }
 
@@ -507,6 +524,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub async fn save_pending_block(&mut self, pending_block: PendingBlock) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
+
         let storage_block = StoragePendingBlock {
             number: pending_block.number.into(),
             chunks_left: pending_block.chunks_left as i64,
@@ -523,7 +542,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
               SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4
             ",
             storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration,
-        ).execute(self.0.conn())
+        ).execute(transaction.conn())
         .await?;
 
         // Store the transactions from the block.
@@ -537,8 +556,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
             )
             .collect();
-        self.save_block_transactions(pending_block.number, executed_transactions)
+        BlockSchema(&mut transaction)
+            .save_block_transactions(pending_block.number, executed_transactions)
             .await?;
+
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -561,6 +583,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub(crate) async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
+
         let number = i64::from(block.block_number);
         let root_hash = fe_to_bytes(&block.new_root_hash);
         let fee_account_id = i64::from(block.fee_account);
@@ -570,7 +594,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
         let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
 
-        self.save_block_transactions(block.block_number, block.block_transactions)
+        BlockSchema(&mut transaction)
+            .save_block_transactions(block.block_number, block.block_transactions)
             .await?;
 
         let new_block = StorageBlock {
@@ -591,7 +616,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             ",
             new_block.number
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         // Save new completed block.
@@ -601,8 +626,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             ",
             new_block.number, new_block.root_hash, new_block.fee_account_id, new_block.unprocessed_prior_op_before,
             new_block.unprocessed_prior_op_after, new_block.block_size, new_block.commit_gas_limit, new_block.verify_gas_limit,
-        ).execute(self.0.conn())
+        ).execute(transaction.conn())
         .await?;
+
+        transaction.commit().await?;
 
         Ok(())
     }

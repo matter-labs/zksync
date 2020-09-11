@@ -135,13 +135,6 @@ impl<'a> StorageProcessor<'a> {
         self.in_transaction
     }
 
-    /// Checks if the `StorageProcessor` is currently within database transaction and panics otherwise.
-    pub fn assert_in_transaction(&self) {
-        if !self.in_transaction() {
-            panic!("Schema expected to be in transaction in order to execute required operation.");
-        }
-    }
-
     pub fn from_transaction<'b>(conn: Transaction<'b, Postgres>) -> StorageProcessor<'b> {
         StorageProcessor {
             conn: ConnectionHolder::Transaction(conn),
