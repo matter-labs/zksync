@@ -140,6 +140,7 @@ export function defaultWallet(config: Config, address?: string) {
 
 export async function transfer(
     transferInfo: TransferInfo,
+    fast: boolean = false,
     network: Network = 'localhost'
 ): Promise<string> {
     const { token, amount, to, privkey } = transferInfo;
@@ -159,13 +160,14 @@ export async function transfer(
         token,
         amount: syncProvider.tokenSet.parseToken(token, amount)
     });
-    await txHandle.awaitReceipt();
+    if (!fast) await txHandle.awaitReceipt();
     await syncProvider.disconnect();
     return txHandle.txHash;
 }
 
 export async function deposit(
     transferInfo: TransferInfo,
+    fast: boolean = false,
     network: Network = 'localhost'
 ): Promise<string> {
     const { token, amount, to, privkey } = transferInfo;
@@ -182,7 +184,7 @@ export async function deposit(
         amount: syncProvider.tokenSet.parseToken(token, amount),
         approveDepositAmountForERC20: !zksync.utils.isTokenETH(token)
     });
-    await depositHandle.awaitReceipt();
+    if (!fast) await depositHandle.awaitReceipt();
     await syncProvider.disconnect();
     return depositHandle.ethTx.hash;
 }

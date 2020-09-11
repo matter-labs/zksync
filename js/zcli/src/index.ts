@@ -13,15 +13,56 @@ async function main() {
     const config = loadConfig();
     const program = new Command();
 
+    const handler = async (
+        type: 'transfer' | 'deposit',
+        fast: boolean,
+        json?: string,
+        amount?: string,
+        token?: string,
+        recipient?: string
+    ) => {
+        if (json && (amount || token || recipient)) {
+            throw new Error('--json option and positional arguments are mutually exclusive');
+        }
+        if (!config.defaultWallet && !json) {
+            throw new Error('recipient is not provided');
+        }
+        let operation;
+        if (type == 'deposit') {
+            recipient = recipient || config.defaultWallet || '';
+            operation = commands.deposit;
+        } else {
+            operation = commands.transfer;
+        }
+        // prettier-ignore
+        const txInfo = json ? JSON.parse(json) : {
+            // @ts-ignore
+            privkey: config.wallets[config.defaultWallet],
+            to: recipient,
+            amount,
+            token
+        };
+        const hash = await operation(txInfo, fast, program.network);
+        if (fast) {
+            print(hash);
+        } else {
+            print(await commands.txInfo(hash, program.network));
+        }
+    };
+
     program
         .version('0.1.0')
         .name('zcli')
         .option('-n, --network <network>', 'select network', config.network);
 
     program
-        .command('account <address>')
+        .command('account [address]')
         .description('view account info')
-        .action(async (address: string) => {
+        .action(async (address?: string) => {
+            if (!address && !config.defaultWallet) {
+                throw new Error('no address provided');
+            }
+            address = address || config.defaultWallet || '';
             print(await commands.accountInfo(address, program.network));
         });
 
@@ -36,40 +77,18 @@ async function main() {
         .command('transfer [amount] [token] [recipient]')
         .description('make a transfer')
         .option('--json <string>', 'supply transfer info as json string')
-        .action(async (amount: string, token: string, recipient: string, cmd: Command) => {
-            if (!config.defaultWallet && !cmd.json) {
-                throw new Error('default wallet is not set');
-            }
-            // prettier-ignore
-            const transferInfo = cmd.json ? JSON.parse(cmd.json) : {
-                // @ts-ignore
-                privkey: config.wallets[config.defaultWallet],
-                to: recipient,
-                amount,
-                token
-            };
-            const hash = await commands.transfer(transferInfo, program.network);
-            print(await commands.txInfo(hash, program.network));
+        .option('--fast', 'do not wait for transaction commitment')
+        .action(async (amount, token, recipient, cmd) => {
+            await handler('transfer', cmd.fast, cmd.json, amount, token, recipient);
         });
 
     program
         .command('deposit [amount] [token] [recipient]')
         .description('make a deposit')
         .option('--json <string>', 'supply deposit info as json string')
-        .action(async (amount: string, token: string, recipient: string, cmd: Command) => {
-            if (!config.defaultWallet && !cmd.json) {
-                throw new Error('default wallet is not set');
-            }
-            // prettier-ignore
-            const depositInfo = cmd.json ? JSON.parse(cmd.json) : {
-                // @ts-ignore
-                privkey: config.wallets[config.defaultWallet],
-                to: recipient,
-                amount,
-                token
-            };
-            const hash = await commands.deposit(depositInfo, program.network);
-            print(await commands.txInfo(hash, program.network));
+        .option('--fast', 'do not wait for transaction commitment')
+        .action(async (amount, token, recipient, cmd) => {
+            await handler('deposit', cmd.fast, cmd.json, amount, token, recipient);
         });
 
     const networks = new Command('networks');
