@@ -267,9 +267,15 @@ impl<'a> StateSchema<'a> {
             let last_block = BlockSchema(self.0).get_last_verified_block()?;
 
             let accounts: Vec<StorageAccount> = accounts::table.load(self.0.conn())?;
-            let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
-                .load(self.0.conn())?
-                .grouped_by(&accounts);
+            let mut balances = Vec::new();
+            // Postgres can't execute `belonging_to` for account size >= 2^16
+            for account_chunk in accounts.chunks(2usize.pow(15)) {
+                let chunk_balances: Vec<Vec<StorageBalance>> =
+                    StorageBalance::belonging_to(account_chunk)
+                        .load(self.0.conn())?
+                        .grouped_by(account_chunk);
+                balances.extend(chunk_balances.into_iter());
+            }
 
             let account_map: AccountMap = accounts
                 .into_iter()

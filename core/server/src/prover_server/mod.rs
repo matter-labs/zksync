@@ -243,9 +243,20 @@ pub fn start_prover_server(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
+            let last_verified_block = {
+                let storage = connection_pool
+                    .access_storage()
+                    .expect("Failed to access storage");
+                storage
+                    .chain()
+                    .block_schema()
+                    .get_last_verified_block()
+                    .expect("Failed to get last verified block number") as usize
+            };
+
             // Start pool maintainer threads.
             for offset in 0..config_options.witness_generators {
-                let start_block = 1 + offset as u32;
+                let start_block = (last_verified_block + offset + 1) as u32;
                 let block_step = config_options.witness_generators as u32;
                 info!(
                     "Starting witness generator ({},{})",
