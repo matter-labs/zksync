@@ -69,6 +69,9 @@
 //! tests. Also the database used for tests is different than the database used for `server`,
 //! thus one should not fear to overwrite any important data by running the tests.
 
+// `sqlx` macros result in these warning being triggered.
+#![allow(clippy::toplevel_ref_arg, clippy::suspicious_else_formatting)]
+
 // Built-in deps
 // use std::env;
 // External imports
@@ -130,7 +133,7 @@ impl<'a> StorageProcessor<'a> {
         self.in_transaction
     }
 
-    pub fn from_transaction<'b>(conn: Transaction<'b, Postgres>) -> StorageProcessor<'b> {
+    pub fn from_transaction(conn: Transaction<'_, Postgres>) -> StorageProcessor<'_> {
         StorageProcessor {
             conn: ConnectionHolder::Transaction(conn),
             in_transaction: true,

@@ -120,7 +120,7 @@ impl AppState {
 
     fn db_error(error: failure::Error) -> HttpResponse {
         vlog::warn!("DB error: '{}';", error);
-        HttpResponse::InternalServerError().finish().into()
+        HttpResponse::InternalServerError().finish()
     }
 
     // Spawns future updating SharedNetworkStatus in the current `actix::System`

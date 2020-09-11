@@ -153,7 +153,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                 VALUES ( $1, $2 )
                 RETURNING (id)
                 "#,
-                i64::from(block_number),
+                block_number,
                 worker_.to_string(),
             )
             .fetch_one(transaction.conn())
