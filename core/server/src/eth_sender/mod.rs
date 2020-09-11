@@ -333,9 +333,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Stores the new operation in the database and sends the corresponding transaction.
     async fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
-        let current_block = self.ethereum.block_number()?;
+        let current_block = self.ethereum.block_number().await?;
         let deadline_block = self.get_deadline_block(current_block);
-        let gas_price = self.gas_adjuster.get_gas_price(&self.ethereum, None)?;
+        let gas_price = self
+            .gas_adjuster
+            .get_gas_price(&self.ethereum, None)
+            .await?;
 
         // TODO: Support transactions here!
         // let (new_op, signed_tx) = self.db.transaction(|| {
@@ -367,7 +370,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             };
 
             // Sign the transaction.
-            let signed_tx = Self::sign_new_tx(&self.ethereum, &new_op)?;
+            let signed_tx = Self::sign_new_tx(&self.ethereum, &new_op).await?;
 
             // With signed tx, update the hash in the operation entry and in the db.
             new_op.used_tx_hashes.push(signed_tx.hash);
@@ -385,7 +388,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
             new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
         );
-        self.ethereum.send_tx(&signed_tx).unwrap_or_else(|e| {
+        self.ethereum.send_tx(&signed_tx).await.unwrap_or_else(|e| {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
             // and resent. We can't do anything about this failure either, since it's most probably is not
             // related to the node logic, so we just log this error and pretend to have this operation
@@ -437,7 +440,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             "OperationETHState should have at least one transaction"
         );
 
-        let current_block = self.ethereum.block_number()?;
+        let current_block = self.ethereum.block_number().await?;
 
         // Check statuses of existing transactions.
         // Go through every transaction in a loop. We will exit this method early
@@ -449,7 +452,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 TxCheckMode::Old
             };
 
-            match self.check_transaction_state(mode, op, tx_hash, current_block)? {
+            match self
+                .check_transaction_state(mode, op, tx_hash, current_block)
+                .await?
+            {
                 TxCheckOutcome::Pending => {
                     // Transaction is pending, nothing to do yet.
                     return Ok(OperationCommitment::Pending);
@@ -485,7 +491,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let deadline_block = self.get_deadline_block(current_block);
         // Raw tx contents are the same for every transaction, so we just
         // create a new one from the old one with updated parameters.
-        let new_tx = self.create_supplement_tx(deadline_block, op)?;
+        let new_tx = self.create_supplement_tx(deadline_block, op).await?;
         // New transaction should be persisted in the DB *before* sending it.
 
         // TODO: Restore transaction here!
@@ -502,7 +508,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             op.id,
             self.eth_tx_description(&new_tx),
         );
-        self.ethereum.send_tx(&new_tx)?;
+        self.ethereum.send_tx(&new_tx).await?;
 
         Ok(OperationCommitment::Pending)
     }
@@ -524,14 +530,14 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Looks up for a transaction state on the Ethereum chain
     /// and reduces it to the simpler `TxCheckOutcome` report.
-    fn check_transaction_state(
+    async fn check_transaction_state(
         &self,
         mode: TxCheckMode,
         op: &ETHOperation,
         tx_hash: &H256,
         current_block: u64,
     ) -> Result<TxCheckOutcome, failure::Error> {
-        let status = self.ethereum.get_tx_status(tx_hash)?;
+        let status = self.ethereum.get_tx_status(tx_hash).await?;
 
         let outcome = match status {
             // Successful execution.
@@ -568,7 +574,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     }
 
     /// Creates a new Ethereum operation.
-    fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> Result<SignedCallResult, failure::Error> {
+    async fn sign_new_tx(
+        ethereum: &ETH,
+        op: &ETHOperation,
+    ) -> Result<SignedCallResult, failure::Error> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -595,7 +604,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             options
         };
 
-        let signed_tx = ethereum.sign_prepared_tx(op.encoded_tx_data.clone(), tx_options)?;
+        let signed_tx = ethereum
+            .sign_prepared_tx(op.encoded_tx_data.clone(), tx_options)
+            .await?;
 
         Ok(signed_tx)
     }
@@ -623,15 +634,15 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Creates a new transaction for the existing Ethereum operation.
     /// This method is used to create supplement transactions instead of the stuck one.
-    fn create_supplement_tx(
+    async fn create_supplement_tx(
         &mut self,
         deadline_block: u64,
         stuck_tx: &mut ETHOperation,
     ) -> Result<SignedCallResult, failure::Error> {
-        let tx_options = self.tx_options_from_stuck_tx(stuck_tx)?;
+        let tx_options = self.tx_options_from_stuck_tx(stuck_tx).await?;
 
         let raw_tx = stuck_tx.encoded_tx_data.clone();
-        let signed_tx = self.ethereum.sign_prepared_tx(raw_tx, tx_options)?;
+        let signed_tx = self.ethereum.sign_prepared_tx(raw_tx, tx_options).await?;
 
         stuck_tx.last_deadline_block = deadline_block;
         stuck_tx.last_used_gas_price = signed_tx.gas_price;
@@ -642,7 +653,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Creates a new tx options from a stuck transaction, with updated gas amount
     /// and nonce.
-    fn tx_options_from_stuck_tx(
+    async fn tx_options_from_stuck_tx(
         &mut self,
         stuck_tx: &ETHOperation,
     ) -> Result<Options, failure::Error> {
@@ -650,7 +661,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         let new_gas_price = self
             .gas_adjuster
-            .get_gas_price(&self.ethereum, Some(old_tx_gas_price))?;
+            .get_gas_price(&self.ethereum, Some(old_tx_gas_price))
+            .await?;
         let nonce = stuck_tx.nonce;
         let gas_limit = Self::gas_limit_for_op(stuck_tx);
 

@@ -51,12 +51,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
 
     /// Calculates a new gas amount for the replacement of the stuck tx.
     /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
-    pub fn get_gas_price(
+    pub async fn get_gas_price(
         &mut self,
         ethereum: &ETH,
         old_tx_gas_price: Option<U256>,
     ) -> Result<U256, failure::Error> {
-        let network_price = ethereum.gas_price()?;
+        let network_price = ethereum.gas_price().await?;
 
         let scaled_price = if let Some(old_price) = old_tx_gas_price {
             // Stuck transaction, scale it up.
@@ -89,7 +89,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     pub async fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
         if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
             // Report the current price to be gathered by the statistics module.
-            match ethereum.gas_price() {
+            match ethereum.gas_price().await {
                 Ok(network_price) => {
                     self.statistics.add_sample(network_price);
 
