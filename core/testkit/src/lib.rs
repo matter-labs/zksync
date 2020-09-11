@@ -353,7 +353,7 @@ pub fn spawn_state_keeper(
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
     let sk_thread_handle = std::thread::spawn(move || {
         let mut main_runtime = Runtime::new().expect("main runtime start");
-        let state_keeper_task = start_state_keeper(state_keeper, None, &main_runtime);
+        let state_keeper_task = start_state_keeper(state_keeper, None);
         main_runtime.block_on(async move {
             tokio::select! {
                 _ = stop_state_keeper_receiver => {},

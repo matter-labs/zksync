@@ -17,7 +17,7 @@ pub struct AccountTransaction {
     pub verified: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct TransactionsHistoryItem {
     pub tx_id: String,
     pub hash: Option<String>,

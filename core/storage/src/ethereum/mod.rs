@@ -298,7 +298,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// stats values. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     async fn report_created_operation(&mut self, operation_type: OperationType) -> QueryResult<()> {
-        let mut current_stats = self.load_eth_stats().await?;
+        let mut current_stats = self.load_eth_params().await?;
 
         // Increase the only one type of operations.
         match operation_type {
@@ -351,7 +351,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     }
 
     pub async fn load_gas_price_limit(&mut self) -> QueryResult<U256> {
-        let params = self.load_eth_stats().await?;
+        let params = self.load_eth_params().await?;
 
         let gas_price_limit =
             U256::try_from(params.gas_price_limit).expect("Negative gas limit value stored in DB");
@@ -361,12 +361,12 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
     /// Loads the stored Ethereum operations stats.
     pub async fn load_stats(&mut self) -> QueryResult<ETHStats> {
-        let params = self.load_eth_stats().await?;
+        let params = self.load_eth_params().await?;
 
         Ok(params.into())
     }
 
-    async fn load_eth_stats(&mut self) -> QueryResult<ETHParams> {
+    async fn load_eth_params(&mut self) -> QueryResult<ETHParams> {
         let params = sqlx::query_as!(ETHParams, "SELECT * FROM eth_parameters WHERE id = true",)
             .fetch_one(self.0.conn())
             .await?;
@@ -414,7 +414,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     pub(crate) async fn get_next_nonce(&mut self) -> QueryResult<i64> {
-        let old_nonce: ETHParams = self.load_eth_stats().await?;
+        let old_nonce: ETHParams = self.load_eth_params().await?;
 
         let new_nonce_value = old_nonce.nonce + 1;
 
@@ -436,9 +436,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Since in db tests the database is empty, we must provide a possibility
     /// to initialize required db fields.
     #[cfg(test)]
-    pub fn initialize_eth_data(&mut self) -> QueryResult<()> {
-        #[derive(Debug, Insertable)]
-        #[table_name = "eth_parameters"]
+    pub async fn initialize_eth_data(&mut self) -> QueryResult<()> {
+        #[derive(Debug)]
         pub struct NewETHParams {
             pub nonce: i64,
             pub gas_price_limit: i64,
@@ -448,7 +447,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         }
 
         let old_params: Option<ETHParams> =
-            eth_parameters::table.first(self.0.conn()).optional()?;
+            sqlx::query_as!(ETHParams, "SELECT * FROM eth_parameters WHERE id = true",)
+                .fetch_optional(self.0.conn())
+                .await?;
 
         if old_params.is_none() {
             let params = NewETHParams {
@@ -459,9 +460,13 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 withdraw_ops: 0,
             };
 
-            insert_into(eth_parameters::table)
-                .values(&params)
-                .execute(self.0.conn())?;
+            sqlx::query!(
+                "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
+                VALUES ($1, $2, $3, $4, $5)",
+                params.nonce, params.gas_price_limit, params.commit_ops, params.verify_ops, params.withdraw_ops
+            )
+            .execute(self.0.conn())
+            .await?;
         }
 
         Ok(())

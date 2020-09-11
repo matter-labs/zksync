@@ -41,8 +41,9 @@ mod gas_adjuster;
 mod transactions;
 mod tx_queue;
 
-#[cfg(test)]
-mod tests;
+// TODO: Tests are commented for now as DB traits aren't implemented yet
+// #[cfg(test)]
+// mod tests;
 
 #[derive(Debug)]
 pub enum ETHSenderRequest {

@@ -6,8 +6,10 @@ use web3::types::U256;
 use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumInterface};
 
 mod parameters;
-#[cfg(test)]
-mod tests;
+
+// TODO: Tests are commented for now as DB traits aren't implemented yet.
+// #[cfg(test)]
+// mod tests;
 
 /// Gas adjuster is an entity capable of scaling the gas price for
 /// all the Ethereum transactions.
