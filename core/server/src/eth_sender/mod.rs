@@ -27,7 +27,7 @@ use models::{
 use storage::ConnectionPool;
 // Local uses
 use self::{
-    database::{Database, DatabaseAccess},
+    database::Database,
     ethereum_interface::{EthereumHttpClient, EthereumInterface},
     gas_adjuster::GasAdjuster,
     transactions::*,
@@ -41,7 +41,7 @@ mod gas_adjuster;
 mod transactions;
 mod tx_queue;
 
-// TODO: Tests are commented for now as DB traits aren't implemented yet
+// TODO: Restore tests
 // #[cfg(test)]
 // mod tests;
 
@@ -121,11 +121,11 @@ enum TxCheckMode {
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
-struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
+struct ETHSender<ETH: EthereumInterface> {
     /// Ongoing operations queue.
     ongoing_ops: VecDeque<ETHOperation>,
     /// Connection to the database.
-    db: DB,
+    db: Database,
     /// Ethereum intermediator.
     ethereum: ETH,
     /// Channel for receiving operations to commit.
@@ -135,26 +135,34 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     /// Queue for ordered transaction processing.
     tx_queue: TxQueue,
     /// Utility for managing the gas price for transactions.
-    gas_adjuster: GasAdjuster<ETH, DB>,
+    gas_adjuster: GasAdjuster<ETH>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
     /// struct to communicate current verified block number to api server
     current_zksync_info: CurrentZksyncInfo,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
+impl<ETH: EthereumInterface> ETHSender<ETH> {
     pub async fn new(
         options: EthSenderOptions,
-        db: DB,
+        db: Database,
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
         current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
-        let (ongoing_ops, unprocessed_ops) = db.restore_state().await.expect("Can't restore state");
+        let mut connection = db
+            .acquire_connection()
+            .await
+            .expect("Unable to connect to DB");
+
+        let (ongoing_ops, unprocessed_ops) = db
+            .restore_state(&mut connection)
+            .await
+            .expect("Can't restore state");
 
         let stats = db
-            .load_stats()
+            .load_stats(&mut connection)
             .await
             .expect("Failed loading ETH operations stats");
 
@@ -167,6 +175,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         let gas_adjuster = GasAdjuster::new(&db).await;
 
+        drop(connection);
         let mut sender = Self {
             ethereum,
             ongoing_ops,
@@ -340,7 +349,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .get_gas_price(&self.ethereum, None)
             .await?;
 
-        // TODO: Support transactions here!
+        let mut connection = self.db.acquire_connection().await?;
+        let mut transaction = connection.start_transaction().await?;
+
         // let (new_op, signed_tx) = self.db.transaction(|| {
         let (new_op, signed_tx) = {
             // First, we should store the operation in the database and obtain the assigned
@@ -348,6 +359,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             let assigned_data = self
                 .db
                 .save_new_eth_tx(
+                    &mut transaction,
                     tx.op_type,
                     tx.operation.clone(),
                     deadline_block as i64,
@@ -374,7 +386,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
             // With signed tx, update the hash in the operation entry and in the db.
             new_op.used_tx_hashes.push(signed_tx.hash);
-            self.db.add_hash_entry(new_op.id, &signed_tx.hash).await?;
+            self.db
+                .add_hash_entry(&mut transaction, new_op.id, &signed_tx.hash)
+                .await?;
 
             (new_op, signed_tx)
         };
@@ -395,6 +409,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             // processed.
             warn!("Error while sending the operation: {}", e);
         });
+
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -465,7 +481,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         "Confirmed: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
                         op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
-                    self.db.confirm_operation(tx_hash).await?;
+                    let mut connection = self.db.acquire_connection().await?;
+                    self.db.confirm_operation(&mut connection, tx_hash).await?;
                     return Ok(OperationCommitment::Committed);
                 }
                 TxCheckOutcome::Stuck => {
@@ -494,14 +511,19 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let new_tx = self.create_supplement_tx(deadline_block, op).await?;
         // New transaction should be persisted in the DB *before* sending it.
 
-        // TODO: Restore transaction here!
-        // self.db.transaction(|| {
+        let mut connection = self.db.acquire_connection().await?;
+        let mut transaction = connection.start_transaction().await?;
         self.db
-            .update_eth_tx(op.id, deadline_block as i64, new_tx.gas_price)
+            .update_eth_tx(
+                &mut transaction,
+                op.id,
+                deadline_block as i64,
+                new_tx.gas_price,
+            )
             .await?;
-        self.db.add_hash_entry(op.id, &new_tx.hash).await?;
-        //     Ok(())
-        // })?;
+        self.db
+            .add_hash_entry(&mut transaction, op.id, &new_tx.hash)
+            .await?;
 
         info!(
             "Stuck tx processing: sending tx for op, eth_op_id: {}; ETH tx: {}",
@@ -509,6 +531,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             self.eth_tx_description(&new_tx),
         );
         self.ethereum.send_tx(&new_tx).await?;
+        transaction.commit().await?;
 
         Ok(OperationCommitment::Pending)
     }

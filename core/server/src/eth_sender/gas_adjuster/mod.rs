@@ -3,7 +3,7 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 // External deps
 use web3::types::U256;
 // Local deps
-use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumInterface};
+use crate::eth_sender::{database::Database, ethereum_interface::EthereumInterface};
 
 mod parameters;
 
@@ -21,7 +21,7 @@ mod parameters;
 /// gas price for transactions that were not mined by the network
 /// within a reasonable time.
 #[derive(Debug)]
-pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
+pub(super) struct GasAdjuster<ETH: EthereumInterface> {
     /// Collected statistics about recently used gas prices.
     statistics: GasStatistics,
     /// Timestamp of the last maximum gas price update.
@@ -30,13 +30,16 @@ pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
     last_sample_added: Instant,
 
     _etherum_client: PhantomData<ETH>,
-    _db: PhantomData<DB>,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
-    pub async fn new(db: &DB) -> Self {
+impl<ETH: EthereumInterface> GasAdjuster<ETH> {
+    pub async fn new(db: &Database) -> Self {
+        let mut connection = db
+            .acquire_connection()
+            .await
+            .expect("Unable to connect to DB");
         let gas_price_limit = db
-            .load_gas_price_limit()
+            .load_gas_price_limit(&mut connection)
             .await
             .expect("Can't load the gas price limit");
         Self {
@@ -45,7 +48,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
             last_sample_added: Instant::now(),
 
             _etherum_client: PhantomData,
-            _db: PhantomData,
         }
     }
 
@@ -86,7 +88,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     /// Performs an actualization routine for `GasAdjuster`:
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
-    pub async fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
+    pub async fn keep_updated(&mut self, ethereum: &ETH, db: &Database) {
         if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
             // Report the current price to be gathered by the statistics module.
             match ethereum.gas_price().await {
@@ -108,7 +110,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
             self.last_price_renewal = Instant::now();
 
             // Update the value in the database as well.
-            let result = db.update_gas_price_limit(self.statistics.get_limit()).await;
+            let mut connection = match db.acquire_connection().await {
+                Ok(connection) => connection,
+                Err(err) => {
+                    log::warn!("Cannot update the gas limit value in the database: {}", err);
+                    return;
+                }
+            };
+            let result = db
+                .update_gas_price_limit(&mut connection, self.statistics.get_limit())
+                .await;
 
             if let Err(err) = result {
                 // Inability of update the value in the DB is not critical as it's not

@@ -16,7 +16,7 @@ use models::{
 };
 // Local uses
 use super::ETHSender;
-use crate::eth_sender::database::DatabaseAccess;
+// use crate::eth_sender::database::DatabaseAccess;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
 use crate::eth_sender::transactions::{ETHStats, ExecutedTxStatus};
 use crate::eth_sender::ETHSenderRequest;
