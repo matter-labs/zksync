@@ -55,8 +55,7 @@ pub struct BlockTransactionItem {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
-#[table_name = "account_tree_cache"]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountTreeCache {
     pub block: i64,
     pub tree_cache: serde_json::Value,

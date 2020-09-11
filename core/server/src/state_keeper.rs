@@ -163,9 +163,10 @@ impl PlasmaStateInitParams {
 
     async fn load_account_tree(
         &mut self,
-        storage: &storage::StorageProcessor<'_>,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Result<BlockNumber, failure::Error> {
-        let (verified_block, accounts) = storage.chain().state_schema().load_verified_state()?;
+        let (verified_block, accounts) =
+            storage.chain().state_schema().load_verified_state().await?;
         for (id, account) in accounts {
             self.insert_account(id, account);
         }
@@ -173,17 +174,19 @@ impl PlasmaStateInitParams {
         if let Some(account_tree_cache) = storage
             .chain()
             .block_schema()
-            .get_account_tree_cache_block(verified_block)?
+            .get_account_tree_cache_block(verified_block)
+            .await?
         {
             self.tree
                 .set_internals(serde_json::from_value(account_tree_cache)?);
         } else {
             self.tree.root_hash();
             let account_tree_cache = self.tree.get_internals();
-            storage.chain().block_schema().store_account_tree_cache(
-                verified_block,
-                serde_json::to_value(account_tree_cache)?,
-            )?;
+            storage
+                .chain()
+                .block_schema()
+                .store_account_tree_cache(verified_block, serde_json::to_value(account_tree_cache)?)
+                .await?;
         }
 
         let (block_number, accounts) = storage
@@ -197,7 +200,8 @@ impl PlasmaStateInitParams {
             if let Some((_, account_updates)) = storage
                 .chain()
                 .state_schema()
-                .load_state_diff(verified_block, Some(block_number))?
+                .load_state_diff(verified_block, Some(block_number))
+                .await?
             {
                 let mut updated_accounts = account_updates
                     .into_iter()
@@ -218,7 +222,8 @@ impl PlasmaStateInitParams {
             let storage_root_hash = storage
                 .chain()
                 .block_schema()
-                .get_block(block_number)?
+                .get_block(block_number)
+                .await?
                 .expect("restored block must exist");
             assert_eq!(
                 storage_root_hash.new_root_hash,
@@ -231,7 +236,7 @@ impl PlasmaStateInitParams {
 
     async fn load_from_db(
         &mut self,
-        storage: &storage::StorageProcessor<'_>,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Result<(), failure::Error> {
         let block_number = self.load_account_tree(storage).await?;
         self.last_block_number = block_number;

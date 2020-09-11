@@ -111,7 +111,7 @@ impl WitnessGenerator {
     async fn load_account_tree(
         &self,
         block: BlockNumber,
-        storage: &StorageProcessor<'_>,
+        storage: &mut StorageProcessor<'_>,
     ) -> Result<CircuitAccountTree, failure::Error> {
         let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
 
@@ -139,7 +139,8 @@ impl WitnessGenerator {
                 if let Some((_, account_updates)) = storage
                     .chain()
                     .state_schema()
-                    .load_state_diff(block, Some(cached_block))?
+                    .load_state_diff(block, Some(cached_block))
+                    .await?
                 {
                     let mut updated_accounts = account_updates
                         .into_iter()
@@ -196,9 +197,11 @@ impl WitnessGenerator {
 
     async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), failure::Error> {
         let timer = Instant::now();
-        let storage = self.conn_pool.access_storage_fragile()?;
+        let mut storage = self.conn_pool.access_storage_fragile().await?;
+        let mut transaction = storage.start_transaction().await?;
+
         let mut circuit_account_tree = self
-            .load_account_tree(block.block_number - 1, &storage)
+            .load_account_tree(block.block_number - 1, &mut transaction)
             .await?;
         trace!(
             "Witness generator loading circuit account tree {}s",

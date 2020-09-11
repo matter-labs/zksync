@@ -637,49 +637,62 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     /// Stores account tree cache for a block
-    pub fn store_account_tree_cache(
-        &self,
+    pub async fn store_account_tree_cache(
+        &mut self,
         block: BlockNumber,
         tree_cache: serde_json::Value,
     ) -> QueryResult<()> {
-        use crate::schema::*;
-
         if block == 0 {
             return Ok(());
         }
 
-        diesel::insert_into(account_tree_cache::table)
-            .values(&AccountTreeCache {
-                block: block as i64,
-                tree_cache,
-            })
-            .on_conflict(account_tree_cache::block)
-            .do_nothing()
-            .execute(self.0.conn())
-            .map(drop)
+        sqlx::query!(
+            "
+            INSERT INTO account_tree_cache (block, tree_cache)
+            VALUES ($1, $2)
+            ",
+            block as i64,
+            tree_cache,
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
     }
 
     /// Gets stored account tree cache for a block
-    pub fn get_account_tree_cache(&self) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
-        use crate::schema::*;
-        let account_tree_cache = account_tree_cache::table
-            .order_by(account_tree_cache::block.desc())
-            .first::<AccountTreeCache>(self.0.conn())
-            .optional()?;
+    pub async fn get_account_tree_cache(
+        &mut self,
+    ) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
+        let account_tree_cache = sqlx::query_as!(
+            AccountTreeCache,
+            "
+            SELECT * FROM account_tree_cache
+            ORDER BY block DESC
+            LIMIT 1
+            ",
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
 
         Ok(account_tree_cache.map(|w| (w.block as BlockNumber, w.tree_cache)))
     }
 
     /// Gets stored account tree cache for a block
-    pub fn get_account_tree_cache_block(
-        &self,
+    pub async fn get_account_tree_cache_block(
+        &mut self,
         block: BlockNumber,
     ) -> QueryResult<Option<serde_json::Value>> {
-        use crate::schema::*;
-        let account_tree_cache = account_tree_cache::table
-            .filter(account_tree_cache::block.eq(block as i64))
-            .first::<AccountTreeCache>(self.0.conn())
-            .optional()?;
+        let account_tree_cache = sqlx::query_as!(
+            AccountTreeCache,
+            "
+            SELECT * FROM account_tree_cache
+            WHERE block = $1
+            ",
+            block as i64
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
 
         Ok(account_tree_cache.map(|w| w.tree_cache))
     }

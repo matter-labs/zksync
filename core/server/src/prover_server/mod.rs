@@ -268,10 +268,11 @@ pub fn start_prover_server(
 
             actix_runtime.block_on(async move {
                 let last_verified_block = {
-                    let storage = connection_pool
+                    let mut storage = connection_pool
                         .access_storage()
                         .await
                         .expect("Failed to access storage");
+
                     storage
                         .chain()
                         .block_schema()
