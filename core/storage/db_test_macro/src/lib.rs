@@ -1,6 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
+#[allow(clippy::cmp_owned)] // False positive, `syn::Ident` cannot be dereferenced.
 fn is_arg_storage_processor(arg: Option<&syn::FnArg>) -> bool {
     if let Some(syn::FnArg::Typed(arg)) = arg {
         // For now, we just assume that people writing tests know what they're doing and if method has
