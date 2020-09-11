@@ -352,4 +352,44 @@ describe('Making Transactions', () => {
             amount: '73.0'
         })).to.be.rejected;
     });
+
+    it('should not wait for commitment', async () => {
+        await commands.deposit({
+            to: poor1.address,
+            privkey: rich.privateKey,
+            token: 'DAI',
+            amount: '2.0'
+        });
+        const hash = await commands.transfer(
+            {
+                to: poor2.address,
+                privkey: poor1.privateKey,
+                token: 'DAI',
+                amount: '1.0'
+            },
+            true
+        );
+        const info = await commands.txInfo(hash);
+        expect(info.transaction).to.be.null;
+    });
+
+    it('should wait for commitment', async () => {
+        await commands.deposit({
+            to: poor1.address,
+            privkey: rich.privateKey,
+            token: 'DAI',
+            amount: '1.5'
+        });
+        const hash = await commands.transfer(
+            {
+                to: poor2.address,
+                privkey: poor1.privateKey,
+                token: 'DAI',
+                amount: '1.0'
+            },
+            true
+        );
+        const info = await commands.txInfo(hash, 'localhost', 'COMMIT');
+        expect(info.transaction).to.not.be.null;
+    });
 });

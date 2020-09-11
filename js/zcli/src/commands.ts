@@ -34,11 +34,20 @@ export async function accountInfo(
     };
 }
 
-export async function txInfo(tx_hash: string, network: Network = 'localhost'): Promise<TxInfo> {
+export async function txInfo(
+    tx_hash: string,
+    network: Network = 'localhost',
+    wait: '' | 'COMMIT' | 'VERIFY' = ''
+): Promise<TxInfo> {
+    const provider = await zksync.getDefaultProvider(network, 'HTTP');
+    if (wait !== '') {
+        await provider.notifyTransaction(tx_hash, wait);
+    }
     const api_url = `${apiServer(network)}/transactions_all/${tx_hash}`;
     const response = await fetch(api_url);
     const tx = await response.json();
     if (tx === null) {
+        await provider.disconnect();
         return {
             network,
             transaction: null
@@ -56,10 +65,11 @@ export async function txInfo(tx_hash: string, network: Network = 'localhost'): P
         }
     };
     if (tx.token === -1) {
+        await provider.disconnect();
         return info;
     }
-    const provider = await zksync.getDefaultProvider(network, 'HTTP');
     const tokens = await provider.getTokens();
+    await provider.disconnect();
     const tokenInfo = Object.values(tokens).find((value) => value.id == tx.token);
     if (tokenInfo) {
         const token = tokenInfo.symbol; // @ts-ignore

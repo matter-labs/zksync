@@ -136,6 +136,25 @@ async function main() {
 
     program.addCommand(wallets);
 
+    const awaitCmd = new Command('await');
+
+    awaitCmd
+        .description('await for transaction commitment / verification')
+        .command('commit <tx_hash>')
+        .description('await for transaction commitment')
+        .action(async (tx_hash: string) => {
+            print(await commands.txInfo(tx_hash, program.network, 'COMMIT'));
+        });
+
+    awaitCmd
+        .command('verify <tx_hash>')
+        .description('await for transaction verification')
+        .action(async (tx_hash: string) => {
+            print(await commands.txInfo(tx_hash, program.network, 'VERIFY'));
+        });
+
+    program.addCommand(awaitCmd);
+
     await program.parseAsync(process.argv);
 }
 
