@@ -162,15 +162,75 @@ impl PlasmaStateInitParams {
         Ok(init_params)
     }
 
-    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
+    fn load_account_tree(
+        &mut self,
+        storage: &storage::StorageProcessor,
+    ) -> Result<BlockNumber, failure::Error> {
+        let (verified_block, accounts) = storage.chain().state_schema().load_verified_state()?;
+        for (id, account) in accounts {
+            self.insert_account(id, account);
+        }
+
+        if let Some(account_tree_cache) = storage
+            .chain()
+            .block_schema()
+            .get_account_tree_cache_block(verified_block)?
+        {
+            self.tree
+                .set_internals(serde_json::from_value(account_tree_cache)?);
+        } else {
+            self.tree.root_hash();
+            let account_tree_cache = self.tree.get_internals();
+            storage.chain().block_schema().store_account_tree_cache(
+                verified_block,
+                serde_json::to_value(account_tree_cache)?,
+            )?;
+        }
+
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
             .load_committed_state(None)
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
-        for (account_id, account) in accounts.into_iter() {
-            self.insert_account(account_id, account);
+
+        if block_number != verified_block {
+            if let Some((_, account_updates)) = storage
+                .chain()
+                .state_schema()
+                .load_state_diff(verified_block, Some(block_number))?
+            {
+                let mut updated_accounts = account_updates
+                    .into_iter()
+                    .map(|(id, _)| id)
+                    .collect::<Vec<_>>();
+                updated_accounts.sort();
+                updated_accounts.dedup();
+                for idx in updated_accounts {
+                    if let Some(acc) = accounts.get(&idx).cloned() {
+                        self.insert_account(idx, acc);
+                    } else {
+                        self.remove_account(idx);
+                    }
+                }
+            }
         }
+        if block_number != 0 {
+            let storage_root_hash = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)?
+                .expect("restored block must exist");
+            assert_eq!(
+                storage_root_hash.new_root_hash,
+                self.tree.root_hash(),
+                "restored root_hash is different"
+            );
+        }
+        Ok(block_number)
+    }
+
+    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
+        let block_number = self.load_account_tree(storage)?;
         self.last_block_number = block_number;
         self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, block_number)?;
 

@@ -36,7 +36,7 @@ use crate::gas_counter::{CommitCost, GasCounter, VerifyCost};
 use crate::{
     eth_sender::ETHSenderRequest,
     fee_ticker::{
-        ticker_api::{FeeTickerAPI, TickerApi},
+        ticker_api::{FeeTickerAPI, TickerApi, CONNECTION_TIMEOUT},
         ticker_info::{FeeTickerInfo, TickerInfo},
     },
     state_keeper::StateKeeperRequest,
@@ -188,9 +188,14 @@ pub fn run_ticker_task(
         tokens_risk_factors: HashMap::new(),
     };
 
+    let client = reqwest::ClientBuilder::new()
+        .timeout(CONNECTION_TIMEOUT)
+        .connect_timeout(CONNECTION_TIMEOUT)
+        .build()
+        .expect("Failed to build reqwest::Client");
     match token_price_source {
         TokenPriceSource::CoinMarketCap { base_url } => {
-            let token_price_api = CoinMarketCapAPI::new(reqwest::Client::new(), base_url);
+            let token_price_api = CoinMarketCapAPI::new(client, base_url);
 
             let ticker_api = TickerApi::new(db_pool, eth_sender_request_sender, token_price_api);
             let ticker_info = TickerInfo::new(state_keeper_request_sender);
@@ -200,8 +205,8 @@ pub fn run_ticker_task(
             runtime.spawn(fee_ticker.run())
         }
         TokenPriceSource::CoinGecko { base_url } => {
-            let token_price_api = CoinGeckoAPI::new(reqwest::Client::new(), base_url)
-                .expect("failed to init CoinGecko client");
+            let token_price_api =
+                CoinGeckoAPI::new(client, base_url).expect("failed to init CoinGecko client");
 
             let ticker_api = TickerApi::new(db_pool, eth_sender_request_sender, token_price_api);
             let ticker_info = TickerInfo::new(state_keeper_request_sender);

@@ -71,3 +71,10 @@ pub struct BlockTransactionItem {
     #[sql_type = "Timestamp"]
     pub created_at: NaiveDateTime,
 }
+
+#[derive(Debug, Clone, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
+#[table_name = "account_tree_cache"]
+pub struct AccountTreeCache {
+    pub block: i64,
+    pub tree_cache: serde_json::Value,
+}

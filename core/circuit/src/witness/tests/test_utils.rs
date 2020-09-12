@@ -66,18 +66,22 @@ impl PlasmaStateGenerator {
             .map(|acc| (acc.id, acc.account.clone()))
             .collect();
 
-        if accounts.iter().any(|(id, _)| *id == FEE_ACCOUNT_ID) {
-            panic!("AccountId {} is an existing fee account", FEE_ACCOUNT_ID);
-        }
+        let accounts = if accounts.iter().any(|(id, _)| *id == FEE_ACCOUNT_ID) {
+            println!(
+                "Note: AccountId {} is an existing fee account",
+                FEE_ACCOUNT_ID
+            );
+            accounts.into_iter().collect()
+        } else {
+            std::iter::once((
+                FEE_ACCOUNT_ID,
+                Account::default_with_address(&Address::default()),
+            ))
+            .chain(accounts)
+            .collect()
+        };
 
-        let validator_accounts = std::iter::once((
-            FEE_ACCOUNT_ID,
-            Account::default_with_address(&Address::default()),
-        ))
-        .chain(accounts)
-        .collect();
-
-        Self::create_state(validator_accounts)
+        Self::create_state(accounts)
     }
 }
 

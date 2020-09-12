@@ -21,6 +21,11 @@ pub mod coinmarkercap;
 const API_PRICE_EXPIRATION_TIME_SECS: i64 = 300; // 5 mins
 const HISTORICAL_PRICE_EXPIRATION_TIME: Duration = Duration::from_secs(60);
 
+/// The limit of time we are willing to wait for response.
+pub const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
+/// Configuration parameter of the reqwest Client
+pub const CONNECTION_TIMEOUT: Duration = Duration::from_millis(250);
+
 #[async_trait]
 pub trait TokenPriceAPI {
     async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, failure::Error>;

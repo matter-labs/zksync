@@ -37,6 +37,13 @@ table! {
 }
 
 table! {
+    account_tree_cache (block) {
+        block -> Int8,
+        tree_cache -> Jsonb,
+    }
+}
+
+table! {
     accounts (id) {
         id -> Int8,
         last_block -> Int8,
@@ -263,6 +270,7 @@ table! {
 }
 
 joinable!(account_balance_updates -> tokens (coin_id));
+joinable!(account_tree_cache -> blocks (block));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
 joinable!(block_witness -> blocks (block));
@@ -275,6 +283,7 @@ allow_tables_to_appear_in_same_query!(
     account_balance_updates,
     account_creates,
     account_pubkey_updates,
+    account_tree_cache,
     accounts,
     active_provers,
     balances,

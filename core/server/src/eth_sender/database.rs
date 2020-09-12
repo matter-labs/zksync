@@ -14,7 +14,7 @@ use models::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Operation,
 };
-use storage::ConnectionPool;
+use storage::{ConnectionPool, StorageProcessor};
 // Local uses
 use super::transactions::ETHStats;
 
@@ -65,28 +65,32 @@ pub(super) trait DatabaseAccess {
 }
 
 /// The actual database wrapper.
-/// This structure uses `ConnectionPool` to interact with an existing database.
-#[derive(Debug, Clone)]
+/// This structure uses `StorageProcessor` to interact with an existing database.
+#[derive(Debug)]
 pub struct Database {
     /// Connection to the database.
-    db_pool: ConnectionPool,
+    storage: StorageProcessor,
 }
 
 impl Database {
     pub fn new(db_pool: ConnectionPool) -> Self {
-        Self { db_pool }
+        let storage = db_pool
+            .access_storage()
+            .expect("failed to get db connection");
+        Self { storage }
     }
 }
 
 impl DatabaseAccess for Database {
     fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error> {
-        let storage = self
-            .db_pool
-            .access_storage()
-            .expect("Failed to access storage");
-
-        let unconfirmed_ops = storage.ethereum_schema().load_unconfirmed_operations()?;
-        let unprocessed_ops = storage.ethereum_schema().load_unprocessed_operations()?;
+        let unconfirmed_ops = self
+            .storage
+            .ethereum_schema()
+            .load_unconfirmed_operations()?;
+        let unprocessed_ops = self
+            .storage
+            .ethereum_schema()
+            .load_unprocessed_operations()?;
         Ok((unconfirmed_ops, unprocessed_ops))
     }
 
@@ -98,9 +102,7 @@ impl DatabaseAccess for Database {
         used_gas_price: U256,
         raw_tx: Vec<u8>,
     ) -> Result<InsertedOperationResponse, failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-
-        Ok(storage.ethereum_schema().save_new_eth_tx(
+        Ok(self.storage.ethereum_schema().save_new_eth_tx(
             op_type,
             op.map(|op| op.id.unwrap()),
             deadline_block,
@@ -110,9 +112,10 @@ impl DatabaseAccess for Database {
     }
 
     fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-
-        Ok(storage.ethereum_schema().add_hash_entry(eth_op_id, hash)?)
+        Ok(self
+            .storage
+            .ethereum_schema()
+            .add_hash_entry(eth_op_id, hash)?)
     }
 
     fn update_eth_tx(
@@ -121,8 +124,7 @@ impl DatabaseAccess for Database {
         new_deadline_block: i64,
         new_gas_value: U256,
     ) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        Ok(storage.ethereum_schema().update_eth_tx(
+        Ok(self.storage.ethereum_schema().update_eth_tx(
             eth_op_id,
             new_deadline_block,
             BigUint::from_str(&new_gas_value.to_string()).unwrap(),
@@ -130,25 +132,23 @@ impl DatabaseAccess for Database {
     }
 
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        Ok(storage.ethereum_schema().confirm_eth_tx(hash)?)
+        Ok(self.storage.ethereum_schema().confirm_eth_tx(hash)?)
     }
 
     fn load_stats(&self) -> Result<ETHStats, failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        let stats = storage.ethereum_schema().load_stats()?;
+        let stats = self.storage.ethereum_schema().load_stats()?;
         Ok(stats.into())
     }
 
     fn load_gas_price_limit(&self) -> Result<U256, failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        let limit = storage.ethereum_schema().load_gas_price_limit()?;
+        let limit = self.storage.ethereum_schema().load_gas_price_limit()?;
         Ok(limit)
     }
 
     fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        storage.ethereum_schema().update_gas_price_limit(value)?;
+        self.storage
+            .ethereum_schema()
+            .update_gas_price_limit(value)?;
         Ok(())
     }
 
@@ -156,8 +156,6 @@ impl DatabaseAccess for Database {
     where
         F: FnOnce() -> Result<T, failure::Error>,
     {
-        let storage = self.db_pool.access_storage()?;
-
-        storage.transaction(|| f())
+        self.storage.transaction(|| f())
     }
 }
