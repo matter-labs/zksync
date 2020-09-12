@@ -86,10 +86,10 @@ impl TokenPriceAPI for CoinGeckoAPI {
         // Theoretically we should use min and max price for ETH in our ticker formula when we
         // calculate fee for tx with ETH token. Practically if we use only max price foe ETH it is fine because
         // we don't need to sell this token lnd price only affects ZKP cost of such tx which is negligible.
-        let usd_price = if token_symbol != "ETH" {
-            usd_prices.min()
-        } else {
+        let usd_price = if token_symbol == "ETH" {
             usd_prices.max()
+        } else {
+            usd_prices.min()
         };
         let usd_price =
             usd_price.ok_or_else(|| failure::format_err!("CoinGecko returned empty price data"))?;
