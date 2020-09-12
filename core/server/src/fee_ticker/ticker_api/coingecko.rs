@@ -54,6 +54,8 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .join(format!("api/v3/coins/{}/market_chart", token_id).as_str())
             .expect("failed to join URL path");
 
+        // If we use 2 day interval we will get hourly prices and not minute by minute which makes
+        // response faster and smaller
         let request = self
             .client
             .get(market_chart_url)
@@ -74,12 +76,23 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .ok_or_else(|| failure::format_err!("CoinGecko returned empty price data"))?
             .0;
 
-        let usd_price = market_chart
+        let usd_prices = market_chart
             .prices
             .into_iter()
-            .map(|token_price| token_price.1)
-            .min()
-            .ok_or_else(|| failure::format_err!("CoinGecko returned empty price data"))?;
+            .map(|token_price| token_price.1);
+
+        // We use max price for ETH token because we spend ETH with each commit and collect token
+        // so it is in our interest to assume highest price for ETH.
+        // Theoretically we should use min and max price for ETH in our ticker formula when we
+        // calculate fee for tx with ETH token. Practically if we use only max price foe ETH it is fine because
+        // we don't need to sell this token lnd price only affects ZKP cost of such tx which is negligible.
+        let usd_price = if token_symbol != "ETH" {
+            usd_prices.min()
+        } else {
+            usd_prices.max()
+        };
+        let usd_price =
+            usd_price.ok_or_else(|| failure::format_err!("CoinGecko returned empty price data"))?;
 
         let naive_last_updated = NaiveDateTime::from_timestamp(
             last_updated_timestamp_ms / 1_000,                      // ms to s
