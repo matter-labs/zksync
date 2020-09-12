@@ -57,7 +57,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
         let request = self
             .client
             .get(market_chart_url)
-            .query(&[("vs_currency", "usd"), ("days", "1")]);
+            .query(&[("vs_currency", "usd"), ("days", "2")]);
 
         let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
 
