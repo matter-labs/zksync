@@ -7,7 +7,10 @@
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
-use models::{config_options::ConfigurationOptions, Operation};
+use models::{
+    config_options::{AdminServerOptions, ConfigurationOptions},
+    Operation,
+};
 use storage::ConnectionPool;
 // Local uses
 use crate::fee_ticker::TickerRequest;
@@ -19,6 +22,7 @@ use crate::{
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 
+mod admin_server;
 mod event_notify;
 mod loggers;
 mod ops_counter;
@@ -37,6 +41,7 @@ pub fn start_api_server(
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
+    admin_server_opts: AdminServerOptions,
     current_zksync_info: CurrentZksyncInfo,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
@@ -69,6 +74,13 @@ pub fn start_api_server(
         panic_notify.clone(),
         config_options.api_requests_caches_size,
         current_zksync_info.clone(),
+    );
+
+    admin_server::start_admin_server(
+        admin_server_opts.admin_http_server_address,
+        admin_server_opts.secret_auth,
+        connection_pool.clone(),
+        panic_notify.clone(),
     );
 
     rpc_server::start_rpc_server(

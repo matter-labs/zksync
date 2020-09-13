@@ -19,7 +19,7 @@ import {deployContract} from "ethereum-waffle";
 
     const erc20 = await deployContract(
         deployWallet,
-        readContractCode("TEST-ERC20"), [],
+        readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
         {gasLimit: 5000000},
     );
     console.log(`TEST_ERC20=${erc20.address}`);

@@ -108,7 +108,7 @@ describe("ZK priority queue ops unit tests", function() {
 
         tokenContract = await deployContract(
             wallet,
-            readContractCode("TEST-ERC20"), [],
+            readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
             {gasLimit: 5000000},
         );
         await tokenContract.mint(wallet.address, parseEther("1000000"));
@@ -250,7 +250,7 @@ describe("zkSync withdraw unit tests", function() {
 
         tokenContract = await deployContract(
             wallet,
-            readContractCode("TEST-ERC20"), [],
+            readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
             {gasLimit: 5000000},
         );
         await tokenContract.mint(wallet.address, parseEther("1000000"));
@@ -265,7 +265,7 @@ describe("zkSync withdraw unit tests", function() {
 
         incorrectTokenContract = await deployContract(
             wallet,
-            readContractCode("TEST-ERC20"), [],
+            readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
             {gasLimit: 5000000},
         );
         await tokenContract.mint(wallet.address, parseEther("1000000"));
@@ -411,7 +411,7 @@ describe("zkSync auth pubkey onchain unit tests", function() {
 
         tokenContract = await deployContract(
             wallet,
-            readContractCode("TEST-ERC20"), [],
+            readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
             {gasLimit: 5000000},
         );
         await tokenContract.mint(wallet.address, parseEther("1000000"));
@@ -490,7 +490,7 @@ describe("zkSync test process next operation", function() {
 
         tokenContract = await deployContract(
             wallet,
-            readContractCode("TEST-ERC20"), [],
+            readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
             {gasLimit: 5000000},
         );
         await tokenContract.mint(wallet.address, parseEther("1000000"));
@@ -505,7 +505,7 @@ describe("zkSync test process next operation", function() {
 
         incorrectTokenContract = await deployContract(
             wallet,
-            readContractCode("TEST-ERC20"), [],
+            readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
             {gasLimit: 5000000},
         );
         await tokenContract.mint(wallet.address, parseEther("1000000"));
