@@ -1,6 +1,6 @@
-import {BigNumber, BigNumberish, utils, ethers, Contract} from "ethers";
+import {BigNumber, BigNumberish, Contract, ethers, utils} from "ethers";
 import Axios from "axios";
-import {MAX_ERC20_APPROVE_AMOUNT} from "../zksync.js/src/utils";
+import * as zksync from "zksync";
 
 export async function getExpectedETHSwapResult(tokenSymbol: string, tokenDecimals: number, amount: BigNumberish): Promise<BigNumber> {
     const coinGeckoResponse = await Axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${tokenSymbol}&vs_currencies=ETH`)
@@ -103,4 +103,26 @@ export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddr
         console.log(`Approving token ${tokenAddress}`);
         const tx = await erc20contract.approve(contractAddress, MAX_ERC20_APPROVE_AMOUNT);
     }
+}
+
+export async function sendNotification(text: string, webhookUrl: string) {
+    try {
+        await Axios.post(webhookUrl, {
+            username: "fee_seller_bot",
+            text,
+        })
+    } catch (e) {
+        console.error("Failed to send notification: ", e.toString());
+    }
+}
+
+export function fmtToken(zksProvider: zksync.Provider, token, amount: BigNumber): string {
+    return `${zksProvider.tokenSet.formatToken(token, amount)} ${zksProvider.tokenSet.resolveTokenSymbol(token)}`;
+}
+
+export async function fmtTokenWithETHValue(zksProvider: zksync.Provider, token, amount: BigNumber): Promise<string> {
+    const tokenSymbol = zksProvider.tokenSet.resolveTokenSymbol(token);
+    const tokenDecimals = zksProvider.tokenSet.resolveTokenDecimals(token);
+    const estimatedETHValue = await getExpectedETHSwapResult(tokenSymbol, tokenDecimals, amount);
+    return `${fmtToken(zksProvider, token, amount)} (${fmtToken(zksProvider, "ETH", estimatedETHValue)})`;
 }
