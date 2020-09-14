@@ -26,6 +26,13 @@ use storage::ConnectionPool;
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
 use models::node::SignedFranklinTx;
 
+/// Since withdraw is an expensive operation, we have to limit amount of
+/// withdrawals in one block to not exceed the gas limit in prover.
+/// 10 is a safe value which won't cause any problems.
+/// If this threshold is reached, block will be immediately sealed and
+/// the remaining withdrawals will go to the next block.
+pub const MAX_WITHDRAWALS_PER_BLOCK: u32 = 10;
+
 pub enum ExecutedOpId {
     Transaction(TxHash),
     PriorityOp(u64),
