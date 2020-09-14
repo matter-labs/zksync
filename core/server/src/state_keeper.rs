@@ -27,13 +27,6 @@ use storage::ConnectionPool;
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
 use models::node::SignedFranklinTx;
 
-/// Since withdraw is an expensive operation, we have to limit amount of
-/// withdrawals in one block to not exceed the gas limit in prover.
-/// 10 is a safe value which won't cause any problems.
-/// If this threshold is reached, block will be immediately sealed and
-/// the remaining withdrawals will go to the next block.
-pub const MAX_WITHDRAWALS_PER_BLOCK: u32 = 10;
-
 pub enum ExecutedOpId {
     Transaction(TxHash),
     PriorityOp(u64),
@@ -104,6 +97,7 @@ pub struct PlasmaStateKeeper {
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
     fast_miniblock_iterations: usize,
+    max_number_of_withdrawals_per_block: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -311,6 +305,7 @@ impl PlasmaStateKeeper {
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
+        max_number_of_withdrawals_per_block: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -343,6 +338,7 @@ impl PlasmaStateKeeper {
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
+            max_number_of_withdrawals_per_block,
         };
 
         let root = keeper.state.root_hash();
@@ -675,7 +671,9 @@ impl PlasmaStateKeeper {
 
             // Check if we've reached the withdraw operations amount limit.
             // If so, this block will be sealed and this tx will go to the next block.
-            if self.pending_block.withdrawals_amount > MAX_WITHDRAWALS_PER_BLOCK {
+            if self.pending_block.withdrawals_amount
+                > self.max_number_of_withdrawals_per_block as u32
+            {
                 return Err(());
             }
         }
@@ -773,7 +771,7 @@ impl PlasmaStateKeeper {
 
         // Check if we've reached the withdraw operations amount limit.
         // If so, this block will be sealed and this tx will go to the next block.
-        if self.pending_block.withdrawals_amount > MAX_WITHDRAWALS_PER_BLOCK {
+        if self.pending_block.withdrawals_amount > self.max_number_of_withdrawals_per_block as u32 {
             return Err(());
         }
 

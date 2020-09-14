@@ -264,6 +264,7 @@ impl From<TxAddError> for RpcErrorCodes {
             TxAddError::Other => Self::Other,
             TxAddError::DbError => Self::Other,
             TxAddError::BatchTooBig => Self::Other,
+            TxAddError::BatchWithdrawalsOverload => Self::Other,
         }
     }
 }

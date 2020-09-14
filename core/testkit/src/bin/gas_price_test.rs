@@ -22,11 +22,14 @@ use models::params::{
 };
 use models::primitives::UnsignedRatioSerializeAsDecimal;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
-use server::state_keeper::MAX_WITHDRAWALS_PER_BLOCK;
 use std::str::FromStr;
 use testkit::*;
 use web3::transports::Http;
 use web3::types::U256;
+
+/// Constant for gas_price_test
+/// Real value is in `dev.env`
+pub const MAX_WITHDRAWALS_PER_BLOCK: u32 = 10;
 
 const MIN_BLOCK_SIZE_CHUNKS: usize = 0;
 

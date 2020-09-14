@@ -68,6 +68,9 @@ pub enum TxAddError {
 
     #[fail(display = "Batch will not fit in any of supported block sizes")]
     BatchTooBig,
+
+    #[fail(display = "The number of withdrawals in the batch is too big")]
+    BatchWithdrawalsOverload,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -214,6 +217,7 @@ struct Mempool {
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     max_block_size_chunks: usize,
+    max_number_of_withdrawals_per_block: usize,
 }
 
 impl Mempool {
@@ -246,6 +250,16 @@ impl Mempool {
 
         if self.mempool_state.chunks_for_batch(&batch) > self.max_block_size_chunks {
             return Err(TxAddError::BatchTooBig);
+        }
+
+        let mut number_of_withdrawals = 0;
+        for tx in txs {
+            if tx.into_inner().tx.is_withdraw() {
+                number_of_withdrawals += 1;
+            }
+        }
+        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
+            return Err(TxAddError::BatchWithdrawalsOverload);
         }
 
         storage
@@ -396,6 +410,7 @@ pub fn run_mempool_task(
             .iter()
             .max()
             .expect("failed to find max block chunks size"),
+        max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
     };
     runtime.spawn(mempool.run())
 }

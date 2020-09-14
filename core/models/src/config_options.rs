@@ -195,6 +195,7 @@ pub struct ConfigurationOptions {
     pub confirmations_for_eth_event: u64,
     pub api_requests_caches_size: usize,
     pub available_block_chunk_sizes: Vec<usize>,
+    pub max_number_of_withdrawals_per_block: usize,
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
     pub idle_provers: u32,
@@ -234,6 +235,7 @@ impl ConfigurationOptions {
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
             available_block_chunk_sizes,
+            max_number_of_withdrawals_per_block: parse_env("MAX_NUMBER_OF_WITHDRAWALS_PER_BLOCK"),
             eth_watch_poll_interval: Duration::from_millis(parse_env::<u64>(
                 "ETH_WATCH_POLL_INTERVAL",
             )),
