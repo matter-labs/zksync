@@ -110,11 +110,11 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
     await transferToNewHandle.awaitReceipt();
     console.log(`Transfer to self committed: ${new Date().getTime() - startTime} ms`);
     const walletAfterTransfer = await syncWallet.getBalance(token);
-    const operatorAfterTransfer = await getOperatorBalance(token);
 
     let transferCorrect = true;
     transferCorrect = transferCorrect && walletBeforeTransfer.sub(fee).eq(walletAfterTransfer);
     await promiseTimeout(VERIFY_TIMEOUT, transferToNewHandle.awaitVerifyReceipt()); // we should wait for the fee to be applied to the state
+    const operatorAfterTransfer = await getOperatorBalance(token);
     transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
     if (!transferCorrect) {
         throw new Error("Transfer to self checks failed");
@@ -147,12 +147,12 @@ async function testTransfer(
     console.log(`Transfer committed: ${new Date().getTime() - startTime} ms`);
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
     const wallet2AfterTransfer = await syncWallet2.getBalance(token);
-    const operatorAfterTransfer = await getOperatorBalance(token);
 
     let transferCorrect = true;
     transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.add(fee));
     transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount);
     await promiseTimeout(VERIFY_TIMEOUT, transferToNewHandle.awaitVerifyReceipt()); // we should wait for the fee to be applied to the state
+    const operatorAfterTransfer = await getOperatorBalance(token);
     transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
     if (!transferCorrect) {
         throw new Error("Transfer checks failed");
