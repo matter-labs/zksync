@@ -128,6 +128,18 @@ impl<T: Transport> ETHClient<T> {
         data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
+        self.sign_prepared_tx_for_contract(data, self.contract_addr, options)
+            .await
+    }
+
+    /// Signs the transaction given the previously encoded data.
+    /// Fills in gas/nonce if not supplied inside options.
+    pub async fn sign_prepared_tx_for_contract(
+        &self,
+        data: Vec<u8>,
+        contract_addr: H160,
+        options: Options,
+    ) -> Result<SignedCallResult, failure::Error> {
         // fetch current gas_price
         let gas_price = match options.gas_price {
             Some(gas_price) => gas_price,
@@ -158,7 +170,7 @@ impl<T: Transport> ETHClient<T> {
         let tx = signer::RawTransaction {
             chain_id: self.chain_id,
             nonce,
-            to: Some(self.contract_addr),
+            to: Some(contract_addr),
             value: options.value.unwrap_or_default(),
             gas_price,
             gas,

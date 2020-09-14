@@ -16,9 +16,9 @@ fn signing_failed_error(err: impl ToString) -> SignerError {
 pub struct Signer {
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
-    private_key: PrivateKey,
-    eth_private_key: Option<H256>,
-    account_id: Option<AccountId>,
+    pub(crate) private_key: PrivateKey,
+    pub(crate) eth_private_key: Option<H256>,
+    pub(crate) account_id: Option<AccountId>,
 }
 
 impl fmt::Debug for Signer {

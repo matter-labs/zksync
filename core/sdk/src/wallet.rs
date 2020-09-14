@@ -1,8 +1,8 @@
 use models::node::Address;
 
 use crate::{
-    credentials::WalletCredentials, error::ClientError, operations::*, provider::Provider,
-    signer::Signer, tokens_cache::TokensCache,
+    credentials::WalletCredentials, error::ClientError, ethereum::EthereumProvider, operations::*,
+    provider::Provider, signer::Signer, tokens_cache::TokensCache,
 };
 
 #[derive(Debug)]
@@ -72,5 +72,28 @@ impl Wallet {
     /// Initializes `Withdraw` transaction sending.
     pub fn start_withdraw(&self) -> WithdrawBuilder<'_> {
         WithdrawBuilder::new(self)
+    }
+
+    /// Creates an `EthereumProvider` to interact with the Ethereum network.
+    ///
+    /// Returns an error if wallet was created without providing an Ethereum private key.
+    pub async fn ethereum(
+        &self,
+        web3_addr: impl AsRef<str>,
+    ) -> Result<EthereumProvider, ClientError> {
+        if let Some(eth_private_key) = self.signer.eth_private_key {
+            let ethereum_provider = EthereumProvider::new(
+                &self.provider,
+                self.tokens.clone(),
+                web3_addr,
+                eth_private_key,
+                self.signer.address,
+            )
+            .await?;
+
+            Ok(ethereum_provider)
+        } else {
+            Err(ClientError::NoEthereumPrivateKey)
+        }
     }
 }

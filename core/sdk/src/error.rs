@@ -30,6 +30,9 @@ pub enum ClientError {
     SigningError(SignerError),
     #[error("Missing required field for a transaction: {0}")]
     MissingRequiredField(String),
+
+    #[error("Ethereum private key was not provided for this wallet")]
+    NoEthereumPrivateKey,
 }
 
 #[derive(Debug, Error)]

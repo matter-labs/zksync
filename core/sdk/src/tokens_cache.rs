@@ -1,7 +1,7 @@
 use models::node::{Address, Token, TokenLike};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokensCache {
     tokens: HashMap<String, Token>,
 }

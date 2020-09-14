@@ -33,7 +33,7 @@ pub fn get_rpc_addr(network: Network) -> &'static str {
 pub struct Provider {
     rpc_addr: String,
     client: reqwest::Client,
-    network: Network,
+    pub network: Network,
 }
 
 impl Provider {
