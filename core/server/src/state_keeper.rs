@@ -103,7 +103,6 @@ pub struct PlasmaStateKeeper {
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
     fast_miniblock_iterations: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -311,7 +310,6 @@ impl PlasmaStateKeeper {
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
-        max_number_of_withdrawals_per_block: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -344,7 +342,6 @@ impl PlasmaStateKeeper {
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
-            max_number_of_withdrawals_per_block,
         };
 
         let root = keeper.state.root_hash();
