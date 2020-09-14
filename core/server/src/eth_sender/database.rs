@@ -23,15 +23,12 @@ use super::transactions::ETHStats;
 #[derive(Debug)]
 pub struct Database {
     /// Connection to the database.
-    storage: StorageProcessor,
+    db_pool: ConnectionPool,
 }
 
 impl Database {
     pub fn new(db_pool: ConnectionPool) -> Self {
-        let storage = db_pool
-            .access_storage()
-            .expect("failed to get db connection");
-        Self { storage }
+        Self { db_pool }
     }
 }
 

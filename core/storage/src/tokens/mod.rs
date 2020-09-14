@@ -66,8 +66,17 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     }
 
     /// Get the number of tokens from Database
-    pub fn get_count(&self) -> QueryResult<i64> {
-        tokens::table.count().get_result(self.0.conn())
+    pub async fn get_count(&mut self) -> QueryResult<i64> {
+        let tokens_count = sqlx::query!(
+            r#"
+            SELECT count(*) as "count!" FROM tokens
+            "#,
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count;
+
+        Ok(tokens_count)
     }
 
     /// Given the numeric token ID, symbol or address, returns token.
