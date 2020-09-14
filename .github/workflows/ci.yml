@@ -21,6 +21,9 @@ jobs:
         echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
         echo "::set-env name=CI::1"
 
+    - name: update-rust
+      run: rustup update stable
+
     - name: lints
       run: |
         zksync db-setup # So database will be created for compilation.
