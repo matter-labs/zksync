@@ -14,7 +14,7 @@ async function main() {
     const program = new Command();
 
     const handler = async (
-        type: 'transfer' | 'deposit',
+        operation: 'transfer' | 'deposit',
         fast: boolean,
         json?: string,
         amount?: string,
@@ -27,27 +27,18 @@ async function main() {
         if (!config.defaultWallet && !json) {
             throw new Error('recipient is not provided');
         }
-        let operation;
-        if (type == 'deposit') {
+        if (operation == 'deposit') {
             recipient = recipient || config.defaultWallet || '';
-            operation = commands.deposit;
-        } else {
-            operation = commands.transfer;
         }
         // prettier-ignore
-        const txInfo = json ? JSON.parse(json) : {
-            // @ts-ignore
-            privkey: config.wallets[config.defaultWallet],
+        const txDetails = json ? JSON.parse(json) : {
+            privkey: config.wallets[config.defaultWallet as any],
             to: recipient,
             amount,
             token
         };
-        const hash = await operation(txInfo, fast, program.network);
-        if (fast) {
-            print(hash);
-        } else {
-            print(await commands.txInfo(hash, program.network));
-        }
+        const hash = await commands.submitTx(operation, txDetails, fast, program.network);
+        print(fast ? hash : await commands.txInfo(hash, program.network));
     };
 
     program.version('0.1.0').name('zcli').option('-n, --network <network>', 'select network', config.network);

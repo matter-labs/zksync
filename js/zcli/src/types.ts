@@ -36,7 +36,7 @@ export interface TxInfo {
     };
 }
 
-export interface TransferInfo {
+export interface TxDetails {
     privkey: string;
     to: string;
     token: string;

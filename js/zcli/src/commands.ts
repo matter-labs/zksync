@@ -2,7 +2,7 @@ import 'isomorphic-fetch';
 import * as zksync from 'zksync';
 import * as ethers from 'ethers';
 import { saveConfig } from './config';
-import { ALL_NETWORKS, Network, Config, AccountInfo, TxInfo, TransferInfo } from './types';
+import { ALL_NETWORKS, Network, Config, AccountInfo, TxInfo, TxDetails } from './types';
 
 export function apiServer(network: Network) {
     const servers = {
@@ -145,49 +145,56 @@ export function defaultWallet(config: Config, address?: string) {
     return config.defaultWallet;
 }
 
-export async function transfer(
-    transferInfo: TransferInfo,
-    fast: boolean = false,
-    network: Network = 'localhost'
-): Promise<string> {
-    const { token, amount, to, privkey } = transferInfo;
-    const ethProvider =
-        network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
-    const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
-    const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
-    const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
-    if (!(await syncWallet.isSigningKeySet())) {
-        const changePubkey = await syncWallet.setSigningKey();
-        await changePubkey.awaitReceipt();
+class TxSubmitter {
+    private constructor(private syncProvider: zksync.Provider, private syncWallet: zksync.Wallet) {}
+
+    static async submit(
+        type: 'deposit' | 'transfer',
+        txDetails: TxDetails,
+        fast: boolean = false,
+        network: Network = 'localhost'
+    ) {
+        const ethProvider =
+            network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
+        const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
+        const ethWallet = new ethers.Wallet(txDetails.privkey).connect(ethProvider);
+        const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
+        const submitter = new TxSubmitter(syncProvider, syncWallet);
+        const hash = await submitter[type](txDetails, fast);
+        await submitter.syncProvider.disconnect();
+        return hash;
     }
-    const txHandle = await syncWallet.syncTransfer({
-        to,
-        token,
-        amount: syncProvider.tokenSet.parseToken(token, amount)
-    });
-    if (!fast) await txHandle.awaitReceipt();
-    await syncProvider.disconnect();
-    return txHandle.txHash;
+
+    private async transfer(txDetails: TxDetails, fast: boolean) {
+        const { to, token, amount } = txDetails;
+        if (!(await this.syncWallet.isSigningKeySet())) {
+            const changePubkey = await this.syncWallet.setSigningKey();
+            await changePubkey.awaitReceipt();
+        }
+        const txHandle = await this.syncWallet.syncTransfer({
+            to,
+            token,
+            amount: this.syncProvider.tokenSet.parseToken(token, amount)
+        });
+        if (!fast) await txHandle.awaitReceipt();
+        return txHandle.txHash;
+    }
+
+    private async deposit(txDetails: TxDetails, fast: boolean) {
+        const { to: depositTo, token, amount } = txDetails;
+        const depositHandle = await this.syncWallet.depositToSyncFromEthereum({
+            depositTo,
+            token,
+            amount: this.syncProvider.tokenSet.parseToken(token, amount),
+            approveDepositAmountForERC20: !zksync.utils.isTokenETH(token)
+        });
+        if (!fast) await depositHandle.awaitReceipt();
+        return depositHandle.ethTx.hash;
+    }
 }
 
-export async function deposit(
-    transferInfo: TransferInfo,
-    fast: boolean = false,
-    network: Network = 'localhost'
-): Promise<string> {
-    const { token, amount, to, privkey } = transferInfo;
-    const ethProvider =
-        network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
-    const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
-    const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
-    const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
-    const depositHandle = await syncWallet.depositToSyncFromEthereum({
-        depositTo: to,
-        token,
-        amount: syncProvider.tokenSet.parseToken(token, amount),
-        approveDepositAmountForERC20: !zksync.utils.isTokenETH(token)
-    });
-    if (!fast) await depositHandle.awaitReceipt();
-    await syncProvider.disconnect();
-    return depositHandle.ethTx.hash;
-}
+export const submitTx = TxSubmitter.submit;
+export const deposit = async (details: TxDetails, fast: boolean = false, network: Network = 'localhost') =>
+    await submitTx('deposit', details, fast, network);
+export const transfer = async (details: TxDetails, fast: boolean = false, network: Network = 'localhost') =>
+    await submitTx('transfer', details, fast, network);
