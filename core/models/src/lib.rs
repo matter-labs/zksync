@@ -4,7 +4,6 @@ extern crate serde_derive;
 extern crate log;
 
 pub mod abi;
-pub mod account_info_resp;
 pub mod circuit;
 pub mod config_options;
 pub mod ethereum;

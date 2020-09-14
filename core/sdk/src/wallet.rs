@@ -1,77 +1,98 @@
-// Wallet: TODO describe what's here
-use crate::{provider::Provider, signer::Signer};
-use anyhow;
-use crypto_exports::rand::{thread_rng, Rng};
-use models::node::priv_key_from_fs;
-use models::node::tx::{PackedEthSignature, TxHash};
-use models::node::{Address, FranklinTx, Nonce, TokenId, H256};
-use num::BigUint;
+use models::node::Address;
 
-#[derive(Debug)]
-struct Wallet {
-    pub provider: Provider,
-    pub signer: Signer, // NOTE: Address in Wallet is the same as Address in provider
-    pub address: Address,
+use crate::{
+    credentials::WalletCredentials, error::ClientError, operations::*, provider::Provider,
+    signer::Signer, tokens_cache::TokensCache,
+};
+
+/*
+// Design goals
+let provider = Provider::from_network(Network::Mainnet).await?;
+let walletCredentials = WalletCredentials::from_eth_signer(eth_pk, eth_address).await?;
+let wallet = Wallet::new(provider, walletCredentials).await?;
+
+let handle = wallet.start_deposit()
+    .token(token)
+    .amount(amount)
+    .send()
+    .await?;
+
+handle.wait_for_verify().await?;
+
+if !wallet.is_signing_key_set().await? {
+    let handle = wallet.set_signing_key().await?;
+    handle.wait_for_commit().await?;
 }
 
-// NOTE: This was was not strictly copy paste from elsewhere, deserves higher scrutiny
+let handle = wallet.start_transfer()
+    .to(address)
+    .token(token)
+    .amount(amount)
+    .fee(fee) // Optional
+    .nonce(nonce) // Optional
+    .send()
+    .await?;
+
+handle.wait_for_commit().await?;
+*/
+
+#[derive(Debug)]
+pub struct Wallet {
+    pub provider: Provider,
+    pub signer: Signer,
+    pub tokens: TokensCache,
+}
+
 impl Wallet {
-    fn new(provider: Provider, signer: Signer) -> Self {
-        let signer_address = signer.address.clone();
-        Wallet {
+    pub async fn new(
+        provider: Provider,
+        credentials: WalletCredentials,
+    ) -> Result<Self, ClientError> {
+        let mut signer = Signer::new(
+            credentials.zksync_private_key,
+            credentials.eth_address,
+            credentials.eth_private_key,
+        );
+
+        let account_info = provider.account_info(credentials.eth_address).await?;
+        signer.set_account_id(account_info.id);
+
+        let tokens = TokensCache::new(provider.tokens().await?);
+
+        Ok(Wallet {
             provider,
             signer,
-            address: signer_address,
-        }
+            tokens,
+        })
     }
 
-    //Derive address from eth_pk, derive signer from signature of login message using eth_pk as a seed.
-    pub async fn new_from_eth_private_key(eth_pk: H256, provider: Provider) -> Self {
-        // NOTE: I may have misinterpreted how to derive zksync privkey. Borrowed this approach from zkSyncAccount::rand.
-        let rng = &mut thread_rng();
-        let zksync_pk = priv_key_from_fs(rng.gen());
-        let address = PackedEthSignature::address_from_private_key(&eth_pk)
-            .expect("private key is incorrect");
-        // TODO: refactor error handling
-        let acct_state = provider
-            .account_state_info(address)
-            .await
-            .expect("request ");
-
-        let nonce;
-        match acct_state.id {
-            None => nonce = 0,
-            Some(id) => nonce = id,
-        }
-
-        let signer = Signer::new(zksync_pk, nonce, address, eth_pk);
-        Self::new(provider, signer)
+    /// Returns the wallet address.
+    pub fn address(&self) -> Address {
+        self.signer.address
     }
 
-    // Sign transaction with a signer and sumbit it using provider.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn transfer(
-        &self,
-        token_id: TokenId,
-        token_symbol: &str,
-        amount: BigUint,
-        fee: BigUint,
-        to: &Address,
-        nonce: Option<Nonce>,
-        increment_nonce: bool,
-    ) -> Result<TxHash, anyhow::Error> {
-        let (tx, eth_signature) = &self.signer.sign_transfer(
-            token_id,
-            token_symbol,
-            amount,
-            fee,
-            to,
-            nonce,
-            increment_nonce,
-        );
-        // Clone, since behind a shared reference
-        let franklin_tx = FranklinTx::Transfer(Box::new(tx.clone()));
-        let ets = Some(eth_signature.clone());
-        self.provider.send_tx(franklin_tx, ets).await
+    /// Updates the list of tokens supported by zkSync.
+    /// This method only needs to be called if a new token was added to zkSync after
+    /// `Wallet` object was created.
+    pub async fn refresh_tokens_cache(&mut self) -> Result<(), ClientError> {
+        self.tokens = TokensCache::new(self.provider.tokens().await?);
+
+        Ok(())
+    }
+
+    pub fn is_signing_key_set(&self) -> bool {
+        self.signer.get_account_id().is_some()
+    }
+
+    pub async fn start_transfer(&self) -> TransferBuilder<'_> {
+        TransferBuilder::new(self)
+    }
+
+    pub async fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_> {
+        ChangePubKeyBuilder::new(self)
+    }
+
+    pub async fn start_withdraw(&self) -> WithdrawBuilder<'_> {
+        WithdrawBuilder::new(self)
     }
 }

@@ -8,14 +8,13 @@ edition = "2018"
 
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
-server = { path = "../server", version = "0.0.1" }
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
 
-#zks_crypto = { package = "zks-crypto", git = "https://github.com/matter-labs/zks-crypto.git"}
 bellman = { package = "bellman_ce", git = "https://github.com/matter-labs/bellman", branch = "plonk_release" }
 sha2 = "0.8"
 web3 = "0.10.0"
+tokio = { version = "0.2", features = ["time"] }
 
 serde = "1.0.90"
 serde_derive = "1.0.90"
@@ -23,6 +22,7 @@ serde_json = "1.0.0"
 
 reqwest = { version = "0.10", features = ["json", "blocking"] }
 anyhow = "1.0"
+thiserror = "1.0"
 
 jsonrpc-core = "14.0.3"
 
