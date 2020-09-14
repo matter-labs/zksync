@@ -2,7 +2,7 @@ import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import fs from 'fs';
 import mock from 'mock-fs';
-import type { Network, Config } from '../src/common';
+import type { Network, Config } from '../src/types';
 import * as ethers from 'ethers';
 import * as zksync from 'zksync';
 import * as commands from '../src/commands';
@@ -21,10 +21,9 @@ describe('Fetching Information', () => {
     before('make some deposits & transactions', async () => {
         const ethProvider = new ethers.providers.JsonRpcProvider();
         const syncProvider = await zksync.getDefaultProvider('localhost', 'HTTP');
-        const ethWallet = ethers.Wallet.fromMnemonic(
-            process.env.TEST_MNEMONIC as string,
-            "m/44'/60'/0'/0/0"
-        ).connect(ethProvider);
+        const ethWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC as string, "m/44'/60'/0'/0/0").connect(
+            ethProvider
+        );
         ethDepositor = ethWallet.address;
         alice = ethers.Wallet.createRandom().connect(ethProvider);
         bob = ethers.Wallet.createRandom();
@@ -136,8 +135,7 @@ describe('Fetching Information', () => {
         });
 
         it('should be empty for non-existent transaction', async () => {
-            const non_existent =
-                'sync-tx:8888888888888888888888888888888888888888888888888888888888888888';
+            const non_existent = 'sync-tx:8888888888888888888888888888888888888888888888888888888888888888';
             const info = await commands.txInfo(non_existent);
             expect(info.transaction).to.be.null;
         });
@@ -213,9 +211,7 @@ describe('Config Management', () => {
             const config = loadConfig();
             const invalid_network = 'random' as Network;
             expect(commands.defaultNetwork(config)).to.equal(config1.network);
-            expect(commands.defaultNetwork(config, 'rinkeby'))
-                .to.equal('rinkeby')
-                .to.equal(config.network);
+            expect(commands.defaultNetwork(config, 'rinkeby')).to.equal('rinkeby').to.equal(config.network);
             expect(() => commands.defaultNetwork(config, invalid_network)).to.throw();
         });
     });
@@ -236,10 +232,7 @@ describe('Config Management', () => {
             const config = loadConfig();
             const wallet = ethers.Wallet.createRandom();
             expect(commands.addWallet(config, wallet.privateKey)).to.equal(wallet.address);
-            expect(config.wallets).to.have.property(
-                wallet.address.toLowerCase(),
-                wallet.privateKey
-            );
+            expect(config.wallets).to.have.property(wallet.address.toLowerCase(), wallet.privateKey);
         });
 
         it('should properly remove a wallet', () => {
@@ -260,10 +253,7 @@ describe('Config Management', () => {
 });
 
 describe('Making Transactions', () => {
-    const rich = ethers.Wallet.fromMnemonic(
-        process.env.TEST_MNEMONIC as string,
-        "m/44'/60'/0'/0/0"
-    );
+    const rich = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC as string, "m/44'/60'/0'/0/0");
     const poor1 = ethers.Wallet.createRandom();
     const poor2 = ethers.Wallet.createRandom();
 

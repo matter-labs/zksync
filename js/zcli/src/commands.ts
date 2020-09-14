@@ -2,7 +2,7 @@ import 'isomorphic-fetch';
 import * as zksync from 'zksync';
 import * as ethers from 'ethers';
 import { saveConfig } from './config';
-import { ALL_NETWORKS, Network, Config, AccountInfo, TxInfo, TransferInfo } from './common';
+import { ALL_NETWORKS, Network, Config, AccountInfo, TxInfo, TransferInfo } from './types';
 
 export function apiServer(network: Network) {
     const servers = {
@@ -14,10 +14,7 @@ export function apiServer(network: Network) {
     return `${servers[network]}/api/v0.1`;
 }
 
-export async function accountInfo(
-    address: string,
-    network: Network = 'localhost'
-): Promise<AccountInfo> {
+export async function accountInfo(address: string, network: Network = 'localhost'): Promise<AccountInfo> {
     const provider = await zksync.getDefaultProvider(network, 'HTTP');
     const state = await provider.getState(address);
     let balances: { [token: string]: string } = {};
@@ -155,9 +152,7 @@ export async function transfer(
 ): Promise<string> {
     const { token, amount, to, privkey } = transferInfo;
     const ethProvider =
-        network == 'localhost'
-            ? new ethers.providers.JsonRpcProvider()
-            : ethers.getDefaultProvider(network);
+        network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
     const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
     const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
@@ -182,9 +177,7 @@ export async function deposit(
 ): Promise<string> {
     const { token, amount, to, privkey } = transferInfo;
     const ethProvider =
-        network == 'localhost'
-            ? new ethers.providers.JsonRpcProvider()
-            : ethers.getDefaultProvider(network);
+        network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
     const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
     const ethWallet = new ethers.Wallet(privkey).connect(ethProvider);
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);

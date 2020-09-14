@@ -32,8 +32,10 @@ zcli wallets default
 # sets ADDRESS as a default wallet
 zcli wallets default ADDRESS
 
-# adds a wallet to config; if default was not set - sets it as default
-zcli wallets add PRIVATE_KEY
+# adds a wallet to config
+# if key is not provided, creates a random wallet
+# if default wallet was not set - sets it as default
+zcli wallets add [PRIVATE_KEY]
 
 # removes ADDRESS from wallets
 zcli wallets delete ADDRESS

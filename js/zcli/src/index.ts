@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import * as commands from './commands';
 import { loadConfig } from './config';
-import type { Network } from './common';
+import type { Network } from './types';
 
 function print(object: any) {
     console.log(JSON.stringify(object, null, 4));
@@ -50,10 +50,7 @@ async function main() {
         }
     };
 
-    program
-        .version('0.1.0')
-        .name('zcli')
-        .option('-n, --network <network>', 'select network', config.network);
+    program.version('0.1.0').name('zcli').option('-n, --network <network>', 'select network', config.network);
 
     program
         .command('account [address]')

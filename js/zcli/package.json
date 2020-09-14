@@ -6,7 +6,7 @@
     "bin": "build/index.js",
     "prettier": {
         "tabWidth": 4,
-        "printWidth": 100,
+        "printWidth": 120,
         "parser": "typescript",
         "singleQuote": true,
         "trailingComma": "none"

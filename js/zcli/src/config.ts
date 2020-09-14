@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Config, ALL_NETWORKS } from './common';
+import { Config, ALL_NETWORKS } from './types';
 import assert from 'assert';
 
 const CONFIG_FILE = '.zcli-config.json';
