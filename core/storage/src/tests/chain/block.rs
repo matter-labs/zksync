@@ -694,6 +694,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
 
     Ok(())
 }
+
 /// Here we create blocks and publish proofs for them in different order
 #[db_test]
 async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryResult<()> {

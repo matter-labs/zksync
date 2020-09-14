@@ -7,4 +7,9 @@
 .confirm_action || exit 1
 
 cd $ZKSYNC_HOME/contracts
-f npx ts-node scripts/add-erc20-token.ts $1
+
+if [ -n "$2" ]; then
+  npx ts-node scripts/add-erc20-token.ts --tokenAddress $1 --deployerPrivateKey $2
+else
+  npx ts-node scripts/add-erc20-token.ts --tokenAddress $1
+fi

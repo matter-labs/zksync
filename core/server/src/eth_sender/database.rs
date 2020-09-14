@@ -19,16 +19,19 @@ use storage::{ConnectionPool, StorageProcessor};
 use super::transactions::ETHStats;
 
 /// The actual database wrapper.
-/// This structure uses `ConnectionPool` to interact with an existing database.
-#[derive(Debug, Clone)]
+/// This structure uses `StorageProcessor` to interact with an existing database.
+#[derive(Debug)]
 pub struct Database {
     /// Connection to the database.
-    db_pool: ConnectionPool,
+    storage: StorageProcessor,
 }
 
 impl Database {
     pub fn new(db_pool: ConnectionPool) -> Self {
-        Self { db_pool }
+        let storage = db_pool
+            .access_storage()
+            .expect("failed to get db connection");
+        Self { storage }
     }
 }
 

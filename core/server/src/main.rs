@@ -8,7 +8,7 @@ use tokio::{runtime::Builder, task::JoinHandle};
 use web3::types::H160;
 // Workspace uses
 use models::{
-    config_options::{ConfigurationOptions, ProverOptions},
+    config_options::{AdminServerOptions, ConfigurationOptions, ProverOptions},
     node::{
         config::OBSERVER_MODE_PULL_INTERVAL,
         tokens::{get_genesis_token_list, Token},
@@ -37,6 +37,7 @@ fn main() {
     env_logger::init();
 
     let config_opts = ConfigurationOptions::from_env();
+    let admin_server_opts = AdminServerOptions::from_env();
 
     let mut main_runtime = Builder::new()
         .threaded_scheduler()
@@ -211,6 +212,7 @@ fn main() {
             eth_watch_req_sender.clone(),
             ticker_request_sender,
             config_opts.clone(),
+            admin_server_opts,
             current_zksync_info,
         );
 

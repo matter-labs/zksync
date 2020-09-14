@@ -1,4 +1,4 @@
-use crate::fee_ticker::ticker_api::TokenPriceAPI;
+use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use failure::Error;
@@ -8,10 +8,6 @@ use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
 use std::collections::HashMap;
-use std::time::Duration;
-
-/// The limit of time we are willing to wait for response.
-const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(Debug)]
 pub struct CoinGeckoAPI {
@@ -58,10 +54,12 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .join(format!("api/v3/coins/{}/market_chart", token_id).as_str())
             .expect("failed to join URL path");
 
+        // If we use 2 day interval we will get hourly prices and not minute by minute which makes
+        // response faster and smaller
         let request = self
             .client
             .get(market_chart_url)
-            .query(&[("vs_currency", "usd"), ("days", "1")]);
+            .query(&[("vs_currency", "usd"), ("days", "2")]);
 
         let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
 
@@ -78,12 +76,23 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .ok_or_else(|| failure::format_err!("CoinGecko returned empty price data"))?
             .0;
 
-        let usd_price = market_chart
+        let usd_prices = market_chart
             .prices
             .into_iter()
-            .map(|token_price| token_price.1)
-            .min()
-            .ok_or_else(|| failure::format_err!("CoinGecko returned empty price data"))?;
+            .map(|token_price| token_price.1);
+
+        // We use max price for ETH token because we spend ETH with each commit and collect token
+        // so it is in our interest to assume highest price for ETH.
+        // Theoretically we should use min and max price for ETH in our ticker formula when we
+        // calculate fee for tx with ETH token. Practically if we use only max price foe ETH it is fine because
+        // we don't need to sell this token lnd price only affects ZKP cost of such tx which is negligible.
+        let usd_price = if token_symbol == "ETH" {
+            usd_prices.max()
+        } else {
+            usd_prices.min()
+        };
+        let usd_price =
+            usd_price.ok_or_else(|| failure::format_err!("CoinGecko returned empty price data"))?;
 
         let naive_last_updated = NaiveDateTime::from_timestamp(
             last_updated_timestamp_ms / 1_000,                      // ms to s

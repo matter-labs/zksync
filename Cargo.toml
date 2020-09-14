@@ -15,4 +15,5 @@ members = [
     "core/testkit",
     "core/loadtest",
     "core/crypto_exports",
+    "core/tok_cli"
 ]
