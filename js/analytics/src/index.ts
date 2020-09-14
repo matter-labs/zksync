@@ -28,8 +28,8 @@ function print(object: any) {
     program
         .command("fees")
         .description("output information about collected fees in the selected period")
-        .requiredOption("--timeFrom <timeFrom>", "start of time period in format 'DD-MM-YYYY HH:MM:SS'")
-        .option("--timeTo <timeTo>", "end of time period in format 'DD-MM-YYYY HH:MM:SS' (Default - current time)")
+        .requiredOption("--timeFrom <timeFrom>", "start of time period in format 'YYYY-MM-DDTHH:MM:SS'")
+        .option("--timeTo <timeTo>", "end of time period in format 'YYYY-MM-DDTHH:MM:SS' (Default - current time)")
         .action(async (cmd: Command) => {
             const timePeriod = new types.TimePeriod(cmd.timeFrom, cmd.timeTo);
             print(await commands.collectedFees(config.network, config.rest_api_address, timePeriod));
@@ -38,10 +38,11 @@ function print(object: any) {
     program
         .command("liquidations")
         .description("output total amount of ETH accrued to the SENDER_ACCOUNT as a result of token liquidations during the specified period")
-        .requiredOption("--timeFrom <timeFrom>", "start of time period in format 'DD-MM-YYYY HH:MM:SS'")
-        .option("--timeTo [timeTo]", "end of time period in format 'DD-MM-YYYY HH:MM:SS' (Default - current time)")
-        .action(async () => {
-            print(await commands.collectedTokenLiquidations());
+        .requiredOption("--timeFrom <timeFrom>", "start of time period in format 'YYYY-MM-DDTHH:MM:SS'")
+        .option("--timeTo [timeTo]", "end of time period in format 'YYYY-MM-DDTHH:MM:SS' (Default - current time)")
+        .action(async (cmd: Command) => {
+            const timePeriod = new types.TimePeriod(cmd.timeFrom, cmd.timeTo);
+            print(await commands.collectedTokenLiquidations(config.network, config.operator_fee_address, timePeriod));
         });
 
     program.parse(process.argv);

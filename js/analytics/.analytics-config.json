@@ -4,7 +4,7 @@
         "mainnet": {
             "ZKSYNC_CONTRACT_ADDRESS": "0xabea9132b05a70803a4e85094fd0e1800777fbef",
             "OPERATOR_COMMIT_ETH_ADDRESS": "0xda7357bbce5e8c616bc7b0c3c86f0c71c5b4eabb",
-            "OPERATOR_FEE_ETH_ADDRESS": "0xda7357bbce5e8c616bc7b0c3c86f0c71c5b4eabb",
+            "OPERATOR_FEE_ETH_ADDRESS": "0x2a0a81e257a2f5d6ed4f07b81dbda09f107bd027",
             "REST_API_ADDR": "https://api.zksync.io"
         },
         "localhost": {

@@ -44,6 +44,8 @@ export function loadConfig(network?: types.Network) {
             operator_commit_address: network_config["OPERATOR_COMMIT_ETH_ADDRESS"],
             operator_fee_address: network_config["OPERATOR_FEE_ETH_ADDRESS"]
         };
+        if(network_config["WEB3_URL"])
+            config.web3_url = network_config["WEB3_URL"];
 
         return config;
     } catch (err) {
