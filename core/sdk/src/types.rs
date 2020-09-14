@@ -17,6 +17,8 @@ pub enum Network {
     Ropsten,
     /// Self-hosted Ethereum & zkSync networks.
     Localhost,
+    /// Unknown network type.
+    Unknown,
 }
 
 pub type Tokens = HashMap<String, Token>;

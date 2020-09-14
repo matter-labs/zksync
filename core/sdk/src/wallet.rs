@@ -5,37 +5,6 @@ use crate::{
     signer::Signer, tokens_cache::TokensCache,
 };
 
-/*
-// Design goals
-let provider = Provider::from_network(Network::Mainnet).await?;
-let walletCredentials = WalletCredentials::from_eth_signer(eth_pk, eth_address).await?;
-let wallet = Wallet::new(provider, walletCredentials).await?;
-
-let handle = wallet.start_deposit()
-    .token(token)
-    .amount(amount)
-    .send()
-    .await?;
-
-handle.wait_for_verify().await?;
-
-if !wallet.is_signing_key_set().await? {
-    let handle = wallet.set_signing_key().await?;
-    handle.wait_for_commit().await?;
-}
-
-let handle = wallet.start_transfer()
-    .to(address)
-    .token(token)
-    .amount(amount)
-    .fee(fee) // Optional
-    .nonce(nonce) // Optional
-    .send()
-    .await?;
-
-handle.wait_for_commit().await?;
-*/
-
 #[derive(Debug)]
 pub struct Wallet {
     pub provider: Provider,
@@ -80,19 +49,28 @@ impl Wallet {
         Ok(())
     }
 
+    /// Returns `true` if signing key for account was set in zkSync network.
+    /// In other words, returns `true` if `ChangePubKey` operation was performed for the
+    /// account.
+    ///
+    /// If this method has returned `false`, one must send a `ChangePubKey` transaction
+    /// via `Wallet::start_change_pubkey` method.
     pub fn is_signing_key_set(&self) -> bool {
         self.signer.get_account_id().is_some()
     }
 
-    pub async fn start_transfer(&self) -> TransferBuilder<'_> {
+    /// Initializes `Transfer` transaction sending.
+    pub fn start_transfer(&self) -> TransferBuilder<'_> {
         TransferBuilder::new(self)
     }
 
-    pub async fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_> {
+    /// Initializes `ChangePubKey` transaction sending.
+    pub fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_> {
         ChangePubKeyBuilder::new(self)
     }
 
-    pub async fn start_withdraw(&self) -> WithdrawBuilder<'_> {
+    /// Initializes `Withdraw` transaction sending.
+    pub fn start_withdraw(&self) -> WithdrawBuilder<'_> {
         WithdrawBuilder::new(self)
     }
 }

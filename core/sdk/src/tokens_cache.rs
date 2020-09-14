@@ -1,4 +1,4 @@
-use models::node::{Token, TokenLike};
+use models::node::{Address, Token, TokenLike};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -20,6 +20,14 @@ impl TokensCache {
                 .find(|el| el.address == address)
                 .cloned(),
             TokenLike::Id(id) => self.tokens.values().find(|el| el.id == id).cloned(),
+        }
+    }
+
+    pub fn is_eth(&self, token: TokenLike) -> bool {
+        match token {
+            TokenLike::Symbol(symbol) => symbol == "ETH",
+            TokenLike::Address(address) => address == Address::zero(),
+            TokenLike::Id(id) => id == 0,
         }
     }
 }

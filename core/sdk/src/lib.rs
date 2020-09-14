@@ -1,6 +1,6 @@
 pub mod credentials;
 pub mod error;
-pub mod onchain;
+pub mod ethereum;
 pub mod operations;
 pub mod provider;
 pub mod signer;

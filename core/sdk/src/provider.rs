@@ -23,6 +23,7 @@ pub fn get_rpc_addr(network: Network) -> &'static str {
         Network::Rinkeby => "https://rinkeby-api.zksync.io/jsrpc",
         Network::Ropsten => "https://ropsten-api.zksync.io/jsrpc",
         Network::Localhost => "http://127.0.0.1:3030",
+        Network::Unknown => panic!("Attempt to create a provider from an unknown network"),
     }
 }
 
@@ -32,12 +33,17 @@ pub fn get_rpc_addr(network: Network) -> &'static str {
 pub struct Provider {
     rpc_addr: String,
     client: reqwest::Client,
+    network: Network,
 }
 
 impl Provider {
     /// Creates a new `Provider` connected to the desired zkSync network.
     pub fn new(network: Network) -> Self {
-        Self::from_addr(get_rpc_addr(network))
+        Self {
+            rpc_addr: get_rpc_addr(network).into(),
+            client: reqwest::Client::new(),
+            network,
+        }
     }
 
     /// Creates a new `Provider` object connected to a custom address.
@@ -45,9 +51,11 @@ impl Provider {
         Self {
             rpc_addr: rpc_addr.into(),
             client: reqwest::Client::new(),
+            network: Network::Unknown,
         }
     }
 
+    /// Obtains minimum fee required to process transaction in zkSync network.
     pub async fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
@@ -63,6 +71,8 @@ impl Provider {
         Ok(fee)
     }
 
+    /// Submits a transaction to the zkSync network.
+    /// Returns the hash of created transaction.
     pub async fn send_tx(
         &self,
         tx: FranklinTx,
@@ -107,6 +117,15 @@ impl Provider {
     /// Requests and returns a list of tokens supported by zkSync.
     pub async fn tokens(&self) -> Result<Tokens, ClientError> {
         let msg = JsonRpcRequest::tokens();
+
+        let ret = self.post(&msg).await?;
+        let tx_info = serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        Ok(tx_info)
+    }
+
+    /// Requests and returns a smart contract address (for Ethereum network associated with network specified in `Provider`).
+    pub async fn contract_address(&self) -> Result<ContractAddress, ClientError> {
+        let msg = JsonRpcRequest::contract_address();
 
         let ret = self.post(&msg).await?;
         let tx_info = serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
@@ -214,6 +233,11 @@ mod messages {
         pub fn tokens() -> Self {
             let params = Vec::new();
             Self::create("tokens", params)
+        }
+
+        pub fn contract_address() -> Self {
+            let params = Vec::new();
+            Self::create("contract_address", params)
         }
 
         pub fn get_tx_fee(tx_type: TxFeeTypes, address: Address, token_symbol: TokenLike) -> Self {
