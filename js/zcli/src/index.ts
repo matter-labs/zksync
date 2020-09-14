@@ -120,6 +120,7 @@ async function main() {
         .command('add [private_key]')
         .description('create or import a wallet')
         .action((privkey?: string) => {
+            console.warn('[WARNING]: private keys are stored unencrypted');
             print(commands.addWallet(config, privkey));
         });
 
