@@ -711,6 +711,9 @@ async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryRe
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
+    ProverSchema(&mut storage)
+        .store_witness(1, serde_json::json!(null))
+        .await?;
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 1);
     BlockSchema(&mut storage)
         .execute_operation(get_operation(
@@ -720,6 +723,9 @@ async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryRe
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
+    ProverSchema(&mut storage)
+        .store_witness(2, serde_json::json!(null))
+        .await?;
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 2);
     BlockSchema(&mut storage)
         .execute_operation(get_operation(
@@ -728,6 +734,9 @@ async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryRe
             Vec::new(),
             BLOCK_SIZE_CHUNKS,
         ))
+        .await?;
+    ProverSchema(&mut storage)
+        .store_witness(3, serde_json::json!(null))
         .await?;
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 3);
 
