@@ -710,6 +710,7 @@ fn pending_block_workflow() {
         Ok(())
     });
 }
+
 /// Here we create blocks and publish proofs for them in different order
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
@@ -727,6 +728,7 @@ fn test_unproven_block_query() {
             Vec::new(),
             BLOCK_SIZE_CHUNKS,
         ))?;
+        ProverSchema(&conn).store_witness(1, serde_json::json!(null))?;
         assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 1);
         BlockSchema(&conn).execute_operation(get_operation(
             2,
@@ -734,6 +736,7 @@ fn test_unproven_block_query() {
             Vec::new(),
             BLOCK_SIZE_CHUNKS,
         ))?;
+        ProverSchema(&conn).store_witness(2, serde_json::json!(null))?;
         assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 2);
         BlockSchema(&conn).execute_operation(get_operation(
             3,
@@ -741,6 +744,7 @@ fn test_unproven_block_query() {
             Vec::new(),
             BLOCK_SIZE_CHUNKS,
         ))?;
+        ProverSchema(&conn).store_witness(3, serde_json::json!(null))?;
         assert_eq!(ProverSchema(&conn).pending_jobs_count()?, 3);
 
         // Add proofs for the first two blocks.

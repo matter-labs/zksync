@@ -963,10 +963,6 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
             .wrap(Cors::new().send_wildcard().max_age(3600))
             .service(
                 web::scope("/api/v0.1")
-                    .route(
-                        "/blocks/{block_id}/transactions",
-                        web::get().to(handle_get_block_transactions),
-                    )
                     .route("/testnet_config", web::get().to(handle_get_testnet_config))
                     .route("/status", web::get().to(handle_get_network_status))
                     .route("/tokens", web::get().to(handle_get_tokens))
