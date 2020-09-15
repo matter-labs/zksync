@@ -4,11 +4,10 @@ import * as zksync from "zksync";
 import * as ethers from "ethers";
 import * as utils from "./utils";
 
-export async function currentBalances(network: Network, operator_address: string, web3_url?: string) {
+export async function currentBalances(network: Network, operator_address: string) {
     const zksProvider = await zksync.getDefaultProvider(network, "HTTP");
-    const ethProvider = web3_url
-        ? new ethers.providers.JsonRpcProvider(web3_url, network)
-        : ethers.getDefaultProvider(network);
+    const ethProvider =
+        network == "localhost" ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
 
     let balances: TokensInfo = { total: { eth: 0, usd: 0 } };
 
@@ -40,20 +39,14 @@ export async function currentBalances(network: Network, operator_address: string
     return balances;
 }
 
-export async function collectedFees(
-    network: Network,
-    providerAddress: string,
-    timePeriod: utils.TimePeriod,
-    web3_url?: string
-) {
+export async function collectedFees(network: Network, providerAddress: string, timePeriod: utils.TimePeriod) {
     const MAX_LIMIT = 100; // maximum number of blocks that the server returns in one request
     let currentBlock = 999_999_999; // the maximum block number that we request from the server
     let currentBlockTime = new Date();
 
     const zksProvider = await zksync.getDefaultProvider(network);
-    const ethProvider = web3_url
-        ? new ethers.providers.JsonRpcProvider(web3_url, network)
-        : ethers.getDefaultProvider(network);
+    const ethProvider =
+        network == "localhost" ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
 
     const eth_price = await zksProvider.getTokenPrice("ETH");
     const tokens = await zksProvider.getTokens();
@@ -116,6 +109,7 @@ export async function collectedFees(
                 const transactionTime = new Date(transaction.created_at);
 
                 // TODO: handle fee for `CompleteWithdrawals` operation in L1
+                // wait for update API
 
                 if (utils.correctTransactionWithFee(transaction) && timePeriod.inTime(transactionTime)) {
                     const transactionFee = utils.getTransactionFee(transaction);

@@ -43,7 +43,6 @@ export function loadConfig(network?: Network) {
             operator_fee_address: network_config["OPERATOR_FEE_ETH_ADDRESS"],
             etherscan_api_address: network_config["ETHERSCAN_API_KEY"],
         };
-        if (network_config["WEB3_URL"]) config.web3_url = network_config["WEB3_URL"];
 
         return config;
     } catch (err) {

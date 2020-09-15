@@ -5,7 +5,6 @@ export interface Config {
     rest_api_address: string;
     operator_commit_address: string;
     operator_fee_address: string;
-    web3_url?: string;
     etherscan_api_address?: string;
 }
 

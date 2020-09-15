@@ -21,8 +21,7 @@ async function main() {
             .action(async () => {
                 const balancesInfo = await commands.currentBalances(
                     config.network,
-                    config.operator_fee_address,
-                    config.web3_url
+                    config.operator_fee_address
                 );
                 print(balancesInfo);
             });
@@ -37,8 +36,7 @@ async function main() {
                 const feesInfo = await commands.collectedFees(
                     config.network,
                     config.rest_api_address,
-                    timePeriod,
-                    config.web3_url
+                    timePeriod
                 );
                 print(feesInfo);
             });

@@ -112,7 +112,7 @@ export async function getBlockInterval(etherscanApiURL: string, etherscanApiKey:
     const startBlock = (await responseStartBlock.json()).result;
     const endBlock = (await responseEndBlock.json()).result;
 
-    if (startBlock == null || endBlock == null) throw "Some TODO MESSAGE";
+    if (startBlock == null || endBlock == null) throw new Error(`Failed to get block by time from ${etherscanApiURL}`);
 
     return { startBlock, endBlock };
 }
