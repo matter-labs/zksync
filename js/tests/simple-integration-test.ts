@@ -7,7 +7,7 @@ import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
-const VERIFY_TIMEOUT = 3 * 60000; // 3 minutes in ms.
+const VERIFY_TIMEOUT = 120000; // 2 minutes in ms.
 
 const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
 console.log("Running integration test on the ", network, " network");
