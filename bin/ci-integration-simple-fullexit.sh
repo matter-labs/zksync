@@ -24,9 +24,9 @@ function cat_logs() {
     sleep 30
 
     set +e
-    pkill -9 $SERVER_PID
-    pkill -9 $PROVER_PID
-    pkill -9 $TIMEOUT_PID
+    pkill -P $SERVER_PID
+    pkill -P $PROVER_PID
+    pkill -P $TIMEOUT_PID
     echo Server logs:
     cat integration-server.log
     echo ===========
