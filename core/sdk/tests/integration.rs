@@ -102,7 +102,7 @@ async fn transfer_eth_to(to: H160) {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration-tests"), ignore)]
 async fn simple_workflow() -> Result<(), anyhow::Error> {
-    let (eth_address, eth_private_key) = eth_main_account_credentials();
+    let (eth_address, eth_private_key) = eth_random_account_credentials();
 
     // Transfer funds from "rich" account to a randomly created one (so we won't reuse the same
     // account in subsequent test runs).
