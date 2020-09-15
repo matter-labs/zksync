@@ -1,16 +1,16 @@
 import "isomorphic-fetch";
+import { Network, TokensInfo } from "./types";
 import * as zksync from "zksync";
-import * as types from "./types";
 import * as ethers from "ethers";
 import * as utils from "./utils";
 
-export async function currentBalances(network: types.Network, operator_address: string, web3_url?: string) {
+export async function currentBalances(network: Network, operator_address: string, web3_url?: string) {
     const zksProvider = await zksync.getDefaultProvider(network, "HTTP");
     const ethProvider = web3_url
         ? new ethers.providers.JsonRpcProvider(web3_url, network)
         : ethers.getDefaultProvider(network);
 
-    let balances: types.TokensInfo = { total: { eth: 0, usd: 0 } };
+    let balances: TokensInfo = { total: { eth: 0, usd: 0 } };
 
     const eth_price = await zksProvider.getTokenPrice("ETH");
     const tokens = await zksProvider.getTokens();
@@ -41,7 +41,7 @@ export async function currentBalances(network: types.Network, operator_address: 
 }
 
 export async function collectedFees(
-    network: types.Network,
+    network: Network,
     providerAddress: string,
     timePeriod: utils.TimePeriod,
     web3_url?: string
@@ -59,7 +59,7 @@ export async function collectedFees(
     const tokens = await zksProvider.getTokens();
 
     let senderAccountStat = { "spent by SENDER ACCOUNT": { eth: 0, usd: 0 } };
-    let tokensStat: types.TokensInfo = { total: { eth: 0, usd: 0 } };
+    let tokensStat: TokensInfo = { total: { eth: 0, usd: 0 } };
     let tokensCashed = new utils.TokensCashed();
 
     for (const token in tokens) {
@@ -79,7 +79,9 @@ export async function collectedFees(
         if (blocks == null) break;
 
         for (const block of blocks) {
-            console.log(`Block number: ${block.block_number}, commit Txhash: ${block.commit_tx_hash}, verify Txhash: ${block.verify_tx_hash}`);
+            console.log(
+                `Block number: ${block.block_number}, commit Txhash: ${block.commit_tx_hash}, verify Txhash: ${block.verify_tx_hash}`
+            );
             // skip uncommited blocks
             if (block.committed_at == null) continue;
 
@@ -88,7 +90,7 @@ export async function collectedFees(
 
             if (timePeriod.less(currentBlockTime)) break;
 
-            const commitTransactionFee = await utils.transactionFee(ethProvider, block.commit_tx_hash);
+            const commitTransactionFee = await utils.chainTransactionFee(ethProvider, block.commit_tx_hash);
 
             senderAccountStat["spent by SENDER ACCOUNT"].eth += commitTransactionFee;
             senderAccountStat["spent by SENDER ACCOUNT"].usd += commitTransactionFee * eth_price;
@@ -99,7 +101,7 @@ export async function collectedFees(
             currentBlockTime = new Date(block.verified_at);
             if (timePeriod.less(currentBlockTime)) break;
 
-            const verifyTransactionFee = await utils.transactionFee(ethProvider, block.verify_tx_hash);
+            const verifyTransactionFee = await utils.chainTransactionFee(ethProvider, block.verify_tx_hash);
 
             senderAccountStat["spent by SENDER ACCOUNT"].eth += verifyTransactionFee;
             senderAccountStat["spent by SENDER ACCOUNT"].usd += verifyTransactionFee * eth_price;
@@ -118,12 +120,10 @@ export async function collectedFees(
                 if (utils.correctTransactionWithFee(transaction) && timePeriod.inTime(transactionTime)) {
                     const transactionFee = utils.getTransactionFee(transaction);
 
-                    const tokenID  = utils.getTransactionTokenID(transaction);                    
+                    const tokenID = utils.getTransactionTokenID(transaction);
                     const tokenSymbol = tokensCashed.getTokenSymbol(tokenID);
                     const tokenPrice = tokensCashed.getTokenPrice(tokenSymbol);
-                    const tokenAmount = Number(
-                        zksProvider.tokenSet.formatToken(tokenSymbol, transactionFee)
-                    );
+                    const tokenAmount = Number(zksProvider.tokenSet.formatToken(tokenSymbol, transactionFee));
 
                     tokensStat[tokenSymbol].amount += tokenAmount;
                     tokensStat[tokenSymbol].usd += tokenAmount * tokenPrice;
@@ -140,7 +140,7 @@ export async function collectedFees(
 }
 
 export async function collectedTokenLiquidations(
-    network: types.Network,
+    network: Network,
     operatorAddress: string,
     timePeriod: utils.TimePeriod,
     etherscan_api_key: string

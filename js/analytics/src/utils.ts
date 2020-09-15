@@ -56,7 +56,7 @@ export class TokensCashed {
     }
 }
 
-export async function transactionFee(ethProvider: BaseProvider, txHash: string) {
+export async function chainTransactionFee(ethProvider: BaseProvider, txHash: string) {
     const transaction = await ethProvider.getTransaction(txHash);
     const transactionRequest = await ethProvider.getTransactionReceipt(txHash);
 
@@ -69,27 +69,24 @@ export async function transactionFee(ethProvider: BaseProvider, txHash: string) 
 }
 
 export function getTransactionFee(transaction: any) {
-    if(transaction == null || transaction.op == null || transaction.op.fee == null)
-        return ethers.BigNumber.from(0);
+    if (transaction == null || transaction.op == null || transaction.op.fee == null) return ethers.BigNumber.from(0);
 
     return ethers.BigNumber.from(transaction.op.fee);
 }
 
 export function getTransactionTokenID(transaction: any) {
-    if(transaction == null || transaction.op == null)
-        return 0;
-    
-    if(transaction.op.token != null)
-        return Number(transaction.op.token);
+    if (transaction == null || transaction.op == null) return 0;
 
-    if(transaction.op.priority_op != null && transaction.op.priority_op.token != null)
+    if (transaction.op.token != null) return Number(transaction.op.token);
+
+    if (transaction.op.priority_op != null && transaction.op.priority_op.token != null)
         return Number(transaction.op.priority_op.token);
 
     return 0;
 }
 
 export function correctTransactionWithFee(transaction: any) {
-    return (transaction != null && transaction.op != null && transaction.op.fee != null);
+    return transaction != null && transaction.op != null && transaction.op.fee != null;
 }
 
 export async function getBlockInterval(etherscanApiURL: string, etherscanApiKey: string, timePeriod: TimePeriod) {

@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import * as types from "./types";
+import { Network, Config } from "./types";
 
 const CONFIG_FILE = ".analytics-config.json";
 
@@ -20,7 +20,7 @@ function configPath() {
     return;
 }
 
-export function loadConfig(network?: types.Network) {
+export function loadConfig(network?: Network) {
     const config_path = configPath();
 
     if (!fs.existsSync(config_path)) {
@@ -32,11 +32,11 @@ export function loadConfig(network?: types.Network) {
         const config_json = fs.readFileSync(config_path);
         const parsed = JSON.parse(config_json.toString());
 
-        if (!network) network = parsed["defaultNetwork"] as types.Network;
+        if (!network) network = parsed["defaultNetwork"] as Network;
 
         const network_config = parsed["network"][network];
 
-        const config: types.Config = {
+        const config: Config = {
             network: network,
             rest_api_address: network_config["REST_API_ADDR"],
             operator_commit_address: network_config["OPERATOR_COMMIT_ETH_ADDRESS"],
