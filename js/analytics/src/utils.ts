@@ -1,62 +1,121 @@
-import {Provider} from 'zksync';
+import "isomorphic-fetch";
+import * as ethers from "ethers";
+
+type BaseProvider = ethers.ethers.providers.BaseProvider;
 
 export class TimePeriod {
     public timeFrom: Date;
     public timeTo: Date;
 
-    constructor(timeFrom: string, timeTo?: string) {
+    constructor(timeFrom: string, timeTo: string) {
         this.timeFrom = new Date(timeFrom);
-        this.timeTo = timeTo? new Date(timeTo): new Date();
-    };
+        this.timeTo = timeTo != null ? new Date(timeTo) : new Date();
+    }
 
-    inTime(timeStamp: Date) {
+    public getTimeFromTimeStamp() {
+        return Math.floor(this.timeFrom.getTime() / 1000);
+    }
+
+    public getTimeToTimeStamp() {
+        return Math.floor(this.timeTo.getTime() / 1000);
+    }
+
+    public inTime(timeStamp: Date) {
         return +this.timeFrom <= +timeStamp && +this.timeTo >= +timeStamp;
-    }  
+    }
 
-    less(timeStamp: Date) {
+    public less(timeStamp: Date) {
         return timeStamp < this.timeFrom;
+    }
+
+    public isCorrect() {
+        return +this.timeFrom <= +this.timeTo;
     }
 }
 
 export class TokensCashed {
-    tokenPrice: Map<string, number>;
-    symbolFromID: Map<number, string>;
+    private tokenPrice: Map<string, number>;
+    private symbolFromID: Map<number, string>;
 
-    addToken(tokenSymbol: string, tokenID: number, tokenPrice: number){
-        this.tokenPrice[tokenSymbol] = tokenPrice;
-        this.symbolFromID[tokenID] = tokenSymbol;
+    constructor() {
+        this.tokenPrice = new Map();
+        this.symbolFromID = new Map();
     }
 
-    getTokenSymbol(id: number)
-    {
-        return this.symbolFromID[id];
+    public addToken(tokenSymbol: string, tokenID: number, tokenPrice: number) {
+        this.tokenPrice.set(tokenSymbol, tokenPrice);
+        this.symbolFromID.set(tokenID, tokenSymbol);
     }
 
-    getTokenPrice(tokenSymbol: string)
-    {
-        return this.tokenPrice[tokenSymbol];
+    public getTokenSymbol(id: number) {
+        return this.symbolFromID.get(id);
+    }
+
+    public getTokenPrice(tokenSymbol: string) {
+        return this.tokenPrice.get(tokenSymbol);
     }
 }
 
-export async function getBlockInterval(timePeriod: TimePeriod) {
-    const startBlockUrl = "https://api.etherscan.io/api" +
-        `?module=block` +
-        `&action=getblocknobytime` +
-        `&timestamp=${timePeriod.timeFrom.valueOf()}` +
-        `&closest=after`;
+export async function transactionFee(ethProvider: BaseProvider, txHash: string) {
+    const transaction = await ethProvider.getTransaction(txHash);
+    const transactionRequest = await ethProvider.getTransactionReceipt(txHash);
 
-    const endBlockUrl = "https://api.etherscan.io/api" +
+    if (transaction == null || transactionRequest == null) return 0;
+
+    const feeWei = transactionRequest.gasUsed.mul(transaction.gasPrice);
+    const transactionFee = Number(ethers.utils.formatEther(feeWei));
+
+    return transactionFee;
+}
+
+export function getTransactionFee(transaction: any) {
+    if(transaction == null || transaction.op == null || transaction.op.fee == null)
+        return ethers.BigNumber.from(0);
+
+    return ethers.BigNumber.from(transaction.op.fee);
+}
+
+export function getTransactionTokenID(transaction: any) {
+    if(transaction == null || transaction.op == null)
+        return 0;
+    
+    if(transaction.op.token != null)
+        return Number(transaction.op.token);
+
+    if(transaction.op.priority_op != null && transaction.op.priority_op.token != null)
+        return Number(transaction.op.priority_op.token);
+
+    return 0;
+}
+
+export function correctTransactionWithFee(transaction: any) {
+    return (transaction != null && transaction.op != null && transaction.op.fee != null);
+}
+
+export async function getBlockInterval(etherscanApiURL: string, etherscanApiKey: string, timePeriod: TimePeriod) {
+    const startBlockUrl =
+        `${etherscanApiURL}/api` +
         `?module=block` +
         `&action=getblocknobytime` +
-        `&timestamp=${timePeriod.timeTo.valueOf()}` +
-        `&closest=before`;
-    
+        `&timestamp=${timePeriod.getTimeFromTimeStamp()}` +
+        `&closest=after` +
+        `&apikey=${etherscanApiKey}`;
+
+    const endBlockUrl =
+        `${etherscanApiURL}/api` +
+        `?module=block` +
+        `&action=getblocknobytime` +
+        `&timestamp=${timePeriod.getTimeToTimeStamp()}` +
+        `&closest=before` +
+        `&apikey=${etherscanApiKey}`;
 
     const responseStartBlock = await fetch(startBlockUrl);
     const responseEndBlock = await fetch(endBlockUrl);
 
-    const startBlock = await responseStartBlock.json();
-    const endBlock = await responseEndBlock.json();
+    const startBlock = (await responseStartBlock.json()).result;
+    const endBlock = (await responseEndBlock.json()).result;
 
-    return {startBlock, endBlock};
+    if (startBlock == null || endBlock == null) throw "Some TODO MESSAGE";
+
+    return { startBlock, endBlock };
 }
