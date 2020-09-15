@@ -63,7 +63,7 @@ impl Signer {
         nonce: Nonce,
         auth_onchain: bool,
     ) -> Result<ChangePubKey, SignerError> {
-        let account_id = self.account_id.expect("can't sign tx withoud account id");
+        let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
         let eth_signature = if auth_onchain {
             None

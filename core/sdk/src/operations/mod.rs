@@ -56,15 +56,17 @@ impl SyncTransactionHandle {
     /// Sets the timeout for commit operation.
     /// With this value set, `SyncTransactionHandle::wait_for_commit` will return a `ClientError::OperationTimeout`
     /// error if block will not be committed within provided time range.
-    pub fn commit_timeout(&mut self, commit_timeout: Duration) {
+    pub fn commit_timeout(mut self, commit_timeout: Duration) -> Self {
         self.commit_timeout = Some(commit_timeout);
+        self
     }
 
     /// Sets the timeout for commit operation.
     /// With this value set, `SyncTransactionHandle::wait_for_verify` will return a `ClientError::OperationTimeout`
     /// error if block will not be verified within provided time range.
-    pub fn verify_timeout(&mut self, verify_timeout: Duration) {
+    pub fn verify_timeout(mut self, verify_timeout: Duration) -> Self {
         self.verify_timeout = Some(verify_timeout);
+        self
     }
 
     /// Awaits for the transaction commit and returns the information about execution.

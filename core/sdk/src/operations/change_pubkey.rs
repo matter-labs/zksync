@@ -26,6 +26,7 @@ impl<'a> ChangePubKeyBuilder<'a> {
 
     /// Sends the transaction, returning the handle for its awaiting.
     pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+        // Currently fees aren't supported by ChangePubKey tx, but they will be in the near future.
         // let fee = match self.fee {
         //     Some(fee) => fee,
         //     None => {
@@ -37,9 +38,9 @@ impl<'a> ChangePubKeyBuilder<'a> {
         //         fee.total_fee
         //     }
         // };
-        let _fee_token = self
-            .fee_token
-            .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
+        // let _fee_token = self
+        //     .fee_token
+        //     .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
 
         let nonce = match self.nonce {
             Some(nonce) => nonce,

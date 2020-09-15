@@ -35,6 +35,17 @@ impl Wallet {
         })
     }
 
+    /// Updates account ID stored in the wallet.
+    /// This method must be invoked if the wallet was created for a non-existent account,
+    /// and it was initialized after creation (e.g. by doing a deposit).
+    /// If zkSync wallet was initialized, but information in `Wallet` object was not updated,
+    /// `Wallet` won't be able to perform any zkSync transaction.
+    pub async fn update_account_id(&mut self) -> Result<(), ClientError> {
+        let account_info = self.provider.account_info(self.address()).await?;
+        self.signer.set_account_id(account_info.id);
+        Ok(())
+    }
+
     /// Returns the wallet address.
     pub fn address(&self) -> Address {
         self.signer.address
@@ -61,8 +72,12 @@ impl Wallet {
     ///
     /// If this method has returned `false`, one must send a `ChangePubKey` transaction
     /// via `Wallet::start_change_pubkey` method.
-    pub fn is_signing_key_set(&self) -> bool {
-        self.signer.get_account_id().is_some()
+    pub async fn is_signing_key_set(&self) -> Result<bool, ClientError> {
+        let account_info = self.provider.account_info(self.address()).await?;
+
+        let key_set =
+            account_info.id.is_some() && account_info.committed.pub_key_hash != Default::default();
+        Ok(key_set)
     }
 
     /// Initializes `Transfer` transaction sending.

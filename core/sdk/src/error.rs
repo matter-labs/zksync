@@ -6,7 +6,7 @@ pub enum ClientError {
     #[error("Network '{0}' is not supported")]
     NetworkNotSupported(String),
     #[error("Unable to decode server response")]
-    MalformedResponse,
+    MalformedResponse(String),
     #[error("RPC error: {0:?}")]
     RpcError(RpcFailure),
     #[error("Network error: {0}")]

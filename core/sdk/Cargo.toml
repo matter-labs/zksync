@@ -1,5 +1,5 @@
 [package]
-name = "sdk"
+name = "zksync"
 version = "0.1.0"
 authors = ["Thor Kamphefner <thor@matterlabs.dev>"]
 edition = "2018"
@@ -30,3 +30,9 @@ thiserror = "1.0"
 jsonrpc-core = "14.0.3"
 
 num = { version = "0.2", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["full"] }
+
+[features]
+integration-tests = []

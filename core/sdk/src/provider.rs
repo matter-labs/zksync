@@ -66,7 +66,8 @@ impl Provider {
         let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token);
 
         let ret = self.post(&msg).await?;
-        let fee = serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        let fee = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
 
         Ok(fee)
     }
@@ -81,7 +82,8 @@ impl Provider {
         let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
 
         let ret = self.post(&msg).await?;
-        let tx_hash = serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        let tx_hash = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
         Ok(tx_hash)
     }
 
@@ -90,8 +92,8 @@ impl Provider {
         let msg = JsonRpcRequest::account_info(address);
 
         let ret = self.post(&msg).await?;
-        let account_state =
-            serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        let account_state = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
         Ok(account_state)
     }
 
@@ -100,8 +102,8 @@ impl Provider {
         let msg = JsonRpcRequest::ethop_info(serial_id);
 
         let ret = self.post(&msg).await?;
-        let eth_op_info =
-            serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        let eth_op_info = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
         Ok(eth_op_info)
     }
 
@@ -110,7 +112,8 @@ impl Provider {
         let msg = JsonRpcRequest::tx_info(tx_hash);
 
         let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        let tx_info = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
         Ok(tx_info)
     }
 
@@ -119,7 +122,8 @@ impl Provider {
         let msg = JsonRpcRequest::tokens();
 
         let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        let tx_info = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
         Ok(tx_info)
     }
 
@@ -128,7 +132,8 @@ impl Provider {
         let msg = JsonRpcRequest::contract_address();
 
         let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret).map_err(|_| ClientError::MalformedResponse)?;
+        let tx_info = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
         Ok(tx_info)
     }
 
@@ -171,7 +176,7 @@ impl Provider {
         let reply: Output = res
             .json()
             .await
-            .map_err(|_| ClientError::MalformedResponse)?;
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
 
         Ok(reply)
     }

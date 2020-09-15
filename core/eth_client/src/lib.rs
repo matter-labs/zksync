@@ -128,13 +128,13 @@ impl<T: Transport> ETHClient<T> {
         data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
-        self.sign_prepared_tx_for_contract(data, self.contract_addr, options)
+        self.sign_prepared_tx_for_addr(data, self.contract_addr, options)
             .await
     }
 
     /// Signs the transaction given the previously encoded data.
     /// Fills in gas/nonce if not supplied inside options.
-    pub async fn sign_prepared_tx_for_contract(
+    pub async fn sign_prepared_tx_for_addr(
         &self,
         data: Vec<u8>,
         contract_addr: H160,

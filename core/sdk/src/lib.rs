@@ -8,3 +8,11 @@ pub mod tokens_cache;
 pub mod types;
 pub mod utils;
 pub mod wallet;
+
+pub use crate::{
+    credentials::WalletCredentials, ethereum::EthereumProvider, provider::Provider, types::Network,
+    wallet::Wallet,
+};
+
+pub use models as zksync_models;
+pub use web3;
