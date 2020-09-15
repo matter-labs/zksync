@@ -1,11 +1,13 @@
 // Built-in deps
-use std::cmp;
+use std::{cmp, collections::HashMap};
 // External imports
 use num::BigInt;
 use sqlx::types::BigDecimal;
 // Workspace imports
-use models::node::PubKeyHash;
-use models::node::{apply_updates, reverse_updates, AccountMap, AccountUpdate, AccountUpdates};
+use models::node::{
+    apply_updates, reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates,
+    PubKeyHash,
+};
 // Local imports
 use crate::chain::{
     account::{
@@ -355,17 +357,31 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         let mut account_map = AccountMap::default();
 
-        for stored_account in accounts {
+        for stored_accounts in accounts.chunks(2usize.pow(15)) {
+            let stored_account_ids: Vec<_> = stored_accounts.iter().map(|acc| acc.id).collect();
             let balances = sqlx::query_as!(
                 StorageBalance,
-                "SELECT * FROM balances WHERE account_id = $1",
-                stored_account.id
+                "SELECT * FROM balances WHERE account_id = ANY($1)",
+                &stored_account_ids
             )
             .fetch_all(transaction.conn())
             .await?;
 
-            let (id, account) = restore_account(stored_account, balances);
-            account_map.insert(id, account);
+            let mut balances_for_id: HashMap<AccountId, Vec<StorageBalance>> = HashMap::new();
+
+            for balance in balances.into_iter() {
+                balances_for_id
+                    .entry(balance.account_id as AccountId)
+                    .and_modify(|balances| balances.push(balance.clone()))
+                    .or_insert_with(|| vec![balance]);
+            }
+
+            for stored_account in stored_accounts {
+                let id = stored_account.id as AccountId;
+                let balances = balances_for_id.remove(&id).unwrap_or_default();
+                let (id, account) = restore_account(stored_account, balances);
+                account_map.insert(id, account);
+            }
         }
 
         transaction.commit().await?;

@@ -194,7 +194,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?;
 
             let last_block = account.last_block;
-            let (_, account) = restore_account(account, balances);
+            let (_, account) = restore_account(&account, balances);
             Ok((last_block, Some(account)))
         } else {
             Ok((0, None))

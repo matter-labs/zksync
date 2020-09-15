@@ -45,7 +45,7 @@ pub struct StorageAccountPubkeyUpdate {
     pub new_nonce: i64,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Clone)]
 pub struct StorageBalance {
     pub account_id: i64,
     pub coin_id: i32,

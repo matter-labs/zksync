@@ -9,7 +9,7 @@ use models::node::{Account, AccountId, TokenId};
 use super::records::*;
 
 pub(crate) fn restore_account(
-    stored_account: StorageAccount,
+    stored_account: &StorageAccount,
     stored_balances: Vec<StorageBalance>,
 ) -> (AccountId, Account) {
     let mut account = Account::default();
