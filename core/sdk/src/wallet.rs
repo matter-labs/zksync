@@ -1,4 +1,4 @@
-use models::node::Address;
+use models::node::{AccountId, Address};
 
 use crate::{
     credentials::WalletCredentials, error::ClientError, ethereum::EthereumProvider, operations::*,
@@ -38,6 +38,12 @@ impl Wallet {
     /// Returns the wallet address.
     pub fn address(&self) -> Address {
         self.signer.address
+    }
+
+    /// Returns the current account ID.
+    /// Result may be `None` if the signing key was not set for account via `ChangePubKey` transaction.
+    pub fn account_id(&self) -> Option<AccountId> {
+        self.signer.account_id
     }
 
     /// Updates the list of tokens supported by zkSync.

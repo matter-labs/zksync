@@ -26,6 +26,10 @@ fn chain_id(network: Network) -> u8 {
     }
 }
 
+/// `EthereumProvider` gains access to on-chain operations, such as deposits and full exits.
+/// Methods to interact with Ethereum return corresponding Ethereum transaction hash.
+/// In order to monitor transaction execution, an Etherereum node `web3` API is exposed
+/// via `EthereumProvider::web3` method.
 pub struct EthereumProvider {
     tokens_cache: TokensCache,
     eth_client: ETHClient<Http>,
@@ -35,6 +39,7 @@ pub struct EthereumProvider {
 }
 
 impl EthereumProvider {
+    /// Creates a new Ethereum provider.
     pub async fn new(
         provider: &Provider,
         tokens_cache: TokensCache,
@@ -72,14 +77,17 @@ impl EthereumProvider {
         })
     }
 
+    /// Exposes Ethereum node `web3` API.
     pub fn web3(&self) -> &Web3<Http> {
         &self.eth_client.web3
     }
 
+    /// Returns the zkSync contract address.
     pub fn contract_address(&self) -> H160 {
         self.eth_client.contract_addr
     }
 
+    /// Returns the pending nonce for the Ethereum account.
     pub async fn nonce(&self) -> Result<U256, ClientError> {
         self.eth_client
             .pending_nonce()
@@ -87,6 +95,7 @@ impl EthereumProvider {
             .map_err(|err| ClientError::NetworkError(err.to_string()))
     }
 
+    /// Checks whether ERC20 of a certain token deposit is approved for account.
     pub async fn is_erc20_deposit_approved(&self, token: TokenLike) -> Result<bool, ClientError> {
         let erc20_approve_threshold: U256 =
             "57896044618658097711785492504343953926634992332820282019728792003956564819968"
@@ -119,6 +128,7 @@ impl EthereumProvider {
         Ok(current_allowance >= erc20_approve_threshold)
     }
 
+    /// Sends a transaction to ERC20 token contract to approve the ERC20 deposit.
     pub async fn approve_erc20_token_deposits(
         &self,
         token: TokenLike,
@@ -157,7 +167,9 @@ impl EthereumProvider {
         Ok(transactin_hash)
     }
 
-    pub async fn deposit_erc20(
+    /// Performs a deposit in zkSync network.
+    /// For ERC20 tokens, a deposit must be approved beforehand via the `EthereumProvider::approve_erc20_token_deposits` method.
+    pub async fn deposit(
         &self,
         token: TokenLike,
         amount: U256,
@@ -201,6 +213,7 @@ impl EthereumProvider {
         Ok(transactin_hash)
     }
 
+    /// Performs a full exit for a certain token.
     pub async fn full_exit(
         &self,
         token: TokenLike,
