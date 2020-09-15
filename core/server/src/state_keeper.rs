@@ -21,11 +21,10 @@ use models::{
     ActionType, BlockCommitRequest, CommitRequest,
 };
 use plasma::state::{OpSuccess, PlasmaState};
-use storage::{ConnectionPool, StorageProcessor};
+use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
 use models::node::SignedFranklinTx;
-use models::params::account_tree_depth;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
