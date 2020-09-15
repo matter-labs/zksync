@@ -12,7 +12,7 @@
     "axios": "^0.19.0",
     "bootstrap-vue": "^2.0.4",
     "core-js": "^3.3.2",
-    "ethers": "^4.0.46",
+    "ethers": "^5.0.0",
     "node-libs-browser": "^2.2.1",
     "node-sass": "^4.13.0",
     "sass-loader": "^8.0.0",
@@ -32,8 +32,5 @@
     "node-sass": "^4.13.0",
     "sass-loader": "^8.0.0",
     "vue-template-compiler": "^2.6.10"
-  },
-  "resolutions": {
-    "websocket-extensions": "0.1.4"
   }
 }

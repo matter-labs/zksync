@@ -39,7 +39,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[wasm_bindgen]
 /// This method initializes params for current thread, otherwise they will be initialized when signing
 /// first message.
-pub fn init() {
+pub fn zksync_crypto_init() {
     JUBJUB_PARAMS.with(|_| {});
     RESCUE_PARAMS.with(|_| {});
     set_panic_hook();
@@ -81,14 +81,30 @@ fn read_signing_key(private_key: &[u8]) -> PrivateKey<Engine> {
     PrivateKey::<Engine>(Fs::from_repr(fs_repr).expect("couldn't read private key from repr"))
 }
 
-#[wasm_bindgen]
-pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Vec<u8> {
+fn privkey_to_pubkey_internal(private_key: &[u8]) -> PublicKey<Engine> {
     let p_g = FixedGenerators::SpendingKeyGenerator;
 
     let sk = read_signing_key(private_key);
 
-    let pubkey = JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params));
-    pub_key_hash(&pubkey)
+    JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params))
+}
+
+#[wasm_bindgen]
+pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Vec<u8> {
+    pub_key_hash(&privkey_to_pubkey_internal(private_key))
+}
+
+#[wasm_bindgen]
+pub fn private_key_to_pubkey(private_key: &[u8]) -> Vec<u8> {
+    let mut pubkey_buf = Vec::with_capacity(PACKED_POINT_SIZE);
+
+    let pubkey = privkey_to_pubkey_internal(private_key);
+
+    pubkey
+        .write(&mut pubkey_buf)
+        .expect("failed to write pubkey to buffer");
+
+    pubkey_buf
 }
 
 #[wasm_bindgen]

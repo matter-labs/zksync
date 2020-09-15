@@ -1,6 +1,6 @@
 import {deployContract} from "ethereum-waffle";
-import {Contract, ethers, Signer} from "ethers";
-import {formatEther, Interface, parseEther} from "ethers/utils";
+import {Contract, ethers, Signer, providers} from "ethers";
+import {formatEther, Interface} from "ethers/lib/utils";
 import * as fs from "fs";
 import {
     encodeConstructorArgs,
@@ -8,9 +8,6 @@ import {
     publishAbiToTesseracts,
     publishSourceCodeToEtherscan,
 } from "./publish-utils";
-import {Provider} from "ethers/providers";
-
-type ContractName = "Governance" | "ZkSync" | "Verifier" | "Proxy" | "UpgradeGatekeeper";
 
 export interface Contracts {
     governance;
@@ -39,14 +36,7 @@ export interface DeployerConfig {
 }
 
 export function readContractCode(name: string) {
-    if (name === "TEST-ERC20") {
-        const contract = require("openzeppelin-solidity/build/contracts/ERC20Mintable");
-        contract.evm = {bytecode: contract.bytecode};
-        contract.interface = contract.abi;
-        return contract;
-    } else {
         return JSON.parse(fs.readFileSync(`build/${name}.json`, {encoding: "utf-8"}));
-    }
 }
 
 export function readProductionContracts(): Contracts {
@@ -166,15 +156,18 @@ export class Deployer {
             {gasLimit: 5000000, ...ethTxOptions},
         );
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
-        const deployFactoryInterface = new Interface(this.deployFactoryCode.interface);
+        const deployFactoryInterface = new Interface(this.deployFactoryCode.abi);
+
         for (const log of deployFactoryTx.logs) {
-            const parsedLog = deployFactoryInterface.parseLog(log);
-            if (parsedLog) {
-                this.addresses.Governance = parsedLog.values.governance;
-                this.addresses.ZkSync = parsedLog.values.zksync;
-                this.addresses.Verifier = parsedLog.values.verifier;
-                this.addresses.UpgradeGatekeeper = parsedLog.values.gatekeeper;
-            }
+            try {
+                const parsedLog = deployFactoryInterface.parseLog(log);
+                if (parsedLog) {
+                    this.addresses.Governance = parsedLog.args.governance;
+                    this.addresses.ZkSync = parsedLog.args.zksync;
+                    this.addresses.Verifier = parsedLog.args.verifier;
+                    this.addresses.UpgradeGatekeeper = parsedLog.args.gatekeeper;
+                }
+            } catch (_) {}
         }
         const txHash = deployFactoryTx.transactionHash;
         const gasUsed = deployFactoryTx.gasUsed;
@@ -236,19 +229,19 @@ export class Deployer {
         await this.deployProxiesAndGatekeeper(ethTxOptions);
     }
 
-    public governanceContract(signerOrProvider: Signer | Provider): Contract {
+    public governanceContract(signerOrProvider: Signer | providers.Provider): Contract {
         return new ethers.Contract(this.addresses.Governance, this.contracts.governance.abi, signerOrProvider);
     }
 
-    public zkSyncContract(signerOrProvider: Signer | Provider): Contract {
+    public zkSyncContract(signerOrProvider: Signer | providers.Provider): Contract {
         return new ethers.Contract(this.addresses.ZkSync, this.contracts.zkSync.abi, signerOrProvider);
     }
 
-    public verifierContract(signerOrProvider: Signer | Provider): Contract {
+    public verifierContract(signerOrProvider: Signer | providers.Provider): Contract {
         return new ethers.Contract(this.addresses.Verifier, this.contracts.verifier.abi, signerOrProvider);
     }
 
-    public upgradeGatekeeperContract(signerOrProvider: Signer | Provider): Contract {
+    public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): Contract {
         return new ethers.Contract(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper.abi, signerOrProvider);
     }
 }

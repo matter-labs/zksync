@@ -9,9 +9,9 @@
     "argparse": "^1.0.10",
     "axios": "^0.19.0",
     "chai": "^4.2.0",
-    "ethereum-waffle": "2.0.12",
+    "ethereum-waffle": "^3.0.0",
     "ethereumjs-abi": "^0.6.8",
-    "ethers": "4.0.47",
+    "ethers": "^5.0.0",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "mocha": "^6.2.0",
@@ -28,13 +28,14 @@
     "zksync": "link:../js/zksync.js"
   },
   "scripts": {
+    "build-dev": "waffle .waffle-dev.json",
     "build": "waffle .waffle.json",
     "test": "yarn build && f mocha -r ts-node/register test/**/*.ts",
     "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
     "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",
     "unit-test-watch": "yarn build && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
     "deploy-no-build": "ts-node scripts/deploy.ts",
-    "deploy-dev-erc20": "ts-node scripts/deploy-dev-erc20.ts",
+    "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "ts-node scripts/publish.ts",
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
@@ -42,8 +43,5 @@
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
     "prettier:solidity": "prettier --write contracts/**/*.sol"
-  },
-  "resolutions": {
-    "ethereum-waffle/ethers": "4.0.47"
   }
 }

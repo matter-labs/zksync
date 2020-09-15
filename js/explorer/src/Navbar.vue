@@ -20,6 +20,11 @@
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
             <b-nav-item 
+                href="/tokens"
+                class="nowrap">
+                Tokens
+            </b-nav-item>
+            <b-nav-item 
                 v-if="store.walletLink"
                 v-bind:href="store.walletLink" 
                 target="_blank" 

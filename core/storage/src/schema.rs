@@ -37,6 +37,13 @@ table! {
 }
 
 table! {
+    account_tree_cache (block) {
+        block -> Int8,
+        tree_cache -> Jsonb,
+    }
+}
+
+table! {
     accounts (id) {
         id -> Int8,
         last_block -> Int8,
@@ -61,6 +68,13 @@ table! {
         account_id -> Int8,
         coin_id -> Int4,
         balance -> Numeric,
+    }
+}
+
+table! {
+    block_witness (block) {
+        block -> Int8,
+        witness -> Jsonb,
     }
 }
 
@@ -150,7 +164,7 @@ table! {
 }
 
 table! {
-    executed_priority_operations (eth_hash) {
+    executed_priority_operations (priority_op_serialid) {
         block_number -> Int8,
         block_index -> Int4,
         operation -> Jsonb,
@@ -255,8 +269,10 @@ table! {
 }
 
 joinable!(account_balance_updates -> tokens (coin_id));
+joinable!(account_tree_cache -> blocks (block));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
+joinable!(block_witness -> blocks (block));
 joinable!(eth_ops_binding -> eth_operations (eth_op_id));
 joinable!(eth_ops_binding -> operations (op_id));
 joinable!(eth_tx_hashes -> eth_operations (eth_op_id));
@@ -266,9 +282,11 @@ allow_tables_to_appear_in_same_query!(
     account_balance_updates,
     account_creates,
     account_pubkey_updates,
+    account_tree_cache,
     accounts,
     active_provers,
     balances,
+    block_witness,
     blocks,
     data_restore_events_state,
     data_restore_last_watched_eth_block,

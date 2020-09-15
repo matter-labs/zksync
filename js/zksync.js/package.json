@@ -1,37 +1,43 @@
 {
-  "name": "zksync",
-  "version": "0.5.15",
-  "license": "MIT",
-  "main": "build/index.js",
-  "types": "build/index.d.ts",
-  "dependencies": {
-    "axios": "^0.19.0",
-    "bn.js": "^5.0.0",
-    "websocket": "^1.0.30",
-    "websocket-as-promised": "^0.10.1",
-    "zksync-crypto": "^0.2.1"
-  },
-  "peerDependencies": {
-    "ethers": "^4.0.46"
-  },
-  "devDependencies": {
-    "@types/chai": "^4.1.7",
-    "@types/mocha": "^5.2.7",
-    "@types/node": "^12.6.8",
-    "chai": "^4.2.0",
-    "ethers": "4.0.47",
-    "mocha": "^6.2.0",
-    "prettier": "1.18.2",
-    "ts-node": "^8.3.0",
-    "tslint": "^6.0.0-beta0",
-    "typescript": "^3.5.3"
-  },
-  "scripts": {
-    "lint:ts": "tslint -c tslint.json {examples,test,src}/**/*.ts",
-    "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
-    "test": "mocha -r ts-node/register tests/**/*.test.ts",
-    "fmt": "prettier --tab-width 4 --parser typescript --write \"{src,tests,examples}/*.ts\"",
-    "build": "tsc",
-    "watch": "tsc --watch"
-  }
+    "name": "zksync",
+    "version": "0.6.5",
+    "license": "MIT",
+    "main": "build/index.js",
+    "types": "build/index.d.ts",
+    "dependencies": {
+        "axios": "^0.19.0",
+        "websocket": "^1.0.30",
+        "websocket-as-promised": "^0.10.1",
+        "zksync-crypto": "^0.3.1"
+    },
+    "peerDependencies": {
+        "ethers": "^5.0.0"
+    },
+    "devDependencies": {
+        "@rollup/plugin-commonjs": "^15.0.0",
+        "@rollup/plugin-json": "^4.1.0",
+        "@rollup/plugin-node-resolve": "^9.0.0",
+        "@types/chai": "^4.1.7",
+        "@types/mocha": "^5.2.7",
+        "@types/node": "^12.6.8",
+        "chai": "^4.2.0",
+        "ethers": "^5.0.0",
+        "mocha": "^6.2.0",
+        "prettier": "1.18.2",
+        "rollup": "^2.26.3",
+        "rollup-plugin-copy": "^3.3.0",
+        "rollup-plugin-terser": "^7.0.0",
+        "ts-node": "^8.3.0",
+        "tslint": "^6.0.0-beta0",
+        "typescript": "^3.5.3"
+    },
+    "scripts": {
+        "lint:ts": "tslint -c tslint.json {examples,test,src}/**/*.ts",
+        "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
+        "test": "mocha -r ts-node/register tests/**/*.test.ts",
+        "fmt": "prettier --tab-width 4 --print-width 120 --parser typescript --write \"{src,tests,examples}/*.ts\"",
+        "build": "tsc",
+        "watch": "tsc --watch",
+        "prepublish": "yarn build && rollup -c"
+    }
 }

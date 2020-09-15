@@ -18,42 +18,6 @@
     "name": "ChainLink Token"
   },
   {
-    "address": "0x030b0a08eCaDdE5Ac33859a48d87416946C966A1",
-    "decimals": 18,
-    "symbol": "BNB",
-    "name": "BNB"
-  },
-  {
-    "address": "0x3fbd20f0b9A96CF9126f2C28f8976188D05B3A8c",
-    "decimals": 18,
-    "symbol": "PAX",
-    "name": "Paxos Standard"
-  },
-  {
-    "address": "0xCF19C55A1f728123fb41Cb7B4A15b705aA06a8B1",
-    "decimals": 18,
-    "symbol": "ZB",
-    "name": "ZBToken"
-  },
-  {
-    "address": "0xfA1e1aBc499Fcf23369bF2aD00662007801F4dAB",
-    "decimals": 18,
-    "symbol": "OKB",
-    "name": "OKB"
-  },
-  {
-    "address": "0x1351E94ed4314e4cD3d2E54eAF22aaBe7bC3060a",
-    "decimals": 18,
-    "symbol": "FSN",
-    "name": "Fusion Token"
-  },
-  {
-    "address": "0x4e2442A6f7AeCE64Ca33d31756B5390860BF973E",
-    "decimals": 18,
-    "symbol": "BUSD",
-    "name": "Binance USD"
-  },
-  {
     "address": "0xd2255612F9b045e9c81244bB874aBb413Ca139a3",
     "decimals": 18,
     "symbol": "TUSD",

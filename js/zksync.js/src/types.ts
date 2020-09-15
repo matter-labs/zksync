@@ -1,4 +1,4 @@
-import { utils } from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
 
 // 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
@@ -22,7 +22,7 @@ export interface AccountState {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: {
                 // Sum of pending deposits for the token.
-                amount: utils.BigNumberish;
+                amount: BigNumberish;
                 // Value denoting the block number when the funds are expected
                 // to be received by zkSync network.
                 expectedAcceptBlock: number;
@@ -32,7 +32,7 @@ export interface AccountState {
     committed: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
-            [token: string]: utils.BigNumberish;
+            [token: string]: BigNumberish;
         };
         nonce: number;
         pubKeyHash: PubKeyHash;
@@ -40,7 +40,7 @@ export interface AccountState {
     verified: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
-            [token: string]: utils.BigNumberish;
+            [token: string]: BigNumberish;
         };
         nonce: number;
         pubKeyHash: PubKeyHash;
@@ -70,8 +70,8 @@ export interface Transfer {
     from: Address;
     to: Address;
     token: number;
-    amount: utils.BigNumberish;
-    fee: utils.BigNumberish;
+    amount: BigNumberish;
+    fee: BigNumberish;
     nonce: number;
     signature: Signature;
 }
@@ -82,8 +82,8 @@ export interface Withdraw {
     from: Address;
     to: Address;
     token: number;
-    amount: utils.BigNumberish;
-    fee: utils.BigNumberish;
+    amount: BigNumberish;
+    fee: BigNumberish;
     nonce: number;
     signature: Signature;
 }
@@ -102,6 +102,11 @@ export interface CloseAccount {
     account: Address;
     nonce: number;
     signature: Signature;
+}
+
+export interface SignedTransaction {
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount;
+    ethereumSignature?: TxEthSignature;
 }
 
 export interface BlockInfo {
@@ -139,15 +144,15 @@ export interface Tokens {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: "Withdraw" | "Transfer" | "TransferToNew";
+    feeType: "Withdraw" | "Transfer" | "TransferToNew" | "FastWithdraw";
     // Amount of gas used by transaction
-    gasTxAmount: utils.BigNumber;
+    gasTxAmount: BigNumber;
     // Gas price (in wei)
-    gasPriceWei: utils.BigNumber;
+    gasPriceWei: BigNumber;
     // Ethereum gas part of fee (in wei)
-    gasFee: utils.BigNumber;
+    gasFee: BigNumber;
     // Zero-knowledge proof part of fee (in wei)
-    zkpFee: utils.BigNumber;
+    zkpFee: BigNumber;
     // Total fee amount (in wei)
-    totalFee: utils.BigNumber;
+    totalFee: BigNumber;
 }

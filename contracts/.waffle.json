@@ -1,15 +1,11 @@
 {
-    "sourcesPath": "./contracts",
-    "targetPath": "./build",
-    "compiler": "native",
+    "sourceDirectory": "./contracts",
+    "outputDirectory": "./build",
+    "compilerType": "native",
     "compilerOptions": {
         "optimizer": {
             "enabled": true,
             "runs": 200
         }
-    },
-    "ganacheOptions": {
-        "gasLimit": "10000000",
-        "gasPrice": "0x77359400"
     }
 }

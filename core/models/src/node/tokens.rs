@@ -87,5 +87,6 @@ pub struct TokenPrice {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
     Withdraw,
+    FastWithdraw,
     Transfer,
 }

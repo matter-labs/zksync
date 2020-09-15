@@ -10,6 +10,7 @@ use models::node::BlockNumber;
 use models::prover_utils::EncodedProofPlonk;
 // Local imports
 use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
+use crate::prover::records::StorageBlockWitness;
 use crate::{chain::block::BlockSchema, StorageProcessor};
 
 pub mod records;
@@ -64,6 +65,8 @@ impl<'a> ProverSchema<'a> {
                WHERE action_type = 'COMMIT' \
                    AND block_number > \
                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
+                   AND EXISTS \
+                       (SELECT * FROM block_witness WHERE block = o.block_number) \
                    AND NOT EXISTS \
                        (SELECT * FROM proofs WHERE block_number = o.block_number);";
 
@@ -201,5 +204,31 @@ impl<'a> ProverSchema<'a> {
             .filter(dsl::block_number.eq(i64::from(block_number)))
             .get_result(self.0.conn())?;
         Ok(serde_json::from_value(stored.proof).unwrap())
+    }
+
+    /// Stores witness for a block
+    pub fn store_witness(&self, block: BlockNumber, witness: serde_json::Value) -> QueryResult<()> {
+        use crate::schema::*;
+
+        insert_into(block_witness::table)
+            .values(&StorageBlockWitness {
+                block: block as i64,
+                witness,
+            })
+            .on_conflict(block_witness::block)
+            .do_nothing()
+            .execute(self.0.conn())
+            .map(drop)
+    }
+
+    /// Gets stored witness for a block
+    pub fn get_witness(&self, block_number: BlockNumber) -> QueryResult<Option<serde_json::Value>> {
+        use crate::schema::*;
+        let block_witness = block_witness::table
+            .filter(block_witness::block.eq(block_number as i64))
+            .first::<StorageBlockWitness>(self.0.conn())
+            .optional()?;
+
+        Ok(block_witness.map(|w| w.witness))
     }
 }

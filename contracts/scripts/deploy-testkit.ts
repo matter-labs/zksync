@@ -1,7 +1,6 @@
 import {ethers, Wallet} from "ethers";
 import {Deployer, readContractCode, readTestContracts} from "../src.ts/deploy";
 import {deployContract} from "ethereum-waffle";
-import {parseEther} from "ethers/utils";
 
 (async () => {
     if (process.env.ETH_NETWORK !== "test") {
@@ -20,7 +19,7 @@ import {parseEther} from "ethers/utils";
 
     const erc20 = await deployContract(
         deployWallet,
-        readContractCode("TEST-ERC20"), [],
+        readContractCode("TestnetERC20Token"), ["Matter Labs Trial Token", "MLTT", 18],
         {gasLimit: 5000000},
     );
     console.log(`TEST_ERC20=${erc20.address}`);

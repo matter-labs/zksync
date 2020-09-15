@@ -1,18 +1,14 @@
 import Axios from "axios";
 import WebSocketAsPromised = require("websocket-as-promised");
-const W3CWebSocket = require("websocket").w3cwebsocket;
+import * as websocket from "websocket";
+const W3CWebSocket = websocket.w3cwebsocket;
 
 export abstract class AbstractJSONRPCTransport {
     abstract async request(method: string, params): Promise<any>;
     subscriptionsSupported(): boolean {
         return false;
     }
-    async subscribe(
-        subMethod: string,
-        subParams,
-        unsubMethod: string,
-        cb: (data: any) => void
-    ): Promise<Subscription> {
+    async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
         throw new Error("subscription are not supported for this transport");
     }
     abstract async disconnect();
@@ -53,9 +49,9 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
             return resp.data;
         });
 
-        if (response.result) {
+        if ("result" in response) {
             return response.result;
-        } else if (response.error) {
+        } else if ("error" in response) {
             throw new JRPCError("JRPC response error", response.error);
         } else {
             throw new Error("Unknown JRPC Error");
@@ -75,8 +71,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
             createWebSocket: url => new W3CWebSocket(url),
             packMessage: data => JSON.stringify(data),
             unpackMessage: data => JSON.parse(data as string),
-            attachRequestId: (data, requestId) =>
-                Object.assign({ id: requestId }, data), // attach requestId to message as `id` field
+            attachRequestId: (data, requestId) => Object.assign({ id: requestId }, data), // attach requestId to message as `id` field
             extractRequestId: data => data && data.id
         });
 
@@ -87,17 +82,13 @@ export class WSTransport extends AbstractJSONRPCTransport {
             if (data.params && data.params.subscription) {
                 const params = data.params;
                 if (this.subscriptionCallback.has(params.subscription)) {
-                    this.subscriptionCallback.get(params.subscription)(
-                        params.result
-                    );
+                    this.subscriptionCallback.get(params.subscription)(params.result);
                 }
             }
         });
     }
 
-    static async connect(
-        address = "ws://127.0.0.1:3031"
-    ): Promise<WSTransport> {
+    static async connect(address = "ws://127.0.0.1:3031"): Promise<WSTransport> {
         const transport = new WSTransport(address);
         await transport.ws.open();
         return transport;
@@ -107,12 +98,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
         return true;
     }
 
-    async subscribe(
-        subMethod: string,
-        subParams,
-        unsubMethod: string,
-        cb: (data: any) => void
-    ): Promise<Subscription> {
+    async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
         const req = { jsonrpc: "2.0", method: subMethod, params: subParams };
         const sub = await this.ws.sendRequest(req);
 
@@ -130,17 +116,10 @@ export class WSTransport extends AbstractJSONRPCTransport {
                 params: [subId]
             });
             if (unsubRep.error) {
-                throw new JRPCError(
-                    `Unsubscribe failed: ${subId}, ${JSON.stringify(
-                        unsubRep.error
-                    )}`,
-                    unsubRep.error
-                );
+                throw new JRPCError(`Unsubscribe failed: ${subId}, ${JSON.stringify(unsubRep.error)}`, unsubRep.error);
             }
             if (unsubRep.result !== true) {
-                throw new Error(
-                    `Unsubscription failed, returned false: ${subId}`
-                );
+                throw new Error(`Unsubscription failed, returned false: ${subId}`);
             }
             this.subscriptionCallback.delete(subId);
         };
@@ -158,9 +137,9 @@ export class WSTransport extends AbstractJSONRPCTransport {
 
         const response = await this.ws.sendRequest(request);
 
-        if (response.result) {
+        if ("result" in response) {
             return response.result;
-        } else if (response.error) {
+        } else if ("error" in response) {
             throw new JRPCError("JRPC response error", response.error);
         } else {
             throw new Error("Unknown JRPC Error");

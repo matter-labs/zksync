@@ -62,6 +62,8 @@ struct PendingBlock {
     pending_block_iteration: usize,
     withdrawals_amount: u32,
     gas_counter: GasCounter,
+    /// Option denoting if this block should be generated faster than usual.
+    fast_processing_required: bool,
 }
 
 impl PendingBlock {
@@ -76,6 +78,7 @@ impl PendingBlock {
             pending_block_iteration: 0,
             withdrawals_amount: 0,
             gas_counter: GasCounter::new(),
+            fast_processing_required: false,
         }
     }
 }
@@ -96,7 +99,7 @@ pub struct PlasmaStateKeeper {
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
-    max_miniblock_iterations_withdraw_block: usize,
+    fast_miniblock_iterations: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -155,15 +158,75 @@ impl PlasmaStateInitParams {
         Ok(init_params)
     }
 
-    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
+    fn load_account_tree(
+        &mut self,
+        storage: &storage::StorageProcessor,
+    ) -> Result<BlockNumber, failure::Error> {
+        let (verified_block, accounts) = storage.chain().state_schema().load_verified_state()?;
+        for (id, account) in accounts {
+            self.insert_account(id, account);
+        }
+
+        if let Some(account_tree_cache) = storage
+            .chain()
+            .block_schema()
+            .get_account_tree_cache_block(verified_block)?
+        {
+            self.tree
+                .set_internals(serde_json::from_value(account_tree_cache)?);
+        } else {
+            self.tree.root_hash();
+            let account_tree_cache = self.tree.get_internals();
+            storage.chain().block_schema().store_account_tree_cache(
+                verified_block,
+                serde_json::to_value(account_tree_cache)?,
+            )?;
+        }
+
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
             .load_committed_state(None)
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
-        for (account_id, account) in accounts.into_iter() {
-            self.insert_account(account_id, account);
+
+        if block_number != verified_block {
+            if let Some((_, account_updates)) = storage
+                .chain()
+                .state_schema()
+                .load_state_diff(verified_block, Some(block_number))?
+            {
+                let mut updated_accounts = account_updates
+                    .into_iter()
+                    .map(|(id, _)| id)
+                    .collect::<Vec<_>>();
+                updated_accounts.sort();
+                updated_accounts.dedup();
+                for idx in updated_accounts {
+                    if let Some(acc) = accounts.get(&idx).cloned() {
+                        self.insert_account(idx, acc);
+                    } else {
+                        self.remove_account(idx);
+                    }
+                }
+            }
         }
+        if block_number != 0 {
+            let storage_root_hash = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)?
+                .expect("restored block must exist");
+            assert_eq!(
+                storage_root_hash.new_root_hash,
+                self.tree.root_hash(),
+                "restored root_hash is different"
+            );
+        }
+        Ok(block_number)
+    }
+
+    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
+        let block_number = self.load_account_tree(storage)?;
         self.last_block_number = block_number;
         self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, block_number)?;
 
@@ -243,7 +306,7 @@ impl PlasmaStateKeeper {
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
-        max_miniblock_iterations_withdraw_block: usize,
+        fast_miniblock_iterations: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -275,7 +338,7 @@ impl PlasmaStateKeeper {
             executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
-            max_miniblock_iterations_withdraw_block,
+            fast_miniblock_iterations,
         };
 
         let root = keeper.state.root_hash();
@@ -312,10 +375,12 @@ impl PlasmaStateKeeper {
             }
 
             log::info!(
-                "Executed restored proposed block: {} transactions, {} priority operations",
+                "Executed restored proposed block: {} transactions, {} priority operations, {} failed transactions",
                 txs_count,
-                priority_op_count
+                priority_op_count,
+                pending_block.failed_txs.len()
             );
+            self.pending_block.failed_txs = pending_block.failed_txs;
         } else {
             log::info!("There is no pending block to restore");
         }
@@ -478,19 +543,20 @@ impl PlasmaStateKeeper {
 
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
-
-            // If pending block contains withdrawals we seal it faster
-            let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
-                self.max_miniblock_iterations_withdraw_block
-            } else {
-                self.max_miniblock_iterations
-            };
-            if self.pending_block.pending_block_iteration > max_miniblock_iterations {
-                self.seal_pending_block().await;
-            } else {
-                self.store_pending_block().await;
-            }
         }
+
+        // If pending block contains withdrawals we seal it faster
+        let max_miniblock_iterations = if self.pending_block.fast_processing_required {
+            self.fast_miniblock_iterations
+        } else {
+            self.max_miniblock_iterations
+        };
+        if self.pending_block.pending_block_iteration > max_miniblock_iterations {
+            self.seal_pending_block().await;
+        } else {
+            self.store_pending_block().await;
+        }
+
         self.notify_executed_ops(&mut executed_ops).await;
     }
 
@@ -577,9 +643,14 @@ impl PlasmaStateKeeper {
             }
         }
 
-        if matches!(tx.tx, FranklinTx::Withdraw(_)) {
+        if let FranklinTx::Withdraw(tx) = &tx.tx {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
+
+            // Check if we should mark this block as requiring fast processing.
+            if tx.fast {
+                self.pending_block.fast_processing_required = true;
+            }
         }
 
         // Check if we've reached the withdraw operations amount limit.
@@ -713,12 +784,14 @@ impl PlasmaStateKeeper {
             unprocessed_priority_op_before: self.pending_block.unprocessed_priority_op_before,
             pending_block_iteration: self.pending_block.pending_block_iteration,
             success_operations: self.pending_block.success_operations.clone(),
+            failed_txs: self.pending_block.failed_txs.clone(),
         };
 
         log::trace!(
-            "Persisting mini block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
+            "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
             pending_block.number,
             pending_block.success_operations.len(),
+            pending_block.failed_txs.len(),
             pending_block.chunks_left,
             pending_block.pending_block_iteration
         );

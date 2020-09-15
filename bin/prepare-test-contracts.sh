@@ -5,7 +5,7 @@
 cd $ZKSYNC_HOME
 
 IN_DIR=./contracts/contracts
-OUT_DIR=./contracts/contracts/generated
+OUT_DIR=./contracts/dev-contracts/generated
 
 rm -rf $OUT_DIR
 mkdir -p $OUT_DIR
@@ -17,8 +17,6 @@ cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
 cp $IN_DIR/UpgradeGatekeeper.sol $OUT_DIR/UpgradeGatekeeperTest.sol
 cp $IN_DIR/ZkSync.sol $OUT_DIR/ZkSyncTestUpgradeTarget.sol
 
-# Change dependencies
-ssed 's/import "\.\./import "\.\.\/\.\./' -i $OUT_DIR/*.sol
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
 ssed 's/\bVerifier\b/VerifierTest/' -i $OUT_DIR/*.sol
@@ -42,7 +40,7 @@ create_constant_getter() {
 }
 
 # Change constants
-set_constant MAX_AMOUNT_OF_REGISTERED_TOKENS 4 $OUT_DIR/ConfigTest.sol
+set_constant MAX_AMOUNT_OF_REGISTERED_TOKENS 5 $OUT_DIR/ConfigTest.sol
 set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/ConfigTest.sol
 set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/ConfigTest.sol
 set_constant PRIORITY_EXPIRATION 101 $OUT_DIR/ConfigTest.sol

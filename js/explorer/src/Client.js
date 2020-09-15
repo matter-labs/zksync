@@ -287,6 +287,13 @@ export class Client {
         const txs = await Promise.all(res);
         return txs.filter(Boolean);
     }
+
+    async loadTokens() {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/tokens`,
+        });
+    }
 };
 
 export const clientPromise = Client.new();
