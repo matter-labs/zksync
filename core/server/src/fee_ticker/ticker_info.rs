@@ -35,15 +35,16 @@ impl TickerInfo {
 #[async_trait]
 impl FeeTickerInfo for TickerInfo {
     async fn is_account_new(&mut self, address: Address) -> bool {
-        let (account_info_sender, account_info_receiver) =
-            oneshot::channel::<Option<(AccountId, Account)>>();
-
-        self.state_keeper_request_sender
-            .send(StateKeeperRequest::GetAccount(address, account_info_sender))
-            .await
-            .expect("State keeper receiver dropped");
-
-        // If account is `Some(_)` then it's not new.
-        account_info_receiver.await.unwrap().is_none()
+        false
+        // let (account_info_sender, account_info_receiver) =
+        //     oneshot::channel::<Option<(AccountId, Account)>>();
+        //
+        // self.state_keeper_request_sender
+        //     .send(StateKeeperRequest::GetAccount(address, account_info_sender))
+        //     .await
+        //     .expect("State keeper receiver dropped");
+        //
+        // // If account is `Some(_)` then it's not new.
+        // account_info_receiver.await.unwrap().is_none()
     }
 }

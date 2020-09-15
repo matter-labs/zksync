@@ -21,10 +21,11 @@ use models::{
     ActionType, BlockCommitRequest, CommitRequest,
 };
 use plasma::state::{OpSuccess, PlasmaState};
-use storage::ConnectionPool;
+use storage::{ConnectionPool, StorageProcessor};
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
 use models::node::SignedFranklinTx;
+use models::params::account_tree_depth;
 
 /// Since withdraw is an expensive operation, we have to limit amount of
 /// withdrawals in one block to not exceed the gas limit in prover.
@@ -162,7 +163,16 @@ impl PlasmaStateInitParams {
         &mut self,
         storage: &storage::StorageProcessor,
     ) -> Result<BlockNumber, failure::Error> {
-        let (verified_block, accounts) = storage.chain().state_schema().load_verified_state()?;
+        let (last_cached_block_number, accounts) =
+            if let Some((block, _)) = storage.chain().block_schema().get_account_tree_cache()? {
+                storage
+                    .chain()
+                    .state_schema()
+                    .load_committed_state(Some(block))?
+            } else {
+                storage.chain().state_schema().load_verified_state()?
+            };
+
         for (id, account) in accounts {
             self.insert_account(id, account);
         }
@@ -170,7 +180,7 @@ impl PlasmaStateInitParams {
         if let Some(account_tree_cache) = storage
             .chain()
             .block_schema()
-            .get_account_tree_cache_block(verified_block)?
+            .get_account_tree_cache_block(last_cached_block_number)?
         {
             self.tree
                 .set_internals(serde_json::from_value(account_tree_cache)?);
@@ -178,7 +188,7 @@ impl PlasmaStateInitParams {
             self.tree.root_hash();
             let account_tree_cache = self.tree.get_internals();
             storage.chain().block_schema().store_account_tree_cache(
-                verified_block,
+                last_cached_block_number,
                 serde_json::to_value(account_tree_cache)?,
             )?;
         }
@@ -189,11 +199,11 @@ impl PlasmaStateInitParams {
             .load_committed_state(None)
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
 
-        if block_number != verified_block {
+        if block_number != last_cached_block_number {
             if let Some((_, account_updates)) = storage
                 .chain()
                 .state_schema()
-                .load_state_diff(verified_block, Some(block_number))?
+                .load_state_diff(last_cached_block_number, Some(block_number))?
             {
                 let mut updated_accounts = account_updates
                     .into_iter()
