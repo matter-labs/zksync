@@ -97,7 +97,22 @@ $ yarn start current-balances
 }
 $ yarn start fees --timeFrom 2020-09-15T00:00:00
 {
-
+    "spent by SENDER ACCOUNT":{
+        "eth": 3.567,
+        "usd": 1303.85
+    },
+    "collected fees":{
+        "total":{
+            "eth": 11.1331,
+            "usd": 4069.48
+        },
+        "BAT":{
+            "amount":1000.32,
+            "eth":32.201024,
+            "usd":0.088726
+        },
+        ...
+    }
 }
 $ yarn start liquidations --timeFrom 2020-09-14 --timeTo 2020-09-15
 {

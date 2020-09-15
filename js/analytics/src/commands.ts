@@ -9,7 +9,7 @@ export async function currentBalances(network: Network, operator_address: string
     const ethProvider =
         network == "localhost" ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
 
-    let balances: TokensInfo = { total: { eth: 0, usd: 0 } };
+    const balances: TokensInfo = { total: { eth: 0, usd: 0 } };
 
     const eth_price = await zksProvider.getTokenPrice("ETH");
     const tokens = await zksProvider.getTokens();
@@ -44,6 +44,8 @@ export async function collectedFees(network: Network, providerAddress: string, t
     let currentBlock = 999_999_999; // the maximum block number that we request from the server
     let currentBlockTime = new Date();
 
+    if (!timePeriod.isCorrect()) throw new Error(`Error time period ${timePeriod.timeFrom} - ${timePeriod.timeTo}`);
+
     const zksProvider = await zksync.getDefaultProvider(network);
     const ethProvider =
         network == "localhost" ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
@@ -51,9 +53,9 @@ export async function collectedFees(network: Network, providerAddress: string, t
     const eth_price = await zksProvider.getTokenPrice("ETH");
     const tokens = await zksProvider.getTokens();
 
-    let senderAccountStat = { "spent by SENDER ACCOUNT": { eth: 0, usd: 0 } };
-    let tokensStat: TokensInfo = { total: { eth: 0, usd: 0 } };
-    let tokensCashed = new utils.TokensCashed();
+    const senderAccountStat = { eth: 0, usd: 0 };
+    const tokensStat: TokensInfo = { total: { eth: 0, usd: 0 } };
+    const tokensCashed = new utils.TokensCashed();
 
     for (const token in tokens) {
         const tokenSymbol = zksProvider.tokenSet.resolveTokenSymbol(token);
@@ -85,8 +87,8 @@ export async function collectedFees(network: Network, providerAddress: string, t
 
             const commitTransactionFee = await utils.chainTransactionFee(ethProvider, block.commit_tx_hash);
 
-            senderAccountStat["spent by SENDER ACCOUNT"].eth += commitTransactionFee;
-            senderAccountStat["spent by SENDER ACCOUNT"].usd += commitTransactionFee * eth_price;
+            senderAccountStat.eth += commitTransactionFee;
+            senderAccountStat.usd += commitTransactionFee * eth_price;
 
             // skip unverified blocks
             if (block.verified_at == null) continue;
@@ -96,8 +98,8 @@ export async function collectedFees(network: Network, providerAddress: string, t
 
             const verifyTransactionFee = await utils.chainTransactionFee(ethProvider, block.verify_tx_hash);
 
-            senderAccountStat["spent by SENDER ACCOUNT"].eth += verifyTransactionFee;
-            senderAccountStat["spent by SENDER ACCOUNT"].usd += verifyTransactionFee * eth_price;
+            senderAccountStat.eth += verifyTransactionFee;
+            senderAccountStat.usd += verifyTransactionFee * eth_price;
 
             const transactionUrl = `${providerAddress}/api/v0.1/blocks/${currentBlock}/transactions`;
             const response = await fetch(transactionUrl);
@@ -130,7 +132,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
         }
     }
 
-    return Object.assign(senderAccountStat, { "collected fees": tokensStat });
+    return Object.assign({ "spent by SENDER ACCOUNT": senderAccountStat }, { "collected fees": tokensStat });
 }
 
 export async function collectedTokenLiquidations(
@@ -141,7 +143,7 @@ export async function collectedTokenLiquidations(
 ) {
     const ethProvider = new ethers.providers.EtherscanProvider(network, etherscan_api_key);
 
-    let liquidationInfo = { "Total amount of ETH": 0 };
+    let liquidationAmount = 0;
     let history: ethers.ethers.providers.TransactionResponse[];
 
     do {
@@ -162,9 +164,9 @@ export async function collectedTokenLiquidations(
             const transactionValueWei = transaction.value;
             const transactionValue = Number(ethers.utils.formatEther(transactionValueWei));
 
-            liquidationInfo["Total amount of ETH"] += transactionValue;
+            liquidationAmount += transactionValue;
         }
     } while (history.length > 0 && timePeriod.isCorrect());
 
-    return liquidationInfo;
+    return { "Total amount of ETH": liquidationAmount };
 }

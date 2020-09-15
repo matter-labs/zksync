@@ -19,10 +19,7 @@ async function main() {
             .command("current-balances")
             .description("output worth of tokens on operator balances in zkSync as ETH and USD")
             .action(async () => {
-                const balancesInfo = await commands.currentBalances(
-                    config.network,
-                    config.operator_fee_address
-                );
+                const balancesInfo = await commands.currentBalances(config.network, config.operator_fee_address);
                 print(balancesInfo);
             });
 
@@ -33,11 +30,7 @@ async function main() {
             .option("--timeTo <timeTo>", "end of time period in format 'YYYY-MM-DDTHH:MM:SS' (Default - current time)")
             .action(async (cmd: Command) => {
                 const timePeriod = new TimePeriod(cmd.timeFrom, cmd.timeTo);
-                const feesInfo = await commands.collectedFees(
-                    config.network,
-                    config.rest_api_address,
-                    timePeriod
-                );
+                const feesInfo = await commands.collectedFees(config.network, config.rest_api_address, timePeriod);
                 print(feesInfo);
             });
 
