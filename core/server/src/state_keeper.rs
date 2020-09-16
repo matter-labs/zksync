@@ -5,7 +5,7 @@ use futures::{
     stream::StreamExt,
     SinkExt,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 use web3::types::Address;
 // Workspace uses
 use crypto_exports::ff;
@@ -125,14 +125,15 @@ impl PlasmaStateInitParams {
         }
     }
 
-    pub fn get_pending_block(
+    pub async fn get_pending_block(
         &self,
-        storage: &storage::StorageProcessor,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Option<SendablePendingBlock> {
         let pending_block = storage
             .chain()
             .block_schema()
             .load_pending_block()
+            .await
             .unwrap_or_default()?;
 
         if pending_block.number <= self.last_block_number {
@@ -151,18 +152,21 @@ impl PlasmaStateInitParams {
         Some(pending_block)
     }
 
-    pub fn restore_from_db(storage: &storage::StorageProcessor) -> Result<Self, failure::Error> {
+    pub async fn restore_from_db(
+        storage: &mut storage::StorageProcessor<'_>,
+    ) -> Result<Self, failure::Error> {
         let mut init_params = Self::new();
-        init_params.load_from_db(&storage)?;
+        init_params.load_from_db(storage).await?;
 
         Ok(init_params)
     }
 
-    fn load_account_tree(
+    async fn load_account_tree(
         &mut self,
-        storage: &storage::StorageProcessor,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Result<BlockNumber, failure::Error> {
-        let (verified_block, accounts) = storage.chain().state_schema().load_verified_state()?;
+        let (verified_block, accounts) =
+            storage.chain().state_schema().load_verified_state().await?;
         for (id, account) in accounts {
             self.insert_account(id, account);
         }
@@ -170,30 +174,34 @@ impl PlasmaStateInitParams {
         if let Some(account_tree_cache) = storage
             .chain()
             .block_schema()
-            .get_account_tree_cache_block(verified_block)?
+            .get_account_tree_cache_block(verified_block)
+            .await?
         {
             self.tree
                 .set_internals(serde_json::from_value(account_tree_cache)?);
         } else {
             self.tree.root_hash();
             let account_tree_cache = self.tree.get_internals();
-            storage.chain().block_schema().store_account_tree_cache(
-                verified_block,
-                serde_json::to_value(account_tree_cache)?,
-            )?;
+            storage
+                .chain()
+                .block_schema()
+                .store_account_tree_cache(verified_block, serde_json::to_value(account_tree_cache)?)
+                .await?;
         }
 
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
             .load_committed_state(None)
+            .await
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
 
         if block_number != verified_block {
             if let Some((_, account_updates)) = storage
                 .chain()
                 .state_schema()
-                .load_state_diff(verified_block, Some(block_number))?
+                .load_state_diff(verified_block, Some(block_number))
+                .await?
             {
                 let mut updated_accounts = account_updates
                     .into_iter()
@@ -214,7 +222,8 @@ impl PlasmaStateInitParams {
             let storage_root_hash = storage
                 .chain()
                 .block_schema()
-                .get_block(block_number)?
+                .get_block(block_number)
+                .await?
                 .expect("restored block must exist");
             assert_eq!(
                 storage_root_hash.new_root_hash,
@@ -225,10 +234,14 @@ impl PlasmaStateInitParams {
         Ok(block_number)
     }
 
-    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
-        let block_number = self.load_account_tree(storage)?;
+    async fn load_from_db(
+        &mut self,
+        storage: &mut storage::StorageProcessor<'_>,
+    ) -> Result<(), failure::Error> {
+        let block_number = self.load_account_tree(storage).await?;
         self.last_block_number = block_number;
-        self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, block_number)?;
+        self.unprocessed_priority_op =
+            Self::unprocessed_priority_op_id(storage, block_number).await?;
 
         info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
@@ -237,14 +250,15 @@ impl PlasmaStateInitParams {
         Ok(())
     }
 
-    pub fn load_state_diff(
+    pub async fn load_state_diff(
         &mut self,
-        storage: &storage::StorageProcessor,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Result<(), failure::Error> {
         let state_diff = storage
             .chain()
             .state_schema()
             .load_state_diff(self.last_block_number, None)
+            .await
             .map_err(|e| failure::format_err!("failed to load committed state: {}", e))?;
 
         if let Some((block_number, updates)) = state_diff {
@@ -255,7 +269,7 @@ impl PlasmaStateInitParams {
                 }
             }
             self.unprocessed_priority_op =
-                Self::unprocessed_priority_op_id(&storage, block_number)?;
+                Self::unprocessed_priority_op_id(storage, block_number).await?;
             self.last_block_number = block_number;
         }
         Ok(())
@@ -275,17 +289,19 @@ impl PlasmaStateInitParams {
         }
     }
 
-    fn unprocessed_priority_op_id(
-        storage: &storage::StorageProcessor,
+    async fn unprocessed_priority_op_id(
+        storage: &mut storage::StorageProcessor<'_>,
         block_number: BlockNumber,
     ) -> Result<u64, failure::Error> {
         let storage_op = storage
             .chain()
             .operations_schema()
-            .get_operation(block_number, ActionType::COMMIT);
+            .get_operation(block_number, ActionType::COMMIT)
+            .await;
         if let Some(storage_op) = storage_op {
             Ok(storage_op
-                .into_op(&storage)
+                .into_op(storage)
+                .await
                 .map_err(|e| failure::format_err!("could not convert storage_op: {}", e))?
                 .block
                 .processed_priority_ops
@@ -386,15 +402,21 @@ impl PlasmaStateKeeper {
         }
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
-        let storage = pool
+    pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
+        let mut storage = pool
             .access_storage()
+            .await
             .expect("db connection failed for statekeeper");
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .expect("unable to create db transaction in statekeeper");
 
-        let (last_committed, mut accounts) = storage
+        let (last_committed, mut accounts) = transaction
             .chain()
             .state_schema()
             .load_committed_state(None)
+            .await
             .expect("db failed");
         // TODO: move genesis block creation to separate routine.
         assert!(
@@ -408,16 +430,23 @@ impl PlasmaStateKeeper {
             nonce: fee_account.nonce,
         };
         accounts.insert(0, fee_account);
-        storage
+        transaction
             .chain()
             .state_schema()
             .commit_state_update(0, &[(0, db_account_update)])
+            .await
             .expect("db fail");
-        storage
+        transaction
             .chain()
             .state_schema()
             .apply_state_update(0)
+            .await
             .expect("db fail");
+
+        transaction
+            .commit()
+            .await
+            .expect("Unable to commit transaction in statekeeper");
         let state = PlasmaState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());
@@ -849,7 +878,6 @@ impl PlasmaStateKeeper {
 pub fn start_state_keeper(
     sk: PlasmaStateKeeper,
     pending_block: Option<SendablePendingBlock>,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
-    runtime.spawn(sk.run(pending_block))
+    tokio::spawn(sk.run(pending_block))
 }

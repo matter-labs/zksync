@@ -1,0 +1,13 @@
+[package]
+name = "db_test_macro"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.7"
+quote = "1"
+syn = { version = "1.0.3", features = ["full"] }

@@ -6,6 +6,7 @@ members = [
     "core/plasma",
     "core/server",
     "core/storage",
+    "core/storage/db_test_macro",
     "core/circuit",
     "core/models",
     "core/prover",

@@ -1,6 +1,6 @@
 // External deps
 use failure::format_err;
-use futures::{compat::Future01CompatExt, executor::block_on};
+use futures::compat::Future01CompatExt;
 use models::NewTokenEvent;
 use std::convert::TryFrom;
 use web3::contract::Contract;
@@ -63,7 +63,7 @@ impl EventsState {
     /// * `eth_blocks_step` - Blocks step for watching
     /// * `end_eth_blocks_offset` - Delta between last eth block and last watched block
     ///
-    pub fn update_events_state<T: Transport>(
+    pub async fn update_events_state<T: Transport>(
         &mut self,
         web3: &Web3<T>,
         franklin_contract: &(ethabi::Contract, Contract<T>),
@@ -81,7 +81,8 @@ impl EventsState {
                 self.last_watched_eth_block_number,
                 eth_blocks_step,
                 end_eth_blocks_offset,
-            )?;
+            )
+            .await?;
 
         self.last_watched_eth_block_number = to_block_number;
 
@@ -120,7 +121,7 @@ impl EventsState {
     /// * `eth_blocks_step` - Ethereum blocks delta step
     /// * `end_eth_blocks_offset` - last block delta
     ///
-    fn get_new_events_and_last_watched_block<T: Transport>(
+    async fn get_new_events_and_last_watched_block<T: Transport>(
         web3: &Web3<T>,
         franklin_contract: &(ethabi::Contract, Contract<T>),
         governance_contract: &(ethabi::Contract, Contract<T>),
@@ -161,7 +162,8 @@ impl EventsState {
             governance_contract,
             from_block_number,
             to_block_number,
-        )?;
+        )
+        .await?;
 
         Ok((block_logs, token_logs, to_block_number_u64))
     }
@@ -175,7 +177,7 @@ impl EventsState {
     /// * `from` - From ethereum block number
     /// * `to` - To ethereum block number
     ///
-    fn get_token_added_logs<T: Transport>(
+    async fn get_token_added_logs<T: Transport>(
         web3: &Web3<T>,
         contract: &(ethabi::Contract, Contract<T>),
         from: BlockNumber,
@@ -193,7 +195,10 @@ impl EventsState {
             .topics(Some(vec![new_token_event_topic]), None, None, None)
             .build();
 
-        block_on(web3.eth().logs(filter).compat())?
+        web3.eth()
+            .logs(filter)
+            .compat()
+            .await?
             .into_iter()
             .map(|event| {
                 NewTokenEvent::try_from(event)

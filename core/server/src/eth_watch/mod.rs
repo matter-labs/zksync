@@ -18,7 +18,7 @@ use futures::{
     compat::Future01CompatExt,
     SinkExt, StreamExt,
 };
-use tokio::{runtime::Runtime, task::JoinHandle, time};
+use tokio::{task::JoinHandle, time};
 use web3::{
     contract::{Contract, Options},
     transports::EventLoopHandle,
@@ -531,7 +531,6 @@ pub fn start_eth_watch(
     config_options: ConfigurationOptions,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
     let (web3_event_loop_handle, transport) =
         web3::transports::Http::new(&config_options.web3_url).unwrap();
@@ -544,9 +543,9 @@ pub fn start_eth_watch(
         config_options.confirmations_for_eth_event,
         eth_req_receiver,
     );
-    runtime.spawn(eth_watch.run());
+    tokio::spawn(eth_watch.run());
 
-    runtime.spawn(async move {
+    tokio::spawn(async move {
         let mut timer = time::interval(config_options.eth_watch_poll_interval);
 
         loop {

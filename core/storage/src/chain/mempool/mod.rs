@@ -1,29 +1,32 @@
 // Built-in deps
 use std::collections::VecDeque;
 // External imports
-use diesel::prelude::*;
 // Workspace imports
 use models::node::{tx::TxHash, SignedFranklinTx};
 // Local imports
-use self::records::{MempoolTx, NewMempoolTx};
-use crate::{schema::*, StorageProcessor};
+use self::records::MempoolTx;
+use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
 
 /// Schema for TODO
 #[derive(Debug)]
-pub struct MempoolSchema<'a>(pub &'a StorageProcessor);
+pub struct MempoolSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> MempoolSchema<'a> {
+impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Loads all the transactions stored in the mempool schema.
-    pub fn load_txs(&self) -> Result<VecDeque<SignedFranklinTx>, failure::Error> {
-        let txs: Vec<MempoolTx> = mempool_txs::table
-            .order_by(mempool_txs::created_at)
-            .load(self.0.conn())?;
+    pub async fn load_txs(&mut self) -> QueryResult<VecDeque<SignedFranklinTx>> {
+        let txs: Vec<MempoolTx> = sqlx::query_as!(
+            MempoolTx,
+            "SELECT * FROM mempool_txs
+            ORDER BY created_at",
+        )
+        .fetch_all(self.0.conn())
+        .await?;
 
         let mut txs = txs
             .into_iter()
-            .map(|tx_object| -> Result<SignedFranklinTx, failure::Error> {
+            .map(|tx_object| -> QueryResult<SignedFranklinTx> {
                 let tx = serde_json::from_value(tx_object.tx)?;
                 let sign_data = match tx_object.eth_sign_data {
                     None => None,
@@ -41,41 +44,53 @@ impl<'a> MempoolSchema<'a> {
     }
 
     /// Adds a new transaction to the mempool schema.
-    pub fn insert_tx(&self, tx_data: &SignedFranklinTx) -> Result<(), failure::Error> {
+    pub async fn insert_tx(&mut self, tx_data: &SignedFranklinTx) -> QueryResult<()> {
         let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
         let tx = serde_json::to_value(&tx_data.tx)?;
 
-        let db_entry = NewMempoolTx {
+        let eth_sign_data = tx_data
+            .eth_sign_data
+            .as_ref()
+            .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
+
+        sqlx::query!(
+            "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)
+            VALUES ($1, $2, $3, $4)",
             tx_hash,
             tx,
-            created_at: chrono::Utc::now(),
-            eth_sign_data: tx_data
-                .eth_sign_data
-                .as_ref()
-                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData")),
-        };
-
-        diesel::insert_into(mempool_txs::table)
-            .values(db_entry)
-            .execute(self.0.conn())?;
+            chrono::Utc::now(),
+            eth_sign_data
+        )
+        .execute(self.0.conn())
+        .await?;
 
         Ok(())
     }
 
-    pub fn remove_tx(&self, tx: &[u8]) -> QueryResult<()> {
+    pub async fn remove_tx(&mut self, tx: &[u8]) -> QueryResult<()> {
         let tx_hash = hex::encode(tx);
 
-        diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq(&tx_hash)))
-            .execute(self.0.conn())?;
+        sqlx::query!(
+            "DELETE FROM mempool_txs
+            WHERE tx_hash = $1",
+            &tx_hash
+        )
+        .execute(self.0.conn())
+        .await?;
 
         Ok(())
     }
 
-    fn remove_txs(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
+    async fn remove_txs(&mut self, txs: &[TxHash]) -> QueryResult<()> {
         let tx_hashes: Vec<_> = txs.iter().map(hex::encode).collect();
 
-        diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq_any(&tx_hashes)))
-            .execute(self.0.conn())?;
+        sqlx::query!(
+            "DELETE FROM mempool_txs
+            WHERE tx_hash = ANY($1)",
+            &tx_hashes
+        )
+        .execute(self.0.conn())
+        .await?;
 
         Ok(())
     }
@@ -89,21 +104,27 @@ impl<'a> MempoolSchema<'a> {
     ///
     /// This method is expected to be initially invoked on the server start, and then
     /// invoked periodically with a big interval (to prevent possible database bloating).
-    pub fn collect_garbage(&self) -> Result<(), failure::Error> {
-        let mut txs_to_remove: Vec<_> = self.load_txs()?.into_iter().collect();
-        txs_to_remove.retain(|tx| {
+    pub async fn collect_garbage(&mut self) -> QueryResult<()> {
+        let all_txs: Vec<_> = self.load_txs().await?.into_iter().collect();
+        let mut tx_hashes_to_remove = Vec::new();
+
+        for tx in all_txs {
             let tx_hash = tx.hash();
-            self.0
+            let should_remove = self
+                .0
                 .chain()
                 .operations_ext_schema()
                 .get_tx_by_hash(tx_hash.as_ref())
+                .await
                 .expect("DB issue while restoring the mempool state")
-                .is_some()
-        });
+                .is_some();
 
-        let tx_hashes: Vec<_> = txs_to_remove.into_iter().map(|tx| tx.hash()).collect();
+            if should_remove {
+                tx_hashes_to_remove.push(tx.hash())
+            }
+        }
 
-        self.remove_txs(&tx_hashes)?;
+        self.remove_txs(&tx_hashes_to_remove).await?;
 
         Ok(())
     }

@@ -10,7 +10,7 @@ use models::{
 };
 // Local imports
 use crate::tests::db_test;
-use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, StorageProcessor};
+use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, QueryResult, StorageProcessor};
 use num::BigUint;
 
 /// Creates a sample operation to be stored in `operations` table.
@@ -80,16 +80,14 @@ impl EthereumTxParams {
 }
 
 /// Verifies that on a fresh database no bogus operations are loaded.
-#[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
-fn ethereum_empty_load() {
-    let conn = StorageProcessor::establish_connection().unwrap();
-    db_test(conn.conn(), || {
-        let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        assert!(unconfirmed_operations.is_empty());
+#[db_test]
+async fn ethereum_empty_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert!(unconfirmed_operations.is_empty());
 
-        Ok(())
-    });
+    Ok(())
 }
 
 /// Checks the basic Ethereum storage workflow:
@@ -100,100 +98,114 @@ fn ethereum_empty_load() {
 /// - Check that both txs can be loaded.
 /// - Make the operation as completed.
 /// - Check that now txs aren't loaded.
-#[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
-fn ethereum_storage() {
-    let conn = StorageProcessor::establish_connection().unwrap();
-    db_test(conn.conn(), || {
-        EthereumSchema(&conn).initialize_eth_data()?;
+#[db_test]
+async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    EthereumSchema(&mut storage).initialize_eth_data().await?;
 
-        let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        assert!(unconfirmed_operations.is_empty());
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert!(unconfirmed_operations.is_empty());
 
-        // Store operation with ID 1.
-        let block_number = 1;
-        let operation = BlockSchema(&conn).execute_operation(get_operation(block_number))?;
+    // Store operation with ID 1.
+    let block_number = 1;
+    let operation = BlockSchema(&mut storage)
+        .execute_operation(get_operation(block_number))
+        .await?;
 
-        // Store the Ethereum transaction.
-        let params = EthereumTxParams::new("commit".into(), operation.clone());
-        let response = EthereumSchema(&conn).save_new_eth_tx(
+    // Store the Ethereum transaction.
+    let params = EthereumTxParams::new("commit".into(), operation.clone());
+    let response = EthereumSchema(&mut storage)
+        .save_new_eth_tx(
             OperationType::Commit,
             Some(params.op.id.unwrap()),
             params.deadline_block as i64,
             params.gas_price.clone(),
             params.raw_tx.clone(),
-        )?;
-        EthereumSchema(&conn).add_hash_entry(response.id, &params.hash)?;
+        )
+        .await?;
+    EthereumSchema(&mut storage)
+        .add_hash_entry(response.id, &params.hash)
+        .await?;
 
-        // Check that it can be loaded.
-        let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        let eth_op = unconfirmed_operations[0].clone();
-        let op = eth_op.op.clone().expect("No Operation entry");
-        assert_eq!(op.id, operation.id);
-        // Load the database ID, since we can't predict it for sure.
-        assert_eq!(
-            eth_op,
-            params.to_eth_op(eth_op.id, response.nonce.low_u64())
-        );
+    // Check that it can be loaded.
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    let eth_op = unconfirmed_operations[0].clone();
+    let op = eth_op.op.clone().expect("No Operation entry");
+    assert_eq!(op.id, operation.id);
+    // Load the database ID, since we can't predict it for sure.
+    assert_eq!(
+        eth_op,
+        params.to_eth_op(eth_op.id, response.nonce.low_u64())
+    );
 
-        // Store operation with ID 2.
-        let block_number = 2;
-        let operation_2 = BlockSchema(&conn).execute_operation(get_operation(block_number))?;
+    // Store operation with ID 2.
+    let block_number = 2;
+    let operation_2 = BlockSchema(&mut storage)
+        .execute_operation(get_operation(block_number))
+        .await?;
 
-        // Create one more Ethereum transaction.
-        let params_2 = EthereumTxParams::new("commit".into(), operation_2.clone());
-        let response_2 = EthereumSchema(&conn).save_new_eth_tx(
+    // Create one more Ethereum transaction.
+    let params_2 = EthereumTxParams::new("commit".into(), operation_2.clone());
+    let response_2 = EthereumSchema(&mut storage)
+        .save_new_eth_tx(
             OperationType::Commit,
             Some(params_2.op.id.unwrap()),
             params_2.deadline_block as i64,
             params_2.gas_price.clone(),
             params_2.raw_tx.clone(),
-        )?;
-        EthereumSchema(&conn).add_hash_entry(response_2.id, &params_2.hash)?;
+        )
+        .await?;
+    EthereumSchema(&mut storage)
+        .add_hash_entry(response_2.id, &params_2.hash)
+        .await?;
 
-        // Check that we now can load two operations.
-        let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        assert_eq!(unconfirmed_operations.len(), 2);
-        let eth_op = unconfirmed_operations[1].clone();
-        let op = eth_op.op.clone().expect("No Operation entry");
-        assert_eq!(op.id, operation_2.id);
-        assert_eq!(
-            eth_op,
-            params_2.to_eth_op(eth_op.id, response_2.nonce.low_u64())
-        );
+    // Check that we now can load two operations.
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert_eq!(unconfirmed_operations.len(), 2);
+    let eth_op = unconfirmed_operations[1].clone();
+    let op = eth_op.op.clone().expect("No Operation entry");
+    assert_eq!(op.id, operation_2.id);
+    assert_eq!(
+        eth_op,
+        params_2.to_eth_op(eth_op.id, response_2.nonce.low_u64())
+    );
 
-        // Make the transaction as completed.
-        EthereumSchema(&conn).confirm_eth_tx(&params_2.hash)?;
+    // Make the transaction as completed.
+    EthereumSchema(&mut storage)
+        .confirm_eth_tx(&params_2.hash)
+        .await?;
 
-        // Now there should be only one unconfirmed operation.
-        let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        assert_eq!(unconfirmed_operations.len(), 1);
+    // Now there should be only one unconfirmed operation.
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert_eq!(unconfirmed_operations.len(), 1);
 
-        // Check that stats are updated as well.
-        let updated_stats = EthereumSchema(&conn).load_stats()?;
+    // Check that stats are updated as well.
+    let updated_stats = EthereumSchema(&mut storage).load_stats().await?;
 
-        assert_eq!(updated_stats.commit_ops, 2);
-        assert_eq!(updated_stats.verify_ops, 0);
-        assert_eq!(updated_stats.withdraw_ops, 0);
+    assert_eq!(updated_stats.commit_ops, 2);
+    assert_eq!(updated_stats.verify_ops, 0);
+    assert_eq!(updated_stats.withdraw_ops, 0);
 
-        Ok(())
-    });
+    Ok(())
 }
 
 /// Check that stored nonce starts with 0 and is incremented after every getting.
-#[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
-fn eth_nonce() {
-    let conn = StorageProcessor::establish_connection().unwrap();
-    db_test(conn.conn(), || {
-        EthereumSchema(&conn).initialize_eth_data()?;
+#[db_test]
+async fn eth_nonce(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    EthereumSchema(&mut storage).initialize_eth_data().await?;
 
-        for expected_next_nonce in 0..5 {
-            let actual_next_nonce = EthereumSchema(&conn).get_next_nonce()?;
+    for expected_next_nonce in 0..5 {
+        let actual_next_nonce = EthereumSchema(&mut storage).get_next_nonce().await?;
 
-            assert_eq!(actual_next_nonce, expected_next_nonce);
-        }
+        assert_eq!(actual_next_nonce, expected_next_nonce);
+    }
 
-        Ok(())
-    });
+    Ok(())
 }
