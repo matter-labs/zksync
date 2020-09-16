@@ -21,7 +21,7 @@ export class TimePeriod {
     }
 
     public inTime(timeStamp: Date) {
-        return +this.timeFrom <= +timeStamp && +this.timeTo >= +timeStamp;
+        return +this.timeFrom <= +timeStamp && +timeStamp <= +this.timeTo;
     }
 
     public less(timeStamp: Date) {
