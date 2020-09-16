@@ -10,7 +10,8 @@ The configuration file contains the default network and a list of all networks w
 | :-- | :-- |
 | `OPERATOR_FEE_ETH_ADDRESS` | Ethereum Address to be used for zkSync account to collect fees |
 | `REST_API_ADDR` | Address where the zkSync REST API is located |
-| `ETHERSCAN_API_KEY` | Api-Key Token which uses for all API request to Etherscan   |
+
+Also load environment variable `ETHERSCAN_API_KEY` from .env file only once
 
 ## Usage
 
@@ -70,7 +71,7 @@ Output such information:
 $ yarn start liquidations [--timeFrom <time>] [--timeTo <time>]
 ```
 
-The total amount of ETH accrued as a result of token liquidations during the specified period.
+Output the total amount of ETH accrued as a result of token liquidations during the specified period.
 
 ## Testing
 
