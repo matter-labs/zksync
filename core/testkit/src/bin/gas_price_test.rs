@@ -180,7 +180,7 @@ fn gen_unpacked_amount(rng: &mut impl Rng) -> BigUint {
         * BigUint::from(rng.gen_range(0u64, 2u64.pow(5 * 4)))
 }
 
-fn gas_price_test() {
+async fn gas_price_test() {
     let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
@@ -238,70 +238,50 @@ fn gas_price_test() {
 
     let rng = &mut XorShiftRng::from_seed([0, 1, 2, 3]);
 
-    commit_cost_of_empty_block(&mut test_setup); // warmup, init some storage slots
-    let base_cost = commit_cost_of_empty_block(&mut test_setup);
+    commit_cost_of_empty_block(&mut test_setup).await; // warmup, init some storage slots
+    let base_cost = commit_cost_of_empty_block(&mut test_setup).await;
     println!(
         "block operations base cost: commit: {} verify: {} withdrawals: {}",
         base_cost.base_commit_cost, base_cost.base_verify_cost, base_cost.base_withdraw_cost
     );
 
-    commit_cost_of_deposits(&mut test_setup, 100, Token(0), rng).report(
-        &base_cost,
-        "deposit ETH",
-        true,
-    );
-    commit_cost_of_deposits(&mut test_setup, 50, Token(1), rng).report(
-        &base_cost,
-        "deposit ERC20",
-        true,
-    );
+    commit_cost_of_deposits(&mut test_setup, 100, Token(0), rng)
+        .await
+        .report(&base_cost, "deposit ETH", true);
+    commit_cost_of_deposits(&mut test_setup, 50, Token(1), rng)
+        .await
+        .report(&base_cost, "deposit ERC20", true);
 
-    commit_cost_of_change_pubkey(&mut test_setup, 50).report(
-        &base_cost,
-        "change pubkey offchain",
-        false,
-    );
+    commit_cost_of_change_pubkey(&mut test_setup, 50)
+        .await
+        .report(&base_cost, "change pubkey", false);
 
-    commit_cost_of_change_pubkey_onchain_auth(&mut test_setup, 50).report(
-        &base_cost,
-        "change pubkey onchain auth",
-        false,
-    );
-
-    commit_cost_of_transfers(&mut test_setup, 500, rng).report(&base_cost, "transfer", false);
-    commit_cost_of_transfers_to_new(&mut test_setup, 500, rng).report(
-        &base_cost,
-        "transfer to new",
-        false,
-    );
-    commit_cost_of_full_exits(&mut test_setup, 100, Token(0)).report(
-        &base_cost,
-        "full exit ETH",
-        true,
-    );
-    commit_cost_of_full_exits(&mut test_setup, 100, Token(1)).report(
-        &base_cost,
-        "full exit ERC20",
-        true,
-    );
+    commit_cost_of_transfers(&mut test_setup, 500, rng)
+        .await
+        .report(&base_cost, "transfer", false);
+    commit_cost_of_transfers_to_new(&mut test_setup, 500, rng)
+        .await
+        .report(&base_cost, "transfer to new", false);
+    commit_cost_of_full_exits(&mut test_setup, 100, Token(0))
+        .await
+        .report(&base_cost, "full exit ETH", true);
+    commit_cost_of_full_exits(&mut test_setup, 100, Token(1))
+        .await
+        .report(&base_cost, "full exit ERC20", true);
 
     let withdrawals_amount = MAX_WITHDRAWALS_PER_BLOCK as usize;
-    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(0), rng).report(
-        &base_cost,
-        "withdrawals ETH",
-        false,
-    );
-    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(1), rng).report(
-        &base_cost,
-        "withdrawals ERC20",
-        false,
-    );
+    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(0), rng)
+        .await
+        .report(&base_cost, "withdrawals ETH", false);
+    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(1), rng)
+        .await
+        .report(&base_cost, "withdrawals ERC20", false);
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
 }
 
-fn commit_cost_of_transfers(
+async fn commit_cost_of_transfers(
     test_setup: &mut TestSetup,
     n_transfers: usize,
     rng: &mut impl Rng,
@@ -323,37 +303,45 @@ fn commit_cost_of_transfers(
 
     // Prepare block with transfers
     test_setup.start_block();
-    test_setup.deposit(
-        ETHAccountId(1),
-        ZKSyncAccountId(1),
-        Token(0),
-        deposit_amount,
-    );
+    test_setup
+        .deposit(
+            ETHAccountId(1),
+            ZKSyncAccountId(1),
+            Token(0),
+            deposit_amount,
+        )
+        .await;
     // create account 2
-    test_setup.deposit(
-        ETHAccountId(2),
-        ZKSyncAccountId(2),
-        Token(0),
-        BigUint::from(0u32),
-    );
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), change_pk_fee);
+    test_setup
+        .deposit(
+            ETHAccountId(2),
+            ZKSyncAccountId(2),
+            Token(0),
+            BigUint::from(0u32),
+        )
+        .await;
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
     test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
 
     // Execute transfers
     test_setup.start_block();
     for i in 0..n_transfers {
-        test_setup.transfer(
-            ZKSyncAccountId(1),
-            ZKSyncAccountId(2),
-            Token(0),
-            tranfers_amount[i].clone(),
-            tranfers_fee[i].clone(),
-        );
+        test_setup
+            .transfer(
+                ZKSyncAccountId(1),
+                ZKSyncAccountId(2),
+                Token(0),
+                tranfers_amount[i].clone(),
+                tranfers_fee[i].clone(),
+            )
+            .await;
     }
     let transfer_execute_result = test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
     assert_eq!(
         transfer_execute_result.block_size_chunks,
@@ -364,7 +352,7 @@ fn commit_cost_of_transfers(
     CostsSample::new(n_transfers, U256::from(0), transfer_execute_result)
 }
 
-fn commit_cost_of_transfers_to_new(
+async fn commit_cost_of_transfers_to_new(
     test_setup: &mut TestSetup,
     n_transfers: usize,
     rng: &mut impl Rng,
@@ -385,29 +373,35 @@ fn commit_cost_of_transfers_to_new(
     }
 
     test_setup.start_block();
-    test_setup.deposit(
-        ETHAccountId(1),
-        ZKSyncAccountId(1),
-        Token(0),
-        deposit_amount,
-    );
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), change_pk_fee);
+    test_setup
+        .deposit(
+            ETHAccountId(1),
+            ZKSyncAccountId(1),
+            Token(0),
+            deposit_amount,
+        )
+        .await;
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
     test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
 
     test_setup.start_block();
     for i in 0..n_transfers {
-        test_setup.transfer_to_new_random(
-            ZKSyncAccountId(1),
-            Token(0),
-            tranfers_amount[i].clone(),
-            tranfers_fee[i].clone(),
-            rng,
-        );
+        test_setup
+            .transfer_to_new_random(
+                ZKSyncAccountId(1),
+                Token(0),
+                tranfers_amount[i].clone(),
+                tranfers_fee[i].clone(),
+                rng,
+            )
+            .await;
     }
     let transfer_execute_result = test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
     assert_eq!(
         transfer_execute_result.block_size_chunks,
@@ -417,7 +411,7 @@ fn commit_cost_of_transfers_to_new(
     CostsSample::new(n_transfers, U256::from(0), transfer_execute_result)
 }
 
-fn commit_cost_of_withdrawals(
+async fn commit_cost_of_withdrawals(
     test_setup: &mut TestSetup,
     n_withdrawals: usize,
     token: Token,
@@ -446,24 +440,30 @@ fn commit_cost_of_withdrawals(
     }
 
     test_setup.start_block();
-    test_setup.deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount);
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), token, change_pk_fee);
+    test_setup
+        .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
+        .await;
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
     test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
 
     test_setup.start_block();
     for i in 0..n_withdrawals {
-        test_setup.withdraw_to_random_account(
-            ZKSyncAccountId(1),
-            token,
-            withdraws_fee[i].clone(),
-            withdrawals_fee[i].clone(),
-            rng,
-        );
+        test_setup
+            .withdraw_to_random_account(
+                ZKSyncAccountId(1),
+                token,
+                withdraws_fee[i].clone(),
+                withdrawals_fee[i].clone(),
+                rng,
+            )
+            .await;
     }
     let withdraws_execute_result = test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
     assert_eq!(
         withdraws_execute_result.block_size_chunks,
@@ -473,7 +473,7 @@ fn commit_cost_of_withdrawals(
     CostsSample::new(n_withdrawals, U256::from(0), withdraws_execute_result)
 }
 
-fn commit_cost_of_deposits(
+async fn commit_cost_of_deposits(
     test_setup: &mut TestSetup,
     n_deposits: usize,
     token: Token,
@@ -489,6 +489,7 @@ fn commit_cost_of_deposits(
     for amount in amounts.into_iter() {
         let deposit_tx_receipt = test_setup
             .deposit_to_random(ETHAccountId(4), token, amount.clone(), rng)
+            .await
             .last()
             .cloned()
             .expect("At least one receipt is expected for deposit");
@@ -496,6 +497,7 @@ fn commit_cost_of_deposits(
     }
     let deposits_execute_result = test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
     assert_eq!(
         deposits_execute_result.block_size_chunks,
@@ -505,7 +507,7 @@ fn commit_cost_of_deposits(
     CostsSample::new(n_deposits, user_gas_cost, deposits_execute_result)
 }
 
-fn commit_cost_of_full_exits(
+async fn commit_cost_of_full_exits(
     test_setup: &mut TestSetup,
     n_full_exits: usize,
     token: Token,
@@ -513,23 +515,29 @@ fn commit_cost_of_full_exits(
     let mut user_gas_cost = U256::from(0);
 
     test_setup.start_block();
-    test_setup.deposit(
-        ETHAccountId(3),
-        ZKSyncAccountId(4),
-        token,
-        BigUint::from(1u32),
-    );
+    test_setup
+        .deposit(
+            ETHAccountId(3),
+            ZKSyncAccountId(4),
+            token,
+            BigUint::from(1u32),
+        )
+        .await;
     test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
 
     test_setup.start_block();
     for _ in 0..n_full_exits {
-        let full_exit_tx_receipt = test_setup.full_exit(ETHAccountId(3), ZKSyncAccountId(4), token);
+        let full_exit_tx_receipt = test_setup
+            .full_exit(ETHAccountId(3), ZKSyncAccountId(4), token)
+            .await;
         user_gas_cost += full_exit_tx_receipt.gas_used.expect("full exit gas used");
     }
     let full_exits_execute_results = test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
     assert_eq!(
         full_exits_execute_results.block_size_chunks,
@@ -539,10 +547,11 @@ fn commit_cost_of_full_exits(
     CostsSample::new(n_full_exits, user_gas_cost, full_exits_execute_results)
 }
 
-fn commit_cost_of_empty_block(test_setup: &mut TestSetup) -> BaseCost {
+async fn commit_cost_of_empty_block(test_setup: &mut TestSetup) -> BaseCost {
     test_setup.start_block();
     let empty_block_exec_results = test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
     assert_eq!(
         empty_block_exec_results.block_size_chunks, MIN_BLOCK_SIZE_CHUNKS,
@@ -567,7 +576,7 @@ fn commit_cost_of_empty_block(test_setup: &mut TestSetup) -> BaseCost {
     }
 }
 
-fn commit_cost_of_change_pubkey(
+async fn commit_cost_of_change_pubkey(
     test_setup: &mut TestSetup,
     n_change_pubkeys: usize,
 ) -> CostsSample {
@@ -576,18 +585,22 @@ fn commit_cost_of_change_pubkey(
     let deposit_amount = (fee_amount * (n_change_pubkeys + 1) as u32).into();
 
     test_setup.start_block();
-    test_setup.deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount);
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), token, BigUint::from(fee_amount));
+    test_setup
+        .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
+        .await;
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
     test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
 
     test_setup.start_block();
     for _ in 0..n_change_pubkeys {
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), token, BigUint::from(fee_amount));
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
     }
     let change_pubkey_execute_result = test_setup
         .execute_commit_and_verify_block()
+        .await
         .expect("Block execution failed");
     assert_eq!(
         change_pubkey_execute_result.block_size_chunks,
@@ -601,45 +614,7 @@ fn commit_cost_of_change_pubkey(
     )
 }
 
-fn commit_cost_of_change_pubkey_onchain_auth(
-    test_setup: &mut TestSetup,
-    n_change_pubkeys: usize,
-) -> CostsSample {
-    let token = Token(0);
-    let fee_amount = 100u32;
-    let deposit_amount = (fee_amount * (n_change_pubkeys + 1) as u32).into();
-
-    test_setup.start_block();
-    test_setup.deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount);
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1), token, BigUint::from(fee_amount));
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-
-    test_setup.start_block();
-    for _ in 0..n_change_pubkeys {
-        test_setup.change_pubkey_with_onchain_auth(
-            ETHAccountId(0),
-            ZKSyncAccountId(1),
-            token,
-            BigUint::from(fee_amount),
-        );
-    }
-    let change_pubkey_execute_result = test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-    assert_eq!(
-        change_pubkey_execute_result.block_size_chunks,
-        n_change_pubkeys * ChangePubKeyOp::CHUNKS,
-        "block size mismatch"
-    );
-    CostsSample::new(
-        n_change_pubkeys,
-        U256::from(0),
-        change_pubkey_execute_result,
-    )
-}
-
-fn main() {
-    gas_price_test();
+#[tokio::main]
+async fn main() {
+    gas_price_test().await;
 }

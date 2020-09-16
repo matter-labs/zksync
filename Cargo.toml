@@ -6,6 +6,7 @@ members = [
     "core/plasma",
     "core/server",
     "core/storage",
+    "core/storage/db_test_macro",
     "core/circuit",
     "core/models",
     "core/prover",
@@ -14,4 +15,5 @@ members = [
     "core/testkit",
     "core/loadtest",
     "core/crypto_exports",
+    "core/tok_cli"
 ]

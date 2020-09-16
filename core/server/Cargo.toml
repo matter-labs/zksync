@@ -34,9 +34,10 @@ jsonrpc-derive = "14.0.3"
 tokio = { version = "0.2", features = ["full"] }
 tokio_old = { package = "tokio", version = "0.1.22" }
 futures = { version = "0.3", features = ["compat"] }
-actix-rt = "0.2.5"
-actix-cors = "0.1.0"
-actix-web = "1.0.8"
+actix-rt = "1.1.1"
+actix-cors = "0.3.0"
+actix-web = "3.0.0"
+actix-web-httpauth = "0.5.0"
 
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
@@ -49,6 +50,7 @@ reqwest = { version = "0.10", features = ["blocking"] }
 tiny-keccak = "1.4.2"
 async-trait = "0.1.31"
 prometheus_exporter_base = "0.31.0"
+jsonwebtoken = "7"
 
 rand = "0.7"
 

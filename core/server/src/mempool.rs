@@ -22,7 +22,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 // Workspace uses
 use models::node::{
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
@@ -112,12 +112,18 @@ impl MempoolState {
         }
     }
 
-    fn restore_from_db(db_pool: &ConnectionPool) -> Self {
-        let storage = db_pool.access_storage().expect("mempool db restore");
-        let (_, accounts) = storage
+    async fn restore_from_db(db_pool: &ConnectionPool) -> Self {
+        let mut storage = db_pool.access_storage().await.expect("mempool db restore");
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .expect("mempool db transaction");
+
+        let (_, accounts) = transaction
             .chain()
             .state_schema()
             .load_committed_state(None)
+            .await
             .expect("mempool account state load");
 
         let mut account_ids = HashMap::new();
@@ -130,19 +136,26 @@ impl MempoolState {
 
         // Remove any possible duplicates of already executed transactions
         // from the database.
-        storage
+        transaction
             .chain()
             .mempool_schema()
             .collect_garbage()
+            .await
             .expect("Collecting garbage in the mempool schema failed");
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let ready_txs = storage
+        let ready_txs = transaction
             .chain()
             .mempool_schema()
             .load_txs()
+            .await
             .expect("Attempt to restore mempool txs from DB failed");
+
+        transaction
+            .commit()
+            .await
+            .expect("mempool db transaction commit");
 
         log::info!(
             "{} transactions were restored from the persistent mempool storage",
@@ -182,20 +195,30 @@ struct Mempool {
 }
 
 impl Mempool {
-    fn add_tx(&mut self, tx: VerifiedTx) -> Result<(), TxAddError> {
-        let storage = self.db_pool.access_storage().map_err(|err| {
+    async fn add_tx(&mut self, tx: VerifiedTx) -> Result<(), TxAddError> {
+        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
-        storage
+        let mut transaction = storage.start_transaction().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+        transaction
             .chain()
             .mempool_schema()
             .insert_tx(tx.inner())
+            .await
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
+
+        transaction.commit().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
 
         self.mempool_state.add_tx(tx.into_inner())
     }
@@ -204,7 +227,7 @@ impl Mempool {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(*tx);
+                    let tx_add_result = self.add_tx(*tx).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
@@ -318,20 +341,23 @@ pub fn run_mempool_task(
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     config: &ConfigurationOptions,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
-    let mempool_state = MempoolState::restore_from_db(&db_pool);
+    let config = config.clone();
+    tokio::spawn(async move {
+        let mempool_state = MempoolState::restore_from_db(&db_pool).await;
 
-    let mempool = Mempool {
-        db_pool,
-        mempool_state,
-        requests,
-        eth_watch_req,
-        max_block_size_chunks: *config
-            .available_block_chunk_sizes
-            .iter()
-            .max()
-            .expect("failed to find max block chunks size"),
-    };
-    runtime.spawn(mempool.run())
+        let mempool = Mempool {
+            db_pool,
+            mempool_state,
+            requests,
+            eth_watch_req,
+            max_block_size_chunks: *config
+                .available_block_chunk_sizes
+                .iter()
+                .max()
+                .expect("failed to find max block chunks size"),
+        };
+
+        mempool.run().await
+    })
 }

@@ -1,10 +1,9 @@
 // External imports
+use sqlx::FromRow;
 // Workspace imports
 // Local imports
-use crate::schema::*;
 
-#[derive(Debug, Queryable, QueryableByName)]
-#[table_name = "server_config"]
+#[derive(Debug, FromRow)]
 pub struct ServerConfig {
     pub id: bool,
     pub contract_addr: Option<String>,

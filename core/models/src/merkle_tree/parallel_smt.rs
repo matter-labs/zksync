@@ -1,15 +1,18 @@
 /// Sparse Merkle tree with batch updates
 use super::hasher::Hasher;
+use crate::node::Fr;
 use crate::primitives::GetBits;
-use fnv::FnvHashMap;
+use crypto_exports::ff::{PrimeField, PrimeFieldRepr};
 
+use fnv::FnvHashMap;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::{RwLock, RwLockReadGuard};
 
 /// Nodes are indexed starting with index(root) = 0
 /// To store the index, at least 2 * TREE_HEIGHT bits is required.
 /// Wrapper-structure is used to avoid mixing up with `ItemIndex` on the type level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 struct NodeIndex(pub u64);
 
 /// Lead index: 0 <= i < N.
@@ -99,7 +102,7 @@ where
 }
 
 /// Merkle Tree branch node.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     depth: Depth,
     index: NodeIndex,
@@ -646,6 +649,55 @@ where
 
     fn calculate_level(&self, cur_depth: usize) -> usize {
         self.tree_depth - cur_depth - 1
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SparseMerkleTreeSerializableCacheBN256 {
+    root: NodeRef,
+    nodes: Vec<Node>,
+    cache: Vec<(NodeIndex, [u8; 32])>,
+}
+
+impl<T, H> SparseMerkleTree<T, Fr, H>
+where
+    T: GetBits,
+    H: Hasher<Fr>,
+{
+    pub fn get_internals(&self) -> SparseMerkleTreeSerializableCacheBN256 {
+        SparseMerkleTreeSerializableCacheBN256 {
+            root: self.root,
+            nodes: self.nodes.clone(),
+            cache: self
+                .cache
+                .read()
+                .unwrap()
+                .iter()
+                .map(|(idx, fr)| {
+                    let mut fr_bytes = [0u8; 32];
+                    fr.into_repr()
+                        .write_be(&mut fr_bytes[..])
+                        .expect("Fr write error");
+                    (*idx, fr_bytes)
+                })
+                .collect(),
+        }
+    }
+
+    pub fn set_internals(&mut self, internals: SparseMerkleTreeSerializableCacheBN256) {
+        self.root = internals.root;
+        self.nodes = internals.nodes;
+        self.cache = RwLock::new(
+            internals
+                .cache
+                .into_iter()
+                .map(|(idx, fr_bytes)| {
+                    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+                    fr_repr.read_be(&fr_bytes[..]).expect("Fr read error");
+                    (idx, Fr::from_repr(fr_repr).expect("Fr decode error"))
+                })
+                .collect(),
+        );
     }
 }
 
