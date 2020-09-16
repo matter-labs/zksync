@@ -60,6 +60,9 @@ export async function collectedFees(network: Network, providerAddress: string, t
 
     const senderAccountStat = { eth: 0, usd: 0 };
     const tokensStat: TokensInfo = { total: { eth: 0, usd: 0 } };
+
+    // structure that stores data about each token from zSync
+    // so as not to request the server many times for the same data
     const tokensCashed = new utils.TokensCashed();
 
     for (const token in tokens) {
@@ -71,6 +74,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
         tokensStat[token] = { amount: 0, eth: 0, usd: 0 };
     }
 
+    // traverse all blocks starting from the last one
     while (!timePeriod.less(currentBlockTime)) {
         const blockUrl = `${providerAddress}/api/v0.1/blocks?limit=${MAX_LIMIT}&max_block=${currentBlock}`;
         const response = await fetch(blockUrl);
@@ -92,6 +96,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
 
             const commitTransactionFee = await utils.chainTransactionFee(ethProvider, block.commit_tx_hash);
 
+            // update statistics for `commit` operation in L1
             senderAccountStat.eth += commitTransactionFee;
             senderAccountStat.usd += commitTransactionFee * eth_price;
 
@@ -103,9 +108,12 @@ export async function collectedFees(network: Network, providerAddress: string, t
 
             const verifyTransactionFee = await utils.chainTransactionFee(ethProvider, block.verify_tx_hash);
 
+            // update statistics for `verify` operation in L1
             senderAccountStat.eth += verifyTransactionFee;
             senderAccountStat.usd += verifyTransactionFee * eth_price;
 
+            // Each block includes many transactions
+            // Some transactions include a fee that operator collect
             const transactionUrl = `${providerAddress}/api/v0.1/blocks/${currentBlock}/transactions`;
             const response = await fetch(transactionUrl);
             const transactions = await response.json();
@@ -118,6 +126,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
                 // TODO: handle fee for `CompleteWithdrawals` operation in L1
                 // wait for update API
 
+                // some transactions that are included in the block do not contain fee
                 if (utils.correctTransactionWithFee(transaction) && timePeriod.contains(transactionTime)) {
                     const transactionFee = utils.getTransactionFee(transaction);
 
@@ -126,6 +135,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
                     const tokenPrice = tokensCashed.getTokenPrice(tokenSymbol);
                     const tokenAmount = Number(zksProvider.tokenSet.formatToken(tokenSymbol, transactionFee));
 
+                    //update statistics on collected tokens
                     tokensStat[tokenSymbol].amount += tokenAmount;
                     tokensStat[tokenSymbol].usd += tokenAmount * tokenPrice;
                     tokensStat[tokenSymbol].eth += (tokenAmount * tokenPrice) / eth_price;
@@ -148,11 +158,14 @@ export async function collectedTokenLiquidations(
 ) {
     if (!timePeriod.isValid()) throw new Error(`Error time period ${timePeriod.timeFrom} - ${timePeriod.timeTo}`);
 
+    // To view all transactions outgoing from the account use the Etherscan provider
     const ethProvider = new ethers.providers.EtherscanProvider(network, etherscan_api_key);
 
     let liquidationAmount = 0;
     let history: ethers.ethers.providers.TransactionResponse[];
 
+    // Etherscan API has limits on the number of transactions in one request
+    // so request transactions until getting an empty list
     do {
         const { startBlock, endBlock } = await utils.getBlockInterval(
             ethProvider.baseUrl,
@@ -165,7 +178,9 @@ export async function collectedTokenLiquidations(
         for (const transaction of history) {
             console.log(`Tx hash: ${transaction.hash}`);
 
+            // save the current time as the last viewed transaction + 1 second
             timePeriod.timeFrom = new Date(transaction.timestamp * 1000 + 1000);
+
             if (transaction.from == null || transaction.from.toLocaleLowerCase() != operatorAddress) continue;
 
             const transactionValueWei = transaction.value;
