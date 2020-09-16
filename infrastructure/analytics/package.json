@@ -10,7 +10,7 @@
     "ethers": "^5.0.12",
     "fs": "^0.0.1-security",
     "isomorphic-fetch": "^2.2.1",
-    "zksync": "link:../zksync.js"
+    "zksync": "link:../../js/zksync.js"
   },
   "scripts": {
     "build": "tsc",
