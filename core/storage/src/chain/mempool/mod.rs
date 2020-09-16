@@ -8,6 +8,7 @@ use itertools::Itertools;
 use models::node::{mempool::SignedTxVariant, tx::TxHash, SignedFranklinTx};
 // Local imports
 use self::records::{MempoolTx, NewMempoolTx};
+use crate::chain::mempool::records::NewMempoolBatchTx;
 use crate::{schema::*, StorageProcessor};
 
 pub mod records;
@@ -29,10 +30,21 @@ impl<'a> MempoolSchema<'a> {
             .order_by(mempool_txs::created_at)
             .load(self.0.conn())?;
 
-        let mut prev_batch_id = txs.first().map(|tx| tx.batch_id).flatten();
+        // Handles special case: batch_id == 0 <==> transaction is not a part of some batch
+        fn batch_id_optional(batch_id: i64) -> Option<i64> {
+            match batch_id {
+                0 => None,
+                _ => Some(batch_id),
+            }
+        };
+
+        let mut prev_batch_id = txs
+            .first()
+            .map(|tx| batch_id_optional(tx.batch_id))
+            .flatten();
 
         let grouped_txs = txs.into_iter().group_by(|tx| {
-            prev_batch_id = tx.batch_id;
+            prev_batch_id = batch_id_optional(tx.batch_id);
 
             prev_batch_id
         });
@@ -56,9 +68,9 @@ impl<'a> MempoolSchema<'a> {
                 .collect::<Result<Vec<SignedFranklinTx>, failure::Error>>()?;
 
             match batch_id {
-                Some(_) => {
+                Some(batch_id) => {
                     // Group of batched transactions.
-                    let variant = SignedTxVariant::from(deserialized_txs);
+                    let variant = SignedTxVariant::from((deserialized_txs, batch_id));
                     txs.push(variant);
                 }
                 None => {
@@ -77,7 +89,7 @@ impl<'a> MempoolSchema<'a> {
         txs.sort_by_key(|tx| match tx {
             SignedTxVariant::Tx(tx) => tx.tx.nonce(),
             SignedTxVariant::Batch(batch) => batch
-                .0
+                .txs
                 .last()
                 .expect("batch must contain at least one transaction")
                 .tx
@@ -88,21 +100,47 @@ impl<'a> MempoolSchema<'a> {
     }
 
     /// Adds a new transactions batch to the mempool schema.
-    pub fn insert_batch(&self, txs: &[SignedFranklinTx]) -> Result<(), failure::Error> {
+    /// Returns id of the inserted batch
+    pub fn insert_batch(&self, txs: &[SignedFranklinTx]) -> Result<i64, failure::Error> {
         if txs.is_empty() {
             failure::bail!("Cannot insert an empty batch");
         }
 
         self.0.transaction(|| {
-            // Batch ID is set to the maximum transaction ID in the table. It is guaranteed to be unique,
-            // since as long as batch exists, the maximum ID will be greater than the batch ID (as we've inserted
-            // more transactions).
-            let batch_id = mempool_txs::table
-                .select(max(mempool_txs::id))
-                .first::<Option<i64>>(self.0.conn())?
-                .unwrap_or(0);
+            // The first transaction of the batch would be inserted manually
+            // batch_id of the inserted transaction would be the id of this batch
+            // Will be unique cause batch_id is bigserial
+            // Special case: batch_id == 0 <==> transaction is not a part of some batch (uses in `insert_tx` function)
+            let batch_id = {
+                let first_tx_data = txs[0].clone();
+                let tx_hash = hex::encode(first_tx_data.hash().as_ref());
+                let tx = serde_json::to_value(&first_tx_data.tx)
+                    .expect("Unserializable TX provided to the database");
 
-            let new_transactions: Vec<_> = txs
+                let tx_to_insert = NewMempoolBatchTx {
+                    tx_hash,
+                    tx,
+                    created_at: chrono::Utc::now(),
+                    eth_sign_data: first_tx_data
+                        .eth_sign_data
+                        .as_ref()
+                        .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData")),
+                };
+
+                diesel::insert_into(mempool_txs::table)
+                    .values(tx_to_insert)
+                    .execute(self.0.conn())?;
+
+                mempool_txs::table
+                    .select(max(mempool_txs::batch_id))
+                    .first::<Option<i64>>(self.0.conn())?
+                    .ok_or_else(|| {
+                        failure::format_err!("Can't get maximal batch_id from mempool_txs")
+                    })?
+            };
+
+            // Processing of all batch transactions, except the first
+            let new_transactions: Vec<_> = txs[1..]
                 .iter()
                 .map(|tx_data| {
                     let tx_hash = hex::encode(tx_data.hash().as_ref());
@@ -116,7 +154,7 @@ impl<'a> MempoolSchema<'a> {
                         eth_sign_data: tx_data.eth_sign_data.as_ref().map(|sd| {
                             serde_json::to_value(sd).expect("failed to encode EthSignData")
                         }),
-                        batch_id: Some(batch_id),
+                        batch_id,
                     }
                 })
                 .collect();
@@ -125,7 +163,7 @@ impl<'a> MempoolSchema<'a> {
                 .values(new_transactions)
                 .execute(self.0.conn())?;
 
-            Ok(())
+            Ok(batch_id)
         })
     }
 
@@ -133,7 +171,7 @@ impl<'a> MempoolSchema<'a> {
     pub fn insert_tx(&self, tx_data: &SignedFranklinTx) -> Result<(), failure::Error> {
         let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
         let tx = serde_json::to_value(&tx_data.tx)?;
-        let batch_id = None;
+        let batch_id = 0; // Special case: batch_id == 0 <==> transaction is not a part of some batch
 
         let db_entry = NewMempoolTx {
             tx_hash,
@@ -195,7 +233,7 @@ impl<'a> MempoolSchema<'a> {
                 }
                 SignedTxVariant::Batch(batch) => {
                     // We assume that for batch one executed transaction <=> all the transactions are executed.
-                    let tx_hash = batch.0[0].hash();
+                    let tx_hash = batch.txs[0].hash();
                     self.0
                         .chain()
                         .operations_ext_schema()

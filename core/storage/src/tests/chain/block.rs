@@ -548,6 +548,7 @@ fn pending_block_workflow() {
             fail_reason: None,
             block_index: None,
             created_at: chrono::Utc::now(),
+            batch_id: None,
         };
 
         (
@@ -581,6 +582,7 @@ fn pending_block_workflow() {
             fail_reason: None,
             block_index: None,
             created_at: chrono::Utc::now(),
+            batch_id: None,
         };
 
         (

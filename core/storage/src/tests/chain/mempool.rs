@@ -274,6 +274,7 @@ fn collect_garbage() {
             nonce: Default::default(),
             created_at: chrono::Utc::now(),
             eth_sign_data: None,
+            batch_id: None,
         };
         OperationsSchema(&conn).store_executed_operation(executed_tx)?;
 

@@ -128,7 +128,7 @@ impl MempoolState {
     }
 
     fn chunks_for_batch(&self, batch: &SignedTxsBatch) -> usize {
-        batch.0.iter().map(|tx| self.chunks_for_tx(&tx.tx)).sum()
+        batch.txs.iter().map(|tx| self.chunks_for_tx(&tx.tx)).sum()
     }
 
     fn required_chunks(&self, element: &SignedTxVariant) -> usize {
@@ -199,7 +199,7 @@ impl MempoolState {
     }
 
     fn add_batch(&mut self, batch: SignedTxsBatch) -> Result<(), TxAddError> {
-        for tx in batch.0.iter() {
+        for tx in batch.txs.iter() {
             if tx.nonce() < self.nonce(&tx.account()) {
                 return Err(TxAddError::NonceMismatch);
             }
@@ -245,8 +245,10 @@ impl Mempool {
             TxAddError::DbError
         })?;
 
-        let batch: SignedTxsBatch =
-            SignedTxsBatch(txs.iter().map(|tx| tx.clone().into_inner()).collect());
+        let mut batch: SignedTxsBatch = SignedTxsBatch {
+            txs: txs.iter().map(|tx| tx.clone().into_inner()).collect(),
+            batch_id: 0, // Will be determined after inserting to the database
+        };
 
         if self.mempool_state.chunks_for_batch(&batch) > self.max_block_size_chunks {
             return Err(TxAddError::BatchTooBig);
@@ -262,14 +264,16 @@ impl Mempool {
             return Err(TxAddError::BatchWithdrawalsOverload);
         }
 
-        storage
+        let batch_id = storage
             .chain()
             .mempool_schema()
-            .insert_batch(&batch.0)
+            .insert_batch(&batch.txs)
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
+
+        batch.batch_id = batch_id;
 
         self.mempool_state.add_batch(batch)
     }

@@ -543,7 +543,7 @@ impl PlasmaStateKeeper {
                     }
                 }
                 SignedTxVariant::Batch(batch) => {
-                    match self.apply_batch(&batch.0) {
+                    match self.apply_batch(&batch.txs, batch.batch_id) {
                         Ok(mut ops) => {
                             executed_ops.append(&mut ops);
                         }
@@ -636,7 +636,11 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
-    fn apply_batch(&mut self, txs: &[SignedFranklinTx]) -> Result<Vec<ExecutedOperations>, ()> {
+    fn apply_batch(
+        &mut self,
+        txs: &[SignedFranklinTx],
+        batch_id: i64,
+    ) -> Result<Vec<ExecutedOperations>, ()> {
         let chunks_needed = self.state.chunks_for_batch(txs);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -706,6 +710,7 @@ impl PlasmaStateKeeper {
                         fail_reason: None,
                         block_index: Some(block_index),
                         created_at: chrono::Utc::now(),
+                        batch_id: Some(batch_id),
                     }));
                     self.pending_block
                         .success_operations
@@ -721,6 +726,7 @@ impl PlasmaStateKeeper {
                         fail_reason: Some(e.to_string()),
                         block_index: None,
                         created_at: chrono::Utc::now(),
+                        batch_id: Some(batch_id),
                     };
                     self.pending_block.failed_txs.push(failed_tx.clone());
                     let exec_result = ExecutedOperations::Tx(Box::new(failed_tx));
@@ -801,6 +807,7 @@ impl PlasmaStateKeeper {
                     fail_reason: None,
                     block_index: Some(block_index),
                     created_at: chrono::Utc::now(),
+                    batch_id: None,
                 }));
                 self.pending_block
                     .success_operations
@@ -816,6 +823,7 @@ impl PlasmaStateKeeper {
                     fail_reason: Some(e.to_string()),
                     block_index: None,
                     created_at: chrono::Utc::now(),
+                    batch_id: None,
                 };
                 self.pending_block.failed_txs.push(failed_tx.clone());
                 ExecutedOperations::Tx(Box::new(failed_tx))

@@ -75,6 +75,7 @@ impl StoredExecutedTransaction {
                 .block_index
                 .map(|val| u32::try_from(val).expect("Invalid block index")),
             created_at: DateTime::<Utc>::from_utc(self.created_at, Utc),
+            batch_id: self.batch_id,
         })
     }
 }
@@ -187,6 +188,7 @@ impl NewExecutedTransaction {
             nonce: exec_tx.signed_tx.nonce() as i64,
             created_at: exec_tx.created_at,
             eth_sign_data,
+            batch_id: exec_tx.batch_id,
         }
     }
 }

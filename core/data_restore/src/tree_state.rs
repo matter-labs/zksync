@@ -367,6 +367,7 @@ impl TreeState {
             fail_reason: None,
             block_index: Some(block_index),
             created_at: chrono::Utc::now(),
+            batch_id: None, // Now data restore module have no information to restore dependency `transaction <--> batch`
         };
         ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
         current_op_block_index + 1

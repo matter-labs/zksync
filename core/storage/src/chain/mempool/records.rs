@@ -12,7 +12,7 @@ pub struct MempoolTx {
     pub tx: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
-    pub batch_id: Option<i64>,
+    pub batch_id: i64,
 }
 
 #[derive(Debug, Insertable)]
@@ -22,5 +22,14 @@ pub struct NewMempoolTx {
     pub tx: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
-    pub batch_id: Option<i64>,
+    pub batch_id: i64,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "mempool_txs"]
+pub struct NewMempoolBatchTx {
+    pub tx_hash: String,
+    pub tx: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub eth_sign_data: Option<serde_json::Value>,
 }
