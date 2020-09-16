@@ -26,7 +26,7 @@ init:
 yarn:
 	@cd sdk/zksync-crypto
 	@cd sdk/zksync.js && yarn && yarn build
-	@cd explorer && yarn
+	@cd infrastructure/explorer && yarn
 	@cd contracts && yarn
 	@cd core/tests/ts-tests && yarn
 

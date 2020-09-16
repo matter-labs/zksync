@@ -4,6 +4,8 @@ members = [
     "core/bin/key_generator",
     "core/bin/server",
     "core/bin/prover",
+    "core/bin/gen_token_add_contract",
+    "core/bin/parse_pub_data",
 
     "core/lib/circuit",
     "core/lib/crypto_exports",

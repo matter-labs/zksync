@@ -35,11 +35,9 @@ fn main() {
 fn get_token_add_template_file() -> PathBuf {
     let mut template = parse_env::<PathBuf>("ZKSYNC_HOME");
     template.push("core");
-    template.push("lib");
-    template.push("models");
-    template.push("src");
     template.push("bin");
     template.push("gen_token_add_contract");
+    template.push("src");
     template.push("TokenInitTemplate.sol");
     template
 }
