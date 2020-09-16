@@ -47,7 +47,7 @@ async function main() {
                     config.network,
                     config.operator_fee_address,
                     timePeriod,
-                    config.etherscan_api_address
+                    config.etherscan_api_key
                 );
                 print(liquidationInfo);
             });

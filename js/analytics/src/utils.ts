@@ -12,15 +12,15 @@ export class TimePeriod {
         this.timeTo = timeTo != null ? new Date(timeTo) : new Date();
     }
 
-    public getTimeFromTimeStamp() {
+    public getStartTimeStamp() {
         return Math.floor(this.timeFrom.getTime() / 1000);
     }
 
-    public getTimeToTimeStamp() {
+    public getEndTimeStamp() {
         return Math.floor(this.timeTo.getTime() / 1000);
     }
 
-    public inTime(timeStamp: Date) {
+    public contains(timeStamp: Date) {
         return +this.timeFrom <= +timeStamp && +this.timeTo >= +timeStamp;
     }
 
@@ -28,7 +28,7 @@ export class TimePeriod {
         return timeStamp < this.timeFrom;
     }
 
-    public isCorrect() {
+    public isValid() {
         return +this.timeFrom <= +this.timeTo;
     }
 }
@@ -94,7 +94,7 @@ export async function getBlockInterval(etherscanApiURL: string, etherscanApiKey:
         `${etherscanApiURL}/api` +
         `?module=block` +
         `&action=getblocknobytime` +
-        `&timestamp=${timePeriod.getTimeFromTimeStamp()}` +
+        `&timestamp=${timePeriod.getStartTimeStamp()}` +
         `&closest=after` +
         `&apikey=${etherscanApiKey}`;
 
@@ -102,7 +102,7 @@ export async function getBlockInterval(etherscanApiURL: string, etherscanApiKey:
         `${etherscanApiURL}/api` +
         `?module=block` +
         `&action=getblocknobytime` +
-        `&timestamp=${timePeriod.getTimeToTimeStamp()}` +
+        `&timestamp=${timePeriod.getEndTimeStamp()}` +
         `&closest=before` +
         `&apikey=${etherscanApiKey}`;
 

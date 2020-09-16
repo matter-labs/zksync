@@ -4,7 +4,7 @@ export interface Config {
     network: Network;
     rest_api_address: string;
     operator_fee_address: string;
-    etherscan_api_address: string;
+    etherscan_api_key?: string;
 }
 
 export interface TokensInfo {

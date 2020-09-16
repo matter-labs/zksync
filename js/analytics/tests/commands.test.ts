@@ -106,34 +106,13 @@ describe("Tests", () => {
     });
 
     describe("Liquidations Info", () => {
-        it("should be non-empty for operator account", async () => {
-            const fees = await commands.collectedFees(network, config.rest_api_address, validTimePeriod);
-            expect(fees["spent by SENDER ACCOUNT"].eth).not.to.equal(0);
-            expect(fees["spent by SENDER ACCOUNT"].usd).not.to.equal(0);
-
-            expect(fees["collected fees"].total.eth).not.to.equal(0);
-            expect(fees["collected fees"].total.usd).not.to.equal(0);
-        });
-
-        it("should fail on invalid network", async () => {
-            const invalidNetwork = "invalid" as Network;
-            expect(
-                commands.collectedTokenLiquidations(
-                    invalidNetwork,
-                    config.operator_fee_address,
-                    validTimePeriod,
-                    config.etherscan_api_address
-                )
-            ).to.be.rejected;
-        });
-
-        it("should fail on invalid time period", async () => {
+        it("should fail on invalid localhost", async () => {
             expect(
                 commands.collectedTokenLiquidations(
                     network,
                     config.operator_fee_address,
-                    invalidTimePeriod,
-                    config.etherscan_api_address
+                    validTimePeriod,
+                    config.etherscan_api_key
                 )
             ).to.be.rejected;
         });

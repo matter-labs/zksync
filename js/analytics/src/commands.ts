@@ -49,7 +49,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
     let currentBlock = 999_999_999; // the maximum block number that we request from the server
     let currentBlockTime = new Date();
 
-    if (!timePeriod.isCorrect()) throw new Error(`Error time period ${timePeriod.timeFrom} - ${timePeriod.timeTo}`);
+    if (!timePeriod.isValid()) throw new Error(`Error time period ${timePeriod.timeFrom} - ${timePeriod.timeTo}`);
 
     const zksProvider = await zksync.getDefaultProvider(network);
     const ethProvider =
@@ -118,7 +118,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
                 // TODO: handle fee for `CompleteWithdrawals` operation in L1
                 // wait for update API
 
-                if (utils.correctTransactionWithFee(transaction) && timePeriod.inTime(transactionTime)) {
+                if (utils.correctTransactionWithFee(transaction) && timePeriod.contains(transactionTime)) {
                     const transactionFee = utils.getTransactionFee(transaction);
 
                     const tokenID = utils.getTransactionTokenID(transaction);
@@ -146,7 +146,7 @@ export async function collectedTokenLiquidations(
     timePeriod: utils.TimePeriod,
     etherscan_api_key: string
 ) {
-    if (!timePeriod.isCorrect()) throw new Error(`Error time period ${timePeriod.timeFrom} - ${timePeriod.timeTo}`);
+    if (!timePeriod.isValid()) throw new Error(`Error time period ${timePeriod.timeFrom} - ${timePeriod.timeTo}`);
 
     const ethProvider = new ethers.providers.EtherscanProvider(network, etherscan_api_key);
 
@@ -173,7 +173,7 @@ export async function collectedTokenLiquidations(
 
             liquidationAmount += transactionValue;
         }
-    } while (history.length > 0 && timePeriod.isCorrect());
+    } while (history.length > 0 && timePeriod.isValid());
 
     return { "Total amount of ETH": liquidationAmount };
 }
