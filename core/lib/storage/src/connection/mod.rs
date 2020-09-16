@@ -15,7 +15,6 @@ use crate::StorageProcessor;
 use models::config_options::parse_env;
 
 pub mod holder;
-// pub mod recoverable_connection;
 
 /// `ConnectionPool` is a wrapper over a `diesel`s `Pool`, encapsulating
 /// the fixed size pool of connection to the database.
