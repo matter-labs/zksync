@@ -32,6 +32,13 @@ The following guides for developers are available:
 - Development guide: [docs/development.md](docs/development.md).
 - Repository architecture overview: [docs/architecture.md](docs/architecture.md).
 
+## Projects
+
+- [zkSync server](core/bin/server)
+- [zkSync prover](core/bin/prover)
+- [zkSync explorer](infrastructure/explorer)
+- [JavaScript SDK](sdk/zksync.js)
+
 ## License
 
 zkSync is distributed under the terms of both the MIT license
