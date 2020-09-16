@@ -28,11 +28,11 @@ jobs:
       run: |
         zksync db-setup # So database will be created for compilation.
         zksync dummy-prover ensure-disabled
-        cargo fmt -- --check
+        cargo fmt --all -- --check
         cargo clippy --tests --benches -- -D warnings
-        pushd js/zksync-crypto
+        pushd sdk/zksync-crypto
         cargo fmt -- --check
-        cargo clippy --tests --benches -- -D warnings
+        cargo clippy --all --tests --benches -- -D warnings
 
     - name: init
       run: zksync init
