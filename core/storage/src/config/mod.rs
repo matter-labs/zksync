@@ -1,10 +1,10 @@
 // Built-in deps
 // External imports
-use diesel::prelude::*;
+
 // Workspace imports
 // Local imports
 use self::records::ServerConfig;
-use crate::StorageProcessor;
+use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
 
@@ -14,12 +14,15 @@ pub mod records;
 ///
 /// Currently config is added to ZKSync by the `db-insert-contract.sh` script.
 #[derive(Debug)]
-pub struct ConfigSchema<'a>(pub &'a StorageProcessor);
+pub struct ConfigSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> ConfigSchema<'a> {
+impl<'a, 'c> ConfigSchema<'a, 'c> {
     /// Loads the server configuration.
-    pub fn load_config(&self) -> QueryResult<ServerConfig> {
-        use crate::schema::server_config::dsl::*;
-        server_config.first(self.0.conn())
+    pub async fn load_config(&mut self) -> QueryResult<ServerConfig> {
+        let config = sqlx::query_as!(ServerConfig, "SELECT * FROM server_config",)
+            .fetch_one(self.0.conn())
+            .await?;
+
+        Ok(config)
     }
 }

@@ -1,7 +1,7 @@
 // Built-in deps
 // External uses
 use failure::ensure;
-use futures::{compat::Future01CompatExt, executor::block_on};
+use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::transports::{EventLoopHandle, Http};
@@ -25,6 +25,7 @@ const SLEEP_DURATION: Duration = Duration::from_millis(250);
 ///
 /// The provided interface is not as rich as the actual `ETHClient`
 /// structure, but it is instead optimized for the needs of `ETHSender`.
+#[async_trait::async_trait]
 pub(super) trait EthereumInterface {
     /// Obtains a transaction status from the Ethereum blockchain.
     /// The resulting information is reduced to the following minimum:
@@ -32,16 +33,16 @@ pub(super) trait EthereumInterface {
     /// - If transaction was not executed, returned value is `None`.
     /// - If transaction was executed, the information about its success and amount
     ///   of confirmations is returned.
-    fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error>;
+    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error>;
 
     /// Gets the actual block number.
-    fn block_number(&self) -> Result<u64, failure::Error>;
+    async fn block_number(&self) -> Result<u64, failure::Error>;
 
     /// Gets the current gas price.
-    fn gas_price(&self) -> Result<U256, failure::Error>;
+    async fn gas_price(&self) -> Result<U256, failure::Error>;
 
     /// Sends a signed transaction to the Ethereum blockchain.
-    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error>;
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error>;
 
     /// Encodes the transaction data (smart contract method and its input) to the bytes
     /// without creating an actual transaction.
@@ -49,7 +50,7 @@ pub(super) trait EthereumInterface {
 
     /// Signs the transaction given the previously encoded data.
     /// Fills in gas/nonce if not supplied inside options.
-    fn sign_prepared_tx(
+    async fn sign_prepared_tx(
         &self,
         data: Vec<u8>,
         options: Options,
@@ -93,16 +94,17 @@ impl EthereumHttpClient {
     }
 }
 
+#[async_trait::async_trait]
 impl EthereumInterface for EthereumHttpClient {
-    fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
+    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
         self.sleep();
-        let receipt = block_on(
-            self.eth_client
-                .web3
-                .eth()
-                .transaction_receipt(*hash)
-                .compat(),
-        )?;
+        let receipt = self
+            .eth_client
+            .web3
+            .eth()
+            .transaction_receipt(*hash)
+            .compat()
+            .await?;
 
         match receipt {
             Some(TransactionReceipt {
@@ -111,7 +113,8 @@ impl EthereumInterface for EthereumHttpClient {
                 ..
             }) => {
                 let confirmations = self
-                    .block_number()?
+                    .block_number()
+                    .await?
                     .saturating_sub(tx_block_number.as_u64());
                 let success = status.as_u64() == 1;
 
@@ -132,14 +135,18 @@ impl EthereumInterface for EthereumHttpClient {
         }
     }
 
-    fn block_number(&self) -> Result<u64, failure::Error> {
+    async fn block_number(&self) -> Result<u64, failure::Error> {
         self.sleep();
-        Ok(block_on(self.eth_client.web3.eth().block_number().compat()).map(|n| n.as_u64())?)
+        let block_number = self.eth_client.web3.eth().block_number().compat().await?;
+        Ok(block_number.as_u64())
     }
 
-    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
         self.sleep();
-        let hash = block_on(self.eth_client.send_raw_tx(signed_tx.raw_tx.clone()))?;
+        let hash = self
+            .eth_client
+            .send_raw_tx(signed_tx.raw_tx.clone())
+            .await?;
         ensure!(
             hash == signed_tx.hash,
             "Hash from signer and Ethereum node mismatch"
@@ -147,21 +154,21 @@ impl EthereumInterface for EthereumHttpClient {
         Ok(())
     }
 
-    fn gas_price(&self) -> Result<U256, failure::Error> {
+    async fn gas_price(&self) -> Result<U256, failure::Error> {
         self.sleep();
-        block_on(self.eth_client.get_gas_price())
+        self.eth_client.get_gas_price().await
     }
 
     fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
         self.eth_client.encode_tx_data(func, params)
     }
 
-    fn sign_prepared_tx(
+    async fn sign_prepared_tx(
         &self,
         data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
         self.sleep();
-        block_on(self.eth_client.sign_prepared_tx(data, options))
+        self.eth_client.sign_prepared_tx(data, options).await
     }
 }

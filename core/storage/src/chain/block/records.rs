@@ -1,15 +1,13 @@
 // External imports
 use chrono::prelude::*;
-use diesel::sql_types::{BigInt, Binary, Jsonb, Nullable, Text, Timestamp};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
+use sqlx::FromRow;
 // Workspace imports
 // Local imports
-use crate::schema::*;
 use crate::utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix};
 
-#[derive(Debug, Insertable, Queryable)]
-#[table_name = "blocks"]
+#[derive(Debug, FromRow)]
 pub struct StorageBlock {
     pub number: i64,
     pub root_hash: Vec<u8>,
@@ -21,8 +19,7 @@ pub struct StorageBlock {
     pub verify_gas_limit: i64,
 }
 
-#[derive(Debug, Insertable, Queryable, AsChangeset)]
-#[table_name = "pending_block"]
+#[derive(Debug, FromRow)]
 pub struct StoragePendingBlock {
     pub number: i64,
     pub chunks_left: i64,
@@ -30,44 +27,36 @@ pub struct StoragePendingBlock {
     pub pending_block_iteration: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Clone)]
 pub struct BlockDetails {
-    #[sql_type = "BigInt"]
     pub block_number: i64,
 
-    #[sql_type = "Binary"]
     #[serde(with = "BytesToHexSerde::<SyncBlockPrefix>")]
     pub new_state_root: Vec<u8>,
 
-    #[sql_type = "BigInt"]
     pub block_size: i64,
 
-    #[sql_type = "Nullable<Binary>"]
     #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
     pub commit_tx_hash: Option<Vec<u8>>,
 
-    #[sql_type = "Nullable<Binary>"]
     #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
     pub verify_tx_hash: Option<Vec<u8>>,
 
-    #[sql_type = "Timestamp"]
-    pub committed_at: NaiveDateTime,
+    pub committed_at: DateTime<Utc>,
 
-    #[sql_type = "Nullable<Timestamp>"]
-    pub verified_at: Option<NaiveDateTime>,
+    pub verified_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct BlockTransactionItem {
-    #[sql_type = "Text"]
     pub tx_hash: String,
-
-    #[sql_type = "BigInt"]
     pub block_number: i64,
-
-    #[sql_type = "Jsonb"]
     pub op: Value,
+    pub created_at: DateTime<Utc>,
+}
 
-    #[sql_type = "Timestamp"]
-    pub created_at: NaiveDateTime,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountTreeCache {
+    pub block: i64,
+    pub tree_cache: serde_json::Value,
 }

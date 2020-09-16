@@ -1,5 +1,4 @@
 use crate::eth_sender::ETHSenderRequest;
-use crate::fee_ticker::ticker_api::coinmarkercap::{fetch_coimarketcap_data, CoinmarketcapQuote};
 use crate::utils::token_db_cache::TokenDBCache;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -11,16 +10,26 @@ use futures::{
 use models::node::{Token, TokenId, TokenLike, TokenPrice};
 use num::rational::Ratio;
 use num::BigUint;
-use reqwest::Url;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use storage::ConnectionPool;
 use tokio::sync::Mutex;
 
-mod coinmarkercap;
+pub mod coingecko;
+pub mod coinmarkercap;
 
 const API_PRICE_EXPIRATION_TIME_SECS: i64 = 300; // 5 mins
 const HISTORICAL_PRICE_EXPIRATION_TIME: Duration = Duration::from_secs(60);
+
+/// The limit of time we are willing to wait for response.
+pub const REQUEST_TIMEOUT: Duration = Duration::from_millis(700);
+/// Configuration parameter of the reqwest Client
+pub const CONNECTION_TIMEOUT: Duration = Duration::from_millis(700);
+
+#[async_trait]
+pub trait TokenPriceAPI {
+    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, failure::Error>;
+}
 
 /// Api responsible for querying for TokenPrices
 #[async_trait]
@@ -31,16 +40,7 @@ pub trait FeeTickerAPI {
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, failure::Error>;
 
-    fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error>;
-}
-
-impl From<CoinmarketcapQuote> for TokenPrice {
-    fn from(quote: CoinmarketcapQuote) -> TokenPrice {
-        TokenPrice {
-            usd_price: quote.price,
-            last_updated: quote.last_updated,
-        }
-    }
+    async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error>;
 }
 
 #[derive(Debug, Clone)]
@@ -77,33 +77,57 @@ impl TokenCacheEntry {
 }
 
 #[derive(Debug)]
-pub(super) struct TickerApi {
-    api_base_url: Url,
-    http_client: reqwest::Client,
+pub(super) struct TickerApi<T: TokenPriceAPI> {
     db_pool: ConnectionPool,
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
 
     token_db_cache: TokenDBCache,
     price_cache: Mutex<HashMap<TokenId, TokenCacheEntry>>,
     gas_price_cache: Mutex<Option<(BigUint, Instant)>>,
+
+    token_price_api: T,
 }
 
-impl TickerApi {
+impl<T: TokenPriceAPI> TickerApi<T> {
     pub fn new(
-        api_base_url: Url,
         db_pool: ConnectionPool,
         eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
+        token_price_api: T,
     ) -> Self {
         let token_db_cache = TokenDBCache::new(db_pool.clone());
         Self {
-            api_base_url,
-            http_client: reqwest::Client::new(),
             db_pool,
             eth_sender_request_sender,
             token_db_cache,
             price_cache: Mutex::new(HashMap::new()),
             gas_price_cache: Mutex::new(None),
+            token_price_api,
         }
+    }
+
+    // Version of `update_stored_value` which returns a `Result` for convenient error handling.
+    async fn _update_stored_value(
+        &self,
+        token_id: TokenId,
+        price: TokenPrice,
+    ) -> Result<(), failure::Error> {
+        let mut storage = self
+            .db_pool
+            .access_storage_fragile()
+            .await
+            .map_err(|e| format_err!("Can't access storage: {}", e))?;
+
+        let mut transaction = storage.start_transaction().await?;
+
+        transaction
+            .tokens_schema()
+            .update_historical_ticker_price(token_id, price)
+            .await
+            .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))?;
+
+        transaction.commit().await?;
+
+        Ok(())
     }
 
     async fn update_stored_value(
@@ -118,17 +142,8 @@ impl TickerApi {
         );
 
         if !is_price_historical {
-            self.db_pool
-                .access_storage_fragile()
-                .map_err(|e| format_err!("Can't access storage: {}", e))
-                .and_then(|storage| {
-                    storage
-                        .tokens_schema()
-                        .update_historical_ticker_price(token_id, price)
-                        .map_err(|e| {
-                            format_err!("Can't update historical ticker price from storage: {}", e)
-                        })
-                })
+            self._update_stored_value(token_id, price)
+                .await
                 .map_err(|e| warn!("Failed to update historical ticker price: {}", e))
                 .unwrap_or_default();
         }
@@ -148,15 +163,33 @@ impl TickerApi {
         }
         None
     }
+
+    async fn get_historical_ticker_price(
+        &self,
+        token_id: TokenId,
+    ) -> Result<Option<TokenPrice>, failure::Error> {
+        let mut storage = self
+            .db_pool
+            .access_storage_fragile()
+            .await
+            .map_err(|e| format_err!("Can't access storage: {}", e))?;
+
+        storage
+            .tokens_schema()
+            .get_historical_ticker_price(token_id)
+            .await
+            .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))
+    }
 }
 
 #[async_trait]
-impl FeeTickerAPI for TickerApi {
+impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
     /// Get last price from ticker
     async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, failure::Error> {
         let token = self
             .token_db_cache
-            .get_token(token.clone())?
+            .get_token(token.clone())
+            .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
 
         // TODO: remove hardcode for Matter Labs Trial Token (issue #738)
@@ -171,28 +204,20 @@ impl FeeTickerAPI for TickerApi {
             return Ok(cached_value);
         }
 
-        let coinmarkercap_price =
-            fetch_coimarketcap_data(&self.http_client, &self.api_base_url, &token.symbol)
-                .await
-                .map_err(|e| warn!("Failed to get price from coinmarketcap: {}", e));
-        if let Ok(coinmarkercap_price) = coinmarkercap_price {
-            self.update_stored_value(token.id, coinmarkercap_price.clone(), false)
+        let api_price = self
+            .token_price_api
+            .get_price(&token.symbol)
+            .await
+            .map_err(|e| warn!("Failed to get price: {}", e));
+        if let Ok(api_price) = api_price {
+            self.update_stored_value(token.id, api_price.clone(), false)
                 .await;
-            return Ok(coinmarkercap_price);
+            return Ok(api_price);
         }
 
         let historical_price = self
-            .db_pool
-            .access_storage_fragile()
-            .map_err(|e| format_err!("Can't access storage: {}", e))
-            .and_then(|storage| {
-                storage
-                    .tokens_schema()
-                    .get_historical_ticker_price(token.id)
-                    .map_err(|e| {
-                        format_err!("Can't get historical ticker price from storage: {}", e)
-                    })
-            })
+            .get_historical_ticker_price(token.id)
+            .await
             .map_err(|e| warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
@@ -228,9 +253,10 @@ impl FeeTickerAPI for TickerApi {
         Ok(eth_sender_resp)
     }
 
-    fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+    async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
         self.token_db_cache
-            .get_token(token.clone())?
+            .get_token(token.clone())
+            .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))
     }
 }

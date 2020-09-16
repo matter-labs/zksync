@@ -1,52 +1,64 @@
 // Built-in deps
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 // External deps
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use failure::format_err;
 use num::{rational::Ratio, BigUint};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
+use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use models::{
     node::{TokenLike, TokenPrice},
     primitives::UnsignedRatioSerializeAsDecimal,
 };
 
-/// The limit of time we are willing to wait for response.
-const REQUEST_TIMEOUT: Duration = Duration::from_millis(500);
+#[derive(Debug)]
+pub struct CoinMarketCapAPI {
+    client: reqwest::Client,
+    base_url: Url,
+}
 
-pub(super) async fn fetch_coimarketcap_data(
-    client: &reqwest::Client,
-    base_url: &Url,
-    token_symbol: &str,
-) -> Result<TokenPrice, failure::Error> {
-    let request_url = base_url
-        .join(&format!(
-            "cryptocurrency/quotes/latest?symbol={}",
-            token_symbol
-        ))
-        .expect("failed to join url path");
+impl CoinMarketCapAPI {
+    pub fn new(client: reqwest::Client, base_url: Url) -> Self {
+        Self { client, base_url }
+    }
+}
 
-    let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, client.get(request_url).send());
+#[async_trait]
+impl TokenPriceAPI for CoinMarketCapAPI {
+    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, failure::Error> {
+        let request_url = self
+            .base_url
+            .join(&format!(
+                "cryptocurrency/quotes/latest?symbol={}",
+                token_symbol
+            ))
+            .expect("failed to join url path");
 
-    let mut api_response = api_request_future
-        .await
-        .map_err(|_| failure::format_err!("Coinmarketcap API request timeout"))?
-        .map_err(|err| failure::format_err!("Coinmarketcap API request failed: {}", err))?
-        .json::<CoinmarketCapResponse>()
-        .await?;
-    let mut token_info = api_response
-        .data
-        .remove(&TokenLike::Symbol(token_symbol.to_string()))
-        .ok_or_else(|| format_err!("Could not found token in response"))?;
-    let usd_quote = token_info
-        .quote
-        .remove(&TokenLike::Symbol("USD".to_string()))
-        .ok_or_else(|| format_err!("Could not found usd quote in response"))?;
-    Ok(TokenPrice {
-        usd_price: usd_quote.price,
-        last_updated: usd_quote.last_updated,
-    })
+        let api_request_future =
+            tokio::time::timeout(REQUEST_TIMEOUT, self.client.get(request_url).send());
+
+        let mut api_response = api_request_future
+            .await
+            .map_err(|_| failure::format_err!("Coinmarketcap API request timeout"))?
+            .map_err(|err| failure::format_err!("Coinmarketcap API request failed: {}", err))?
+            .json::<CoinmarketCapResponse>()
+            .await?;
+        let mut token_info = api_response
+            .data
+            .remove(&TokenLike::Symbol(token_symbol.to_string()))
+            .ok_or_else(|| format_err!("Could not found token in response"))?;
+        let usd_quote = token_info
+            .quote
+            .remove(&TokenLike::Symbol("USD".to_string()))
+            .ok_or_else(|| format_err!("Could not found usd quote in response"))?;
+        Ok(TokenPrice {
+            usd_price: usd_quote.price,
+            last_updated: usd_quote.last_updated,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -80,10 +92,11 @@ mod test {
             .enable_all()
             .build()
             .expect("tokio runtime");
-        let ticker_url = parse_env("TICKER_URL");
+        let ticker_url = parse_env("COINMARKETCAP_BASE_URL");
         let client = reqwest::Client::new();
+        let api = CoinMarketCapAPI::new(client, ticker_url);
         runtime
-            .block_on(fetch_coimarketcap_data(&client, &ticker_url, "ETH"))
+            .block_on(api.get_price("ETH"))
             .expect("Failed to get data from ticker");
     }
 

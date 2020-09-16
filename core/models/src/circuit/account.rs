@@ -1,3 +1,5 @@
+use lazy_static::lazy_static;
+
 use crate::params;
 
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
@@ -84,7 +86,7 @@ impl std::default::Default for CircuitAccount<Bn256> {
             nonce: Fr::zero(),
             pub_key_hash: Fr::zero(),
             address: Fr::zero(),
-            subtree: SparseMerkleTree::new(params::balance_tree_depth()),
+            subtree: BALANCE_TREE.clone(),
         }
     }
 }
@@ -113,4 +115,9 @@ impl<E: Engine> std::default::Default for Balance<E> {
             value: E::Fr::zero(),
         }
     }
+}
+
+lazy_static! {
+    static ref BALANCE_TREE: CircuitBalanceTree =
+        SparseMerkleTree::new(params::balance_tree_depth());
 }

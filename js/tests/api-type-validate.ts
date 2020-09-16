@@ -1,50 +1,46 @@
-import * as fs from 'fs';
-import Axios from 'axios';
-import * as assert from 'assert';
+import * as fs from "fs";
+import Axios from "axios";
+import * as assert from "assert";
 
-import { Interface as StatusInterface } from './api-types/status';
-import { Interface as BlockInterface } from './api-types/block';
-import { Interface as BlocksInterface } from './api-types/blocks';
-import { Interface as TxHistoryInterface } from './api-types/tx-history';
-import { Interface as TestnetConfigInterface } from './api-types/config';
-import { Interface as BlockTransactionsInterface } from './api-types/block-transactions';
-import { Interface as TransactionInterface } from './api-types/transaction';
+import { Interface as StatusInterface } from "./api-types/status";
+import { Interface as BlockInterface } from "./api-types/block";
+import { Interface as BlocksInterface } from "./api-types/blocks";
+import { Interface as TxHistoryInterface } from "./api-types/tx-history";
+import { Interface as TestnetConfigInterface } from "./api-types/config";
+import { Interface as BlockTransactionsInterface } from "./api-types/block-transactions";
+import { Interface as TransactionInterface } from "./api-types/transaction";
 
-import * as zksync from 'zksync';
-import * as ethers from 'ethers';
+import * as zksync from "zksync";
+import * as ethers from "ethers";
 
-
-const apiTypesFolder = './api-types';
+const apiTypesFolder = "./api-types";
 
 /**
  * Checks that json string has the expected js type.
- * 
+ *
  * Usage: pass a path to .ts file that exports a type named `Interface` and a json string.
  * A new .gen.ts file will be generated, with your json string assigned to an `Interface`-typed variable.
- * If this file compiles, the types match. 
+ * If this file compiles, the types match.
  * If it doesn't, see the generated file to find what fields don't match.
- * 
+ *
  * @param typeFilePath: the path to .ts file containing expected type of response
  * @param json: A JSON string to check.
  */
 async function validateTypeJSON(typeFilePath: string, json: string) {
     const tmpFilePath = typeFilePath.replace(
-        /\.ts$/, 
-        `${new Date().toString().slice(16, 24).replace(/\:/g, '_')}.gen.ts`
+        /\.ts$/,
+        `${new Date().toString().slice(16, 24).replace(/\:/g, "_")}.gen.ts`
     );
-    const typeContent = fs.readFileSync(typeFilePath, 'utf-8');
+    const typeContent = fs.readFileSync(typeFilePath, "utf-8");
 
-    fs.writeFileSync(
-        tmpFilePath,
-        typeContent + `\n\nexport const val: Interface = ` + json + ';\n'
-    );
+    fs.writeFileSync(tmpFilePath, typeContent + `\n\nexport const val: Interface = ` + json + ";\n");
 
     try {
         require(tmpFilePath);
         fs.unlinkSync(tmpFilePath);
     } catch (e) {
-        console.error(`Error in type ${typeFilePath}:`)
-        console.error(e.message.split('\n').slice(2, 7).join('\n'));
+        console.error(`Error in type ${typeFilePath}:`);
+        console.error(e.message.split("\n").slice(2, 7).join("\n"));
         console.error(`Check file ${tmpFilePath} to see the error.`);
         console.error(`Edit ${typeFilePath} to match the new format,`);
         console.error(`and don't forget to check that frontend (e.g. explorer) work!`);
@@ -61,10 +57,9 @@ async function validateTypeJSON(typeFilePath: string, json: string) {
  * @param url: url to fetch data (must contain all the GET parameters needed).
  */
 async function validateResponseFromUrl(typeFilePath: string, url: string): Promise<any> {
-    const { data } = await Axios.get(url)
-        .catch(e => {
-            throw new Error(`Request to ${e.config.url} failed with status code ${e.response.status}`);
-        });
+    const { data } = await Axios.get(url).catch((e) => {
+        throw new Error(`Request to ${e.config.url} failed with status code ${e.response.status}`);
+    });
 
     const serverJson = JSON.stringify(data, null, 4);
 
@@ -83,8 +78,8 @@ async function validateResponseFromUrl(typeFilePath: string, url: string): Promi
  * @param address: string to check
  */
 function assertAddress(address: string) {
-    if (! /^0x([0-9a-fA-F]){40}$/.test(address)) {
-        throw new Error(address + ' is not address!');
+    if (!/^0x([0-9a-fA-F]){40}$/.test(address)) {
+        throw new Error(address + " is not address!");
     }
 }
 
@@ -93,8 +88,8 @@ function assertAddress(address: string) {
  * @param pubKey: string to check
  */
 function assertPubKey(pubKey: string) {
-    if (! /^sync:([0-9a-fA-F]){40}$/.test(pubKey)) {
-        throw new Error(pubKey + ' is not pubkey!');
+    if (!/^sync:([0-9a-fA-F]){40}$/.test(pubKey)) {
+        throw new Error(pubKey + " is not pubkey!");
     }
 }
 
@@ -103,8 +98,8 @@ function assertPubKey(pubKey: string) {
  * @param number: string to check
  */
 function assertNumeric(number: string) {
-    if (! (/^\d+$/.test(number) && (number == '0' || number[0] != '0'))) {
-        throw new Error(number + ' is not numeric!');
+    if (!(/^\d+$/.test(number) && (number == "0" || number[0] != "0"))) {
+        throw new Error(number + " is not numeric!");
     }
 }
 
@@ -113,8 +108,8 @@ function assertNumeric(number: string) {
  * @param hash: string to check
  */
 function assertHash(hash: string) {
-    if (! /^0x([0-9a-fA-F]){64}$/.test(hash)) {
-        throw new Error(hash + ' is not a hash!');
+    if (!/^0x([0-9a-fA-F]){64}$/.test(hash)) {
+        throw new Error(hash + " is not a hash!");
     }
 }
 
@@ -123,8 +118,8 @@ function assertHash(hash: string) {
  * @param hash: string to check
  */
 function assertSyncHash(hash: string) {
-    if (! /^sync-tx:([0-9a-fA-F]){64}$/.test(hash)) {
-        throw new Error(hash + ' is not a sync hash!');
+    if (!/^sync-tx:([0-9a-fA-F]){64}$/.test(hash)) {
+        throw new Error(hash + " is not a sync hash!");
     }
 }
 
@@ -133,8 +128,8 @@ function assertSyncHash(hash: string) {
  * @param hash: string to check
  */
 function assertEthOrSyncHash(hash: string) {
-    if (! /^(sync-tx:|0x)([0-9a-fA-F]){64}$/.test(hash)) {
-        throw new Error(hash + ' is neither a sync nor eth hash!');
+    if (!/^(sync-tx:|0x)([0-9a-fA-F]){64}$/.test(hash)) {
+        throw new Error(hash + " is neither a sync nor eth hash!");
     }
 }
 
@@ -144,7 +139,7 @@ function assertEthOrSyncHash(hash: string) {
  * @param date: string to check
  */
 function assertDate(date: string) {
-    if (! /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?/.test(date)) {
+    if (!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?/.test(date)) {
         throw new Error(date + `doesn't conform to 2020-04-29T11:14:03.198603 format.`);
     }
 }
@@ -155,6 +150,17 @@ function assertDate(date: string) {
 export async function checkStatusResponseType(): Promise<StatusInterface> {
     const url = `${process.env.REST_API_ADDR}/api/v0.1/status`;
     const typeFilePath = `${apiTypesFolder}/status.ts`;
+    const data: StatusInterface = await validateResponseFromUrl(typeFilePath, url);
+
+    return data;
+}
+
+/**
+ * Check `/withdrawal_processing_time` method of our rest api
+ */
+export async function checkWithdrawalProcessingTimeResponseType(): Promise<StatusInterface> {
+    const url = `${process.env.REST_API_ADDR}/api/v0.1/withdrawal_processing_time`;
+    const typeFilePath = `${apiTypesFolder}/withdrawal-processing.ts`;
     const data: StatusInterface = await validateResponseFromUrl(typeFilePath, url);
 
     return data;
@@ -245,8 +251,8 @@ export async function checkTransactionsResponseType(txHash: string): Promise<Tra
  */
 export function deleteUnusedGenFiles() {
     fs.readdirSync(apiTypesFolder)
-        .filter(n => n.endsWith('.gen.ts'))
-        .map(n => apiTypesFolder + '/' + n)
+        .filter((n) => n.endsWith(".gen.ts"))
+        .map((n) => apiTypesFolder + "/" + n)
         .forEach(fs.unlinkSync);
 }
 
@@ -260,30 +266,31 @@ let ethersProvider: ethers.providers.Provider;
  * Transfer,
  * Withdraw,
  * FullExit
- * 
+ *
  * And proceeds to check the type of response of every our rest api method.
- * 
+ *
  * Apart from checking the types, this function is handy for testing
  * block explorer, as it performs all transactions, and only once.
  */
 async function test() {
     syncProvider = await zksync.Provider.newWebsocketProvider(process.env.WS_API_ADDR);
     ethersProvider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-    
-    const ethWallet = ethers.Wallet.fromMnemonic(
-        process.env.TEST_MNEMONIC,
-        "m/44'/60'/0'/0/1"
-    ).connect(ethersProvider);
-    
-    const ethWallet2 = ethers.Wallet.fromMnemonic(
-        process.env.TEST_MNEMONIC,
-        "m/44'/60'/0'/0/2"
-    ).connect(ethersProvider);
+
+    const ethWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/1").connect(ethersProvider);
+
+    const ethWallet2 = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/2").connect(
+        ethersProvider
+    );
 
     const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
 
-    for (const token of ['ETH', "DAI", "wBTC"]) {
-        console.log('Balance of ' + token + ': ' + syncProvider.tokenSet.formatToken(token, await syncWallet.getEthereumBalance(token)));
+    for (const token of ["ETH", "DAI", "wBTC"]) {
+        console.log(
+            "Balance of " +
+                token +
+                ": " +
+                syncProvider.tokenSet.formatToken(token, await syncWallet.getEthereumBalance(token))
+        );
         const deposit = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
             token,
@@ -291,34 +298,34 @@ async function test() {
             approveDepositAmountForERC20: true,
         });
 
-        console.log('deposit hash:', deposit.ethTx.hash);
+        console.log("deposit hash:", deposit.ethTx.hash);
         await deposit.awaitReceipt();
 
-        if (! await syncWallet.isSigningKeySet()) {
+        if (!(await syncWallet.isSigningKeySet())) {
             const changePubKey = await syncWallet.setSigningKey();
             await changePubKey.awaitReceipt();
-            console.log('changePubKey hash:', changePubKey.txHash);
+            console.log("changePubKey hash:", changePubKey.txHash);
         }
 
         const transfer = await syncWallet.syncTransfer({
             to: ethWallet2.address,
             token,
-            amount: syncProvider.tokenSet.parseToken(token, "300")
+            amount: syncProvider.tokenSet.parseToken(token, "300"),
         });
         await transfer.awaitReceipt();
-        console.log('transfer hash:', transfer.txHash);
+        console.log("transfer hash:", transfer.txHash);
 
         const withdraw = await syncWallet.withdrawFromSyncToEthereum({
             ethAddress: syncWallet.address(),
             token,
-            amount: syncProvider.tokenSet.parseToken(token, "200")
+            amount: syncProvider.tokenSet.parseToken(token, "200"),
         });
         await withdraw.awaitReceipt();
-        console.log('withdraw hash:', withdraw.txHash);
+        console.log("withdraw hash:", withdraw.txHash);
 
-        const fullExit = await syncWallet.emergencyWithdraw({token});
+        const fullExit = await syncWallet.emergencyWithdraw({ token });
         await fullExit.awaitReceipt();
-        console.log('fullExit hash:', fullExit.ethTx.hash);
+        console.log("fullExit hash:", fullExit.ethTx.hash);
 
         const deposit2 = await syncWallet.depositToSyncFromEthereum({
             depositTo: syncWallet.address(),
@@ -327,18 +334,19 @@ async function test() {
             approveDepositAmountForERC20: true,
         });
         await deposit2.awaitReceipt();
-        console.log('deposit2 hash:', deposit.ethTx.hash);
+        console.log("deposit2 hash:", deposit.ethTx.hash);
     }
 
     deleteUnusedGenFiles();
 
-    console.log("Checking status and testnet config");
+    console.log("Checking status, testnet config and withdrawal processing time endpoints");
     await checkStatusResponseType();
     await checkTestnetConfigResponseType();
+    await checkWithdrawalProcessingTimeResponseType();
 
     console.log("Checking tx history");
     await checkTxHistoryResponseType(syncWallet.address());
-    
+
     const numBlocksToCheck = 10;
 
     const blocks = await checkBlocksResponseType();
@@ -357,8 +365,8 @@ async function test() {
 }
 
 // only with this flag, otherwise it will run even when the file is just imported somewhere.
-if (process.argv[2] == '--test') {
-    test().catch(e => {
+if (process.argv[2] == "--test") {
+    test().catch((e) => {
         console.error(e);
         process.exit(1);
     });
