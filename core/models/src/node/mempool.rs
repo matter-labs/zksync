@@ -23,16 +23,6 @@ impl From<SignedFranklinTx> for SignedTxVariant {
     }
 }
 
-impl From<(Vec<SignedFranklinTx>, i64)> for SignedTxVariant {
-    fn from(batch_info: (Vec<SignedFranklinTx>, i64)) -> Self {
-        let batch = SignedTxsBatch {
-            txs: batch_info.0,
-            batch_id: batch_info.1,
-        };
-        Self::Batch(batch)
-    }
-}
-
 impl SignedTxVariant {
     pub fn batch(txs: Vec<SignedFranklinTx>, batch_id: i64) -> Self {
         Self::Batch(SignedTxsBatch { txs, batch_id })
