@@ -38,7 +38,7 @@ All output printed to stdout is strict JSON
 
 ### Options/flags
 
-- --network \<networt\> (Default: from config file)  
+- --network \<network\> (Default: from config file)  
 select a network from the list of the configuration file
 - --timeFrom \<time\>   
 start of time period in format 'YYYY-MM-DDTHH:MM:SS'
