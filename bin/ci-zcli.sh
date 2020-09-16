@@ -16,7 +16,7 @@ function cat_logs() {
     echo Termination started
 
     # Wait for server to finish any ongoing jobs
-    sleep 10
+    sleep 30
 
     set +e
     pkill -P $TIMEOUT_PID,$SERVER_PID
