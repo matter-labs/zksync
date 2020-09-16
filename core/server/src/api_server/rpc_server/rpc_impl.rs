@@ -148,6 +148,10 @@ impl RpcApp {
             });
         }
 
+        if let FranklinTx::ForcedExit(forced_exit) = &*tx {
+            self.check_forced_exit(&forced_exit).await?;
+        }
+
         let fast_processing = fast_processing.unwrap_or_default(); // `None` => false
 
         if fast_processing && !tx.is_withdraw() {
@@ -193,19 +197,36 @@ impl RpcApp {
                     withdraw.fee.clone(),
                 ))
             }
+            FranklinTx::ForcedExit(forced_exit) => Some((
+                TxFeeTypes::Withdraw,
+                TokenLike::Id(forced_exit.token),
+                forced_exit.target,
+                forced_exit.fee.clone(),
+            )),
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
                 transfer.to,
                 transfer.fee.clone(),
             )),
+            FranklinTx::ChangePubKey(change_pubkey) => {
+                // If there is no Ethereum signature in the transaction, it is assumed that auth is performed on-chain.
+                let onchain_pubkey_auth = change_pubkey.eth_signature.is_none();
+                Some((
+                    TxFeeTypes::ChangePubKey {
+                        onchain_pubkey_auth,
+                    },
+                    TokenLike::Id(change_pubkey.fee_token),
+                    change_pubkey.account,
+                    change_pubkey.fee.clone(),
+                ))
+            }
             _ => None,
         };
 
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
         let ticker_request_sender = self.ticker_request_sender.clone();
-        let ops_counter = self.ops_counter.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
             let required_fee =
@@ -234,21 +255,6 @@ impl RpcApp {
             sign_verify_channel,
         )
         .await?;
-
-        // Check whether operations limit for this account was reached.
-        // We must do it after we've checked that transaction is correct to avoid the situation
-        // when somebody sends incorrect transactions to deny changing the pubkey for some account ID.
-        if let FranklinTx::ChangePubKey(tx) = tx.as_ref() {
-            let mut ops_counter_lock = ops_counter.write().expect("Write lock");
-
-            if let Err(error) = ops_counter_lock.check_allowanse(&tx) {
-                return Err(Error {
-                    code: RpcErrorCodes::OperationsLimitReached.into(),
-                    message: error.to_string(),
-                    data: None,
-                });
-            }
-        }
 
         let hash = tx.hash();
         let mempool_resp = oneshot::channel();

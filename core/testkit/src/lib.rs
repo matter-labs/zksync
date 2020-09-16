@@ -475,10 +475,17 @@ pub async fn perform_basic_operations(
 
     if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
-            .change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1))
+            .change_pubkey_with_onchain_auth(
+                ETHAccountId(0),
+                ZKSyncAccountId(1),
+                Token(token),
+                0u32.into(),
+            )
             .await;
     } else {
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+        test_setup
+            .change_pubkey_with_tx(ZKSyncAccountId(1), Token(token), 0u32.into())
+            .await;
     }
 
     //transfer to self should work
@@ -528,7 +535,9 @@ pub async fn perform_basic_operations(
         )
         .await;
 
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(2)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(2), Token(token), 0u32.into())
+        .await;
 
     test_setup
         .withdraw(
@@ -954,9 +963,14 @@ impl TestSetup {
         receipt
     }
 
-    pub async fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
+    pub async fn change_pubkey_with_tx(
+        &mut self,
+        account: ZKSyncAccountId,
+        fee_token: Token,
+        fee: BigUint,
+    ) {
         let account_id = self
-            .get_zksync_account_committed_state(zksync_signer)
+            .get_zksync_account_committed_state(account)
             .await
             .expect("can't change pubkey, account does not exist")
             .0;
@@ -978,15 +992,18 @@ impl TestSetup {
         fee: BigUint,
     ) {
         // Subtract fee from the account
-        let mut account_balance = self.get_expected_zksync_account_balance(account, fee_token.0);
+        let mut account_balance = self
+            .get_expected_zksync_account_balance(account, fee_token.0)
+            .await;
         account_balance -= &fee;
         self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((account, fee_token.0), account_balance);
 
         // Add fee to the fee collector account
-        let mut fee_account =
-            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0);
+        let mut fee_account = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0)
+            .await;
         fee_account += &fee;
         self.expected_changes_for_current_block
             .sync_accounts_state
@@ -994,15 +1011,15 @@ impl TestSetup {
 
         // Update account pubkey
         let account_id = self
-            .get_zksync_account_committed_state(zksync_signer)
+            .get_zksync_account_committed_state(account)
             .await
             .expect("can't change pubkey, account does not exist")
             .0;
-        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
+        self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
         let tx = self
             .accounts
-            .change_pubkey_with_onchain_auth(eth_account, zksync_signer, None, true)
+            .change_pubkey_with_onchain_auth(eth_account, account, fee_token.0, fee, None, true)
             .await;
 
         self.execute_tx(tx).await;
@@ -1166,7 +1183,7 @@ impl TestSetup {
         self.execute_tx(withdraw).await;
     }
 
-    pub fn forced_exit(
+    pub async fn forced_exit(
         &mut self,
         initiator: ZKSyncAccountId,
         target: ZKSyncAccountId,
@@ -1176,23 +1193,29 @@ impl TestSetup {
     ) {
         self.increase_block_withdraws_amount();
 
-        let mut initiator_old = self.get_expected_zksync_account_balance(target, token_id.0);
+        let mut initiator_old = self
+            .get_expected_zksync_account_balance(target, token_id.0)
+            .await;
         initiator_old -= &fee;
 
-        let target_old = self.get_expected_zksync_account_balance(target, token_id.0);
+        let target_old = self
+            .get_expected_zksync_account_balance(target, token_id.0)
+            .await;
         self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((target, token_id.0), 0u64.into());
 
-        let mut target_eth_balance =
-            self.get_expected_eth_account_balance(target_eth_id, token_id.0);
+        let mut target_eth_balance = self
+            .get_expected_eth_account_balance(target_eth_id, token_id.0)
+            .await;
         target_eth_balance += &target_old;
         self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((target_eth_id, token_id.0), target_eth_balance);
 
-        let mut fee_account_balance =
-            self.get_expected_zksync_account_balance(self.accounts.fee_account_id, token_id.0);
+        let mut fee_account_balance = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, token_id.0)
+            .await;
         fee_account_balance += &fee;
         self.expected_changes_for_current_block
             .sync_accounts_state
@@ -1205,7 +1228,7 @@ impl TestSetup {
             .accounts
             .forced_exit(initiator, target, token_id, fee, None, true);
 
-        self.execute_tx(forced_exit);
+        self.execute_tx(forced_exit).await;
     }
 
     /// Waits for `CommitRequest::Block` to appear on proposed blocks receiver, ignoring

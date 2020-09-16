@@ -320,7 +320,9 @@ async fn commit_cost_of_transfers(
             BigUint::from(0u32),
         )
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -381,7 +383,9 @@ async fn commit_cost_of_transfers_to_new(
             deposit_amount,
         )
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -443,7 +447,9 @@ async fn commit_cost_of_withdrawals(
     test_setup
         .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -588,7 +594,9 @@ async fn commit_cost_of_change_pubkey(
     test_setup
         .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -596,7 +604,9 @@ async fn commit_cost_of_change_pubkey(
 
     test_setup.start_block();
     for _ in 0..n_change_pubkeys {
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+        test_setup
+            .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+            .await;
     }
     let change_pubkey_execute_result = test_setup
         .execute_commit_and_verify_block()

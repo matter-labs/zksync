@@ -17,9 +17,9 @@ pub struct AccountTransaction {
     pub verified: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct AccountCreatedAt {
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]

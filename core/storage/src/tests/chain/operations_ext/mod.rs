@@ -35,7 +35,6 @@ async fn commit_schema_data(
 #[db_test]
 async fn get_account_transactions_history(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut setup = TransactionsHistoryTestSetup::new();
-    let setup_initial_time = setup.next_tx_time;
     setup.add_block(1);
 
     let from_account_address_string = format!("{:?}", setup.from_zksync_account.address);
