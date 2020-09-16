@@ -47,7 +47,7 @@ describe("Tests", () => {
         const txHandle = await aliceWallet.syncTransfer({
             to: bob.address,
             token: "DAI",
-            amount: zksProvider.tokenSet.parseToken("DAI", "3.0"),
+            amount: zksProvider.tokenSet.parseToken("DAI", "0.1"),
         });
         await txHandle.awaitVerifyReceipt();
         await zksProvider.disconnect();
@@ -132,7 +132,7 @@ describe("Tests", () => {
                 commands.collectedTokenLiquidations(
                     network,
                     config.operator_fee_address,
-                    validTimePeriod,
+                    invalidTimePeriod,
                     config.etherscan_api_address
                 )
             ).to.be.rejected;
