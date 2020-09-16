@@ -69,20 +69,18 @@
 //! tests. Also the database used for tests is different than the database used for `server`,
 //! thus one should not fear to overwrite any important data by running the tests.
 
-#[macro_use]
-extern crate diesel;
+// `sqlx` macros result in these warning being triggered.
+#![allow(clippy::toplevel_ref_arg, clippy::suspicious_else_formatting)]
 
 // Built-in deps
-use std::env;
+// use std::env;
 // External imports
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, PooledConnection};
+use sqlx::{pool::PoolConnection, postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
 // Local imports
-use crate::connection::{holder::ConnectionHolder, recoverable_connection::RecoverableConnection};
+use crate::connection::holder::ConnectionHolder;
 
-mod schema;
+// mod schema;
 #[cfg(test)]
 mod tests;
 
@@ -97,78 +95,105 @@ pub mod tokens;
 pub mod utils;
 
 pub use crate::connection::ConnectionPool;
+pub type QueryResult<T> = Result<T, failure::Error>;
 
 /// Storage processor is the main storage interaction point.
 /// It holds down the connection (either direct or pooled) to the database
 /// and provide methods to obtain different storage schemas.
 #[derive(Debug)]
-pub struct StorageProcessor {
-    conn: ConnectionHolder,
+pub struct StorageProcessor<'a> {
+    conn: ConnectionHolder<'a>,
+    in_transaction: bool,
 }
 
-impl StorageProcessor {
+impl<'a> StorageProcessor<'a> {
     /// Creates a `StorageProcessor` using an unique sole connection to the database.
-    pub fn establish_connection() -> ConnectionResult<Self> {
-        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let connection = RecoverableConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
-        Ok(Self {
+    pub async fn establish_connection<'b>() -> QueryResult<StorageProcessor<'b>> {
+        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let connection = PgConnection::connect(&database_url).await?;
+        Ok(StorageProcessor {
             conn: ConnectionHolder::Direct(connection),
+            in_transaction: false,
         })
+    }
+
+    pub async fn start_transaction<'c: 'b, 'b>(
+        &'c mut self,
+    ) -> Result<StorageProcessor<'b>, failure::Error> {
+        let transaction = self.conn().begin().await?;
+
+        let mut processor = StorageProcessor::from_transaction(transaction);
+        processor.in_transaction = true;
+
+        Ok(processor)
+    }
+
+    /// Checks if the `StorageProcessor` is currently within database transaction.
+    pub fn in_transaction(&self) -> bool {
+        self.in_transaction
+    }
+
+    pub fn from_transaction(conn: Transaction<'_, Postgres>) -> StorageProcessor<'_> {
+        StorageProcessor {
+            conn: ConnectionHolder::Transaction(conn),
+            in_transaction: true,
+        }
+    }
+
+    pub async fn commit(self) -> QueryResult<()> {
+        if let ConnectionHolder::Transaction(transaction) = self.conn {
+            transaction.commit().await?;
+            Ok(())
+        } else {
+            panic!("StorageProcessor::commit can only be invoked after calling StorageProcessor::begin_transaction");
+        }
     }
 
     /// Creates a `StorageProcessor` using a pool of connections.
     /// This method borrows one of the connections from the pool, and releases it
     /// after `drop`.
-    pub fn from_pool(
-        conn: PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>,
-    ) -> Self {
+    pub fn from_pool(conn: PoolConnection<Postgres>) -> Self {
         Self {
             conn: ConnectionHolder::Pooled(conn),
+            in_transaction: false,
         }
     }
 
     /// Gains access to the `Chain` schemas.
-    pub fn chain(&self) -> chain::ChainIntermediator<'_> {
+    pub fn chain(&mut self) -> chain::ChainIntermediator<'_, 'a> {
         chain::ChainIntermediator(self)
     }
 
     /// Gains access to the `Config` schema.
-    pub fn config_schema(&self) -> config::ConfigSchema<'_> {
+    pub fn config_schema(&mut self) -> config::ConfigSchema<'_, 'a> {
         config::ConfigSchema(self)
     }
 
     /// Gains access to the `DataRestore` schema.
-    pub fn data_restore_schema(&self) -> data_restore::DataRestoreSchema<'_> {
+    pub fn data_restore_schema(&mut self) -> data_restore::DataRestoreSchema<'_, 'a> {
         data_restore::DataRestoreSchema(self)
     }
 
     /// Gains access to the `Ethereum` schema.
-    pub fn ethereum_schema(&self) -> ethereum::EthereumSchema<'_> {
+    pub fn ethereum_schema(&mut self) -> ethereum::EthereumSchema<'_, 'a> {
         ethereum::EthereumSchema(self)
     }
 
     /// Gains access to the `Prover` schema.
-    pub fn prover_schema(&self) -> prover::ProverSchema<'_> {
+    pub fn prover_schema(&mut self) -> prover::ProverSchema<'_, 'a> {
         prover::ProverSchema(self)
     }
 
     /// Gains access to the `Tokens` schema.
-    pub fn tokens_schema(&self) -> tokens::TokensSchema<'_> {
+    pub fn tokens_schema(&mut self) -> tokens::TokensSchema<'_, 'a> {
         tokens::TokensSchema(self)
     }
 
-    /// Performs several database operations within one database transaction.
-    pub fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
-    where
-        F: FnOnce() -> Result<T, failure::Error>,
-    {
-        self.conn().transaction(|| f())
-    }
-
-    fn conn(&self) -> &RecoverableConnection<PgConnection> {
-        match self.conn {
-            ConnectionHolder::Pooled(ref conn) => conn,
-            ConnectionHolder::Direct(ref conn) => conn,
+    fn conn(&mut self) -> &mut PgConnection {
+        match &mut self.conn {
+            ConnectionHolder::Pooled(conn) => conn,
+            ConnectionHolder::Direct(conn) => conn,
+            ConnectionHolder::Transaction(conn) => conn,
         }
     }
 }

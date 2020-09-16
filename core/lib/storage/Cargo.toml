@@ -16,7 +16,6 @@ serde = "1.0.90"
 serde_derive = "1.0.90"
 serde_json = "1.0.0"
 web3 = "0.10.0"
-diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono", "numeric"] }
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "=0.1.0", features = ["serde"]} #hard fix version to avoid cargo bug
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
@@ -25,8 +24,11 @@ failure = "0.1"
 itertools = "0.8"
 hex = "0.4"
 
+sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runtime-tokio", "macros", "postgres", "bigdecimal", "chrono", "json" ] }
+
 [dev-dependencies]
 env_logger = "0.6"
 testkit = { path = "../../tests/testkit" }
 parity-crypto = {version = "0.5.0", features = ["publickey"] }
-
+db_test_macro = { path = "./db_test_macro" }
+tokio = { version = "0.2", features = ["full"] }

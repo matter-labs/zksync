@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 
-import "../Operations.sol";
+import "../contracts/Operations.sol";
 
 
 contract OperationsTest {

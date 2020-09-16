@@ -26,7 +26,7 @@ use web3::transports::Http;
 const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
-fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
+async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
     let genesis_tokens =
         get_genesis_token_list(&eth_network).expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
@@ -38,6 +38,7 @@ fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
             token.decimals
         );
         pool.access_storage()
+            .await
             .expect("failed to access db")
             .tokens_schema()
             .store_token(Token {
@@ -48,14 +49,16 @@ fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
                     .expect("failed to parse token address"),
                 decimals: token.decimals,
             })
+            .await
             .expect("failed to store token");
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     info!("Restoring zkSync state from the contract");
     env_logger::init();
-    let connection_pool = ConnectionPool::new(Some(1));
+    let connection_pool = ConnectionPool::new(Some(1)).await;
     let config_opts = ConfigurationOptions::from_env();
 
     let cli = App::new("Data restore driver")
@@ -114,14 +117,14 @@ fn main() {
     if cli.is_present("genesis") {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_db(&driver.connection_pool, &config_opts.eth_network);
+        add_tokens_to_db(&driver.connection_pool, &config_opts.eth_network).await;
 
-        driver.set_genesis_state(genesis_tx_hash);
+        driver.set_genesis_state(genesis_tx_hash).await;
     }
 
     if cli.is_present("continue") {
-        driver.load_state_from_storage();
+        driver.load_state_from_storage().await;
     }
 
-    driver.run_state_update();
+    driver.run_state_update().await;
 }

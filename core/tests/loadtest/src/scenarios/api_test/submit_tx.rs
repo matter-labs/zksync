@@ -9,7 +9,7 @@ use models::node::{
     tx::{PackedEthSignature, Transfer, TxSignature},
     Address, FranklinTx, TokenId,
 };
-use server::api_server::rpc_server::RpcErrorCodes;
+use server::api_server::rpc_server::error::RpcErrorCodes;
 use testkit::zksync_account::ZksyncAccount;
 // Local deps
 use super::TestExecutor;

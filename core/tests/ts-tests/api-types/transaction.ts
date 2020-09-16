@@ -70,7 +70,8 @@ type Withdraw = {
         },
         "to": string,
         "token": number,
-        "type": "Withdraw"
+        "type": "Withdraw",
+        fast?: boolean,
     }
 }
 

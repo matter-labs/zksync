@@ -1,6 +1,5 @@
 // Built-in deps
 // External imports
-use diesel::prelude::*;
 // Workspace imports
 use models::node::{Address, TokenId};
 use models::ActionType;
@@ -8,15 +7,12 @@ use models::ActionType;
 use self::records::{
     PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
 };
-use crate::schema::*;
 use crate::tokens::TokensSchema;
 use crate::StorageProcessor;
 use crate::{
-    chain::operations::{
-        records::{StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation},
-        OperationsSchema,
-    },
-    prover::records::ProverRun,
+    chain::operations::{records::StoredExecutedPriorityOperation, OperationsSchema},
+    prover::{records::ProverRun, ProverSchema},
+    QueryResult,
 };
 
 pub mod records;
@@ -35,27 +31,26 @@ pub enum SearchDirection {
 /// While `Operations` getters are very basic, `OperationsExt` schema can transform
 /// the data to be convenient for the caller.
 #[derive(Debug)]
-pub struct OperationsExtSchema<'a>(pub &'a StorageProcessor);
+pub struct OperationsExtSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> OperationsExtSchema<'a> {
-    pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
-        let tx = OperationsSchema(self.0).get_executed_operation(hash)?;
+impl<'a, 'c> OperationsExtSchema<'a, 'c> {
+    pub async fn tx_receipt(&mut self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
+        let tx = OperationsSchema(self.0)
+            .get_executed_operation(hash)
+            .await?;
 
         if let Some(tx) = tx {
             // Check whether transaction was verified.
-            let verified = operations::table
-                .filter(operations::block_number.eq(tx.block_number))
-                .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
-                .first::<StoredOperation>(self.0.conn())
-                .optional()?
+            let verified = OperationsSchema(self.0)
+                .get_operation(tx.block_number as u32, ActionType::VERIFY)
+                .await
                 .map(|v| v.confirmed)
                 .unwrap_or(false);
 
             // Get the prover job details.
-            let prover_run: Option<ProverRun> = prover_runs::table
-                .filter(prover_runs::block_number.eq(tx.block_number))
-                .first::<ProverRun>(self.0.conn())
-                .optional()?;
+            let prover_run = ProverSchema(self.0)
+                .get_existing_prover_run(tx.block_number as u32)
+                .await?;
 
             Ok(Some(TxReceiptResponse {
                 tx_hash: hex::encode(hash),
@@ -70,23 +65,27 @@ impl<'a> OperationsExtSchema<'a> {
         }
     }
 
-    pub fn get_priority_op_receipt(&self, op_id: u32) -> QueryResult<PriorityOpReceiptResponse> {
+    pub async fn get_priority_op_receipt(
+        &mut self,
+        op_id: u32,
+    ) -> QueryResult<PriorityOpReceiptResponse> {
         // TODO: jazzandrock maybe use one db query(?).
-        let stored_executed_prior_op =
-            OperationsSchema(self.0).get_executed_priority_operation(op_id)?;
+        let stored_executed_prior_op = OperationsSchema(self.0)
+            .get_executed_priority_operation(op_id)
+            .await?;
 
         match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
-                let prover_run: Option<ProverRun> = prover_runs::table
-                    .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
-                    .first::<ProverRun>(self.0.conn())
-                    .optional()?;
+                let prover_run: Option<ProverRun> = ProverSchema(self.0)
+                    .get_existing_prover_run(stored_executed_prior_op.block_number as u32)
+                    .await?;
 
-                let confirm = operations::table
-                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
-                    .first::<StoredOperation>(self.0.conn())
-                    .optional()?;
+                let confirm = OperationsSchema(self.0)
+                    .get_operation(
+                        stored_executed_prior_op.block_number as u32,
+                        ActionType::VERIFY,
+                    )
+                    .await;
 
                 Ok(PriorityOpReceiptResponse {
                     committed: true,
@@ -102,14 +101,14 @@ impl<'a> OperationsExtSchema<'a> {
         }
     }
 
-    pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+    pub async fn get_tx_by_hash(&mut self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         // Attempt to find the transaction in the list of executed operations.
-        if let Some(response) = self.find_tx_by_hash(hash)? {
+        if let Some(response) = self.find_tx_by_hash(hash).await? {
             return Ok(Some(response));
         }
         // The transaction was not found in the list of executed transactions.
         // Check executed priority operations list.
-        if let Some(response) = self.find_priority_op_by_hash(hash)? {
+        if let Some(response) = self.find_priority_op_by_hash(hash).await? {
             return Ok(Some(response));
         }
 
@@ -119,12 +118,11 @@ impl<'a> OperationsExtSchema<'a> {
 
     /// Helper method for `get_tx_by_hash` which attempts to find a transaction
     /// in the list of executed operations.
-    fn find_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+    async fn find_tx_by_hash(&mut self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         // TODO: Maybe move the transformations to api_server?
-        let query_result = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(hash))
-            .first::<StoredExecutedTransaction>(self.0.conn())
-            .optional()?;
+        let query_result = OperationsSchema(self.0)
+            .get_executed_operation(hash)
+            .await?;
 
         if let Some(tx) = query_result {
             let block_number = tx.block_number;
@@ -189,12 +187,14 @@ impl<'a> OperationsExtSchema<'a> {
 
     /// Helper method for `get_tx_by_hash` which attempts to find a transaction
     /// in the list of executed priority operations.
-    fn find_priority_op_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+    async fn find_priority_op_by_hash(
+        &mut self,
+        hash: &[u8],
+    ) -> QueryResult<Option<TxByHashResponse>> {
         // TODO: Maybe move the transformations to api_server?
-        let tx: Option<StoredExecutedPriorityOperation> = executed_priority_operations::table
-            .filter(executed_priority_operations::eth_hash.eq(hash))
-            .first(self.0.conn())
-            .optional()?;
+        let tx: Option<StoredExecutedPriorityOperation> = OperationsSchema(self.0)
+            .get_executed_priority_operation_by_hash(hash)
+            .await?;
 
         if let Some(tx) = tx {
             let operation = tx.operation;
@@ -263,8 +263,8 @@ impl<'a> OperationsExtSchema<'a> {
 
     /// Loads the range of the transactions applied to the account starting
     /// from the block with number $(offset) up to $(offset + limit).
-    pub fn get_account_transactions_history(
-        &self,
+    pub async fn get_account_transactions_history(
+        &mut self,
         address: &Address,
         offset: u64,
         limit: u64,
@@ -280,8 +280,15 @@ impl<'a> OperationsExtSchema<'a> {
         //   same way as it done for "verified" flag. Later we've decided that if tx was added
         //   to the `executed_*` table, it actually **is** committed, thus now we just add
         //   `true`.
-        let query = format!(
-            "
+        // let query = format!(
+        //     ,
+        //     address = hex::encode(address.as_ref().to_vec()),
+        //     offset = offset,
+        //     limit = limit
+        // );
+        let mut tx_history = sqlx::query_as!(
+            TransactionsHistoryItem,
+            r#"
             with eth_ops as (
                 select distinct on (block_number, action_type)
                     operations.block_number,
@@ -293,7 +300,6 @@ impl<'a> OperationsExtSchema<'a> {
                 select
                     *
                 from (
-                    with vars (address_bytes) as ( select decode('{address}', 'hex') )
                     select
                         concat_ws(',', block_number, block_index) as tx_id,
                         tx,
@@ -305,13 +311,13 @@ impl<'a> OperationsExtSchema<'a> {
                         block_number,
                         created_at
                     from
-                        executed_transactions, vars
+                        executed_transactions
                     where
-                        from_account = address_bytes
+                        from_account = $1
                         or
-                        to_account = address_bytes
+                        to_account = $1
                         or
-                        primary_account_address = address_bytes
+                        primary_account_address = $1
                     union all
                     select
                         concat_ws(',', block_number, block_index) as tx_id,
@@ -324,42 +330,41 @@ impl<'a> OperationsExtSchema<'a> {
                         block_number,
                         created_at
                     from 
-                        executed_priority_operations, vars
+                        executed_priority_operations
                     where 
-                        from_account = address_bytes
+                        from_account = $1
                         or
-                        to_account = address_bytes) t
+                        to_account = $1) t
                 order by
                     block_number desc, created_at desc
                 offset 
-                    {offset}
+                    $2
                 limit 
-                    {limit}
+                    $3
             )
             select
-                tx_id,
-                hash,
-                eth_block,
-                pq_id,
-                tx,
-                success,
-                fail_reason,
-                true as commited,
-                coalesce(verified.confirmed, false) as verified,
-                created_at
+                tx_id as "tx_id!",
+                hash as "hash?",
+                eth_block as "eth_block?",
+                pq_id as "pq_id?",
+                tx as "tx!",
+                success as "success?",
+                fail_reason as "fail_reason?",
+                true as "commited!",
+                coalesce(verified.confirmed, false) as "verified!",
+                created_at as "created_at!"
             from transactions
             left join eth_ops verified on
                 verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
             order by transactions.block_number desc, created_at desc
-            ",
-            address = hex::encode(address.as_ref().to_vec()),
-            offset = offset,
-            limit = limit
-        );
-        let mut tx_history =
-            diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
+            "#,
+            address.as_ref(), offset as i64, limit as i64
+        ).fetch_all(self.0.conn())
+        .await?;
+
+        // diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
         if !tx_history.is_empty() {
-            let tokens = TokensSchema(self.0).load_tokens()?;
+            let tokens = TokensSchema(self.0).load_tokens().await?;
             for tx_item in &mut tx_history {
                 let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
                     "NONE" => {
@@ -402,25 +407,26 @@ impl<'a> OperationsExtSchema<'a> {
     /// Unlike `get_account_transactions_history`, this method does not use
     /// a relative offset, and thus not prone to report the same tx twice if new
     /// transactions were added to the database.
-    pub fn get_account_transactions_history_from(
-        &self,
+    pub async fn get_account_transactions_history_from(
+        &mut self,
         address: &Address,
         tx_id: (u64, u64),
         direction: SearchDirection,
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
-        let direction_sign = match direction {
-            SearchDirection::Older => "<", // Older blocks have lesser block ID.
-            SearchDirection::Newer => ">", // Newer blocks have greater block ID.
-        };
-
         // Filter for txs that older/newer than provided tx ID.
-        let ordered_filter = format!(
-            "(block_number {sign} {block_id} or (block_number = {block_id} and block_index {sign} {block_tx_id}))",
-            sign = direction_sign,
-            block_id = tx_id.0,
-            block_tx_id = tx_id.1
-        );
+        // For older blocks, block number should be between 0 and block number - 1,
+        // or for the same block number, transaction in block should be between 0 and tx in block number - 1.
+        // For newer filter range starts on the ID + 1 and ends in the max value for the type correspondingly.
+        let (block_id, block_tx_id) = tx_id;
+        let (block_number_start_idx, block_number_end_idx) = match direction {
+            SearchDirection::Older => (0i64, block_id as i64 - 1), // Older blocks have lesser block ID.
+            SearchDirection::Newer => (block_id as i64 + 1, i64::max_value()), // Newer blocks have greater block ID.
+        };
+        let (tx_number_start_idx, tx_number_end_idx) = match direction {
+            SearchDirection::Older => (0i32, block_tx_id as i32 - 1),
+            SearchDirection::Newer => (block_tx_id as i32 + 1, i32::max_value()),
+        };
 
         // This query does the following:
         // - creates a union of `executed_transactions` and the `executed_priority_operations`
@@ -433,8 +439,9 @@ impl<'a> OperationsExtSchema<'a> {
         //   same way as it done for "verified" flag. Later we've decided that if tx was added
         //   to the `executed_*` table, it actually **is** committed, thus now we just add
         //   `true`.
-        let query = format!(
-            "
+        let mut tx_history = sqlx::query_as!(
+            TransactionsHistoryItem,
+            r#"
             with eth_ops as (
                 select distinct on (block_number, action_type)
                     operations.block_number,
@@ -446,7 +453,6 @@ impl<'a> OperationsExtSchema<'a> {
                 select
                     *
                 from (
-                    with vars (address_bytes) as ( select decode('{address}', 'hex') )
                     select
                         concat_ws(',', block_number, block_index) as tx_id,
                         tx,
@@ -458,17 +464,17 @@ impl<'a> OperationsExtSchema<'a> {
                         block_number,
                         created_at
                     from
-                        executed_transactions, vars
+                        executed_transactions
                     where
                         (
-                            from_account = address_bytes
+                            from_account = $1
                             or
-                            to_account = address_bytes
+                            to_account = $1
                             or
-                            primary_account_address = address_bytes
+                            primary_account_address = $1
                         )
                         and
-                        {ordered_filter}
+                        (block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6))
                     union all
                     select
                         concat_ws(',', block_number, block_index) as tx_id,
@@ -481,47 +487,50 @@ impl<'a> OperationsExtSchema<'a> {
                         block_number,
                         created_at
                     from 
-                        executed_priority_operations, vars
+                        executed_priority_operations
                     where 
                         (
-                            from_account = address_bytes
+                            from_account = $1
                             or
-                            to_account = address_bytes
+                            to_account = $1
                         )
                         and
-                        {ordered_filter}
+                        (block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6))
                     ) t
                 order by
                     block_number desc, created_at desc
                 limit 
-                    {limit}
+                    $7
             )
             select
-                tx_id,
-                hash,
-                eth_block,
-                pq_id,
-                tx,
-                success,
-                fail_reason,
-                true as commited,
-                coalesce(verified.confirmed, false) as verified,
-                created_at
+                tx_id as "tx_id!",
+                hash as "hash?",
+                eth_block as "eth_block?",
+                pq_id as "pq_id?",
+                tx as "tx!",
+                success as "success?",
+                fail_reason as "fail_reason?",
+                true as "commited!",
+                coalesce(verified.confirmed, false) as "verified!",
+                created_at as "created_at!"
             from transactions
             left join eth_ops committed on
                 committed.block_number = transactions.block_number and committed.action_type = 'COMMIT'
             left join eth_ops verified on
                 verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
             order by transactions.block_number desc, created_at desc
-            ",
-            address = hex::encode(address.as_ref().to_vec()),
-            ordered_filter = ordered_filter,
-            limit = limit
-        );
-        let mut tx_history =
-            diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
+            "#,
+            address.as_ref(),
+            block_id as i64,
+            block_number_start_idx, block_number_end_idx,
+            tx_number_start_idx, tx_number_end_idx,
+            limit as i64
+        ).fetch_all(self.0.conn())
+        .await?;
+
+        // diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
         if !tx_history.is_empty() {
-            let tokens = TokensSchema(self.0).load_tokens()?;
+            let tokens = TokensSchema(self.0).load_tokens().await?;
             for tx_item in &mut tx_history {
                 let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
                     "NONE" => {
