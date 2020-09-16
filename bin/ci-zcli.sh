@@ -37,4 +37,4 @@ SERVER_PID=$!
 
 sleep 10
 echo Performing zcli tests...
-yarn --cwd js/zcli test
+yarn --cwd infrastructure/zcli test
