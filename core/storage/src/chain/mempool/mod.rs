@@ -70,7 +70,7 @@ impl<'a> MempoolSchema<'a> {
             match batch_id {
                 Some(batch_id) => {
                     // Group of batched transactions.
-                    let variant = SignedTxVariant::from((deserialized_txs, batch_id));
+                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id);
                     txs.push(variant);
                 }
                 None => {

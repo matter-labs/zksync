@@ -199,6 +199,8 @@ impl MempoolState {
     }
 
     fn add_batch(&mut self, batch: SignedTxsBatch) -> Result<(), TxAddError> {
+        assert_ne!(batch.batch_id, 0, "Batch ID was not set");
+
         for tx in batch.txs.iter() {
             if tx.nonce() < self.nonce(&tx.account()) {
                 return Err(TxAddError::NonceMismatch);

@@ -34,6 +34,10 @@ impl From<(Vec<SignedFranklinTx>, i64)> for SignedTxVariant {
 }
 
 impl SignedTxVariant {
+    pub fn batch(txs: Vec<SignedFranklinTx>, batch_id: i64) -> Self {
+        Self::Batch(SignedTxsBatch { txs, batch_id })
+    }
+
     pub fn hashes(&self) -> Vec<TxHash> {
         match self {
             Self::Tx(tx) => vec![tx.hash()],
