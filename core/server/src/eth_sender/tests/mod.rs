@@ -12,7 +12,6 @@ use super::{
     transactions::{ETHStats, ExecutedTxStatus, TxCheckOutcome},
     ETHSender, TxCheckMode,
 };
-use crate::eth_sender::database::DatabaseAccess;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
 use crate::eth_sender::ETHSenderRequest;
 use futures::executor::block_on;

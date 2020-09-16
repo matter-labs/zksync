@@ -14,13 +14,14 @@ pub struct CurrentZksyncInfo {
 }
 
 impl CurrentZksyncInfo {
-    pub fn new(connection_pool: &ConnectionPool) -> Self {
-        let storage = connection_pool.access_storage().expect("db failed");
+    pub async fn new(connection_pool: &ConnectionPool) -> Self {
+        let mut storage = connection_pool.access_storage().await.expect("db failed");
 
         let last_verified_block = storage
             .chain()
             .block_schema()
             .get_last_verified_block()
+            .await
             .expect("Can't get the last verified block");
 
         Self::with_block_number(last_verified_block)

@@ -403,10 +403,7 @@ pub fn get_audits(
     (audit_account, audit_balance)
 }
 
-pub fn apply_leaf_operation<
-    Fa: Fn(&mut CircuitAccount<Bn256>) -> (),
-    Fb: Fn(&mut Balance<Bn256>) -> (),
->(
+pub fn apply_leaf_operation<Fa: Fn(&mut CircuitAccount<Bn256>), Fb: Fn(&mut Balance<Bn256>)>(
     tree: &mut CircuitAccountTree,
     account_address: u32,
     token: u32,

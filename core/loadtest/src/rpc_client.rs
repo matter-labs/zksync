@@ -8,7 +8,7 @@ use models::node::{
     tx::{FranklinTx, PackedEthSignature, TxHash},
     Address,
 };
-use server::api_server::rpc_server::AccountInfoResp;
+use server::api_server::rpc_server::types::AccountInfoResp;
 // Local uses
 use self::messages::JsonRpcRequest;
 

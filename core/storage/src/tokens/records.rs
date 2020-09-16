@@ -1,8 +1,8 @@
 // External imports
 use serde_derive::{Deserialize, Serialize};
+use sqlx::FromRow;
 // Workspace imports
 // Local imports
-use crate::schema::*;
 use crate::tokens::utils::{address_to_stored_string, stored_str_address_to_address};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
@@ -10,18 +10,7 @@ use models::node::tokens::TokenPrice;
 use models::node::{Token, TokenId};
 use models::primitives::big_decimal_to_ratio;
 
-#[derive(
-    Debug,
-    Clone,
-    Insertable,
-    QueryableByName,
-    Queryable,
-    Serialize,
-    Deserialize,
-    AsChangeset,
-    PartialEq,
-)]
-#[table_name = "tokens"]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, FromRow)]
 pub struct DbToken {
     pub id: i32,
     pub address: String,
@@ -51,8 +40,7 @@ impl Into<Token> for DbToken {
     }
 }
 
-#[derive(Debug, Clone, Insertable, Queryable)]
-#[table_name = "ticker_price"]
+#[derive(Debug, Clone, FromRow)]
 pub struct DbTickerPrice {
     pub token_id: i32,
     pub usd_price: BigDecimal,
