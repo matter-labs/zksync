@@ -335,7 +335,14 @@
     "@ethersproject/properties" "^5.0.3"
     "@ethersproject/strings" "^5.0.3"
 
-"@types/chai@^4.2.12":
+"@types/chai-as-promised@^7.1.3":
+  version "7.1.3"
+  resolved "https://registry.yarnpkg.com/@types/chai-as-promised/-/chai-as-promised-7.1.3.tgz#779166b90fda611963a3adbfd00b339d03b747bd"
+  integrity sha512-FQnh1ohPXJELpKhzjuDkPLR2BZCAqed+a6xV4MI/T3XzHfd2FlarfUGUdZYgqYe8oxkYn0fchHEeHfHqdZ96sg==
+  dependencies:
+    "@types/chai" "*"
+
+"@types/chai@*", "@types/chai@^4.2.12":
   version "4.2.12"
   resolved "https://registry.yarnpkg.com/@types/chai/-/chai-4.2.12.tgz#6160ae454cd89dae05adc3bb97997f488b608201"
   integrity sha512-aN5IAC8QNtSUdQzxu7lGBgYAOuU1tmRU4c9dIq5OKGf/SBVjXo+ffM2wEjudAWbgpOhy60nLoAGH1xm8fpCKFQ==
@@ -349,6 +356,18 @@
   version "8.0.3"
   resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.0.3.tgz#51b21b6acb6d1b923bbdc7725c38f9f455166402"
   integrity sha512-vyxR57nv8NfcU0GZu8EUXZLTbCMupIUwy95LJ6lllN+JRPG25CwMHoB1q5xKh8YKhQnHYRAn4yW2yuHbf/5xgg==
+
+"@types/mock-fs@^4.10.0":
+  version "4.10.0"
+  resolved "https://registry.yarnpkg.com/@types/mock-fs/-/mock-fs-4.10.0.tgz#460061b186993d76856f669d5317cda8a007c24b"
+  integrity sha512-FQ5alSzmHMmliqcL36JqIA4Yyn9jyJKvRSGV3mvPh108VFatX7naJDzSG4fnFQNZFq9dIx0Dzoe6ddflMB2Xkg==
+  dependencies:
+    "@types/node" "*"
+
+"@types/node@*":
+  version "14.10.2"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.10.2.tgz#9b47a2c8e4dabd4db73b57e750b24af689600514"
+  integrity sha512-IzMhbDYCpv26pC2wboJ4MMOa9GKtjplXfcAqrMeNJpUUwpM/2ATt2w1JPUXwS6spu856TvKZL2AOmeU2rAxskw==
 
 aes-js@3.0.0:
   version "3.0.0"
@@ -488,6 +507,13 @@ camelcase@^5.0.0, camelcase@^5.3.1:
   version "5.3.1"
   resolved "https://registry.yarnpkg.com/camelcase/-/camelcase-5.3.1.tgz#e3c9b31569e106811df242f715725a1f4c494320"
   integrity sha512-L28STB170nwWS63UjtlEOE3dldQApaJXZkOI1uMFfzf3rRuPegHaHesyee+YxQ+W6SvRDQV6UrdOdRiR153wJg==
+
+chai-as-promised@^7.1.1:
+  version "7.1.1"
+  resolved "https://registry.yarnpkg.com/chai-as-promised/-/chai-as-promised-7.1.1.tgz#08645d825deb8696ee61725dbf590c012eb00ca0"
+  integrity sha512-azL6xMoi+uxu6z4rhWQ1jbdUhOMhis2PvscD/xjLqNMkv3BPPp2JyyuTHOrf9BOosGpNQ11v6BKv/g57RXbiaA==
+  dependencies:
+    check-error "^1.0.2"
 
 chai@^4.2.0:
   version "4.2.0"
@@ -1152,6 +1178,11 @@ mocha@^8.1.3:
     yargs-parser "13.1.2"
     yargs-unparser "1.6.1"
 
+mock-fs@^4.13.0:
+  version "4.13.0"
+  resolved "https://registry.yarnpkg.com/mock-fs/-/mock-fs-4.13.0.tgz#31c02263673ec3789f90eb7b6963676aa407a598"
+  integrity sha512-DD0vOdofJdoaRNtnWcrXe6RQbpHkPPmtqGq14uRX0F8ZKJ5nv89CVTYl/BZdppDxBDaV0hl75htg3abpEWlPZA==
+
 ms@2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.0.0.tgz#5608aeadfc00be6c2901df5f9861788de0d597c8"
@@ -1637,12 +1668,6 @@ zksync-crypto@^0.3.1:
   resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.3.1.tgz#ad0c1d299246de6fdd7907532387466599787edd"
   integrity sha512-9BbIxVPIKXAAT+TUiMJXuoaVcNJqBZ23CNEHWOSJrQNJHUGkaHUQ426xAw/bNjNbRn4UTkM/AhyyqAUMnVX6nA==
 
-zksync@^0.6.5:
-  version "0.6.5"
-  resolved "https://registry.yarnpkg.com/zksync/-/zksync-0.6.5.tgz#63a4711cbeb3ed93f73b8ecce8a377783edd9317"
-  integrity sha512-+/6fCSYMLMXNd2jfQQ0tJ2d0iCDslny92hrUOschCsv0HCP/HEcbcX/ry8lS2IKg9hJJL4AqXuK0xeRkp4Rc0A==
-  dependencies:
-    axios "^0.19.0"
-    websocket "^1.0.30"
-    websocket-as-promised "^0.10.1"
-    zksync-crypto "^0.3.1"
+"zksync@link:../zksync.js":
+  version "0.0.0"
+  uid ""

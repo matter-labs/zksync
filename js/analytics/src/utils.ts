@@ -7,7 +7,7 @@ export class TimePeriod {
     public timeFrom: Date;
     public timeTo: Date;
 
-    constructor(timeFrom: string, timeTo: string) {
+    constructor(timeFrom: string, timeTo?: string) {
         this.timeFrom = new Date(timeFrom);
         this.timeTo = timeTo != null ? new Date(timeTo) : new Date();
     }

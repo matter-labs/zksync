@@ -39,7 +39,6 @@ export function loadConfig(network?: Network) {
         const config: Config = {
             network: network,
             rest_api_address: network_config["REST_API_ADDR"],
-            operator_commit_address: network_config["OPERATOR_COMMIT_ETH_ADDRESS"],
             operator_fee_address: network_config["OPERATOR_FEE_ETH_ADDRESS"],
             etherscan_api_address: network_config["ETHERSCAN_API_KEY"],
         };

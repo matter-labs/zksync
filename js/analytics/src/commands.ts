@@ -18,7 +18,12 @@ export async function currentBalances(network: Network, operator_address: string
         if (zksProvider.tokenSet.resolveTokenSymbol(token) === "MLTT" || zksync.utils.isTokenETH(token)) continue;
 
         const tokenAddress = tokens[token].address;
-        const erc20contract = new ethers.Contract(tokenAddress, zksync.utils.IERC20_INTERFACE, ethProvider);
+
+        const erc20contract = new ethers.Contract(
+            tokenAddress,
+            zksync.utils.IERC20_INTERFACE as ethers.ethers.ContractInterface,
+            ethProvider
+        );
 
         const tokenPrice = await zksProvider.getTokenPrice(token);
         const contractBalance = await erc20contract.balanceOf(operator_address);
@@ -141,6 +146,8 @@ export async function collectedTokenLiquidations(
     timePeriod: utils.TimePeriod,
     etherscan_api_key: string
 ) {
+    if (!timePeriod.isCorrect()) throw new Error(`Error time period ${timePeriod.timeFrom} - ${timePeriod.timeTo}`);
+
     const ethProvider = new ethers.providers.EtherscanProvider(network, etherscan_api_key);
 
     let liquidationAmount = 0;

@@ -2,13 +2,11 @@
     "defaultNetwork": "mainnet",
     "network": {
         "mainnet": {
-            "OPERATOR_COMMIT_ETH_ADDRESS": "0xda7357bbce5e8c616bc7b0c3c86f0c71c5b4eabb",
             "OPERATOR_FEE_ETH_ADDRESS": "0x2a0a81e257a2f5d6ed4f07b81dbda09f107bd027",
             "REST_API_ADDR": "https://api.zksync.io",
             "ETHERSCAN_API_KEY": "ANJG7YGR3B2M29YYNTXWWEBJRA7848VPFC"
         },
         "localhost": {
-            "OPERATOR_COMMIT_ETH_ADDRESS": "0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7",
             "OPERATOR_FEE_ETH_ADDRESS": "0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7",
             "REST_API_ADDR": "http://localhost:3001",
             "ETHERSCAN_API_KEY": "ANJG7YGR3B2M29YYNTXWWEBJRA7848VPFC"

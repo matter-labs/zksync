@@ -8,7 +8,6 @@ The configuration file contains the default network and a list of all networks w
 
 | Parameter | Description |
 | :-- | :-- |
-| `OPERATOR_COMMIT_ETH_ADDRESS` | Ethereum Address to be used for zkSync account managing the interaction with a contract on Ethereum |
 | `OPERATOR_FEE_ETH_ADDRESS` | Ethereum Address to be used for zkSync account to collect fees |
 | `REST_API_ADDR` | Address where the zkSync REST API is located |
 | `ETHERSCAN_API_KEY` | Api-Key Token which uses for all API request to Etherscan   |

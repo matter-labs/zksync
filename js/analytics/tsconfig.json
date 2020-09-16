@@ -4,6 +4,7 @@
     "target": "es6",
     "outDir": "./build",
     "declaration": true,
+    "esModuleInterop": true,
     "preserveSymlinks": true,
     "preserveWatchOutput": true
   },

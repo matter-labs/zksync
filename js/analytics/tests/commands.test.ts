@@ -17,7 +17,7 @@ describe("Tests", () => {
 
     before("prepare auxiliary data & create new zksync account, make transfer", async () => {
         config = loadConfig(network);
-        const timeFrom = new Date().toUTCString();
+        const timeFrom = new Date().toISOString();
 
         const ethProvider = new ethers.providers.JsonRpcProvider();
         const zksProvider = await zksync.getDefaultProvider(network, "HTTP");
@@ -43,7 +43,7 @@ describe("Tests", () => {
         await daiDeposit.awaitReceipt();
         const changePubkey = await aliceWallet.setSigningKey();
         await changePubkey.awaitReceipt();
-        
+
         const txHandle = await aliceWallet.syncTransfer({
             to: bob.address,
             token: "DAI",
@@ -52,7 +52,7 @@ describe("Tests", () => {
         await txHandle.awaitVerifyReceipt();
         await zksProvider.disconnect();
 
-        const timeTo = new Date().toUTCString();
+        const timeTo = new Date().toISOString();
         validTimePeriod = new TimePeriod(timeFrom, timeTo);
         invalidTimePeriod = new TimePeriod(timeTo, timeFrom);
     });
