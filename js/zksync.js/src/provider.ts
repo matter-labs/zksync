@@ -10,7 +10,7 @@ import {
     Tokens,
     TokenAddress,
     TxEthSignature,
-    Fee
+    Fee,
 } from "./types";
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from "./utils";
 
@@ -79,8 +79,8 @@ export class Provider {
     }
 
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTx(tx: any, signature?: TxEthSignature): Promise<string> {
-        return await this.transport.request("tx_submit", [tx, signature]);
+    async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
+        return await this.transport.request("tx_submit", [tx, signature, fastProcessing]);
     }
 
     async getContractAddress(): Promise<ContractAddress> {
@@ -110,13 +110,13 @@ export class Provider {
 
     async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
-            return await new Promise(resolve => {
+            return await new Promise((resolve) => {
                 const subscribe = this.transport.subscribe(
                     "ethop_subscribe",
                     [serialId, action],
                     "ethop_unsubscribe",
-                    resp => {
-                        subscribe.then(sub => sub.unsubscribe());
+                    (resp) => {
+                        subscribe.then((sub) => sub.unsubscribe());
                         resolve(resp);
                     }
                 );
@@ -139,9 +139,9 @@ export class Provider {
 
     async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<TransactionReceipt> {
         if (this.transport.subscriptionsSupported()) {
-            return await new Promise(resolve => {
-                const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", resp => {
-                    subscribe.then(sub => sub.unsubscribe());
+            return await new Promise((resolve) => {
+                const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", (resp) => {
+                    subscribe.then((sub) => sub.unsubscribe());
                     resolve(resp);
                 });
             });
@@ -161,7 +161,11 @@ export class Provider {
         }
     }
 
-    async getTransactionFee(txType: "Withdraw" | "Transfer", address: Address, tokenLike: TokenLike): Promise<Fee> {
+    async getTransactionFee(
+        txType: "Withdraw" | "Transfer" | "FastWithdraw",
+        address: Address,
+        tokenLike: TokenLike
+    ): Promise<Fee> {
         const transactionFee = await this.transport.request("get_tx_fee", [txType, address.toString(), tokenLike]);
         return {
             feeType: transactionFee.feeType,
@@ -169,7 +173,7 @@ export class Provider {
             gasPriceWei: BigNumber.from(transactionFee.gasPriceWei),
             gasFee: BigNumber.from(transactionFee.gasFee),
             zkpFee: BigNumber.from(transactionFee.zkpFee),
-            totalFee: BigNumber.from(transactionFee.totalFee)
+            totalFee: BigNumber.from(transactionFee.totalFee),
         };
     }
 

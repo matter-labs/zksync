@@ -21,7 +21,7 @@ use storage::ConnectionPool;
 use crate::fee_ticker::TickerRequest;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
-    api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
+    api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
     mempool::MempoolRequest,
     signature_checker::VerifyTxSignatureRequest,
     state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
@@ -223,7 +223,6 @@ pub fn start_ws_server(
         event_sub_receiver,
         executed_tx_receiver,
         state_keeper_request_sender,
-        panic_notify.clone(),
         each_cache_size,
     );
 

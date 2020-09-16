@@ -12,7 +12,7 @@ import {
     TxEthSignature,
     ChangePubKey,
     EthSignerType,
-    SignedTransaction
+    SignedTransaction,
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -23,7 +23,7 @@ import {
     SYNC_MAIN_CONTRACT_INTERFACE,
     getSignedBytesFromMessage,
     signMessagePersonalAPI,
-    ERC20_DEPOSIT_GAS_LIMIT
+    ERC20_DEPOSIT_GAS_LIMIT,
 } from "./utils";
 
 class ZKSyncTxError extends Error {
@@ -91,7 +91,7 @@ export class Wallet {
 
         return {
             type: this.ethSignerType.verificationMethod === "ECDSA" ? "EthereumSignature" : "EIP1271Signature",
-            signature
+            signature,
         };
     }
 
@@ -117,7 +117,7 @@ export class Wallet {
             tokenId,
             amount: transfer.amount,
             fee: transfer.fee,
-            nonce: transfer.nonce
+            nonce: transfer.nonce,
         };
 
         const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
@@ -134,7 +134,7 @@ export class Wallet {
         const signedTransferTransaction = this.signer.signSyncTransfer(transactionData);
         return {
             tx: signedTransferTransaction,
-            ethereumSignature: txMessageEthSignature
+            ethereumSignature: txMessageEthSignature,
         };
     }
 
@@ -175,7 +175,7 @@ export class Wallet {
             tokenId,
             amount: withdraw.amount,
             fee: withdraw.fee,
-            nonce: withdraw.nonce
+            nonce: withdraw.nonce,
         };
 
         const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
@@ -194,7 +194,7 @@ export class Wallet {
 
         return {
             tx: signedWithdrawTransaction,
-            ethereumSignature: txMessageEthSignature
+            ethereumSignature: txMessageEthSignature,
         };
     }
 
@@ -204,17 +204,20 @@ export class Wallet {
         amount: BigNumberish;
         fee?: BigNumberish;
         nonce?: Nonce;
+        fastProcessing?: boolean;
     }): Promise<Transaction> {
         withdraw.nonce = withdraw.nonce != null ? await this.getNonce(withdraw.nonce) : await this.getNonce();
 
         if (withdraw.fee == null) {
-            const fullFee = await this.provider.getTransactionFee("Withdraw", withdraw.ethAddress, withdraw.token);
+            const feeType = withdraw.fastProcessing === true ? "FastWithdraw" : "Withdraw";
+
+            const fullFee = await this.provider.getTransactionFee(feeType, withdraw.ethAddress, withdraw.token);
             withdraw.fee = fullFee.totalFee;
         }
 
         const signedWithdrawTransaction = await this.signWithdrawFromSyncToEthereum(withdraw as any);
 
-        return submitSignedTransaction(signedWithdrawTransaction, this.provider);
+        return submitSignedTransaction(signedWithdrawTransaction, this.provider, withdraw.fastProcessing);
     }
 
     async isSigningKeySet(): Promise<boolean> {
@@ -244,11 +247,11 @@ export class Wallet {
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
             nonce,
-            ethSignature
+            ethSignature,
         };
 
         return {
-            tx: changePubKeyTx
+            tx: changePubKeyTx,
         };
     }
 
@@ -301,7 +304,7 @@ export class Wallet {
 
         return mainZkSyncContract.setAuthPubkeyHash(newPubKeyHash.replace("sync:", "0x"), numNonce, {
             gasLimit: BigNumber.from("200000"),
-            ...ethTxOptions
+            ...ethTxOptions,
         });
     }
 
@@ -401,7 +404,7 @@ export class Wallet {
                 value: BigNumber.from(deposit.amount),
                 gasLimit: BigNumber.from("200000"),
                 gasPrice,
-                ...deposit.ethTxOptions
+                ...deposit.ethTxOptions,
             });
         } else {
             const tokenAddress = this.provider.tokenSet.resolveTokenAddress(deposit.token);
@@ -422,8 +425,8 @@ export class Wallet {
                 {
                     nonce,
                     gasPrice,
-                    ...deposit.ethTxOptions
-                } as ethers.providers.TransactionRequest
+                    ...deposit.ethTxOptions,
+                } as ethers.providers.TransactionRequest,
             ];
 
             // We set gas limit only if user does not set it using ethTxOptions.
@@ -431,7 +434,7 @@ export class Wallet {
             if (txRequest.gasLimit == null) {
                 const gasEstimate = await mainZkSyncContract.estimateGas
                     .depositERC20(...args)
-                    .then(estimate => estimate, _err => BigNumber.from("0"));
+                    .then((estimate) => estimate, (_err) => BigNumber.from("0"));
                 txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT) ? gasEstimate : ERC20_DEPOSIT_GAS_LIMIT;
                 args[args.length - 1] = txRequest;
             }
@@ -473,7 +476,7 @@ export class Wallet {
         const ethTransaction = await mainZkSyncContract.fullExit(accountId, tokenAddress, {
             gasLimit: BigNumber.from("500000"),
             gasPrice,
-            ...withdraw.ethTxOptions
+            ...withdraw.ethTxOptions,
         });
 
         return new ETHOperation(ethTransaction, this.provider);
@@ -600,7 +603,11 @@ class Transaction {
     }
 }
 
-export async function submitSignedTransaction(signedTx: SignedTransaction, provider: Provider): Promise<Transaction> {
-    const transactionHash = await provider.submitTx(signedTx.tx, signedTx.ethereumSignature);
+export async function submitSignedTransaction(
+    signedTx: SignedTransaction,
+    provider: Provider,
+    fastProcessing?: boolean
+): Promise<Transaction> {
+    const transactionHash = await provider.submitTx(signedTx.tx, signedTx.ethereumSignature, fastProcessing);
     return new Transaction(signedTx, transactionHash, provider);
 }

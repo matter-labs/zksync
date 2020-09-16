@@ -6,7 +6,10 @@ use web3::transports::Http;
 
 /// Executes blocks with some basic operations with new state keeper
 /// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
-fn execute_blocks_with_new_state_keeper(contracts: Contracts, block_processing: BlockProcessing) {
+async fn execute_blocks_with_new_state_keeper(
+    contracts: Contracts,
+    block_processing: BlockProcessing,
+) {
     let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
@@ -68,19 +71,23 @@ fn execute_blocks_with_new_state_keeper(contracts: Contracts, block_processing: 
             &mut test_setup,
             deposit_amount.clone(),
             block_processing,
-        );
+        )
+        .await;
     }
 
     if block_processing == BlockProcessing::NoVerify {
         let blocks_committed = test_setup
             .total_blocks_committed()
+            .await
             .expect("total_blocks_committed call fails");
         let blocks_verified = test_setup
             .total_blocks_verified()
+            .await
             .expect("total_blocks_verified call fails");
         assert_ne!(blocks_committed, blocks_verified, "no blocks to revert");
         test_setup
             .revert_blocks(blocks_committed - blocks_verified)
+            .await
             .expect("revert_blocks call fails");
     }
 
@@ -88,17 +95,18 @@ fn execute_blocks_with_new_state_keeper(contracts: Contracts, block_processing: 
     sk_thread_handle.join().expect("sk thread join");
 }
 
-fn revert_blocks_test() {
+async fn revert_blocks_test() {
     println!("deploying contracts");
     let contracts = deploy_test_contracts();
     println!("contracts deployed");
 
-    execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify);
+    execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify).await;
     println!("some blocks are committed and reverted");
 
-    execute_blocks_with_new_state_keeper(contracts, BlockProcessing::CommitAndVerify);
+    execute_blocks_with_new_state_keeper(contracts, BlockProcessing::CommitAndVerify).await;
 }
 
-fn main() {
-    revert_blocks_test();
+#[tokio::main]
+async fn main() {
+    revert_blocks_test().await;
 }

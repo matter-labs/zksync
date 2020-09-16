@@ -5,7 +5,7 @@ use futures::{
     stream::StreamExt,
     SinkExt,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 use web3::types::Address;
 // Workspace uses
 use crypto_exports::ff;
@@ -62,6 +62,8 @@ struct PendingBlock {
     pending_block_iteration: usize,
     withdrawals_amount: u32,
     gas_counter: GasCounter,
+    /// Option denoting if this block should be generated faster than usual.
+    fast_processing_required: bool,
 }
 
 impl PendingBlock {
@@ -76,6 +78,7 @@ impl PendingBlock {
             pending_block_iteration: 0,
             withdrawals_amount: 0,
             gas_counter: GasCounter::new(),
+            fast_processing_required: false,
         }
     }
 }
@@ -96,7 +99,7 @@ pub struct PlasmaStateKeeper {
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
-    max_miniblock_iterations_withdraw_block: usize,
+    fast_miniblock_iterations: usize,
 }
 
 pub struct PlasmaStateInitParams {
@@ -122,14 +125,15 @@ impl PlasmaStateInitParams {
         }
     }
 
-    pub fn get_pending_block(
+    pub async fn get_pending_block(
         &self,
-        storage: &storage::StorageProcessor,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Option<SendablePendingBlock> {
         let pending_block = storage
             .chain()
             .block_schema()
             .load_pending_block()
+            .await
             .unwrap_or_default()?;
 
         if pending_block.number <= self.last_block_number {
@@ -148,24 +152,96 @@ impl PlasmaStateInitParams {
         Some(pending_block)
     }
 
-    pub fn restore_from_db(storage: &storage::StorageProcessor) -> Result<Self, failure::Error> {
+    pub async fn restore_from_db(
+        storage: &mut storage::StorageProcessor<'_>,
+    ) -> Result<Self, failure::Error> {
         let mut init_params = Self::new();
-        init_params.load_from_db(&storage)?;
+        init_params.load_from_db(storage).await?;
 
         Ok(init_params)
     }
 
-    fn load_from_db(&mut self, storage: &storage::StorageProcessor) -> Result<(), failure::Error> {
+    async fn load_account_tree(
+        &mut self,
+        storage: &mut storage::StorageProcessor<'_>,
+    ) -> Result<BlockNumber, failure::Error> {
+        let (verified_block, accounts) =
+            storage.chain().state_schema().load_verified_state().await?;
+        for (id, account) in accounts {
+            self.insert_account(id, account);
+        }
+
+        if let Some(account_tree_cache) = storage
+            .chain()
+            .block_schema()
+            .get_account_tree_cache_block(verified_block)
+            .await?
+        {
+            self.tree
+                .set_internals(serde_json::from_value(account_tree_cache)?);
+        } else {
+            self.tree.root_hash();
+            let account_tree_cache = self.tree.get_internals();
+            storage
+                .chain()
+                .block_schema()
+                .store_account_tree_cache(verified_block, serde_json::to_value(account_tree_cache)?)
+                .await?;
+        }
+
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
             .load_committed_state(None)
+            .await
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
-        for (account_id, account) in accounts.into_iter() {
-            self.insert_account(account_id, account);
+
+        if block_number != verified_block {
+            if let Some((_, account_updates)) = storage
+                .chain()
+                .state_schema()
+                .load_state_diff(verified_block, Some(block_number))
+                .await?
+            {
+                let mut updated_accounts = account_updates
+                    .into_iter()
+                    .map(|(id, _)| id)
+                    .collect::<Vec<_>>();
+                updated_accounts.sort();
+                updated_accounts.dedup();
+                for idx in updated_accounts {
+                    if let Some(acc) = accounts.get(&idx).cloned() {
+                        self.insert_account(idx, acc);
+                    } else {
+                        self.remove_account(idx);
+                    }
+                }
+            }
         }
+        if block_number != 0 {
+            let storage_root_hash = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await?
+                .expect("restored block must exist");
+            assert_eq!(
+                storage_root_hash.new_root_hash,
+                self.tree.root_hash(),
+                "restored root_hash is different"
+            );
+        }
+        Ok(block_number)
+    }
+
+    async fn load_from_db(
+        &mut self,
+        storage: &mut storage::StorageProcessor<'_>,
+    ) -> Result<(), failure::Error> {
+        let block_number = self.load_account_tree(storage).await?;
         self.last_block_number = block_number;
-        self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, block_number)?;
+        self.unprocessed_priority_op =
+            Self::unprocessed_priority_op_id(storage, block_number).await?;
 
         info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
@@ -174,14 +250,15 @@ impl PlasmaStateInitParams {
         Ok(())
     }
 
-    pub fn load_state_diff(
+    pub async fn load_state_diff(
         &mut self,
-        storage: &storage::StorageProcessor,
+        storage: &mut storage::StorageProcessor<'_>,
     ) -> Result<(), failure::Error> {
         let state_diff = storage
             .chain()
             .state_schema()
             .load_state_diff(self.last_block_number, None)
+            .await
             .map_err(|e| failure::format_err!("failed to load committed state: {}", e))?;
 
         if let Some((block_number, updates)) = state_diff {
@@ -192,7 +269,7 @@ impl PlasmaStateInitParams {
                 }
             }
             self.unprocessed_priority_op =
-                Self::unprocessed_priority_op_id(&storage, block_number)?;
+                Self::unprocessed_priority_op_id(storage, block_number).await?;
             self.last_block_number = block_number;
         }
         Ok(())
@@ -212,17 +289,19 @@ impl PlasmaStateInitParams {
         }
     }
 
-    fn unprocessed_priority_op_id(
-        storage: &storage::StorageProcessor,
+    async fn unprocessed_priority_op_id(
+        storage: &mut storage::StorageProcessor<'_>,
         block_number: BlockNumber,
     ) -> Result<u64, failure::Error> {
         let storage_op = storage
             .chain()
             .operations_schema()
-            .get_operation(block_number, ActionType::COMMIT);
+            .get_operation(block_number, ActionType::COMMIT)
+            .await;
         if let Some(storage_op) = storage_op {
             Ok(storage_op
-                .into_op(&storage)
+                .into_op(storage)
+                .await
                 .map_err(|e| failure::format_err!("could not convert storage_op: {}", e))?
                 .block
                 .processed_priority_ops
@@ -243,7 +322,7 @@ impl PlasmaStateKeeper {
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
-        max_miniblock_iterations_withdraw_block: usize,
+        fast_miniblock_iterations: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -275,7 +354,7 @@ impl PlasmaStateKeeper {
             executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
-            max_miniblock_iterations_withdraw_block,
+            fast_miniblock_iterations,
         };
 
         let root = keeper.state.root_hash();
@@ -323,15 +402,21 @@ impl PlasmaStateKeeper {
         }
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
-        let storage = pool
+    pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
+        let mut storage = pool
             .access_storage()
+            .await
             .expect("db connection failed for statekeeper");
+        let mut transaction = storage
+            .start_transaction()
+            .await
+            .expect("unable to create db transaction in statekeeper");
 
-        let (last_committed, mut accounts) = storage
+        let (last_committed, mut accounts) = transaction
             .chain()
             .state_schema()
             .load_committed_state(None)
+            .await
             .expect("db failed");
         // TODO: move genesis block creation to separate routine.
         assert!(
@@ -345,16 +430,23 @@ impl PlasmaStateKeeper {
             nonce: fee_account.nonce,
         };
         accounts.insert(0, fee_account);
-        storage
+        transaction
             .chain()
             .state_schema()
             .commit_state_update(0, &[(0, db_account_update)])
+            .await
             .expect("db fail");
-        storage
+        transaction
             .chain()
             .state_schema()
             .apply_state_update(0)
+            .await
             .expect("db fail");
+
+        transaction
+            .commit()
+            .await
+            .expect("Unable to commit transaction in statekeeper");
         let state = PlasmaState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());
@@ -483,8 +575,8 @@ impl PlasmaStateKeeper {
         }
 
         // If pending block contains withdrawals we seal it faster
-        let max_miniblock_iterations = if self.pending_block.withdrawals_amount > 0 {
-            self.max_miniblock_iterations_withdraw_block
+        let max_miniblock_iterations = if self.pending_block.fast_processing_required {
+            self.fast_miniblock_iterations
         } else {
             self.max_miniblock_iterations
         };
@@ -580,9 +672,14 @@ impl PlasmaStateKeeper {
             }
         }
 
-        if matches!(tx.tx, FranklinTx::Withdraw(_)) {
+        if let FranklinTx::Withdraw(tx) = &tx.tx {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
+
+            // Check if we should mark this block as requiring fast processing.
+            if tx.fast {
+                self.pending_block.fast_processing_required = true;
+            }
         }
 
         // Check if we've reached the withdraw operations amount limit.
@@ -781,7 +878,6 @@ impl PlasmaStateKeeper {
 pub fn start_state_keeper(
     sk: PlasmaStateKeeper,
     pending_block: Option<SendablePendingBlock>,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
-    runtime.spawn(sk.run(pending_block))
+    tokio::spawn(sk.run(pending_block))
 }

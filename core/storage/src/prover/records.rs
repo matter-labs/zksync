@@ -1,49 +1,49 @@
 // External imports
 use chrono::prelude::*;
-use diesel::sql_types::BigInt;
 use serde_derive::{Deserialize, Serialize};
+use sqlx::FromRow;
 // Workspace imports
 // Local imports
-use crate::schema::*;
 
-#[derive(Debug, Insertable, Queryable, QueryableByName)]
-#[table_name = "active_provers"]
+#[derive(Debug, FromRow)]
 pub struct ActiveProver {
     pub id: i32,
     pub worker: String,
-    pub created_at: NaiveDateTime,
-    pub stopped_at: Option<NaiveDateTime>,
+    pub created_at: DateTime<Utc>,
+    pub stopped_at: Option<DateTime<Utc>>,
     pub block_size: i64,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName)]
-#[table_name = "proofs"]
+#[derive(Debug, FromRow)]
 pub struct NewProof {
     pub block_number: i64,
     pub proof: serde_json::Value,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName)]
-#[table_name = "proofs"]
+#[derive(Debug, FromRow)]
 pub struct StoredProof {
     pub block_number: i64,
     pub proof: serde_json::Value,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
-#[derive(Debug, Clone, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
-#[table_name = "prover_runs"]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct ProverRun {
     pub id: i32,
     pub block_number: i64,
     pub worker: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, QueryableByName)]
+#[derive(Debug, FromRow)]
 pub struct IntegerNumber {
-    #[sql_type = "BigInt"]
     pub integer_value: i64,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct StorageBlockWitness {
+    pub block: i64,
+    pub witness: serde_json::Value,
 }
