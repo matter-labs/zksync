@@ -1,8 +1,8 @@
 // External imports
-use chrono::NaiveDateTime;
-use diesel::sql_types::{BigInt, Bool, Jsonb, Nullable, Text, Timestamp};
+use chrono::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
+use sqlx::FromRow;
 // Workspace imports
 // Local imports
 use crate::prover::records::ProverRun;
@@ -17,37 +17,18 @@ pub struct AccountTransaction {
     pub verified: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct TransactionsHistoryItem {
-    #[sql_type = "Text"]
     pub tx_id: String,
-
-    #[sql_type = "Nullable<Text>"]
     pub hash: Option<String>,
-
-    #[sql_type = "Nullable<BigInt>"]
     pub eth_block: Option<i64>,
-
-    #[sql_type = "Nullable<BigInt>"]
     pub pq_id: Option<i64>,
-
-    #[sql_type = "Jsonb"]
     pub tx: Value,
-
-    #[sql_type = "Nullable<Bool>"]
     pub success: Option<bool>,
-
-    #[sql_type = "Nullable<Text>"]
     pub fail_reason: Option<String>,
-
-    #[sql_type = "Bool"]
     pub commited: bool,
-
-    #[sql_type = "Bool"]
     pub verified: bool,
-
-    #[sql_type = "Timestamp"]
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

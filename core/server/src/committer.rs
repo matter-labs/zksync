@@ -3,7 +3,7 @@ use std::time::Duration;
 // External uses
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
-use tokio::{runtime::Runtime, task::JoinHandle, time};
+use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
@@ -34,7 +34,7 @@ async fn handle_new_commit_task(
                 notifier.send(()).expect("state keeper receiver dropped");
             }
             CommitRequest::PendingBlock(pending_block, notifier) => {
-                save_pending_block(pending_block, &pool);
+                save_pending_block(pending_block, &pool).await;
 
                 notifier.send(()).expect("state keeper receiver dropped");
             }
@@ -42,9 +42,10 @@ async fn handle_new_commit_task(
     }
 }
 
-fn save_pending_block(pending_block: PendingBlock, pool: &ConnectionPool) {
-    let storage = pool
+async fn save_pending_block(pending_block: PendingBlock, pool: &ConnectionPool) {
+    let mut storage = pool
         .access_storage()
+        .await
         .expect("db connection fail for committer");
 
     log::trace!("persist pending block #{}", pending_block.number);
@@ -53,6 +54,7 @@ fn save_pending_block(pending_block: PendingBlock, pool: &ConnectionPool) {
         .chain()
         .block_schema()
         .save_pending_block(pending_block)
+        .await
         .expect("committer must commit the pending block into db");
 }
 
@@ -68,9 +70,15 @@ async fn commit_block(
         accounts_updated,
     } = request;
 
-    let storage = pool
+    let mut storage = pool
         .access_storage()
+        .await
         .expect("db connection fail for committer");
+
+    let mut transaction = storage
+        .start_transaction()
+        .await
+        .expect("Failed initializing a DB transaction");
 
     // handle empty block case (only failed txs)
     if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
@@ -78,10 +86,11 @@ async fn commit_block(
             "Failed transactions committed block: #{}",
             block.block_number
         );
-        storage
+        transaction
             .chain()
             .block_schema()
             .save_block_transactions(block.block_number, block.block_transactions)
+            .await
             .expect("committer failed tx save");
         return;
     }
@@ -93,10 +102,11 @@ async fn commit_block(
         id: None,
     };
     info!("commit block #{}", op.block.block_number);
-    let op = storage
+    let op = transaction
         .chain()
         .block_schema()
         .execute_operation(op.clone())
+        .await
         .expect("committer must commit the op into db");
 
     tx_for_eth
@@ -116,17 +126,24 @@ async fn commit_block(
         .await
         .map_err(|e| warn!("Failed notify mempool about account updates: {}", e))
         .unwrap_or_default();
+
+    transaction
+        .commit()
+        .await
+        .expect("Unable to commit DB transaction");
 }
 
 async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool: ConnectionPool) {
     let mut last_verified_block = {
-        let storage = pool
+        let mut storage = pool
             .access_storage()
+            .await
             .expect("db connection failed for committer");
         storage
             .chain()
             .block_schema()
             .get_last_verified_block()
+            .await
             .expect("db failed")
     };
 
@@ -134,20 +151,28 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool
     loop {
         timer.tick().await;
 
-        let storage = pool
+        let mut storage = pool
             .access_storage()
+            .await
             .expect("db connection failed for committer");
 
         loop {
             let block_number = last_verified_block + 1;
-            let proof = storage.prover_schema().load_proof(block_number);
-            if let Ok(proof) = proof {
+            let proof = storage.prover_schema().load_proof(block_number).await;
+            if let Ok(Some(proof)) = proof {
+                let mut transaction = storage
+                    .start_transaction()
+                    .await
+                    .expect("Unable to start DB transaction");
+
                 info!("New proof for block: {}", block_number);
-                let block = storage
+                let block = transaction
                     .chain()
                     .block_schema()
                     .load_committed_block(block_number)
+                    .await
                     .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
+
                 let op = Operation {
                     action: Action::Verify {
                         proof: Box::new(proof),
@@ -156,16 +181,22 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool
                     accounts_updated: Vec::new(),
                     id: None,
                 };
-                let op = storage
+                let op = transaction
                     .chain()
                     .block_schema()
                     .execute_operation(op.clone())
+                    .await
                     .expect("committer must commit the op into db");
                 tx_for_eth
                     .send(ETHSenderRequest::SendOperation(op))
                     .await
                     .expect("must send an operation for verification to ethereum");
                 last_verified_block += 1;
+
+                transaction
+                    .commit()
+                    .await
+                    .expect("Failed to commit transaction");
             } else {
                 break;
             }
@@ -180,14 +211,13 @@ pub fn run_committer(
     op_notify_sender: Sender<Operation>,
     mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
-    runtime.spawn(handle_new_commit_task(
+    tokio::spawn(handle_new_commit_task(
         rx_for_ops,
         tx_for_eth.clone(),
         op_notify_sender,
         mempool_req_sender,
         pool.clone(),
     ));
-    runtime.spawn(poll_for_new_proofs_task(tx_for_eth, pool))
+    tokio::spawn(poll_for_new_proofs_task(tx_for_eth, pool))
 }
