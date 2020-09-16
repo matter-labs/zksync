@@ -97,7 +97,7 @@ Adding a new migration requires the following actions:
   zksync integration-simple # Has to be run in the 3rd terminal
   ```
 
-- Running the full integration tests (similar to `integration-simple`, but performs different full exits)
+- Running the integration tests for Full Exit operations
   
   ```sh
   zksync server # Has to be run in the 1st terminal
