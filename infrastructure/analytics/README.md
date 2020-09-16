@@ -41,7 +41,7 @@ All output printed to stdout is strict JSON
 
 - --network \<network\> (Default: from config file)  
 select a network from the list of the configuration file
-- --timeFrom \<time\>   
+- --timeFrom \<time\>  
 start of time period in format 'YYYY-MM-DDTHH:MM:SS'
 - --timeTo \<time\> (Default - current time)  
 end of time period in format 'YYYY-MM-DDTHH:MM:SS' 
@@ -59,7 +59,7 @@ The report contains information about all tokens that are supported in zkSync.
 ### Collected fees reports
 
 ```console
-$ yarn start fees [--timeFrom <time>] [--timeTo <time>]
+$ yarn start fees --timeFrom <time> [--timeTo <time>] 
 ```
 Output such information:
 - amount of ETH spent for `commit`, `verify` and `completeWithdrawals` operations in L1 and it's equivalent in USD (at present moment)
@@ -68,7 +68,7 @@ Output such information:
 ### Liquidations reports
 
 ```console
-$ yarn start liquidations [--timeFrom <time>] [--timeTo <time>]
+$ yarn start liquidations --timeFrom <time> [--timeTo <time>]
 ```
 
 Output the total amount of ETH accrued as a result of token liquidations during the specified period.
@@ -79,7 +79,7 @@ Output the total amount of ETH accrued as a result of token liquidations during 
 $ yarn test 
 ```
 
-## Example usage
+## Usage examples
 
 ```console 
 $ yarn start current-balances 
