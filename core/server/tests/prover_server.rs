@@ -17,13 +17,17 @@ use prover::{client, ApiClient};
 use circuit::witness::utils::get_used_subtree_root_hash;
 use server::prover_server;
 
-fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
+async fn connect_to_db() -> storage::ConnectionPool {
+    storage::ConnectionPool::new(Some(1)).await
+}
+
+async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
     // TODO: make single server spawn for all tests
     let bind_to = "127.0.0.1:8088";
     let mut config_opt = ConfigurationOptions::from_env();
     config_opt.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();
 
-    let conn_pool = storage::ConnectionPool::new(Some(1));
+    let conn_pool = connect_to_db().await;
     let (tx, _rx) = mpsc::channel(1);
 
     thread::spawn(move || {
@@ -38,12 +42,6 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
     bind_to.to_string()
 }
 
-fn access_storage() -> storage::StorageProcessor {
-    storage::ConnectionPool::new(Some(1))
-        .access_storage()
-        .expect("failed to connect to db")
-}
-
 #[test]
 #[should_panic]
 fn client_with_empty_worker_name_panics() {
@@ -54,11 +52,11 @@ fn client_with_empty_worker_name_panics() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
-fn api_client_register_start_and_stop_of_prover() {
+async fn api_client_register_start_and_stop_of_prover() {
     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
-    let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
+    let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1)).await;
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
         "foo",
@@ -67,26 +65,34 @@ fn api_client_register_start_and_stop_of_prover() {
     let id = client
         .register_prover(block_size_chunks)
         .expect("failed to register");
-    let storage = access_storage();
+
+    let db_connection = connect_to_db().await;
+    let mut storage = db_connection
+        .access_storage()
+        .await
+        .expect("Failed to connect to db");
+
     storage
         .prover_schema()
         .prover_by_id(id)
+        .await
         .expect("failed to select registered prover");
     client.prover_stopped(id).expect("unexpected error");
     let prover = storage
         .prover_schema()
         .prover_by_id(id)
+        .await
         .expect("failed to select registered prover");
     prover.stopped_at.expect("expected not empty");
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
-fn api_client_simple_simulation() {
+async fn api_client_simple_simulation() {
     let prover_timeout = time::Duration::from_secs(1);
     let rounds_interval = time::Duration::from_secs(10);
 
-    let addr = spawn_server(prover_timeout, rounds_interval);
+    let addr = spawn_server(prover_timeout, rounds_interval).await;
 
     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     let client = client::ApiClient::new(
@@ -101,9 +107,13 @@ fn api_client_simple_simulation() {
         .expect("failed to get block to prove");
     assert!(to_prove.is_none());
 
-    let storage = access_storage();
+    let db_connection = connect_to_db().await;
+    let mut storage = db_connection
+        .access_storage()
+        .await
+        .expect("Failed to connect to db");
 
-    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data(block_size_chunks);
+    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data(block_size_chunks).await;
 
     println!("inserting test operation");
     // write test commit operation to db
@@ -111,6 +121,7 @@ fn api_client_simple_simulation() {
         .chain()
         .block_schema()
         .execute_operation(op)
+        .await
         .expect("failed to mock commit operation");
 
     thread::sleep(time::Duration::from_secs(10));
@@ -156,13 +167,18 @@ fn api_client_simple_simulation() {
     );
 }
 
-pub fn test_operation_and_wanted_prover_data(
+pub async fn test_operation_and_wanted_prover_data(
     block_size_chunks: usize,
 ) -> (models::Operation, prover::prover_data::ProverData) {
     let mut circuit_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth());
     // insert account and its balance
-    let storage = access_storage();
+
+    let db_connection = connect_to_db().await;
+    let mut storage = db_connection
+        .access_storage()
+        .await
+        .expect("Failed to connect to db");
 
     // Fee account
     let mut accounts = models::node::AccountMap::default();
@@ -212,11 +228,13 @@ pub fn test_operation_and_wanted_prover_data(
                 },
             )],
         )
+        .await
         .unwrap();
     storage
         .chain()
         .state_schema()
         .apply_state_update(0)
+        .await
         .unwrap();
 
     ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(
@@ -323,14 +341,14 @@ pub fn test_operation_and_wanted_prover_data(
     )
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
-fn api_server_publish_dummy() {
+async fn api_server_publish_dummy() {
     let prover_timeout = time::Duration::from_secs(1);
     let rounds_interval = time::Duration::from_secs(10);
-    let addr = spawn_server(prover_timeout, rounds_interval);
+    let addr = spawn_server(prover_timeout, rounds_interval).await;
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let res = client
         .post(&format!("http://{}/publish", &addr))
         .json(&client::PublishReq {
@@ -338,6 +356,7 @@ fn api_server_publish_dummy() {
             proof: EncodedProofPlonk::default(),
         })
         .send()
+        .await
         .expect("failed to send publish request");
 
     assert_eq!(res.status(), reqwest::StatusCode::OK);

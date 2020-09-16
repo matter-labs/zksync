@@ -19,7 +19,7 @@ use num::{
     traits::{Inv, Pow},
     BigUint,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 // Workspace deps
 use models::{
     node::{
@@ -153,7 +153,6 @@ pub fn run_ticker_task(
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
     // We increase gas price for fast withdrawals, since it will induce generating a smaller block
     // size, resulting in us paying more gas than for bigger block.
@@ -189,7 +188,7 @@ pub fn run_ticker_task(
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
-            runtime.spawn(fee_ticker.run())
+            tokio::spawn(fee_ticker.run())
         }
         TokenPriceSource::CoinGecko { base_url } => {
             let token_price_api =
@@ -200,7 +199,7 @@ pub fn run_ticker_task(
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
-            runtime.spawn(fee_ticker.run())
+            tokio::spawn(fee_ticker.run())
         }
     }
 }
@@ -256,7 +255,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         recipient: Address,
     ) -> Result<Fee, failure::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
-        let token = self.api.get_token(token)?;
+        let token = self.api.get_token(token).await?;
         let token_risk_factor = self
             .config
             .tokens_risk_factors
@@ -411,7 +410,7 @@ mod test {
             Ok(BigUint::from(10u32).pow(7u32)) // 10 GWei
         }
 
-        fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+        async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
             for test_token in TestToken::all_tokens() {
                 if TokenLike::Id(test_token.id) == token {
                     return Ok(Token::new(
@@ -446,7 +445,9 @@ mod test {
                 let fee_in_token =
                     block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
                         .expect("failed to get fee in token");
-                let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
+                let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+                    .unwrap()
+                    .decimals;
 
                 // Fee in usd
                 (block_on(MockApiProvider.get_last_quote(token))
