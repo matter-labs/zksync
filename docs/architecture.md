@@ -66,7 +66,9 @@ This section provides an overview on folders / sub-projects that exist in this r
   - `/js`: Configuration files for JavaScript applications (such as Explorer).
   - `/tesseracts`: Configuration for `tesseracts` minimalistic blockchain explorer (used for development).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
-- `/explorer`: A blockchain explorer for zkSync network.
+- `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
+  - `/explorer`: A blockchain explorer for zkSync network.
+  - `/tok_cli`: A command-line utility for adding new supported tokens into zkSync
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.
   - `/zksync-crypto`: zkSync network cryptographic primitives, which can be compiled to WASM.

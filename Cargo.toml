@@ -4,7 +4,6 @@ members = [
     "core/bin/key_generator",
     "core/bin/server",
     "core/bin/prover",
-    "core/bin/tok_cli",
 
     "core/lib/circuit",
     "core/lib/crypto_exports",
@@ -16,4 +15,6 @@ members = [
 
     "core/tests/testkit",
     "core/tests/loadtest",
+
+    "infrastructure/tok_cli",
 ]
