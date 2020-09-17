@@ -43,6 +43,7 @@ pub struct StoredExecutedTransaction {
     pub nonce: i64,
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
+    pub batch_id: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -80,4 +81,5 @@ pub struct NewExecutedTransaction {
     pub nonce: i64,
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
+    pub batch_id: Option<i64>,
 }

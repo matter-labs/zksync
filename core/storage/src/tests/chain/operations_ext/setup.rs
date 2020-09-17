@@ -180,6 +180,7 @@ impl TransactionsHistoryTestSetup {
             fail_reason: None,
             block_index,
             created_at: self.get_tx_time(),
+            batch_id: None,
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op))
@@ -210,6 +211,7 @@ impl TransactionsHistoryTestSetup {
             fail_reason: None,
             block_index,
             created_at: self.get_tx_time(),
+            batch_id: None,
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_op))
@@ -239,6 +241,7 @@ impl TransactionsHistoryTestSetup {
             fail_reason: None,
             block_index,
             created_at: self.get_tx_time(),
+            batch_id: None,
         };
 
         ExecutedOperations::Tx(Box::new(executed_withdraw_op))
@@ -257,6 +260,7 @@ impl TransactionsHistoryTestSetup {
             fail_reason: None,
             block_index,
             created_at: self.get_tx_time(),
+            batch_id: None,
         };
 
         ExecutedOperations::Tx(Box::new(executed_close_op))
@@ -277,6 +281,7 @@ impl TransactionsHistoryTestSetup {
             fail_reason: None,
             block_index,
             created_at: self.get_tx_time(),
+            batch_id: None,
         };
 
         ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))

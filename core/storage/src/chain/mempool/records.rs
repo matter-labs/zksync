@@ -11,4 +11,5 @@ pub struct MempoolTx {
     pub tx: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub eth_sign_data: Option<serde_json::Value>,
+    pub batch_id: i64,
 }

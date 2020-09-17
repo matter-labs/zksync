@@ -10,15 +10,15 @@ use futures::{
 };
 use models::config_options::ConfigurationOptions;
 use models::node::{
-    Account, AccountId, AccountMap, Address, DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp,
-    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
+    DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
 use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
-    MAX_WITHDRAWALS_PER_BLOCK,
 };
 use std::collections::HashMap;
 use std::thread::JoinHandle;
@@ -34,6 +34,10 @@ use crypto_exports::rand::Rng;
 use itertools::Itertools;
 use models::prover_utils::EncodedProofPlonk;
 use web3::types::{TransactionReceipt, U64};
+
+/// Constant for testkit
+/// Real value is in `dev.env`
+pub const MAX_WITHDRAWALS_PER_BLOCK: u32 = 10;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(pub usize);
@@ -354,6 +358,7 @@ pub fn spawn_state_keeper(
         block_chunks_sizes,
         max_miniblock_iterations,
         max_miniblock_iterations,
+        MAX_WITHDRAWALS_PER_BLOCK as usize,
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
@@ -773,7 +778,7 @@ impl TestSetup {
     async fn execute_tx(&mut self, tx: FranklinTx) {
         let block = ProposedBlock {
             priority_ops: Vec::new(),
-            txs: vec![tx.into()],
+            txs: vec![SignedTxVariant::from(SignedFranklinTx::from(tx))],
         };
 
         // Request miniblock execution.

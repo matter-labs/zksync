@@ -193,6 +193,7 @@ table! {
         nonce -> Int8,
         created_at -> Timestamptz,
         eth_sign_data -> Nullable<Jsonb>,
+        batch_id -> Nullable<Int8>,
     }
 }
 
@@ -203,6 +204,7 @@ table! {
         tx -> Jsonb,
         created_at -> Timestamptz,
         eth_sign_data -> Nullable<Jsonb>,
+        batch_id -> Int8,
     }
 }
 
