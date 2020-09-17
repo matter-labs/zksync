@@ -17,7 +17,7 @@ use models::node::{
 // };
 
 // Local uses
-use crate::fee_ticker::Fee;
+use crate::fee_ticker::{BatchFee, Fee};
 use bigdecimal::BigDecimal;
 
 use super::{types::*, RpcApp};
@@ -43,6 +43,9 @@ pub trait Rpc {
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash>;
 
+    #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
+    fn submit_txs_batch(&self, txs: Vec<TxWithSignature>) -> FutureResp<Vec<TxHash>>;
+
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
     fn contract_address(&self) -> FutureResp<ContractAddressResp>;
 
@@ -57,6 +60,14 @@ pub trait Rpc {
         address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee>;
+
+    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "BatchFee")]
+    fn get_txs_batch_fee_in_wei(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token_like: TokenLike,
+    ) -> FutureResp<BatchFee>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(&self, token_like: TokenLike) -> FutureResp<BigDecimal>;
@@ -95,6 +106,12 @@ impl Rpc for RpcApp {
         Box::new(resp.boxed().compat())
     }
 
+    fn submit_txs_batch(&self, txs: Vec<TxWithSignature>) -> FutureResp<Vec<TxHash>> {
+        let self_ = self.clone();
+        let resp = self_._impl_submit_txs_batch(txs);
+        Box::new(resp.boxed().compat())
+    }
+
     fn contract_address(&self) -> FutureResp<ContractAddressResp> {
         let self_ = self.clone();
         let resp = self_._impl_contract_address();
@@ -115,6 +132,17 @@ impl Rpc for RpcApp {
     ) -> FutureResp<Fee> {
         let self_ = self.clone();
         let resp = self_._impl_get_tx_fee(tx_type, address, token_like);
+        Box::new(resp.boxed().compat())
+    }
+
+    fn get_txs_batch_fee_in_wei(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token_like: TokenLike,
+    ) -> FutureResp<BatchFee> {
+        let self_ = self.clone();
+        let resp = self_._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like);
         Box::new(resp.boxed().compat())
     }
 
