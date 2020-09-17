@@ -156,7 +156,7 @@ async function testTransfer(
     feeInfo.globalFee = feeInfo.globalFee.add(fee);
 }
 
-async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber) {
+async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber, feeInfo: any) {
     const fee = await syncProvider.getTransactionsBatchFee(["Transfer", "Transfer"], [syncWallet2.address(), syncWallet2.address()], token);
 
     // First, execute batched transfers successfully.
@@ -164,7 +164,6 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
     {
         const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
         const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
-        const operatorBeforeTransfer = await getOperatorBalance(token);
         const startTime = new Date().getTime();
         const transferHandles = await syncWallet1.syncMultiTransfer([{
             to: syncWallet2.address(),
@@ -184,15 +183,15 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
         console.log(`Batched transfer committed: ${(new Date().getTime()) - startTime} ms`);
         const wallet1AfterTransfer = await syncWallet1.getBalance(token);
         const wallet2AfterTransfer = await syncWallet2.getBalance(token);
-        const operatorAfterTransfer = await getOperatorBalance(token);
 
         let transferCorrect = true;
         transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.mul(2).add(fee));
         transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount.mul(2));
-        transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
         if (!transferCorrect) {
             throw new Error("Batched transfer checks failed");
         }
+
+        feeInfo.globalFee = feeInfo.globalFee.add(fee);
     }
 
     // Then, send another batch in which the second transaction will fail.
@@ -201,7 +200,6 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
     {
         const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
         const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
-        const operatorBeforeTransfer = await getOperatorBalance(token);
         const startTime = new Date().getTime();
         const transferHandles = await syncWallet1.syncMultiTransfer([{
             to: syncWallet2.address(),
@@ -225,12 +223,10 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
         console.log(`Batched transfers (that should fail) committed: ${(new Date().getTime()) - startTime} ms`);
         const wallet1AfterTransfer = await syncWallet1.getBalance(token);
         const wallet2AfterTransfer = await syncWallet2.getBalance(token);
-        const operatorAfterTransfer = await getOperatorBalance(token);
 
         let transferCorrect = true;
         transferCorrect = transferCorrect && wallet1BeforeTransfer.eq(wallet1AfterTransfer);
         transferCorrect = transferCorrect && wallet2AfterTransfer.eq(wallet2BeforeTransfer);
-        transferCorrect = transferCorrect && operatorAfterTransfer.eq(operatorBeforeTransfer);
         if (!transferCorrect) {
             throw new Error("Batched transfer checks failed: balances changed after batch failure");
         }
@@ -466,7 +462,7 @@ async function moveFunds(
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
 
-    await testMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
+    await testMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2), feeInfo); // `.div(2)` because we do 2 transfers inside.
     console.log(`Batched transfers ok, Token: ${token}`);
     await testFailedMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
 
