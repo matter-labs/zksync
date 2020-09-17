@@ -520,6 +520,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             fail_reason: None,
             block_index: None,
             created_at: chrono::Utc::now(),
+            batch_id: None,
         };
 
         (
@@ -553,6 +554,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             fail_reason: None,
             block_index: None,
             created_at: chrono::Utc::now(),
+            batch_id: None,
         };
 
         (

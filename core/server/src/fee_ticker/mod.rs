@@ -92,6 +92,13 @@ pub struct Fee {
     pub total_fee: BigUint,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchFee {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub total_fee: BigUint,
+}
+
 impl Fee {
     pub fn new(
         fee_type: OutputFeeType,
@@ -125,6 +132,11 @@ pub struct TickerConfig {
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
 }
 
+pub enum TokenPriceRequestType {
+    USDForOneWei,
+    USDForOneToken,
+}
+
 pub enum TickerRequest {
     GetTxFee {
         tx_type: TxFeeTypes,
@@ -135,6 +147,7 @@ pub enum TickerRequest {
     GetTokenPrice {
         token: TokenLike,
         response: oneshot::Sender<Result<BigDecimal, failure::Error>>,
+        req_type: TokenPriceRequestType,
     },
 }
 
@@ -228,19 +241,35 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                         .await;
                     response.send(fee).unwrap_or_default();
                 }
-                TickerRequest::GetTokenPrice { token, response } => {
-                    let price = self.get_token_price(token).await;
+                TickerRequest::GetTokenPrice {
+                    token,
+                    response,
+                    req_type,
+                } => {
+                    let price = self.get_token_price(token, req_type).await;
                     response.send(price).unwrap_or_default();
                 }
             }
         }
     }
 
-    async fn get_token_price(&self, token: TokenLike) -> Result<BigDecimal, failure::Error> {
+    async fn get_token_price(
+        &self,
+        token: TokenLike,
+        req_rype: TokenPriceRequestType,
+    ) -> Result<BigDecimal, failure::Error> {
+        let factor = match req_rype {
+            TokenPriceRequestType::USDForOneWei => {
+                let token_decimals = self.api.get_token(token.clone()).await?.decimals;
+                BigUint::from(10u32).pow(u32::from(token_decimals))
+            }
+            TokenPriceRequestType::USDForOneToken => BigUint::from(1u32),
+        };
+
         self.api
             .get_last_quote(token)
             .await
-            .map(|price| ratio_to_big_decimal(&price.usd_price, 6))
+            .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.
