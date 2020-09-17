@@ -168,8 +168,21 @@ impl PlasmaStateInitParams {
         &mut self,
         storage: &mut storage::StorageProcessor<'_>,
     ) -> Result<BlockNumber, failure::Error> {
-        let (verified_block, accounts) =
-            storage.chain().state_schema().load_verified_state().await?;
+        let (last_cached_block_number, accounts) = if let Some((block, _)) = storage
+            .chain()
+            .block_schema()
+            .get_account_tree_cache()
+            .await?
+        {
+            storage
+                .chain()
+                .state_schema()
+                .load_committed_state(Some(block))
+                .await?
+        } else {
+            storage.chain().state_schema().load_verified_state().await?
+        };
+
         for (id, account) in accounts {
             self.insert_account(id, account);
         }
@@ -177,7 +190,7 @@ impl PlasmaStateInitParams {
         if let Some(account_tree_cache) = storage
             .chain()
             .block_schema()
-            .get_account_tree_cache_block(verified_block)
+            .get_account_tree_cache_block(last_cached_block_number)
             .await?
         {
             self.tree
@@ -188,7 +201,10 @@ impl PlasmaStateInitParams {
             storage
                 .chain()
                 .block_schema()
-                .store_account_tree_cache(verified_block, serde_json::to_value(account_tree_cache)?)
+                .store_account_tree_cache(
+                    last_cached_block_number,
+                    serde_json::to_value(account_tree_cache)?,
+                )
                 .await?;
         }
 
@@ -199,11 +215,11 @@ impl PlasmaStateInitParams {
             .await
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
 
-        if block_number != verified_block {
+        if block_number != last_cached_block_number {
             if let Some((_, account_updates)) = storage
                 .chain()
                 .state_schema()
-                .load_state_diff(verified_block, Some(block_number))
+                .load_state_diff(last_cached_block_number, Some(block_number))
                 .await?
             {
                 let mut updated_accounts = account_updates

@@ -155,18 +155,19 @@ fn main() {
             .expect("Error setting Ctrl-C handler");
         }
 
-        let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(256);
+        let channel_size = 32768;
+        let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(channel_size);
         let eth_watch_task = start_eth_watch(
             config_opts.clone(),
             eth_watch_req_sender.clone(),
             eth_watch_req_receiver,
         );
 
-        let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
-        let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
-        let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
-        let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
-        let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(512);
+        let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(channel_size);
+        let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(channel_size);
+        let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(channel_size);
+        let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(channel_size);
+        let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
 
         // Load the most recent pending block from the database.
         let pending_block = observer_mode_final_state
