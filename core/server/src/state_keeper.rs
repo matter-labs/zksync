@@ -20,7 +20,7 @@ use models::{
     },
     ActionType, BlockCommitRequest, CommitRequest,
 };
-use plasma::state::{OpSuccess, PlasmaState};
+use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
 use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
@@ -64,6 +64,8 @@ struct PendingBlock {
     gas_counter: GasCounter,
     /// Option denoting if this block should be generated faster than usual.
     fast_processing_required: bool,
+    /// Fee should be applied only when sealing the block (because of corresponding logic in the circuit)
+    collected_fees: Vec<CollectedFee>,
 }
 
 impl PendingBlock {
@@ -79,6 +81,7 @@ impl PendingBlock {
             withdrawals_amount: 0,
             gas_counter: GasCounter::new(),
             fast_processing_required: false,
+            collected_fees: Vec::new(),
         }
     }
 }
@@ -624,10 +627,7 @@ impl PlasmaStateKeeper {
         self.pending_block.chunks_left -= chunks_needed;
         self.pending_block.account_updates.append(&mut updates);
         if let Some(fee) = fee {
-            let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
-            self.pending_block
-                .account_updates
-                .extend(fee_updates.into_iter());
+            self.pending_block.collected_fees.push(fee);
         }
         let block_index = self.pending_block.pending_op_block_index;
         self.pending_block.pending_op_block_index += 1;
@@ -699,10 +699,7 @@ impl PlasmaStateKeeper {
                 self.pending_block.chunks_left -= chunks_needed;
                 self.pending_block.account_updates.append(&mut updates);
                 if let Some(fee) = fee {
-                    let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
-                    self.pending_block
-                        .account_updates
-                        .extend(fee_updates.into_iter());
+                    self.pending_block.collected_fees.push(fee);
                 }
                 let block_index = self.pending_block.pending_op_block_index;
                 self.pending_block.pending_op_block_index += 1;
@@ -740,7 +737,7 @@ impl PlasmaStateKeeper {
 
     /// Finalizes the pending block, transforming it into a full block.
     async fn seal_pending_block(&mut self) {
-        let pending_block = std::mem::replace(
+        let mut pending_block = std::mem::replace(
             &mut self.pending_block,
             PendingBlock::new(
                 self.current_unprocessed_priority_op,
@@ -750,6 +747,14 @@ impl PlasmaStateKeeper {
                     .expect("failed to get max block size"),
             ),
         );
+
+        // Apply fees of pending block
+        let fee_updates = self
+            .state
+            .collect_fee(&pending_block.collected_fees, self.fee_account_id);
+        pending_block
+            .account_updates
+            .extend(fee_updates.into_iter());
 
         let mut block_transactions = pending_block.success_operations;
         block_transactions.extend(

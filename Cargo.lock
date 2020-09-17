@@ -5750,3 +5750,27 @@ name = "zeroize"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cbac2ed2ba24cc90f5e06485ac8c7c1e5449fe8911aef4d8877218af021a5b8"
+
+[[package]]
+name = "zksync"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bellman_ce",
+ "crypto_exports",
+ "eth_client",
+ "ethabi",
+ "franklin-crypto",
+ "futures 0.3.5",
+ "jsonrpc-core",
+ "models",
+ "num",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.8.2",
+ "thiserror",
+ "tokio 0.2.22",
+ "web3",
+]
