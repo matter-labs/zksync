@@ -1,15 +1,12 @@
 // Built-in deps
 use std::collections::VecDeque;
 // External imports
-use diesel::dsl::max;
-use diesel::prelude::*;
 use itertools::Itertools;
 // Workspace imports
 use models::node::{mempool::SignedTxVariant, tx::TxHash, SignedFranklinTx};
 // Local imports
-use self::records::{MempoolTx, NewMempoolTx};
-use crate::chain::mempool::records::NewMempoolBatchTx;
-use crate::{schema::*, StorageProcessor};
+use self::records::MempoolTx;
+use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
 
@@ -20,15 +17,19 @@ pub mod records;
 /// in case of the unexpected server reboot sent transactions won't disappear, and will be executed
 /// as if the server haven't been relaunched.
 #[derive(Debug)]
-pub struct MempoolSchema<'a>(pub &'a StorageProcessor);
+pub struct MempoolSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-impl<'a> MempoolSchema<'a> {
+impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Loads all the transactions stored in the mempool schema.
-    pub fn load_txs(&self) -> Result<VecDeque<SignedTxVariant>, failure::Error> {
+    pub async fn load_txs(&mut self) -> QueryResult<VecDeque<SignedTxVariant>> {
         // Load the transactions from mempool along with corresponding batch IDs.
-        let txs: Vec<MempoolTx> = mempool_txs::table
-            .order_by(mempool_txs::created_at)
-            .load(self.0.conn())?;
+        let txs: Vec<MempoolTx> = sqlx::query_as!(
+            MempoolTx,
+            "SELECT * FROM mempool_txs
+            ORDER BY created_at",
+        )
+        .fetch_all(self.0.conn())
+        .await?;
 
         // Handles special case: batch_id == 0 <==> transaction is not a part of some batch
         fn batch_id_optional(batch_id: i64) -> Option<i64> {
@@ -53,7 +54,7 @@ impl<'a> MempoolSchema<'a> {
 
         for (batch_id, group) in grouped_txs.into_iter() {
             let deserialized_txs: Vec<SignedFranklinTx> = group
-                .map(|tx_object| -> Result<SignedFranklinTx, failure::Error> {
+                .map(|tx_object| -> QueryResult<SignedFranklinTx> {
                     let tx = serde_json::from_value(tx_object.tx)?;
                     let sign_data = match tx_object.eth_sign_data {
                         None => None,
@@ -101,110 +102,124 @@ impl<'a> MempoolSchema<'a> {
 
     /// Adds a new transactions batch to the mempool schema.
     /// Returns id of the inserted batch
-    pub fn insert_batch(&self, txs: &[SignedFranklinTx]) -> Result<i64, failure::Error> {
+    pub async fn insert_batch(&mut self, txs: &[SignedFranklinTx]) -> QueryResult<i64> {
         if txs.is_empty() {
             failure::bail!("Cannot insert an empty batch");
         }
 
-        self.0.transaction(|| {
-            // The first transaction of the batch would be inserted manually
-            // batch_id of the inserted transaction would be the id of this batch
-            // Will be unique cause batch_id is bigserial
-            // Special case: batch_id == 0 <==> transaction is not a part of some batch (uses in `insert_tx` function)
-            let batch_id = {
-                let first_tx_data = txs[0].clone();
-                let tx_hash = hex::encode(first_tx_data.hash().as_ref());
-                let tx = serde_json::to_value(&first_tx_data.tx)
-                    .expect("Unserializable TX provided to the database");
+        // The first transaction of the batch would be inserted manually
+        // batch_id of the inserted transaction would be the id of this batch
+        // Will be unique cause batch_id is bigserial
+        // Special case: batch_id == 0 <==> transaction is not a part of some batch (uses in `insert_tx` function)
+        let batch_id = {
+            let first_tx_data = txs[0].clone();
+            let tx_hash = hex::encode(first_tx_data.hash().as_ref());
+            let tx = serde_json::to_value(&first_tx_data.tx)
+                .expect("Unserializable TX provided to the database");
+            let eth_sign_data = first_tx_data
+                .eth_sign_data
+                .as_ref()
+                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
 
-                let tx_to_insert = NewMempoolBatchTx {
-                    tx_hash,
-                    tx,
-                    created_at: chrono::Utc::now(),
-                    eth_sign_data: first_tx_data
-                        .eth_sign_data
-                        .as_ref()
-                        .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData")),
-                };
+            sqlx::query!(
+                "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)
+                VALUES ($1, $2, $3, $4)",
+                tx_hash,
+                tx,
+                chrono::Utc::now(),
+                eth_sign_data,
+            )
+            .execute(self.0.conn())
+            .await?;
 
-                diesel::insert_into(mempool_txs::table)
-                    .values(tx_to_insert)
-                    .execute(self.0.conn())?;
+            sqlx::query_as!(
+                MempoolTx,
+                "SELECT * FROM mempool_txs
+                ORDER BY batch_id DESC
+                LIMIT 1",
+            )
+            .fetch_optional(self.0.conn())
+            .await?
+            .ok_or_else(|| failure::format_err!("Can't get maximal batch_id from mempool_txs"))?
+            .batch_id
+        };
 
-                mempool_txs::table
-                    .select(max(mempool_txs::batch_id))
-                    .first::<Option<i64>>(self.0.conn())?
-                    .ok_or_else(|| {
-                        failure::format_err!("Can't get maximal batch_id from mempool_txs")
-                    })?
-            };
+        // Processing of all batch transactions, except the first
+        for tx_data in txs[1..].iter() {
+            let tx_hash = hex::encode(tx_data.hash().as_ref());
+            let tx = serde_json::to_value(&tx_data.tx)
+                .expect("Unserializable TX provided to the database");
+            let eth_sign_data = tx_data
+                .eth_sign_data
+                .as_ref()
+                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
 
-            // Processing of all batch transactions, except the first
-            let new_transactions: Vec<_> = txs[1..]
-                .iter()
-                .map(|tx_data| {
-                    let tx_hash = hex::encode(tx_data.hash().as_ref());
-                    let tx = serde_json::to_value(&tx_data.tx)
-                        .expect("Unserializable TX provided to the database");
+            sqlx::query!(
+                "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
+                VALUES ($1, $2, $3, $4, $5)",
+                tx_hash,
+                tx,
+                chrono::Utc::now(),
+                eth_sign_data,
+                batch_id,
+            )
+            .execute(self.0.conn())
+            .await?;
+        }
 
-                    NewMempoolTx {
-                        tx_hash,
-                        tx,
-                        created_at: chrono::Utc::now(),
-                        eth_sign_data: tx_data.eth_sign_data.as_ref().map(|sd| {
-                            serde_json::to_value(sd).expect("failed to encode EthSignData")
-                        }),
-                        batch_id,
-                    }
-                })
-                .collect();
-
-            diesel::insert_into(mempool_txs::table)
-                .values(new_transactions)
-                .execute(self.0.conn())?;
-
-            Ok(batch_id)
-        })
+        Ok(batch_id)
     }
 
     /// Adds a new transaction to the mempool schema.
-    pub fn insert_tx(&self, tx_data: &SignedFranklinTx) -> Result<(), failure::Error> {
+    pub async fn insert_tx(&mut self, tx_data: &SignedFranklinTx) -> QueryResult<()> {
         let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
         let tx = serde_json::to_value(&tx_data.tx)?;
         let batch_id = 0; // Special case: batch_id == 0 <==> transaction is not a part of some batch
 
-        let db_entry = NewMempoolTx {
+        let eth_sign_data = tx_data
+            .eth_sign_data
+            .as_ref()
+            .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
+
+        sqlx::query!(
+            "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
+            VALUES ($1, $2, $3, $4, $5)",
             tx_hash,
             tx,
-            created_at: chrono::Utc::now(),
-            eth_sign_data: tx_data
-                .eth_sign_data
-                .as_ref()
-                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData")),
+            chrono::Utc::now(),
+            eth_sign_data,
             batch_id,
-        };
-
-        diesel::insert_into(mempool_txs::table)
-            .values(db_entry)
-            .execute(self.0.conn())?;
+        )
+        .execute(self.0.conn())
+        .await?;
 
         Ok(())
     }
 
-    pub fn remove_tx(&self, tx: &[u8]) -> QueryResult<()> {
+    pub async fn remove_tx(&mut self, tx: &[u8]) -> QueryResult<()> {
         let tx_hash = hex::encode(tx);
 
-        diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq(&tx_hash)))
-            .execute(self.0.conn())?;
+        sqlx::query!(
+            "DELETE FROM mempool_txs
+            WHERE tx_hash = $1",
+            &tx_hash
+        )
+        .execute(self.0.conn())
+        .await?;
 
         Ok(())
     }
 
-    pub fn remove_txs(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
+    pub async fn remove_txs(&mut self, txs: &[TxHash]) -> QueryResult<()> {
         let tx_hashes: Vec<_> = txs.iter().map(hex::encode).collect();
 
-        diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq_any(&tx_hashes)))
-            .execute(self.0.conn())?;
+        sqlx::query!(
+            "DELETE FROM mempool_txs
+            WHERE tx_hash = ANY($1)",
+            &tx_hashes
+        )
+        .execute(self.0.conn())
+        .await?;
 
         Ok(())
     }
@@ -218,16 +233,19 @@ impl<'a> MempoolSchema<'a> {
     ///
     /// This method is expected to be initially invoked on the server start, and then
     /// invoked periodically with a big interval (to prevent possible database bloating).
-    pub fn collect_garbage(&self) -> Result<(), failure::Error> {
-        let mut txs_to_remove: Vec<_> = self.load_txs()?.into_iter().collect();
-        txs_to_remove.retain(|tx| {
-            match tx {
+    pub async fn collect_garbage(&mut self) -> QueryResult<()> {
+        let all_txs: Vec<_> = self.load_txs().await?.into_iter().collect();
+        let mut tx_hashes_to_remove = Vec::new();
+
+        for tx in all_txs {
+            let should_remove = match &tx {
                 SignedTxVariant::Tx(tx) => {
                     let tx_hash = tx.hash();
                     self.0
                         .chain()
                         .operations_ext_schema()
                         .get_tx_by_hash(tx_hash.as_ref())
+                        .await
                         .expect("DB issue while restoring the mempool state")
                         .is_some()
                 }
@@ -238,19 +256,18 @@ impl<'a> MempoolSchema<'a> {
                         .chain()
                         .operations_ext_schema()
                         .get_tx_by_hash(tx_hash.as_ref())
+                        .await
                         .expect("DB issue while restoring the mempool state")
                         .is_some()
                 }
+            };
+
+            if should_remove {
+                tx_hashes_to_remove.extend(tx.hashes())
             }
-        });
+        }
 
-        let tx_hashes: Vec<_> = txs_to_remove
-            .into_iter()
-            .map(|tx| tx.hashes())
-            .flatten()
-            .collect();
-
-        self.remove_txs(&tx_hashes)?;
+        self.remove_txs(&tx_hashes_to_remove).await?;
 
         Ok(())
     }

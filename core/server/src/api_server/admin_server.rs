@@ -25,17 +25,21 @@ struct PayloadAuthToken {
     exp: usize,  // Expiration time (as UTC timestamp)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct AppState {
+    secret_auth: String,
     connection_pool: storage::ConnectionPool,
 }
 
 impl AppState {
-    fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor> {
-        self.connection_pool.access_storage_fragile().map_err(|e| {
-            vlog::warn!("Failed to access storage: {}", e);
-            actix_web::error::ErrorInternalServerError(e)
-        })
+    async fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor<'_>> {
+        self.connection_pool
+            .access_storage_fragile()
+            .await
+            .map_err(|e| {
+                vlog::warn!("Failed to access storage: {}", e);
+                actix_web::error::ErrorInternalServerError(e)
+            })
     }
 }
 
@@ -71,15 +75,12 @@ impl<'a> AuthTokenValidator<'a> {
         token.map(drop)
     }
 
-    fn validator(
+    async fn validator(
         &self,
         req: ServiceRequest,
         credentials: BearerAuth,
     ) -> Result<ServiceRequest, Error> {
-        let config = req
-            .app_data::<Config>()
-            .map(|data| data.get_ref().clone())
-            .unwrap_or_default();
+        let config = req.app_data::<Config>().cloned().unwrap_or_default();
 
         self.validate_auth_token(credentials.token())
             .map(|_| req)
@@ -87,16 +88,16 @@ impl<'a> AuthTokenValidator<'a> {
     }
 }
 
-fn add_token(
+async fn add_token(
     data: web::Data<AppState>,
     token_request: web::Json<AddTokenRequest>,
 ) -> actix_web::Result<HttpResponse> {
-    let storage = data.access_storage()?;
+    let mut storage = data.access_storage().await?;
 
     // if id is None then set it to next available ID from server.
     let id = match token_request.id {
         Some(id) => id,
-        None => storage.tokens_schema().get_count().map_err(|e| {
+        None => storage.tokens_schema().get_count().await.map_err(|e| {
             vlog::warn!(
                 "failed get number of token from database in progress request: {}",
                 e
@@ -115,12 +116,35 @@ fn add_token(
     storage
         .tokens_schema()
         .store_token(token.clone())
+        .await
         .map_err(|e| {
             vlog::warn!("failed add token to database in progress request: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
 
     Ok(HttpResponse::Ok().json(token))
+}
+
+async fn run_server(app_state: AppState, bind_to: SocketAddr) {
+    HttpServer::new(move || {
+        let auth = HttpAuthentication::bearer(move |req, credentials| async {
+            let secret_auth = req.app_data::<AppState>().unwrap().secret_auth.clone();
+            AuthTokenValidator::new(&secret_auth)
+                .validator(req, credentials)
+                .await
+        });
+
+        App::new()
+            .wrap(auth)
+            .data(app_state.clone())
+            .route("/tokens", web::post().to(add_token))
+    })
+    .workers(1)
+    .bind(&bind_to)
+    .expect("failed to bind")
+    .run()
+    .await
+    .expect("failed to run endpoint server");
 }
 
 pub fn start_admin_server(
@@ -132,28 +156,15 @@ pub fn start_admin_server(
     thread::Builder::new()
         .name("admin_server".to_string())
         .spawn(move || {
-            HttpServer::new(move || {
-                let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-                let secret_auth = secret_auth.clone();
-
+            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+            actix_rt::System::new("api-server").block_on(async move {
                 let app_state = AppState {
-                    connection_pool: connection_pool.clone(),
+                    connection_pool,
+                    secret_auth,
                 };
 
-                let auth = HttpAuthentication::bearer(move |req, credentials| {
-                    AuthTokenValidator::new(&secret_auth).validator(req, credentials)
-                });
-
-                App::new()
-                    .wrap(auth)
-                    .register_data(web::Data::new(app_state))
-                    .route("/tokens", web::post().to(add_token))
-            })
-            .workers(1)
-            .bind(&bind_to)
-            .expect("failed to bind")
-            .run()
-            .expect("failed to run endpoint server");
+                run_server(app_state, bind_to).await;
+            });
         })
         .expect("failed to start endpoint server");
 }

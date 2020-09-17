@@ -1,7 +1,6 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, sync::Arc};
+
+use tokio::sync::RwLock;
 
 use models::node::{Token, TokenId, TokenLike};
 use storage::ConnectionPool;
@@ -21,14 +20,14 @@ impl TokenDBCache {
         }
     }
 
-    pub fn get_token(
+    pub async fn get_token(
         &self,
         token_query: impl Into<TokenLike>,
     ) -> Result<Option<Token>, failure::Error> {
         let token_like = token_query.into();
 
         let cached_value = {
-            let cache_lock = self.tokens.read().expect("Expected read lock");
+            let cache_lock = self.tokens.read().await;
 
             let value = match &token_like {
                 TokenLike::Id(token_id) => cache_lock.get(token_id),
@@ -42,21 +41,20 @@ impl TokenDBCache {
         if let Some(cached_value) = cached_value {
             Ok(Some(cached_value))
         } else {
-            let storage = self
+            let mut storage = self
                 .db_pool
                 .access_storage_fragile()
+                .await
                 .map_err(|e| failure::format_err!("Failed to access storage: {}", e))?;
 
             let db_token = storage
                 .tokens_schema()
                 .get_token(token_like)
+                .await
                 .map_err(|e| failure::format_err!("Tokens load failed: {}", e))?;
 
             if let Some(token) = &db_token {
-                self.tokens
-                    .write()
-                    .expect("Expected write lock")
-                    .insert(token.id, token.clone());
+                self.tokens.write().await.insert(token.id, token.clone());
             }
             Ok(db_token)
         }

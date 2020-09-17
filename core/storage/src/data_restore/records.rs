@@ -3,32 +3,30 @@ use serde_json::Value;
 // Workspace imports
 use models::node::{AccountId, BlockNumber, FranklinOp};
 use serde_derive::{Deserialize, Serialize};
+use sqlx::FromRow;
 // Workspace imports
 // Local imports
-use crate::schema::*;
 
-#[derive(Debug, Clone, Queryable)]
+#[derive(Debug, Clone, FromRow)]
 pub struct StoredRollupOpsBlock {
     pub block_num: BlockNumber,
     pub ops: Vec<FranklinOp>,
     pub fee_account: AccountId,
 }
 
-#[derive(Debug, Insertable, PartialEq)]
-#[table_name = "data_restore_last_watched_eth_block"]
-pub struct NewLastWatchedEthBlockNumber {
-    pub block_number: String,
-}
+// #[derive(Debug, Insertable, PartialEq)]
+// #[table_name = "data_restore_last_watched_eth_block"]
+// pub struct NewLastWatchedEthBlockNumber {
+//     pub block_number: String,
+// }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Queryable, QueryableByName, PartialEq)]
-#[table_name = "data_restore_last_watched_eth_block"]
+#[derive(Debug, Serialize, Deserialize, Clone, FromRow, PartialEq)]
 pub struct StoredLastWatchedEthBlockNumber {
     pub id: i32,
     pub block_number: String,
 }
 
-#[derive(Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "data_restore_rollup_ops"]
+#[derive(Debug, Clone, FromRow)]
 pub struct StoredFranklinOp {
     pub id: i32,
     pub block_num: i64,
@@ -41,8 +39,7 @@ impl StoredFranklinOp {
         serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db")
     }
 }
-#[derive(Debug, Clone, Insertable)]
-#[table_name = "data_restore_rollup_ops"]
+#[derive(Debug, Clone)]
 pub struct NewFranklinOp {
     pub block_num: i64,
     pub operation: Value,
@@ -63,29 +60,25 @@ impl NewFranklinOp {
     }
 }
 
-#[derive(Debug, Insertable)]
-#[table_name = "data_restore_storage_state_update"]
+#[derive(Debug)]
 pub struct NewStorageState {
     pub storage_state: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable, QueryableByName)]
-#[table_name = "data_restore_storage_state_update"]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct StoredStorageState {
     pub id: i32,
     pub storage_state: String,
 }
 
-#[derive(Debug, Insertable)]
-#[table_name = "data_restore_events_state"]
+#[derive(Debug)]
 pub struct NewBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
 }
 
-#[derive(Debug, Clone, Insertable, Serialize, Deserialize, Queryable, QueryableByName)]
-#[table_name = "data_restore_events_state"]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct StoredBlockEvent {
     pub id: i32,
     pub block_type: String, // 'Committed', 'Verified'

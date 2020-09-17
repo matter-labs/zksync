@@ -5,9 +5,7 @@
 // Built-in deps
 use std::convert::TryFrom;
 // External imports
-use chrono::{DateTime, Utc};
 // Workspace imports
-use diesel::prelude::*;
 use models::{
     node::{
         block::{ExecutedPriorityOp, ExecutedTx},
@@ -26,29 +24,34 @@ use crate::{
         state::StateSchema,
     },
     prover::ProverSchema,
-    StorageProcessor,
+    QueryResult, StorageProcessor,
 };
 use models::node::SignedFranklinTx;
 
 impl StoredOperation {
-    pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
+    pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
         let block_number = self.block_number as BlockNumber;
         let id = Some(self.id);
 
         let action = if self.action_type == ActionType::COMMIT.to_string() {
             Action::Commit
         } else if self.action_type == ActionType::VERIFY.to_string() {
-            let proof = Box::new(ProverSchema(&conn).load_proof(block_number)?);
-            Action::Verify { proof }
+            let proof = Box::new(ProverSchema(conn).load_proof(block_number).await?);
+            Action::Verify {
+                proof: proof.expect("No proof for verify action").into(),
+            }
         } else {
             unreachable!("Incorrect action type in db");
         };
 
-        let block = BlockSchema(&conn)
-            .get_block(block_number)?
+        let block = BlockSchema(conn)
+            .get_block(block_number)
+            .await?
             .expect("Block for action does not exist");
 
-        let accounts_updated = StateSchema(&conn).load_state_diff_for_block(block_number)?;
+        let accounts_updated = StateSchema(conn)
+            .load_state_diff_for_block(block_number)
+            .await?;
         Ok(Operation {
             id,
             action,
@@ -74,7 +77,7 @@ impl StoredExecutedTransaction {
             block_index: self
                 .block_index
                 .map(|val| u32::try_from(val).expect("Invalid block index")),
-            created_at: DateTime::<Utc>::from_utc(self.created_at, Utc),
+            created_at: self.created_at,
             batch_id: self.batch_id,
         })
     }
@@ -96,7 +99,7 @@ impl StoredExecutedPriorityOperation {
             },
             op: franklin_op,
             block_index: self.block_index as u32,
-            created_at: DateTime::<Utc>::from_utc(self.created_at, Utc),
+            created_at: self.created_at,
         }
     }
 }

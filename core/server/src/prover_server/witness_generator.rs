@@ -66,17 +66,36 @@ impl WitnessGenerator {
             .name("prover_server_pool".to_string())
             .spawn(move || {
                 let _panic_sentinel = ThreadPanicNotify(panic_notify);
-                self.maintain();
+                let mut runtime = tokio::runtime::Builder::new()
+                    .basic_scheduler()
+                    .enable_all()
+                    .build()
+                    .expect("Unable to build runtime for a witness generator");
+
+                runtime.block_on(async move {
+                    self.maintain().await;
+                });
             })
             .expect("failed to start provers server");
     }
 
     /// Returns status of witness for block with index block_number
-    fn should_work_on_block(&self, block_number: BlockNumber) -> Result<BlockInfo, failure::Error> {
-        let storage = self.conn_pool.access_storage_fragile()?;
-        let block = storage.chain().block_schema().get_block(block_number)?;
+    async fn should_work_on_block(
+        &self,
+        block_number: BlockNumber,
+    ) -> Result<BlockInfo, failure::Error> {
+        let mut storage = self.conn_pool.access_storage_fragile().await?;
+        let mut transaction = storage.start_transaction().await?;
+        let block = transaction
+            .chain()
+            .block_schema()
+            .get_block(block_number)
+            .await?;
         let block_info = if let Some(block) = block {
-            let witness = storage.prover_schema().get_witness(block_number)?;
+            let witness = transaction
+                .prover_schema()
+                .get_witness(block_number)
+                .await?;
             if witness.is_none() {
                 BlockInfo::NoWitness(block)
             } else {
@@ -85,23 +104,28 @@ impl WitnessGenerator {
         } else {
             BlockInfo::NotReadyBlock
         };
+        transaction.commit().await?;
         Ok(block_info)
     }
 
-    fn load_account_tree(
+    async fn load_account_tree(
         &self,
         block: BlockNumber,
-        storage: &StorageProcessor,
+        storage: &mut StorageProcessor<'_>,
     ) -> Result<CircuitAccountTree, failure::Error> {
         let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
 
-        if let Some((cached_block, account_tree_cache)) =
-            storage.chain().block_schema().get_account_tree_cache()?
+        if let Some((cached_block, account_tree_cache)) = storage
+            .chain()
+            .block_schema()
+            .get_account_tree_cache()
+            .await?
         {
             let (_, accounts) = storage
                 .chain()
                 .state_schema()
-                .load_committed_state(Some(block))?;
+                .load_committed_state(Some(block))
+                .await?;
             for (id, account) in accounts {
                 circuit_account_tree.insert(id, account.into());
             }
@@ -110,11 +134,13 @@ impl WitnessGenerator {
                 let (_, accounts) = storage
                     .chain()
                     .state_schema()
-                    .load_committed_state(Some(block))?;
+                    .load_committed_state(Some(block))
+                    .await?;
                 if let Some((_, account_updates)) = storage
                     .chain()
                     .state_schema()
-                    .load_state_diff(block, Some(cached_block))?
+                    .load_state_diff(block, Some(cached_block))
+                    .await?
                 {
                     let mut updated_accounts = account_updates
                         .into_iter()
@@ -132,13 +158,15 @@ impl WitnessGenerator {
                 storage
                     .chain()
                     .block_schema()
-                    .store_account_tree_cache(block, serde_json::to_value(account_tree_cache)?)?;
+                    .store_account_tree_cache(block, serde_json::to_value(account_tree_cache)?)
+                    .await?;
             }
         } else {
             let (_, accounts) = storage
                 .chain()
                 .state_schema()
-                .load_committed_state(Some(block))?;
+                .load_committed_state(Some(block))
+                .await?;
             for (id, account) in accounts {
                 circuit_account_tree.insert(id, account.into());
             }
@@ -147,14 +175,16 @@ impl WitnessGenerator {
             storage
                 .chain()
                 .block_schema()
-                .store_account_tree_cache(block, serde_json::to_value(account_tree_cache)?)?;
+                .store_account_tree_cache(block, serde_json::to_value(account_tree_cache)?)
+                .await?;
         }
 
         if block != 0 {
             let storage_block = storage
                 .chain()
                 .block_schema()
-                .get_block(block)?
+                .get_block(block)
+                .await?
                 .expect("Block for witness generator must exist");
             assert_eq!(
                 storage_block.new_root_hash,
@@ -165,26 +195,36 @@ impl WitnessGenerator {
         Ok(circuit_account_tree)
     }
 
-    fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), failure::Error> {
+    async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), failure::Error> {
         let timer = Instant::now();
-        let storage = self.conn_pool.access_storage_fragile()?;
-        let mut circuit_account_tree = self.load_account_tree(block.block_number - 1, &storage)?;
+        let mut storage = self.conn_pool.access_storage_fragile().await?;
+        let mut transaction = storage.start_transaction().await?;
+
+        let mut circuit_account_tree = self
+            .load_account_tree(block.block_number - 1, &mut transaction)
+            .await?;
         trace!(
             "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
 
         let timer = Instant::now();
-        let witness = build_prover_block_data(&mut circuit_account_tree, &storage, &block)?;
+        let witness =
+            build_prover_block_data(&mut circuit_account_tree, &mut transaction, &block).await?;
         trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
 
-        storage.prover_schema().store_witness(
-            block.block_number,
-            serde_json::to_value(witness).expect("Witness serialize to json"),
-        )?;
+        transaction
+            .prover_schema()
+            .store_witness(
+                block.block_number,
+                serde_json::to_value(witness).expect("Witness serialize to json"),
+            )
+            .await?;
+
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -203,7 +243,7 @@ impl WitnessGenerator {
 
     /// Updates witness data in database in an infinite loop,
     /// awaiting `rounds_interval` time between updates.
-    fn maintain(self) {
+    async fn maintain(self) {
         info!(
             "preparing prover data routine started with start_block({}), block_step({})",
             self.start_block, self.block_step
@@ -211,7 +251,7 @@ impl WitnessGenerator {
         let mut current_block = self.start_block;
         loop {
             std::thread::sleep(self.rounds_interval);
-            let should_work = match self.should_work_on_block(current_block) {
+            let should_work = match self.should_work_on_block(current_block).await {
                 Ok(should_work) => should_work,
                 Err(err) => {
                     log::warn!("witness for block {} check failed: {}", current_block, err);
@@ -222,7 +262,7 @@ impl WitnessGenerator {
             let next_block = Self::next_witness_block(current_block, self.block_step, &should_work);
             if let BlockInfo::NoWitness(block) = should_work {
                 let block_number = block.block_number;
-                if let Err(err) = self.prepare_witness_and_save_it(block) {
+                if let Err(err) = self.prepare_witness_and_save_it(block).await {
                     log::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
                         self.start_block, self.block_step, block_number, err);
                     continue; // Retry the same block on the next iteration.
@@ -235,9 +275,9 @@ impl WitnessGenerator {
     }
 }
 
-fn build_prover_block_data(
+async fn build_prover_block_data(
     account_tree: &mut CircuitAccountTree,
-    storage: &storage::StorageProcessor,
+    transaction: &mut storage::StorageProcessor<'_>,
     block: &Block,
 ) -> Result<ProverData, failure::Error> {
     let block_number = block.block_number;
@@ -247,10 +287,11 @@ fn build_prover_block_data(
 
     let mut witness_accum = WitnessBuilder::new(account_tree, block.fee_account, block_number);
 
-    let ops = storage
+    let ops = transaction
         .chain()
         .block_schema()
         .get_block_operations(block_number)
+        .await
         .map_err(|e| failure::format_err!("failed to get block operations {}", e))?;
 
     let mut operations = vec![];

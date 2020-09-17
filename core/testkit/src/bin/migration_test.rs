@@ -5,7 +5,7 @@ use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
 
-fn migration_test() {
+async fn migration_test() {
     let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
@@ -76,7 +76,8 @@ fn migration_test() {
             &mut test_setup,
             deposit_amount.clone(),
             BlockProcessing::CommitAndVerify,
-        );
+        )
+        .await;
     }
 
     let start_upgrade = Instant::now();
@@ -89,13 +90,15 @@ fn migration_test() {
             &mut test_setup,
             deposit_amount.clone(),
             BlockProcessing::CommitAndVerify,
-        );
+        )
+        .await;
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
 }
 
-fn main() {
-    migration_test();
+#[tokio::main]
+async fn main() {
+    migration_test().await;
 }
