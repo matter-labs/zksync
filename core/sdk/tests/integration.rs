@@ -115,7 +115,7 @@ async fn simple_workflow() -> Result<(), anyhow::Error> {
     let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await.unwrap();
 
     let deposit_tx_hash = ethereum
-        .deposit("ETH", one_ether(), wallet.address())
+        .deposit("ETH", one_ether() / 2, wallet.address())
         .await
         .unwrap();
 

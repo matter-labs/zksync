@@ -200,7 +200,7 @@ impl EthereumProvider {
             let mut options = Options::default();
             options.value = Some(amount);
             self.eth_client
-                .sign_prepared_tx_for_addr(Vec::new(), to, Default::default())
+                .sign_prepared_tx_for_addr(Vec::new(), to, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
