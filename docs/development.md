@@ -2,6 +2,42 @@
 
 This document covers development-related actions in zkSync.
 
+## Initializing the project
+
+Once all the dependencies were installed, project can be initialized:
+
+```sh
+zksync init
+```
+
+This command will do the following:
+
+- Generate `$ZKSYNC_HOME/etc/env/dev.env` file with settings for the applications.
+- Initialize docker containers with `geth` Ethereum node and `postgres` database for local development.
+- Download and unpack files for cryptographical backend (`circuit`).
+- Generate required smart contracts.
+- Compile all the smart contracts.
+- Deploy smart contracts to the local Ethereum network.
+- Initialize database and apply migrations.
+- Insert required data into created database.
+- Create "genesis block" for server.
+
+Initializing may take pretty long, but many steps (such as downloading & unpacking keys and initializing containers) are
+required to be done only once.
+
+Usually, it is a good idea to do `zksync init` once after each merge to the `dev` branch (as application setup may change).
+
+**Note:** If after getting new functionality from the `dev` branch your code stopped working and `zksync init` doesn't help,
+you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zksync init` once again. This may help if the application
+configuration has changed.
+
+If you don't need all of the `zksync init` functionality, but just need to start/stop containers, use the following commands:
+
+```sh
+zksync dev-up # Set up `geth` and `postgres` containers
+zksync dev-down # Shut down `geth` and `postgres` containers
+```
+
 ## Committing changes
 
 `zksync` uses pre-commit git hooks for basic code integrity checks. Hooks are set up automatically
