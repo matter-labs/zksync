@@ -33,6 +33,9 @@ pub enum ClientError {
 
     #[error("Ethereum private key was not provided for this wallet")]
     NoEthereumPrivateKey,
+
+    #[error("Provided value is not packable")]
+    NotPackableValue,
 }
 
 #[derive(Debug, Error)]

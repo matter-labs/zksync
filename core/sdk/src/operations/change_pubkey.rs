@@ -1,4 +1,6 @@
-use models::node::{closest_packable_fee_amount, FranklinTx, Nonce, Token, TokenLike};
+use models::node::{
+    closest_packable_fee_amount, is_fee_amount_packable, FranklinTx, Nonce, Token, TokenLike,
+};
 use num::BigUint;
 
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
@@ -91,6 +93,20 @@ impl<'a> ChangePubKeyBuilder<'a> {
         self.fee = Some(fee);
 
         self
+    }
+
+    /// Set the fee amount. If the provided fee is not packable,
+    /// returns an error.
+    ///
+    /// For more details, see [utils](../utils/index.html) functions.
+    pub fn fee_exact(mut self, fee: impl Into<BigUint>) -> Result<Self, ClientError> {
+        let fee = fee.into();
+        if !is_fee_amount_packable(&fee) {
+            return Err(ClientError::NotPackableValue);
+        }
+        self.fee = Some(fee);
+
+        Ok(self)
     }
 
     /// Sets the transaction nonce.

@@ -1,6 +1,6 @@
 use models::node::{
-    closest_packable_fee_amount, closest_packable_token_amount, Address, FranklinTx, Nonce, Token,
-    TokenLike, TxFeeTypes,
+    closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
+    is_token_amount_packable, Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
 };
 use num::BigUint;
 
@@ -113,6 +113,34 @@ impl<'a> WithdrawBuilder<'a> {
         self.fee = Some(fee);
 
         self
+    }
+
+    /// Set the transfer amount. If the provided amount is not packable,
+    /// returns an error.
+    ///
+    /// For more details, see [utils](../utils/index.html) functions.
+    pub fn amount_exact(mut self, amount: impl Into<BigUint>) -> Result<Self, ClientError> {
+        let amount = amount.into();
+        if !is_token_amount_packable(&amount) {
+            return Err(ClientError::NotPackableValue);
+        }
+        self.amount = Some(amount);
+
+        Ok(self)
+    }
+
+    /// Set the fee amount. If the provided fee is not packable,
+    /// returns an error.
+    ///
+    /// For more details, see [utils](../utils/index.html) functions.
+    pub fn fee_exact(mut self, fee: impl Into<BigUint>) -> Result<Self, ClientError> {
+        let fee = fee.into();
+        if !is_fee_amount_packable(&fee) {
+            return Err(ClientError::NotPackableValue);
+        }
+        self.fee = Some(fee);
+
+        Ok(self)
     }
 
     /// Sets the address of Ethereum wallet to withdraw funds to.
