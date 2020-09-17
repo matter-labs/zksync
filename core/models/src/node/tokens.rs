@@ -21,6 +21,18 @@ impl From<TokenId> for TokenLike {
     }
 }
 
+impl From<Address> for TokenLike {
+    fn from(address: Address) -> Self {
+        Self::Address(address)
+    }
+}
+
+impl From<&str> for TokenLike {
+    fn from(symbol: &str) -> Self {
+        Self::Symbol(symbol.to_string())
+    }
+}
+
 /// Token supported in zkSync protocol
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Token {
