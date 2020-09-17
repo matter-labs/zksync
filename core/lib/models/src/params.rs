@@ -6,43 +6,19 @@ use std::str::FromStr;
 use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 // Workspace deps
-use crate::config_options::parse_env;
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
 use crate::node::{AccountId, TokenId};
 
-static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
 /// account_tree_depth.
 pub fn account_tree_depth() -> usize {
-    unsafe {
-        if ACCOUNT_TREE_DEPTH_VALUE == 0 {
-            let runtime_value = parse_env::<usize>("ACCOUNT_TREE_DEPTH");
-            ACCOUNT_TREE_DEPTH_VALUE = runtime_value;
-        }
-        assert!(ACCOUNT_TREE_DEPTH_VALUE <= ACCOUNT_ID_BIT_WIDTH);
-
-        ACCOUNT_TREE_DEPTH_VALUE
-    }
+    crate::node::config::ACCOUNT_TREE_DEPTH
 }
 
-static mut BALANCE_TREE_DEPTH_VALUE: usize = 0;
 /// balance tree_depth.
-/// Value must be specified as environment variable at compile time under `BALANCE_TREE_DEPTH_VALUE` key.
 pub fn balance_tree_depth() -> usize {
-    // use of mutable static is unsafe as it can be mutated by multiple threads.
-    // There's no risk of data race, the worst that can happen is that we parse
-    // and set environment value multuple times, which is ok.
-
-    unsafe {
-        if BALANCE_TREE_DEPTH_VALUE == 0 {
-            let runtime_value = parse_env::<usize>("BALANCE_TREE_DEPTH");
-            BALANCE_TREE_DEPTH_VALUE = runtime_value;
-        }
-        assert!(BALANCE_TREE_DEPTH_VALUE <= TOKEN_BIT_WIDTH);
-
-        BALANCE_TREE_DEPTH_VALUE
-    }
+    crate::node::config::BALANCE_TREE_DEPTH
 }
 /// Number of supported tokens.
 pub fn total_tokens() -> usize {
