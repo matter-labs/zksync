@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    # Binaries
     "core/bin/data_restore",
     "core/bin/key_generator",
     "core/bin/server",
@@ -7,6 +8,7 @@ members = [
     "core/bin/gen_token_add_contract",
     "core/bin/parse_pub_data",
 
+    # Libraries
     "core/lib/circuit",
     "core/lib/crypto_exports",
     "core/lib/eth_client",
@@ -15,8 +17,13 @@ members = [
     "core/lib/storage",
     "core/lib/vlog",
 
+    # Test infrastructure
     "core/tests/testkit",
     "core/tests/loadtest",
 
+    # Infrastructure applications
     "infrastructure/tok_cli",
+
+    # SDK section
+    "sdk/zksync-rs",
 ]
