@@ -93,12 +93,11 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
     }
 }
 
-async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
+async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, amount: BigNumber, feeInfo: any) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet.address(), token);
     const fee = fullFee.totalFee;
 
     const walletBeforeTransfer = await syncWallet.getBalance(token);
-    const operatorBeforeTransfer = await getOperatorBalance(token);
     const startTime = new Date().getTime();
     const transferToNewHandle = await syncWallet.syncTransfer({
         to: syncWallet.address(),
@@ -110,14 +109,14 @@ async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, am
     await transferToNewHandle.awaitReceipt();
     console.log(`Transfer to self committed: ${new Date().getTime() - startTime} ms`);
     const walletAfterTransfer = await syncWallet.getBalance(token);
-    const operatorAfterTransfer = await getOperatorBalance(token);
 
     let transferCorrect = true;
     transferCorrect = transferCorrect && walletBeforeTransfer.sub(fee).eq(walletAfterTransfer);
-    transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
     if (!transferCorrect) {
         throw new Error("Transfer to self checks failed");
     }
+
+    feeInfo.globalFee = feeInfo.globalFee.add(fee);
 }
 
 async function testTransfer(
@@ -125,6 +124,7 @@ async function testTransfer(
     syncWallet2: Wallet,
     token: types.TokenLike,
     amount: BigNumber,
+    feeInfo: any,
     timeoutBeforeReceipt = 0
 ) {
     const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), token);
@@ -132,7 +132,6 @@ async function testTransfer(
 
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
-    const operatorBeforeTransfer = await getOperatorBalance(token);
     const startTime = new Date().getTime();
     const transferToNewHandle = await syncWallet1.syncTransfer({
         to: syncWallet2.address(),
@@ -146,18 +145,24 @@ async function testTransfer(
     console.log(`Transfer committed: ${new Date().getTime() - startTime} ms`);
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
     const wallet2AfterTransfer = await syncWallet2.getBalance(token);
-    const operatorAfterTransfer = await getOperatorBalance(token);
 
     let transferCorrect = true;
     transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.add(fee));
     transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount);
-    transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
     if (!transferCorrect) {
         throw new Error("Transfer checks failed");
     }
+
+    feeInfo.globalFee = feeInfo.globalFee.add(fee);
 }
 
-async function testForcedExit(contract: Contract, syncWallet: Wallet, token: types.TokenLike, amount: BigNumber) {
+async function testForcedExit(
+    contract: Contract,
+    syncWallet: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber,
+    feeInfo: any
+) {
     const targetEthWallet = ethers.Wallet.createRandom().connect(ethersProvider);
     const targetWallet = await Wallet.fromEthSigner(targetEthWallet, syncProvider);
 
@@ -173,9 +178,11 @@ async function testForcedExit(contract: Contract, syncWallet: Wallet, token: typ
     });
     await transferToNewHandle.awaitReceipt();
 
+    // We performed a transfer here, so we must add its fee to the global expected fee.
+    feeInfo.globalFee = feeInfo.globalFee.add(transferFee);
+
     const initiatorBeforeWithdraw = await syncWallet.getBalance(token);
     const targetBeforeWithdraw = await targetWallet.getBalance(token);
-    const operatorBeforeWithdraw = await getOperatorBalance(token);
     const onchainBalanceBeforeWithdraw = await targetWallet.getEthereumBalance(token);
 
     // Then do a ForcedExit operation.
@@ -196,11 +203,12 @@ async function testForcedExit(contract: Contract, syncWallet: Wallet, token: typ
 
     const initiatorAfterWithdraw = await syncWallet.getBalance(token);
     const targetAfterWithdraw = await targetWallet.getBalance(token);
-    const operatorAfterWithdraw = await getOperatorBalance(token);
     const onchainBalanceAfterWithdraw = await targetWallet.getEthereumBalance(token);
 
     const tokenId = await targetWallet.provider.tokenSet.resolveTokenId(token);
     const pendingToBeOnchainBalance = await contract.getBalanceToWithdraw(await targetWallet.address(), tokenId);
+
+    feeInfo.globalFee = feeInfo.globalFee.add(fee);
 
     if (!initiatorBeforeWithdraw.sub(initiatorAfterWithdraw).eq(fee)) {
         throw new Error("Wrong amount on initiator wallet after ForcedExit");
@@ -208,12 +216,24 @@ async function testForcedExit(contract: Contract, syncWallet: Wallet, token: typ
     if (!targetBeforeWithdraw.sub(targetAfterWithdraw).eq(amount)) {
         throw new Error("Wrong amount on target wallet after ForcedExit");
     }
-    if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
-        throw new Error("Wrong amount of operator fees after ForcedExit");
-    }
     if (!onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
         throw new Error("Wrong amount onchain after ForcedExit");
     }
+
+    // Cause we awaited for verifying we must check the collected fees
+    const operatorBalanceAfter = await getOperatorBalance(token);
+    if (!operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).eq(feeInfo.globalFee)) {
+        console.log(
+            "The collected fee is not right :: expected(",
+            feeInfo.globalFee.toString(),
+            "), found(",
+            operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(),
+            ")"
+        );
+        throw new Error("The collected fee is not right");
+    }
+    feeInfo.lastVerifiedOperatorBalance = operatorBalanceAfter;
+    feeInfo.globalFee = BigNumber.from(0);
 }
 
 async function testWithdraw(
@@ -221,13 +241,13 @@ async function testWithdraw(
     withdrawTo: Wallet,
     syncWallet: Wallet,
     token: types.TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    feeInfo: any
 ) {
     const fullFee = await syncProvider.getTransactionFee("Withdraw", withdrawTo.address(), token);
     const fee = fullFee.totalFee;
 
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
-    const operatorBeforeWithdraw = await getOperatorBalance(token);
     const onchainBalanceBeforeWithdraw = await withdrawTo.getEthereumBalance(token);
     const startTime = new Date().getTime();
     const withdrawHandle = await syncWallet.withdrawFromSyncToEthereum({
@@ -242,7 +262,6 @@ async function testWithdraw(
     await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
     console.log(`Withdraw verified: ${new Date().getTime() - startTime} ms`);
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
-    const operatorAfterWithdraw = await getOperatorBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
     const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
@@ -251,12 +270,26 @@ async function testWithdraw(
     if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
         throw new Error("Wrong amount on wallet after WITHDRAW");
     }
-    if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
-        throw new Error("Wrong amount of operator fees after WITHDRAW");
-    }
     if (!onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
         throw new Error("Wrong amount onchain after WITHDRAW");
     }
+
+    feeInfo.globalFee = feeInfo.globalFee.add(fee);
+
+    // Cause we awaited for verifying we must check the collected fees
+    const operatorBalanceAfter = await getOperatorBalance(token);
+    if (!operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).eq(feeInfo.globalFee)) {
+        console.log(
+            "The collected fee is not right :: expected(",
+            feeInfo.globalFee.toString(),
+            "), found(",
+            operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(),
+            ")"
+        );
+        throw new Error("The collected fee is not right");
+    }
+    feeInfo.lastVerifiedOperatorBalance = operatorBalanceAfter;
+    feeInfo.globalFee = BigNumber.from(0);
 }
 
 async function testFastWithdraw(
@@ -264,13 +297,13 @@ async function testFastWithdraw(
     withdrawTo: Wallet,
     syncWallet: Wallet,
     token: types.TokenLike,
-    amount: BigNumber
+    amount: BigNumber,
+    feeInfo: any
 ) {
     const fullFee = await syncProvider.getTransactionFee("FastWithdraw", withdrawTo.address(), token);
     const fee = fullFee.totalFee;
 
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
-    const operatorBeforeWithdraw = await getOperatorBalance(token);
     const onchainBalanceBeforeWithdraw = await withdrawTo.getEthereumBalance(token);
     const startTime = new Date().getTime();
     const withdrawHandle = await syncWallet.withdrawFromSyncToEthereum({
@@ -286,7 +319,6 @@ async function testFastWithdraw(
     await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
     console.log(`Fast withdraw verified: ${new Date().getTime() - startTime} ms`);
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
-    const operatorAfterWithdraw = await getOperatorBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
     const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
@@ -295,20 +327,43 @@ async function testFastWithdraw(
     if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
         throw new Error("Wrong amount on wallet after fast withdraw");
     }
-    if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
-        throw new Error("Wrong amount of operator fees after fast withdraw");
-    }
     if (!onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
         throw new Error("Wrong amount onchain after fast withdraw");
     }
+
+    feeInfo.globalFee = feeInfo.globalFee.add(fee);
+
+    // Cause we awaited for verifying we must check the collected fees
+    const operatorBalanceAfter = await getOperatorBalance(token);
+    if (!operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).eq(feeInfo.globalFee)) {
+        console.log(
+            "The collected fee is not right :: expected(",
+            feeInfo.globalFee.toString(),
+            "), found(",
+            operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(),
+            ")"
+        );
+        throw new Error("The collected fee is not right");
+    }
+    feeInfo.lastVerifiedOperatorBalance = operatorBalanceAfter;
+    feeInfo.globalFee = BigNumber.from(0);
 }
 
-async function testChangePubkeyOnchain(syncWallet: Wallet, token: types.TokenLike) {
+async function testChangePubkeyOnchain(syncWallet: Wallet, feeToken: types.TokenLike, feeInfo: any) {
     if (!(await syncWallet.isSigningKeySet())) {
+        const feeType = {
+            ChangePubKey: {
+                onchainPubkeyAuth: true,
+            },
+        };
+        let fullFee = await syncProvider.getTransactionFee(feeType, syncWallet.address(), feeToken);
+        let fee = fullFee.totalFee;
+
         const startTime = new Date().getTime();
         await (await syncWallet.onchainAuthSigningKey("committed")).wait();
         const changePubkeyHandle = await syncWallet.setSigningKey({
-            feeToken: token,
+            feeToken,
+            fee,
             onchainAuth: true,
         });
         console.log(`Change pubkey onchain posted: ${new Date().getTime() - startTime} ms`);
@@ -317,14 +372,25 @@ async function testChangePubkeyOnchain(syncWallet: Wallet, token: types.TokenLik
         if (!(await syncWallet.isSigningKeySet())) {
             throw new Error("Change pubkey onchain failed");
         }
+
+        feeInfo.globalFee = feeInfo.globalFee.add(fee);
     }
 }
 
-async function testChangePubkeyOffchain(syncWallet: Wallet, token: types.TokenLike) {
+async function testChangePubkeyOffchain(syncWallet: Wallet, feeToken: types.TokenLike, feeInfo: any) {
     if (!(await syncWallet.isSigningKeySet())) {
+        const feeType = {
+            ChangePubKey: {
+                onchainPubkeyAuth: false,
+            },
+        };
+        let fullFee = await syncProvider.getTransactionFee(feeType, syncWallet.address(), feeToken);
+        let fee = fullFee.totalFee;
+
         const startTime = new Date().getTime();
         const changePubkeyHandle = await syncWallet.setSigningKey({
-            feeToken: token,
+            feeToken,
+            fee,
         });
         console.log(`Change pubkey offchain posted: ${new Date().getTime() - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
@@ -332,6 +398,8 @@ async function testChangePubkeyOffchain(syncWallet: Wallet, token: types.TokenLi
         if (!(await syncWallet.isSigningKeySet())) {
             throw new Error("Change pubkey offchain failed");
         }
+
+        feeInfo.globalFee = feeInfo.globalFee.add(fee);
     }
 }
 
@@ -377,6 +445,10 @@ async function moveFunds(
     token: types.TokenLike,
     depositAmountETH: string
 ) {
+    const feeInfo = {
+        lastVerifiedOperatorBalance: await getOperatorBalance(token),
+        globalFee: BigNumber.from(0),
+    };
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
@@ -387,23 +459,23 @@ async function moveFunds(
     console.log(`Auto approved deposit ok, Token: ${token}`);
     await testDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Forever approved deposit ok, Token: ${token}`);
-    await testChangePubkeyOnchain(syncWallet1, token);
+    await testChangePubkeyOnchain(syncWallet1, token, feeInfo);
     console.log(`Change pubkey onchain ok`);
-    await testForcedExit(contract, syncWallet1, token, transfersAmount);
+    await testForcedExit(contract, syncWallet1, token, transfersAmount, feeInfo);
     console.log(`ForcedExit OK`);
-    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount);
+    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, feeInfo);
     console.log(`Transfer to new ok, Token: ${token}`);
-    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount);
+    await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, feeInfo);
     console.log(`Transfer ok, Token: ${token}`);
-    await testTransferToSelf(syncWallet1, token, transfersAmount);
+    await testTransferToSelf(syncWallet1, token, transfersAmount, feeInfo);
     console.log(`Transfer to self with fee ok, Token: ${token}`);
-    await testChangePubkeyOffchain(syncWallet2, token);
+    await testChangePubkeyOffchain(syncWallet2, token, feeInfo);
     console.log(`Change pubkey offchain ok`);
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
-    await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount);
+    await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, feeInfo);
     console.log(`Withdraw ok, Token: ${token}`);
     // Note that wallet is different from `testWithdraw` to not interfere with previous withdrawal.
-    await testFastWithdraw(contract, syncWallet1, syncWallet1, token, withdrawAmount);
+    await testFastWithdraw(contract, syncWallet1, syncWallet1, token, withdrawAmount, feeInfo);
     console.log(`Fast withdraw ok, Token: ${token}`);
 }
 
@@ -472,7 +544,15 @@ function promiseTimeout(ms, promise) {
 }
 
 async function checkFailedTransactionResending(
-    depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet) {
+    contract: Contract,
+    depositWallet: Wallet,
+    syncWallet1: Wallet,
+    syncWallet2: Wallet
+) {
+    const feeInfo = {
+        lastVerifiedOperatorBalance: await getOperatorBalance("ETH"),
+        globalFee: BigNumber.from(0),
+    };
     console.log("Checking invalid transaction resending");
     const amount = utils.parseEther("0.2");
 
@@ -491,12 +571,17 @@ async function checkFailedTransactionResending(
         "ETH",
         amount.div(2).add(transferFee).add(changePubKeyFee)
     );
-    await testChangePubkeyOnchain(syncWallet1, "ETH");
+    await testChangePubkeyOnchain(syncWallet1, "ETH", feeInfo);
+    let testPassed = true;
     try {
-        await testTransfer(syncWallet1, syncWallet2, "ETH", amount);
+        await testTransfer(syncWallet1, syncWallet2, "ETH", amount, feeInfo);
+        testPassed = false;
     } catch (e) {
         assert(e?.value?.failReason == `Not enough balance`);
         console.log("Transfer failed (expected)");
+    }
+    if (!testPassed) {
+        throw new Error("checkFailedTransactionResending failed");
     }
 
     await testDeposit(depositWallet, syncWallet1, "ETH", amount.div(2));
@@ -506,7 +591,7 @@ async function checkFailedTransactionResending(
     // If we won't wait enough, then we'll get the receipt for the previous, failed tx,
     // which has the same hash. The new (successful) receipt will be available only
     // when tx will be executed again in state keeper, so we must wait for it.
-    await testTransfer(syncWallet1, syncWallet2, "ETH", amount, 3000);
+    await testTransfer(syncWallet1, syncWallet2, "ETH", amount, feeInfo, 3000);
 }
 
 (async () => {
@@ -561,7 +646,6 @@ async function checkFailedTransactionResending(
         const ethWallet5 = ethers.Wallet.createRandom().connect(ethersProvider);
         await await ethWallet.sendTransaction({ to: ethWallet5.address, value: utils.parseEther("6.0") });
         const syncWallet5 = await Wallet.fromEthSigner(ethWallet5, syncProvider);
-        await checkFailedTransactionResending(zksyncDepositorWallet, syncWallet4, syncWallet5);
 
         console.log("Move funds ERC-20 start");
         await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "200.0");
@@ -570,6 +654,8 @@ async function checkFailedTransactionResending(
         console.log("Move funds ETH start");
         await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "1.0");
         console.log("Move funds ETH OK");
+
+        await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
 
         await syncProvider.disconnect();
     } catch (e) {

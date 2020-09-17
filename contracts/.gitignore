@@ -2,6 +2,6 @@
 # /contracts/keys
 /flat
 /flat_build
-/contracts/generated
+/dev-contracts/generated
 /contracts/KeysWithPlonkVerifier.sol
 /contracts/TokenInit.sol

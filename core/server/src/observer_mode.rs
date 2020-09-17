@@ -23,24 +23,25 @@ pub struct ObservedState {
     /// Block number corresponding to the state in `circuit_acc_tree`.
     pub circuit_tree_block: BlockNumber,
 
-    storage: storage::StorageProcessor,
+    pub connection_pool: storage::ConnectionPool,
 }
 
 impl ObservedState {
-    fn new(storage: storage::StorageProcessor) -> Self {
+    fn new(connection_pool: storage::ConnectionPool) -> Self {
         Self {
             state_keeper_init: PlasmaStateInitParams::new(),
             circuit_acc_tree: CircuitAccountTree::new(models::params::account_tree_depth()),
             circuit_tree_block: 0,
-            storage,
+            connection_pool,
         }
     }
 
     /// Init state by pulling verified and committed state from db.
-    fn init(&mut self) -> Result<(), failure::Error> {
-        self.init_circuit_tree()?;
+    async fn init(&mut self) -> Result<(), failure::Error> {
+        self.init_circuit_tree().await?;
         info!("updated circuit tree to block: {}", self.circuit_tree_block);
-        self.state_keeper_init = PlasmaStateInitParams::restore_from_db(&self.storage)?;
+        let mut storage = self.connection_pool.access_storage().await?;
+        self.state_keeper_init = PlasmaStateInitParams::restore_from_db(&mut storage).await?;
         info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
@@ -48,13 +49,16 @@ impl ObservedState {
         Ok(())
     }
 
-    fn init_circuit_tree(&mut self) -> Result<(), failure::Error> {
-        let (block_number, accounts) = self
-            .storage
-            .chain()
-            .state_schema()
-            .load_verified_state()
-            .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
+    async fn init_circuit_tree(&mut self) -> Result<(), failure::Error> {
+        let mut storage = self.connection_pool.access_storage().await?;
+
+        let (block_number, accounts) =
+            storage
+                .chain()
+                .state_schema()
+                .load_verified_state()
+                .await
+                .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
         for (account_id, account) in accounts.into_iter() {
             let circuit_account = CircuitAccount::from(account.clone());
             self.circuit_acc_tree.insert(account_id, circuit_account);
@@ -64,14 +68,16 @@ impl ObservedState {
     }
 
     /// Pulls new changes from db and update.
-    fn update(&mut self) -> Result<(), failure::Error> {
+    async fn update(&mut self) -> Result<(), failure::Error> {
         let old = self.circuit_tree_block;
-        self.update_circuit_account_tree()?;
+        self.update_circuit_account_tree().await?;
         if old != self.circuit_tree_block {
             info!("updated circuit tree to block: {}", self.circuit_tree_block);
         }
         let old = self.state_keeper_init.last_block_number;
-        self.state_keeper_init.load_state_diff(&self.storage)?;
+
+        let mut storage = self.connection_pool.access_storage().await?;
+        self.state_keeper_init.load_state_diff(&mut storage).await?;
         if old != self.state_keeper_init.last_block_number {
             info!(
                 "updated state keeper init params to block: {}",
@@ -81,21 +87,27 @@ impl ObservedState {
         Ok(())
     }
 
-    fn update_circuit_account_tree(&mut self) -> Result<(), failure::Error> {
-        let block_number = self
-            .storage
-            .chain()
-            .block_schema()
-            .get_last_verified_block()
-            .map_err(|e| failure::format_err!("failed to get last committed block: {}", e))?;
-
-        for bn in self.circuit_tree_block..block_number {
-            let ops = self
-                .storage
+    async fn update_circuit_account_tree(&mut self) -> Result<(), failure::Error> {
+        let block_number = {
+            let mut storage = self.connection_pool.access_storage().await?;
+            storage
                 .chain()
                 .block_schema()
-                .get_block_operations(bn + 1)
-                .map_err(|e| failure::format_err!("failed to get block operations {}", e))?;
+                .get_last_verified_block()
+                .await
+                .map_err(|e| failure::format_err!("failed to get last committed block: {}", e))?
+        };
+
+        for bn in self.circuit_tree_block..block_number {
+            let ops = {
+                let mut storage = self.connection_pool.access_storage().await?;
+                storage
+                    .chain()
+                    .block_schema()
+                    .get_block_operations(bn + 1)
+                    .await
+                    .map_err(|e| failure::format_err!("failed to get block operations {}", e))?
+            };
             self.apply(ops);
         }
         self.circuit_tree_block = block_number;
@@ -143,16 +155,16 @@ impl ObservedState {
 ///
 /// # Panics
 /// Panics on failed connection to db.
-pub fn run(
+pub async fn run(
     conn_pool: storage::ConnectionPool,
     interval: Duration,
     stop: mpsc::Receiver<()>,
 ) -> ObservedState {
     info!("starting observer mode");
-    let storage = conn_pool.access_storage().expect("failed to access db");
-    let mut observed_state = ObservedState::new(storage);
+    let mut observed_state = ObservedState::new(conn_pool);
     observed_state
         .init()
+        .await
         .expect("failed to init observed state");
     loop {
         let exit = match stop.try_recv() {
@@ -165,6 +177,7 @@ pub fn run(
         thread::sleep(interval);
         observed_state
             .update()
+            .await
             .expect("failed to update observed state");
         if exit {
             break;

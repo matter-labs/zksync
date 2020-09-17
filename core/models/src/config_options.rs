@@ -106,6 +106,26 @@ impl ProverOptions {
     }
 }
 
+/// Configuration options for `admin server`.
+#[derive(Debug, Clone)]
+pub struct AdminServerOptions {
+    pub admin_http_server_url: Url,
+    pub admin_http_server_address: SocketAddr,
+    pub secret_auth: String,
+}
+
+impl AdminServerOptions {
+    /// Parses the configuration options values from the environment variables.
+    /// Panics if any of options is missing or has inappropriate value.
+    pub fn from_env() -> Self {
+        Self {
+            admin_http_server_url: parse_env("ADMIN_SERVER_API_URL"),
+            admin_http_server_address: parse_env("ADMIN_SERVER_API_BIND"),
+            secret_auth: parse_env("SECRET_AUTH"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum TokenPriceSource {
     CoinMarketCap { base_url: Url },

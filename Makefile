@@ -121,10 +121,10 @@ server:
 sandbox:
 	@cargo run --bin sandbox
 
-image-server: build-contracts
+image-server: build-contracts build-dev-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
 
-image-prover: build-contracts
+image-prover: build-contracts build-dev-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${PROVER_DOCKER_IMAGE}" -t "${PROVER_DOCKER_IMAGE_LATEST}"  -f ./docker/prover/Dockerfile .
 
 image-rust: image-server image-prover
@@ -150,14 +150,17 @@ publish-contracts:
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
-build-contracts: confirm_action prepare-contracts
+build-dev-contracts: confirm_action prepare-verify-contracts
 	@bin/prepare-test-contracts.sh
-	@cd contracts && yarn build
+	@cd contracts && yarn build-dev
 
-prepare-contracts:
-	@cargo run --release --bin gen_token_add_contract
+prepare-verify-contracts:
 	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
+build-contracts: confirm_action prepare-verify-contracts
+	@cargo run --release --bin gen_token_add_contract
+	@cd contracts && yarn build
+	
 # testing
 
 ci-check:
