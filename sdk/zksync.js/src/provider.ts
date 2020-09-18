@@ -122,7 +122,9 @@ export class Provider {
                     [serialId, action],
                     "ethop_unsubscribe",
                     (resp) => {
-                        subscribe.then((sub) => sub.unsubscribe());
+                        subscribe
+                            .then((sub) => sub.unsubscribe())
+                            .catch((err) => console.log(`WebSocket connection closed with reason: ${err}`));
                         resolve(resp);
                     }
                 );
@@ -147,7 +149,9 @@ export class Provider {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise((resolve) => {
                 const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", (resp) => {
-                    subscribe.then((sub) => sub.unsubscribe());
+                    subscribe
+                        .then((sub) => sub.unsubscribe())
+                        .catch((err) => console.log(`WebSocket connection closed with reason: ${err}`));
                     resolve(resp);
                 });
             });
