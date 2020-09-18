@@ -1,8 +1,10 @@
+use failure::Error;
 use models::{
     node::{
         operations::{FranklinOp, TransferOp, TransferToNewOp},
-        Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address,
-        BlockNumber, Fr, FranklinPriorityOp, FranklinTx, TokenId,
+        reverse_updates, Account, AccountId, AccountMap, AccountTree, AccountUpdate,
+        AccountUpdates, Address, BlockNumber, Fr, FranklinPriorityOp, FranklinTx, SignedFranklinTx,
+        TokenId,
     },
     params,
 };
