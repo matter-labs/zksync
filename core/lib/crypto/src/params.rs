@@ -1,7 +1,4 @@
-#![allow(clippy::option_env_unwrap)]
 // Built-in deps
-use std::env;
-use std::str::FromStr;
 // External deps
 use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
@@ -9,17 +6,22 @@ use lazy_static::lazy_static;
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
-use crate::node::{AccountId, TokenId};
+
+/// Depth of the account tree.
+pub const ACCOUNT_TREE_DEPTH: usize = 32;
+/// Depth of the balance tree for each account.
+pub const BALANCE_TREE_DEPTH: usize = 11;
 
 /// account_tree_depth.
 pub fn account_tree_depth() -> usize {
-    crate::node::config::ACCOUNT_TREE_DEPTH
+    ACCOUNT_TREE_DEPTH
 }
 
 /// balance tree_depth.
 pub fn balance_tree_depth() -> usize {
-    crate::node::config::BALANCE_TREE_DEPTH
+    BALANCE_TREE_DEPTH
 }
+
 /// Number of supported tokens.
 pub fn total_tokens() -> usize {
     2usize.pow(balance_tree_depth() as u32)
@@ -45,7 +47,7 @@ pub fn used_account_subtree_depth() -> usize {
 }
 
 /// Max token id, based on the depth of the used left subtree
-pub fn max_account_id() -> AccountId {
+pub fn max_account_id() -> u32 {
     let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
     if list_count == u32::max_value() {
         list_count
@@ -55,11 +57,11 @@ pub fn max_account_id() -> AccountId {
 }
 
 /// Max token id, based on the number of processable tokens
-pub fn max_token_id() -> TokenId {
+pub fn max_token_id() -> u16 {
     number_of_processable_tokens() as u16 - 1
 }
 
-pub const ETH_TOKEN_ID: TokenId = 0;
+pub const ETH_TOKEN_ID: u16 = 0;
 
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 32;
 
@@ -116,24 +118,6 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 
 pub const LEAF_DATA_BIT_WIDTH: usize =
     NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
-
-static mut BLOCK_CHUNK_SIZES_VALUE: Vec<usize> = Vec::new();
-
-pub(crate) fn block_chunk_sizes() -> &'static [usize] {
-    // use of mutable static is unsafe as it can be mutated by multiple threads.
-    // using `unsafe` block as there's no risk of data race, the worst that can
-    // happen is we read and set environment value multuple times, which is ok.
-    unsafe {
-        if BLOCK_CHUNK_SIZES_VALUE.is_empty() {
-            let runtime_value = env::var("BLOCK_CHUNK_SIZES").expect("BLOCK_CHUNK_SIZES missing");
-            BLOCK_CHUNK_SIZES_VALUE = runtime_value
-                .split(',')
-                .map(|s| usize::from_str(s).unwrap())
-                .collect::<Vec<_>>();
-        }
-        BLOCK_CHUNK_SIZES_VALUE.as_slice()
-    }
-}
 
 /// Priority op should be executed for this number of eth blocks.
 pub const PRIORITY_EXPIRATION: u64 = 35000;

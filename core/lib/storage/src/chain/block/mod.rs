@@ -6,9 +6,8 @@ use models::node::{
     block::{Block, ExecutedOperations},
     AccountId, BlockNumber, FranklinOp,
 };
-use models::{
-    fe_from_bytes, fe_to_bytes, node::block::PendingBlock, Action, ActionType, Operation,
-};
+use models::{node::block::PendingBlock, Action, ActionType, Operation};
+use zksync_crypto::convert::{fe_from_bytes, fe_to_bytes};
 // Local imports
 use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,

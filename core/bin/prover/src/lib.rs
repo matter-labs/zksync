@@ -18,7 +18,8 @@ use std::{
 // External deps
 use rand::Rng;
 // Workspace deps
-use models::{config_options::ProverOptions, node::Engine, prover_utils::EncodedProofPlonk};
+use zksync_config::ProverOptions;
+use zksync_crypto::{proof::EncodedProofPlonk, Engine};
 
 const ABSENT_PROVER_ID: i32 = -1;
 

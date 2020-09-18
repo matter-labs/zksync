@@ -2,8 +2,9 @@
 use web3::types::H256;
 // Workspace imports
 use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
-use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
-use models::{ethereum::OperationType, fe_to_bytes, Action, Operation};
+use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber};
+use models::{ethereum::OperationType, Action, Operation};
+use zksync_crypto::{convert::fe_to_bytes, Fr};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
 use crate::tests::{create_rng, db_test};

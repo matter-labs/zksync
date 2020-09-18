@@ -8,12 +8,13 @@ use models::node::tx::{EthSignData, PackedEthSignature, TxEthSignature};
 use models::{
     node::{
         block::{Block, ExecutedOperations},
-        AccountUpdate, BlockNumber, Fr, PubKeyHash,
+        AccountUpdate, BlockNumber, PubKeyHash,
     },
     Action, Operation,
 };
 use num::BigUint;
 use std::ops::Deref;
+use zksync_crypto::Fr;
 // Local imports
 
 pub fn acc_create_random_updates<R: Rng>(

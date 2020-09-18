@@ -1,14 +1,15 @@
 use super::AccountId;
 use super::TokenId;
-use crate::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
-};
-use crate::primitives::{bytes_slice_to_uint32, BigUintSerdeAsRadix10Str};
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
 use num::BigUint;
 use std::convert::{TryFrom, TryInto};
 use web3::types::{Address, Log, U256};
+use zksync_crypto::params::{
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+};
+use zksync_crypto::primitives::bytes_slice_to_uint32;
+use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::operations::{DepositOp, FullExitOp};
 

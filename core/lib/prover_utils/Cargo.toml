@@ -1,0 +1,17 @@
+[package]
+name = "zksync_prover_utils"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+zksync_crypto = { path = "../crypto", version = "0.1.0" }
+zksync_utils = { path = "../utils", version = "0.1.0" }
+zksync_basic_types = { path = "../basic_types", version = "0.1.0" }
+lazy_static = "1.2.0"
+failure = "0.1"
+log = "0.4"
+backoff = "0.1.6"
+reqwest = { version = "0.10.6", features = ["blocking"] }

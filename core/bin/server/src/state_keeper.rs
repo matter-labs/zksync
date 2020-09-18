@@ -119,7 +119,7 @@ impl Default for PlasmaStateInitParams {
 impl PlasmaStateInitParams {
     pub fn new() -> Self {
         Self {
-            tree: AccountTree::new(models::params::account_tree_depth()),
+            tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
             acc_id_by_addr: HashMap::new(),
             last_block_number: 0,
             unprocessed_priority_op: 0,

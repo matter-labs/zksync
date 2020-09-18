@@ -28,14 +28,17 @@ use web3::{
 // Workspace deps
 use models::{
     abi::{eip1271_contract, zksync_contract},
-    config_options::ConfigurationOptions,
-    misc::constants::EIP1271_SUCCESS_RETURN_VALUE,
     node::tx::EIP1271Signature,
     node::{FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
-    params::PRIORITY_EXPIRATION,
 };
+use zksync_config::ConfigurationOptions;
+use zksync_crypto::params::PRIORITY_EXPIRATION;
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
+
+/// isValidSignature return value according to EIP1271 standard
+/// bytes4(keccak256("isValidSignature(bytes,bytes)")
+pub const EIP1271_SUCCESS_RETURN_VALUE: [u8; 4] = [0x20, 0xc1, 0x3b, 0x0b];
 
 mod eth_state;
 mod received_ops;

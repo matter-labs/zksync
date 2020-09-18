@@ -3,8 +3,8 @@
 //! This module provides building blocks for serializing and deserializing
 //! common `zksync` types.
 
-use super::node::Fr;
-use super::{fe_from_hex, fe_to_hex};
+use crate::convert::{fe_from_hex, fe_to_hex};
+use crate::Fr;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Blanket structure implementing serializing/deserializing methods for `Fr`.
@@ -145,7 +145,7 @@ impl VecOptionalFrSerde {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
     use serde_json::json;
 
     #[test]

@@ -3,13 +3,11 @@ use std::collections::HashMap;
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
 // Workspace uses
-use models::{
-    node::{
-        tx::TxEthSignature, Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce,
-        PriorityOp, PubKeyHash,
-    },
-    primitives::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper},
+use models::node::{
+    tx::TxEthSignature, Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce,
+    PriorityOp, PubKeyHash,
 };
+use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
 

@@ -1,6 +1,6 @@
 // External deps
 use crypto::{digest::Digest, sha2::Sha256};
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{
         pairing::ff::{Field, PrimeField, PrimeFieldRepr},
         Circuit, ConstraintSystem, SynthesisError,
@@ -9,16 +9,17 @@ use crypto_exports::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::{
+use models::node::{AccountId, TokenId};
+use zksync_crypto::{
     circuit::{
         utils::{append_be_fixed_width, be_bit_vector_into_bytes},
         CircuitAccountTree,
     },
-    node::{AccountId, Engine, Fr, TokenId},
     params::{
         ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED,
         SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
     },
+    Engine, Fr,
 };
 // Local deps
 use crate::{
@@ -59,7 +60,7 @@ impl<'a, E: RescueEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
         let (state_root, _, _) = check_account_data(
             cs.namespace(|| "calculate account root"),
             &branch,
-            models::params::account_tree_depth(),
+            zksync_crypto::params::account_tree_depth(),
             self.params,
         )?;
 
@@ -152,7 +153,7 @@ pub fn create_exit_circuit_with_public_input(
     let pub_data_commitment = Fr::from_repr(repr).unwrap();
 
     ZksyncExitCircuit {
-        params: &models::params::RESCUE_PARAMS,
+        params: &zksync_crypto::params::RESCUE_PARAMS,
         pub_data_commitment: Some(pub_data_commitment),
         root_hash: Some(root_hash),
         account_audit_data: OperationBranch {
@@ -171,11 +172,11 @@ pub fn create_exit_circuit_with_public_input(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crypto_exports::franklin_crypto::circuit::test::TestConstraintSystem;
-    use models::circuit::account::CircuitAccount;
-    use models::circuit::CircuitAccountTree;
     use models::node::Account;
     use num::BigUint;
+    use zksync_crypto::circuit::account::CircuitAccount;
+    use zksync_crypto::circuit::CircuitAccountTree;
+    use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
 
     #[test]
     #[ignore]
@@ -189,7 +190,7 @@ mod test {
         test_account.nonce = 0xbabe;
 
         let mut circuit_account_tree =
-            CircuitAccountTree::new(models::params::account_tree_depth());
+            CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
         circuit_account_tree.insert(test_account_id, CircuitAccount::from(test_account));
 
         let zksync_exit_circuit = create_exit_circuit_with_public_input(

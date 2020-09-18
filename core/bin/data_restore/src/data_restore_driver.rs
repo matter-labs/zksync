@@ -7,9 +7,10 @@ use web3::{
 // Workspace deps
 use models::{
     abi::{governance_contract, zksync_contract},
-    node::{AccountMap, AccountUpdate, Fr},
+    node::{AccountMap, AccountUpdate},
 };
 use storage::ConnectionPool;
+use zksync_crypto::Fr;
 // Local deps
 use crate::{
     contract_functions::{get_genesis_account, get_total_verified_blocks},

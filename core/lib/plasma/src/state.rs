@@ -7,15 +7,17 @@ use models::node::operations::{
 use models::node::tx::ChangePubKey;
 use models::node::Address;
 use models::node::{
-    reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
+    reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
 };
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
-use models::params;
-use models::params::max_account_id;
-use models::primitives::BigUintSerdeWrapper;
 use num::BigUint;
 use std::collections::HashMap;
+use zksync_crypto::{
+    params::{self, max_account_id},
+    Fr,
+};
+use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Debug)]
 pub struct OpSuccess {

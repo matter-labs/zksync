@@ -4,12 +4,10 @@ use std::{fmt, sync::Mutex};
 use num::BigUint;
 use web3::types::H256;
 // Workspace uses
-use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
-use models::node::{
-    priv_key_from_fs, AccountId, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer,
-    Withdraw,
-};
+use models::node::{AccountId, Address, Close, Nonce, PubKeyHash, TokenId, Transfer, Withdraw};
+use zksync_crypto::rand::{thread_rng, Rng};
+use zksync_crypto::{priv_key_from_fs, PrivateKey};
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {

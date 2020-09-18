@@ -12,8 +12,8 @@ use futures::{
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
 use models::{
-    config_options::ThreadPanicNotify,
     node::{tx::TxEthSignature, FranklinTx, SignedFranklinTx},
+    panic_notify::ThreadPanicNotify,
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;

@@ -1,11 +1,11 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
-use crate::node::Engine;
-use crate::params::{account_tree_depth, balance_tree_depth};
-use crypto_exports::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use failure::format_err;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use zksync_crypto::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
+use zksync_crypto::params::{account_tree_depth, balance_tree_depth};
+use zksync_crypto::Engine;
 
 pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();

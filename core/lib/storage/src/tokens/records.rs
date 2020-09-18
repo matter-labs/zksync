@@ -8,7 +8,7 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use models::node::tokens::TokenPrice;
 use models::node::{Token, TokenId};
-use models::primitives::big_decimal_to_ratio;
+use zksync_utils::big_decimal_to_ratio;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, FromRow)]
 pub struct DbToken {

@@ -1,16 +1,15 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use num::BigUint;
+use zksync_crypto::franklin_crypto::{
     bellman::{pairing::ff::PrimeField, Circuit},
     circuit::test::TestConstraintSystem,
 };
-use num::BigUint;
 // Workspace deps
-use models::{
-    circuit::{account::CircuitAccount, CircuitAccountTree},
-    node::{Account, AccountId, AccountMap, Address, Engine, Fr},
-};
+use models::node::{Account, AccountId, AccountMap, Address};
 use plasma::state::{CollectedFee, PlasmaState};
 use testkit::zksync_account::ZksyncAccount;
+use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
+use zksync_crypto::{Engine, Fr};
 // Local deps
 use crate::{circuit::FranklinCircuit, witness::Witness};
 
@@ -52,7 +51,7 @@ impl PlasmaStateGenerator {
         let plasma_state = PlasmaState::from_acc_map(accounts, 1);
 
         let mut circuit_account_tree =
-            CircuitAccountTree::new(models::params::account_tree_depth());
+            CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
         for (id, account) in plasma_state.get_accounts() {
             circuit_account_tree.insert(id, CircuitAccount::from(account))
         }

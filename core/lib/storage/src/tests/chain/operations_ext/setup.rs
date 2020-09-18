@@ -3,15 +3,16 @@
 use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
-use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::operations::{ChangePubKeyOp, FranklinOp};
 use models::node::priority_ops::PriorityOp;
 use models::node::{
-    Address, CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, Token, TransferOp,
-    TransferToNewOp, WithdrawOp,
+    Address, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
 use testkit::zksync_account::ZksyncAccount;
+use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
+use zksync_crypto::Fr;
 // Local imports
 
 pub struct TransactionsHistoryTestSetup {

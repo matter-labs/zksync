@@ -1,6 +1,7 @@
 // External deps
 use crypto::{digest::Digest, sha2::Sha256};
-use crypto_exports::franklin_crypto::{
+use num::ToPrimitive;
+use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::AltJubjubBn256,
     bellman::pairing::{
         bn256::{Bn256, Fr},
@@ -10,26 +11,26 @@ use crypto_exports::franklin_crypto::{
     jubjub::{FixedGenerators, JubjubEngine},
     rescue::bn256::Bn256RescueParams,
 };
-use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
-use num::ToPrimitive;
+use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace deps
-use models::{
+use models::node::{
+    operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
+    tx::PackedPublicKey,
+    AccountId, BlockNumber,
+};
+use plasma::state::CollectedFee;
+use zksync_crypto::{
     circuit::{
         account::{Balance, CircuitAccount, CircuitAccountTree},
         utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element},
     },
     merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
-    node::{
-        operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
-        tx::PackedPublicKey,
-        AccountId, BlockNumber, Engine,
-    },
     params::{
         total_tokens, used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS,
     },
     primitives::GetBits,
+    Engine,
 };
-use plasma::state::CollectedFee;
 // Local deps
 use crate::{
     account::AccountWitness,
@@ -161,8 +162,8 @@ impl<'a> WitnessBuilder<'a> {
     /// Finaly, creates circuit instance for given operations.
     pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
         FranklinCircuit {
-            rescue_params: &models::params::RESCUE_PARAMS,
-            jubjub_params: &models::params::JUBJUB_PARAMS,
+            rescue_params: &zksync_crypto::params::RESCUE_PARAMS,
+            jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS,
             old_root: Some(self.initial_root_hash),
             initial_used_subtree_root: Some(self.initial_used_subtree_root_hash),
             operations: self.operations,
@@ -484,11 +485,11 @@ impl SigDataInput {
         pub_key: &PackedPublicKey,
     ) -> Result<SigDataInput, String> {
         let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-        let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(&r_bytes)
+        let r_bits: Vec<_> = zksync_crypto::primitives::bytes_into_be_bits(&r_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
-        let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(&s_bytes)
+        let s_bits: Vec<_> = zksync_crypto::primitives::bytes_into_be_bits(&s_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
@@ -496,12 +497,12 @@ impl SigDataInput {
             r_packed: r_bits,
             s: s_bits,
         };
-        let sig_bits: Vec<bool> = models::primitives::bytes_into_be_bits(&tx_bytes);
+        let sig_bits: Vec<bool> = zksync_crypto::primitives::bytes_into_be_bits(&tx_bytes);
 
         let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(
             &sig_bits,
-            &models::params::PEDERSEN_HASHER,
-            &models::params::JUBJUB_PARAMS,
+            &zksync_crypto::params::PEDERSEN_HASHER,
+            &zksync_crypto::params::JUBJUB_PARAMS,
         );
 
         let signer_packed_key_bytes = match pub_key.serialize_packed() {
@@ -511,7 +512,7 @@ impl SigDataInput {
             }
         };
         let signer_pub_key_packed: Vec<_> =
-            models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+            zksync_crypto::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
                 .iter()
                 .map(|x| Some(*x))
                 .collect();

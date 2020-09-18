@@ -1,6 +1,5 @@
 // Built-in deps
 use std::convert::TryInto;
-use std::str::FromStr;
 // External deps
 use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
@@ -9,16 +8,9 @@ use crate::franklin_crypto::bellman::pairing::ff::{
 };
 use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 use crate::franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
-use bigdecimal::BigDecimal;
 use failure::bail;
-use num::{
-    bigint::ToBigInt,
-    rational::Ratio,
-    traits::{sign::Signed, Pow},
-    BigUint, FromPrimitive, ToPrimitive,
-};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use web3::types::U256;
+use num::{BigUint, FromPrimitive, ToPrimitive};
+use zksync_basic_types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{
@@ -474,103 +466,6 @@ pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
     let bytes = &bytes[..array.len()];
     array.copy_from_slice(bytes);
     Some(array)
-}
-
-#[derive(Clone, Debug)]
-pub struct UnsignedRatioSerializeAsDecimal;
-impl UnsignedRatioSerializeAsDecimal {
-    pub fn serialize<S>(value: &Ratio<BigUint>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        BigDecimal::serialize(&ratio_to_big_decimal(value, 18), serializer)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Ratio<BigUint>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        // First, deserialize a string value. It is expected to be a
-        // hexadecimal representation of `Fr`.
-        let big_decimal_string = BigDecimal::deserialize(deserializer)?;
-
-        big_decimal_to_ratio(&big_decimal_string).map_err(de::Error::custom)
-    }
-
-    pub fn deserialize_from_str_with_dot(input: &str) -> Result<Ratio<BigUint>, failure::Error> {
-        big_decimal_to_ratio(&BigDecimal::from_str(input)?)
-    }
-
-    pub fn serialize_to_str_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
-        ratio_to_big_decimal(num, precision)
-            .to_string()
-            .trim_end_matches('0')
-            .to_string()
-    }
-}
-
-/// Used to serialize BigUint as radix 10 string.
-#[derive(Clone, Debug)]
-pub struct BigUintSerdeAsRadix10Str;
-
-impl BigUintSerdeAsRadix10Str {
-    pub fn serialize<S>(val: &BigUint, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let big_dec = BigDecimal::from(val.to_bigint().unwrap());
-        BigDecimal::serialize(&big_dec, serializer)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error;
-        BigDecimal::deserialize(deserializer).and_then(|bigdecimal| {
-            let big_int = bigdecimal
-                .to_bigint()
-                .ok_or_else(|| Error::custom("Expected integer value"))?;
-            big_int
-                .to_biguint()
-                .ok_or_else(|| Error::custom("Expected positive value"))
-        })
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct BigUintSerdeWrapper(#[serde(with = "BigUintSerdeAsRadix10Str")] pub BigUint);
-
-impl From<BigUint> for BigUintSerdeWrapper {
-    fn from(uint: BigUint) -> BigUintSerdeWrapper {
-        BigUintSerdeWrapper(uint)
-    }
-}
-
-pub fn ratio_to_big_decimal(num: &Ratio<BigUint>, precision: usize) -> BigDecimal {
-    let bigint = round_precision_raw_no_div(num, precision)
-        .to_bigint()
-        .unwrap();
-    BigDecimal::new(bigint, precision as i64)
-}
-
-pub fn big_decimal_to_ratio(num: &BigDecimal) -> Result<Ratio<BigUint>, failure::Error> {
-    let (big_int, exp) = num.as_bigint_and_exponent();
-    failure::ensure!(!big_int.is_negative(), "BigDecimal should be unsigned");
-    let big_uint = big_int.to_biguint().unwrap();
-    let ten_pow = BigUint::from(10 as u32).pow(exp as u128);
-    Ok(Ratio::new(big_uint, ten_pow))
-}
-
-fn round_precision_raw_no_div(num: &Ratio<BigUint>, precision: usize) -> BigUint {
-    let ten_pow = BigUint::from(10u32).pow(precision);
-    (num * ten_pow).round().to_integer()
-}
-
-pub fn round_precision(num: &Ratio<BigUint>, precision: usize) -> Ratio<BigUint> {
-    let ten_pow = BigUint::from(10u32).pow(precision);
-    let numerator = (num * &ten_pow).trunc().to_integer();
-    Ratio::new(numerator, ten_pow)
 }
 
 #[cfg(test)]

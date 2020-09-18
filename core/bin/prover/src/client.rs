@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use crate::client;
 use crate::prover_data::ProverData;
 use circuit::circuit::FranklinCircuit;
-use models::node::Engine;
-use models::prover_utils::EncodedProofPlonk;
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::Engine;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {

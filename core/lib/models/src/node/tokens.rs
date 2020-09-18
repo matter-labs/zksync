@@ -1,10 +1,10 @@
-use crate::config_options::parse_env;
 use crate::node::{Address, TokenId};
-use crate::primitives::UnsignedRatioSerializeAsDecimal;
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use std::fs::read_to_string;
 use std::path::PathBuf;
+use zksync_utils::parse_env;
+use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 /// Order of the fields are important (from more specific types to less specific types)
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]

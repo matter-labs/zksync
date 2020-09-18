@@ -8,11 +8,11 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
 use models::{
-    config_options::{ConfigurationOptions, ThreadPanicNotify},
     node::{
         tx::{TxEthSignature, TxHash},
         Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
     },
+    panic_notify::ThreadPanicNotify,
 };
 use storage::{
     chain::{
@@ -21,6 +21,7 @@ use storage::{
     },
     ConnectionPool, StorageProcessor,
 };
+use zksync_config::ConfigurationOptions;
 // Local uses
 use crate::{
     api_server::ops_counter::ChangePubKeyOpsCounter,

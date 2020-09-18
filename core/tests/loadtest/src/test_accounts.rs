@@ -6,11 +6,9 @@ use tokio::sync::Mutex;
 use tokio::time;
 use web3::transports::Http;
 // Workspace uses
-use models::{
-    config_options::ConfigurationOptions,
-    node::{tx::PackedEthSignature, FranklinTx},
-};
+use models::node::{tx::PackedEthSignature, FranklinTx};
 use testkit::{eth_account::EthereumAccount, zksync_account::ZksyncAccount};
+use zksync_config::ConfigurationOptions;
 // Local uses
 use crate::{rpc_client::RpcClient, scenarios::configs::AccountInfo};
 

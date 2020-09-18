@@ -12,16 +12,14 @@ pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
-use models::{
-    config_options::ConfigurationOptions,
-    fe_from_hex,
-    node::{
-        tokens::{get_genesis_token_list, Token},
-        TokenId,
-    },
+use models::node::{
+    tokens::{get_genesis_token_list, Token},
+    TokenId,
 };
 use storage::ConnectionPool;
 use web3::transports::Http;
+use zksync_config::ConfigurationOptions;
+use zksync_crypto::convert::fe_from_hex;
 
 const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;

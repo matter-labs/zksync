@@ -12,9 +12,9 @@ use web3::{
 
 // Local uses
 use cli::App;
-use models::config_options::{AdminServerOptions, ConfigurationOptions};
 use token::Token;
 use utils::{get_matches_from_lines, run_external_command, str_to_address};
+use zksync_config::{AdminServerOptions, ConfigurationOptions};
 
 #[tokio::main]
 async fn main() -> Result<()> {

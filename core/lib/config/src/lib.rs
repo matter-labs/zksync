@@ -4,54 +4,10 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 // External uses
-use futures::{channel::mpsc, executor::block_on, SinkExt};
-use web3::types::{H160, H256};
+use zksync_basic_types::{H160, H256};
+use zksync_utils::{get_env, parse_env, parse_env_with};
 // Local uses
-use crate::params::block_chunk_sizes;
 use url::Url;
-
-/// If its placed inside thread::spawn closure it will notify channel when this thread panics.
-pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
-
-impl Drop for ThreadPanicNotify {
-    fn drop(&mut self) {
-        if std::thread::panicking() {
-            block_on(self.0.send(true)).unwrap();
-        }
-    }
-}
-
-/// Obtains the environment variable value.
-/// Panics if there is no environment variable with provided name set.
-pub fn get_env(name: &str) -> String {
-    env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e))
-}
-
-/// Obtains the environment variable value and parses it using the `FromStr` type implementation.
-/// Panics if there is no environment variable with provided name set, or the value cannot be parsed.
-pub fn parse_env<F>(name: &str) -> F
-where
-    F: FromStr,
-    F::Err: std::fmt::Debug,
-{
-    get_env(name)
-        .parse()
-        .unwrap_or_else(|e| panic!("Failed to parse environment variable {}: {:?}", name, e))
-}
-
-/// Similar to `parse_env`, but also takes a function to change the variable value before parsing.
-pub fn parse_env_with<T, F>(name: &str, f: F) -> T
-where
-    T: FromStr,
-    T::Err: std::fmt::Debug,
-    F: FnOnce(&str) -> &str,
-{
-    let env_var = get_env(name);
-
-    f(&env_var)
-        .parse()
-        .unwrap_or_else(|e| panic!("Failed to parse environment variable {}: {:?}", name, e))
-}
 
 /// Configuration options for `eth_sender`.
 #[derive(Debug, Clone)]
@@ -211,7 +167,12 @@ impl ConfigurationOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
-        let mut available_block_chunk_sizes = block_chunk_sizes().to_vec();
+        let runtime_value = env::var("BLOCK_CHUNK_SIZES").expect("BLOCK_CHUNK_SIZES missing");
+        let mut available_block_chunk_sizes = runtime_value
+            .split(',')
+            .map(|s| usize::from_str(s).unwrap())
+            .collect::<Vec<_>>();
+
         available_block_chunk_sizes.sort();
 
         Self {

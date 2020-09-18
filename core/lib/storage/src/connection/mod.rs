@@ -12,7 +12,7 @@ use sqlx::{
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
 use crate::StorageProcessor;
-use models::config_options::parse_env;
+use zksync_utils::parse_env;
 
 pub mod holder;
 

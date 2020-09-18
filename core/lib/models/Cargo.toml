@@ -7,6 +7,9 @@ edition = "2018"
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
+zksync_crypto = { path = "../crypto", version = "0.1.0" }
+zksync_utils = { path = "../utils", version = "0.1.0" }
+zksync_basic_types = { path = "../basic_types", version = "0.1.0" }
 
 ethabi = "9.0.0"
 web3 = "0.10.0"
@@ -33,7 +36,6 @@ backoff = "0.1.6"
 criterion = "0.3.0"
 secp256k1 = {version = "0.17.2", features = ["std", "recovery"] }
 
-
 [[bench]]
 name = "criterion"
 harness = false
@@ -42,3 +44,4 @@ path = "benches/criterion/lib.rs"
 [features]
 default=[]
 run_benches=[]
+

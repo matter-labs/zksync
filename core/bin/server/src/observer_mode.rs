@@ -7,12 +7,12 @@ use circuit::witness::{
     TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use log::info;
-use models::circuit::account::CircuitAccount;
-use models::circuit::CircuitAccountTree;
 use models::node::{BlockNumber, FranklinOp};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use zksync_crypto::circuit::account::CircuitAccount;
+use zksync_crypto::circuit::CircuitAccountTree;
 
 /// The state being observed during observer mode. Meant to be used later to initialize server actors.
 pub struct ObservedState {
@@ -30,7 +30,7 @@ impl ObservedState {
     fn new(connection_pool: storage::ConnectionPool) -> Self {
         Self {
             state_keeper_init: PlasmaStateInitParams::new(),
-            circuit_acc_tree: CircuitAccountTree::new(models::params::account_tree_depth()),
+            circuit_acc_tree: CircuitAccountTree::new(zksync_crypto::params::account_tree_depth()),
             circuit_tree_block: 0,
             connection_pool,
         }

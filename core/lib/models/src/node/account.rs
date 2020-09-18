@@ -1,5 +1,6 @@
-use crate::params;
-use crate::primitives::{BigUintSerdeWrapper, GetBits};
+use zksync_crypto::params;
+use zksync_crypto::primitives::GetBits;
+use zksync_utils::BigUintSerdeWrapper;
 
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -13,11 +14,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::Engine;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
-use crate::circuit::account::{Balance, CircuitAccount};
-use crate::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
-use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
-use crate::node::{public_key_from_private, PrivateKey};
 use web3::types::Address;
+use zksync_crypto::circuit::account::{Balance, CircuitAccount};
+use zksync_crypto::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
+use zksync_crypto::merkle_tree::rescue_hasher::BabyRescueHasher;
+use zksync_crypto::{public_key_from_private, PrivateKey};
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct PubKeyHash {

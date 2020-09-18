@@ -62,7 +62,6 @@ use tokio::{fs, time};
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
-    config_options::ConfigurationOptions,
     misc::utils::format_ether,
     node::{
         closest_packable_fee_amount, closest_packable_token_amount, tx::PackedEthSignature,
@@ -70,6 +69,7 @@ use models::{
     },
 };
 use testkit::zksync_account::ZksyncAccount;
+use zksync_config::ConfigurationOptions;
 // Local deps
 use self::satellite::SatelliteScenario;
 use crate::{

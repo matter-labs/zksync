@@ -13,11 +13,11 @@ use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
 use log::*;
 use models::node::{AccountId, AccountMap};
-use models::prover_utils::EncodedProofPlonk;
 use num::BigUint;
 use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
+use zksync_crypto::proof::EncodedProofPlonk;
 
 const PRIORITY_EXPIRATION: u64 = 101;
 

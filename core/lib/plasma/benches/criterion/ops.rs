@@ -10,11 +10,10 @@ use crypto_exports::rand::{thread_rng, Rng};
 use models::node::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
-    priv_key_from_fs,
     tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},
-    AccountId, AccountMap, Address, BlockNumber, FranklinPriorityOp, FranklinTx, PrivateKey,
-    TokenId,
+    AccountId, AccountMap, Address, BlockNumber, FranklinPriorityOp, FranklinTx, TokenId,
 };
+use zksync_crypto::{priv_key_from_fs, PrivateKey};
 // Local uses
 use plasma::state::PlasmaState;
 

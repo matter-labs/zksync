@@ -1,12 +1,8 @@
-use super::merkle_tree::{RescueHasher, SparseMerkleTree};
-use super::params;
-use super::primitives::{pack_as_float, unpack_float};
-use crate::franklin_crypto::bellman::pairing::bn256;
-use crate::franklin_crypto::{
-    eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
-    jubjub::{FixedGenerators, JubjubEngine},
-};
 use num::{BigUint, FromPrimitive};
+use zksync_crypto::merkle_tree::{RescueHasher, SparseMerkleTree};
+use zksync_crypto::params;
+use zksync_crypto::primitives::{pack_as_float, unpack_float};
+use zksync_crypto::{Engine, Fr};
 
 pub mod account;
 pub mod block;
@@ -16,8 +12,6 @@ pub mod operations;
 pub mod priority_ops;
 pub mod tokens;
 pub mod tx;
-
-pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -29,21 +23,11 @@ pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
 pub use self::tx::{Close, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
 
-pub type Engine = bn256::Bn256;
-pub type Fr = bn256::Fr;
-pub type Fs = <Engine as JubjubEngine>::Fs;
+pub use zksync_basic_types::*;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
-
-pub type PrivateKey = PrivateKeyImport<Engine>;
-pub type PublicKey = PublicKeyImport<Engine>;
-pub type Address = web3::types::Address;
-
-pub fn priv_key_from_fs(fs: Fs) -> PrivateKey {
-    PrivateKeyImport(fs)
-}
 
 pub fn apply_updates(accounts: &mut AccountMap, updates: AccountUpdates) {
     for (id, update) in updates.into_iter() {
@@ -60,12 +44,6 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
         *acc_upd = acc_upd.reversed_update();
     }
 }
-
-pub type TokenId = u16;
-
-pub type AccountId = u32;
-pub type BlockNumber = u32;
-pub type Nonce = u32;
 
 pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {
     pack_as_float(
@@ -117,15 +95,6 @@ pub fn closest_packable_fee_amount(amount: &BigUint) -> BigUint {
 pub fn closest_packable_token_amount(amount: &BigUint) -> BigUint {
     let fee_packed = pack_token_amount(&amount);
     unpack_token_amount(&fee_packed).expect("token amount repacking")
-}
-
-/// Derives public key prom private
-pub fn public_key_from_private(pk: &PrivateKey) -> PublicKey {
-    PublicKey::from_private(
-        pk,
-        FixedGenerators::SpendingKeyGenerator,
-        &params::JUBJUB_PARAMS,
-    )
 }
 
 #[cfg(test)]

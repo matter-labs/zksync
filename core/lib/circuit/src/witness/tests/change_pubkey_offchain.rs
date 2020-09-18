@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use models::node::operations::ChangePubKeyOp;
 use plasma::state::CollectedFee;

@@ -19,12 +19,12 @@ use web3::{
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
-    config_options::{ConfigurationOptions, EthSenderOptions},
     ethereum::{ETHOperation, OperationType},
     node::config,
     Action, Operation,
 };
 use storage::ConnectionPool;
+use zksync_config::{ConfigurationOptions, EthSenderOptions};
 // Local uses
 use self::{
     database::Database,

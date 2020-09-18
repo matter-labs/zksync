@@ -5,13 +5,13 @@ use web3::types::H256;
 // Workspace deps
 use models::{
     node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
-    prover_utils::EncodedProofPlonk,
     Action, NewTokenEvent, Operation,
 };
 use storage::{
     data_restore::records::{NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock},
     ConnectionPool,
 };
+use zksync_crypto::proof::EncodedProofPlonk;
 // Local deps
 use crate::{
     data_restore_driver::StorageUpdateState,

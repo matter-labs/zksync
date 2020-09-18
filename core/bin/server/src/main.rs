@@ -7,13 +7,12 @@ use futures::{channel::mpsc, executor::block_on, future, SinkExt, StreamExt};
 use tokio::{runtime::Builder, task::JoinHandle};
 use web3::types::H160;
 // Workspace uses
-use models::{
-    config_options::{AdminServerOptions, ConfigurationOptions, ProverOptions},
-    node::{
-        config::OBSERVER_MODE_PULL_INTERVAL,
-        tokens::{get_genesis_token_list, Token},
-        TokenId,
-    },
+use zksync_config::{AdminServerOptions, ConfigurationOptions, ProverOptions};
+
+use models::node::{
+    config::OBSERVER_MODE_PULL_INTERVAL,
+    tokens::{get_genesis_token_list, Token},
+    TokenId,
 };
 use storage::ConnectionPool;
 // Local uses

@@ -2,24 +2,16 @@ use super::{Nonce, TokenId};
 
 use crate::node::{
     is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
-    public_key_from_private, AccountId, CloseOp, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
+    AccountId, CloseOp, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
 use crypto::{digest::Digest, sha2::Sha256};
 use num::{BigUint, ToPrimitive};
+use zksync_crypto::public_key_from_private;
 
 use super::account::PubKeyHash;
 use super::Engine;
-use crate::franklin_crypto::alt_babyjubjub::fs::FsRepr;
-use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
-use crate::franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
-use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
-use crate::franklin_crypto::jubjub::FixedGenerators;
-use crate::franklin_crypto::rescue::RescueEngine;
 use crate::misc::utils::format_units;
 use crate::node::operations::ChangePubKeyOp;
-use crate::params::{max_account_id, max_token_id, JUBJUB_PARAMS, RESCUE_PARAMS};
-use crate::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg, BigUintSerdeAsRadix10Str};
 use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
     public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
@@ -28,7 +20,20 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 use std::fmt;
 use std::str::FromStr;
-use web3::types::{Address, H256};
+use zksync_basic_types::{Address, H256};
+use zksync_crypto::franklin_crypto::{
+    alt_babyjubjub::{
+        fs::FsRepr,
+        JubjubEngine, {edwards, AltJubjubBn256},
+    },
+    bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
+    eddsa::{PrivateKey, PublicKey, Seed, Signature},
+    jubjub::FixedGenerators,
+    rescue::RescueEngine,
+};
+use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS, RESCUE_PARAMS};
+use zksync_crypto::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg};
+use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct TxHash {
@@ -995,7 +1000,7 @@ impl<'de> Deserialize<'de> for PackedEthSignature {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::rand::{Rng, SeedableRng, XorShiftRng};
+    use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
     fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

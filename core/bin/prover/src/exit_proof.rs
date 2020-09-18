@@ -3,12 +3,13 @@
 use circuit::exit_circuit::create_exit_circuit_with_public_input;
 use failure::format_err;
 use log::info;
-use models::circuit::account::CircuitAccount;
-use models::circuit::CircuitAccountTree;
 use models::node::{AccountId, AccountMap, Address, TokenId};
-use models::prover_utils::{gen_verified_proof_for_exit_circuit, EncodedProofPlonk};
 use num::BigUint;
 use std::time::Instant;
+use zksync_crypto::circuit::account::CircuitAccount;
+use zksync_crypto::circuit::CircuitAccountTree;
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_prover_utils::gen_verified_proof_for_exit_circuit;
 
 pub fn create_exit_proof(
     accounts: AccountMap,
@@ -17,7 +18,8 @@ pub fn create_exit_proof(
     token_id: TokenId,
 ) -> Result<(EncodedProofPlonk, BigUint), failure::Error> {
     let timer = Instant::now();
-    let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
+    let mut circuit_account_tree =
+        CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
 
     let mut target_account = None;
     for (id, account) in accounts {

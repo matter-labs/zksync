@@ -7,10 +7,10 @@ use circuit::circuit::FranklinCircuit;
 use circuit::operation::{
     OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
-use crypto_exports::ff::PrimeField;
-use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
-use models::node::{Engine, Fr};
+use zksync_crypto::ff::PrimeField;
+use zksync_crypto::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use zksync_crypto::{Engine, Fr};
 // Local
 use crate::serialization::*;
 
@@ -40,8 +40,8 @@ pub struct ProverData {
 impl ProverData {
     pub fn into_circuit(self, block: i64) -> FranklinCircuit<'static, Engine> {
         FranklinCircuit {
-            rescue_params: &models::params::RESCUE_PARAMS as &Bn256RescueParams,
-            jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
+            rescue_params: &zksync_crypto::params::RESCUE_PARAMS as &Bn256RescueParams,
+            jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS as &AltJubjubBn256,
             old_root: Some(self.old_root),
             initial_used_subtree_root: Some(self.initial_used_subtree_root),
             block_number: Fr::from_str(&block.to_string()),

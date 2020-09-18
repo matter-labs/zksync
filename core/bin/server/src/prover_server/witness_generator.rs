@@ -12,16 +12,14 @@ use circuit::witness::{
     TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use models::node::block::Block;
-use models::params::{account_tree_depth, CHUNK_BIT_WIDTH};
-use models::{
-    circuit::CircuitAccountTree,
-    config_options::ThreadPanicNotify,
-    node::{BlockNumber, Fr, FranklinOp},
-};
+use models::node::{BlockNumber, FranklinOp};
+use models::panic_notify::ThreadPanicNotify;
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
 use std::time::Instant;
 use storage::StorageProcessor;
+use zksync_crypto::params::{account_tree_depth, CHUNK_BIT_WIDTH};
+use zksync_crypto::{circuit::CircuitAccountTree, Fr};
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
@@ -424,8 +422,8 @@ async fn build_prover_block_data(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::node::Fr;
     use web3::types::U256;
+    use zksync_crypto::Fr;
 
     #[test]
     fn test_next_witness_block() {

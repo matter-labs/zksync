@@ -5,14 +5,11 @@ use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
 // Workspace deps
 use circuit::witness::{deposit::DepositWitness, Witness};
-use models::{
-    config_options::ConfigurationOptions,
-    node::{block::Block, Address},
-    params::total_tokens,
-    prover_utils::EncodedProofPlonk,
-};
+use models::node::{block::Block, Address};
 use num::BigUint;
 use prover::{client, ApiClient};
+use zksync_config::ConfigurationOptions;
+use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 // Local deps
 use circuit::witness::utils::get_used_subtree_root_hash;
 use server::prover_server;
@@ -170,8 +167,9 @@ async fn api_client_simple_simulation() {
 pub async fn test_operation_and_wanted_prover_data(
     block_size_chunks: usize,
 ) -> (models::Operation, prover::prover_data::ProverData) {
-    let mut circuit_tree =
-        models::circuit::CircuitAccountTree::new(models::params::account_tree_depth());
+    let mut circuit_tree = zksync_crypto::circuit::CircuitAccountTree::new(
+        zksync_crypto::params::account_tree_depth(),
+    );
     // insert account and its balance
 
     let db_connection = connect_to_db().await;
@@ -189,11 +187,12 @@ pub async fn test_operation_and_wanted_prover_data(
     let mut state = plasma::state::PlasmaState::from_acc_map(accounts, 1);
     println!(
         "acc_number 0, acc {:?}",
-        models::circuit::account::CircuitAccount::from(validator_account.clone()).pub_key_hash,
+        zksync_crypto::circuit::account::CircuitAccount::from(validator_account.clone())
+            .pub_key_hash,
     );
     circuit_tree.insert(
         0,
-        models::circuit::account::CircuitAccount::from(validator_account.clone()),
+        zksync_crypto::circuit::account::CircuitAccount::from(validator_account.clone()),
     );
     let initial_root = circuit_tree.root_hash();
     let initial_root2 = circuit_tree.root_hash();
@@ -299,12 +298,12 @@ pub async fn test_operation_and_wanted_prover_data(
     let mut validator_balances = vec![];
     for i in 0..total_tokens() {
         let balance_value = match validator_acc.subtree.get(i as u32) {
-            None => models::node::Fr::zero(),
+            None => zksync_crypto::Fr::zero(),
             Some(bal) => bal.value,
         };
         validator_balances.push(Some(balance_value));
     }
-    let _: models::node::Fr = circuit_tree.root_hash();
+    let _: zksync_crypto::Fr = circuit_tree.root_hash();
     let (root_after_fee, validator_account_witness) =
         circuit::witness::utils::apply_fee(&mut circuit_tree, block.fee_account, 0, 0);
 
@@ -312,12 +311,12 @@ pub async fn test_operation_and_wanted_prover_data(
     let (validator_audit_path, _) =
         circuit::witness::utils::get_audits(&circuit_tree, block.fee_account as u32, 0);
     let public_data_commitment =
-        circuit::witness::utils::public_data_commitment::<models::node::Engine>(
+        circuit::witness::utils::public_data_commitment::<zksync_crypto::Engine>(
             &pub_data,
             Some(initial_root),
             Some(root_after_fee),
-            Some(models::node::Fr::from_str(&block.fee_account.to_string()).unwrap()),
-            Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
+            Some(zksync_crypto::Fr::from_str(&block.fee_account.to_string()).unwrap()),
+            Some(zksync_crypto::Fr::from_str(&(block.block_number).to_string()).unwrap()),
         );
 
     (
@@ -332,7 +331,7 @@ pub async fn test_operation_and_wanted_prover_data(
             old_root: initial_root2,
             initial_used_subtree_root,
             new_root: block.new_root_hash,
-            validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
+            validator_address: zksync_crypto::Fr::from_str(&block.fee_account.to_string()).unwrap(),
             operations,
             validator_balances,
             validator_audit_path,

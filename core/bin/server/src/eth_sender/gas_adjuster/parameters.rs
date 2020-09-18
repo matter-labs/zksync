@@ -47,7 +47,7 @@ mod parameters_impl {
     // Built-in deps.
     use std::time::Duration;
     // Workspace deps
-    use models::config_options::parse_env;
+    use zksync_utils::parse_env;
 
     /// Name of the environment variable responsible for the `gas_price_limit` renewing interval.
     const GAS_PRICE_LIMIT_UPDATE_INTERVAL: &str = "ETH_GAS_PRICE_LIMIT_UPDATE_INTERVAL";

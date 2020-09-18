@@ -4,11 +4,11 @@
 use clap::{App, Arg};
 use log::info;
 use models::node::{AccountId, Address, TokenId, TokenLike};
-use models::prover_utils::EncodedProofPlonk;
 use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;
 use storage::ConnectionPool;
+use zksync_crypto::proof::EncodedProofPlonk;
 
 #[derive(Serialize, Debug)]
 struct ExitProofData {

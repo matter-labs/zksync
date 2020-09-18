@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::AltJubjubBn256,
     bellman::pairing::{
         bn256::{Bn256, Fr},
@@ -9,9 +9,9 @@ use crypto_exports::franklin_crypto::{
     jubjub::FixedGenerators,
     rescue::bn256::Bn256RescueParams,
 };
-use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace deps
-use models::{
+use zksync_crypto::{
     circuit::{
         account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree},
         utils::pub_key_hash_fe,

@@ -16,6 +16,11 @@ members = [
     "core/lib/plasma",
     "core/lib/storage",
     "core/lib/vlog",
+    "core/lib/crypto",
+    "core/lib/utils",
+    "core/lib/basic_types",
+    "core/lib/prover_utils",
+    "core/lib/config",
 
     # Test infrastructure
     "core/tests/testkit",

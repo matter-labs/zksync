@@ -1,21 +1,19 @@
-use crate::franklin_crypto::bellman::Circuit;
-use crate::node::U256;
-use crate::node::{Engine, Fr};
-use crate::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethereum};
-use crate::prover_utils::fs_utils::{
-    get_block_verification_key_path, get_exodus_verification_key_path,
-};
-use crypto_exports::bellman::kate_commitment::{Crs, CrsForMonomialForm};
-use crypto_exports::bellman::plonk::better_cs::{
-    adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::Proof,
-    keys::SetupPolynomials, keys::VerificationKey,
-};
-use crypto_exports::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile, verify};
+use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fs::File;
 use std::sync::{Arc, Mutex};
+use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
+use zksync_crypto::bellman::plonk::better_cs::{
+    adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::Proof,
+    keys::SetupPolynomials, keys::VerificationKey,
+};
+use zksync_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
+use zksync_crypto::bellman::plonk::{prove_by_steps, setup, transpile, verify};
+use zksync_crypto::franklin_crypto::bellman::Circuit;
+use zksync_crypto::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethereum};
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::{Engine, Fr};
 
 pub mod fs_utils;
 pub mod network_utils;
@@ -38,21 +36,6 @@ impl PlonkVerificationKey {
         let verification_key =
             VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
         Ok(Self(verification_key))
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct EncodedProofPlonk {
-    pub inputs: Vec<U256>,
-    pub proof: Vec<U256>,
-}
-
-impl Default for EncodedProofPlonk {
-    fn default() -> Self {
-        Self {
-            inputs: vec![U256::default(); 1],
-            proof: vec![U256::default(); 33],
-        }
     }
 }
 
@@ -121,7 +104,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
 ) -> Result<EncodedProofPlonk, failure::Error> {
     let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
 
-    info!("Proof for circuit started");
+    log::info!("Proof for circuit started");
 
     let hints = transpile(circuit.clone())?;
     let setup = setup(circuit.clone(), &hints)?;
@@ -141,7 +124,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
     failure::ensure!(valid, "proof for exit is invalid");
 
-    info!("Proof for circuit successful");
+    log::info!("Proof for circuit successful");
     Ok(serialize_proof(&proof))
 }
 

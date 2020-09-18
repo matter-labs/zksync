@@ -6,18 +6,19 @@ use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
     FranklinPriorityOp, FullExit, PubKeyHash, Transfer, Withdraw,
 };
-use crate::params::{
+use failure::{ensure, format_err};
+use num::{BigUint, FromPrimitive, ToPrimitive};
+use web3::types::Address;
+use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
     BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH,
     FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
     TOKEN_BIT_WIDTH,
 };
-use crate::primitives::{
-    bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32, BigUintSerdeWrapper,
+use zksync_crypto::primitives::{
+    bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
 };
-use failure::{ensure, format_err};
-use num::{BigUint, FromPrimitive, ToPrimitive};
-use web3::types::Address;
+use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {

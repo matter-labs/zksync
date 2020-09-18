@@ -7,8 +7,8 @@
 //! - Generic tests for the combinations of different operations are placed in this module.
 
 // External deps
-use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 use num::BigUint;
+use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use models::node::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},

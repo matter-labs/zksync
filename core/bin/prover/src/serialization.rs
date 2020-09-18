@@ -5,13 +5,13 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // Workspace deps
 use circuit::operation::Operation;
-use models::node::Engine;
+use zksync_crypto::Engine;
 // Local
 use crate::prover_data::OperationDef;
 
 // Public re-exports of `models` serialization utilities, so the prover itself
 // can depend on its own serialization module.
-pub use models::serialization::*;
+pub use zksync_crypto::serialization::*;
 
 pub struct VecOperationsSerde;
 

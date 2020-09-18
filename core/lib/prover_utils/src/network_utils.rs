@@ -1,9 +1,9 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
-use crate::node::Engine;
 use backoff::Operation;
-use crypto_exports::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use failure::format_err;
 use std::time::Duration;
+use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
+use zksync_crypto::Engine;
 
 /// Downloads universal setup in the monomial form of the given power of two (range: SETUP_MIN_POW2..=SETUP_MAX_POW2)
 pub fn get_universal_setup_monomial_form(
@@ -20,9 +20,10 @@ pub fn get_universal_setup_monomial_form(
         .retry_notify(&mut get_backoff(), |err, next_after: Duration| {
             let duration_secs = next_after.as_millis() as f32 / 1000.0f32;
 
-            warn!(
+            log::warn!(
                 "Failed to download setup err: <{}>, retrying after: {:.1}s",
-                err, duration_secs,
+                err,
+                duration_secs,
             )
         })
         .map_err(|e| {

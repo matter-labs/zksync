@@ -32,7 +32,7 @@ use models::node::{
 use storage::ConnectionPool;
 // Local uses
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
-use models::config_options::ConfigurationOptions;
+use zksync_config::ConfigurationOptions;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
 pub enum TxAddError {

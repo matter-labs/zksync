@@ -17,7 +17,7 @@ use clap::{App, SubCommand};
 
 use crate::franklin_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
 use crate::verifier_contract_generator::create_verifier_contract;
-use models::config_options::AvailableBlockSizesConfig;
+use zksync_config::AvailableBlockSizesConfig;
 
 fn main() {
     env_logger::init();

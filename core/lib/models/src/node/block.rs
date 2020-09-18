@@ -1,13 +1,13 @@
 use super::FranklinOp;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
-use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::node::SignedFranklinTx;
-use crate::params::CHUNK_BIT_WIDTH;
-use crate::serialization::*;
 use chrono::DateTime;
 use chrono::Utc;
 use web3::types::{H256, U256};
+use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use zksync_crypto::params::CHUNK_BIT_WIDTH;
+use zksync_crypto::serialization::FrSerde;
 
 #[derive(Clone, Debug)]
 pub struct PendingBlock {

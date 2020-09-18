@@ -1,6 +1,7 @@
 use crate::{error::ClientError, utils::private_key_from_seed};
-use models::node::{tx::PackedEthSignature, PrivateKey};
+use models::node::tx::PackedEthSignature;
 use web3::types::{Address, H256};
+use zksync_crypto::PrivateKey;
 
 pub struct WalletCredentials {
     pub(crate) eth_private_key: Option<H256>,

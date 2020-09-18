@@ -1070,7 +1070,6 @@ name = "circuit"
 version = "0.1.1"
 dependencies = [
  "bigdecimal",
- "crypto_exports",
  "hex",
  "log 0.4.11",
  "models",
@@ -1083,6 +1082,7 @@ dependencies = [
  "serde_json",
  "testkit",
  "web3",
+ "zksync_crypto",
 ]
 
 [[package]]
@@ -1414,6 +1414,9 @@ dependencies = [
  "tiny-keccak 1.5.0",
  "tokio 0.2.22",
  "web3",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -1930,6 +1933,7 @@ version = "0.1.0"
 dependencies = [
  "handlebars",
  "models",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -2585,6 +2589,10 @@ dependencies = [
  "rust-crypto",
  "serde_json",
  "time 0.1.44",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_prover_utils",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -2641,6 +2649,7 @@ dependencies = [
  "testkit",
  "tokio 0.2.22",
  "web3",
+ "zksync_config",
 ]
 
 [[package]]
@@ -2888,6 +2897,9 @@ dependencies = [
  "tiny-keccak 1.5.0",
  "url 2.1.1",
  "web3",
+ "zksync_basic_types",
+ "zksync_crypto",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -3353,6 +3365,8 @@ dependencies = [
  "models",
  "num",
  "web3",
+ "zksync_crypto",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -3506,6 +3520,10 @@ dependencies = [
  "signal-hook",
  "tokio 0.1.22",
  "web3",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_prover_utils",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -4204,6 +4222,9 @@ dependencies = [
  "tokio 0.2.22",
  "vlog",
  "web3",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -4528,6 +4549,9 @@ dependencies = [
  "testkit",
  "tokio 0.2.22",
  "web3",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -4661,7 +4685,6 @@ dependencies = [
 name = "testkit"
 version = "0.1.0"
 dependencies = [
- "crypto_exports",
  "env_logger 0.6.2",
  "eth_client",
  "ethabi",
@@ -4678,6 +4701,9 @@ dependencies = [
  "server",
  "tokio 0.2.22",
  "web3",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -4825,6 +4851,7 @@ dependencies = [
  "tokio 0.2.22",
  "url 2.1.1",
  "web3",
+ "zksync_config",
 ]
 
 [[package]]
@@ -5757,10 +5784,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bellman_ce",
- "crypto_exports",
  "eth_client",
  "ethabi",
- "franklin-crypto",
  "futures 0.3.5",
  "jsonrpc-core",
  "models",
@@ -5772,5 +5797,69 @@ dependencies = [
  "sha2 0.8.2",
  "thiserror",
  "tokio 0.2.22",
+ "web3",
+ "zksync_crypto",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_basic_types"
+version = "0.1.0"
+dependencies = [
+ "web3",
+]
+
+[[package]]
+name = "zksync_config"
+version = "0.1.0"
+dependencies = [
+ "url 2.1.1",
+ "zksync_basic_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_crypto"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "crypto_exports",
+ "failure",
+ "fnv",
+ "hex",
+ "lazy_static",
+ "num",
+ "rayon",
+ "serde",
+ "serde_json",
+ "zksync_basic_types",
+]
+
+[[package]]
+name = "zksync_prover_utils"
+version = "0.1.0"
+dependencies = [
+ "backoff",
+ "failure",
+ "lazy_static",
+ "log 0.4.11",
+ "reqwest",
+ "zksync_basic_types",
+ "zksync_crypto",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_utils"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "failure",
+ "fnv",
+ "hex",
+ "lazy_static",
+ "num",
+ "rayon",
+ "serde",
  "web3",
 ]

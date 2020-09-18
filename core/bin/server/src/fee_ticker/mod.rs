@@ -21,14 +21,13 @@ use num::{
 };
 use tokio::task::JoinHandle;
 // Workspace deps
-use models::{
-    node::{
-        pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp,
-        TransferToNewOp, TxFeeTypes, WithdrawOp,
-    },
-    primitives::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str},
+use models::node::{
+    pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp, TransferToNewOp,
+    TxFeeTypes, WithdrawOp,
 };
 use storage::ConnectionPool;
+use zksync_config::TokenPriceSource;
+use zksync_utils::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str};
 // Local deps
 use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
 use crate::fee_ticker::ticker_api::coinmarkercap::CoinMarketCapAPI;
@@ -41,7 +40,6 @@ use crate::{
     },
     state_keeper::StateKeeperRequest,
 };
-use models::config_options::TokenPriceSource;
 use models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
 
 mod ticker_api;
@@ -341,8 +339,8 @@ mod test {
     use chrono::Utc;
     use futures::executor::block_on;
     use models::node::{Address, Token, TokenId, TokenPrice};
-    use models::primitives::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
     use std::str::FromStr;
+    use zksync_utils::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
     #[derive(Debug, Clone)]
     struct TestToken {

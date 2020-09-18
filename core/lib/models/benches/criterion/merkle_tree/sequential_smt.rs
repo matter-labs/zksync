@@ -3,9 +3,9 @@
 use criterion::{black_box, BatchSize, Bencher, Criterion};
 
 use crypto_exports::ff::PrimeField;
-use models::circuit::account::CircuitAccount;
-use models::merkle_tree::{rescue_hasher::RescueHasher, sequential_smt::SparseMerkleTree};
-use models::node::{Engine, Fr};
+use zksync_crypto::circuit::account::CircuitAccount;
+use zksync_crypto::merkle_tree::{rescue_hasher::RescueHasher, sequential_smt::SparseMerkleTree};
+use zksync_crypto::{Engine, Fr};
 
 // This value should be not to high, since the bench will be run for thousands
 // of iterations. Despite the tree cloning time won't affect the bench results
@@ -25,7 +25,7 @@ fn gen_account(id: u32) -> CircuitAccount<Engine> {
 
 /// Measures the time of `RealSMT` creation time.
 fn smt_create(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth();
+    let depth = zksync_crypto::params::account_tree_depth();
 
     b.iter(|| {
         RealSMT::new(black_box(depth));
@@ -34,7 +34,7 @@ fn smt_create(b: &mut Bencher<'_>) {
 
 /// Measures the time of insertion into an empty SMT.
 fn smt_insert_empty(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth();
+    let depth = zksync_crypto::params::account_tree_depth();
 
     // Create an empty SMT and one account in setup.
     let tree = RealSMT::new(depth);
@@ -54,7 +54,7 @@ fn smt_insert_empty(b: &mut Bencher<'_>) {
 
 /// Measures the time of insertion into a non-empty SMT.
 fn smt_insert_filled(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth();
+    let depth = zksync_crypto::params::account_tree_depth();
     let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
@@ -78,7 +78,7 @@ fn smt_insert_filled(b: &mut Bencher<'_>) {
 
 /// Measures the time of obtaining a SMT root hash.
 fn smt_root_hash(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth();
+    let depth = zksync_crypto::params::account_tree_depth();
     let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.

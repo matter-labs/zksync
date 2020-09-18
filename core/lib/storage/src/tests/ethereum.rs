@@ -5,9 +5,10 @@ use web3::types::{H256, U256};
 // Workspace imports
 use models::{
     ethereum::{ETHOperation, OperationType},
-    node::{block::Block, BlockNumber, Fr},
+    node::{block::Block, BlockNumber},
     Action, Operation,
 };
+use zksync_crypto::Fr;
 // Local imports
 use crate::tests::db_test;
 use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, QueryResult, StorageProcessor};
