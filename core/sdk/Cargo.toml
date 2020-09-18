@@ -1,0 +1,36 @@
+[package]
+name = "zksync"
+version = "0.1.0"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+edition = "2018"
+
+[dependencies]
+models = { path = "../models", version = "0.0.1" }
+eth_client = { path = "../eth_client", version = "0.1.0" }
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
+
+bellman = { package = "bellman_ce", git = "https://github.com/matter-labs/bellman", branch = "plonk_release" }
+sha2 = "0.8"
+web3 = "0.10.0"
+ethabi = "9.0.0"
+tokio = { version = "0.2", features = ["time"] }
+futures = { version = "0.3", features = ["compat"] }
+
+serde = "1.0.90"
+serde_derive = "1.0.90"
+serde_json = "1.0.0"
+
+reqwest = { version = "0.10", features = ["json", "blocking"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+jsonrpc-core = "14.0.3"
+
+num = { version = "0.2", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["full"] }
+
+[features]
+integration-tests = []
