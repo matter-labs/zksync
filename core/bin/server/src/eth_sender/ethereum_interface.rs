@@ -9,9 +9,9 @@ use web3::types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use super::ExecutedTxStatus;
 use eth_client::{ETHClient, SignedCallResult};
-use models::abi::zksync_contract;
 use std::time::Duration;
 use zksync_config::ConfigurationOptions;
+use zksync_contracts::zksync_contract;
 
 /// Sleep time between consecutive requests.
 const SLEEP_DURATION: Duration = Duration::from_millis(250);

@@ -21,6 +21,7 @@ members = [
     "core/lib/basic_types",
     "core/lib/prover_utils",
     "core/lib/config",
+    "core/lib/contracts",
 
     # Test infrastructure
     "core/tests/testkit",

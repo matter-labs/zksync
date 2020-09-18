@@ -9,6 +9,7 @@ models = { path = "../../core/lib/models", version = "0.0.1" }
 eth_client = { path = "../../core/lib/eth_client", version = "0.1.0" }
 zksync_crypto = { path = "../../core/lib/crypto", version = "0.1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "0.1.0" }
+zksync_contracts = { path = "../../core/lib/contracts", version = "0.1.0" }
 
 bellman = { package = "bellman_ce", git = "https://github.com/matter-labs/bellman", branch = "plonk_release" }
 sha2 = "0.8"

@@ -27,11 +27,11 @@ use web3::{
 };
 // Workspace deps
 use models::{
-    abi::{eip1271_contract, zksync_contract},
     node::tx::EIP1271Signature,
     node::{FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
 };
 use zksync_config::ConfigurationOptions;
+use zksync_contracts::{eip1271_contract, zksync_contract};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
