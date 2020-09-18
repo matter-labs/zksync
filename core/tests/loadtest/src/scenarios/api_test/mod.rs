@@ -16,11 +16,9 @@ use std::time::Duration;
 use num::BigUint;
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
-use models::{
-    misc::utils::format_ether,
-    node::{closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx},
-};
+use models::node::{closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx};
 use testkit::zksync_account::ZksyncAccount;
+use zksync_utils::format_ether;
 // Local deps
 use self::submit_tx::SubmitTxTester;
 use crate::{

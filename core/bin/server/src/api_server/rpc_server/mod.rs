@@ -7,12 +7,9 @@ use futures::{
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use models::{
-    node::{
-        tx::{TxEthSignature, TxHash},
-        Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
-    },
-    panic_notify::ThreadPanicNotify,
+use models::node::{
+    tx::{TxEthSignature, TxHash},
+    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
 };
 use storage::{
     chain::{
@@ -23,6 +20,7 @@ use storage::{
 };
 use zksync_config::ConfigurationOptions;
 // Local uses
+use crate::panic_notify::ThreadPanicNotify;
 use crate::{
     api_server::ops_counter::ChangePubKeyOpsCounter,
     eth_watch::{EthBlockId, EthWatchRequest},

@@ -5,9 +5,7 @@ extern crate log;
 
 pub mod abi;
 pub mod ethereum;
-pub mod misc;
 pub mod node;
-pub mod panic_notify;
 
 use crate::node::block::{Block, PendingBlock};
 use crate::node::BlockNumber;

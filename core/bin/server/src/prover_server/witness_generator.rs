@@ -6,6 +6,7 @@ use failure::format_err;
 use futures::channel::mpsc;
 use log::info;
 // Workspace deps
+use crate::panic_notify::ThreadPanicNotify;
 use circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
@@ -13,7 +14,6 @@ use circuit::witness::{
 };
 use models::node::block::Block;
 use models::node::{BlockNumber, FranklinOp};
-use models::panic_notify::ThreadPanicNotify;
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
 use std::time::Instant;

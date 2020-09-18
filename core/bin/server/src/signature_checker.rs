@@ -11,13 +11,11 @@ use futures::{
 };
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
-use models::{
-    node::{tx::TxEthSignature, FranklinTx, SignedFranklinTx},
-    panic_notify::ThreadPanicNotify,
-};
+use models::node::{tx::TxEthSignature, FranklinTx, SignedFranklinTx};
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 use crate::mempool::TxAddError;
+use crate::panic_notify::ThreadPanicNotify;
 use models::node::tx::EthSignData;
 
 /// Wrapper on a `FranklinTx` which guarantees that

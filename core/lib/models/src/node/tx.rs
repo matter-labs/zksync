@@ -10,7 +10,6 @@ use zksync_crypto::public_key_from_private;
 
 use super::account::PubKeyHash;
 use super::Engine;
-use crate::misc::utils::format_units;
 use crate::node::operations::ChangePubKeyOp;
 use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
@@ -33,6 +32,7 @@ use zksync_crypto::franklin_crypto::{
 };
 use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS, RESCUE_PARAMS};
 use zksync_crypto::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg};
+use zksync_utils::format_units;
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]

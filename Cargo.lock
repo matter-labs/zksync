@@ -2650,6 +2650,7 @@ dependencies = [
  "tokio 0.2.22",
  "web3",
  "zksync_config",
+ "zksync_utils",
 ]
 
 [[package]]

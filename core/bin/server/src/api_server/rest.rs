@@ -13,7 +13,6 @@ use futures::{
 use models::node::{
     Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
 };
-use models::panic_notify::ThreadPanicNotify;
 use models::NetworkStatus;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -31,6 +30,7 @@ use zksync_config::ConfigurationOptions;
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
+use crate::panic_notify::ThreadPanicNotify;
 use storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
 
 #[derive(Default, Clone)]

@@ -7,11 +7,12 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{info, trace};
 // Workspace deps
-use models::{node::BlockNumber, panic_notify::ThreadPanicNotify};
+use models::node::BlockNumber;
 use prover::client;
 use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
 // Local deps
+use crate::panic_notify::ThreadPanicNotify;
 use crate::prover_server::scaler::ScalerOracle;
 
 mod scaler;
