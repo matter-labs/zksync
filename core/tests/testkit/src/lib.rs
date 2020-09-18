@@ -27,9 +27,10 @@ use web3::transports::Http;
 use web3::Transport;
 use zksync_config::ConfigurationOptions;
 
+pub use zksync_test_account as zksync_account;
+
 pub mod eth_account;
 pub mod external_commands;
-pub mod zksync_account;
 use itertools::Itertools;
 use web3::types::{TransactionReceipt, U64};
 use zksync_crypto::proof::EncodedProofPlonk;

@@ -2,10 +2,10 @@
 use std::{fmt, sync::Mutex};
 // External uses
 use num::BigUint;
-use web3::types::H256;
 // Workspace uses
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{AccountId, Address, Close, Nonce, PubKeyHash, TokenId, Transfer, Withdraw};
+use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
 

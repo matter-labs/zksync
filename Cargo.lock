@@ -793,9 +793,9 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "testkit",
  "web3",
  "zksync_crypto",
+ "zksync_test_account",
 ]
 
 [[package]]
@@ -4242,6 +4242,7 @@ dependencies = [
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
+ "zksync_test_account",
  "zksync_utils",
 ]
 
@@ -5324,6 +5325,16 @@ dependencies = [
  "lazy_static",
  "log 0.4.11",
  "reqwest",
+ "zksync_basic_types",
+ "zksync_crypto",
+]
+
+[[package]]
+name = "zksync_test_account"
+version = "0.1.0"
+dependencies = [
+ "models",
+ "num",
  "zksync_basic_types",
  "zksync_crypto",
 ]

@@ -1,0 +1,14 @@
+[package]
+name = "zksync_test_account"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+models = { path = "../../lib/models", version = "0.0.1" }
+zksync_crypto = { path = "../../lib/crypto", version = "0.1.0" }
+zksync_basic_types = { path = "../../lib/basic_types", version = "0.1.0" }
+
+num = { version = "0.2", features = ["serde"] }

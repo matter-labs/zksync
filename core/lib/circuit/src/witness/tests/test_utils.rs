@@ -7,9 +7,9 @@ use zksync_crypto::franklin_crypto::{
 // Workspace deps
 use models::node::{Account, AccountId, AccountMap, Address};
 use plasma::state::{CollectedFee, PlasmaState};
-use testkit::zksync_account::ZksyncAccount;
 use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
 use zksync_crypto::{Engine, Fr};
+use zksync_test_account::ZksyncAccount;
 // Local deps
 use crate::{circuit::FranklinCircuit, witness::Witness};
 

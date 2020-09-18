@@ -24,6 +24,7 @@ members = [
     "core/lib/contracts",
 
     # Test infrastructure
+    "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadtest",
 
