@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es6",
+    "declaration": true,
+    "lib": ["es2015"],
+
+    "preserveSymlinks": true,
+    "preserveWatchOutput": true
+  },
+  "files": [
+    "./index.ts"
+  ]
+}

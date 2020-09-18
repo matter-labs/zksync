@@ -37,6 +37,9 @@ jobs:
     - name: init
       run: zksync init
 
+    - name: js-tests
+      run: zksync js-tests
+
     - name: zcli-tests
       run: ci-zcli.sh
 
