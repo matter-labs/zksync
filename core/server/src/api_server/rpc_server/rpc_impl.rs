@@ -2,7 +2,7 @@ use std::collections::HashMap;
 // External uses
 use futures::{channel::oneshot, SinkExt};
 use jsonrpc_core::{Error, Result};
-use num::BigUint;
+use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
 use models::node::{
     tx::{TxEthSignature, TxHash},
@@ -11,7 +11,7 @@ use models::node::{
 
 // Local uses
 use crate::{
-    fee_ticker::Fee,
+    fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
     state_keeper::StateKeeperRequest,
 };
@@ -178,29 +178,7 @@ impl RpcApp {
 
         let msg_to_sign = self.get_tx_info_message_to_sign(&tx).await?;
 
-        let tx_fee_info = match tx.as_ref() {
-            FranklinTx::Withdraw(withdraw) => {
-                let fee_type = if fast_processing {
-                    TxFeeTypes::FastWithdraw
-                } else {
-                    TxFeeTypes::Withdraw
-                };
-
-                Some((
-                    fee_type,
-                    TokenLike::Id(withdraw.token),
-                    withdraw.to,
-                    withdraw.fee.clone(),
-                ))
-            }
-            FranklinTx::Transfer(transfer) => Some((
-                TxFeeTypes::Transfer,
-                TokenLike::Id(transfer.token),
-                transfer.to,
-                transfer.fee.clone(),
-            )),
-            _ => None,
-        };
+        let tx_fee_info = tx.get_fee_info();
 
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
@@ -215,10 +193,10 @@ impl RpcApp {
             let scaled_provided_fee =
                 provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
             if required_fee.total_fee >= scaled_provided_fee {
-                warn!(
-                        "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
-                        required_fee, provided_fee, scaled_provided_fee, token
-                    );
+                vlog::warn!(
+                    "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
+                    required_fee, provided_fee, scaled_provided_fee, token
+                );
                 return Err(Error {
                     code: RpcErrorCodes::from(TxAddError::TxFeeTooLow).into(),
                     message: TxAddError::TxFeeTooLow.to_string(),
@@ -253,23 +231,124 @@ impl RpcApp {
         let hash = tx.hash();
         let mempool_resp = oneshot::channel();
         mempool_sender
-                .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
-                .await
-                .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
-                        file!(),
-                        line!(),
-                        column!(),
-                        err,
-                        tx,
-                        signature,
-                    );
-                    Error::internal_error()
-                })?;
+            .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
+            .await
+            .map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
+                    err,
+                    tx,
+                    signature,
+                );
+                Error::internal_error()
+            })?;
         let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
 
         tx_add_result.map(|_| hash).map_err(|e| Error {
+            code: RpcErrorCodes::from(e).into(),
+            message: e.to_string(),
+            data: None,
+        })
+    }
+
+    pub async fn _impl_submit_txs_batch(self, txs: Vec<TxWithSignature>) -> Result<Vec<TxHash>> {
+        for tx in &txs {
+            if tx.tx.is_close() {
+                return Err(Error {
+                    code: RpcErrorCodes::AccountCloseDisabled.into(),
+                    message: "Account close tx is disabled.".to_string(),
+                    data: None,
+                });
+            }
+        }
+        let mut messages_to_sign = vec![];
+        for tx in &txs {
+            messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
+        }
+
+        // Checking fees data
+        let mut required_total_usd_fee = BigDecimal::from(0);
+        let mut provided_total_usd_fee = BigDecimal::from(0);
+        for tx in &txs {
+            let tx_fee_info = match &tx.tx {
+                // Cause `ChangePubKey` will have fee we must add this check
+                // TODO: should be removed after merging with a branch that contains a fee on ChangePubKey
+                FranklinTx::ChangePubKey(_) => {
+                    // Now `ChangePubKey` operations are not allowed in batches
+                    return Err(Error {
+                        code: RpcErrorCodes::from(TxAddError::Other).into(),
+                        message: "ChangePubKey operations are not allowed in batches".to_string(),
+                        data: None,
+                    });
+                }
+                _ => tx.tx.get_fee_info(),
+            };
+            if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                let required_fee = Self::ticker_request(
+                    self.ticker_request_sender.clone(),
+                    tx_type,
+                    address,
+                    token.clone(),
+                )
+                .await?;
+                let token_price_in_usd = Self::ticker_price_request(
+                    self.ticker_request_sender.clone(),
+                    token.clone(),
+                    TokenPriceRequestType::USDForOneWei,
+                )
+                .await?;
+                required_total_usd_fee +=
+                    BigDecimal::from(required_fee.total_fee.to_bigint().unwrap())
+                        * &token_price_in_usd;
+                provided_total_usd_fee +=
+                    BigDecimal::from(provided_fee.clone().to_bigint().unwrap())
+                        * &token_price_in_usd;
+            }
+        }
+        // We allow fee to be 5% off the required fee
+        let scaled_provided_fee_in_usd =
+            provided_total_usd_fee.clone() * BigDecimal::from(105u32) / BigDecimal::from(100u32);
+        if required_total_usd_fee >= scaled_provided_fee_in_usd {
+            return Err(Error {
+                code: RpcErrorCodes::from(TxAddError::TxBatchFeeTooLow).into(),
+                message: TxAddError::TxBatchFeeTooLow.to_string(),
+                data: None,
+            });
+        }
+
+        let mut verified_txs = Vec::new();
+        for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {
+            let verified_tx = verify_tx_info_message_signature(
+                &tx.tx,
+                tx.signature.clone(),
+                msg_to_sign.clone(),
+                self.sign_verify_request_sender.clone(),
+            )
+            .await?;
+
+            verified_txs.push(verified_tx);
+        }
+
+        let tx_hashes: Vec<TxHash> = txs.iter().map(|tx| tx.tx.hash()).collect();
+
+        // Send verified transactions to the mempool.
+        let mut mempool_sender = self.mempool_request_sender.clone();
+        let mempool_resp = oneshot::channel();
+        mempool_sender
+            .send(MempoolRequest::NewTxsBatch(verified_txs, mempool_resp.0))
+            .await
+            .map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: <Txs: '{:?}'>",
+                    err,
+                    txs,
+                );
+                Error::internal_error()
+            })?;
+        let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
+
+        // Check the mempool response and, if everything is OK, return the transactions hashes.
+        tx_add_result.map(|_| tx_hashes).map_err(|e| Error {
             code: RpcErrorCodes::from(e).into(),
             message: e.to_string(),
             data: None,
@@ -336,7 +415,44 @@ impl RpcApp {
         Self::ticker_request(self.ticker_request_sender.clone(), tx_type, address, token).await
     }
 
+    pub async fn _impl_get_txs_batch_fee_in_wei(
+        self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token: TokenLike,
+    ) -> Result<BatchFee> {
+        if tx_types.len() != addresses.len() {
+            return Err(Error {
+                code: RpcErrorCodes::IncorrectTx.into(),
+                message: "Number of tx_types must be equal to the number of addresses".to_string(),
+                data: None,
+            });
+        }
+
+        let ticker_request_sender = self.ticker_request_sender.clone();
+
+        let mut total_fee = BigUint::from(0u32);
+
+        for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
+            total_fee += Self::ticker_request(
+                ticker_request_sender.clone(),
+                tx_type.clone(),
+                *address,
+                token.clone(),
+            )
+            .await?
+            .total_fee;
+        }
+
+        Ok(BatchFee { total_fee })
+    }
+
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {
-        Self::ticker_price_request(self.ticker_request_sender.clone(), token).await
+        Self::ticker_price_request(
+            self.ticker_request_sender.clone(),
+            token,
+            TokenPriceRequestType::USDForOneToken,
+        )
+        .await
     }
 }

@@ -4,11 +4,21 @@ use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
 // Workspace uses
 use models::{
-    node::{Account, AccountId, Address, FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
+    node::{
+        tx::TxEthSignature, Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce,
+        PriorityOp, PubKeyHash,
+    },
     primitives::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper},
 };
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxWithSignature {
+    pub tx: FranklinTx,
+    pub signature: Option<TxEthSignature>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]

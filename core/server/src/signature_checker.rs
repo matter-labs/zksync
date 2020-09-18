@@ -26,7 +26,7 @@ use models::node::tx::EthSignData;
 ///
 /// Underlying `FranklinTx` is a private field, thus no such
 /// object can be created without verification.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VerifiedTx(SignedFranklinTx);
 
 impl VerifiedTx {

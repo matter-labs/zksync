@@ -83,6 +83,12 @@ export class Provider {
         return await this.transport.request("tx_submit", [tx, signature, fastProcessing]);
     }
 
+    // Requests `zkSync` server to execute several transactions together.
+    // return transaction hash (e.g. sync-tx:dead..beef)
+    async submitTxsBatch(transactions: { tx: any, signature?: TxEthSignature }[]): Promise<string[]> {
+        return await this.transport.request("submit_txs_batch", [transactions]);
+    }
+
     async getContractAddress(): Promise<ContractAddress> {
         return await this.transport.request("contract_address", null);
     }
@@ -175,6 +181,15 @@ export class Provider {
             zkpFee: BigNumber.from(transactionFee.zkpFee),
             totalFee: BigNumber.from(transactionFee.totalFee),
         };
+    }
+
+    async getTransactionsBatchFee(
+        txTypes: ("Withdraw" | "Transfer" | "FastWithdraw")[],
+        addresses: Address[],
+        tokenLike: TokenLike
+    ): Promise<BigNumber> {
+        const batchFee = await this.transport.request("get_txs_batch_fee_in_wei", [txTypes, addresses, tokenLike]);
+        return BigNumber.from(batchFee.totalFee);
     }
 
     async getTokenPrice(tokenLike: TokenLike): Promise<number> {

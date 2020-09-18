@@ -27,12 +27,15 @@ impl From<TxAddError> for RpcErrorCodes {
             TxAddError::NonceMismatch => Self::NonceMismatch,
             TxAddError::IncorrectTx => Self::IncorrectTx,
             TxAddError::TxFeeTooLow => Self::FeeTooLow,
+            TxAddError::TxBatchFeeTooLow => Self::FeeTooLow,
             TxAddError::MissingEthSignature => Self::MissingEthSignature,
             TxAddError::EIP1271SignatureVerificationFail => Self::EIP1271SignatureVerificationFail,
             TxAddError::IncorrectEthSignature => Self::IncorrectEthSignature,
             TxAddError::ChangePkNotAuthorized => Self::ChangePkNotAuthorized,
             TxAddError::Other => Self::Other,
             TxAddError::DbError => Self::Other,
+            TxAddError::BatchTooBig => Self::Other,
+            TxAddError::BatchWithdrawalsOverload => Self::Other,
         }
     }
 }
