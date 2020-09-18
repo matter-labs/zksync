@@ -25,14 +25,14 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/zksync-crypto
-	@cd js/zksync.js && yarn && yarn build
-	@cd js/client && yarn
-	@cd js/explorer && yarn
+	@cd sdk/zksync-crypto
+	@cd sdk/zksync.js && yarn && yarn build
 	@cd contracts && yarn
-	@cd js/tests && yarn
-	@cd js/fee-seller && yarn
+	@cd core/tests/ts-tests && yarn
+	@cd infrastructure/explorer && yarn
+	@cd infrastructure/fee-seller && yarn
 	@cd infrastructure/zcli && yarn
+	@cd infrastructure/analytics && yarn
 
 
 # Helpers
@@ -85,17 +85,11 @@ genesis: confirm_action db-reset
 
 # Frontend clients
 
-client:
-	@cd js/client && yarn serve
-
 explorer:
-	@cd js/explorer && yarn serve
-
-dist-client: yarn build-contracts
-	@cd js/client && yarn build
+	@cd infrastructure/explorer && yarn serve
 
 dist-explorer: yarn build-contracts
-	@cd js/explorer && yarn build
+	@cd infrastructure/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -t "${NGINX_DOCKER_IMAGE_LATEST}" -f ./docker/nginx/Dockerfile .
@@ -179,10 +173,10 @@ integration-testkit:
 	@bin/integration-testkit.sh
 
 integration-simple:
-	@cd js/tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
+	@cd core/tests/ts-tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
 
 integration-full-exit:
-	@cd js/tests && yarn && yarn full-exit
+	@cd core/tests/ts-tests && yarn && yarn full-exit
 
 price:
 	@node contracts/scripts/check-price.js
@@ -191,8 +185,8 @@ prover-tests:
 	f cargo test -p prover --release -- --ignored
 
 js-tests:
-	@cd js/zksync.js && yarn tests
-	@cd js/fee-seller && yarn tests
+	@cd sdk/zksync.js && yarn tests
+	@cd infrastructure/fee-seller && yarn tests
 
 # Devops: main
 
@@ -299,4 +293,4 @@ push-image-dev-ticker: image-dev-ticker
 	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
 api-type-validate:
-	@cd js/tests && yarn && yarn api-type-validate --test
+	@cd core/tests/ts-tests && yarn && yarn api-type-validate --test

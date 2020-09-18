@@ -1,10 +1,10 @@
 FROM node:12
 WORKDIR /usr/src/fee-seller
-COPY js/fee-seller/package.json .
-COPY js/fee-seller/yarn.lock .
+COPY infrastructure/fee-seller/package.json .
+COPY infrastructure/fee-seller/yarn.lock .
 RUN yarn install --frozen-lockfile
 
-COPY js/fee-seller/ .
+COPY infrastructure/fee-seller/ .
 
 # required env
 # ENV FEE_ACCOUNT_PRIVATE_KEY

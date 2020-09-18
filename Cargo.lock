@@ -1925,6 +1925,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 
 [[package]]
+name = "gen_token_add_contract"
+version = "0.1.0"
+dependencies = [
+ "handlebars",
+ "models",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2864,7 +2872,6 @@ dependencies = [
  "failure",
  "fnv",
  "futures 0.3.5",
- "handlebars",
  "hex",
  "lazy_static",
  "log 0.4.11",
@@ -3206,6 +3213,14 @@ dependencies = [
  "redox_syscall",
  "smallvec 1.4.2",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "parse_pub_data"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "models",
 ]
 
 [[package]]
@@ -4318,21 +4333,6 @@ dependencies = [
  "libc",
  "redox_syscall",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "spec_test"
-version = "0.1.0"
-dependencies = [
- "actix-web 1.0.9",
- "crypto_exports",
- "env_logger 0.6.2",
- "hex",
- "log 0.4.11",
- "models",
- "serde",
- "serde_derive",
- "serde_json",
 ]
 
 [[package]]

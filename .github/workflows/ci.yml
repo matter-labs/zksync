@@ -28,11 +28,11 @@ jobs:
       run: |
         zksync db-setup # So database will be created for compilation.
         zksync dummy-prover ensure-disabled
-        cargo fmt -- --check
+        cargo fmt --all -- --check
         cargo clippy --tests --benches -- -D warnings
-        pushd js/zksync-crypto
+        pushd sdk/zksync-crypto
         cargo fmt -- --check
-        cargo clippy --tests --benches -- -D warnings
+        cargo clippy --all --tests --benches -- -D warnings
 
     - name: init
       run: zksync init
@@ -59,7 +59,7 @@ jobs:
       run: f cargo test --release
 
     - name: zksync-crypto-tests
-      run: pushd js/zksync-crypto && f cargo test --release
+      run: pushd sdk/zksync-crypto && f cargo test --release
 
     - name: db-tests
       run: zksync db-test
@@ -71,7 +71,7 @@ jobs:
       run: zksync circuit-tests "" `nproc`
 
     - name: update-selfhosted-cache
-      run: tar cf ~/runner-cache.tar keys/setup target js/zksync-crypto/target
+      run: tar cf ~/runner-cache.tar keys/setup target sdk/zksync-crypto/target
 
     services:
       geth:

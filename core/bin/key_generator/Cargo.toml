@@ -1,0 +1,22 @@
+[package]
+name = "key_generator"
+version = "0.1.1"
+edition = "2018"
+
+authors = [
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"
+]
+
+[dependencies]
+time = "0.1"
+crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
+models = { path = "../../lib/models", version = "0.0.1" }
+circuit= { path = "../../lib/circuit", version = "0.1.1" }
+hex = "0.4"
+rust-crypto = "0.2"
+log = "0.4"
+env_logger = "0.6"
+clap = "2.33.0"
+handlebars = "3.0.1"
+serde_json = "1.0.0"
