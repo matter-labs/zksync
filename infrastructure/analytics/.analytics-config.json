@@ -1,0 +1,13 @@
+{
+    "defaultNetwork": "mainnet",
+    "network": {
+        "mainnet": {
+            "OPERATOR_FEE_ETH_ADDRESS": "0x2a0a81e257a2f5d6ed4f07b81dbda09f107bd027",
+            "REST_API_ADDR": "https://api.zksync.io"
+        },
+        "localhost": {
+            "OPERATOR_FEE_ETH_ADDRESS": "0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7",
+            "REST_API_ADDR": "http://localhost:3001"
+        }
+    }
+}

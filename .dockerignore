@@ -8,7 +8,6 @@
 !Cargo.lock
 !Cargo.toml
 !contracts/build
-!js/client/index.html
-!js/client/dist
-!js/explorer/index.html
-!js/explorer/dist
+!infrastructure/explorer/index.html
+!infrastructure/explorer/dist
+!infrastructure/fee-seller

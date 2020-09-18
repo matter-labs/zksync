@@ -5,7 +5,7 @@ set -e
 # Force read env
 ZKSYNC_ENV=
 . .setup_env
-cd core/storage
+cd core/lib/storage
 
 echo DATABASE_URL=$DATABASE_URL
 diesel database setup

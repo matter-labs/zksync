@@ -1,0 +1,10 @@
+[package]
+name = "parse_pub_data"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+[dependencies]
+models = { path = "../../lib/models", version = "0.0.1" }
+
+hex = "0.4"
