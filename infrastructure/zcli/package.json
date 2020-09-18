@@ -22,7 +22,7 @@
         "commander": "^6.0.0",
         "ethers": "^5.0.9",
         "isomorphic-fetch": "^2.2.1",
-        "zksync": "link:../../js/zksync.js"
+        "zksync": "link:../../sdk/zksync.js"
     },
     "devDependencies": {
         "@types/chai": "^4.2.12",
