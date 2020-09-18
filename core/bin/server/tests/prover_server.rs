@@ -166,7 +166,10 @@ async fn api_client_simple_simulation() {
 
 pub async fn test_operation_and_wanted_prover_data(
     block_size_chunks: usize,
-) -> (models::Operation, prover::prover_data::ProverData) {
+) -> (
+    models::Operation,
+    zksync_prover_utils::prover_data::ProverData,
+) {
     let mut circuit_tree = zksync_crypto::circuit::CircuitAccountTree::new(
         zksync_crypto::params::account_tree_depth(),
     );
@@ -326,7 +329,7 @@ pub async fn test_operation_and_wanted_prover_data(
             block: block.clone(),
             accounts_updated,
         },
-        prover::prover_data::ProverData {
+        zksync_prover_utils::prover_data::ProverData {
             public_data_commitment,
             old_root: initial_root2,
             initial_used_subtree_root,
@@ -350,7 +353,7 @@ async fn api_server_publish_dummy() {
     let client = reqwest::Client::new();
     let res = client
         .post(&format!("http://{}/publish", &addr))
-        .json(&client::PublishReq {
+        .json(&zksync_prover_utils::api::PublishReq {
             block: 1,
             proof: EncodedProofPlonk::default(),
         })

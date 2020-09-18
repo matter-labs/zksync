@@ -3786,6 +3786,7 @@ dependencies = [
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
+ "zksync_prover_utils",
  "zksync_utils",
 ]
 
@@ -5321,10 +5322,12 @@ name = "zksync_prover_utils"
 version = "0.1.0"
 dependencies = [
  "backoff",
+ "circuit",
  "failure",
  "lazy_static",
  "log 0.4.11",
  "reqwest",
+ "serde",
  "zksync_basic_types",
  "zksync_crypto",
 ]

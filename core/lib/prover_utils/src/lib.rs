@@ -15,8 +15,11 @@ use zksync_crypto::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethe
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::{Engine, Fr};
 
+pub mod api;
 pub mod fs_utils;
 pub mod network_utils;
+pub mod prover_data;
+pub mod serialization;
 
 pub const SETUP_MIN_POW2: u32 = 20;
 pub const SETUP_MAX_POW2: u32 = 26;

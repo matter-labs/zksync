@@ -7,36 +7,13 @@ use failure::bail;
 use failure::format_err;
 use log::*;
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
-use crate::prover_data::ProverData;
 use circuit::circuit::FranklinCircuit;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::Engine;
-
-#[derive(Serialize, Deserialize)]
-pub struct ProverReq {
-    pub name: String,
-    pub block_size: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BlockToProveRes {
-    pub prover_run_id: i32,
-    pub block: i64,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct WorkingOnReq {
-    pub prover_run_id: i32,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct PublishReq {
-    pub block: u32,
-    pub proof: EncodedProofPlonk,
-}
+use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
+use zksync_prover_utils::prover_data::ProverData;
 
 #[derive(Debug, Clone)]
 pub struct ApiClient {

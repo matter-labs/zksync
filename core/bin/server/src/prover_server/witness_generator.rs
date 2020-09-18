@@ -15,11 +15,11 @@ use circuit::witness::{
 use models::node::block::Block;
 use models::node::{BlockNumber, FranklinOp};
 use plasma::state::CollectedFee;
-use prover::prover_data::ProverData;
 use std::time::Instant;
 use storage::StorageProcessor;
 use zksync_crypto::params::{account_tree_depth, CHUNK_BIT_WIDTH};
 use zksync_crypto::{circuit::CircuitAccountTree, Fr};
+use zksync_prover_utils::prover_data::ProverData;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.

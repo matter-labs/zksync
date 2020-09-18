@@ -11,12 +11,12 @@ models = { path = "../../lib/models", version = "0.0.1" }
 storage = { path = "../../lib/storage", version = "0.0.1" }
 circuit = { path = "../../lib/circuit", version = "0.1.1"}
 vlog = { path = "../../lib/vlog", version = "0.1.0"}
-prover = { path = "../prover", version = "0.0.1" }
 
 zksync_crypto = { path = "../../lib/crypto", version = "0.1.0" }
 zksync_config = { path = "../../lib/config", version = "0.1.0" }
 zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "0.1.0" }
+zksync_prover_utils = { path = "../../lib/prover_utils", version = "0.1.0" }
 
 hex = "0.4"
 ethabi = "9.0.0"
@@ -62,3 +62,4 @@ lru-cache = "0.1.2"
 
 [dev-dependencies]
 lazy_static = "1.4"
+prover = { path = "../prover", version = "0.0.1" }

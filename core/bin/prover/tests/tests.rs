@@ -19,10 +19,10 @@ use zksync_crypto::{
     proof::EncodedProofPlonk,
     Engine, Fr,
 };
+use zksync_prover_utils::prover_data::ProverData;
 // Local deps
 use prover::{
     plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
-    prover_data::ProverData,
     ProverImpl,
 };
 

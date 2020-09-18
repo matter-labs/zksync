@@ -2,8 +2,6 @@ pub mod cli_utils;
 pub mod client;
 pub mod exit_proof;
 pub mod plonk_step_by_step_prover;
-pub mod prover_data;
-pub mod serialization;
 
 // Built-in deps
 use std::sync::{
