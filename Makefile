@@ -9,6 +9,7 @@ export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
+export FEE_SELLER_IMAGE ?=matterlabs/fee-seller:latest
 
 # Getting started
 
@@ -29,6 +30,7 @@ yarn:
 	@cd infrastructure/explorer && yarn
 	@cd contracts && yarn
 	@cd core/tests/ts-tests && yarn
+	@cd js/fee-seller && yarn
 	@cd infrastructure/zcli && yarn
 
 
@@ -113,6 +115,12 @@ image-keybase:
 push-image-keybase: image-keybase
 	docker push "${KEYBASE_DOCKER_IMAGE}"
 
+image-fee-seller:
+	@docker build -t "${FEE_SELLER_IMAGE}" -f ./docker/fee-seller/Dockerfile .
+
+push-image-fee-seller: image-fee-seller
+	docker push "${FEE_SELLER_IMAGE}"
+
 # Rust: main stuff
 
 server:
@@ -180,6 +188,10 @@ price:
 
 prover-tests:
 	f cargo test -p prover --release -- --ignored
+
+js-tests:
+	@cd js/zksync.js && yarn tests
+	@cd js/fee-seller && yarn tests
 
 # Devops: main
 
