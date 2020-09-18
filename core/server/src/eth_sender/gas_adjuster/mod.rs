@@ -3,11 +3,13 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 // External deps
 use web3::types::U256;
 // Local deps
-use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumInterface};
+use crate::eth_sender::{database::Database, ethereum_interface::EthereumInterface};
 
 mod parameters;
-#[cfg(test)]
-mod tests;
+
+// TODO: Tests are commented for now as DB traits aren't implemented yet.
+// #[cfg(test)]
+// mod tests;
 
 /// Gas adjuster is an entity capable of scaling the gas price for
 /// all the Ethereum transactions.
@@ -19,7 +21,7 @@ mod tests;
 /// gas price for transactions that were not mined by the network
 /// within a reasonable time.
 #[derive(Debug)]
-pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
+pub(super) struct GasAdjuster<ETH: EthereumInterface> {
     /// Collected statistics about recently used gas prices.
     statistics: GasStatistics,
     /// Timestamp of the last maximum gas price update.
@@ -28,13 +30,17 @@ pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
     last_sample_added: Instant,
 
     _etherum_client: PhantomData<ETH>,
-    _db: PhantomData<DB>,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
-    pub fn new(db: &DB) -> Self {
+impl<ETH: EthereumInterface> GasAdjuster<ETH> {
+    pub async fn new(db: &Database) -> Self {
+        let mut connection = db
+            .acquire_connection()
+            .await
+            .expect("Unable to connect to DB");
         let gas_price_limit = db
-            .load_gas_price_limit()
+            .load_gas_price_limit(&mut connection)
+            .await
             .expect("Can't load the gas price limit");
         Self {
             statistics: GasStatistics::new(gas_price_limit),
@@ -42,18 +48,17 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
             last_sample_added: Instant::now(),
 
             _etherum_client: PhantomData,
-            _db: PhantomData,
         }
     }
 
     /// Calculates a new gas amount for the replacement of the stuck tx.
     /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
-    pub fn get_gas_price(
+    pub async fn get_gas_price(
         &mut self,
         ethereum: &ETH,
         old_tx_gas_price: Option<U256>,
     ) -> Result<U256, failure::Error> {
-        let network_price = ethereum.gas_price()?;
+        let network_price = ethereum.gas_price().await?;
 
         let scaled_price = if let Some(old_price) = old_tx_gas_price {
             // Stuck transaction, scale it up.
@@ -83,10 +88,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     /// Performs an actualization routine for `GasAdjuster`:
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
-    pub fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
+    pub async fn keep_updated(&mut self, ethereum: &ETH, db: &Database) {
         if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
             // Report the current price to be gathered by the statistics module.
-            match ethereum.gas_price() {
+            match ethereum.gas_price().await {
                 Ok(network_price) => {
                     self.statistics.add_sample(network_price);
 
@@ -105,7 +110,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
             self.last_price_renewal = Instant::now();
 
             // Update the value in the database as well.
-            let result = db.update_gas_price_limit(self.statistics.get_limit());
+            let mut connection = match db.acquire_connection().await {
+                Ok(connection) => connection,
+                Err(err) => {
+                    log::warn!("Cannot update the gas limit value in the database: {}", err);
+                    return;
+                }
+            };
+            let result = db
+                .update_gas_price_limit(&mut connection, self.statistics.get_limit())
+                .await;
 
             if let Err(err) = result {
                 // Inability of update the value in the DB is not critical as it's not

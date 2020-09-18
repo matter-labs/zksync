@@ -22,7 +22,8 @@ impl CommitCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 141_595;
+    // TODO: overvalued for quick fix of tx fails
+    pub const BASE_COST: u64 = 300_000;
     pub const DEPOSIT_COST: u64 = 10_397;
     pub const CHANGE_PUBKEY_COST: u64 = 15_866;
     pub const TRANSFER_COST: u64 = 334;
@@ -59,7 +60,8 @@ impl VerifyCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    pub const BASE_COST: u64 = 527_451;
+    // TODO: overvalued for quick fix of tx fails
+    pub const BASE_COST: u64 = 1_000_000;
     pub const DEPOSIT_COST: u64 = 0;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;

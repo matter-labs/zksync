@@ -32,6 +32,7 @@ yarn:
 	@cd contracts && yarn
 	@cd js/tests && yarn
 	@cd js/fee-seller && yarn
+	@cd infrastructure/zcli && yarn
 
 
 # Helpers
@@ -129,10 +130,10 @@ server:
 sandbox:
 	@cargo run --bin sandbox
 
-image-server: build-contracts
+image-server: build-contracts build-dev-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
 
-image-prover: build-contracts
+image-prover: build-contracts build-dev-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${PROVER_DOCKER_IMAGE}" -t "${PROVER_DOCKER_IMAGE_LATEST}"  -f ./docker/prover/Dockerfile .
 
 image-rust: image-server image-prover

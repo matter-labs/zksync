@@ -19,7 +19,8 @@ struct ExitProofData {
     proof: EncodedProofPlonk,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
     let cli = App::new("Franklin operator node")
@@ -53,14 +54,16 @@ fn main() {
 
     let timer = Instant::now();
     info!("Restoring state from db");
-    let connection_pool = ConnectionPool::new(Some(1));
-    let storage = connection_pool
+    let connection_pool = ConnectionPool::new(Some(1)).await;
+    let mut storage = connection_pool
         .access_storage()
+        .await
         .expect("Storage access failed");
 
     let token_id = storage
         .tokens_schema()
         .get_token(token)
+        .await
         .expect("Db access fail")
         .expect("Token not found")
         .id;
@@ -68,6 +71,7 @@ fn main() {
         .chain()
         .account_schema()
         .last_verified_state_for_account(account_id)
+        .await
         .expect("DB access fail")
         .expect("Account not found in the db")
         .address;
@@ -75,6 +79,7 @@ fn main() {
         .chain()
         .state_schema()
         .load_verified_state()
+        .await
         .expect("Failed to load verified state")
         .1;
 

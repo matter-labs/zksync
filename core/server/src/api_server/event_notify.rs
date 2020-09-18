@@ -1,13 +1,13 @@
-use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
-use crate::api_server::rpc_server::{BlockInfo, ResponseAccountState};
+use super::rpc_server::types::{
+    BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
+};
 use crate::state_keeper::{ExecutedOpId, ExecutedOpsNotify, StateKeeperRequest};
 use crate::utils::token_db_cache::TokenDBCache;
 use failure::{bail, format_err};
-use futures::task::LocalSpawnExt;
 use futures::{
     channel::{mpsc, oneshot},
     compat::Future01CompatExt,
-    executor, select,
+    select,
     stream::StreamExt,
     FutureExt, SinkExt,
 };
@@ -16,7 +16,6 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use lru_cache::LruCache;
-use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::BlockNumber;
 use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
@@ -71,21 +70,17 @@ struct OperationNotifier {
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
     prior_op_subs: BTreeMap<(u64, ActionType), Vec<SubscriptionSender<ETHOpInfoResp>>>,
     account_subs: BTreeMap<(AccountId, ActionType), Vec<SubscriptionSender<ResponseAccountState>>>,
-
-    spawner: executor::LocalSpawner,
 }
 
 impl OperationNotifier {
     fn send_once<T: serde::Serialize>(&self, sink: &Sink<T>, val: T) {
-        self.spawner
-            .spawn_local(sink.notify(Ok(val)).compat().map(drop))
-            .expect("future local_spawn");
+        tokio::spawn(sink.notify(Ok(val)).compat().map(drop));
     }
 
     async fn check_op_executed_current_block(
         &self,
         op_id: ExecutedOpId,
-    ) -> Result<Option<(BlockNumber, bool)>, failure::Error> {
+    ) -> Result<Option<(BlockNumber, bool, Option<String>)>, failure::Error> {
         let response = oneshot::channel();
         self.state_keeper_requests
             .clone()
@@ -166,7 +161,10 @@ impl OperationNotifier {
                     address,
                     action,
                     subscriber,
-                } => self.handle_account_update_sub(address, action, subscriber),
+                } => {
+                    self.handle_account_update_sub(address, action, subscriber)
+                        .await
+                }
             }
             .map_err(|e| format_err!("Failed to add sub: {}", e)),
             EventNotifierRequest::Unsub(sub_id) => self
@@ -175,7 +173,7 @@ impl OperationNotifier {
         }
     }
 
-    fn get_executed_priority_operation(
+    async fn get_executed_priority_operation(
         &mut self,
         serial_id: u32,
     ) -> Result<Option<StoredExecutedPriorityOperation>, failure::Error> {
@@ -185,11 +183,12 @@ impl OperationNotifier {
         {
             Some(executed_op.clone())
         } else {
-            let storage = self.db_pool.access_storage_fragile()?;
+            let mut storage = self.db_pool.access_storage_fragile().await?;
             let executed_op = storage
                 .chain()
                 .operations_schema()
-                .get_executed_priority_operation(serial_id)?;
+                .get_executed_priority_operation(serial_id)
+                .await?;
 
             if let Some(executed_op) = executed_op.clone() {
                 self.cache_of_executed_priority_operations
@@ -201,18 +200,23 @@ impl OperationNotifier {
         Ok(res)
     }
 
-    fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, failure::Error> {
+    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, failure::Error> {
         let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
             block_info.clone()
         } else {
-            let storage = self.db_pool.access_storage_fragile()?;
-            let block_info = if let Some(block_with_op) =
-                storage.chain().block_schema().get_block(block_number)?
+            let mut storage = self.db_pool.access_storage_fragile().await?;
+            let mut transaction = storage.start_transaction().await?;
+            let block_info = if let Some(block_with_op) = transaction
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await?
             {
-                let verified = if let Some(block_verify) = storage
+                let verified = if let Some(block_verify) = transaction
                     .chain()
                     .operations_schema()
                     .get_operation(block_number, ActionType::VERIFY)
+                    .await
                 {
                     block_verify.confirmed
                 } else {
@@ -227,6 +231,8 @@ impl OperationNotifier {
             } else {
                 bail!("Transaction is executed but block is not committed. (bug)");
             };
+
+            transaction.commit().await?;
 
             // Unverified blocks can still change, so we can't cache them.
             // Since request for non-existing block will return the last committed block,
@@ -257,7 +263,7 @@ impl OperationNotifier {
 
         // Maybe it was executed already
         if action == ActionType::COMMIT {
-            if let Some((block_number, _)) = self
+            if let Some((block_number, _, _)) = self
                 .check_op_executed_current_block(ExecutedOpId::PriorityOp(serial_id))
                 .await?
             {
@@ -279,9 +285,11 @@ impl OperationNotifier {
             }
         }
 
-        let executed_op = self.get_executed_priority_operation(serial_id as u32)?;
+        let executed_op = self
+            .get_executed_priority_operation(serial_id as u32)
+            .await?;
         if let Some(executed_op) = executed_op {
-            let block_info = self.get_block_info(executed_op.block_number as u32)?;
+            let block_info = self.get_block_info(executed_op.block_number as u32).await?;
 
             match action {
                 ActionType::COMMIT => {
@@ -329,7 +337,7 @@ impl OperationNotifier {
         Ok(())
     }
 
-    fn get_tx_receipt(
+    async fn get_tx_receipt(
         &mut self,
         hash: &TxHash,
     ) -> Result<Option<TxReceiptResponse>, failure::Error> {
@@ -339,11 +347,12 @@ impl OperationNotifier {
         {
             Some(tx_receipt.clone())
         } else {
-            let storage = self.db_pool.access_storage_fragile()?;
+            let mut storage = self.db_pool.access_storage_fragile().await?;
             let tx_receipt = storage
                 .chain()
                 .operations_ext_schema()
-                .tx_receipt(hash.as_ref())?;
+                .tx_receipt(hash.as_ref())
+                .await?;
 
             if let Some(tx_receipt) = tx_receipt.clone() {
                 if tx_receipt.verified {
@@ -373,7 +382,7 @@ impl OperationNotifier {
 
         // Maybe tx was executed already.
         if action == ActionType::COMMIT {
-            if let Some((block_number, success)) = self
+            if let Some((block_number, success, fail_reason)) = self
                 .check_op_executed_current_block(ExecutedOpId::Transaction(hash.clone()))
                 .await?
             {
@@ -383,7 +392,7 @@ impl OperationNotifier {
                     TransactionInfoResp {
                         executed: true,
                         success: Some(success),
-                        fail_reason: None,
+                        fail_reason,
                         block: Some(BlockInfo {
                             block_number: i64::from(block_number),
                             committed: true,
@@ -395,7 +404,7 @@ impl OperationNotifier {
             }
         }
 
-        let tx_receipt = self.get_tx_receipt(&hash)?;
+        let tx_receipt = self.get_tx_receipt(&hash).await?;
 
         if let Some(receipt) = tx_receipt {
             let tx_info_resp = TransactionInfoResp {
@@ -439,17 +448,18 @@ impl OperationNotifier {
         Ok(())
     }
 
-    fn handle_account_update_sub(
+    async fn handle_account_update_sub(
         &mut self,
         address: Address,
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage_fragile()?;
+        let mut storage = self.db_pool.access_storage_fragile().await?;
         let account_state = storage
             .chain()
             .account_schema()
-            .account_state_by_address(&address)?;
+            .account_state_by_address(&address)
+            .await?;
 
         let account_id = if let Some(id) = account_state.committed.as_ref().map(|(id, _)| id) {
             *id
@@ -471,7 +481,7 @@ impl OperationNotifier {
         }
         .map(|(_, a)| a)
         {
-            ResponseAccountState::try_restore(account, &self.tokens_cache)?
+            ResponseAccountState::try_restore(account, &self.tokens_cache).await?
         } else {
             ResponseAccountState::default()
         };
@@ -551,8 +561,7 @@ impl OperationNotifier {
         )
     }
 
-    fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage_fragile()?;
+    async fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
         let action = op.action.get_type();
 
         self.handle_executed_operations(
@@ -561,24 +570,32 @@ impl OperationNotifier {
             op.block.block_number,
         )?;
 
+        let mut storage = self.db_pool.access_storage_fragile().await?;
+
         let updated_accounts = op.accounts_updated.iter().map(|(id, _)| *id);
 
         for id in updated_accounts {
             if let Some(subs) = self.account_subs.remove(&(id, action)) {
                 let stored_account = match action {
-                    ActionType::COMMIT => storage
-                        .chain()
-                        .account_schema()
-                        .last_committed_state_for_account(id)?,
-                    ActionType::VERIFY => storage
-                        .chain()
-                        .account_schema()
-                        .last_verified_state_for_account(id)?,
+                    ActionType::COMMIT => {
+                        storage
+                            .chain()
+                            .account_schema()
+                            .last_committed_state_for_account(id)
+                            .await?
+                    }
+                    ActionType::VERIFY => {
+                        storage
+                            .chain()
+                            .account_schema()
+                            .last_verified_state_for_account(id)
+                            .await?
+                    }
                 };
 
                 let account = if let Some(account) = stored_account {
                     if let Ok(result) =
-                        ResponseAccountState::try_restore(account, &self.tokens_cache)
+                        ResponseAccountState::try_restore(account, &self.tokens_cache).await
                     {
                         result
                     } else {
@@ -612,64 +629,50 @@ pub fn start_sub_notifier(
     mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
     mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
-    panic_notify: mpsc::Sender<bool>,
     api_requests_caches_size: usize,
-) {
-    std::thread::Builder::new()
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+) -> tokio::task::JoinHandle<()> {
+    let tokens_cache = TokenDBCache::new(db_pool.clone());
 
-            let mut local_pool = executor::LocalPool::new();
+    let mut notifier = OperationNotifier {
+        cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
+        cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
+        cache_of_blocks_info: LruCache::new(api_requests_caches_size),
+        tokens_cache,
+        db_pool,
+        state_keeper_requests,
+        tx_subs: BTreeMap::new(),
+        prior_op_subs: BTreeMap::new(),
+        account_subs: BTreeMap::new(),
+    };
 
-            let tokens_cache = TokenDBCache::new(db_pool.clone());
-
-            let mut notifier = OperationNotifier {
-                cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
-                cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
-                cache_of_blocks_info: LruCache::new(api_requests_caches_size),
-                tokens_cache,
-                db_pool,
-                state_keeper_requests,
-                tx_subs: BTreeMap::new(),
-                prior_op_subs: BTreeMap::new(),
-                account_subs: BTreeMap::new(),
-                spawner: local_pool.spawner(),
-            };
-
-            let sub_notifier_task = async move {
-                loop {
-                    select! {
-                        new_block = new_block_stream.next() => {
-                            if let Some(new_block) = new_block {
-                                notifier.handle_new_block(new_block)
-                                    .map_err(|e| warn!("Failed to handle new block: {}",e))
-                                    .unwrap_or_default();
-                            }
-                        },
-                        new_exec_batch = executed_tx_stream.next() => {
-                            if let Some(new_exec_batch) = new_exec_batch {
-                                notifier.handle_new_executed_batch(new_exec_batch)
-                                    .map_err(|e| warn!("Failed to handle new exec batch: {}",e))
-                                    .unwrap_or_default();
-                            }
-                        },
-                        new_sub = subscription_stream.next() => {
-                            if let Some(new_sub) = new_sub {
-                                notifier.handle_notify_req(new_sub).await
-                                    .map_err(|e| warn!("Failed to handle notify request: {}",e))
-                                    .unwrap_or_default();
-                            }
-                        },
-                        complete => break,
+    tokio::spawn(async move {
+        loop {
+            select! {
+                new_block = new_block_stream.next() => {
+                    if let Some(new_block) = new_block {
+                        notifier.handle_new_block(new_block)
+                            .await
+                            .map_err(|e| warn!("Failed to handle new block: {}",e))
+                            .unwrap_or_default();
                     }
-                }
-            };
-
-            local_pool
-                .spawner()
-                .spawn_local(sub_notifier_task)
-                .expect("sub notify future spawn");
-            local_pool.run();
-        })
-        .expect("thread start");
+                },
+                new_exec_batch = executed_tx_stream.next() => {
+                    if let Some(new_exec_batch) = new_exec_batch {
+                        notifier.handle_new_executed_batch(new_exec_batch)
+                            .map_err(|e| warn!("Failed to handle new exec batch: {}",e))
+                            .unwrap_or_default();
+                    }
+                },
+                new_sub = subscription_stream.next() => {
+                    if let Some(new_sub) = new_sub {
+                        notifier.handle_notify_req(new_sub)
+                            .await
+                            .map_err(|e| warn!("Failed to handle notify request: {}",e))
+                            .unwrap_or_default();
+                    }
+                },
+                complete => break,
+            }
+        }
+    })
 }

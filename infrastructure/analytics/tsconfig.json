@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es6",
+    "outDir": "./build",
+    "declaration": true,
+    "esModuleInterop": true,
+    "preserveSymlinks": true,
+    "preserveWatchOutput": true
+  },
+  "files": [
+    "src/index.ts"
+  ]
+}

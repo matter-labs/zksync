@@ -19,7 +19,7 @@ use num::{
     traits::{Inv, Pow},
     BigUint,
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::task::JoinHandle;
 // Workspace deps
 use models::{
     node::{
@@ -92,6 +92,13 @@ pub struct Fee {
     pub total_fee: BigUint,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchFee {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub total_fee: BigUint,
+}
+
 impl Fee {
     pub fn new(
         fee_type: OutputFeeType,
@@ -125,6 +132,11 @@ pub struct TickerConfig {
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
 }
 
+pub enum TokenPriceRequestType {
+    USDForOneWei,
+    USDForOneToken,
+}
+
 pub enum TickerRequest {
     GetTxFee {
         tx_type: TxFeeTypes,
@@ -135,6 +147,7 @@ pub enum TickerRequest {
     GetTokenPrice {
         token: TokenLike,
         response: oneshot::Sender<Result<BigDecimal, failure::Error>>,
+        req_type: TokenPriceRequestType,
     },
 }
 
@@ -153,7 +166,6 @@ pub fn run_ticker_task(
     eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
-    runtime: &Runtime,
 ) -> JoinHandle<()> {
     // We increase gas price for fast withdrawals, since it will induce generating a smaller block
     // size, resulting in us paying more gas than for bigger block.
@@ -189,7 +201,7 @@ pub fn run_ticker_task(
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
-            runtime.spawn(fee_ticker.run())
+            tokio::spawn(fee_ticker.run())
         }
         TokenPriceSource::CoinGecko { base_url } => {
             let token_price_api =
@@ -200,7 +212,7 @@ pub fn run_ticker_task(
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
 
-            runtime.spawn(fee_ticker.run())
+            tokio::spawn(fee_ticker.run())
         }
     }
 }
@@ -229,19 +241,35 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                         .await;
                     response.send(fee).unwrap_or_default();
                 }
-                TickerRequest::GetTokenPrice { token, response } => {
-                    let price = self.get_token_price(token).await;
+                TickerRequest::GetTokenPrice {
+                    token,
+                    response,
+                    req_type,
+                } => {
+                    let price = self.get_token_price(token, req_type).await;
                     response.send(price).unwrap_or_default();
                 }
             }
         }
     }
 
-    async fn get_token_price(&self, token: TokenLike) -> Result<BigDecimal, failure::Error> {
+    async fn get_token_price(
+        &self,
+        token: TokenLike,
+        req_rype: TokenPriceRequestType,
+    ) -> Result<BigDecimal, failure::Error> {
+        let factor = match req_rype {
+            TokenPriceRequestType::USDForOneWei => {
+                let token_decimals = self.api.get_token(token.clone()).await?.decimals;
+                BigUint::from(10u32).pow(u32::from(token_decimals))
+            }
+            TokenPriceRequestType::USDForOneToken => BigUint::from(1u32),
+        };
+
         self.api
             .get_last_quote(token)
             .await
-            .map(|price| ratio_to_big_decimal(&price.usd_price, 6))
+            .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.
@@ -256,7 +284,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         recipient: Address,
     ) -> Result<Fee, failure::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
-        let token = self.api.get_token(token)?;
+        let token = self.api.get_token(token).await?;
         let token_risk_factor = self
             .config
             .tokens_risk_factors
@@ -411,7 +439,7 @@ mod test {
             Ok(BigUint::from(10u32).pow(7u32)) // 10 GWei
         }
 
-        fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+        async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
             for test_token in TestToken::all_tokens() {
                 if TokenLike::Id(test_token.id) == token {
                     return Ok(Token::new(
@@ -446,7 +474,9 @@ mod test {
                 let fee_in_token =
                     block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
                         .expect("failed to get fee in token");
-                let token_precision = MockApiProvider.get_token(token.clone()).unwrap().decimals;
+                let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+                    .unwrap()
+                    .decimals;
 
                 // Fee in usd
                 (block_on(MockApiProvider.get_last_quote(token))
