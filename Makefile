@@ -27,11 +27,12 @@ init:
 yarn:
 	@cd sdk/zksync-crypto
 	@cd sdk/zksync.js && yarn && yarn build
-	@cd infrastructure/explorer && yarn
 	@cd contracts && yarn
 	@cd core/tests/ts-tests && yarn
-	@cd js/fee-seller && yarn
+	@cd infrastructure/explorer && yarn
+	@cd infrastructure/fee-seller && yarn
 	@cd infrastructure/zcli && yarn
+	@cd infrastructure/analytics && yarn
 
 
 # Helpers
@@ -84,17 +85,11 @@ genesis: confirm_action db-reset
 
 # Frontend clients
 
-client:
-	@cd js/client && yarn serve
-
 explorer:
-	@cd js/explorer && yarn serve
-
-dist-client: yarn build-contracts
-	@cd js/client && yarn build
+	@cd infrastructure/explorer && yarn serve
 
 dist-explorer: yarn build-contracts
-	@cd js/explorer && yarn build
+	@cd infrastructure/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -t "${NGINX_DOCKER_IMAGE_LATEST}" -f ./docker/nginx/Dockerfile .
@@ -190,8 +185,8 @@ prover-tests:
 	f cargo test -p prover --release -- --ignored
 
 js-tests:
-	@cd js/zksync.js && yarn tests
-	@cd js/fee-seller && yarn tests
+	@cd sdk/zksync.js && yarn tests
+	@cd infrastructure/fee-seller && yarn tests
 
 # Devops: main
 

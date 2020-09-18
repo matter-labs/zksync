@@ -2,20 +2,18 @@
 # https://help.github.com/articles/about-codeowners/
 
 # notify about changes in codeowners file
-/.github/       @dvush
+/.github/       @dvush @pozpxc
 
 # notify about any circuit, prover and server changes
-/core/circuit/ @alexander-movchan @gluk64
+/core/circuit/ @alexander-movchan
 /core @dvush @popzxc
 
 # dev tools
-/bin @dvush
-/Makefile @dvush
-/.drone.yml @dvush
+/bin @dvush @popzxc
+/Makefile @dvush @popzxc
 
 # js
-/js/zksync.js @dvush
-/js/tests @dvush
+/infrastructure/ @dvush @popzxc
 
 # notify dvush about contracts changes
-/contracts/     @dvush @gluk64
+/contracts/     @dvush @popzxc
