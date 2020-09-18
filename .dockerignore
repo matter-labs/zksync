@@ -12,3 +12,4 @@
 !infrastructure/explorer/dist
 !infrastructure/fee-seller
 !infrastructure/tok_cli
+!sdk/zksync-rs
