@@ -5,16 +5,16 @@ use zksync_utils::BigUintSerdeWrapper;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-use crypto_exports::franklin_crypto::bellman::pairing::ff::{self, PrimeField};
-use crypto_exports::franklin_crypto::eddsa::PublicKey;
 use failure::ensure;
 use num::{BigUint, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use zksync_crypto::franklin_crypto::bellman::pairing::ff::{self, PrimeField};
+use zksync_crypto::franklin_crypto::eddsa::PublicKey;
 
 use super::Engine;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
-use web3::types::Address;
+use zksync_basic_types::Address;
 use zksync_crypto::circuit::account::{Balance, CircuitAccount};
 use zksync_crypto::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
 use zksync_crypto::merkle_tree::rescue_hasher::BabyRescueHasher;
@@ -286,9 +286,10 @@ impl Account {
                     Some(account)
                 }
                 _ => {
-                    error!(
+                    log::error!(
                         "Incorrect update received {:?} for account {:?}",
-                        update, account
+                        update,
+                        account
                     );
                     Some(account)
                 }
@@ -301,7 +302,7 @@ impl Account {
                     Some(new_account)
                 }
                 _ => {
-                    error!("Incorrect update received {:?} for empty account", update);
+                    log::error!("Incorrect update received {:?} for empty account", update);
                     None
                 }
             },

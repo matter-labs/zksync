@@ -25,7 +25,7 @@ pub use self::tx::{Close, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
 
 pub use zksync_basic_types::*;
 
-pub type AccountMap = fnv::FnvHashMap<u32, Account>;
+pub type AccountMap = zksync_crypto::fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 
@@ -100,6 +100,7 @@ pub fn closest_packable_token_amount(amount: &BigUint) -> BigUint {
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde::{Deserialize, Serialize};
     #[test]
     fn test_roundtrip() {
         let zero = BigUint::from_u32(1).unwrap();

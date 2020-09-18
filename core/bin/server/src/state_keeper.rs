@@ -19,12 +19,16 @@ use models::{
         tx::{FranklinTx, TxHash},
         Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
     },
-    ActionType, BlockCommitRequest, CommitRequest,
+    ActionType,
 };
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 // Local uses
-use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
+use crate::{
+    committer::{BlockCommitRequest, CommitRequest},
+    gas_counter::GasCounter,
+    mempool::ProposedBlock,
+};
 use models::node::SignedFranklinTx;
 
 pub enum ExecutedOpId {

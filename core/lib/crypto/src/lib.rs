@@ -14,13 +14,12 @@ pub mod serialization;
 
 pub use crypto_exports::*;
 
+// Public re-export, so other crates don't have to specify it as their dependency.
+pub use fnv;
+
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
 pub type Fs = <Engine as JubjubEngine>::Fs;
-
-// pub type AccountMap = fnv::FnvHashMap<u32, Account>;
-// pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
-// pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 
 pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;

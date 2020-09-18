@@ -13,8 +13,8 @@ use models::node::{
     DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
     WithdrawOp,
 };
-use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
+use server::committer::{BlockCommitRequest, CommitRequest};
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,

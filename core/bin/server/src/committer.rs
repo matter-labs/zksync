@@ -1,14 +1,35 @@
 // Built-in uses
 use std::time::Duration;
 // External uses
-use futures::channel::mpsc::{Receiver, Sender};
+use futures::channel::{
+    mpsc::{Receiver, Sender},
+    oneshot,
+};
 use futures::{SinkExt, StreamExt};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
-use models::{node::block::PendingBlock, Action, BlockCommitRequest, CommitRequest, Operation};
+use models::{
+    node::{
+        block::{Block, PendingBlock},
+        AccountUpdates,
+    },
+    Action, Operation,
+};
 use storage::ConnectionPool;
+
+#[derive(Debug)]
+pub enum CommitRequest {
+    PendingBlock(PendingBlock, oneshot::Sender<()>),
+    Block(BlockCommitRequest, oneshot::Sender<()>),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlockCommitRequest {
+    pub block: Block,
+    pub accounts_updated: AccountUpdates,
+}
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 

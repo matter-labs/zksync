@@ -1,6 +1,7 @@
 use crate::node::{Address, TokenId};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
+use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use zksync_utils::parse_env;

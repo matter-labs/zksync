@@ -5,7 +5,7 @@ use std::str::FromStr;
 // External uses
 /// Local uses
 use crate::{Action, Operation};
-use web3::types::{H256, U256};
+use zksync_basic_types::{H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
 pub type EthOpId = i64;

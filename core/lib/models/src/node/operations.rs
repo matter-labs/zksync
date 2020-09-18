@@ -8,7 +8,8 @@ use crate::node::{
 };
 use failure::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
-use web3::types::Address;
+use serde::{Deserialize, Serialize};
+use zksync_basic_types::Address;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
     BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH,

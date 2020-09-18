@@ -2,8 +2,8 @@
 
 use criterion::{black_box, BatchSize, Bencher, Criterion};
 
-use crypto_exports::ff::PrimeField;
 use zksync_crypto::circuit::account::CircuitAccount;
+use zksync_crypto::ff::PrimeField;
 use zksync_crypto::merkle_tree::{rescue_hasher::RescueHasher, sequential_smt::SparseMerkleTree};
 use zksync_crypto::{Engine, Fr};
 

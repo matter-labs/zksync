@@ -10,9 +10,4 @@ edition = "2018"
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
 serde = "1.0"
-web3 = "0.10.0"
 failure = "0.1"
-lazy_static = "1.2.0"
-fnv = "1.0.3"
-rayon = "1.0.3"
-hex = "0.4"

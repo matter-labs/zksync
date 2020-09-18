@@ -1,21 +1,16 @@
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate log;
-
 pub mod abi;
 pub mod ethereum;
 pub mod node;
 
-use crate::node::block::{Block, PendingBlock};
+use crate::node::block::Block;
 use crate::node::BlockNumber;
 use crate::node::{AccountUpdates, TokenId};
 use zksync_crypto::proof::EncodedProofPlonk;
 
 use failure::format_err;
-use futures::channel::oneshot;
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use web3::types::{Address, Log, U256};
+use zksync_basic_types::{Address, Log, U256};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {
@@ -73,18 +68,6 @@ impl std::fmt::Debug for Action {
 pub struct Operation {
     pub id: Option<i64>,
     pub action: Action,
-    pub block: Block,
-    pub accounts_updated: AccountUpdates,
-}
-
-#[derive(Debug)]
-pub enum CommitRequest {
-    PendingBlock(PendingBlock, oneshot::Sender<()>),
-    Block(BlockCommitRequest, oneshot::Sender<()>),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BlockCommitRequest {
     pub block: Block,
     pub accounts_updated: AccountUpdates,
 }

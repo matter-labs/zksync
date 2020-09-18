@@ -1,4 +1,4 @@
-pub use web3::types::{H160, H256, U128, U256};
+pub use web3::types::{Log, H160, H256, U128, U256};
 
 pub type Address = web3::types::Address;
 
