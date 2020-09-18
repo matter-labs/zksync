@@ -25,6 +25,7 @@ use futures::{
 use tokio::task::JoinHandle;
 // Workspace uses
 use models::node::{
+    mempool::{SignedTxVariant, SignedTxsBatch},
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
     SignedFranklinTx, TransferOp, TransferToNewOp,
 };
@@ -44,6 +45,9 @@ pub enum TxAddError {
     #[fail(display = "Transaction fee is too low")]
     TxFeeTooLow,
 
+    #[fail(display = "Transactions batch summary fee is too low")]
+    TxBatchFeeTooLow,
+
     #[fail(display = "EIP1271 signature could not be verified")]
     EIP1271SignatureVerificationFail,
 
@@ -61,12 +65,18 @@ pub enum TxAddError {
 
     #[fail(display = "Database unavailable")]
     DbError,
+
+    #[fail(display = "Batch will not fit in any of supported block sizes")]
+    BatchTooBig,
+
+    #[fail(display = "The number of withdrawals in the batch is too big")]
+    BatchWithdrawalsOverload,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct ProposedBlock {
     pub priority_ops: Vec<PriorityOp>,
-    pub txs: Vec<SignedFranklinTx>,
+    pub txs: Vec<SignedTxVariant>,
 }
 
 impl ProposedBlock {
@@ -85,6 +95,11 @@ pub enum MempoolRequest {
     /// for correctness (including its Ethereum and ZKSync signatures).
     /// oneshot is used to receive tx add result.
     NewTx(Box<VerifiedTx>, oneshot::Sender<Result<(), TxAddError>>),
+    /// Add a new batch of transactions to the mempool. All transactions in batch must
+    /// be either executed successfully, or otherwise fail all together.
+    /// Invariants for each individual transaction in the batch are the same as in
+    /// `NewTx` variant of this enum.
+    NewTxsBatch(Vec<VerifiedTx>, oneshot::Sender<Result<(), TxAddError>>),
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -95,7 +110,7 @@ struct MempoolState {
     // account and last committed nonce
     account_nonces: HashMap<Address, Nonce>,
     account_ids: HashMap<AccountId, Address>,
-    ready_txs: VecDeque<SignedFranklinTx>,
+    ready_txs: VecDeque<SignedTxVariant>,
 }
 
 impl MempoolState {
@@ -109,6 +124,17 @@ impl MempoolState {
                 }
             }
             _ => tx.min_chunks(),
+        }
+    }
+
+    fn chunks_for_batch(&self, batch: &SignedTxsBatch) -> usize {
+        batch.txs.iter().map(|tx| self.chunks_for_tx(&tx.tx)).sum()
+    }
+
+    fn required_chunks(&self, element: &SignedTxVariant) -> usize {
+        match element {
+            SignedTxVariant::Tx(tx) => self.chunks_for_tx(&tx.tx),
+            SignedTxVariant::Batch(batch) => self.chunks_for_batch(batch),
         }
     }
 
@@ -145,7 +171,7 @@ impl MempoolState {
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let ready_txs = transaction
+        let ready_txs: VecDeque<_> = transaction
             .chain()
             .mempool_schema()
             .load_txs()
@@ -178,11 +204,25 @@ impl MempoolState {
         // `tx.check_correctness()` is not invoked here.
 
         if tx.nonce() >= self.nonce(&tx.account()) {
-            self.ready_txs.push_back(tx);
+            self.ready_txs.push_back(tx.into());
             Ok(())
         } else {
             Err(TxAddError::NonceMismatch)
         }
+    }
+
+    fn add_batch(&mut self, batch: SignedTxsBatch) -> Result<(), TxAddError> {
+        assert_ne!(batch.batch_id, 0, "Batch ID was not set");
+
+        for tx in batch.txs.iter() {
+            if tx.nonce() < self.nonce(&tx.account()) {
+                return Err(TxAddError::NonceMismatch);
+            }
+        }
+
+        self.ready_txs.push_back(SignedTxVariant::Batch(batch));
+
+        Ok(())
     }
 }
 
@@ -192,6 +232,7 @@ struct Mempool {
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     max_block_size_chunks: usize,
+    max_number_of_withdrawals_per_block: usize,
 }
 
 impl Mempool {
@@ -223,11 +264,63 @@ impl Mempool {
         self.mempool_state.add_tx(tx.into_inner())
     }
 
+    async fn add_batch(&mut self, txs: Vec<VerifiedTx>) -> Result<(), TxAddError> {
+        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        let mut batch: SignedTxsBatch = SignedTxsBatch {
+            txs: txs.iter().map(|tx| tx.clone().into_inner()).collect(),
+            batch_id: 0, // Will be determined after inserting to the database
+        };
+
+        if self.mempool_state.chunks_for_batch(&batch) > self.max_block_size_chunks {
+            return Err(TxAddError::BatchTooBig);
+        }
+
+        let mut number_of_withdrawals = 0;
+        for tx in txs {
+            if tx.into_inner().tx.is_withdraw() {
+                number_of_withdrawals += 1;
+            }
+        }
+        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
+            return Err(TxAddError::BatchWithdrawalsOverload);
+        }
+
+        let mut transaction = storage.start_transaction().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+        let batch_id = transaction
+            .chain()
+            .mempool_schema()
+            .insert_batch(&batch.txs)
+            .await
+            .map_err(|err| {
+                log::warn!("Mempool storage access error: {}", err);
+                TxAddError::DbError
+            })?;
+        transaction.commit().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        batch.batch_id = batch_id;
+
+        self.mempool_state.add_batch(batch)
+    }
+
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
                     let tx_add_result = self.add_tx(*tx).await;
+                    resp.send(tx_add_result).unwrap_or_default();
+                }
+                MempoolRequest::NewTxsBatch(txs, resp) => {
+                    let tx_add_result = self.add_batch(txs).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
@@ -316,11 +409,11 @@ impl Mempool {
         )
     }
 
-    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<SignedFranklinTx>) {
+    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<SignedTxVariant>) {
         let mut txs_for_commit = Vec::new();
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
-            let chunks_for_tx = self.mempool_state.chunks_for_tx(&tx);
+            let chunks_for_tx = self.mempool_state.required_chunks(&tx);
             if chunks_left >= chunks_for_tx {
                 txs_for_commit.push(tx);
                 chunks_left -= chunks_for_tx;
@@ -356,6 +449,7 @@ pub fn run_mempool_task(
                 .iter()
                 .max()
                 .expect("failed to find max block chunks size"),
+            max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
         };
 
         mempool.run().await

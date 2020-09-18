@@ -55,6 +55,7 @@ async fn executed_operations(mut storage: StorageProcessor<'_>) -> QueryResult<(
         nonce: Default::default(),
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
+        batch_id: None,
     };
 
     OperationsSchema(&mut storage)
@@ -142,6 +143,7 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         nonce: Default::default(),
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
+        batch_id: None,
     };
 
     let executed_priority_op = NewExecutedPriorityOperation {

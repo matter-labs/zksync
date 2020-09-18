@@ -2,6 +2,7 @@
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
 use models::node::{
+    mempool::SignedTxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
     Address, FranklinTx, SignedFranklinTx,
 };
@@ -81,6 +82,41 @@ fn franklin_txs() -> Vec<SignedFranklinTx> {
         .collect()
 }
 
+/// Generates the required number of transfer transactions.
+fn gen_transfers(n: usize) -> Vec<SignedFranklinTx> {
+    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+    (0..n)
+        .map(|id| {
+            let transfer = Transfer::new(
+                id as u32,
+                Address::random(),
+                Address::random(),
+                0,
+                100u32.into(),
+                10u32.into(),
+                10,
+                None,
+            );
+
+            let test_message = format!("test message {}", rng.gen::<u32>());
+
+            SignedFranklinTx {
+                tx: FranklinTx::Transfer(Box::new(transfer)),
+                eth_sign_data: Some(get_eth_sing_data(test_message)),
+            }
+        })
+        .collect()
+}
+
+/// Gets a single transaction from a `SignedTxVariant`. Panics if variant is a batch.
+fn unwrap_tx(tx: SignedTxVariant) -> SignedFranklinTx {
+    match tx {
+        SignedTxVariant::Tx(tx) => tx,
+        SignedTxVariant::Batch(_) => panic!("Attempt to unwrap a single transaction from a batch"),
+    }
+}
+
 /// Checks the save&load routine for mempool schema.
 #[db_test]
 async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
@@ -101,12 +137,55 @@ async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     assert_eq!(txs_from_db.len(), txs.len());
 
     for (tx, tx_from_db) in txs.iter().zip(txs_from_db) {
+        let tx_from_db = unwrap_tx(tx_from_db);
         assert_eq!(tx_from_db.hash(), tx.hash(), "transaction changed");
         assert_eq!(
             tx_from_db.eth_sign_data, tx.eth_sign_data,
             "sign data changed"
         );
     }
+
+    Ok(())
+}
+
+/// Checks the save&load routine for mempool schema.
+#[db_test]
+async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert several txs into the mempool schema.
+    let txs = gen_transfers(10);
+    let alone_txs_1 = &txs[0..2];
+    let batch_1 = &txs[2..4];
+    let batch_2 = &txs[4..6];
+    let alone_txs_2 = &txs[6..8];
+    let batch_3 = &txs[8..10];
+
+    let elements_count = alone_txs_1.len() + alone_txs_2.len() + 3; // Amount of alone txs + amount of batches.
+
+    for tx in alone_txs_1 {
+        MempoolSchema(&mut storage).insert_tx(tx).await?;
+    }
+
+    MempoolSchema(&mut storage).insert_batch(batch_1).await?;
+
+    MempoolSchema(&mut storage).insert_batch(batch_2).await?;
+
+    for tx in alone_txs_2 {
+        MempoolSchema(&mut storage).insert_tx(tx).await?;
+    }
+
+    MempoolSchema(&mut storage).insert_batch(batch_3).await?;
+
+    // Load the txs and check that they match the expected list.
+    let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
+    assert_eq!(txs_from_db.len(), elements_count);
+
+    assert!(matches!(txs_from_db[0], SignedTxVariant::Tx(_)));
+    assert!(matches!(txs_from_db[1], SignedTxVariant::Tx(_)));
+    assert!(matches!(txs_from_db[2], SignedTxVariant::Batch(_)));
+    assert!(matches!(txs_from_db[3], SignedTxVariant::Batch(_)));
+    assert!(matches!(txs_from_db[4], SignedTxVariant::Tx(_)));
+    assert!(matches!(txs_from_db[5], SignedTxVariant::Tx(_)));
+    assert!(matches!(txs_from_db[6], SignedTxVariant::Batch(_)));
 
     Ok(())
 }
@@ -138,7 +217,7 @@ async fn remove_txs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
-        assert_eq!(*expected_hash, tx_from_db.hash());
+        assert_eq!(*expected_hash, unwrap_tx(tx_from_db).hash());
     }
 
     Ok(())
@@ -171,6 +250,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         nonce: Default::default(),
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
+        batch_id: None,
     };
     OperationsSchema(&mut storage)
         .store_executed_operation(executed_tx)
@@ -186,7 +266,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     assert_eq!(txs_from_db.len(), retained_hashes.len());
 
     for (expected_hash, tx_from_db) in retained_hashes.iter().zip(txs_from_db) {
-        assert_eq!(*expected_hash, tx_from_db.hash());
+        assert_eq!(*expected_hash, unwrap_tx(tx_from_db).hash());
     }
 
     Ok(())

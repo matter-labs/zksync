@@ -367,6 +367,7 @@ impl TreeState {
             fail_reason: None,
             block_index: Some(block_index),
             created_at: chrono::Utc::now(),
+            batch_id: None, // Currently `data_restore` is unable to restore `transaction <--> batch` relation
         };
         ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
         current_op_block_index + 1

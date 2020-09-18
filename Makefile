@@ -29,6 +29,7 @@ yarn:
 	@cd infrastructure/explorer && yarn
 	@cd contracts && yarn
 	@cd core/tests/ts-tests && yarn
+	@cd infrastructure/zcli && yarn
 
 
 # Helpers

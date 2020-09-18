@@ -156,6 +156,116 @@ async function testTransfer(
     feeInfo.globalFee = feeInfo.globalFee.add(fee);
 }
 
+async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber, feeInfo: any) {
+    const fee = await syncProvider.getTransactionsBatchFee(["Transfer", "Transfer"], [syncWallet2.address(), syncWallet2.address()], token);
+
+    // First, execute batched transfers successfully.
+
+    {
+        const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
+        const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
+        const startTime = new Date().getTime();
+        const transferHandles = await syncWallet1.syncMultiTransfer([{
+            to: syncWallet2.address(),
+            token,
+            amount,
+            fee: fee.div(2),
+        }, {
+            to: syncWallet2.address(),
+            token,
+            amount,
+            fee: fee.div(2),
+        }]);
+        console.log(`Batched transfers posted: ${(new Date().getTime()) - startTime} ms`);
+        for (let i = 0; i < transferHandles.length; i++) {
+            await transferHandles[i].awaitReceipt();
+        }
+        console.log(`Batched transfer committed: ${(new Date().getTime()) - startTime} ms`);
+        const wallet1AfterTransfer = await syncWallet1.getBalance(token);
+        const wallet2AfterTransfer = await syncWallet2.getBalance(token);
+
+        let transferCorrect = true;
+        transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(amount.mul(2).add(fee));
+        transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(amount.mul(2));
+        if (!transferCorrect) {
+            throw new Error("Batched transfer checks failed");
+        }
+
+        feeInfo.globalFee = feeInfo.globalFee.add(fee);
+    }
+
+    // Then, send another batch in which the second transaction will fail.
+    // The first transaction should not be executed.
+
+    {
+        const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
+        const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
+        const startTime = new Date().getTime();
+        const transferHandles = await syncWallet1.syncMultiTransfer([{
+            to: syncWallet2.address(),
+            token,
+            amount,
+            fee: fee.div(2),
+        }, {
+            to: syncWallet2.address(),
+            token,
+            amount: amount.mul(10000), // Set too big amount for the 2nd transaction.
+            fee: fee.div(2),
+        }]);
+        console.log(`Batched transfers (that should fail) posted: ${(new Date().getTime()) - startTime} ms`);
+        for (let i = 0; i < transferHandles.length; i++) {
+            try {
+                await transferHandles[i].awaitReceipt();
+            } catch (e) {
+                console.log('Error (expected) on sync tx fail:', e.message);
+            }
+        }
+        console.log(`Batched transfers (that should fail) committed: ${(new Date().getTime()) - startTime} ms`);
+        const wallet1AfterTransfer = await syncWallet1.getBalance(token);
+        const wallet2AfterTransfer = await syncWallet2.getBalance(token);
+
+        let transferCorrect = true;
+        transferCorrect = transferCorrect && wallet1BeforeTransfer.eq(wallet1AfterTransfer);
+        transferCorrect = transferCorrect && wallet2AfterTransfer.eq(wallet2BeforeTransfer);
+        if (!transferCorrect) {
+            throw new Error("Batched transfer checks failed: balances changed after batch failure");
+        }
+    }
+}
+
+async function testFailedMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber) {
+    let testPassed = true;
+    try {
+        const startTime = new Date().getTime();
+        const transferHandles = await syncWallet1.syncMultiTransfer([{
+            to: syncWallet2.address(),
+            token,
+            amount,
+            fee: utils.parseEther('0'),
+        }, {
+            to: syncWallet2.address(),
+            token,
+            amount,
+            fee: utils.parseEther('0'),
+        }]);
+        console.log(`  Batched transfers posted: ${(new Date().getTime()) - startTime} ms`);
+        for (let i = 0; i < transferHandles.length; i++) {
+            await transferHandles[i].awaitVerifyReceipt();
+        }
+        console.log(`  Batched transfer committed: ${(new Date().getTime()) - startTime} ms`);
+        testPassed = false;
+    } catch (e) {
+        assert(e.jrpcError.message == 'Transactions batch summary fee is too low');
+        console.log('  Error (expected) on tx batch fail:', e.jrpcError.message);
+    }
+
+    if (!testPassed) {
+        throw new Error("testFailedMultiTransfer failed !!!");
+    }
+    console.log("testFailedMultiTransfer ok")
+}
+
+
 async function testWithdraw(
     contract: Contract,
     withdrawTo: Wallet,
@@ -309,7 +419,7 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
         await tx.awaitVerifyReceipt();
         testPassed = false;
     } catch (e) {
-        console.log("Error (expected) on sync tx fail:", e);
+        console.log("Error (expected) on sync tx fail:", e.message);
     }
 
     if (!testPassed) {
@@ -351,6 +461,11 @@ async function moveFunds(
     console.log(`Transfer to self with fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
+
+    await testMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2), feeInfo); // `.div(2)` because we do 2 transfers inside.
+    console.log(`Batched transfers ok, Token: ${token}`);
+    await testFailedMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2)); // `.div(2)` because we do 2 transfers inside.
+
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, feeInfo);
     console.log(`Withdraw ok, Token: ${token}`);

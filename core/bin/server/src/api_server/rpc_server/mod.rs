@@ -25,7 +25,7 @@ use storage::{
 use crate::{
     api_server::ops_counter::ChangePubKeyOpsCounter,
     eth_watch::{EthBlockId, EthWatchRequest},
-    fee_ticker::{Fee, TickerRequest},
+    fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
@@ -358,12 +358,14 @@ impl RpcApp {
     async fn ticker_price_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         token: TokenLike,
+        req_type: TokenPriceRequestType,
     ) -> Result<BigDecimal> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTokenPrice {
                 token: token.clone(),
                 response: req.0,
+                req_type,
             })
             .await
             .expect("ticker receiver dropped");

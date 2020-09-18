@@ -27,6 +27,7 @@ pub struct ExecutedTx {
     pub fail_reason: Option<String>,
     pub block_index: Option<u32>,
     pub created_at: DateTime<Utc>,
+    pub batch_id: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
