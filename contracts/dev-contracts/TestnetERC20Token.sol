@@ -1,12 +1,15 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: UNLICENSED
 
-import "openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+pragma solidity ^0.7.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 
-contract TestnetERC20Token is ERC20, ERC20Detailed {
+contract TestnetERC20Token is ERC20 {
 
-    constructor (string memory name, string memory symbol, uint8 decimals) public ERC20Detailed(name, symbol, decimals) {}
+    constructor (string memory name, string memory symbol, uint8 decimals) ERC20(name, symbol) {
+        _setupDecimals(decimals);
+    }
 
     function mint(address _to, uint256 _amount) public returns (bool) {
         _mint(_to, _amount);

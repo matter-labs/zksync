@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: UNLICENSED
+
+pragma solidity ^0.7.0;
 
 import "./ContextTest.sol";
 import "./MintableIERC20Test.sol";
@@ -37,7 +39,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
 
     uint256 private _totalSupply;
 
-    function mint(address to, uint256 amount) external {
+    function mint(address to, uint256 amount) external override {
         _mint(to, amount);
     }
 
@@ -49,7 +51,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
 
     /// shouldBeFeeTransfers - true if there is should be taken fee, false if there should be dividends
     /// senderUnintuitiveProcess - true if there is should be taken fee from sender (or dividends for him), false if this process works with recipient
-    constructor(bool shouldBeFeeTransfers, bool senderUnintuitiveProcess) public {
+    constructor(bool shouldBeFeeTransfers, bool senderUnintuitiveProcess) {
         _shouldBeFeeTransfers = shouldBeFeeTransfers;
         _senderUnintuitiveProcess = senderUnintuitiveProcess;
     }
@@ -57,14 +59,14 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     /**
      * @dev See {IERC20-totalSupply}.
      */
-    function totalSupply() public view returns (uint256) {
+    function totalSupply() public view override returns (uint256) {
         return _totalSupply;
     }
 
     /**
      * @dev See {IERC20-balanceOf}.
      */
-    function balanceOf(address account) public view returns (uint256) {
+    function balanceOf(address account) public view override returns (uint256) {
         return _balances[account];
     }
 
@@ -76,7 +78,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address recipient, uint256 amount) public returns (bool) {
+    function transfer(address recipient, uint256 amount) public override returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -84,7 +86,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender) public view returns (uint256) {
+    function allowance(address owner, address spender) public override view returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -95,7 +97,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount) public returns (bool) {
+    function approve(address spender, uint256 amount) public override returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -112,7 +114,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      * - the caller must have allowance for `sender`'s tokens of at least
      * `amount`.
      */
-    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public override returns (bool) {
         _transfer(sender, recipient, amount);
         _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
         return true;

@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
-pragma solidity >=0.5.0 <0.7.0;
+pragma solidity ^0.7.0;
 
 import "./PlonkCore.sol";
 

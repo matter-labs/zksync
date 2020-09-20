@@ -422,6 +422,11 @@
     "@ethersproject/properties" "^5.0.3"
     "@ethersproject/strings" "^5.0.4"
 
+"@openzeppelin/contracts@3.2.1-solc-0.7":
+  version "3.2.1-solc-0.7"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.2.1-solc-0.7.tgz#067a60918b935d4733208edb3d7e35cd1d51026b"
+  integrity sha512-VfKZE9L2HNaZVBR7l5yHbRmap3EiVw9F5iVXRRDdgfnA9vQ1yFanrs0VYmdo2VIXC+EsI9wPPYZY9Ic7/qDBdw==
+
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
   resolved "https://registry.yarnpkg.com/@resolver-engine/core/-/core-0.3.3.tgz#590f77d85d45bc7ecc4e06c654f41345db6ca967"
@@ -5969,11 +5974,6 @@ onetime@^2.0.0:
   integrity sha1-BnQoIw/WdEOyeUsiu6UotoZ5YtQ=
   dependencies:
     mimic-fn "^1.0.0"
-
-openzeppelin-solidity@^2.3.0:
-  version "2.5.1"
-  resolved "https://registry.yarnpkg.com/openzeppelin-solidity/-/openzeppelin-solidity-2.5.1.tgz#1cdcce30c4c6a7b6625dab62ccd0440a813ab597"
-  integrity sha512-oCGtQPLOou4su76IMr4XXJavy9a8OZmAXeUZ8diOdFznlL/mlkIlYr7wajqCzH4S47nlKPS7m0+a2nilCTpVPQ==
 
 optionator@^0.8.2:
   version "0.8.3"

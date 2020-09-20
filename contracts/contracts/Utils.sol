@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./IERC20.sol";
 import "./Bytes.sol";
@@ -55,7 +57,7 @@ library Utils {
         // TODO: Use constant from Config
         uint256 ETH_WITHDRAWAL_GAS_LIMIT = 10000;
 
-        (bool callSuccess, ) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
+        (bool callSuccess, ) = _to.call{ gas: ETH_WITHDRAWAL_GAS_LIMIT, value: _amount}("");
         return callSuccess;
     }
 

@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: UNLICENSED
+
+pragma solidity ^0.7.0;
 
 import "../contracts/Upgradeable.sol";
 import "../contracts/UpgradeableMaster.sol";
@@ -23,30 +25,30 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function getNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external pure override returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function upgradeNoticePeriodStarted() external {}
+    function upgradeNoticePeriodStarted() external override  {}
 
-    function upgradePreparationStarted() external {}
+    function upgradePreparationStarted() external override {}
 
-    function upgradeCanceled() external {}
+    function upgradeCanceled() external override {}
 
-    function upgradeFinishes() external {}
+    function upgradeFinishes() external override {}
 
-    function isReadyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external view override returns (bool) {
         return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
     uint256 private constant DUMMY_INDEX = 1;
-    function get_DUMMY_INDEX() external pure returns (uint256) {
+    function get_DUMMY_INDEX() external pure override returns (uint256) {
         return DUMMY_INDEX;
     }
 
     uint64 _verifiedPriorityOperations;
 
-    function initialize(bytes calldata initializationParameters) external {
+    function initialize(bytes calldata initializationParameters) external override {
         bytes32 byte_0 = bytes32(uint256(uint8(initializationParameters[0])));
         bytes32 byte_1 = bytes32(uint256(uint8(initializationParameters[1])));
         assembly {
@@ -55,19 +57,19 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
         }
     }
 
-    function upgrade(bytes calldata upgradeParameters) external {
+    function upgrade(bytes calldata upgradeParameters) external override {
 
     }
 
-    function totalVerifiedPriorityOperations() internal returns (uint64) {
+    function totalVerifiedPriorityOperations() internal view returns (uint64) {
         return _verifiedPriorityOperations;
     }
 
-    function totalRegisteredPriorityOperations() internal returns (uint64) {
+    function totalRegisteredPriorityOperations() internal pure returns (uint64) {
         return 1;
     }
 
-    function verifyPriorityOperation() external {
+    function verifyPriorityOperation() external override {
         _verifiedPriorityOperations++;
     }
 
@@ -80,34 +82,34 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function getNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external pure override returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function upgradeNoticePeriodStarted() external {}
+    function upgradeNoticePeriodStarted() external override {}
 
-    function upgradePreparationStarted() external {}
+    function upgradePreparationStarted() external override {}
 
-    function upgradeCanceled() external {}
+    function upgradeCanceled() external override {}
 
-    function upgradeFinishes() external {}
+    function upgradeFinishes() external override {}
 
-    function isReadyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external view override returns (bool) {
         return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
     uint256 private constant DUMMY_INDEX = 2;
-    function get_DUMMY_INDEX() external pure returns (uint256) {
+    function get_DUMMY_INDEX() external override pure returns (uint256) {
         return DUMMY_INDEX;
     }
 
     uint64 _verifiedPriorityOperations;
 
-    function initialize(bytes calldata initializationParameters) external {
+    function initialize(bytes calldata) external pure override {
         revert("dsini");
     }
 
-    function upgrade(bytes calldata upgradeParameters) external {
+    function upgrade(bytes calldata upgradeParameters) external override {
         bytes32 byte_0 = bytes32(uint256(uint8(upgradeParameters[0])));
         bytes32 byte_1 = bytes32(uint256(uint8(upgradeParameters[1])));
         assembly {
@@ -116,15 +118,15 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
         }
     }
 
-    function totalVerifiedPriorityOperations() internal returns (uint64) {
+    function totalVerifiedPriorityOperations() internal view returns (uint64) {
         return _verifiedPriorityOperations;
     }
 
-    function totalRegisteredPriorityOperations() internal returns (uint64) {
+    function totalRegisteredPriorityOperations() internal pure returns (uint64) {
         return 0;
     }
 
-    function verifyPriorityOperation() external {
+    function verifyPriorityOperation() external override {
         _verifiedPriorityOperations++;
     }
 

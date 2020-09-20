@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./Config.sol";
 
@@ -39,7 +41,7 @@ contract Governance is Config {
     /// @notice List of permitted validators
     mapping(address => bool) public validators;
 
-    constructor() public {}
+    constructor() {}
 
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:

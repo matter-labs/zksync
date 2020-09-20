@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./IERC20.sol";
 
@@ -19,10 +21,10 @@ contract Storage {
     /// @dev Will be equal to zero in case of not active upgrade mode
     uint public upgradePreparationActivationTime;
 
-    /// @notice Verifier contract. Used to verify block proof and exit proof
+    /// @dev Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;
 
-    /// @notice Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
+    /// @dev Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance internal governance;
 
     struct BalanceToWithdraw {
@@ -63,7 +65,7 @@ contract Storage {
         uint32 committedAtBlock;
         uint64 priorityOperations;
         uint32 chunks;
-        bytes32 withdrawalsDataHash; /// can be restricted to 16 bytes to reduce number of required storage slots
+        bytes32 withdrawalsDataHash; // can be restricted to 16 bytes to reduce number of required storage slots
         bytes32 commitment;
         bytes32 stateRoot;
     }

@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./Bytes.sol";
 
@@ -32,15 +34,15 @@ library Operations {
 
     uint8 constant ADDRESS_BYTES = 20;
 
-    /// @notice Packed fee bytes lengths
+    /// @dev Packed fee bytes lengths
     uint8 constant FEE_BYTES = 2;
 
-    /// @notice zkSync account id bytes lengths
+    /// @dev zkSync account id bytes lengths
     uint8 constant ACCOUNT_ID_BYTES = 4;
 
     uint8 constant AMOUNT_BYTES = 16;
 
-    /// @notice Signature (for example full exit signature) bytes length
+    /// @dev Signature (for example full exit signature) bytes length
     uint8 constant SIGNATURE_BYTES = 64;
 
     // Deposit pubdata

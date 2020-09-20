@@ -15,7 +15,6 @@
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "mocha": "^6.2.0",
-    "openzeppelin-solidity": "^2.3.0",
     "path": "^0.12.7",
     "prettier": "^1.18.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.27",
@@ -43,5 +42,8 @@
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
     "prettier:solidity": "prettier --write contracts/**/*.sol"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "3.2.1-solc-0.7"
   }
 }

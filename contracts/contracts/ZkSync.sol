@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./ReentrancyGuard.sol";
 import "./SafeMath.sol";
@@ -26,36 +28,36 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     // Upgrade functional
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function getNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external pure override returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
     /// @notice Notification that upgrade notice period started
-    function upgradeNoticePeriodStarted() external {
+    function upgradeNoticePeriodStarted() external override {
 
     }
 
     /// @notice Notification that upgrade preparation status is activated
-    function upgradePreparationStarted() external {
+    function upgradePreparationStarted() external override {
         upgradePreparationActive = true;
-        upgradePreparationActivationTime = now;
+        upgradePreparationActivationTime = block.timestamp;
     }
 
     /// @notice Notification that upgrade canceled
-    function upgradeCanceled() external {
+    function upgradeCanceled() external override {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
     }
 
     /// @notice Notification that upgrade finishes
-    function upgradeFinishes() external {
+    function upgradeFinishes() external override {
         upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
     }
 
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
-    function isReadyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external view override returns (bool) {
         return !exodusMode;
     }
 
@@ -129,7 +131,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
                     // we can just check that call not reverts because it wants to withdraw all amount
-                    (sent, ) = address(this).call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
+                    (sent, ) = address(this).call{ gas: ERC20_WITHDRAWAL_GAS_LIMIT }(
                         abi.encodeWithSignature("withdrawERC20Guarded(address,address,uint128,uint128)", tokenAddr, to, amount, amount)
                     );
                 }
@@ -174,7 +176,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _amount Ether amount to withdraw
     function withdrawETH(uint128 _amount) external nonReentrant {
         registerWithdrawal(0, _amount, msg.sender);
-        (bool success, ) = msg.sender.call.value(_amount)("");
+        (bool success, ) = msg.sender.call{ value: _amount }("");
         require(success, "fwe11"); // ETH withdraw failed
     }
 
@@ -586,13 +588,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return recoveredAddress == _ethAddress;
     }
 
-    /// @notice Creates block commitment from its data
+    /// @dev Creates block commitment from its data
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
     /// @param _oldRoot Old tree root
     /// @param _newRoot New tree root
     /// @param _publicData Operations pubdata
-    /// @return block commitment
+    /// @return commitment block commitment
     function createBlockCommitment(
         uint32 _blockNumber,
         uint32 _feeAccount,
@@ -620,7 +622,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             mstore(_publicData, hash)
             // staticcall to the sha256 precompile at address 0x2
             let success := staticcall(
-                gas,
+                gas(),
                 0x2,
                 _publicData,
                 add(pubDataLen, 0x20),

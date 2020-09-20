@@ -1,4 +1,6 @@
-pragma solidity ^0.5.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 // Functions named bytesToX, except bytesToBytes20, where X is some type of size N < 32 (size of one word)
 // implements the following algorithm:
