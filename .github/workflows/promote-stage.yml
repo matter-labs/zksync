@@ -1,8 +1,8 @@
 name: Promote to stage
 
 on:
-  push:
-    branches: [ dev, master, breaking ]
+  pull_request:  # FIXME (revert to 'push')
+    branches: [ dev ] # FIXME (revert to 'dev, master, breaking')
 
 jobs:
   build-images:
@@ -18,10 +18,7 @@ jobs:
         echo "::set-env name=CI::1"
 
     - name: init
-      run: |
-        zksync yarn
-        cp etc/tokens/{test,localhost}.json
-        zksync verify-keys unpack
+      run: zksync init
 
     - name: update-images
       run: |
@@ -39,3 +36,9 @@ jobs:
          -F "variables[EXPLORER_TAG]=$IMAGE_TAG" \
          -F "variables[GITHUB_REF]=$GITHUB_REF" \
          https://gitlab.com/api/v4/projects/19173848/trigger/pipeline
+
+    services:
+      postgres:
+        image: postgres:10.4
+        ports:
+          - 5432:5432
