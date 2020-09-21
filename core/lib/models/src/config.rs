@@ -9,10 +9,3 @@ pub const MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL: u64 = 20;
 pub const LEADER_LOOKUP_INTERVAL: Duration = Duration::from_secs(1);
 /// Interval between state updates in server replica's observer mode.
 pub const OBSERVER_MODE_PULL_INTERVAL: Duration = Duration::from_secs(1);
-
-// Parameters below are considered stable thus no need to keep them inside env.
-
-/// Depth of the account tree.
-pub const ACCOUNT_TREE_DEPTH: usize = 32;
-/// Depth of the balance tree for each account.
-pub const BALANCE_TREE_DEPTH: usize = 11;
