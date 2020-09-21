@@ -21,15 +21,18 @@ jobs:
         echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
         echo "::set-env name=CI::1"
 
-    - name: update-rust
-      run: rustup update stable
+    - name: update-deps
+      run: |
+        rustup update stable
+        cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
 
     - name: lints
       run: |
         zksync db-setup # So database will be created for compilation.
         zksync dummy-prover ensure-disabled
         cargo fmt --all -- --check
-        cargo clippy --tests --benches -- -D warnings
+        # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
+        f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
