@@ -1,16 +1,17 @@
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
-use models::node::operations::{
+use models::operations::{
     ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
     WithdrawOp,
 };
-use models::node::tx::ChangePubKey;
-use models::node::Address;
-use models::node::{
-    reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
+use models::tx::ChangePubKey;
+use models::Address;
+use models::{
+    helpers::reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
+    TokenId,
 };
-use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
-use models::node::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
+use models::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
+use models::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
 use num::BigUint;
 use std::collections::HashMap;
 use zksync_crypto::{

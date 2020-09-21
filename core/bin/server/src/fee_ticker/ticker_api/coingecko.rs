@@ -2,7 +2,7 @@ use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use failure::Error;
-use models::node::TokenPrice;
+use models::TokenPrice;
 use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;

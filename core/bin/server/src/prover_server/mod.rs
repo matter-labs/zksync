@@ -7,7 +7,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{info, trace};
 // Workspace deps
-use models::node::BlockNumber;
+use models::BlockNumber;
 use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};

@@ -10,7 +10,7 @@ use circuit::{
     circuit::FranklinCircuit,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
-use models::node::{
+use models::{
     block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
 };
 use zksync_config::ConfigurationOptions;

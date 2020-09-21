@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
 // Workspace uses
-use models::node::{
+use models::{
     tx::TxEthSignature, Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce,
     PriorityOp, PubKeyHash,
 };

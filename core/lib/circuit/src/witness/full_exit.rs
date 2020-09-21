@@ -7,7 +7,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::node::FullExitOp;
+use models::FullExitOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,

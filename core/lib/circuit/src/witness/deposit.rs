@@ -7,7 +7,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::node::operations::DepositOp;
+use models::operations::DepositOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,

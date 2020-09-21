@@ -17,7 +17,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::node::{
+use models::{
     operations::{ChangePubKeyOp, NoopOp},
     CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };

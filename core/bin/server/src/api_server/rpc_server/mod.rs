@@ -7,7 +7,7 @@ use futures::{
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use models::node::{
+use models::{
     tx::{TxEthSignature, TxHash},
     Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
 };
@@ -34,7 +34,7 @@ use crate::{
     },
 };
 use bigdecimal::BigDecimal;
-use models::node::tx::EthSignData;
+use models::tx::EthSignData;
 
 pub mod error;
 mod rpc_impl;

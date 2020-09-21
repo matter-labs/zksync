@@ -2,7 +2,7 @@
 
 use eth_client::ETHClient;
 use futures::compat::Future01CompatExt;
-use models::node::{AccountId, TokenLike};
+use models::{AccountId, TokenLike};
 use std::str::FromStr;
 use web3::contract::tokens::Tokenize;
 use web3::contract::{Contract, Options};

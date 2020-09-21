@@ -7,7 +7,7 @@ use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throu
 use web3::types::H256;
 // Workspace uses
 use crypto_exports::rand::{thread_rng, Rng};
-use models::node::{
+use models::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
     tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},

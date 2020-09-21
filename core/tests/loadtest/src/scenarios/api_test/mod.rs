@@ -16,7 +16,7 @@ use std::time::Duration;
 use num::BigUint;
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
-use models::node::{closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx};
+use models::{helpers::closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx};
 use testkit::zksync_account::ZksyncAccount;
 use zksync_utils::format_ether;
 // Local deps

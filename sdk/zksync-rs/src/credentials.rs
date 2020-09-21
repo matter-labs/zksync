@@ -1,5 +1,5 @@
 use crate::{error::ClientError, utils::private_key_from_seed};
-use models::node::tx::PackedEthSignature;
+use models::tx::PackedEthSignature;
 use web3::types::{Address, H256};
 use zksync_crypto::PrivateKey;
 

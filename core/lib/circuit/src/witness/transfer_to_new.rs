@@ -1,5 +1,5 @@
 // Workspace deps
-use models::node::operations::TransferToNewOp;
+use models::operations::TransferToNewOp;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
@@ -29,7 +29,7 @@ use crate::{
         Witness,
     },
 };
-use models::node::operations::ChangePubKeyOp;
+use models::operations::ChangePubKeyOp;
 
 pub struct TransferToNewData {
     pub amount: u128,

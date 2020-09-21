@@ -1,6 +1,6 @@
 // External imports
 // Workspace imports
-use models::node::AccountMap;
+use models::AccountMap;
 use models::Action;
 // Local imports
 use super::{block::apply_random_updates, utils::get_operation};

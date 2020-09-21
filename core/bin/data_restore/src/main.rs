@@ -12,7 +12,7 @@ pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
-use models::node::{
+use models::{
     tokens::{get_genesis_token_list, Token},
     TokenId,
 };

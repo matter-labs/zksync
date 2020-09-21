@@ -9,7 +9,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::node::{AccountId, TokenId};
+use models::{AccountId, TokenId};
 use zksync_crypto::{
     circuit::{
         utils::{append_be_fixed_width, be_bit_vector_into_bytes},
@@ -172,7 +172,7 @@ pub fn create_exit_circuit_with_public_input(
 #[cfg(test)]
 mod test {
     use super::*;
-    use models::node::Account;
+    use models::Account;
     use num::BigUint;
     use zksync_crypto::circuit::account::CircuitAccount;
     use zksync_crypto::circuit::CircuitAccountTree;

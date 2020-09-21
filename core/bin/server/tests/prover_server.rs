@@ -5,7 +5,7 @@ use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
 // Workspace deps
 use circuit::witness::{deposit::DepositWitness, Witness};
-use models::node::{block::Block, Address};
+use models::{block::Block, Address};
 use num::BigUint;
 use prover::{client, ApiClient};
 use zksync_config::ConfigurationOptions;
@@ -182,8 +182,8 @@ pub async fn test_operation_and_wanted_prover_data(
         .expect("Failed to connect to db");
 
     // Fee account
-    let mut accounts = models::node::AccountMap::default();
-    let validator_account = models::node::Account::default_with_address(&Address::random());
+    let mut accounts = models::AccountMap::default();
+    let validator_account = models::Account::default_with_address(&Address::random());
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
@@ -200,7 +200,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let initial_root = circuit_tree.root_hash();
     let initial_root2 = circuit_tree.root_hash();
     let initial_used_subtree_root = get_used_subtree_root_hash(&circuit_tree);
-    let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
+    let deposit_priority_op = models::FranklinPriorityOp::Deposit(models::Deposit {
         from: validator_account.address,
         token: 0,
         amount: BigUint::from(10u32),
@@ -224,7 +224,7 @@ pub async fn test_operation_and_wanted_prover_data(
             0,
             &[(
                 0,
-                models::node::AccountUpdate::Create {
+                models::AccountUpdate::Create {
                     address: validator_account.address,
                     nonce: validator_account.nonce,
                 },
@@ -239,10 +239,10 @@ pub async fn test_operation_and_wanted_prover_data(
         .await
         .unwrap();
 
-    ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(
-        models::node::ExecutedPriorityOp {
+    ops.push(models::ExecutedOperations::PriorityOp(Box::new(
+        models::ExecutedPriorityOp {
             op: op_success.executed_op,
-            priority_op: models::node::PriorityOp {
+            priority_op: models::PriorityOp {
                 serial_id: 0,
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
@@ -271,10 +271,10 @@ pub async fn test_operation_and_wanted_prover_data(
     let mut pub_data = vec![];
     let mut operations = vec![];
 
-    if let models::node::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
+    if let models::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
         let deposit_witness = DepositWitness::apply_tx(
             &mut circuit_tree,
-            &models::node::operations::DepositOp {
+            &models::operations::DepositOp {
                 priority_op: deposit_op,
                 account_id: 0,
             },

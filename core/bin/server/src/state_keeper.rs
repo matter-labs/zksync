@@ -10,7 +10,8 @@ use web3::types::Address;
 // Workspace uses
 use crypto_exports::ff;
 use models::{
-    node::{
+    ActionType,
+    {
         block::{
             Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
             PendingBlock as SendablePendingBlock,
@@ -19,7 +20,6 @@ use models::{
         tx::{FranklinTx, TxHash},
         Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
     },
-    ActionType,
 };
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 use storage::ConnectionPool;
@@ -29,7 +29,7 @@ use crate::{
     gas_counter::GasCounter,
     mempool::ProposedBlock,
 };
-use models::node::SignedFranklinTx;
+use models::SignedFranklinTx;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),

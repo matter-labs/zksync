@@ -5,7 +5,7 @@ use zksync_crypto::franklin_crypto::{
     circuit::test::TestConstraintSystem,
 };
 // Workspace deps
-use models::node::{Account, AccountId, AccountMap, Address};
+use models::{Account, AccountId, AccountMap, Address};
 use plasma::state::{CollectedFee, PlasmaState};
 use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
 use zksync_crypto::{Engine, Fr};

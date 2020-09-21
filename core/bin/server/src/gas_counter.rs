@@ -6,7 +6,7 @@
 // External deps
 use web3::types::U256;
 // Workspace deps
-use models::node::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
+use models::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -173,7 +173,7 @@ impl GasCounter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::node::{operations::ChangePubKeyOp, tx::ChangePubKey};
+    use models::{operations::ChangePubKeyOp, tx::ChangePubKey};
 
     #[test]
     fn commit_cost() {

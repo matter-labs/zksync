@@ -9,7 +9,7 @@
 //! For localhost network we deploy test ERC20 token and generate token list file in the `zksync init` script.
 
 use handlebars::{to_json, Handlebars};
-use models::node::tokens::get_genesis_token_list;
+use models::tokens::get_genesis_token_list;
 use std::collections::HashMap;
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;

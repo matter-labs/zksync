@@ -1,7 +1,7 @@
 // Built-in deps
 // External imports
 // Workspace imports
-use models::{node::BlockNumber, ActionType};
+use models::{ActionType, BlockNumber};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,

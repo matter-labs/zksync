@@ -3,10 +3,10 @@
 use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::operations::{ChangePubKeyOp, FranklinOp};
-use models::node::priority_ops::PriorityOp;
-use models::node::{
+use models::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use models::operations::{ChangePubKeyOp, FranklinOp};
+use models::priority_ops::PriorityOp;
+use models::{
     Address, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token, TransferOp, TransferToNewOp,
     WithdrawOp,
 };

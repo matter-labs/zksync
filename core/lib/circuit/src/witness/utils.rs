@@ -13,7 +13,7 @@ use zksync_crypto::franklin_crypto::{
 };
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace deps
-use models::node::{
+use models::{
     operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
     tx::PackedPublicKey,
     AccountId, BlockNumber,

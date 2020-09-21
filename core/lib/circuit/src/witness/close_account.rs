@@ -7,7 +7,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::node::operations::CloseOp;
+use models::operations::CloseOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -204,7 +204,7 @@ impl CloseAccountWitness<Bn256> {
 //    use crypto_exports::franklin_crypto::jubjub::FixedGenerators;
 //    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
 //    use models::circuit::utils::*;
-//    use models::node::tx::PackedPublicKey;
+//    use models::tx::PackedPublicKey;
 //    use models::params as franklin_constants;
 //    use rand::{Rng, SeedableRng, XorShiftRng};
 

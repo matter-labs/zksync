@@ -1,4 +1,4 @@
-use models::node::{AccountId, Address, Nonce, PubKeyHash, Token};
+use models::{AccountId, Address, Nonce, PubKeyHash, Token};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

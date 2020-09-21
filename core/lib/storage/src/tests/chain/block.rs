@@ -2,7 +2,7 @@
 use web3::types::H256;
 // Workspace imports
 use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
-use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber};
+use models::{block::Block, helpers::apply_updates, AccountMap, AccountUpdate, BlockNumber};
 use models::{ethereum::OperationType, Action, Operation};
 use zksync_crypto::{convert::fe_to_bytes, Fr};
 // Local imports
@@ -489,7 +489,7 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 #[db_test]
 async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     use crate::chain::operations_ext::OperationsExtSchema;
-    use models::node::{
+    use models::{
         block::PendingBlock,
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, FranklinOp, FranklinTx,

@@ -1,7 +1,7 @@
 // External uses
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 // Local uses
-use models::node::{Account, Address, PubKeyHash};
+use models::{Account, Address, PubKeyHash};
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::primitives::{
     bytes_into_be_bits, get_bits_le_fixed_u128, pack_bits_into_bytes,

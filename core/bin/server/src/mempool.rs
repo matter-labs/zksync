@@ -24,7 +24,7 @@ use futures::{
 };
 use tokio::task::JoinHandle;
 // Workspace uses
-use models::node::{
+use models::{
     mempool::{SignedTxVariant, SignedTxsBatch},
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
     SignedFranklinTx, TransferOp, TransferToNewOp,

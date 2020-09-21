@@ -9,7 +9,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use super::{TokenPriceAPI, REQUEST_TIMEOUT};
-use models::node::{TokenLike, TokenPrice};
+use models::{TokenLike, TokenPrice};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 #[derive(Debug)]

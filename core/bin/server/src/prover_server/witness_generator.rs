@@ -12,8 +12,8 @@ use circuit::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
     TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
-use models::node::block::Block;
-use models::node::{BlockNumber, FranklinOp};
+use models::block::Block;
+use models::{BlockNumber, FranklinOp};
 use plasma::state::CollectedFee;
 use std::time::Instant;
 use storage::StorageProcessor;

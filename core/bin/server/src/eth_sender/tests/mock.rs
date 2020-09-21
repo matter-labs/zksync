@@ -465,7 +465,7 @@ pub(in crate::eth_sender) fn create_signed_withdraw_tx(
 
     let raw_tx = eth_sender.ethereum.encode_tx_data(
         "completeWithdrawals",
-        models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+        models::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
     );
     let signed_tx = eth_sender
         .ethereum

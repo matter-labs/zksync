@@ -9,7 +9,7 @@ use web3::types::H160;
 // Workspace uses
 use zksync_config::{AdminServerOptions, ConfigurationOptions, ProverOptions};
 
-use models::node::{
+use models::{
     config::OBSERVER_MODE_PULL_INTERVAL,
     tokens::{get_genesis_token_list, Token},
     TokenId,

@@ -2,8 +2,8 @@
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use models::node::block::Block;
-use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
+use models::block::Block;
+use models::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
 use models::{NewTokenEvent, Operation};
 // Local imports
 use self::records::{

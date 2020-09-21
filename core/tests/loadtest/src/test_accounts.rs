@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use tokio::time;
 use web3::transports::Http;
 // Workspace uses
-use models::node::{tx::PackedEthSignature, FranklinTx};
+use models::{tx::PackedEthSignature, FranklinTx};
 use testkit::{eth_account::EthereumAccount, zksync_account::ZksyncAccount};
 use zksync_config::ConfigurationOptions;
 // Local uses

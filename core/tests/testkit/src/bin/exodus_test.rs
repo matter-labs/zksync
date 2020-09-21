@@ -12,7 +12,7 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
 use log::*;
-use models::node::{AccountId, AccountMap};
+use models::{AccountId, AccountMap};
 use num::BigUint;
 use std::time::Instant;
 use testkit::*;

@@ -19,8 +19,8 @@ use web3::{
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
+    config,
     ethereum::{ETHOperation, OperationType},
-    node::config,
     Action, Operation,
 };
 use storage::ConnectionPool;

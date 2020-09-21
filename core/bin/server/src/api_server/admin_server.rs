@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 // Local uses
 use crate::panic_notify::ThreadPanicNotify;
-use models::node::{tokens, Address, TokenId};
+use models::{tokens, Address, TokenId};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {

@@ -1,5 +1,5 @@
 use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
-use models::node::account::Account;
+use models::account::Account;
 use web3::contract::{Contract, Options};
 use web3::futures::Future;
 use web3::types::{Address, BlockNumber, Transaction, U256};

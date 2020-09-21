@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 // External imports
 // Workspace imports
-use models::node::{Token, TokenId, TokenLike, TokenPrice};
+use models::{Token, TokenId, TokenLike, TokenPrice};
 // Local imports
 use self::records::{DbTickerPrice, DbToken};
 use crate::tokens::utils::address_to_stored_string;

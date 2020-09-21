@@ -11,9 +11,9 @@
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
-use models::node::{
-    pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, ChangePubKeyOp,
-    DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+use models::{
+    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
+    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::str::FromStr;

@@ -2,10 +2,10 @@ use crate::playground::get_path_in_file_dump_dir;
 use crate::witness::tests::test_utils::{PlasmaStateGenerator, WitnessTestAccount};
 use crate::witness::utils::WitnessBuilder;
 use crate::witness::{deposit::DepositWitness, Witness};
-use models::node::{Deposit, DepositOp};
 use models::prover_utils::fs_utils::{
     get_universal_setup_lagrange_form, get_universal_setup_monomial_form,
 };
+use models::{Deposit, DepositOp};
 use num::BigUint;
 use rayon::prelude::*;
 use std::time::Instant;

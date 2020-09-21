@@ -3,7 +3,7 @@
 
 use clap::{App, Arg};
 use log::info;
-use models::node::{AccountId, Address, TokenId, TokenLike};
+use models::{AccountId, Address, TokenId, TokenLike};
 use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;

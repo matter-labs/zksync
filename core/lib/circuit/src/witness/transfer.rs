@@ -8,7 +8,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::node::operations::TransferOp;
+use models::operations::TransferOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,

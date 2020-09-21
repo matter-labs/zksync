@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
-use models::node::tx::{PackedEthSignature, TxSignature};
+use models::tx::{PackedEthSignature, TxSignature};
 use zksync_basic_types::H256;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};

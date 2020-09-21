@@ -4,7 +4,7 @@ use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 // Workspace uses
-use models::node::{
+use models::{
     tx::{TxEthSignature, TxHash},
     Address, FranklinTx, Token, TokenLike, TxFeeTypes,
 };

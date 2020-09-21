@@ -1,12 +1,12 @@
 use crate::rollup_ops::RollupOpsBlock;
 use failure::format_err;
-use models::node::account::Account;
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::operations::FranklinOp;
-use models::node::priority_ops::FranklinPriorityOp;
-use models::node::priority_ops::PriorityOp;
-use models::node::tx::FranklinTx;
-use models::node::{AccountId, AccountMap, AccountUpdates};
+use models::account::Account;
+use models::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use models::operations::FranklinOp;
+use models::priority_ops::FranklinPriorityOp;
+use models::priority_ops::PriorityOp;
+use models::tx::FranklinTx;
+use models::{AccountId, AccountMap, AccountUpdates};
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 use web3::types::Address;
 use zksync_crypto::Fr;
@@ -399,7 +399,7 @@ impl TreeState {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
-    use models::node::{
+    use models::{
         Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
     use num::BigUint;

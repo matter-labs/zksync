@@ -4,8 +4,8 @@ use std::cmp::Ordering;
 use num::bigint::ToBigInt;
 use web3::types::Address;
 // Workspace imports
-use models::node::PubKeyHash;
-use models::node::{AccountUpdate, TokenId};
+use models::PubKeyHash;
+use models::{AccountUpdate, TokenId};
 // Local imports
 use crate::chain::account::records::*;
 

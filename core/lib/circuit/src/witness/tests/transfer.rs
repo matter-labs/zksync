@@ -2,7 +2,7 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::node::operations::TransferOp;
+use models::operations::TransferOp;
 use plasma::state::CollectedFee;
 // Local deps
 use crate::witness::{

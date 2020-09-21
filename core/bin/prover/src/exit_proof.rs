@@ -3,7 +3,7 @@
 use circuit::exit_circuit::create_exit_circuit_with_public_input;
 use failure::format_err;
 use log::info;
-use models::node::{AccountId, AccountMap, Address, TokenId};
+use models::{AccountId, AccountMap, Address, TokenId};
 use num::BigUint;
 use std::time::Instant;
 use zksync_crypto::circuit::account::CircuitAccount;

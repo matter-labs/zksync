@@ -61,8 +61,10 @@ use num::BigUint;
 use tokio::{fs, time};
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
-use models::node::{
-    closest_packable_fee_amount, closest_packable_token_amount, tx::PackedEthSignature, FranklinTx,
+use models::{
+    helpers::{closest_packable_fee_amount, closest_packable_token_amount},
+    tx::PackedEthSignature,
+    FranklinTx,
 };
 use testkit::zksync_account::ZksyncAccount;
 use zksync_config::ConfigurationOptions;

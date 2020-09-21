@@ -8,7 +8,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use models::node::{
+use models::{
     mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
     DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
     WithdrawOp,

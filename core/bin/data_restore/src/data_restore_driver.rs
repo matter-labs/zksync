@@ -5,7 +5,7 @@ use web3::{
     Transport, Web3,
 };
 // Workspace deps
-use models::node::{AccountMap, AccountUpdate};
+use models::{AccountMap, AccountUpdate};
 use storage::ConnectionPool;
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;

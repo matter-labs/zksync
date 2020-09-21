@@ -1,15 +1,40 @@
+pub mod account;
+pub mod block;
+pub mod config;
 pub mod ethereum;
-pub mod node;
+pub mod helpers;
+pub mod mempool;
+pub mod operations;
+pub mod priority_ops;
+pub mod tokens;
+pub mod tx;
 
-use crate::node::block::Block;
-use crate::node::BlockNumber;
-use crate::node::{AccountUpdates, TokenId};
-use zksync_crypto::proof::EncodedProofPlonk;
+pub use self::account::{Account, AccountUpdate, PubKeyHash};
+pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+pub use self::operations::{
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
+    WithdrawOp,
+};
+pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
+pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
+pub use self::tx::{Close, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
+
+pub use zksync_basic_types::*;
+
+pub type AccountMap = zksync_crypto::fnv::FnvHashMap<u32, Account>;
+pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
+pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
+
+use crate::block::Block;
+use zksync_crypto::{
+    merkle_tree::{RescueHasher, SparseMerkleTree},
+    proof::EncodedProofPlonk,
+    Engine, Fr,
+};
 
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use zksync_basic_types::{Address, Log, U256};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {

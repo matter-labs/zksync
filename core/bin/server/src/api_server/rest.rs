@@ -10,10 +10,10 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::node::{
+use models::NetworkStatus;
+use models::{
     Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
 };
-use models::NetworkStatus;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};

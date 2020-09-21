@@ -3,7 +3,7 @@
 use sqlx::Acquire;
 use web3::types::Address;
 // Workspace imports
-use models::node::{Account, AccountId, AccountUpdates};
+use models::{Account, AccountId, AccountUpdates};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;

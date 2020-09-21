@@ -7,7 +7,7 @@
 use jsonrpc_core::types::response::Output;
 
 // Workspace uses
-use models::node::{
+use models::{
     tx::{FranklinTx, PackedEthSignature, TxHash},
     Address, TokenLike, TxFeeTypes,
 };
@@ -183,7 +183,7 @@ impl Provider {
 }
 
 mod messages {
-    use models::node::{
+    use models::{
         tx::{FranklinTx, PackedEthSignature, TxEthSignature, TxHash},
         Address, TokenLike, TxFeeTypes,
     };

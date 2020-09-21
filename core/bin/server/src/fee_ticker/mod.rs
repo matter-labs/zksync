@@ -21,9 +21,9 @@ use num::{
 };
 use tokio::task::JoinHandle;
 // Workspace deps
-use models::node::{
-    pack_fee_amount, unpack_fee_amount, Address, TokenId, TokenLike, TransferOp, TransferToNewOp,
-    TxFeeTypes, WithdrawOp,
+use models::{
+    helpers::{pack_fee_amount, unpack_fee_amount},
+    Address, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
 };
 use storage::ConnectionPool;
 use zksync_config::TokenPriceSource;
@@ -40,7 +40,7 @@ use crate::{
     },
     state_keeper::StateKeeperRequest,
 };
-use models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
+use models::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
 
 mod ticker_api;
 mod ticker_info;
@@ -338,7 +338,7 @@ mod test {
     use bigdecimal::BigDecimal;
     use chrono::Utc;
     use futures::executor::block_on;
-    use models::node::{Address, Token, TokenId, TokenPrice};
+    use models::{Address, Token, TokenId, TokenPrice};
     use std::str::FromStr;
     use zksync_utils::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 

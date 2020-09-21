@@ -5,7 +5,7 @@ use zksync_crypto::franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use zksync_crypto::{priv_key_from_fs, Fs, PrivateKey};
 
 // Public re-exports.
-pub use models::node::{
+pub use models::helpers::{
     closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
     is_token_amount_packable,
 };

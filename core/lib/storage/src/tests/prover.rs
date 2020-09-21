@@ -2,7 +2,7 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use models::{node::block::PendingBlock, Action};
+use models::{block::PendingBlock, Action};
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};

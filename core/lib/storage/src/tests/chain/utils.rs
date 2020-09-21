@@ -4,13 +4,13 @@ use parity_crypto::publickey::{Generator, Random};
 use web3::types::Address;
 // Workspace imports
 use crypto_exports::rand::Rng;
-use models::node::tx::{EthSignData, PackedEthSignature, TxEthSignature};
+use models::tx::{EthSignData, PackedEthSignature, TxEthSignature};
 use models::{
-    node::{
+    Action, Operation,
+    {
         block::{Block, ExecutedOperations},
         AccountUpdate, BlockNumber, PubKeyHash,
     },
-    Action, Operation,
 };
 use num::BigUint;
 use std::ops::Deref;
@@ -26,7 +26,7 @@ pub fn acc_create_random_updates<R: Rng>(
     let pub_key_hash = PubKeyHash { data: rng.gen() };
     let address: Address = rng.gen::<[u8; 20]>().into();
 
-    let mut a = models::node::account::Account::default_with_address(&address);
+    let mut a = models::account::Account::default_with_address(&address);
     let old_nonce = nonce;
     a.nonce = old_nonce + 2;
     a.pub_key_hash = pub_key_hash;

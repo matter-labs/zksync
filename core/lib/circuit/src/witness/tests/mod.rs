@@ -10,7 +10,7 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::node::{
+use models::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
     Address, Deposit, FullExit,
 };

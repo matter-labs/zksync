@@ -11,7 +11,7 @@ use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 use web3::types::Address;
 // Workspace uses
-use models::{node::tx::TxHash, ActionType, Operation};
+use models::{tx::TxHash, ActionType, Operation};
 use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
 // Local uses

@@ -4,8 +4,8 @@ use std::{convert::TryFrom, str::FromStr};
 use web3::types::H256;
 // Workspace deps
 use models::{
-    node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
     Action, NewTokenEvent, Operation,
+    {block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
 };
 use storage::{
     data_restore::records::{NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock},

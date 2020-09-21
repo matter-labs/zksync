@@ -27,8 +27,8 @@ use web3::{
 };
 // Workspace deps
 use models::{
-    node::tx::EIP1271Signature,
-    node::{FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
+    tx::EIP1271Signature,
+    {FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
 };
 use zksync_config::ConfigurationOptions;
 use zksync_contracts::{eip1271_contract, zksync_contract};

@@ -5,8 +5,8 @@ use web3::types::{H256, U256};
 // Workspace imports
 use models::{
     ethereum::{ETHOperation, OperationType},
-    node::{block::Block, BlockNumber},
     Action, Operation,
+    {block::Block, BlockNumber},
 };
 use zksync_crypto::Fr;
 // Local imports

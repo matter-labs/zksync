@@ -7,7 +7,7 @@ use circuit::witness::{
     TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use log::info;
-use models::node::{BlockNumber, FranklinOp};
+use models::{BlockNumber, FranklinOp};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
