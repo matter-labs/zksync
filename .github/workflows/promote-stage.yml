@@ -19,6 +19,7 @@ jobs:
 
     - name: init
       run: |
+        cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
         zksync yarn
         cp etc/tokens/{test,localhost}.json
         zksync verify-keys unpack
