@@ -1,8 +1,8 @@
 name: Promote to stage
 
 on:
-  pull_request:  # FIXME (revert to 'push')
-    branches: [ dev ] # FIXME (revert to 'dev, master, breaking')
+  push:
+    branches: [ dev, master, breaking ]
 
 jobs:
   build-images:
