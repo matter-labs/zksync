@@ -426,6 +426,26 @@
       ]
     }
   },
+  "17626aba706502252ba06108c8b1563732a3e85094f8d76ce55f1d3487fc605b": {
+    "query": "\n            select \n                created_at as \"created_at!\"\n            from (\n                    select\n                        created_at\n                    from\n                        executed_transactions\n                    where\n                        from_account = $1\n                        or\n                        to_account = $1\n                        or\n                        primary_account_address = $1\n                    union all\n                    select\n                        created_at\n                    from \n                        executed_priority_operations\n                    where \n                        from_account = $1\n                        or\n                        to_account = $1\n            ) t\n            order by\n                created_at asc\n            limit \n                1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "created_at!",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "17db5f9b97791dc5c8edbc69b5a780d68838adbb9debccdc678600673e328aae": {
     "query": "\n                SELECT * FROM account_creates\n                WHERE address = $1 AND is_create = $2\n                ORDER BY block_number desc\n                LIMIT 1\n            ",
     "describe": {
