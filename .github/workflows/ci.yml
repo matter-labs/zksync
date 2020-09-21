@@ -32,7 +32,7 @@ jobs:
         zksync dummy-prover ensure-disabled
         cargo fmt --all -- --check
         # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
-        DATABASE_URL=postgres://postgres@localhost/plasma cargo clippy --tests --benches -- -D warnings
+        f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
