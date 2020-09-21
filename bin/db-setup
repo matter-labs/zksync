@@ -17,15 +17,8 @@ rm src/schema.rs.generated
 # Check generated sqlx data
 if ! cargo sqlx prepare --check
 then
-    if [ -z $CI ]; then
-        # It's not CI, just generate new bindings.
-        # Prepare sqlx bindings
-        echo "Going to rerun 'sqlx prepare'"
-        cargo sqlx prepare
-    else
-        # It's CI and bindings are outdated.
-        echo "'sqlx-data.json' in storagee folder is incorrect."
-        echo "Generate and commit correct one with 'cargo sqlx prepare' in storage folder"
-        exit 1
-    fi
+    # Prepare sqlx bindings
+    # We're going to do it even on CI, since it seems that this file can be invalidated after several subsequent compilations.
+    echo "Going to rerun 'sqlx prepare'"
+    cargo sqlx prepare
 fi
