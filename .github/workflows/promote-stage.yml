@@ -38,6 +38,14 @@ jobs:
          https://gitlab.com/api/v4/projects/19173848/trigger/pipeline
 
     services:
+      geth:
+        image: matterlabs/geth:latest
+        ports:
+          - 8545:8545
+          - 8546:8546
+        env:
+          CONFIG: standard
+
       postgres:
         image: postgres:10.4
         ports:
