@@ -11,7 +11,21 @@ echo DATABASE_URL=$DATABASE_URL
 diesel database setup
 diesel migration run
 
-cargo sqlx prepare
-
 # We don't need this file for sqlx
 rm src/schema.rs.generated
+
+# Check generated sqlx data
+if ! cargo sqlx prepare --check
+then
+    if [ -z $CI ]; then
+        # It's not CI, just generate new bindings.
+        # Prepare sqlx bindings
+        echo "Going to rerun 'sqlx prepare'"
+        cargo sqlx prepare
+    else
+        # It's CI and bindings are outdated.
+        echo "'sqlx-data.json' in storagee folder is incorrect."
+        echo "Generate and commit correct one with 'cargo sqlx prepare' in storage folder"
+        exit 1
+    fi
+fi
