@@ -1,97 +1,22 @@
-use zksync_crypto::params;
 use zksync_crypto::primitives::GetBits;
 use zksync_utils::BigUintSerdeWrapper;
 
 use std::collections::HashMap;
-use std::convert::TryInto;
 
-use failure::ensure;
 use num::{BigUint, Zero};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use zksync_crypto::franklin_crypto::bellman::pairing::ff::{self, PrimeField};
-use zksync_crypto::franklin_crypto::eddsa::PublicKey;
+use serde::{Deserialize, Serialize};
+use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 
-use super::Engine;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use zksync_basic_types::Address;
 use zksync_crypto::circuit::account::{Balance, CircuitAccount};
-use zksync_crypto::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
-use zksync_crypto::merkle_tree::rescue_hasher::BabyRescueHasher;
-use zksync_crypto::{public_key_from_private, PrivateKey};
+use zksync_crypto::circuit::utils::eth_address_to_fr;
 
-#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
-pub struct PubKeyHash {
-    pub data: [u8; params::FR_ADDRESS_LEN],
-}
+pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
 
-impl std::fmt::Debug for PubKeyHash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
-    }
-}
-
-impl PubKeyHash {
-    pub fn zero() -> Self {
-        PubKeyHash {
-            data: [0; params::FR_ADDRESS_LEN],
-        }
-    }
-
-    pub fn to_hex(&self) -> String {
-        format!("sync:{}", hex::encode(&self.data))
-    }
-
-    pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
-        ensure!(s.starts_with("sync:"), "PubKeyHash should start with sync:");
-        let bytes = hex::decode(&s[5..])?;
-        Self::from_bytes(&bytes)
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
-        Ok(PubKeyHash {
-            data: bytes.try_into().unwrap(),
-        })
-    }
-
-    pub fn from_pubkey(public_key: &PublicKey<Engine>) -> Self {
-        let mut pk_hash =
-            pub_key_hash_bytes(public_key, &params::RESCUE_HASHER as &BabyRescueHasher);
-        pk_hash.reverse();
-        Self::from_bytes(&pk_hash).expect("pk convert error")
-    }
-
-    pub fn to_fr(&self) -> Fr {
-        ff::from_hex(&format!("0x{}", hex::encode(&self.data))).unwrap()
-    }
-
-    pub fn from_privkey(private_key: &PrivateKey) -> Self {
-        let pub_key = public_key_from_private(&private_key);
-        Self::from_pubkey(&pub_key)
-    }
-}
-
-impl Serialize for PubKeyHash {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_hex())
-    }
-}
-
-impl<'de> Deserialize<'de> for PubKeyHash {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error;
-        String::deserialize(deserializer).and_then(|string| {
-            PubKeyHash::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
-        })
-    }
-}
+mod account_update;
+mod pubkey_hash;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
@@ -107,31 +32,6 @@ impl PartialEq for Account {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AccountUpdate {
-    Create {
-        address: Address,
-        nonce: Nonce,
-    },
-    Delete {
-        address: Address,
-        nonce: Nonce,
-    },
-    UpdateBalance {
-        old_nonce: Nonce,
-        new_nonce: Nonce,
-        // (token, old, new)
-        balance_update: (TokenId, BigUint, BigUint),
-    },
-    ChangePubKeyHash {
-        old_pub_key_hash: PubKeyHash,
-        new_pub_key_hash: PubKeyHash,
-        old_nonce: Nonce,
-        new_nonce: Nonce,
-    },
-}
-
-// TODO: Check if coding to Fr is the same as in the circuit.
 impl From<Account> for CircuitAccount<super::Engine> {
     fn from(acc: Account) -> Self {
         let mut circuit_account = CircuitAccount::default();
@@ -157,45 +57,6 @@ impl From<Account> for CircuitAccount<super::Engine> {
         circuit_account.pub_key_hash = acc.pub_key_hash.to_fr();
         circuit_account.address = eth_address_to_fr(&acc.address);
         circuit_account
-    }
-}
-
-impl AccountUpdate {
-    pub fn reversed_update(&self) -> Self {
-        match self {
-            AccountUpdate::Create { address, nonce } => AccountUpdate::Delete {
-                address: *address,
-                nonce: *nonce,
-            },
-            AccountUpdate::Delete { address, nonce } => AccountUpdate::Create {
-                address: *address,
-                nonce: *nonce,
-            },
-            AccountUpdate::UpdateBalance {
-                old_nonce,
-                new_nonce,
-                balance_update,
-            } => AccountUpdate::UpdateBalance {
-                old_nonce: *new_nonce,
-                new_nonce: *old_nonce,
-                balance_update: (
-                    balance_update.0,
-                    balance_update.2.clone(),
-                    balance_update.1.clone(),
-                ),
-            },
-            AccountUpdate::ChangePubKeyHash {
-                old_pub_key_hash,
-                new_pub_key_hash,
-                old_nonce,
-                new_nonce,
-            } => AccountUpdate::ChangePubKeyHash {
-                old_pub_key_hash: new_pub_key_hash.clone(),
-                new_pub_key_hash: old_pub_key_hash.clone(),
-                old_nonce: *new_nonce,
-                new_nonce: *old_nonce,
-            },
-        }
     }
 }
 
