@@ -4,12 +4,12 @@ version = "0.1.0"
 authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 circuit = { path = "../circuit", version = "0.1.0" }
 zksync_crypto = { path = "../crypto", version = "0.1.0" }
 zksync_basic_types = { path = "../basic_types", version = "0.1.0" }
+
 lazy_static = "1.2.0"
 failure = "0.1"
 log = "0.4"
