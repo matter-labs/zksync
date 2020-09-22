@@ -2232,7 +2232,7 @@
       "parameters": {
         "Left": [
           "Int8",
-          "Json"
+          "Text"
         ]
       },
       "nullable": []
@@ -2746,7 +2746,7 @@
         {
           "ordinal": 1,
           "name": "witness",
-          "type_info": "Json"
+          "type_info": "Text"
         }
       ],
       "parameters": {
