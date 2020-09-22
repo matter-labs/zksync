@@ -383,7 +383,12 @@ impl RpcApp {
     }
 
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {
+        use std::time::Instant;
+
+        let timer = Instant::now();
         let mut storage = self.access_storage().await?;
+        log::trace!("Access storage timer: {}ms", timer.elapsed().as_millis());
+        let timer = Instant::now();
         let mut tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
             log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
@@ -394,6 +399,7 @@ impl RpcApp {
             );
             Error::internal_error()
         })?;
+        log::trace!("Get tokens timer: {}ms", timer.elapsed().as_millis());
         Ok(tokens
             .drain()
             .map(|(id, token)| {
