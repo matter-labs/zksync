@@ -58,5 +58,5 @@ pub struct BlockTransactionItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountTreeCache {
     pub block: i64,
-    pub tree_cache: serde_json::Value,
+    pub tree_cache: String,
 }
