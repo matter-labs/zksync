@@ -1,10 +1,10 @@
 // External imports
-use web3::types::H256;
+use zksync_basic_types::H256;
 // Workspace imports
-use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
 use models::{block::Block, helpers::apply_updates, AccountMap, AccountUpdate, BlockNumber};
 use models::{ethereum::OperationType, Action, Operation};
 use zksync_crypto::{convert::fe_to_bytes, Fr};
+use zksync_crypto::{ff::PrimeField, rand::XorShiftRng};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
 use crate::tests::{create_rng, db_test};
@@ -494,7 +494,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, FranklinOp, FranklinTx,
     };
-    use testkit::zksync_account::ZksyncAccount;
+    use zksync_test_account::ZksyncAccount;
 
     let _ = env_logger::try_init();
 

@@ -1,6 +1,6 @@
 // Built-in deps
 // External imports
-use web3::types::U256;
+use zksync_basic_types::U256;
 // Workspace imports
 use models::{block::PendingBlock, Action, ActionType, Operation};
 use models::{

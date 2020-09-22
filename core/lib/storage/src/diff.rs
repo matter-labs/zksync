@@ -2,7 +2,7 @@
 use std::cmp::Ordering;
 // External imports
 use num::bigint::ToBigInt;
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace imports
 use models::PubKeyHash;
 use models::{AccountUpdate, TokenId};

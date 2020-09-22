@@ -4084,11 +4084,9 @@ version = "0.0.1"
 dependencies = [
  "bigdecimal",
  "chrono",
- "crypto_exports",
  "db_test_macro",
  "env_logger 0.6.2",
  "failure",
- "fnv",
  "hex",
  "itertools 0.8.2",
  "log 0.4.11",
@@ -4099,11 +4097,11 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sqlx",
- "testkit",
  "tokio 0.2.22",
- "web3",
+ "zksync_basic_types",
  "zksync_config",
  "zksync_crypto",
+ "zksync_test_account",
  "zksync_utils",
 ]
 

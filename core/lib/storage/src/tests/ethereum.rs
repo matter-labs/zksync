@@ -1,7 +1,7 @@
 // Built-in deps
 use std::str::FromStr;
 // External imports
-use web3::types::{H256, U256};
+use zksync_basic_types::{H256, U256};
 // Workspace imports
 use models::{
     ethereum::{ETHOperation, OperationType},

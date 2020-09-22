@@ -1,9 +1,8 @@
 // External imports
 
 use parity_crypto::publickey::{Generator, Random};
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace imports
-use crypto_exports::rand::Rng;
 use models::tx::{EthSignData, PackedEthSignature, TxEthSignature};
 use models::{
     Action, Operation,
@@ -14,6 +13,7 @@ use models::{
 };
 use num::BigUint;
 use std::ops::Deref;
+use zksync_crypto::rand::Rng;
 use zksync_crypto::Fr;
 // Local imports
 

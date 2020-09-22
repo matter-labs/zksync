@@ -1,7 +1,7 @@
 // Built-in deps
 // External imports
 use sqlx::Acquire;
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace imports
 use models::{Account, AccountId, AccountUpdates};
 // Local imports

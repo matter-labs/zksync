@@ -10,9 +10,9 @@ use models::{
     Address, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token, TransferOp, TransferToNewOp,
     WithdrawOp,
 };
-use testkit::zksync_account::ZksyncAccount;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
 use zksync_crypto::Fr;
+use zksync_test_account::ZksyncAccount;
 // Local imports
 
 pub struct TransactionsHistoryTestSetup {
