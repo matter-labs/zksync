@@ -108,7 +108,7 @@ export class Wallet {
 
         await this.setRequiredAccountIdFromServer("Transfer funds");
 
-        const tokenId = await this.provider.tokenSet.resolveTokenId(transfer.token);
+        const tokenId = this.provider.tokenSet.resolveTokenId(transfer.token);
 
         const transactionData = {
             accountId: this.accountId,
@@ -122,7 +122,7 @@ export class Wallet {
 
         const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
         const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
-        const stringToken = await this.provider.tokenSet.resolveTokenSymbol(transfer.token);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
         const humanReadableTxInfo =
             `Transfer ${stringAmount} ${stringToken}\n` +
             `To: ${transfer.to.toLowerCase()}\n` +
@@ -166,9 +166,7 @@ export class Wallet {
         for (let i = 0; i < transfers.length; i++) {
             const transfer = transfers[i];
 
-            const tokenId = await this.provider.tokenSet.resolveTokenId(
-                transfer.token
-            );
+            const tokenId = this.provider.tokenSet.resolveTokenId(transfer.token);
             const nonce = nextNonce;
             nextNonce += 1;
 
@@ -199,9 +197,7 @@ export class Wallet {
                 transfer.token,
                 transfer.fee
             );
-            const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
-                transfer.token
-            );
+            const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
             const humanReadableTxInfo =
                 `Transfer ${stringAmount} ${stringToken}\n` +
                 `To: ${transfer.to.toLowerCase()}\n` +
@@ -260,7 +256,7 @@ export class Wallet {
         }
         await this.setRequiredAccountIdFromServer("Withdraw funds");
 
-        const tokenId = await this.provider.tokenSet.resolveTokenId(withdraw.token);
+        const tokenId = this.provider.tokenSet.resolveTokenId(withdraw.token);
         const transactionData = {
             accountId: this.accountId,
             from: this.address(),
@@ -273,7 +269,7 @@ export class Wallet {
 
         const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
         const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
-        const stringToken = await this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
         const humanReadableTxInfo =
             `Withdraw ${stringAmount} ${stringToken}\n` +
             `To: ${withdraw.ethAddress.toLowerCase()}\n` +
