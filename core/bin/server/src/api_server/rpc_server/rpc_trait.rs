@@ -82,19 +82,31 @@ pub trait Rpc {
 impl Rpc for RpcApp {
     fn account_info(&self, addr: Address) -> FutureResp<AccountInfoResp> {
         let self_ = self.clone();
-        let resp = self_._impl_account_info(addr);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle.spawn(self_._impl_account_info(addr)).await.unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
     fn ethop_info(&self, serial_id: u32) -> FutureResp<ETHOpInfoResp> {
         let self_ = self.clone();
-        let resp = self_._impl_ethop_info(serial_id);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_ethop_info(serial_id))
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
     fn tx_info(&self, hash: TxHash) -> FutureResp<TransactionInfoResp> {
         let self_ = self.clone();
-        let resp = self_._impl_tx_info(hash);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle.spawn(self_._impl_tx_info(hash)).await.unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
@@ -105,25 +117,43 @@ impl Rpc for RpcApp {
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash> {
         let self_ = self.clone();
-        let resp = self_._impl_tx_submit(tx, signature, fast_processing);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_tx_submit(tx, signature, fast_processing))
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
     fn submit_txs_batch(&self, txs: Vec<TxWithSignature>) -> FutureResp<Vec<TxHash>> {
         let self_ = self.clone();
-        let resp = self_._impl_submit_txs_batch(txs);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_submit_txs_batch(txs))
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
     fn contract_address(&self) -> FutureResp<ContractAddressResp> {
         let self_ = self.clone();
-        let resp = self_._impl_contract_address();
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle.spawn(self_._impl_contract_address()).await.unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
     fn tokens(&self) -> FutureResp<HashMap<String, Token>> {
         let self_ = self.clone();
-        let resp = self_._impl_tokens();
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle.spawn(self_._impl_tokens()).await.unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
@@ -134,7 +164,13 @@ impl Rpc for RpcApp {
         token_like: TokenLike,
     ) -> FutureResp<Fee> {
         let self_ = self.clone();
-        let resp = self_._impl_get_tx_fee(tx_type, address, token_like);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_get_tx_fee(tx_type, address, token_like))
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
@@ -145,19 +181,37 @@ impl Rpc for RpcApp {
         token_like: TokenLike,
     ) -> FutureResp<BatchFee> {
         let self_ = self.clone();
-        let resp = self_._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like))
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
     fn get_token_price(&self, token_like: TokenLike) -> FutureResp<BigDecimal> {
         let self_ = self.clone();
-        let resp = self_._impl_get_token_price(token_like);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_get_token_price(token_like))
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 
     fn get_confirmations_for_eth_op_amount(&self) -> FutureResp<u64> {
         let self_ = self.clone();
-        let resp = self_._impl_get_confirmations_for_eth_op_amount();
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_get_confirmations_for_eth_op_amount())
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 

@@ -226,7 +226,7 @@
         {
           "ordinal": 1,
           "name": "tree_cache",
-          "type_info": "Jsonb"
+          "type_info": "Text"
         }
       ],
       "parameters": {
@@ -1156,7 +1156,7 @@
       "parameters": {
         "Left": [
           "Int8",
-          "Jsonb"
+          "Text"
         ]
       },
       "nullable": []
@@ -1317,7 +1317,7 @@
         {
           "ordinal": 1,
           "name": "tree_cache",
-          "type_info": "Jsonb"
+          "type_info": "Text"
         }
       ],
       "parameters": {
@@ -2303,7 +2303,7 @@
       "parameters": {
         "Left": [
           "Int8",
-          "Jsonb"
+          "Text"
         ]
       },
       "nullable": []
@@ -2835,7 +2835,7 @@
         {
           "ordinal": 1,
           "name": "witness",
-          "type_info": "Jsonb"
+          "type_info": "Text"
         }
       ],
       "parameters": {

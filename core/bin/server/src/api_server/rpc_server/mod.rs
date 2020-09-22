@@ -85,6 +85,8 @@ pub struct RpcApp {
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_complete_withdrawal_tx_hashes: SharedLruCache<TxHash, String>,
 
+    tokio_runtime: tokio::runtime::Handle,
+
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
@@ -104,6 +106,7 @@ pub struct RpcApp {
 impl RpcApp {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        tokio_runtime: tokio::runtime::Handle,
         config_options: &ConfigurationOptions,
         connection_pool: ConnectionPool,
         mempool_request_sender: mpsc::Sender<MempoolRequest>,
@@ -123,6 +126,8 @@ impl RpcApp {
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
             cache_of_complete_withdrawal_tx_hashes: SharedLruCache::new(api_requests_caches_size),
+
+            tokio_runtime,
 
             connection_pool,
 
@@ -456,7 +461,14 @@ pub fn start_rpc_server(
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let mut io = IoHandler::new();
 
+            let tokio_runtime = tokio::runtime::Builder::new()
+                .threaded_scheduler()
+                .enable_all()
+                .build()
+                .unwrap();
+
             let rpc_app = RpcApp::new(
+                tokio_runtime.handle().clone(),
                 &config_options,
                 connection_pool,
                 mempool_request_sender,
