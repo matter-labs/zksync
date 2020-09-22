@@ -7,5 +7,5 @@ fi
 
 . .setup_env
 
-cd js/tests;
+cd core/tests/ts-tests;
 yarn --silent print-test-accounts | jq .

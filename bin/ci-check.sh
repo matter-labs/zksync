@@ -12,7 +12,7 @@ function cargo_tests() {
 
 
 zksync init
-pushd js/zksync-crypto
+pushd sdk/zksync-crypto
 cargo_tests
 popd
 cargo_tests
