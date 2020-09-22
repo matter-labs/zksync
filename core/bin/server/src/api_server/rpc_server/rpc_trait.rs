@@ -21,6 +21,7 @@ use crate::fee_ticker::{BatchFee, Fee};
 use bigdecimal::BigDecimal;
 
 use super::{types::*, RpcApp};
+use std::time::Instant;
 
 pub type FutureResp<T> = Box<dyn futures01::Future<Item = T, Error = Error> + Send>;
 
@@ -146,10 +147,15 @@ impl Rpc for RpcApp {
     }
 
     fn tokens(&self) -> FutureResp<HashMap<String, Token>> {
+        let timer = Instant::now();
         let self_ = self.clone();
+        log::trace!("Clone timer: {} ms", timer.elapsed().as_millis());
         let resp = async move {
+            let timer = Instant::now();
             let handle = self_.tokio_runtime.clone();
-            handle.spawn(self_._impl_tokens()).await.unwrap()
+            let res = handle.spawn(self_._impl_tokens()).await.unwrap();
+            log::trace!("Token impl timer: {} ms", timer.elapsed().as_millis());
+            res
         };
         Box::new(resp.boxed().compat())
     }
