@@ -226,7 +226,7 @@
         {
           "ordinal": 1,
           "name": "tree_cache",
-          "type_info": "Jsonb"
+          "type_info": "Json"
         }
       ],
       "parameters": {
@@ -1143,7 +1143,7 @@
       "parameters": {
         "Left": [
           "Int8",
-          "Jsonb"
+          "Json"
         ]
       },
       "nullable": []
@@ -1304,7 +1304,7 @@
         {
           "ordinal": 1,
           "name": "tree_cache",
-          "type_info": "Jsonb"
+          "type_info": "Json"
         }
       ],
       "parameters": {
