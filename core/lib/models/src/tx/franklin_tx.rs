@@ -4,8 +4,8 @@ use crate::{
     tx::{ChangePubKey, Close, Transfer, TxEthSignature, TxHash, Withdraw},
     CloseOp, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
-use crypto::{digest::Digest, sha2::Sha256};
 use num::BigUint;
+use parity_crypto::digest::sha256;
 
 use crate::operations::ChangePubKeyOp;
 use serde::{Deserialize, Serialize};
@@ -58,10 +58,9 @@ impl FranklinTx {
             FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
         };
 
-        let mut hasher = Sha256::new();
-        hasher.input(&bytes);
+        let hash = sha256(&bytes);
         let mut out = [0u8; 32];
-        hasher.result(&mut out);
+        out.copy_from_slice(&hash);
         TxHash { data: out }
     }
 

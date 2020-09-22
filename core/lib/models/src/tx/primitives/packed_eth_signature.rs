@@ -1,6 +1,7 @@
 use failure::ensure;
-use parity_crypto::publickey::{
-    public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
+use parity_crypto::{
+    publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},
+    Keccak256,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_basic_types::{Address, H256};
@@ -57,7 +58,7 @@ impl PackedEthSignature {
         let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
         bytes.extend_from_slice(prefix.as_bytes());
         bytes.extend_from_slice(msg);
-        tiny_keccak::keccak256(&bytes).into()
+        bytes.keccak256().into()
     }
 
     /// Checks signature and returns ethereum address of the signer.
