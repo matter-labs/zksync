@@ -16,9 +16,9 @@ use tokio::time;
 use web3::types::Address;
 // Workspace deps
 use models::node::{closest_packable_fee_amount, closest_packable_token_amount, TxFeeTypes};
+use zksync::Provider;
 // Local deps
 use crate::{
-    rpc_client::RpcClient,
     scenarios::utils::{deposit_single, wait_for_verify},
     sent_transactions::SentTransactions,
     test_accounts::TestAccount,
@@ -26,7 +26,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct SatelliteScenario {
-    rpc_client: RpcClient,
+    provider: Provider,
     accounts: Vec<TestAccount>,
     deposit_size: BigUint,
     verify_timeout: Duration,
@@ -35,13 +35,13 @@ pub struct SatelliteScenario {
 
 impl SatelliteScenario {
     pub fn new(
-        rpc_client: RpcClient,
+        provider: Provider,
         accounts: Vec<TestAccount>,
         deposit_size: BigUint,
         verify_timeout: Duration,
     ) -> Self {
         Self {
-            rpc_client,
+            provider,
             accounts,
             deposit_size,
             verify_timeout,
@@ -71,7 +71,7 @@ impl SatelliteScenario {
 
     async fn initialize(&mut self) -> Result<(), failure::Error> {
         for account in self.accounts.iter_mut() {
-            account.update_nonce_values(&self.rpc_client).await?;
+            account.update_nonce_values(&self.provider).await?;
         }
 
         Ok(())
@@ -119,19 +119,19 @@ impl SatelliteScenario {
         }
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(account, amount_to_deposit, &self.rpc_client).await?;
+        deposit_single(account, amount_to_deposit, &self.provider).await?;
 
         // Now when deposits are done it is time to update account id.
-        account.update_account_id(&self.rpc_client).await?;
+        account.update_account_id(&self.provider).await?;
 
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
         let (change_pubkey_tx, eth_sign) = (account.sign_change_pubkey(), None);
         let mut sent_txs = SentTransactions::new();
-        let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, eth_sign).await?;
+        let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
-        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
 
         Ok(())
     }
@@ -142,7 +142,7 @@ impl SatelliteScenario {
         let current_balance = account.eth_acc.eth_balance().await?;
 
         let fee = self
-            .rpc_client
+            .provider
             .get_tx_fee(TxFeeTypes::Withdraw, account.eth_acc.address, "ETH")
             .await
             .expect("Can't get tx fee")
@@ -151,7 +151,7 @@ impl SatelliteScenario {
         let fee = closest_packable_fee_amount(&fee);
 
         let comitted_account_state = self
-            .rpc_client
+            .provider
             .account_info(account.zk_acc.address)
             .await?
             .committed;
@@ -160,14 +160,11 @@ impl SatelliteScenario {
         let withdraw_amount = closest_packable_token_amount(&withdraw_amount);
 
         let (tx, eth_sign) = account.sign_withdraw(withdraw_amount.clone(), fee);
-        let tx_hash = self
-            .rpc_client
-            .send_tx(tx.clone(), eth_sign.clone())
-            .await?;
+        let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
 
-        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
 
         let expected_balance = current_balance + withdraw_amount;
 

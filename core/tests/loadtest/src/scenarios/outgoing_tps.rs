@@ -13,9 +13,9 @@ use num::BigUint;
 use tokio::runtime::Handle;
 use web3::transports::Http;
 // Workspace uses
+use zksync::Provider;
 // Local uses
 use crate::{
-    rpc_client::RpcClient,
     scenarios::{
         configs::LoadTestConfig,
         utils::{deposit_single, rand_amount, wait_for_verify},
@@ -40,7 +40,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     let verify_timeout_sec = Duration::from_secs(config.verify_timeout_sec);
     let rpc_addr = ctx.rpc_addr.clone();
 
-    let rpc_client = RpcClient::from_addr(&rpc_addr);
+    let provider = Provider::from_addr(&rpc_addr);
 
     // Obtain the Ethereum node JSON RPC address.
     log::info!("Starting the loadtest");
@@ -52,7 +52,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Send the transactions and block until all of them are sent.
     let sent_txs = ctx.rt.block_on(send_transactions(
         test_accounts,
-        rpc_client.clone(),
+        provider.clone(),
         config,
         ctx.rt.handle().clone(),
         ctx.tps_counter,
@@ -61,7 +61,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Wait until all the transactions are verified.
     log::info!("Waiting for all transactions to be verified");
     ctx.rt
-        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &rpc_client))
+        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &provider))
         .expect("Verifying failed");
     log::info!("Loadtest completed.");
 }
@@ -69,7 +69,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 // Sends the configured deposits, withdraws and transfers from each account concurrently.
 async fn send_transactions(
     test_accounts: Vec<TestAccount>,
-    rpc_client: RpcClient,
+    provider: Provider,
     ctx: LoadTestConfig,
     rt_handle: Handle,
     tps_counter: Arc<TPSCounter>,
@@ -82,7 +82,7 @@ async fn send_transactions(
             rt_handle.spawn(send_transactions_from_acc(
                 account,
                 ctx.clone(),
-                rpc_client.clone(),
+                provider.clone(),
                 Arc::clone(&tps_counter),
             ))
         })
@@ -106,7 +106,7 @@ async fn send_transactions(
 async fn send_transactions_from_acc(
     test_acc: TestAccount,
     ctx: LoadTestConfig,
-    rpc_client: RpcClient,
+    provider: Provider,
     tps_counter: Arc<TPSCounter>,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
@@ -114,11 +114,11 @@ async fn send_transactions_from_acc(
     let wei_in_gwei = BigUint::from(1_000_000_000u32);
 
     // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
-    test_acc.update_nonce_values(&rpc_client).await?;
+    test_acc.update_nonce_values(&provider).await?;
 
     // Perform the deposit operation.
     let deposit_amount = BigUint::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
-    let op_id = deposit_single(&test_acc, deposit_amount.clone(), &rpc_client).await?;
+    let op_id = deposit_single(&test_acc, deposit_amount.clone(), &provider).await?;
 
     log::info!(
         "Account {}: initial deposit completed (amount: {})",
@@ -136,12 +136,12 @@ async fn send_transactions_from_acc(
     // Add the deposit operations.
     for _ in 0..ctx.n_deposits {
         let amount = rand_amount(ctx.deposit_from_amount_gwei, ctx.deposit_to_amount_gwei);
-        let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &rpc_client).await?;
+        let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &provider).await?;
         sent_txs.add_op_id(op_id);
     }
 
     // Now when deposits are done it is time to update account id.
-    test_acc.update_account_id(&rpc_client).await?;
+    test_acc.update_account_id(&provider).await?;
 
     // Create a queue for all the transactions to send.
     // First, we will create and sign all the transactions, and then we will send all the
@@ -179,7 +179,7 @@ async fn send_transactions_from_acc(
     );
 
     for (tx, eth_sign) in tx_queue {
-        let tx_hash = rpc_client.send_tx(tx, eth_sign).await?;
+        let tx_hash = provider.send_tx(tx, eth_sign).await?;
         tps_counter.increment();
         sent_txs.add_tx_hash(tx_hash);
     }

@@ -70,10 +70,10 @@ use models::{
     },
 };
 use testkit::zksync_account::ZksyncAccount;
+use zksync::Provider;
 // Local deps
 use self::satellite::SatelliteScenario;
 use crate::{
-    rpc_client::RpcClient,
     scenarios::{
         configs::RealLifeConfig,
         utils::{deposit_single, wait_for_verify, DynamicChunks},
@@ -87,7 +87,7 @@ mod satellite;
 
 #[derive(Debug)]
 struct ScenarioExecutor {
-    rpc_client: RpcClient,
+    provider: Provider,
 
     /// Main account to deposit ETH from / return ETH back to.
     main_account: TestAccount,
@@ -123,7 +123,7 @@ struct ScenarioExecutor {
 
 impl ScenarioExecutor {
     /// Creates a real-life scenario executor.
-    pub fn new(ctx: &ScenarioContext, rpc_client: RpcClient) -> Self {
+    pub fn new(ctx: &ScenarioContext, provider: Provider) -> Self {
         // Load the config for the test from JSON file.
         let config = RealLifeConfig::load(&ctx.config_path);
 
@@ -159,14 +159,14 @@ impl ScenarioExecutor {
         let verify_timeout = Duration::from_secs(config.block_timeout);
 
         let satellite_scenario = Some(SatelliteScenario::new(
-            rpc_client.clone(),
+            provider.clone(),
             additional_accounts,
             transfer_size.clone(),
             verify_timeout,
         ));
 
         Self {
-            rpc_client,
+            provider,
 
             main_account,
             accounts,
@@ -264,7 +264,7 @@ impl ScenarioExecutor {
     async fn initialize(&mut self) -> Result<(), failure::Error> {
         // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
         self.main_account
-            .update_nonce_values(&self.rpc_client)
+            .update_nonce_values(&self.provider)
             .await?;
 
         // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
@@ -326,14 +326,12 @@ impl ScenarioExecutor {
         }
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(&self.main_account, amount_to_deposit, &self.rpc_client).await?;
+        deposit_single(&self.main_account, amount_to_deposit, &self.provider).await?;
 
         log::info!("Deposit sent and verified");
 
         // Now when deposits are done it is time to update account id.
-        self.main_account
-            .update_account_id(&self.rpc_client)
-            .await?;
+        self.main_account.update_account_id(&self.provider).await?;
 
         log::info!("Main account ID set");
 
@@ -342,9 +340,9 @@ impl ScenarioExecutor {
         // `zkSync` account.
         let (change_pubkey_tx, eth_sign) = (self.main_account.sign_change_pubkey(), None);
         let mut sent_txs = SentTransactions::new();
-        let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, eth_sign).await?;
+        let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
-        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
 
         log::info!("Main account pubkey changed");
 
@@ -395,10 +393,7 @@ impl ScenarioExecutor {
             // This has to be done synchronously, since we're sending from the same account
             // and truly async sending will result in a nonce mismatch errors.
             for (tx, eth_sign) in tx_batch {
-                let tx_hash = self
-                    .rpc_client
-                    .send_tx(tx.clone(), eth_sign.clone())
-                    .await?;
+                let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
                 sent_txs.add_tx_hash(tx_hash);
             }
 
@@ -406,7 +401,7 @@ impl ScenarioExecutor {
             verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
 
             log::info!(
                 "Sent and verified {}/{} txs ({} on this iteration)",
@@ -424,7 +419,7 @@ impl ScenarioExecutor {
         let mut tx_futures = vec![];
         for account in self.accounts.iter() {
             let resp = self
-                .rpc_client
+                .provider
                 .account_info(account.address)
                 .await
                 .expect("rpc error");
@@ -435,7 +430,7 @@ impl ScenarioExecutor {
                 account.create_change_pubkey_tx(None, true, false),
             ));
 
-            let tx_future = self.rpc_client.send_tx(change_pubkey_tx, None);
+            let tx_future = self.provider.send_tx(change_pubkey_tx, None);
 
             tx_futures.push(tx_future);
         }
@@ -445,7 +440,7 @@ impl ScenarioExecutor {
         // Calculate the estimated amount of blocks for all the txs to be processed.
         let max_block_size = *self.block_sizes.iter().max().unwrap();
         let n_blocks = (self.accounts.len() / max_block_size + 1) as u32;
-        wait_for_verify(sent_txs, self.verify_timeout * n_blocks, &self.rpc_client).await?;
+        wait_for_verify(sent_txs, self.verify_timeout * n_blocks, &self.provider).await?;
 
         log::info!("All the accounts are prepared");
 
@@ -494,7 +489,7 @@ impl ScenarioExecutor {
             let mut tx_futures = vec![];
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
-                let tx_future = self.rpc_client.send_tx(tx.clone(), eth_sign.clone());
+                let tx_future = self.provider.send_tx(tx.clone(), eth_sign.clone());
 
                 tx_futures.push(tx_future);
             }
@@ -505,7 +500,7 @@ impl ScenarioExecutor {
             verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
 
             log::info!(
                 "Sent and verified {}/{} txs ({} on this iteration)",
@@ -533,7 +528,7 @@ impl ScenarioExecutor {
             let fee = self.transfer_fee(&to_acc).await;
 
             let comitted_account_state = self
-                .rpc_client
+                .provider
                 .account_info(from_acc.address)
                 .await?
                 .committed;
@@ -555,10 +550,7 @@ impl ScenarioExecutor {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
-                let tx_hash = self
-                    .rpc_client
-                    .send_tx(tx.clone(), eth_sign.clone())
-                    .await?;
+                let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
                 sent_txs.add_tx_hash(tx_hash);
             }
 
@@ -566,7 +558,7 @@ impl ScenarioExecutor {
             verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
 
             log::info!(
                 "Sent and verified {}/{} txs ({} on this iteration)",
@@ -587,7 +579,7 @@ impl ScenarioExecutor {
         let fee = self.withdraw_fee(&self.main_account.zk_acc).await;
 
         let comitted_account_state = self
-            .rpc_client
+            .provider
             .account_info(self.main_account.zk_acc.address)
             .await?
             .committed;
@@ -603,14 +595,11 @@ impl ScenarioExecutor {
         let (tx, eth_sign) = self
             .main_account
             .sign_withdraw(withdraw_amount.clone(), fee);
-        let tx_hash = self
-            .rpc_client
-            .send_tx(tx.clone(), eth_sign.clone())
-            .await?;
+        let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
 
-        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
 
         log::info!("Withdrawing funds completed");
 
@@ -663,7 +652,7 @@ impl ScenarioExecutor {
     /// Obtains a fee required for the transfer operation.
     async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
         let fee = self
-            .rpc_client
+            .provider
             .get_tx_fee(TxFeeTypes::Transfer, to_acc.address, "ETH")
             .await
             .expect("Can't get tx fee")
@@ -675,7 +664,7 @@ impl ScenarioExecutor {
     /// Obtains a fee required for the withdraw operation.
     async fn withdraw_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
         let fee = self
-            .rpc_client
+            .provider
             .get_tx_fee(TxFeeTypes::Withdraw, to_acc.address, "ETH")
             .await
             .expect("Can't get tx fee")
@@ -736,9 +725,9 @@ impl ScenarioExecutor {
 /// For description, see the module doc-comment.
 pub fn run_scenario(mut ctx: ScenarioContext) {
     let rpc_addr = ctx.rpc_addr.clone();
-    let rpc_client = RpcClient::from_addr(&rpc_addr);
+    let provider = Provider::from_addr(&rpc_addr);
 
-    let mut scenario = ScenarioExecutor::new(&ctx, rpc_client);
+    let mut scenario = ScenarioExecutor::new(&ctx, provider);
 
     // Run the scenario.
     log::info!("Starting the real-life test");

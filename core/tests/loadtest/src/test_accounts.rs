@@ -11,8 +11,9 @@ use models::{
     node::{tx::PackedEthSignature, FranklinTx},
 };
 use testkit::{eth_account::EthereumAccount, zksync_account::ZksyncAccount};
+use zksync::Provider;
 // Local uses
-use crate::{rpc_client::RpcClient, scenarios::configs::AccountInfo};
+use crate::scenarios::configs::AccountInfo;
 
 #[derive(Debug)]
 pub struct TestAccount {
@@ -62,7 +63,7 @@ impl TestAccount {
     }
 
     // Updates the current Ethereum and ZKSync account nonce values.
-    pub async fn update_nonce_values(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
+    pub async fn update_nonce_values(&self, provider: &Provider) -> Result<(), failure::Error> {
         // Update ETH nonce.
         let mut nonce = self.eth_nonce.lock().await;
         let v = self
@@ -74,7 +75,7 @@ impl TestAccount {
         *nonce = v.as_u32();
 
         // Update ZKSync nonce.
-        let resp = rpc_client
+        let resp = provider
             .account_info(self.zk_acc.address)
             .await
             .expect("rpc error");
@@ -83,10 +84,10 @@ impl TestAccount {
     }
 
     // Updates ZKSync account id.
-    pub async fn update_account_id(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
+    pub async fn update_account_id(&self, provider: &Provider) -> Result<(), failure::Error> {
         let mut ticker = time::interval(std::time::Duration::from_millis(500));
         for _i in 1..100 {
-            let resp = rpc_client
+            let resp = provider
                 .account_info(self.zk_acc.address)
                 .await
                 .expect("rpc error");

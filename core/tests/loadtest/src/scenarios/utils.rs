@@ -1,19 +1,19 @@
 //! Common functions shared by different scenarios.
 
-// Built-in deps
+// Built-in uses
 use std::{
     iter::Iterator,
     time::{Duration, Instant},
 };
-// External deps
+// External uses
 use num::BigUint;
 use rand::Rng;
 use tokio::time;
 use web3::types::U256;
-// Local deps
-use crate::{
-    rpc_client::RpcClient, sent_transactions::SentTransactions, test_accounts::TestAccount,
-};
+// Workspace uses
+use zksync::Provider;
+// Local uses
+use crate::{sent_transactions::SentTransactions, test_accounts::TestAccount};
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 
@@ -27,7 +27,7 @@ pub fn rand_amount(from: u64, to: u64) -> BigUint {
 pub async fn deposit_single(
     test_acc: &TestAccount,
     deposit_amount: BigUint,
-    rpc_client: &RpcClient,
+    provider: &Provider,
 ) -> Result<u64, failure::Error> {
     let nonce = {
         let mut n = test_acc.eth_nonce.lock().await;
@@ -38,13 +38,13 @@ pub async fn deposit_single(
         .eth_acc
         .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
         .await?;
-    wait_for_deposit_executed(priority_op.1.serial_id, &rpc_client).await
+    wait_for_deposit_executed(priority_op.1.serial_id, &provider).await
 }
 
 /// Waits until the deposit priority operation is executed.
 pub async fn wait_for_deposit_executed(
     serial_id: u64,
-    rpc_client: &RpcClient,
+    provider: &Provider,
 ) -> Result<u64, failure::Error> {
     let mut executed = false;
     // We poll the operation status twice a second until timeout is reached.
@@ -56,7 +56,7 @@ pub async fn wait_for_deposit_executed(
     // Polling cycle.
     while !executed && start.elapsed() < timeout {
         timer.tick().await;
-        let state = rpc_client.ethop_info(serial_id).await?;
+        let state = provider.ethop_info(serial_id as u32).await?;
         executed = state.executed;
     }
 
@@ -72,7 +72,7 @@ pub async fn wait_for_deposit_executed(
 pub async fn wait_for_verify(
     sent_txs: SentTransactions,
     timeout: Duration,
-    rpc_client: &RpcClient,
+    provider: &Provider,
 ) -> Result<(), failure::Error> {
     let serial_ids = sent_txs.op_serial_ids;
 
@@ -83,7 +83,7 @@ pub async fn wait_for_verify(
     // Wait until all the transactions are verified.
     for &id in serial_ids.iter() {
         loop {
-            let state = rpc_client.ethop_info(id).await?;
+            let state = provider.ethop_info(id as u32).await?;
             if state.is_verified() {
                 log::debug!("deposit (serial_id={}) is verified", id);
                 break;
@@ -98,7 +98,7 @@ pub async fn wait_for_verify(
     let tx_hashes = sent_txs.tx_hashes;
     for hash in tx_hashes.iter() {
         loop {
-            let state = rpc_client.tx_info(hash.clone()).await?;
+            let state = provider.tx_info(hash.clone()).await?;
             if state.is_verified() {
                 log::debug!("{} is verified", hash.to_string());
                 break;
