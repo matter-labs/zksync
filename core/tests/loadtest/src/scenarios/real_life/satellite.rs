@@ -15,7 +15,7 @@ use num::BigUint;
 use tokio::time;
 use web3::types::Address;
 // Workspace deps
-use models::node::{closest_packable_fee_amount, closest_packable_token_amount};
+use models::node::{closest_packable_fee_amount, closest_packable_token_amount, TxFeeTypes};
 // Local deps
 use crate::{
     rpc_client::RpcClient,
@@ -143,15 +143,16 @@ impl SatelliteScenario {
 
         let fee = self
             .rpc_client
-            .get_tx_fee("Withdraw", account.eth_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Withdraw, account.eth_acc.address, "ETH")
             .await
-            .expect("Can't get tx fee");
+            .expect("Can't get tx fee")
+            .total_fee;
 
         let fee = closest_packable_fee_amount(&fee);
 
         let comitted_account_state = self
             .rpc_client
-            .account_state_info(account.zk_acc.address)
+            .account_info(account.zk_acc.address)
             .await?
             .committed;
         let account_balance = comitted_account_state.balances["ETH"].0.clone();

@@ -8,6 +8,7 @@ edition = "2018"
 models = { path = "../../lib/models", version = "0.0.1" }
 server = { path = "../../bin/server", version = "0.0.1" }
 testkit = { path = "../testkit", version = "0.1.0"}
+zksync = { path = "../../../sdk/zksync-rs", version = "0.1.0" }
 
 serde = "1.0.90"
 serde_derive = "1.0.90"

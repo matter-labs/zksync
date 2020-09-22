@@ -83,8 +83,8 @@ pub async fn wait_for_verify(
     // Wait until all the transactions are verified.
     for &id in serial_ids.iter() {
         loop {
-            let state = rpc_client.ethop_info(id as u64).await?;
-            if state.executed && state.verified {
+            let state = rpc_client.ethop_info(id).await?;
+            if state.is_verified() {
                 log::debug!("deposit (serial_id={}) is verified", id);
                 break;
             }
@@ -99,7 +99,7 @@ pub async fn wait_for_verify(
     for hash in tx_hashes.iter() {
         loop {
             let state = rpc_client.tx_info(hash.clone()).await?;
-            if state.verified {
+            if state.is_verified() {
                 log::debug!("{} is verified", hash.to_string());
                 break;
             }

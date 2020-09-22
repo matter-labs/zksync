@@ -75,7 +75,7 @@ impl TestAccount {
 
         // Update ZKSync nonce.
         let resp = rpc_client
-            .account_state_info(self.zk_acc.address)
+            .account_info(self.zk_acc.address)
             .await
             .expect("rpc error");
         self.zk_acc.set_nonce(resp.committed.nonce);
@@ -87,7 +87,7 @@ impl TestAccount {
         let mut ticker = time::interval(std::time::Duration::from_millis(500));
         for _i in 1..100 {
             let resp = rpc_client
-                .account_state_info(self.zk_acc.address)
+                .account_info(self.zk_acc.address)
                 .await
                 .expect("rpc error");
             if resp.id.is_some() {

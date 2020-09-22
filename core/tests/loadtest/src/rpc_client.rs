@@ -6,9 +6,14 @@ use num::BigUint;
 // Workspace uses
 use models::node::{
     tx::{FranklinTx, PackedEthSignature, TxHash},
-    Address,
+    Address, TokenLike, TxFeeTypes,
 };
-use server::api_server::rpc_server::types::AccountInfoResp;
+use zksync::{
+    error::ClientError,
+    types::AccountInfo,
+    types::{EthOpInfo, Fee, TransactionInfo},
+    Provider,
+};
 // Local uses
 use self::messages::JsonRpcRequest;
 
@@ -25,32 +30,28 @@ pub struct OperationState {
 pub struct RpcClient {
     rpc_addr: String,
     client: reqwest::Client,
+    inner: Provider,
 }
 
 impl RpcClient {
     /// Creates a new `RpcClient` object.
-    pub fn new(rpc_addr: impl Into<String>) -> Self {
+    pub fn from_addr(rpc_addr: impl Into<String>) -> Self {
+        let rpc_addr = rpc_addr.into();
+
         Self {
-            rpc_addr: rpc_addr.into(),
+            rpc_addr: rpc_addr.clone(),
             client: reqwest::Client::new(),
+            inner: Provider::from_addr(rpc_addr),
         }
     }
 
     pub async fn get_tx_fee(
         &self,
-        tx_type: &str,
+        tx_type: TxFeeTypes,
         address: Address,
-        token_symbol: &str,
-    ) -> Result<BigUint, failure::Error> {
-        let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token_symbol);
-
-        let ret = self.post(&msg).await?;
-        let fee_value = ret["totalFee"]
-            .as_str()
-            .expect("Incorrect `totalFee` entry of response");
-        let fee = BigUint::from_str(&fee_value).expect("failed to parse `get_tx_fee` response");
-
-        Ok(fee)
+        token_symbol: impl Into<TokenLike>,
+    ) -> Result<Fee, ClientError> {
+        self.inner.get_tx_fee(tx_type, address, token_symbol).await
     }
 
     /// Sends the transaction to the ZKSync server using the JSON RPC.
@@ -58,15 +59,12 @@ impl RpcClient {
         &self,
         tx: FranklinTx,
         eth_signature: Option<PackedEthSignature>,
-    ) -> Result<TxHash, failure::Error> {
-        let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
-
-        let ret = self.post(&msg).await?;
-        let tx_hash = serde_json::from_value(ret).expect("failed to parse `send_tx` response");
-        Ok(tx_hash)
+    ) -> Result<TxHash, ClientError> {
+        self.inner.send_tx(tx, eth_signature).await
     }
 
     /// Sends the transaction to the ZKSync server and returns raw response.
+    #[deprecated = "There is no way to fetch raw response from the Provider"]
     pub async fn send_tx_raw(
         &self,
         tx: FranklinTx,
@@ -78,70 +76,20 @@ impl RpcClient {
     }
 
     /// Requests and returns information about a ZKSync account given its address.
-    pub async fn account_state_info(
-        &self,
-        address: Address,
-    ) -> Result<AccountInfoResp, failure::Error> {
-        let msg = JsonRpcRequest::account_state(address);
-
-        let ret = self.post(&msg).await?;
-        let account_state =
-            serde_json::from_value(ret).expect("failed to parse account request response");
-        Ok(account_state)
+    pub async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
+        self.inner.account_info(address).await
     }
 
     /// Requests and returns a tuple `(executed, verified)` (as `OperationState`) for
     /// an Ethereum operation given its `serial_id`.
-    pub async fn ethop_info(&self, serial_id: u64) -> Result<OperationState, failure::Error> {
-        let msg = JsonRpcRequest::ethop_info(serial_id);
-
-        let ret = self.post(&msg).await?;
-        let obj = ret.as_object().unwrap();
-        let executed = obj["executed"].as_bool().unwrap();
-        let verified = if executed {
-            let block = obj["block"].as_object().unwrap();
-            block["verified"].as_bool().unwrap()
-        } else {
-            false
-        };
-
-        Ok(OperationState { executed, verified })
+    pub async fn ethop_info(&self, serial_id: u64) -> Result<EthOpInfo, ClientError> {
+        self.inner.ethop_info(serial_id as u32).await
     }
 
     /// Requests and returns a tuple `(executed, verified)` (as `OperationState`) for
     /// a transaction given its hash`.
-    pub async fn tx_info(&self, tx_hash: TxHash) -> Result<OperationState, failure::Error> {
-        let msg = JsonRpcRequest::tx_info(tx_hash);
-
-        let ret = self.post(&msg).await?;
-        let obj = ret.as_object().unwrap();
-        let executed = obj["executed"].as_bool().unwrap();
-        let verified = if executed {
-            let block = obj["block"].as_object().unwrap();
-            block["verified"].as_bool().unwrap()
-        } else {
-            false
-        };
-        Ok(OperationState { executed, verified })
-    }
-
-    /// Performs a POST query to the JSON RPC endpoint,
-    /// and decodes the response, returning the decoded `serde_json::Value`.
-    /// `Ok` is returned only for successful calls, for any kind of error
-    /// the `Err` variant is returned (including the failed RPC method
-    /// execution response).
-    async fn post(
-        &self,
-        message: impl serde::Serialize,
-    ) -> Result<serde_json::Value, failure::Error> {
-        let reply: Output = self.post_raw(message).await?;
-
-        let ret = match reply {
-            Output::Success(v) => v.result,
-            Output::Failure(v) => failure::bail!("RPC error: {}", v.error),
-        };
-
-        Ok(ret)
+    pub async fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
+        self.inner.tx_info(tx_hash).await
     }
 
     /// Performs a POST query to the JSON RPC endpoint,
@@ -202,32 +150,6 @@ mod messages {
                     .expect("serialization fail"),
             );
             Self::create("tx_submit", params)
-        }
-
-        pub fn account_state(address: Address) -> Self {
-            let mut params = Vec::new();
-            params.push(serde_json::to_value(address).expect("serialization fail"));
-            Self::create("account_info", params)
-        }
-
-        pub fn ethop_info(serial_id: u64) -> Self {
-            let mut params = Vec::new();
-            params.push(serde_json::to_value(serial_id).expect("serialization fail"));
-            Self::create("ethop_info", params)
-        }
-
-        pub fn tx_info(tx_hash: TxHash) -> Self {
-            let mut params = Vec::new();
-            params.push(serde_json::to_value(tx_hash).expect("serialization fail"));
-            Self::create("tx_info", params)
-        }
-
-        pub fn get_tx_fee(tx_type: &str, address: Address, token_symbol: &str) -> Self {
-            let mut params = Vec::new();
-            params.push(serde_json::to_value(tx_type).expect("serialization fail"));
-            params.push(serde_json::to_value(address).expect("serialization fail"));
-            params.push(serde_json::to_value(token_symbol).expect("serialization fail"));
-            Self::create("get_tx_fee", params)
         }
     }
 }

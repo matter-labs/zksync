@@ -1,7 +1,7 @@
 pub use jsonrpc_core::types::response::Failure as RpcFailure;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum ClientError {
     #[error("Network '{0}' is not supported")]
     NetworkNotSupported(String),
@@ -38,7 +38,7 @@ pub enum ClientError {
     NotPackableValue,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum SignerError {
     #[error("Ethereum private key required to perform an operation")]
     MissingEthPrivateKey,

@@ -72,11 +72,25 @@ pub struct TransactionInfo {
     pub block: Option<BlockInfo>,
 }
 
+impl TransactionInfo {
+    /// Indicates whether this transaction is verified.
+    pub fn is_verified(&self) -> bool {
+        self.executed && self.block.as_ref().filter(|x| x.verified).is_some()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EthOpInfo {
     pub executed: bool,
     pub block: Option<BlockInfo>,
+}
+
+impl EthOpInfo {
+    /// Indicates whether this operation is verified.
+    pub fn is_verified(&self) -> bool {
+        self.executed && self.block.as_ref().filter(|x| x.verified).is_some()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

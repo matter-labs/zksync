@@ -40,7 +40,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     let verify_timeout_sec = Duration::from_secs(config.verify_timeout_sec);
     let rpc_addr = ctx.rpc_addr.clone();
 
-    let rpc_client = RpcClient::new(&rpc_addr);
+    let rpc_client = RpcClient::from_addr(&rpc_addr);
 
     // Obtain the Ethereum node JSON RPC address.
     log::info!("Starting the loadtest");

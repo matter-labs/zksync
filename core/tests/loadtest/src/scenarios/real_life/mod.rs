@@ -66,7 +66,7 @@ use models::{
     misc::utils::format_ether,
     node::{
         closest_packable_fee_amount, closest_packable_token_amount, tx::PackedEthSignature,
-        FranklinTx,
+        FranklinTx, TxFeeTypes,
     },
 };
 use testkit::zksync_account::ZksyncAccount;
@@ -425,7 +425,7 @@ impl ScenarioExecutor {
         for account in self.accounts.iter() {
             let resp = self
                 .rpc_client
-                .account_state_info(account.address)
+                .account_info(account.address)
                 .await
                 .expect("rpc error");
             assert!(resp.id.is_some(), "Account ID is none for new account");
@@ -534,7 +534,7 @@ impl ScenarioExecutor {
 
             let comitted_account_state = self
                 .rpc_client
-                .account_state_info(from_acc.address)
+                .account_info(from_acc.address)
                 .await?
                 .committed;
             let account_balance = comitted_account_state.balances["ETH"].0.clone();
@@ -588,7 +588,7 @@ impl ScenarioExecutor {
 
         let comitted_account_state = self
             .rpc_client
-            .account_state_info(self.main_account.zk_acc.address)
+            .account_info(self.main_account.zk_acc.address)
             .await?
             .committed;
         let account_balance = comitted_account_state.balances["ETH"].0.clone();
@@ -664,9 +664,10 @@ impl ScenarioExecutor {
     async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
         let fee = self
             .rpc_client
-            .get_tx_fee("Transfer", to_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Transfer, to_acc.address, "ETH")
             .await
-            .expect("Can't get tx fee");
+            .expect("Can't get tx fee")
+            .total_fee;
 
         closest_packable_fee_amount(&fee)
     }
@@ -675,9 +676,10 @@ impl ScenarioExecutor {
     async fn withdraw_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
         let fee = self
             .rpc_client
-            .get_tx_fee("Withdraw", to_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Withdraw, to_acc.address, "ETH")
             .await
-            .expect("Can't get tx fee");
+            .expect("Can't get tx fee")
+            .total_fee;
 
         closest_packable_fee_amount(&fee)
     }
@@ -734,7 +736,7 @@ impl ScenarioExecutor {
 /// For description, see the module doc-comment.
 pub fn run_scenario(mut ctx: ScenarioContext) {
     let rpc_addr = ctx.rpc_addr.clone();
-    let rpc_client = RpcClient::new(&rpc_addr);
+    let rpc_client = RpcClient::from_addr(&rpc_addr);
 
     let mut scenario = ScenarioExecutor::new(&ctx, rpc_client);
 

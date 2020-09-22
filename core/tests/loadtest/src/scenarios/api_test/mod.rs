@@ -18,7 +18,7 @@ use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
     misc::utils::format_ether,
-    node::{closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx},
+    node::{closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx, TxFeeTypes},
 };
 use testkit::zksync_account::ZksyncAccount;
 // Local deps
@@ -206,9 +206,10 @@ impl TestExecutor {
     async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
         let fee = self
             .rpc_client
-            .get_tx_fee("Transfer", to_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Transfer, to_acc.address, "ETH")
             .await
-            .expect("Can't get tx fee");
+            .expect("Can't get tx fee")
+            .total_fee;
 
         closest_packable_fee_amount(&fee)
     }
@@ -217,9 +218,10 @@ impl TestExecutor {
     async fn withdraw_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
         let fee = self
             .rpc_client
-            .get_tx_fee("Withdraw", to_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Withdraw, to_acc.address, "ETH")
             .await
-            .expect("Can't get tx fee");
+            .expect("Can't get tx fee")
+            .total_fee;
 
         closest_packable_fee_amount(&fee)
     }
@@ -252,7 +254,7 @@ impl TestExecutor {
 /// For description, see the module doc-comment.
 pub fn run_scenario(mut ctx: ScenarioContext) {
     let rpc_addr = ctx.rpc_addr.clone();
-    let rpc_client = RpcClient::new(&rpc_addr);
+    let rpc_client = RpcClient::from_addr(&rpc_addr);
 
     let mut scenario = TestExecutor::new(&ctx, rpc_client);
 
