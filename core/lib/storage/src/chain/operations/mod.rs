@@ -226,7 +226,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                         .fetch_one(self.0.conn())
                         .await?
                         .max
-                        .ok_or(format_err!("there is no pending withdrawals in the db"))?;
+                        .ok_or_else(|| format_err!("there is no pending withdrawals in the db"))?;
 
                 max_stored_pending_withdrawal_id + 1
             }

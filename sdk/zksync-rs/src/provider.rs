@@ -259,7 +259,7 @@ mod messages {
         }
 
         pub fn eth_tx_for_withdrawal(withdrawal_hash: TxHash) -> Self {
-            let params = Vec::new();
+            let mut params = Vec::new();
             params.push(serde_json::to_value(withdrawal_hash).expect("serialization fail"));
             Self::create("get_eth_tx_for_withdrawal", params)
         }
