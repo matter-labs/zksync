@@ -14,9 +14,6 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::operations::{DepositOp, FullExitOp};
 
-mod deposit;
-mod full_exit;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
     pub from: Address,
