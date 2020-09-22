@@ -455,4 +455,11 @@ impl RpcApp {
         )
         .await
     }
+
+    pub async fn _impl_get_eth_tx_for_withdrawal(
+        self,
+        withdrawal_hash: TxHash,
+    ) -> Result<Option<String>> {
+        self.eth_tx_for_withdrawal(withdrawal_hash).await
+    }
 }

@@ -1,6 +1,7 @@
 // Built-in uses
 use std::time::Duration;
 // External uses
+use failure::format_err;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use tokio::{task::JoinHandle, time};
@@ -80,19 +81,24 @@ async fn commit_block(
         .await
         .expect("Failed initializing a DB transaction");
 
-    // handle empty block case (only failed txs)
-    if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
-        info!(
-            "Failed transactions committed block: #{}",
-            block.block_number
-        );
-        transaction
-            .chain()
-            .block_schema()
-            .save_block_transactions(block.block_number, block.block_transactions)
-            .await
-            .expect("committer failed tx save");
-        return;
+    for exec_op in block.block_transactions.clone() {
+        if let Some(exec_tx) = exec_op.get_executed_tx() {
+            if exec_tx.success && exec_tx.signed_tx.tx.is_withdraw() {
+                transaction
+                    .chain()
+                    .operations_schema()
+                    .add_pending_withdrawal(&exec_tx.signed_tx.tx.hash(), None)
+                    .await
+                    .map_err(|e| {
+                        format_err!(
+                            "Failed to save pending withdrawal {:?}, error : {}",
+                            exec_tx,
+                            e
+                        )
+                    })
+                    .expect("failed to save pending withdrawals into db");
+            }
+        }
     }
 
     let op = Operation {
