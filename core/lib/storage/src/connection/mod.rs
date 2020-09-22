@@ -12,6 +12,7 @@ use sqlx::{
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
 use crate::StorageProcessor;
+use failure::_core::time::Duration;
 use models::config_options::parse_env;
 
 pub mod holder;
@@ -42,6 +43,7 @@ impl ConnectionPool {
 
         let pool = PgPoolOptions::new()
             .max_connections(max_size)
+            .connect_timeout(Duration::from_secs(3))
             .connect(&database_url)
             .await
             .expect("Failed to create connection pool");
