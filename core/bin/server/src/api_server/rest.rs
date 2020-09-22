@@ -25,7 +25,7 @@ use storage::chain::operations_ext::{
 };
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
-use web3::types::H160;
+use zksync_basic_types::H160;
 use zksync_config::ConfigurationOptions;
 
 use super::rpc_server::get_ongoing_priority_ops;

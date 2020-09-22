@@ -5,7 +5,7 @@ use std::time::Duration;
 use clap::{App, Arg};
 use futures::{channel::mpsc, executor::block_on, future, SinkExt, StreamExt};
 use tokio::{runtime::Builder, task::JoinHandle};
-use web3::types::H160;
+use zksync_basic_types::H160;
 // Workspace uses
 use zksync_config::{AdminServerOptions, ConfigurationOptions, ProverOptions};
 

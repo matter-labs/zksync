@@ -9,7 +9,7 @@ use jsonrpc_core::{MetaIoHandler, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace uses
 use models::{tx::TxHash, ActionType, Operation};
 use storage::ConnectionPool;

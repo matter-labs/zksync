@@ -24,7 +24,7 @@ use std::str::FromStr;
 use storage::chain::operations::records::StoredExecutedPriorityOperation;
 use storage::chain::operations_ext::records::TxReceiptResponse;
 use storage::ConnectionPool;
-use web3::types::Address;
+use zksync_basic_types::Address;
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
 const TX_SUB_PREFIX: &str = "txsub";
@@ -258,7 +258,7 @@ impl OperationNotifier {
             ETHOP_SUB_PREFIX,
             serial_id,
             action.to_string(),
-            crypto_exports::rand::random::<u64>()
+            zksync_crypto::rand::random::<u64>()
         ));
 
         // Maybe it was executed already
@@ -377,7 +377,7 @@ impl OperationNotifier {
             TX_SUB_PREFIX,
             hash.to_string(),
             action.to_string(),
-            crypto_exports::rand::random::<u64>()
+            zksync_crypto::rand::random::<u64>()
         ));
 
         // Maybe tx was executed already.
@@ -472,7 +472,7 @@ impl OperationNotifier {
             ACCOUNT_SUB_PREFIX,
             address,
             action.to_string(),
-            crypto_exports::rand::random::<u64>()
+            zksync_crypto::rand::random::<u64>()
         ));
 
         let account_state = if let Some(account) = match action {

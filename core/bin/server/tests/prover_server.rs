@@ -1,8 +1,8 @@
 // Built-in deps
 use std::{net, str::FromStr, thread, time, time::Duration};
 // External deps
-use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
+use zksync_crypto::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use circuit::witness::{deposit::DepositWitness, Witness};
 use models::{block::Block, Address};

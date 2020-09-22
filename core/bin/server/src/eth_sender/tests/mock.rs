@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 // External uses
 use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
-use web3::types::{H256, U256};
+use zksync_basic_types::{H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{

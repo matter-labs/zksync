@@ -4,7 +4,7 @@
 //! won't run out of the gas and won't trespass the block gas limit.
 
 // External deps
-use web3::types::U256;
+use zksync_basic_types::U256;
 // Workspace deps
 use models::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
 

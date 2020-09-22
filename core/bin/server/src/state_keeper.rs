@@ -6,9 +6,8 @@ use futures::{
     SinkExt,
 };
 use tokio::task::JoinHandle;
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace uses
-use crypto_exports::ff;
 use models::{
     ActionType,
     {
@@ -23,6 +22,7 @@ use models::{
 };
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 use storage::ConnectionPool;
+use zksync_crypto::ff;
 // Local uses
 use crate::{
     committer::{BlockCommitRequest, CommitRequest},
