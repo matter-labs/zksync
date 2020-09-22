@@ -35,11 +35,10 @@ impl WalletCredentials {
 
         // Add chain_id to the message to prevent replay attacks between networks
         // This is added for testnets only
-        let chain_id = network.chain_id();
-        let eth_sign_message = if chain_id == 1 {
+        let eth_sign_message = if let Network::Mainnet = network {
             MESSAGE.into()
         } else {
-            format!("{}\nChainID: {}.", MESSAGE, chain_id)
+            format!("{}\nChainID: {}.", MESSAGE, network.chain_id())
         }
         .into_bytes();
 
