@@ -89,7 +89,8 @@ async fn transfer_eth_to(to: H160) {
 
     let provider = Provider::new(Network::Localhost);
     let credentials =
-        WalletCredentials::from_eth_pk(main_eth_address, main_eth_private_key, 1337).unwrap();
+        WalletCredentials::from_eth_pk(main_eth_address, main_eth_private_key, Network::Localhost)
+            .unwrap();
 
     let wallet = Wallet::new(provider, credentials).await.unwrap();
     let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await.unwrap();
@@ -109,7 +110,8 @@ async fn simple_workflow() -> Result<(), anyhow::Error> {
     transfer_eth_to(eth_address).await;
 
     let provider = Provider::new(Network::Localhost);
-    let credentials = WalletCredentials::from_eth_pk(eth_address, eth_private_key, 1337).unwrap();
+    let credentials =
+        WalletCredentials::from_eth_pk(eth_address, eth_private_key, Network::Localhost).unwrap();
 
     let mut wallet = Wallet::new(provider, credentials).await.unwrap();
     let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await.unwrap();

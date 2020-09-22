@@ -1,4 +1,4 @@
-use crate::{error::ClientError, utils::private_key_from_seed};
+use crate::{error::ClientError, types::Network, utils::private_key_from_seed};
 use models::node::{tx::PackedEthSignature, PrivateKey};
 use web3::types::{Address, H256};
 
@@ -23,11 +23,11 @@ impl WalletCredentials {
     ///
     /// - `eth_address`: Address of the corresponding Ethereum wallet.
     /// - `eth_private_key`: Private key of a corresponding Ethereum account.
-    /// - `chain_id`: ChainID of the network on which the wallet is to be used (EIP155).
+    /// - `network`: Network this wallet is used on.
     pub fn from_eth_pk(
         eth_address: Address,
         eth_private_key: H256,
-        chain_id: usize,
+        network: Network,
     ) -> Result<Self, ClientError> {
         // Pre-defined message to generate seed from.
         const MESSAGE: &str =
@@ -35,6 +35,7 @@ impl WalletCredentials {
 
         // Add chain_id to the message to prevent replay attacks between networks
         // This is added for testnets only
+        let chain_id = network.chain_id();
         let eth_sign_message = if chain_id == 1 {
             MESSAGE.into()
         } else {
