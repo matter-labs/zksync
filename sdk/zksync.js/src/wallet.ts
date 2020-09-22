@@ -142,7 +142,7 @@ export class Wallet {
         to: Address;
         token: TokenLike;
         amount: BigNumberish;
-        fee: BigNumberish;
+        fee?: BigNumberish;
         nonce?: Nonce;
     }[]): Promise<Transaction[]> {
         if (!this.signer) {
