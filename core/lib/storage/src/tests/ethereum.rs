@@ -16,7 +16,7 @@ use num::BigUint;
 /// Creates a sample operation to be stored in `operations` table.
 /// This function is required since `eth_operations` table is linked to
 /// the `operations` table by the operation id.
-pub fn get_operation(block_number: BlockNumber) -> Operation {
+pub fn get_commit_operation(block_number: BlockNumber) -> Operation {
     Operation {
         id: None,
         action: Action::Commit,
@@ -34,7 +34,7 @@ pub fn get_operation(block_number: BlockNumber) -> Operation {
     }
 }
 
-/// Same as `get_operation`, but creates a verify operation instead.
+/// Same as `get_commit_operation`, but creates a verify operation instead.
 pub fn get_verify_operation(block_number: BlockNumber) -> Operation {
     let action = Action::Verify {
         proof: Default::default(),
@@ -132,7 +132,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     // Store operation with ID 1.
     let block_number = 1;
     let operation = BlockSchema(&mut storage)
-        .execute_operation(get_operation(block_number))
+        .execute_operation(get_commit_operation(block_number))
         .await?;
 
     // Store the Ethereum transaction.
@@ -166,7 +166,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     // Store operation with ID 2.
     let block_number = 2;
     let operation_2 = BlockSchema(&mut storage)
-        .execute_operation(get_operation(block_number))
+        .execute_operation(get_commit_operation(block_number))
         .await?;
 
     // Create one more Ethereum transaction.
@@ -255,7 +255,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     // Store operation with ID 1.
     let block_number = 1;
     let operation = BlockSchema(&mut storage)
-        .execute_operation(get_operation(block_number))
+        .execute_operation(get_commit_operation(block_number))
         .await?;
     let verify_operation = BlockSchema(&mut storage)
         .execute_operation(get_verify_operation(block_number))
