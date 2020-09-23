@@ -15,8 +15,8 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 /// ## Example:
 ///
 /// ```
-/// use models::serialization::FrSerde;
-/// use models::Fr;
+/// use crate::serialization::FrSerde;
+/// use crate::Fr;
 /// use serde_derive::{Serialize, Deserialize};
 ///
 /// #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -57,8 +57,8 @@ impl FrSerde {
 /// ## Example:
 ///
 /// ```
-/// use models::serialization::OptionalFrSerde;
-/// use models::Fr;
+/// use crate::serialization::OptionalFrSerde;
+/// use crate::Fr;
 /// use serde_derive::{Serialize, Deserialize};
 ///
 /// #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -99,8 +99,8 @@ impl OptionalFrSerde {
 /// ## Example:
 ///
 /// ```
-/// use models::serialization::VecOptionalFrSerde;
-/// use models::Fr;
+/// use crate::serialization::VecOptionalFrSerde;
+/// use crate::Fr;
 /// use serde_derive::{Serialize, Deserialize};
 ///
 /// #[derive(Clone, Debug, Serialize, Deserialize)]
