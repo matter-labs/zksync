@@ -574,6 +574,30 @@ impl FranklinTx {
     }
 }
 
+impl From<Transfer> for FranklinTx {
+    fn from(transfer: Transfer) -> Self {
+        Self::Transfer(Box::new(transfer))
+    }
+}
+
+impl From<Withdraw> for FranklinTx {
+    fn from(withdraw: Withdraw) -> Self {
+        Self::Withdraw(Box::new(withdraw))
+    }
+}
+
+impl From<Close> for FranklinTx {
+    fn from(close: Close) -> Self {
+        Self::Close(Box::new(close))
+    }
+}
+
+impl From<ChangePubKey> for FranklinTx {
+    fn from(change_pub_key: ChangePubKey) -> Self {
+        Self::ChangePubKey(Box::new(change_pub_key))
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxSignature {
