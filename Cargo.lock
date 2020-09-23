@@ -2641,7 +2641,6 @@ dependencies = [
  "serde_json",
  "server",
  "structopt",
- "testkit",
  "tokio 0.2.22",
  "web3",
  "zksync",

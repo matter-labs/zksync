@@ -59,7 +59,6 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use num::BigUint;
 use tokio::{fs, time};
-use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
     config_options::ConfigurationOptions,
@@ -69,8 +68,7 @@ use models::{
         FranklinTx, TxFeeTypes,
     },
 };
-use testkit::zksync_account::ZksyncAccount;
-use zksync::Provider;
+use zksync::{Network, Provider, Wallet};
 // Local deps
 use self::satellite::SatelliteScenario;
 use crate::{
@@ -80,7 +78,7 @@ use crate::{
         ScenarioContext,
     },
     sent_transactions::SentTransactions,
-    test_accounts::TestAccount,
+    test_accounts::{gen_random_wallet, TestWallet},
 };
 
 mod satellite;
@@ -90,10 +88,10 @@ struct ScenarioExecutor {
     provider: Provider,
 
     /// Main account to deposit ETH from / return ETH back to.
-    main_account: TestAccount,
+    main_wallet: TestWallet,
 
     /// Intermediate account to rotate funds within.
-    accounts: Vec<ZksyncAccount>,
+    accounts: Vec<Wallet>,
 
     /// Amount of intermediate accounts.
     n_accounts: usize,
@@ -116,34 +114,34 @@ struct ScenarioExecutor {
 
     /// Satellite scenario to run alongside with the funds rotation cycles.
     satellite_scenario: Option<SatelliteScenario>,
-
-    /// Event loop handle so transport for Eth account won't be invalidated.
-    _event_loop_handle: EventLoopHandle,
 }
 
 impl ScenarioExecutor {
     /// Creates a real-life scenario executor.
-    pub fn new(ctx: &ScenarioContext, provider: Provider) -> Self {
+    pub fn new(ctx: &mut ScenarioContext, provider: Provider) -> Self {
         // Load the config for the test from JSON file.
         let config = RealLifeConfig::load(&ctx.config_path);
 
         // Generate random accounts to rotate funds within.
         let accounts = (0..config.n_accounts)
-            .map(|_| ZksyncAccount::rand())
+            .map(|_| ctx.rt.block_on(gen_random_wallet(provider.clone())))
             .collect();
 
-        // Create a transport for Ethereum account.
-        let (_event_loop_handle, transport) =
-            Http::new(&ctx.options.web3_url).expect("http transport start");
-
         // Create main account to deposit money from and to return money back later.
-        let main_account = TestAccount::from_info(&config.input_account, &transport, &ctx.options);
+        let main_wallet = ctx.rt.block_on(TestWallet::from_info(
+            &config.input_account,
+            provider.clone(),
+            &ctx.options,
+        ));
 
         // Load additional accounts for the satellite scenario.
         let additional_accounts: Vec<_> = config
             .additional_accounts
             .iter()
-            .map(|acc| TestAccount::from_info(acc, &transport, &ctx.options))
+            .map(|acc| {
+                ctx.rt
+                    .block_on(TestWallet::from_info(acc, provider.clone(), &ctx.options))
+            })
             .collect();
 
         let block_sizes = Self::get_block_sizes(config.use_all_block_sizes);
@@ -168,7 +166,7 @@ impl ScenarioExecutor {
         Self {
             provider,
 
-            main_account,
+            main_wallet,
             accounts,
 
             n_accounts: config.n_accounts,
@@ -182,8 +180,6 @@ impl ScenarioExecutor {
             estimated_fee_for_op: 0u32.into(),
 
             satellite_scenario,
-
-            _event_loop_handle,
         }
     }
 
@@ -214,7 +210,7 @@ impl ScenarioExecutor {
 
         // Add all the accounts to the string.
         // Debug representations of account contains both zkSync and Ethereum private keys.
-        account_list += &format!("{:?}\n", self.main_account.zk_acc);
+        account_list += &format!("{:?}\n", self.main_wallet.zk_wallet);
         for account in self.accounts.iter() {
             account_list += &format!("{:?}\n", account);
         }
@@ -263,14 +259,12 @@ impl ScenarioExecutor {
     /// Initializes the test, preparing the main account for the interaction.
     async fn initialize(&mut self) -> Result<(), failure::Error> {
         // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
-        self.main_account
-            .update_nonce_values(&self.provider)
-            .await?;
+        // self.main_wallet.update_nonce_values(&self.provider).await?;
 
         // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
         // the fee in such a way that it will always be sufficient).
         // Withdraw operation has more chunks, so we estimate fee for it.
-        let mut fee = self.withdraw_fee(&self.main_account.zk_acc).await;
+        let mut fee = self.withdraw_fee(&self.main_wallet.zk_wallet).await;
 
         // To be sure that we will have enough funds for all the transfers,
         // we will request 1.2x of the suggested fees. All the unspent funds
@@ -309,7 +303,7 @@ impl ScenarioExecutor {
         // Also the fee is required to perform a final withdraw
         amount_to_deposit += self.estimated_fee_for_op.clone();
 
-        let account_balance = self.main_account.eth_acc.eth_balance().await?;
+        let account_balance = self.main_wallet.eth_provider.balance().await?;
         log::info!(
             "Main account ETH balance: {} ETH",
             format_ether(&account_balance)
@@ -326,19 +320,19 @@ impl ScenarioExecutor {
         }
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(&self.main_account, amount_to_deposit, &self.provider).await?;
+        deposit_single(&self.main_wallet, amount_to_deposit, &self.provider).await?;
 
         log::info!("Deposit sent and verified");
 
         // Now when deposits are done it is time to update account id.
-        self.main_account.update_account_id(&self.provider).await?;
+        self.main_wallet.update_account_id().await?;
 
         log::info!("Main account ID set");
 
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (self.main_account.sign_change_pubkey(), None);
+        let (change_pubkey_tx, eth_sign) = (self.main_wallet.sign_change_pubkey().await?, None);
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
@@ -363,7 +357,7 @@ impl ScenarioExecutor {
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
 
         for to_idx in 0..self.n_accounts {
-            let from_acc = &self.main_account.zk_acc;
+            let from_acc = &self.main_wallet.zk_wallet;
             let to_acc = &self.accounts[to_idx];
 
             // Transfer size is (transfer_amount) + (fee for every tx to be sent) + (fee for final transfer
@@ -376,7 +370,9 @@ impl ScenarioExecutor {
 
             // Fee for the transfer itself differs from the estimated fee.
             let fee = self.transfer_fee(&to_acc).await;
-            let transfer = self.sign_transfer(from_acc, to_acc, packable_transfer_amount, fee);
+            let transfer = self
+                .sign_transfer(from_acc, to_acc, packable_transfer_amount, fee)
+                .await;
 
             signed_transfers.push(transfer);
         }
@@ -417,19 +413,16 @@ impl ScenarioExecutor {
         // After all the initial transfer completed, we have to update new account IDs
         // and change public keys of accounts (so we'll be able to send transfers from them).
         let mut tx_futures = vec![];
-        for account in self.accounts.iter() {
+        for wallet in self.accounts.iter_mut() {
             let resp = self
                 .provider
-                .account_info(account.address)
+                .account_info(wallet.address())
                 .await
                 .expect("rpc error");
             assert!(resp.id.is_some(), "Account ID is none for new account");
-            account.set_account_id(resp.id);
+            wallet.update_account_id().await?;
 
-            let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
-                account.create_change_pubkey_tx(None, true, false),
-            ));
-
+            let change_pubkey_tx = wallet.start_change_pubkey().tx().await?;
             let tx_future = self.provider.send_tx(change_pubkey_tx, None);
 
             tx_futures.push(tx_future);
@@ -474,7 +467,9 @@ impl ScenarioExecutor {
             let to_acc = &self.accounts[to_id];
 
             let fee = self.transfer_fee(&to_acc).await;
-            let transfer = self.sign_transfer(from_acc, to_acc, self.transfer_size.clone(), fee);
+            let transfer = self
+                .sign_transfer(from_acc, to_acc, self.transfer_size.clone(), fee)
+                .await;
 
             signed_transfers.push(transfer);
         }
@@ -523,19 +518,21 @@ impl ScenarioExecutor {
 
         for from_id in 0..self.n_accounts {
             let from_acc = &self.accounts[from_id];
-            let to_acc = &self.main_account.zk_acc;
+            let to_acc = &self.main_wallet.zk_wallet;
 
             let fee = self.transfer_fee(&to_acc).await;
 
             let comitted_account_state = self
                 .provider
-                .account_info(from_acc.address)
+                .account_info(from_acc.address())
                 .await?
                 .committed;
             let account_balance = comitted_account_state.balances["ETH"].0.clone();
             let transfer_amount = &account_balance - &fee;
             let transfer_amount = closest_packable_token_amount(&transfer_amount);
-            let transfer = self.sign_transfer(from_acc, to_acc, transfer_amount, fee);
+            let transfer = self
+                .sign_transfer(from_acc, to_acc, transfer_amount, fee)
+                .await;
 
             signed_transfers.push(transfer);
         }
@@ -574,13 +571,13 @@ impl ScenarioExecutor {
 
     /// Withdraws the money from the main account back to the Ethereum.
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
-        let current_balance = self.main_account.eth_acc.eth_balance().await?;
+        let current_balance = self.main_wallet.eth_provider.balance().await?;
 
-        let fee = self.withdraw_fee(&self.main_account.zk_acc).await;
+        let fee = self.withdraw_fee(&self.main_wallet.zk_wallet).await;
 
         let comitted_account_state = self
             .provider
-            .account_info(self.main_account.zk_acc.address)
+            .account_info(self.main_wallet.zk_wallet.address())
             .await?
             .committed;
         let account_balance = comitted_account_state.balances["ETH"].0.clone();
@@ -593,8 +590,9 @@ impl ScenarioExecutor {
         );
 
         let (tx, eth_sign) = self
-            .main_account
-            .sign_withdraw(withdraw_amount.clone(), fee);
+            .main_wallet
+            .sign_withdraw(withdraw_amount.clone(), fee)
+            .await?;
         let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
@@ -632,7 +630,7 @@ impl ScenarioExecutor {
         let mut timer = time::interval(polling_interval);
 
         loop {
-            let current_balance = self.main_account.eth_acc.eth_balance().await?;
+            let current_balance = self.main_wallet.eth_provider.balance().await?;
             if current_balance == expected_balance {
                 break;
             }
@@ -650,10 +648,10 @@ impl ScenarioExecutor {
     }
 
     /// Obtains a fee required for the transfer operation.
-    async fn transfer_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+    async fn transfer_fee(&self, to_acc: &Wallet) -> BigUint {
         let fee = self
             .provider
-            .get_tx_fee(TxFeeTypes::Transfer, to_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Transfer, to_acc.address(), "ETH")
             .await
             .expect("Can't get tx fee")
             .total_fee;
@@ -662,10 +660,10 @@ impl ScenarioExecutor {
     }
 
     /// Obtains a fee required for the withdraw operation.
-    async fn withdraw_fee(&self, to_acc: &ZksyncAccount) -> BigUint {
+    async fn withdraw_fee(&self, to_acc: &Wallet) -> BigUint {
         let fee = self
             .provider
-            .get_tx_fee(TxFeeTypes::Withdraw, to_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Withdraw, to_acc.address(), "ETH")
             .await
             .expect("Can't get tx fee")
             .total_fee;
@@ -676,24 +674,22 @@ impl ScenarioExecutor {
     /// Creates a signed transfer transaction.
     /// Sender and receiver are chosen from the generated
     /// accounts, determined by its indices.
-    fn sign_transfer(
+    async fn sign_transfer(
         &self,
-        from: &ZksyncAccount,
-        to: &ZksyncAccount,
+        from: &Wallet,
+        to: &Wallet,
         amount: impl Into<BigUint>,
         fee: impl Into<BigUint>,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
-        let (tx, eth_signature) = from.sign_transfer(
-            0, // ETH
-            "ETH",
-            amount.into(),
-            fee.into(),
-            &to.address,
-            None,
-            true,
-        );
-
-        (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
+        from.start_transfer()
+            .token(TestWallet::TOKEN_NAME)
+            .unwrap()
+            .amount(amount)
+            .fee(fee)
+            .to(to.address())
+            .tx()
+            .await
+            .unwrap()
     }
 
     /// Generates an ID for funds transfer. The ID is the ID of the next
@@ -724,10 +720,9 @@ impl ScenarioExecutor {
 /// Runs the real-life test scenario.
 /// For description, see the module doc-comment.
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let rpc_addr = ctx.rpc_addr.clone();
-    let provider = Provider::from_addr(&rpc_addr);
+    let provider = Provider::new(Network::Localhost);
 
-    let mut scenario = ScenarioExecutor::new(&ctx, provider);
+    let mut scenario = ScenarioExecutor::new(&mut ctx, provider);
 
     // Run the scenario.
     log::info!("Starting the real-life test");

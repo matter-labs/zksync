@@ -9,11 +9,13 @@ use std::{
 use num::BigUint;
 use rand::Rng;
 use tokio::time;
-use web3::types::U256;
 // Workspace uses
-use zksync::Provider;
+use zksync::{
+    ethereum::{biguint_to_u256, find_priority_op_in_tx_logs},
+    Provider,
+};
 // Local uses
-use crate::{sent_transactions::SentTransactions, test_accounts::TestAccount};
+use crate::{sent_transactions::SentTransactions, test_accounts::TestWallet};
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 
@@ -25,20 +27,25 @@ pub fn rand_amount(from: u64, to: u64) -> BigUint {
 
 /// Deposits to contract and waits for node to execute it.
 pub async fn deposit_single(
-    test_acc: &TestAccount,
+    test_wallet: &TestWallet,
     deposit_amount: BigUint,
     provider: &Provider,
 ) -> Result<u64, failure::Error> {
-    let nonce = {
-        let mut n = test_acc.eth_nonce.lock().await;
-        *n += 1;
-        Some(U256::from(*n - 1))
-    };
-    let priority_op = test_acc
-        .eth_acc
-        .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
+    let deposit_amount = biguint_to_u256(deposit_amount);
+
+    let tx_hash = test_wallet
+        .eth_provider
+        .deposit(
+            TestWallet::TOKEN_NAME,
+            deposit_amount,
+            test_wallet.zk_wallet.address(),
+        )
         .await?;
-    wait_for_deposit_executed(priority_op.1.serial_id, &provider).await
+
+    let receipt = test_wallet.eth_provider.wait_for_tx(tx_hash).await?;
+    let priority_op = find_priority_op_in_tx_logs(&receipt).expect("no priority op log in deposit");
+
+    wait_for_deposit_executed(priority_op.serial_id, &provider).await
 }
 
 /// Waits until the deposit priority operation is executed.

@@ -13,7 +13,6 @@ use std::time::{Duration, Instant};
 // External deps
 use num::BigUint;
 use tokio::time;
-use web3::types::Address;
 // Workspace deps
 use models::node::{closest_packable_fee_amount, closest_packable_token_amount, TxFeeTypes};
 use zksync::Provider;
@@ -21,13 +20,13 @@ use zksync::Provider;
 use crate::{
     scenarios::utils::{deposit_single, wait_for_verify},
     sent_transactions::SentTransactions,
-    test_accounts::TestAccount,
+    test_accounts::TestWallet,
 };
 
 #[derive(Debug)]
 pub struct SatelliteScenario {
     provider: Provider,
-    accounts: Vec<TestAccount>,
+    wallets: Vec<TestWallet>,
     deposit_size: BigUint,
     verify_timeout: Duration,
     estimated_fee_for_op: BigUint,
@@ -36,13 +35,13 @@ pub struct SatelliteScenario {
 impl SatelliteScenario {
     pub fn new(
         provider: Provider,
-        accounts: Vec<TestAccount>,
+        wallets: Vec<TestWallet>,
         deposit_size: BigUint,
         verify_timeout: Duration,
     ) -> Self {
         Self {
             provider,
-            accounts,
+            wallets,
             deposit_size,
             verify_timeout,
             estimated_fee_for_op: 0u32.into(),
@@ -57,12 +56,12 @@ impl SatelliteScenario {
         self.initialize().await?;
 
         // Deposit & withdraw phase.
-        for account_id in 0..self.accounts.len() {
+        for account_id in 0..self.wallets.len() {
             self.deposit_withdraw(account_id).await?;
         }
 
         // Deposit & full exit phase.
-        for account_id in 0..self.accounts.len() {
+        for account_id in 0..self.wallets.len() {
             self.deposit_full_exit(account_id).await?;
         }
 
@@ -70,10 +69,6 @@ impl SatelliteScenario {
     }
 
     async fn initialize(&mut self) -> Result<(), failure::Error> {
-        for account in self.accounts.iter_mut() {
-            account.update_nonce_values(&self.provider).await?;
-        }
-
         Ok(())
     }
 
@@ -108,26 +103,26 @@ impl SatelliteScenario {
     }
 
     async fn deposit(&mut self, account_id: usize) -> Result<(), failure::Error> {
-        let account = &mut self.accounts[account_id];
+        let wallet = &mut self.wallets[account_id];
 
         let amount_to_deposit = self.deposit_size.clone() + self.estimated_fee_for_op.clone();
 
         // Ensure that account does have enough money.
-        let account_balance = account.eth_acc.eth_balance().await?;
+        let account_balance = wallet.eth_provider.balance().await?;
         if amount_to_deposit > account_balance {
             panic!("Main ETH account does not have enough balance to run the test with the provided config");
         }
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(account, amount_to_deposit, &self.provider).await?;
+        deposit_single(wallet, amount_to_deposit, &self.provider).await?;
 
         // Now when deposits are done it is time to update account id.
-        account.update_account_id(&self.provider).await?;
+        wallet.update_account_id().await?;
 
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (account.sign_change_pubkey(), None);
+        let (change_pubkey_tx, eth_sign) = (wallet.sign_change_pubkey().await?, None);
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
@@ -137,13 +132,13 @@ impl SatelliteScenario {
     }
 
     async fn withdraw(&mut self, account_id: usize) -> Result<(), failure::Error> {
-        let account = &mut self.accounts[account_id];
+        let wallet = &mut self.wallets[account_id];
 
-        let current_balance = account.eth_acc.eth_balance().await?;
+        let current_balance = wallet.eth_provider.balance().await?;
 
         let fee = self
             .provider
-            .get_tx_fee(TxFeeTypes::Withdraw, account.eth_acc.address, "ETH")
+            .get_tx_fee(TxFeeTypes::Withdraw, wallet.zk_wallet.address(), "ETH")
             .await
             .expect("Can't get tx fee")
             .total_fee;
@@ -152,14 +147,14 @@ impl SatelliteScenario {
 
         let comitted_account_state = self
             .provider
-            .account_info(account.zk_acc.address)
+            .account_info(wallet.zk_wallet.address())
             .await?
             .committed;
         let account_balance = comitted_account_state.balances["ETH"].0.clone();
         let withdraw_amount = &account_balance - &fee;
         let withdraw_amount = closest_packable_token_amount(&withdraw_amount);
 
-        let (tx, eth_sign) = account.sign_withdraw(withdraw_amount.clone(), fee);
+        let (tx, eth_sign) = wallet.sign_withdraw(withdraw_amount.clone(), fee).await?;
         let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
@@ -176,7 +171,7 @@ impl SatelliteScenario {
         let mut timer = time::interval(polling_interval);
 
         loop {
-            let current_balance = account.eth_acc.eth_balance().await?;
+            let current_balance = wallet.eth_provider.balance().await?;
             if current_balance == expected_balance {
                 break;
             }
@@ -193,14 +188,13 @@ impl SatelliteScenario {
     }
 
     async fn full_exit(&mut self, account_id: usize) -> Result<(), failure::Error> {
-        let account = &mut self.accounts[account_id];
+        let wallet = &mut self.wallets[account_id];
 
-        let eth_token_address = Address::zero();
-        let zksync_account_id = account.zk_acc.get_account_id().expect("No account ID set");
+        let zksync_account_id = wallet.zk_wallet.account_id().expect("No account ID set");
 
-        account
-            .eth_acc
-            .full_exit(zksync_account_id, eth_token_address)
+        wallet
+            .eth_provider
+            .full_exit(TestWallet::TOKEN_NAME, zksync_account_id)
             .await?;
 
         Ok(())

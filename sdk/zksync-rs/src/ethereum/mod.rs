@@ -4,13 +4,15 @@ use eth_client::ETHClient;
 use futures::compat::Future01CompatExt;
 use models::{
     abi,
-    node::{AccountId, TokenLike},
+    node::{AccountId, PriorityOp, TokenLike},
 };
-use std::str::FromStr;
+use num::BigUint;
+use std::{convert::TryFrom, time::Duration};
+use std::{str::FromStr, time::Instant};
 use web3::contract::tokens::Tokenize;
 use web3::contract::{Contract, Options};
 use web3::transports::{EventLoopHandle, Http};
-use web3::types::{H160, H256, U256};
+use web3::types::{TransactionReceipt, H160, H256, U256};
 use web3::Web3;
 
 use crate::{error::ClientError, provider::Provider, tokens_cache::TokensCache, types::Network};
@@ -31,6 +33,7 @@ fn chain_id(network: Network) -> u8 {
 /// Methods to interact with Ethereum return corresponding Ethereum transaction hash.
 /// In order to monitor transaction execution, an Etherereum node `web3` API is exposed
 /// via `EthereumProvider::web3` method.
+#[derive(Debug)]
 pub struct EthereumProvider {
     tokens_cache: TokensCache,
     eth_client: ETHClient<Http>,
@@ -95,6 +98,15 @@ impl EthereumProvider {
     /// Returns the zkSync contract address.
     pub fn contract_address(&self) -> H160 {
         self.eth_client.contract_addr
+    }
+
+    /// Returns the Ethereum account balance.
+    pub async fn balance(&self) -> Result<BigUint, ClientError> {
+        self.eth_client
+            .balance()
+            .await
+            .map(u256_to_biguint)
+            .map_err(|err| ClientError::NetworkError(err.to_string()))
     }
 
     /// Returns the pending nonce for the Ethereum account.
@@ -173,13 +185,13 @@ impl EthereumProvider {
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
-        let transactin_hash = self
+        let transaction_hash = self
             .eth_client
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
-        Ok(transactin_hash)
+        Ok(transaction_hash)
     }
 
     /// Performs a transfer of funds from one Ethereum account to another.
@@ -291,12 +303,57 @@ impl EthereumProvider {
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
-        let transactin_hash = self
+        let transaction_hash = self
             .eth_client
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
-        Ok(transactin_hash)
+        Ok(transaction_hash)
     }
+
+    /// Waits until the transaction is confirmed by the Ethereum blockchain.
+    pub async fn wait_for_tx(&self, tx_hash: H256) -> Result<TransactionReceipt, ClientError> {
+        // TODO Make timeouts configurable, or use high level solution like tokio::retry.
+        let timeout = Duration::from_secs(10);
+        let mut poller = tokio::time::interval(Duration::from_millis(100));
+
+        let start = Instant::now();
+        loop {
+            if let Some(receipt) = self
+                .eth_client
+                .tx_receipt(tx_hash)
+                .await
+                .map_err(|err| ClientError::NetworkError(err.to_string()))?
+            {
+                return Ok(receipt);
+            }
+
+            if start.elapsed() > timeout {
+                return Err(ClientError::OperationTimeout);
+            }
+            poller.tick().await;
+        }
+    }
+}
+
+/// Searches for the priority operation in the transaction logs.
+pub fn find_priority_op_in_tx_logs(receipt: &TransactionReceipt) -> Option<PriorityOp> {
+    receipt
+        .logs
+        .iter()
+        .find_map(|op| PriorityOp::try_from(op.clone()).ok())
+}
+
+/// Converts `U256` into the corresponding `BigUint` value.
+pub fn u256_to_biguint(value: U256) -> BigUint {
+    let mut bytes = [0u8; 32];
+    value.to_little_endian(&mut bytes);
+    BigUint::from_bytes_le(&bytes)
+}
+
+/// Converts `BigUint` value into the corresponding `U256` value.
+pub fn biguint_to_u256(value: BigUint) -> U256 {
+    let bytes = value.to_bytes_le();
+    U256::from_little_endian(&bytes)
 }

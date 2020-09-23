@@ -9,12 +9,11 @@
 //! zksync sdk-test
 //! ```
 
-use futures::compat::Future01CompatExt;
 use std::time::{Duration, Instant};
 use zksync::{
     web3::types::{H160, H256, U256},
     zksync_models::node::tx::PackedEthSignature,
-    EthereumProvider, Network, Provider, Wallet, WalletCredentials,
+    Network, Provider, Wallet, WalletCredentials,
 };
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
@@ -40,26 +39,6 @@ fn eth_random_account_credentials() -> (H160, H256) {
 
 fn one_ether() -> U256 {
     U256::from(10).pow(18.into())
-}
-
-async fn wait_for_eth_tx(ethereum: &EthereumProvider, hash: H256) {
-    let timeout = Duration::from_secs(10);
-    let mut poller = tokio::time::interval(std::time::Duration::from_millis(100));
-    let web3 = ethereum.web3();
-    let start = Instant::now();
-    while web3
-        .eth()
-        .transaction_receipt(hash)
-        .compat()
-        .await
-        .unwrap()
-        .is_none()
-    {
-        if start.elapsed() > timeout {
-            panic!("Timeout elapsed while waiting for Ethereum transaction");
-        }
-        poller.tick().await;
-    }
 }
 
 async fn wait_for_deposit_and_update_account_id(wallet: &mut Wallet) {
@@ -96,7 +75,7 @@ async fn transfer_eth_to(to: H160) {
 
     let hash = ethereum.transfer("ETH", one_ether(), to).await.unwrap();
 
-    wait_for_eth_tx(&ethereum, hash).await;
+    ethereum.wait_for_tx(hash).await.unwrap();
 }
 
 #[tokio::test]
@@ -119,7 +98,7 @@ async fn simple_workflow() -> Result<(), anyhow::Error> {
         .await
         .unwrap();
 
-    wait_for_eth_tx(&ethereum, deposit_tx_hash).await;
+    ethereum.wait_for_tx(deposit_tx_hash).await.unwrap();
 
     // Update stored wallet ID after we initialized a wallet via deposit.
     wait_for_deposit_and_update_account_id(&mut wallet).await;
