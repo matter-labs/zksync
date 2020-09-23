@@ -15,7 +15,7 @@
         "build": "tsc",
         "watch": "tsc --watch",
         "start": "node build/index.js",
-        "test": "f mocha -t 10000 -r ts-node/register test/*.test.ts",
+        "test": "f mocha --no-timeout -r ts-node/register test/*.test.ts",
         "fmt": "prettier --write {src,test}/*.ts"
     },
     "dependencies": {
