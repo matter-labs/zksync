@@ -3,8 +3,8 @@ use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
-use crypto_exports::pairing::ff::PrimeField;
 use num::BigUint;
+use zksync_crypto::pairing::ff::PrimeField;
 // Workspace deps
 use circuit::{
     circuit::FranklinCircuit,

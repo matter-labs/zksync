@@ -1,8 +1,8 @@
 use super::hasher::Hasher;
 use crate::merkle_tree::{parallel_smt, sequential_smt, PedersenHasher};
 use crate::primitives::GetBits;
+use crate::rand::{Rng, SeedableRng, XorShiftRng};
 use crate::{Engine, Fr};
-use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 
 /// Applies the proof for the element and compares it against the expected
 /// root hash.

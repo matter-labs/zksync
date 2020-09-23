@@ -18,7 +18,6 @@ futures = { version = "0.3", features = ["compat"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 tokio = { version = "0.2", features = ["full"] }
 
-crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
 plasma = { path = "../../lib/plasma", version = "0.1.1" }
 models = { path = "../../lib/models", version = "0.0.1" }
 storage = { path = "../../lib/storage", version = "0.0.1" }

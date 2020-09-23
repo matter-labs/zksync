@@ -924,7 +924,7 @@ impl PlasmaState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+    use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
     fn plasma_state_reversing_updates() {

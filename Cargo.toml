@@ -10,7 +10,6 @@ members = [
 
     # Libraries
     "core/lib/circuit",
-    "core/lib/crypto_exports",
     "core/lib/eth_client",
     "core/lib/models",
     "core/lib/plasma",

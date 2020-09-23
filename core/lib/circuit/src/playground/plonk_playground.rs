@@ -51,11 +51,11 @@ fn test_transpile_deposit_franklin_existing_account() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::adaptor::alternative::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::plonk::generator::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::plonk::prover::*;
-    use crypto_exports::franklin_crypto::bellman::Circuit;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::adaptor::alternative::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::plonk::generator::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::plonk::prover::*;
+    use zksync_crypto::franklin_crypto::bellman::Circuit;
 
     let mut transpiler = Transpiler::new();
 
@@ -67,7 +67,7 @@ fn test_transpile_deposit_franklin_existing_account() {
 
     let hints = transpiler.into_hints();
 
-    use crypto_exports::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
+    use zksync_crypto::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
 
     let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
 
@@ -134,9 +134,9 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::*;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::*;
 
     // let mut transpiler = Transpiler::new();
 
@@ -158,7 +158,7 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
     hints_hist.insert("into quadratic gate".to_owned(), 0);
     hints_hist.insert("into multiplication gate".to_owned(), 0);
 
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
 
     for (_, h) in hints.iter() {
         match h {
@@ -244,9 +244,9 @@ fn test_new_transpile_deposit_franklin_existing_account() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-    use crypto_exports::franklin_crypto::bellman::plonk::*;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
+    use zksync_crypto::franklin_crypto::bellman::plonk::*;
 
     // let mut transpiler = Transpiler::new();
 
@@ -266,7 +266,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
     hints_hist.insert("into quadratic gate".to_owned(), 0);
     hints_hist.insert("into multiplication gate".to_owned(), 0);
 
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
 
     for (_, h) in hints.iter() {
         match h {
@@ -344,7 +344,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
         make_precomputations(&setup).expect("must make precomputations for proving");
     println!("Precomputations generated: {}s", timer.elapsed().as_secs());
 
-    use crypto_exports::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
+    use zksync_crypto::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
 
     let omegas_bitreversed = BitReversedOmegas::<Fr>::new_for_domain_size(size);
     let omegas_inv_bitreversed =
@@ -418,15 +418,15 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::cs::PlonkCsWidth4WithNextStepParams;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::Transpiler;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::cs::PlonkCsWidth4WithNextStepParams;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::Transpiler;
 
     let mut transpiler = Transpiler::<Bn256, PlonkCsWidth4WithNextStepParams>::new();
 
     let c = witness_accum.into_circuit_instance();
 
-    use crypto_exports::franklin_crypto::bellman::Circuit;
+    use zksync_crypto::franklin_crypto::bellman::Circuit;
     c.clone().synthesize(&mut transpiler).unwrap();
 
     let hints = transpiler.into_hints();
@@ -438,7 +438,7 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
     hints_hist.insert("into multiplication gate".to_owned(), 0);
     hints_hist.insert("into fma gate".to_owned(), 0);
 
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::TranspilationVariant;
+    use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::TranspilationVariant;
 
     for (_, h) in hints.iter() {
         match h {
@@ -473,8 +473,8 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
 
 #[test]
 fn print_available_setup_powers() {
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::plonk::*;
+    use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+    use zksync_crypto::franklin_crypto::bellman::plonk::*;
 
     let calculate_setup_power = |chunks: usize| -> (usize, u32) {
         let circuit = {

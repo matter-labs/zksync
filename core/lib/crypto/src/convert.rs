@@ -58,8 +58,8 @@ pub fn fe_from_hex<F: PrimeField>(value: &str) -> Result<F, failure::Error> {
 mod tests {
     use super::*;
 
+    use crate::rand::{Rand, SeedableRng, XorShiftRng};
     use crate::Fr;
-    use crypto_exports::rand::{Rand, SeedableRng, XorShiftRng};
 
     /// Checks that converting FE to the hex form and back results
     /// in the same FE.

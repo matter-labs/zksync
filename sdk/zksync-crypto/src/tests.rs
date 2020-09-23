@@ -2,10 +2,10 @@
 
 use super::{private_key_to_pubkey_hash, read_signing_key, sign_musig};
 
-use crypto_exports::ff::{self, PrimeField, PrimeFieldRepr};
-use crypto_exports::franklin_crypto::eddsa::PrivateKey;
-use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+use franklin_crypto::bellman::pairing::ff::{self, PrimeField, PrimeFieldRepr};
+use franklin_crypto::eddsa::PrivateKey;
 use models::node::{public_key_from_private, tx::TxSignature, Engine, PubKeyHash};
+use rand::{Rng, SeedableRng, XorShiftRng};
 
 fn gen_private_key_and_its_be_bytes() -> (PrivateKey<Engine>, Vec<u8>) {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

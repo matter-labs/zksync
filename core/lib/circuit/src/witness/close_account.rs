@@ -197,11 +197,11 @@ impl CloseAccountWitness<Bn256> {
 //
 //    use crate::circuit::FranklinCircuit;
 //    use bellman::Circuit;
-//    use crypto_exports::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-//    use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-//    use crypto_exports::franklin_crypto::circuit::test::*;
-//    use crypto_exports::franklin_crypto::eddsa::{PrivateKey, PublicKey};
-//    use crypto_exports::franklin_crypto::jubjub::FixedGenerators;
+//    use zksync_crypto::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+//    use zksync_crypto::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+//    use zksync_crypto::franklin_crypto::circuit::test::*;
+//    use zksync_crypto::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+//    use zksync_crypto::franklin_crypto::jubjub::FixedGenerators;
 //    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
 //    use models::circuit::utils::*;
 //    use models::tx::PackedPublicKey;

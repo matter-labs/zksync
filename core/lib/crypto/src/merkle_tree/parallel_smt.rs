@@ -1,8 +1,8 @@
 /// Sparse Merkle tree with batch updates
 use super::hasher::Hasher;
+use crate::ff::{PrimeField, PrimeFieldRepr};
 use crate::primitives::GetBits;
 use crate::Fr;
-use crypto_exports::ff::{PrimeField, PrimeFieldRepr};
 
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};

@@ -13,8 +13,10 @@ crate-type = ["cdylib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = "0.2.59"
-crypto_exports = { path = "../../core/lib/crypto_exports", version = "0.1.0" }
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
+rand = "0.4"
+
+wasm-bindgen = "=0.2.60"
 hex = "0.4"
 sha2 = "0.8"
 

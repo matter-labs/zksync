@@ -4,6 +4,16 @@ use crate::franklin_crypto::{
     jubjub::{FixedGenerators, JubjubEngine},
 };
 
+mod crypto_exports {
+    pub use crate::franklin_crypto::bellman;
+    pub use crate::franklin_crypto::bellman::pairing;
+    pub use crate::franklin_crypto::bellman::pairing::ff;
+    pub use franklin_crypto;
+    pub use rand;
+}
+
+pub use crypto_exports::*;
+
 pub mod circuit;
 pub mod convert;
 pub mod merkle_tree;

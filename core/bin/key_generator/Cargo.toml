@@ -9,7 +9,6 @@ authors = [
 ]
 
 [dependencies]
-crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
 models = { path = "../../lib/models", version = "0.0.1" }
 circuit= { path = "../../lib/circuit", version = "0.1.1" }
 zksync_config = { path = "../../lib/config", version = "0.1.0" }

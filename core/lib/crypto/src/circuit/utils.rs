@@ -1,11 +1,11 @@
 use crate::params;
 
+use crate::ff;
+use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
+use crate::franklin_crypto::eddsa::PublicKey;
 use crate::merkle_tree::hasher::Hasher;
 use crate::Fr;
-use crypto_exports::ff;
-use crypto_exports::franklin_crypto::alt_babyjubjub::JubjubEngine;
-use crypto_exports::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
-use crypto_exports::franklin_crypto::eddsa::PublicKey;
 use zksync_basic_types::Address;
 
 fn pub_key_hash_self<E: JubjubEngine, H: Hasher<E::Fr>>(
