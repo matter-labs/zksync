@@ -2,7 +2,7 @@ use models::node::{AccountId, Address};
 
 use crate::{
     credentials::WalletCredentials, error::ClientError, ethereum::EthereumProvider, operations::*,
-    provider::Provider, signer::Signer, tokens_cache::TokensCache,
+    provider::Provider, signer::Signer, tokens_cache::TokensCache, types::AccountInfo,
 };
 
 #[derive(Debug)]
@@ -49,6 +49,11 @@ impl Wallet {
     /// Returns the wallet address.
     pub fn address(&self) -> Address {
         self.signer.address
+    }
+
+    /// Returns account state info
+    pub async fn account_info(&self) -> Result<AccountInfo, ClientError> {
+        self.provider.account_info(self.address()).await
     }
 
     /// Returns the current account ID.
