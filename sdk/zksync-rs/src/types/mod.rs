@@ -4,20 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
-/// Network to be used for a zkSync client.
-#[derive(Debug, Clone, Copy)]
-pub enum Network {
-    /// Ethereum Mainnet.
-    Mainnet,
-    /// Ethereum Rinkeby testnet.
-    Rinkeby,
-    /// Ethereum Ropsten testnet.
-    Ropsten,
-    /// Self-hosted Ethereum & zkSync networks.
-    Localhost,
-    /// Unknown network type.
-    Unknown,
-}
+pub mod network;
 
 pub type Tokens = HashMap<String, Token>;
 
