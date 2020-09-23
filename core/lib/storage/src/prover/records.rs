@@ -45,5 +45,5 @@ pub struct IntegerNumber {
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct StorageBlockWitness {
     pub block: i64,
-    pub witness: serde_json::Value,
+    pub witness: String,
 }
