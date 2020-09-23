@@ -1,6 +1,7 @@
 use models::node::{
     closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
-    is_token_amount_packable, Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
+    is_token_amount_packable, tx::PackedEthSignature, Address, FranklinTx, Nonce, Token, TokenLike,
+    TxFeeTypes,
 };
 use num::BigUint;
 
@@ -29,8 +30,8 @@ impl<'a> TransferBuilder<'a> {
         }
     }
 
-    /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+    /// Directly returns the signed transfer transaction for the subsequent usage.
+    pub async fn tx(self) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
         let token = self
             .token
             .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
@@ -65,18 +66,21 @@ impl<'a> TransferBuilder<'a> {
             }
         };
 
-        let (transfer, eth_signature) = self
-            .wallet
+        self.wallet
             .signer
             .sign_transfer(token, amount, fee, to, nonce)
-            .map_err(ClientError::SigningError)?;
+            .map(|(tx, signature)| (FranklinTx::Transfer(Box::new(tx)), signature))
+            .map_err(ClientError::SigningError)
+    }
 
-        let tx = FranklinTx::Transfer(Box::new(transfer));
-        let tx_hash = self.wallet.provider.send_tx(tx, eth_signature).await?;
+    /// Sends the transaction, returning the handle for its awaiting.
+    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+        let provider = self.wallet.provider.clone();
 
-        let handle = SyncTransactionHandle::new(tx_hash, self.wallet.provider.clone());
+        let (tx, eth_signature) = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, eth_signature).await?;
 
-        Ok(handle)
+        Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
 
     /// Sets the transaction token. Returns an error if token is not supported by zkSync.
