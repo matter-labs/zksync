@@ -209,3 +209,79 @@ async fn eth_nonce(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     Ok(())
 }
+
+/// Here we check `unprocessed` and `unconfirmed` operations getting.
+/// If there is no `ETHOperation` for `Operation`, it must be returend by `load_unprocessed_operations`.
+/// It must **not** be returned by `load_unconfirmed_operations`.
+///
+/// If there is an `ETHOperation` and it's not confirmed, it must be returned by `load_unconfirmed_operations`
+/// and **not** returned by `load_unprocessed_operations`.
+#[db_test]
+async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    EthereumSchema(&mut storage).initialize_eth_data().await?;
+
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert!(unconfirmed_operations.is_empty());
+
+    let unprocessed_operations = EthereumSchema(&mut storage)
+        .load_unprocessed_operations()
+        .await?;
+    assert!(unprocessed_operations.is_empty());
+
+    // Store operation with ID 1.
+    let block_number = 1;
+    let operation = BlockSchema(&mut storage)
+        .execute_operation(get_operation(block_number))
+        .await?;
+
+    // Now there must be one unprocessed operation.
+    let unprocessed_operations = EthereumSchema(&mut storage)
+        .load_unprocessed_operations()
+        .await?;
+    assert_eq!(unprocessed_operations.len(), 1);
+    assert_eq!(unprocessed_operations[0].id, operation.id);
+
+    // Check that it's not currently returned by `load_unconfirmed_operations`.
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert!(unconfirmed_operations.is_empty());
+
+    // Store the Ethereum transaction.
+    let params = EthereumTxParams::new("commit".into(), operation.clone());
+    let response = EthereumSchema(&mut storage)
+        .save_new_eth_tx(
+            OperationType::Commit,
+            Some(params.op.id.unwrap()),
+            params.deadline_block as i64,
+            params.gas_price.clone(),
+            params.raw_tx.clone(),
+        )
+        .await?;
+    EthereumSchema(&mut storage)
+        .add_hash_entry(response.id, &params.hash)
+        .await?;
+
+    // Check that it can be loaded.
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    let eth_op = unconfirmed_operations[0].clone();
+    let op = eth_op.op.clone().expect("No Operation entry");
+    assert_eq!(op.id, operation.id);
+    // Load the database ID, since we can't predict it for sure.
+    assert_eq!(
+        eth_op,
+        params.to_eth_op(eth_op.id, response.nonce.low_u64())
+    );
+
+    // After we created an ETHOperation for the operation, there must be no unprocessed operations.
+    let unprocessed_operations = EthereumSchema(&mut storage)
+        .load_unprocessed_operations()
+        .await?;
+    assert!(unprocessed_operations.is_empty());
+
+    Ok(())
+}
