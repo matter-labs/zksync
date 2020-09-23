@@ -922,7 +922,7 @@ impl PlasmaState {
         for (account_id, update) in updates {
             match update {
                 AccountUpdate::Create { address, nonce } => {
-                    let (mut account, _) = Account::create_account(*account_id, address);
+                    let (mut account, _) = Account::create_account(*account_id, *address);
                     account.nonce = *nonce;
                     self.insert_account(*account_id, account);
                 }

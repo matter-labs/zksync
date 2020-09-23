@@ -15,6 +15,12 @@ pub struct PlasmaTestBuilder {
     state: PlasmaState,
 }
 
+impl Default for PlasmaTestBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlasmaTestBuilder {
     pub fn new() -> Self {
         Self {

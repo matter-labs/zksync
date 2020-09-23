@@ -35,7 +35,7 @@ fn test_plasma_transfer_success() {
                 AccountUpdate::UpdateBalance {
                     old_nonce: from_account.nonce,
                     new_nonce: from_account.nonce + 1,
-                    balance_update: (token_id, BigUint::from(&amount + &fee), BigUint::zero()),
+                    balance_update: (token_id, &amount + &fee, BigUint::zero()),
                 },
             ),
             (
@@ -68,8 +68,8 @@ fn test_plasma_transfer_insufficient() {
         from_account.address,
         to_account.address,
         token_id,
-        amount.clone(),
-        fee.clone(),
+        amount,
+        fee,
         from_account.nonce,
         &from_sk,
     )
