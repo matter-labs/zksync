@@ -6,7 +6,7 @@ use zksync_basic_types::Address;
 
 use super::PubKeyHash;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AccountUpdate {
     Create {
         address: Address,

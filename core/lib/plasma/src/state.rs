@@ -249,7 +249,7 @@ impl PlasmaState {
         }
     }
 
-    fn get_free_account_id(&self) -> AccountId {
+    pub(crate) fn get_free_account_id(&self) -> AccountId {
         // TODO check for collisions.
         self.balance_tree.items.len() as u32
     }
@@ -917,6 +917,70 @@ impl PlasmaState {
         match op {
             FranklinPriorityOp::Deposit(op) => self.create_deposit_op(op).into(),
             FranklinPriorityOp::FullExit(op) => self.create_full_exit_op(op).into(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn apply_updates(&mut self, updates: &[(u32, AccountUpdate)]) {
+        for (account_id, update) in updates {
+            match update {
+                AccountUpdate::Create { address, nonce } => {
+                    let (mut account, _) = Account::create_account(*account_id, *address);
+                    account.nonce = *nonce;
+                    self.insert_account(*account_id, account);
+                }
+                AccountUpdate::Delete { address, nonce } => {
+                    let account = self
+                        .get_account(*account_id)
+                        .expect("account doesn't exist");
+                    assert_eq!(&account.address, address);
+                    assert_eq!(&account.nonce, nonce);
+                    self.remove_account(*account_id)
+                }
+                AccountUpdate::UpdateBalance {
+                    old_nonce,
+                    new_nonce,
+                    balance_update,
+                } => {
+                    let mut account = self
+                        .get_account(*account_id)
+                        .expect("account doesn't exist");
+
+                    let (token_id, old_amount, new_amount) = balance_update;
+
+                    assert_eq!(account.nonce, *old_nonce, "nonce mismatch");
+                    assert_eq!(
+                        &account.get_balance(*token_id),
+                        old_amount,
+                        "balance mismatch"
+                    );
+                    account.nonce = *new_nonce;
+                    account.set_balance(*token_id, new_amount.clone());
+
+                    self.insert_account(*account_id, account);
+                }
+                AccountUpdate::ChangePubKeyHash {
+                    old_pub_key_hash,
+                    new_pub_key_hash,
+                    old_nonce,
+                    new_nonce,
+                } => {
+                    let mut account = self
+                        .get_account(*account_id)
+                        .expect("account doesn't exist");
+
+                    assert_eq!(
+                        &account.pub_key_hash, old_pub_key_hash,
+                        "pub_key_hash mismatch"
+                    );
+                    assert_eq!(&account.nonce, old_nonce, "nonce mismatch");
+
+                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.nonce = *new_nonce;
+
+                    self.insert_account(*account_id, account);
+                }
+            }
         }
     }
 }
