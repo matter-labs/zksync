@@ -13,7 +13,7 @@ fn test_plasma_transfer_success() {
     let (from_account_id, from_account, from_sk) = tb.add_account(true);
     tb.set_balance(from_account_id, token_id, &amount + &fee);
 
-    let (_to_account_id, to_account, _to_sk) = tb.add_account(false);
+    let (to_account_id, to_account, _to_sk) = tb.add_account(false);
 
     let transfer = Transfer::new_signed(
         from_account_id,
@@ -39,7 +39,7 @@ fn test_plasma_transfer_success() {
                 },
             ),
             (
-                1,
+                to_account_id,
                 AccountUpdate::UpdateBalance {
                     old_nonce: to_account.nonce,
                     new_nonce: to_account.nonce,
