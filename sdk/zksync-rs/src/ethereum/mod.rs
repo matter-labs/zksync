@@ -15,13 +15,15 @@ use crate::{error::ClientError, provider::Provider, tokens_cache::TokensCache, t
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
 
-fn chain_id(network: Network) -> u8 {
-    match network {
-        Network::Mainnet => 1,
-        Network::Ropsten => 3,
-        Network::Rinkeby => 4,
-        Network::Localhost => 9,
-        Network::Unknown => panic!("Attempt to connect to an unknown network"),
+impl Network {
+    pub fn chain_id(self) -> u8 {
+        match self {
+            Network::Mainnet => 1,
+            Network::Ropsten => 3,
+            Network::Rinkeby => 4,
+            Network::Localhost => 9,
+            Network::Unknown => panic!("Attempt to connect to an unknown network"),
+        }
     }
 }
 
@@ -66,7 +68,7 @@ impl EthereumProvider {
             contract_address
                 .parse()
                 .map_err(|err| ClientError::MalformedResponse(format!("{}", err)))?,
-            chain_id(network),
+            network.chain_id(),
             1.5f64,
         );
 

@@ -148,7 +148,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             .await?;
 
             // We are only interested in operations unknown to `eth_operations` table.
-            if maybe_binding.is_some() {
+            if maybe_binding.is_none() {
                 let op = raw_op
                     .into_op(&mut transaction)
                     .await

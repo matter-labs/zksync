@@ -45,6 +45,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
         let token_id = self
             .token_ids
             .get(&token_symbol.to_lowercase())
+            .or_else(|| self.token_ids.get(token_symbol))
             .ok_or_else(|| {
                 failure::format_err!("Token '{}' is not listed on CoinGecko", token_symbol)
             })?;

@@ -280,13 +280,14 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         block: BlockNumber,
         witness: serde_json::Value,
     ) -> QueryResult<()> {
+        let witness_str = serde_json::to_string(&witness).expect("Failed to serialize witness");
         sqlx::query!(
             "INSERT INTO block_witness (block, witness)
             VALUES ($1, $2)
             ON CONFLICT (block)
             DO NOTHING",
             i64::from(block),
-            witness
+            witness_str
         )
         .execute(self.0.conn())
         .await?;
@@ -307,6 +308,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        Ok(block_witness.map(|w| w.witness))
+        Ok(block_witness
+            .map(|w| serde_json::from_str(&w.witness).expect("Failed to deserialize witness")))
     }
 }

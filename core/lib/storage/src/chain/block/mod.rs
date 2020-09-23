@@ -645,13 +645,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             return Ok(());
         }
 
+        let tree_cache_str =
+            serde_json::to_string(&tree_cache).expect("Failed to serialize Account Tree Cache");
         sqlx::query!(
             "
             INSERT INTO account_tree_cache (block, tree_cache)
             VALUES ($1, $2)
             ",
             block as i64,
-            tree_cache,
+            tree_cache_str,
         )
         .execute(self.0.conn())
         .await?;
@@ -674,7 +676,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        Ok(account_tree_cache.map(|w| (w.block as BlockNumber, w.tree_cache)))
+        Ok(account_tree_cache.map(|w| {
+            (
+                w.block as BlockNumber,
+                serde_json::from_str(&w.tree_cache)
+                    .expect("Failed to deserialize Account Tree Cache"),
+            )
+        }))
     }
 
     /// Gets stored account tree cache for a block
@@ -693,6 +701,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        Ok(account_tree_cache.map(|w| w.tree_cache))
+        Ok(account_tree_cache.map(|w| {
+            serde_json::from_str(&w.tree_cache).expect("Failed to deserialize Account Tree Cache")
+        }))
     }
 }

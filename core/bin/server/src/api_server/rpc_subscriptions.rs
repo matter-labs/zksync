@@ -193,34 +193,17 @@ pub fn start_ws_server(
     each_cache_size: usize,
     current_zksync_info: CurrentZksyncInfo,
 ) {
+    let config_options = config_options.clone();
     let addr = config_options.json_rpc_ws_server_address;
 
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
-    let mut io = PubSubHandler::new(MetaIoHandler::default());
-
-    let req_rpc_app = super::rpc_server::RpcApp::new(
-        config_options,
-        db_pool.clone(),
-        mempool_request_sender,
-        state_keeper_request_sender.clone(),
-        sign_verify_request_sender,
-        eth_watcher_request_sender,
-        ticker_request_sender,
-        current_zksync_info,
-    );
-    req_rpc_app.extend(&mut io);
-
-    let rpc_sub_app = RpcSubApp { event_sub_sender };
-
-    io.extend_with(rpc_sub_app.to_delegate());
-
     start_sub_notifier(
-        db_pool,
+        db_pool.clone(),
         op_recv,
         event_sub_receiver,
         executed_tx_receiver,
-        state_keeper_request_sender,
+        state_keeper_request_sender.clone(),
         each_cache_size,
     );
 
@@ -228,6 +211,31 @@ pub fn start_ws_server(
         .name("json_rpc_ws".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
+
+            let tokio_runtime = tokio::runtime::Builder::new()
+                .threaded_scheduler()
+                .enable_all()
+                .build()
+                .unwrap();
+
+            let mut io = PubSubHandler::new(MetaIoHandler::default());
+
+            let req_rpc_app = super::rpc_server::RpcApp::new(
+                tokio_runtime.handle().clone(),
+                &config_options,
+                db_pool,
+                mempool_request_sender,
+                state_keeper_request_sender,
+                sign_verify_request_sender,
+                eth_watcher_request_sender,
+                ticker_request_sender,
+                current_zksync_info,
+            );
+            req_rpc_app.extend(&mut io);
+
+            let rpc_sub_app = RpcSubApp { event_sub_sender };
+
+            io.extend_with(rpc_sub_app.to_delegate());
 
             let task_executor = tokio_old::runtime::Builder::new()
                 .name_prefix("ws-executor")

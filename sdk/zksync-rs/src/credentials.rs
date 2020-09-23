@@ -1,4 +1,4 @@
-use crate::{error::ClientError, utils::private_key_from_seed};
+use crate::{error::ClientError, types::Network, utils::private_key_from_seed};
 use models::tx::PackedEthSignature;
 use web3::types::{Address, H256};
 use zksync_crypto::PrivateKey;
@@ -24,10 +24,24 @@ impl WalletCredentials {
     ///
     /// - `eth_address`: Address of the corresponding Ethereum wallet.
     /// - `eth_private_key`: Private key of a corresponding Ethereum account.
-    pub fn from_eth_pk(eth_address: Address, eth_private_key: H256) -> Result<Self, ClientError> {
+    /// - `network`: Network this wallet is used on.
+    pub fn from_eth_pk(
+        eth_address: Address,
+        eth_private_key: H256,
+        network: Network,
+    ) -> Result<Self, ClientError> {
         // Pre-defined message to generate seed from.
-        const ETH_SIGN_MESSAGE: &[u8] =
-            b"Access zkSync account.\n\nOnly sign this message for a trusted client!";
+        const MESSAGE: &str =
+            "Access zkSync account.\n\nOnly sign this message for a trusted client!";
+
+        // Add chain_id to the message to prevent replay attacks between networks
+        // This is added for testnets only
+        let eth_sign_message = if let Network::Mainnet = network {
+            MESSAGE.into()
+        } else {
+            format!("{}\nChainID: {}.", MESSAGE, network.chain_id())
+        }
+        .into_bytes();
 
         // Check that private key is correct and corresponds to the provided address.
         let address_from_pk = PackedEthSignature::address_from_private_key(&eth_private_key);
@@ -39,7 +53,7 @@ impl WalletCredentials {
         }
 
         // Generate seed, and then zkSync private key.
-        let signature = PackedEthSignature::sign(&eth_private_key, ETH_SIGN_MESSAGE)
+        let signature = PackedEthSignature::sign(&eth_private_key, &eth_sign_message)
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
         let signature_bytes = signature.serialize_packed();
