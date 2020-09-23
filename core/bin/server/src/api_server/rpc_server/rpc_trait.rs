@@ -217,7 +217,13 @@ impl Rpc for RpcApp {
 
     fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>> {
         let self_ = self.clone();
-        let resp = self_._impl_get_eth_tx_for_withdrawal(withdrawal_hash);
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_get_eth_tx_for_withdrawal(withdrawal_hash))
+                .await
+                .unwrap()
+        };
         Box::new(resp.boxed().compat())
     }
 }
