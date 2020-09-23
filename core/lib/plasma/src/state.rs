@@ -917,12 +917,12 @@ impl PlasmaState {
         }
     }
 
-    #[doc(hidden)] // for tests only
+    #[cfg(test)]
     pub(crate) fn apply_updates(&mut self, updates: &[(u32, AccountUpdate)]) {
         for (account_id, update) in updates {
             match update {
                 AccountUpdate::Create { address, nonce } => {
-                    let (mut account, _) = Account::create_account(*account_id, address.clone());
+                    let (mut account, _) = Account::create_account(*account_id, address);
                     account.nonce = *nonce;
                     self.insert_account(*account_id, account);
                 }
