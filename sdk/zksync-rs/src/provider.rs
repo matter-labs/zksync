@@ -14,7 +14,7 @@ use models::node::{
 
 // Local uses
 use self::messages::JsonRpcRequest;
-use crate::{error::ClientError, types::*};
+use crate::{error::ClientError, types::network::Network, types::*};
 
 /// Returns a corresponding address for a provided network name.
 pub fn get_rpc_addr(network: Network) -> &'static str {

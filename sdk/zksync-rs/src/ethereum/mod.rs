@@ -13,7 +13,9 @@ use web3::transports::{EventLoopHandle, Http};
 use web3::types::{H160, H256, U256};
 use web3::Web3;
 
-use crate::{error::ClientError, provider::Provider, tokens_cache::TokensCache, types::Network};
+use crate::{
+    error::ClientError, provider::Provider, tokens_cache::TokensCache, types::network::Network,
+};
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
 

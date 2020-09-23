@@ -1,4 +1,4 @@
-use crate::{error::ClientError, types::Network, utils::private_key_from_seed};
+use crate::{error::ClientError, types::network::Network, utils::private_key_from_seed};
 use models::node::{tx::PackedEthSignature, PrivateKey};
 use web3::types::{Address, H256};
 
