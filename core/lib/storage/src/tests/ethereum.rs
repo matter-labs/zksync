@@ -34,6 +34,28 @@ pub fn get_operation(block_number: BlockNumber) -> Operation {
     }
 }
 
+/// Same as `get_operation`, but creates a verify operation instead.
+pub fn get_verify_operation(block_number: BlockNumber) -> Operation {
+    let action = Action::Verify {
+        proof: Default::default(),
+    };
+    Operation {
+        id: None,
+        action,
+        block: Block::new(
+            block_number,
+            Fr::default(),
+            0,
+            Vec::new(),
+            (0, 0),
+            100,
+            1_000_000.into(),
+            1_500_000.into(),
+        ),
+        accounts_updated: Default::default(),
+    }
+}
+
 /// Parameters for `EthereumSchema::save_operation_eth_tx` method.
 #[derive(Debug)]
 pub struct EthereumTxParams {
@@ -235,13 +257,17 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     let operation = BlockSchema(&mut storage)
         .execute_operation(get_operation(block_number))
         .await?;
+    let verify_operation = BlockSchema(&mut storage)
+        .execute_operation(get_verify_operation(block_number))
+        .await?;
 
     // Now there must be one unprocessed operation.
     let unprocessed_operations = EthereumSchema(&mut storage)
         .load_unprocessed_operations()
         .await?;
-    assert_eq!(unprocessed_operations.len(), 1);
+    assert_eq!(unprocessed_operations.len(), 2);
     assert_eq!(unprocessed_operations[0].id, operation.id);
+    assert_eq!(unprocessed_operations[1].id, verify_operation.id);
 
     // Check that it's not currently returned by `load_unconfirmed_operations`.
     let unconfirmed_operations = EthereumSchema(&mut storage)
@@ -268,6 +294,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     let unconfirmed_operations = EthereumSchema(&mut storage)
         .load_unconfirmed_operations()
         .await?;
+    assert_eq!(unconfirmed_operations.len(), 1);
     let eth_op = unconfirmed_operations[0].clone();
     let op = eth_op.op.clone().expect("No Operation entry");
     assert_eq!(op.id, operation.id);
@@ -281,7 +308,42 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     let unprocessed_operations = EthereumSchema(&mut storage)
         .load_unprocessed_operations()
         .await?;
+    assert_eq!(unprocessed_operations.len(), 1);
+    assert_eq!(unprocessed_operations[0].id, verify_operation.id);
+
+    let verify_params = EthereumTxParams::new("verify".into(), verify_operation.clone());
+    let response = EthereumSchema(&mut storage)
+        .save_new_eth_tx(
+            OperationType::Verify,
+            Some(verify_params.op.id.unwrap()),
+            verify_params.deadline_block as i64,
+            verify_params.gas_price.clone(),
+            verify_params.raw_tx.clone(),
+        )
+        .await?;
+    EthereumSchema(&mut storage)
+        .add_hash_entry(response.id, &verify_params.hash)
+        .await?;
+
+    let unprocessed_operations = EthereumSchema(&mut storage)
+        .load_unprocessed_operations()
+        .await?;
     assert!(unprocessed_operations.is_empty());
+
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert_eq!(unconfirmed_operations.len(), 2);
+
+    // Confirm first tx and check that it isn't returned by `unconfirmed` method anymore.
+    EthereumSchema(&mut storage)
+        .confirm_eth_tx(&params.hash)
+        .await?;
+
+    let unconfirmed_operations = EthereumSchema(&mut storage)
+        .load_unconfirmed_operations()
+        .await?;
+    assert_eq!(unconfirmed_operations.len(), 1);
 
     Ok(())
 }
