@@ -1,19 +1,29 @@
 [workspace]
 members = [
-    "core/data_restore",
-    "core/key_generator",
-    "core/eth_client",
-    "core/plasma",
-    "core/server",
-    "core/storage",
-    "core/storage/db_test_macro",
-    "core/circuit",
-    "core/models",
-    "core/prover",
-    "core/key_generator",
-    "core/spec_test",
-    "core/testkit",
-    "core/loadtest",
-    "core/crypto_exports",
-    "core/tok_cli"
+    # Binaries
+    "core/bin/data_restore",
+    "core/bin/key_generator",
+    "core/bin/server",
+    "core/bin/prover",
+    "core/bin/gen_token_add_contract",
+    "core/bin/parse_pub_data",
+
+    # Libraries
+    "core/lib/circuit",
+    "core/lib/crypto_exports",
+    "core/lib/eth_client",
+    "core/lib/models",
+    "core/lib/plasma",
+    "core/lib/storage",
+    "core/lib/vlog",
+
+    # Test infrastructure
+    "core/tests/testkit",
+    "core/tests/loadtest",
+
+    # Infrastructure applications
+    "infrastructure/tok_cli",
+
+    # SDK section
+    "sdk/zksync-rs",
 ]

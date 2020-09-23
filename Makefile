@@ -9,6 +9,7 @@ export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
+export FEE_SELLER_IMAGE ?=matterlabs/fee-seller:latest
 
 # Getting started
 
@@ -24,12 +25,14 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/zksync-crypto
-	@cd js/zksync.js && yarn && yarn build
-	@cd js/client && yarn
-	@cd js/explorer && yarn
+	@cd sdk/zksync-crypto
+	@cd sdk/zksync.js && yarn && yarn build
 	@cd contracts && yarn
-	@cd js/tests && yarn
+	@cd core/tests/ts-tests && yarn
+	@cd infrastructure/explorer && yarn
+	@cd infrastructure/fee-seller && yarn
+	@cd infrastructure/zcli && yarn
+	@cd infrastructure/analytics && yarn
 
 
 # Helpers
@@ -82,17 +85,11 @@ genesis: confirm_action db-reset
 
 # Frontend clients
 
-client:
-	@cd js/client && yarn serve
-
 explorer:
-	@cd js/explorer && yarn serve
-
-dist-client: yarn build-contracts
-	@cd js/client && yarn build
+	@cd infrastructure/explorer && yarn serve
 
 dist-explorer: yarn build-contracts
-	@cd js/explorer && yarn build
+	@cd infrastructure/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -t "${NGINX_DOCKER_IMAGE_LATEST}" -f ./docker/nginx/Dockerfile .
@@ -112,6 +109,12 @@ image-keybase:
 
 push-image-keybase: image-keybase
 	docker push "${KEYBASE_DOCKER_IMAGE}"
+
+image-fee-seller:
+	@docker build -t "${FEE_SELLER_IMAGE}" -f ./docker/fee-seller/Dockerfile .
+
+push-image-fee-seller: image-fee-seller
+	docker push "${FEE_SELLER_IMAGE}"
 
 # Rust: main stuff
 
@@ -170,16 +173,20 @@ integration-testkit:
 	@bin/integration-testkit.sh
 
 integration-simple:
-	@cd js/tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
+	@cd core/tests/ts-tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
 
 integration-full-exit:
-	@cd js/tests && yarn && yarn full-exit
+	@cd core/tests/ts-tests && yarn && yarn full-exit
 
 price:
 	@node contracts/scripts/check-price.js
 
 prover-tests:
 	f cargo test -p prover --release -- --ignored
+
+js-tests:
+	@cd sdk/zksync.js && yarn tests
+	@cd infrastructure/fee-seller && yarn tests
 
 # Devops: main
 
@@ -286,4 +293,4 @@ push-image-dev-ticker: image-dev-ticker
 	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
 api-type-validate:
-	@cd js/tests && yarn && yarn api-type-validate --test
+	@cd core/tests/ts-tests && yarn && yarn api-type-validate --test
