@@ -59,7 +59,7 @@ pub fn biguint_to_u256(value: BigUint) -> U256 {
 #[test]
 fn test_biguint_u256_conversions() {
     // Make the value is big enough.
-    let u256 = U256::from(1235_999_123u64).pow(4u64.into());
+    let u256 = U256::from(1_235_999_123_u64).pow(4u64.into());
 
     let biguint = u256_to_biguint(u256);
     // Make sure that the string representations are the same.
