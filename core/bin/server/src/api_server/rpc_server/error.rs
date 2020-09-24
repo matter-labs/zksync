@@ -34,6 +34,7 @@ impl From<TxAddError> for RpcErrorCodes {
             TxAddError::ChangePkNotAuthorized => Self::ChangePkNotAuthorized,
             TxAddError::Other => Self::Other,
             TxAddError::DbError => Self::Other,
+            TxAddError::EmptyBatch => Self::Other,
             TxAddError::BatchTooBig => Self::Other,
             TxAddError::BatchWithdrawalsOverload => Self::Other,
         }

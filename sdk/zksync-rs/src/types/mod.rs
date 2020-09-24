@@ -1,3 +1,5 @@
+pub mod network;
+
 use models::{
     node::{AccountId, Address, Nonce, PubKeyHash, Token},
     primitives::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper},
@@ -5,21 +7,6 @@ use models::{
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-/// Network to be used for a zkSync client.
-#[derive(Debug, Clone, Copy)]
-pub enum Network {
-    /// Ethereum Mainnet.
-    Mainnet,
-    /// Ethereum Rinkeby testnet.
-    Rinkeby,
-    /// Ethereum Ropsten testnet.
-    Ropsten,
-    /// Self-hosted Ethereum & zkSync networks.
-    Localhost,
-    /// Unknown network type.
-    Unknown,
-}
 
 pub type Tokens = HashMap<String, Token>;
 

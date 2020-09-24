@@ -3,14 +3,13 @@
 </template>
 
 <script>
-
 export default {
-    name: 'app',
+    name: "app",
 };
 </script>
 
 <style lang="scss">
-@import "../../client/scss/common.scss";
+@import "../scss/common.scss";
 input::placeholder {
     color: lightgrey !important;
     font-style: italic !important;

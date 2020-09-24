@@ -117,9 +117,9 @@ On debian-based linux:
 sudo apt-get install postgresql
 ```
 
-## `Diesel`
+## `Diesel` CLI
 
-Install [`diesel`](https://diesel.rs/) CLI:
+Install [`diesel`](https://diesel.rs/) CLI (it is used for migrations management only):
 
 ```sh
 cargo install diesel_cli --no-default-features --features postgres
@@ -131,6 +131,14 @@ On debian-based linux:
 
 ```sh
 sudo apt-get install libpq-dev
+```
+
+## `sqlx` CLI
+
+Also, we need [`sqlx`](https://github.com/launchbadge/sqlx) CLI (it is used to generate database wrappers):
+
+```sh
+cargo install --version=0.1.0-beta.1 sqlx-cli
 ```
 
 ## `solc`
