@@ -252,6 +252,14 @@ impl RpcApp {
     }
 
     pub async fn _impl_submit_txs_batch(self, txs: Vec<TxWithSignature>) -> Result<Vec<TxHash>> {
+        if txs.is_empty() {
+            return Err(Error {
+                code: RpcErrorCodes::from(TxAddError::EmptyBatch).into(),
+                message: "Transaction batch cannot be empty".to_string(),
+                data: None,
+            });
+        }
+
         for tx in &txs {
             if tx.tx.is_close() {
                 return Err(Error {

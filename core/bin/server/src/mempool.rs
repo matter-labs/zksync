@@ -66,6 +66,9 @@ pub enum TxAddError {
     #[fail(display = "Database unavailable")]
     DbError,
 
+    #[fail(display = "Transaction batch is empty")]
+    EmptyBatch,
+
     #[fail(display = "Batch will not fit in any of supported block sizes")]
     BatchTooBig,
 
