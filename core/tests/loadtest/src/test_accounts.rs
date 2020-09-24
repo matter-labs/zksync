@@ -9,7 +9,8 @@ use models::{
     node::{tx::PackedEthSignature, AccountId, Address, FranklinTx},
 };
 use zksync::{
-    error::ClientError, web3::types::H256, EthereumProvider, Provider, Wallet, WalletCredentials,
+    error::ClientError, web3::types::H256, EthereumProvider, Network, Provider, Wallet,
+    WalletCredentials,
 };
 // Local uses
 use crate::scenarios::configs::AccountInfo;
@@ -29,7 +30,9 @@ impl TestWallet {
         provider: Provider,
         config: &ConfigurationOptions,
     ) -> Self {
-        let credentials = WalletCredentials::from_eth_pk(info.address, info.private_key).unwrap();
+        let credentials =
+            WalletCredentials::from_eth_pk(info.address, info.private_key, Network::Localhost)
+                .unwrap();
 
         let inner = Wallet::new(provider, credentials).await.unwrap();
         Self::from_wallet(inner, &config.web3_url).await
@@ -58,7 +61,8 @@ impl TestWallet {
 
         let inner = Wallet::new(
             provider,
-            WalletCredentials::from_eth_pk(address_from_pk, eth_private_key).unwrap(),
+            WalletCredentials::from_eth_pk(address_from_pk, eth_private_key, Network::Localhost)
+                .unwrap(),
         )
         .await
         .unwrap();
