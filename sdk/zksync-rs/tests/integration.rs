@@ -336,7 +336,7 @@ async fn test_withdraw(
     let pending_to_be_onchain_balance_before: U256 = {
         let query = main_contract.query(
             "getBalanceToWithdraw",
-            (sync_wallet.address(), token.id),
+            (withdraw_to.address(), token.id),
             None,
             Options::default(),
             None,
@@ -349,7 +349,7 @@ async fn test_withdraw(
 
     let withdraw_handle = sync_wallet
         .start_withdraw()
-        .to(sync_wallet.address())
+        .to(withdraw_to.address())
         .token(token.address)?
         .amount(amount)
         .send()
@@ -366,7 +366,7 @@ async fn test_withdraw(
     let pending_to_be_onchain_balance_after: U256 = {
         let query = main_contract.query(
             "getBalanceToWithdraw",
-            (sync_wallet.address(), token.id),
+            (withdraw_to.address(), token.id),
             None,
             Options::default(),
             None,
