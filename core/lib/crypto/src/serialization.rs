@@ -15,9 +15,9 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 /// ## Example:
 ///
 /// ```
-/// use crate::serialization::FrSerde;
-/// use crate::Fr;
-/// use serde_derive::{Serialize, Deserialize};
+/// use zksync_crypto::serialization::FrSerde;
+/// use zksync_crypto::Fr;
+/// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Clone, Debug, Serialize, Deserialize)]
 /// pub struct SomeStructure {
@@ -57,9 +57,9 @@ impl FrSerde {
 /// ## Example:
 ///
 /// ```
-/// use crate::serialization::OptionalFrSerde;
-/// use crate::Fr;
-/// use serde_derive::{Serialize, Deserialize};
+/// use zksync_crypto::serialization::OptionalFrSerde;
+/// use zksync_crypto::Fr;
+/// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Clone, Debug, Serialize, Deserialize)]
 /// pub struct SomeStructure {
@@ -99,9 +99,9 @@ impl OptionalFrSerde {
 /// ## Example:
 ///
 /// ```
-/// use crate::serialization::VecOptionalFrSerde;
-/// use crate::Fr;
-/// use serde_derive::{Serialize, Deserialize};
+/// use zksync_crypto::serialization::VecOptionalFrSerde;
+/// use zksync_crypto::Fr;
+/// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Clone, Debug, Serialize, Deserialize)]
 /// pub struct SomeStructure {
