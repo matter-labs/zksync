@@ -10,7 +10,7 @@ use num::BigUint;
 use rand::Rng;
 use tokio::time;
 // Workspace uses
-use zksync::{ethereum::find_priority_op_in_tx_logs, utils::biguint_to_u256, Provider};
+use zksync::{ethereum::PriorityOpHolder, utils::biguint_to_u256, Provider};
 // Local uses
 use crate::{sent_transactions::SentTransactions, test_accounts::TestWallet};
 
@@ -40,7 +40,9 @@ pub async fn deposit_single(
         .await?;
 
     let receipt = test_wallet.eth_provider.wait_for_tx(tx_hash).await?;
-    let priority_op = find_priority_op_in_tx_logs(&receipt).expect("no priority op log in deposit");
+    let priority_op = receipt
+        .priority_op()
+        .expect("no priority op log in deposit");
 
     wait_for_deposit_executed(priority_op.serial_id, &provider).await
 }

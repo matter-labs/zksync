@@ -342,10 +342,16 @@ impl EthereumProvider {
     }
 }
 
-/// Searches for the priority operation in the transaction logs.
-pub fn find_priority_op_in_tx_logs(receipt: &TransactionReceipt) -> Option<PriorityOp> {
-    receipt
-        .logs
-        .iter()
-        .find_map(|op| PriorityOp::try_from(op.clone()).ok())
+/// Trait describes the ability to receive the priority operation from this holder.
+pub trait PriorityOpHolder {
+    /// Returns the priority operation if exist.
+    fn priority_op(&self) -> Option<PriorityOp>;
+}
+
+impl PriorityOpHolder for TransactionReceipt {
+    fn priority_op(&self) -> Option<PriorityOp> {
+        self.logs
+            .iter()
+            .find_map(|op| PriorityOp::try_from(op.clone()).ok())
+    }
 }
