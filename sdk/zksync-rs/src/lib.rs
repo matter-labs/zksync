@@ -10,8 +10,8 @@ pub mod utils;
 pub mod wallet;
 
 pub use crate::{
-    credentials::WalletCredentials, ethereum::EthereumProvider, provider::Provider, types::Network,
-    wallet::Wallet,
+    credentials::WalletCredentials, ethereum::EthereumProvider, provider::Provider,
+    types::network::Network, wallet::Wallet,
 };
 
 pub use models as zksync_models;

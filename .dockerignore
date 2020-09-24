@@ -11,3 +11,5 @@
 !infrastructure/explorer/index.html
 !infrastructure/explorer/dist
 !infrastructure/fee-seller
+!infrastructure/tok_cli
+!sdk/zksync-rs

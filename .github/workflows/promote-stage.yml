@@ -19,9 +19,11 @@ jobs:
 
     - name: init
       run: |
+        cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
         zksync yarn
         cp etc/tokens/{test,localhost}.json
         zksync verify-keys unpack
+        zksync db-setup
 
     - name: update-images
       run: |
@@ -39,3 +41,9 @@ jobs:
          -F "variables[EXPLORER_TAG]=$IMAGE_TAG" \
          -F "variables[GITHUB_REF]=$GITHUB_REF" \
          https://gitlab.com/api/v4/projects/19173848/trigger/pipeline
+
+    services:
+      postgres:
+        image: postgres:10.4
+        ports:
+          - 5432:5432
