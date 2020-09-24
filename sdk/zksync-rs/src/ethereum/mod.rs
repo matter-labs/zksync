@@ -17,6 +17,7 @@ use web3::Web3;
 
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, types::network::Network,
+    utils::u256_to_biguint,
 };
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
@@ -347,17 +348,4 @@ pub fn find_priority_op_in_tx_logs(receipt: &TransactionReceipt) -> Option<Prior
         .logs
         .iter()
         .find_map(|op| PriorityOp::try_from(op.clone()).ok())
-}
-
-/// Converts `U256` into the corresponding `BigUint` value.
-pub fn u256_to_biguint(value: U256) -> BigUint {
-    let mut bytes = [0u8; 32];
-    value.to_little_endian(&mut bytes);
-    BigUint::from_bytes_le(&bytes)
-}
-
-/// Converts `BigUint` value into the corresponding `U256` value.
-pub fn biguint_to_u256(value: BigUint) -> U256 {
-    let bytes = value.to_bytes_le();
-    U256::from_little_endian(&bytes)
 }

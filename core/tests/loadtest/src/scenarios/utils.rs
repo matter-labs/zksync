@@ -10,10 +10,7 @@ use num::BigUint;
 use rand::Rng;
 use tokio::time;
 // Workspace uses
-use zksync::{
-    ethereum::{biguint_to_u256, find_priority_op_in_tx_logs},
-    Provider,
-};
+use zksync::{ethereum::find_priority_op_in_tx_logs, utils::biguint_to_u256, Provider};
 // Local uses
 use crate::{sent_transactions::SentTransactions, test_accounts::TestWallet};
 

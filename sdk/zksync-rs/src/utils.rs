@@ -1,7 +1,8 @@
 use crate::error::ClientError;
 use crypto_exports::bellman::{pairing::ff::PrimeField, PrimeFieldRepr};
 use crypto_exports::franklin_crypto::alt_babyjubjub::fs::FsRepr;
-use models::node::{priv_key_from_fs, Fs, PrivateKey};
+use models::node::{priv_key_from_fs, Fs, PrivateKey, U256};
+use num::BigUint;
 use sha2::{Digest, Sha256};
 
 // Public re-exports.
@@ -40,4 +41,31 @@ pub fn private_key_from_seed(seed: &[u8]) -> Result<PrivateKey, ClientError> {
             }
         }
     }
+}
+
+/// Converts `U256` into the corresponding `BigUint` value.
+pub fn u256_to_biguint(value: U256) -> BigUint {
+    let mut bytes = [0u8; 32];
+    value.to_little_endian(&mut bytes);
+    BigUint::from_bytes_le(&bytes)
+}
+
+/// Converts `BigUint` value into the corresponding `U256` value.
+pub fn biguint_to_u256(value: BigUint) -> U256 {
+    let bytes = value.to_bytes_le();
+    U256::from_little_endian(&bytes)
+}
+
+#[test]
+fn test_biguint_u256_conversions() {
+    // Make the value is big enough.
+    let u256 = U256::from(1235_999_123u64).pow(4u64.into());
+
+    let biguint = u256_to_biguint(u256);
+    // Make sure that the string representations are the same.
+    assert_eq!(biguint.to_string(), u256.to_string());
+
+    let u256_2 = biguint_to_u256(biguint);
+
+    assert_eq!(u256, u256_2);
 }
