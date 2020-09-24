@@ -68,7 +68,7 @@ use models::{
         FranklinTx, TxFeeTypes,
     },
 };
-use zksync::{Network, Provider, Wallet};
+use zksync::{Network, Provider};
 // Local deps
 use self::satellite::SatelliteScenario;
 use crate::{
@@ -78,7 +78,7 @@ use crate::{
         ScenarioContext,
     },
     sent_transactions::SentTransactions,
-    test_accounts::{gen_random_wallet, TestWallet},
+    test_accounts::TestWallet,
 };
 
 mod satellite;
@@ -91,7 +91,7 @@ struct ScenarioExecutor {
     main_wallet: TestWallet,
 
     /// Intermediate account to rotate funds within.
-    accounts: Vec<Wallet>,
+    accounts: Vec<TestWallet>,
 
     /// Amount of intermediate accounts.
     n_accounts: usize,
@@ -124,7 +124,10 @@ impl ScenarioExecutor {
 
         // Generate random accounts to rotate funds within.
         let accounts = (0..config.n_accounts)
-            .map(|_| ctx.rt.block_on(gen_random_wallet(provider.clone())))
+            .map(|_| {
+                ctx.rt
+                    .block_on(TestWallet::new_random(provider.clone(), &ctx.options))
+            })
             .collect();
 
         // Create main account to deposit money from and to return money back later.
@@ -210,7 +213,7 @@ impl ScenarioExecutor {
 
         // Add all the accounts to the string.
         // Debug representations of account contains both zkSync and Ethereum private keys.
-        account_list += &format!("{:?}\n", self.main_wallet.zk_wallet);
+        account_list += &format!("{:?}\n", self.main_wallet);
         for account in self.accounts.iter() {
             account_list += &format!("{:?}\n", account);
         }
@@ -264,7 +267,7 @@ impl ScenarioExecutor {
         // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
         // the fee in such a way that it will always be sufficient).
         // Withdraw operation has more chunks, so we estimate fee for it.
-        let mut fee = self.withdraw_fee(&self.main_wallet.zk_wallet).await;
+        let mut fee = self.withdraw_fee(&self.main_wallet).await;
 
         // To be sure that we will have enough funds for all the transfers,
         // we will request 1.2x of the suggested fees. All the unspent funds
@@ -357,7 +360,7 @@ impl ScenarioExecutor {
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
 
         for to_idx in 0..self.n_accounts {
-            let from_acc = &self.main_wallet.zk_wallet;
+            let from_acc = &self.main_wallet;
             let to_acc = &self.accounts[to_idx];
 
             // Transfer size is (transfer_amount) + (fee for every tx to be sent) + (fee for final transfer
@@ -422,7 +425,7 @@ impl ScenarioExecutor {
             assert!(resp.id.is_some(), "Account ID is none for new account");
             wallet.update_account_id().await?;
 
-            let change_pubkey_tx = wallet.start_change_pubkey().tx().await?;
+            let change_pubkey_tx = wallet.sign_change_pubkey().await?;
             let tx_future = self.provider.send_tx(change_pubkey_tx, None);
 
             tx_futures.push(tx_future);
@@ -518,7 +521,7 @@ impl ScenarioExecutor {
 
         for from_id in 0..self.n_accounts {
             let from_acc = &self.accounts[from_id];
-            let to_acc = &self.main_wallet.zk_wallet;
+            let to_acc = &self.main_wallet;
 
             let fee = self.transfer_fee(&to_acc).await;
 
@@ -527,7 +530,9 @@ impl ScenarioExecutor {
                 .account_info(from_acc.address())
                 .await?
                 .committed;
-            let account_balance = comitted_account_state.balances["ETH"].0.clone();
+            let account_balance = comitted_account_state.balances[TestWallet::TOKEN_NAME]
+                .0
+                .clone();
             let transfer_amount = &account_balance - &fee;
             let transfer_amount = closest_packable_token_amount(&transfer_amount);
             let transfer = self
@@ -573,14 +578,16 @@ impl ScenarioExecutor {
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
         let current_balance = self.main_wallet.eth_provider.balance().await?;
 
-        let fee = self.withdraw_fee(&self.main_wallet.zk_wallet).await;
+        let fee = self.withdraw_fee(&self.main_wallet).await;
 
         let comitted_account_state = self
             .provider
-            .account_info(self.main_wallet.zk_wallet.address())
+            .account_info(self.main_wallet.address())
             .await?
             .committed;
-        let account_balance = comitted_account_state.balances["ETH"].0.clone();
+        let account_balance = comitted_account_state.balances[TestWallet::TOKEN_NAME]
+            .0
+            .clone();
         let withdraw_amount = &account_balance - &fee;
         let withdraw_amount = closest_packable_token_amount(&withdraw_amount);
 
@@ -648,10 +655,10 @@ impl ScenarioExecutor {
     }
 
     /// Obtains a fee required for the transfer operation.
-    async fn transfer_fee(&self, to_acc: &Wallet) -> BigUint {
+    async fn transfer_fee(&self, to: &TestWallet) -> BigUint {
         let fee = self
             .provider
-            .get_tx_fee(TxFeeTypes::Transfer, to_acc.address(), "ETH")
+            .get_tx_fee(TxFeeTypes::Transfer, to.address(), TestWallet::TOKEN_NAME)
             .await
             .expect("Can't get tx fee")
             .total_fee;
@@ -660,10 +667,10 @@ impl ScenarioExecutor {
     }
 
     /// Obtains a fee required for the withdraw operation.
-    async fn withdraw_fee(&self, to_acc: &Wallet) -> BigUint {
+    async fn withdraw_fee(&self, to: &TestWallet) -> BigUint {
         let fee = self
             .provider
-            .get_tx_fee(TxFeeTypes::Withdraw, to_acc.address(), "ETH")
+            .get_tx_fee(TxFeeTypes::Withdraw, to.address(), TestWallet::TOKEN_NAME)
             .await
             .expect("Can't get tx fee")
             .total_fee;
@@ -676,20 +683,12 @@ impl ScenarioExecutor {
     /// accounts, determined by its indices.
     async fn sign_transfer(
         &self,
-        from: &Wallet,
-        to: &Wallet,
+        from: &TestWallet,
+        to: &TestWallet,
         amount: impl Into<BigUint>,
         fee: impl Into<BigUint>,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
-        from.start_transfer()
-            .token(TestWallet::TOKEN_NAME)
-            .unwrap()
-            .amount(amount)
-            .fee(fee)
-            .to(to.address())
-            .tx()
-            .await
-            .unwrap()
+        from.sign_transfer(to.address(), amount, fee).await.unwrap()
     }
 
     /// Generates an ID for funds transfer. The ID is the ID of the next

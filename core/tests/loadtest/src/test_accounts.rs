@@ -2,10 +2,11 @@
 // External uses
 use num::BigUint;
 use rand::Rng;
+use tokio::sync::Mutex;
 // Workspace uses
 use models::{
     config_options::ConfigurationOptions,
-    node::{tx::PackedEthSignature, FranklinTx},
+    node::{tx::PackedEthSignature, AccountId, Address, FranklinTx},
 };
 use zksync::{
     error::ClientError, web3::types::H256, EthereumProvider, Provider, Wallet, WalletCredentials,
@@ -15,8 +16,9 @@ use crate::scenarios::configs::AccountInfo;
 
 #[derive(Debug)]
 pub struct TestWallet {
-    pub zk_wallet: Wallet,
     pub eth_provider: EthereumProvider,
+    inner: Wallet,
+    nonce: Mutex<u32>,
 }
 
 impl TestWallet {
@@ -29,13 +31,8 @@ impl TestWallet {
     ) -> Self {
         let credentials = WalletCredentials::from_eth_pk(info.address, info.private_key).unwrap();
 
-        let zk_wallet = Wallet::new(provider, credentials).await.unwrap();
-        let eth_provider = zk_wallet.ethereum(&config.web3_url).await.unwrap();
-
-        Self {
-            zk_wallet,
-            eth_provider,
-        }
+        let inner = Wallet::new(provider, credentials).await.unwrap();
+        Self::from_wallet(inner, &config.web3_url).await
     }
 
     // Parses and builds a new wallets list.
@@ -53,14 +50,61 @@ impl TestWallet {
         wallets
     }
 
+    // Creates a random wallet.
+    pub async fn new_random(provider: Provider, config: &ConfigurationOptions) -> Self {
+        let eth_private_key = gen_random_eth_private_key();
+        let address_from_pk =
+            PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
+
+        let inner = Wallet::new(
+            provider,
+            WalletCredentials::from_eth_pk(address_from_pk, eth_private_key).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        Self::from_wallet(inner, &config.web3_url).await
+    }
+
+    async fn from_wallet(inner: Wallet, web3_url: impl AsRef<str>) -> Self {
+        let eth_provider = inner.ethereum(web3_url).await.unwrap();
+        let zk_nonce = inner
+            .provider
+            .account_info(inner.address())
+            .await
+            .unwrap()
+            .committed
+            .nonce;
+
+        Self {
+            inner,
+            eth_provider,
+            nonce: Mutex::new(zk_nonce),
+        }
+    }
+
+    /// Returns the wallet address.
+    pub fn address(&self) -> Address {
+        self.inner.address()
+    }
+
+    /// Returns the current account ID.
+    pub fn account_id(&self) -> Option<AccountId> {
+        self.inner.account_id()
+    }
+
     // Updates ZKSync account id.
     pub async fn update_account_id(&mut self) -> Result<(), ClientError> {
-        self.zk_wallet.update_account_id().await
+        self.inner.update_account_id().await
     }
 
     // Creates a signed change public key transaction.
     pub async fn sign_change_pubkey(&self) -> Result<FranklinTx, ClientError> {
-        self.zk_wallet.start_change_pubkey().tx().await
+        self.inner
+            .start_change_pubkey()
+            .nonce(self.pending_nonce().await)
+            .tx()
+            .await
     }
 
     // Creates a signed withdraw transaction.
@@ -68,12 +112,13 @@ impl TestWallet {
         &self,
         amount: BigUint,
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
-        self.zk_wallet
+        self.inner
             .start_withdraw()
+            .nonce(self.pending_nonce().await)
             .token(Self::TOKEN_NAME)?
             .amount(amount)
             .fee(0u32)
-            .to(self.zk_wallet.address())
+            .to(self.inner.address())
             .tx()
             .await
     }
@@ -84,12 +129,31 @@ impl TestWallet {
         amount: BigUint,
         fee: BigUint,
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
-        self.zk_wallet
+        self.inner
             .start_withdraw()
+            .nonce(self.pending_nonce().await)
             .token(Self::TOKEN_NAME)?
             .amount(amount)
             .fee(fee)
-            .to(self.zk_wallet.address())
+            .to(self.inner.address())
+            .tx()
+            .await
+    }
+
+    // Creates a signed transfer tx to a given receiver.
+    pub async fn sign_transfer(
+        &self,
+        to: impl Into<Address>,
+        amount: impl Into<BigUint>,
+        fee: impl Into<BigUint>,
+    ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+        self.inner
+            .start_transfer()
+            .nonce(self.pending_nonce().await)
+            .token(Self::TOKEN_NAME)?
+            .amount(amount)
+            .fee(fee)
+            .to(to.into())
             .tx()
             .await
     }
@@ -102,37 +166,28 @@ impl TestWallet {
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
         let to = {
             let mut to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
-            while test_accounts[to_idx].address == self.zk_wallet.address() {
+            while test_accounts[to_idx].address == self.inner.address() {
                 to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
             }
             test_accounts[to_idx].address
         };
 
-        self.zk_wallet
-            .start_transfer()
-            .token(Self::TOKEN_NAME)?
-            .amount(amount)
-            .fee(0u32)
-            .to(to)
-            .tx()
-            .await
+        self.sign_transfer(to, amount, 0u32).await
+    }
+
+    /// Returns appropriate nonce for the new transaction and increments nonce.
+    async fn pending_nonce(&self) -> u32 {
+        let mut nonce = self.nonce.lock().await;
+
+        let pending_nonce = *nonce;
+        *nonce = pending_nonce + 1;
+
+        pending_nonce
     }
 }
 
-pub(crate) fn gen_random_eth_private_key() -> H256 {
+fn gen_random_eth_private_key() -> H256 {
     let mut eth_private_key = H256::default();
     eth_private_key.randomize();
     eth_private_key
-}
-
-pub(crate) async fn gen_random_wallet(provider: Provider) -> Wallet {
-    let eth_private_key = gen_random_eth_private_key();
-    let address_from_pk = PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
-
-    Wallet::new(
-        provider,
-        WalletCredentials::from_eth_pk(address_from_pk, eth_private_key).unwrap(),
-    )
-    .await
-    .unwrap()
 }

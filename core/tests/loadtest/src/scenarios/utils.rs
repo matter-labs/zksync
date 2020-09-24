@@ -38,7 +38,7 @@ pub async fn deposit_single(
         .deposit(
             TestWallet::TOKEN_NAME,
             deposit_amount,
-            test_wallet.zk_wallet.address(),
+            test_wallet.address(),
         )
         .await?;
 

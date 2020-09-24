@@ -138,7 +138,7 @@ impl SatelliteScenario {
 
         let fee = self
             .provider
-            .get_tx_fee(TxFeeTypes::Withdraw, wallet.zk_wallet.address(), "ETH")
+            .get_tx_fee(TxFeeTypes::Withdraw, wallet.address(), "ETH")
             .await
             .expect("Can't get tx fee")
             .total_fee;
@@ -147,7 +147,7 @@ impl SatelliteScenario {
 
         let comitted_account_state = self
             .provider
-            .account_info(wallet.zk_wallet.address())
+            .account_info(wallet.address())
             .await?
             .committed;
         let account_balance = comitted_account_state.balances["ETH"].0.clone();
@@ -190,7 +190,7 @@ impl SatelliteScenario {
     async fn full_exit(&mut self, account_id: usize) -> Result<(), failure::Error> {
         let wallet = &mut self.wallets[account_id];
 
-        let zksync_account_id = wallet.zk_wallet.account_id().expect("No account ID set");
+        let zksync_account_id = wallet.account_id().expect("No account ID set");
 
         wallet
             .eth_provider

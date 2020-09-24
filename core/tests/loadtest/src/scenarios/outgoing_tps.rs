@@ -110,7 +110,7 @@ async fn send_transactions_from_acc(
     tps_counter: Arc<TPSCounter>,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
-    let addr_hex = hex::encode(test_wallet.zk_wallet.address());
+    let addr_hex = hex::encode(test_wallet.address());
     let wei_in_gwei = BigUint::from(1_000_000_000u32);
 
     // FIXME First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
