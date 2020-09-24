@@ -61,7 +61,7 @@ async fn get_sync_committed_balance(
         .unwrap_or_default())
 }
 
-// auxiliary function that returns the balance of the account on Ethereum
+/// Auxiliary function that returns the balance of the account on Ethereum.
 async fn get_ethereum_balance(
     eth_provider: &EthereumProvider,
     address: Address,
@@ -143,7 +143,6 @@ async fn transfer_to(
         WalletCredentials::from_eth_pk(main_eth_address, main_eth_private_key, Network::Localhost)
             .unwrap();
 
-
     let wallet = Wallet::new(provider, credentials).await?;
     let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
     let hash = ethereum
@@ -155,8 +154,8 @@ async fn transfer_to(
     Ok(())
 }
 
-/// create a new wallet and tries to make a transfer
-/// from a new wallet with no money
+/// Creates a new wallet and tries to make a transfer
+/// from a new wallet with no money.
 async fn test_throwing_error_on_tx_fail(
     zksync_depositor_wallet: &Wallet,
 ) -> Result<(), anyhow::Error> {
@@ -180,7 +179,7 @@ async fn test_throwing_error_on_tx_fail(
     Ok(())
 }
 
-/// check the correctness of the `Deposit` operation
+/// Checks the correctness of the `Deposit` operation.
 async fn test_deposit(
     deposit_wallet: &Wallet,
     sync_wallet: &mut Wallet,
@@ -219,14 +218,14 @@ async fn test_deposit(
         assert!(ethereum.is_erc20_deposit_approved(token.address).await?);
     }
 
-    // to be sure that the deposit is committed, we need to listen to the event `NewPriorityRequest`
-    // rust sdk doesn't support getting this information yet, but it will be added soon
+    // To be sure that the deposit is committed, we need to listen to the event `NewPriorityRequest`
+    // rust SDK doesn't support getting this information yet, but it will be added soon.
     // assert_eq!(balance_after - balance_before, u256_to_big_dec(amount / 2));
 
     Ok(())
 }
 
-/// check the correctness of the `ChangePubKey` operation
+/// Checks the correctness of the `ChangePubKey` operation.
 async fn test_change_pubkey(sync_wallet: &Wallet) -> Result<(), anyhow::Error> {
     if !sync_wallet.is_signing_key_set().await? {
         let handle = sync_wallet.start_change_pubkey().send().await?;
@@ -240,8 +239,8 @@ async fn test_change_pubkey(sync_wallet: &Wallet) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// make a transfer from Alice to Bob inside zkSync
-/// check the correctness of the amount of money before the transaction and after
+/// Makes a transfer from Alice to Bob inside zkSync
+/// checks the correctness of the amount of money before the transaction and after.
 async fn test_transfer(
     alice: &Wallet,
     bob: &Wallet,
@@ -283,8 +282,8 @@ async fn test_transfer(
     Ok(())
 }
 
-// make a transaction from the account to its own address
-// check if the expected amount of fee has been spent
+/// Makes a transaction from the account to its own address
+/// checks if the expected amount of fee has been spent.
 async fn test_transfer_to_self(
     sync_wallet: &Wallet,
     token_symbol: &str,
@@ -318,8 +317,8 @@ async fn test_transfer_to_self(
     Ok(())
 }
 
-/// make a withdraw operation on L2
-/// check the correctness of their execution
+/// Makes a withdraw operation on L2
+/// checks the correctness of their execution.
 async fn test_withdraw(
     eth_provider: &EthereumProvider,
     main_contract: &Contract<Http>,
@@ -393,8 +392,8 @@ async fn test_withdraw(
     Ok(())
 }
 
-/// make transfers for different types of operations
-/// check the correctness of their execution
+/// Makes transfers for different types of operations
+/// checks the correctness of their execution.
 async fn move_funds(
     main_contract: &Contract<Http>,
     eth_provider: &EthereumProvider,
