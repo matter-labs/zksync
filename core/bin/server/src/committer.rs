@@ -56,7 +56,14 @@ async fn handle_new_commit_task(
                     .unwrap_or_default();
             }
             CommitRequest::PendingBlock(pending_block) => {
-                let operations = pending_block.success_operations.clone();
+                let mut operations = pending_block.success_operations.clone();
+                operations.extend(
+                    pending_block
+                        .failed_txs
+                        .clone()
+                        .into_iter()
+                        .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
+                );
                 let block_number = pending_block.number;
 
                 save_pending_block(pending_block, &pool).await;
