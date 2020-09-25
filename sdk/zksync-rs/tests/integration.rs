@@ -6,7 +6,7 @@
 //! ```bash
 //! zksync server &!
 //! zksync dummy-prover &!
-//! zksync sdk-test
+//! zksync rust-sdk-tests
 //! ```
 
 use futures::compat::Future01CompatExt;
