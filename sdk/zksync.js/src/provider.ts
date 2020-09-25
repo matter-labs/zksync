@@ -114,6 +114,13 @@ export class Provider {
         return await this.transport.request("get_confirmations_for_eth_op_amount", []);
     }
 
+    async getEthTxForWithdrawal(withdrawal_hash): Promise<string> {
+        return await this.transport.request(
+            "get_eth_tx_for_withdrawal",
+            [withdrawal_hash]
+        );
+    }
+
     async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise((resolve) => {

@@ -67,6 +67,9 @@ pub trait Rpc {
 
     #[rpc(name = "get_confirmations_for_eth_op_amount", returns = "u64")]
     fn get_confirmations_for_eth_op_amount(&self) -> FutureResp<u64>;
+
+    #[rpc(name = "get_eth_tx_for_withdrawal", returns = "Option<String>")]
+    fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>>;
 }
 
 impl Rpc for RpcApp {
@@ -191,6 +194,18 @@ impl Rpc for RpcApp {
         let resp = async move {
             handle
                 .spawn(self_._impl_get_confirmations_for_eth_op_amount())
+                .await
+                .unwrap()
+        };
+        Box::new(resp.boxed().compat())
+    }
+
+    fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>> {
+        let self_ = self.clone();
+        let resp = async move {
+            let handle = self_.tokio_runtime.clone();
+            handle
+                .spawn(self_._impl_get_eth_tx_for_withdrawal(withdrawal_hash))
                 .await
                 .unwrap()
         };

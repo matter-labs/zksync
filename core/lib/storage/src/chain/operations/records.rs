@@ -83,3 +83,16 @@ pub struct NewExecutedTransaction {
     pub eth_sign_data: Option<serde_json::Value>,
     pub batch_id: Option<i64>,
 }
+
+#[derive(Debug, Clone)]
+pub struct StoredPendingWithdrawal {
+    pub id: i64,
+    pub withdrawal_hash: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoredCompleteWithdrawalsTransaction {
+    pub tx_hash: Vec<u8>,
+    pub pending_withdrawals_queue_start_index: i64,
+    pub pending_withdrawals_queue_end_index: i64,
+}
