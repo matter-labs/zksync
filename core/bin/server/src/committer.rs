@@ -8,8 +8,19 @@ use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
-use models::{node::block::PendingBlock, Action, BlockCommitRequest, CommitRequest, Operation};
+use models::{
+    node::{
+        block::{ExecutedOperations, PendingBlock},
+        BlockNumber,
+    },
+    Action, BlockCommitRequest, CommitRequest, Operation,
+};
 use storage::ConnectionPool;
+
+pub struct ExecutedOpsNotify {
+    pub operations: Vec<ExecutedOperations>,
+    pub block_number: BlockNumber,
+}
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -18,11 +29,15 @@ async fn handle_new_commit_task(
     mut tx_for_eth: Sender<ETHSenderRequest>,
     mut op_notify_sender: Sender<Operation>,
     mut mempool_req_sender: Sender<MempoolRequest>,
+    mut executed_tx_notify_sender: Sender<ExecutedOpsNotify>,
     pool: ConnectionPool,
 ) {
     while let Some(request) = rx_for_ops.next().await {
         match request {
-            CommitRequest::Block(request, notifier) => {
+            CommitRequest::Block(request) => {
+                let operations = request.block.block_transactions.clone();
+                let block_number = request.block.block_number;
+
                 commit_block(
                     request,
                     &pool,
@@ -32,12 +47,36 @@ async fn handle_new_commit_task(
                 )
                 .await;
 
-                notifier.send(()).expect("state keeper receiver dropped");
+                executed_tx_notify_sender
+                    .send(ExecutedOpsNotify {
+                        operations,
+                        block_number,
+                    })
+                    .await
+                    .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+                    .unwrap_or_default();
             }
-            CommitRequest::PendingBlock(pending_block, notifier) => {
+            CommitRequest::PendingBlock(pending_block) => {
+                let mut operations = pending_block.success_operations.clone();
+                operations.extend(
+                    pending_block
+                        .failed_txs
+                        .clone()
+                        .into_iter()
+                        .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
+                );
+                let block_number = pending_block.number;
+
                 save_pending_block(pending_block, &pool).await;
 
-                notifier.send(()).expect("state keeper receiver dropped");
+                executed_tx_notify_sender
+                    .send(ExecutedOpsNotify {
+                        operations,
+                        block_number,
+                    })
+                    .await
+                    .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+                    .unwrap_or_default();
             }
         }
     }
@@ -216,6 +255,7 @@ pub fn run_committer(
     tx_for_eth: Sender<ETHSenderRequest>,
     op_notify_sender: Sender<Operation>,
     mempool_req_sender: Sender<MempoolRequest>,
+    executed_tx_notify_sender: Sender<ExecutedOpsNotify>,
     pool: ConnectionPool,
 ) -> JoinHandle<()> {
     tokio::spawn(handle_new_commit_task(
@@ -223,6 +263,7 @@ pub fn run_committer(
         tx_for_eth.clone(),
         op_notify_sender,
         mempool_req_sender,
+        executed_tx_notify_sender,
         pool.clone(),
     ));
     tokio::spawn(poll_for_new_proofs_task(tx_for_eth, pool))

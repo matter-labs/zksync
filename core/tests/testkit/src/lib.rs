@@ -331,7 +331,6 @@ pub fn spawn_state_keeper(
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
-    let (executed_tx_notify_sender, _executed_tx_notify_receiver) = mpsc::channel(256);
 
     let max_ops_in_block = 1000;
     let ops_chunks = vec![
@@ -354,7 +353,6 @@ pub fn spawn_state_keeper(
         *fee_account,
         state_keeper_req_receiver,
         proposed_blocks_sender,
-        executed_tx_notify_sender,
         block_chunks_sizes,
         max_miniblock_iterations,
         max_miniblock_iterations,
@@ -1126,13 +1124,11 @@ impl TestSetup {
     async fn await_for_block_commit_request(&mut self) -> BlockCommitRequest {
         while let Some(new_block_event) = self.proposed_blocks_receiver.next().await {
             match new_block_event {
-                CommitRequest::Block(new_block, receiver) => {
-                    receiver.send(()).unwrap();
+                CommitRequest::Block(new_block) => {
                     return new_block;
                 }
-                CommitRequest::PendingBlock(_, receiver) => {
+                CommitRequest::PendingBlock(_) => {
                     // Pending blocks are ignored.
-                    receiver.send(()).unwrap();
                 }
             }
         }
@@ -1148,15 +1144,14 @@ impl TestSetup {
             .await
             .expect("StateKeeper sender dropped");
         match new_block_event {
-            CommitRequest::Block(new_block, _) => {
+            CommitRequest::Block(new_block) => {
                 panic!(
                     "Expected pending block, got full block proposed. Block: {:?}",
                     new_block
                 );
             }
-            CommitRequest::PendingBlock(_, receiver) => {
-                // Notify state keeper that we've processed the request.
-                receiver.send(()).unwrap();
+            CommitRequest::PendingBlock(_) => {
+                // Nothing to be done.
             }
         }
     }

@@ -43,11 +43,6 @@ pub enum StateKeeperRequest {
     SealBlock,
 }
 
-pub struct ExecutedOpsNotify {
-    pub operations: Vec<ExecutedOperations>,
-    pub block_number: BlockNumber,
-}
-
 #[derive(Debug)]
 struct PendingBlock {
     success_operations: Vec<ExecutedOperations>,
@@ -95,7 +90,6 @@ pub struct PlasmaStateKeeper {
 
     rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
-    executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
@@ -336,7 +330,6 @@ impl PlasmaStateKeeper {
         fee_account_address: Address,
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
-        executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
@@ -369,7 +362,6 @@ impl PlasmaStateKeeper {
             rx_for_blocks,
             tx_for_commitments,
             pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
-            executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
@@ -475,79 +467,28 @@ impl PlasmaStateKeeper {
     async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
         self.initialize(pending_block).await;
 
-        let mut last_request_processed = std::time::Instant::now();
-
         while let Some(req) = self.rx_for_blocks.next().await {
-            let start = std::time::Instant::now();
-
-            log::trace!(
-                "Received new request. Last request was processed {}ms ago",
-                (start - last_request_processed).as_millis()
-            );
-
             match req {
                 StateKeeperRequest::GetAccount(addr, sender) => {
                     sender.send(self.account(&addr)).unwrap_or_default();
-
-                    log::trace!(
-                        "GetAccount request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
-
-                    log::trace!(
-                        "GetLastUnprocessedPriorityOp request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_proposed_block(proposed_block).await;
-
-                    log::trace!(
-                        "ExecuteMiniBlock request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::GetExecutedInPendingBlock(op_id, sender) => {
                     let result = self.check_executed_in_pending_block(op_id);
                     sender.send(result).unwrap_or_default();
-
-                    log::trace!(
-                        "GetExecutedInPendingBlock request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
-
-                    log::trace!(
-                        "SealBlock request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
             }
-
-            last_request_processed = std::time::Instant::now();
         }
-    }
-
-    async fn notify_executed_ops(&self, executed_ops: &mut Vec<ExecutedOperations>) {
-        if !executed_ops.is_empty() {
-            self.executed_tx_notify_sender
-                .clone()
-                .send(ExecutedOpsNotify {
-                    operations: executed_ops.clone(),
-                    block_number: self.state.block_number,
-                })
-                .await
-                .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
-                .unwrap_or_default();
-        }
-        executed_ops.clear();
     }
 
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
@@ -564,7 +505,6 @@ impl PlasmaStateKeeper {
                 }
                 Err(priority_op) => {
                     self.seal_pending_block().await;
-                    self.notify_executed_ops(&mut executed_ops).await;
 
                     priority_op_queue.push_front(priority_op);
                 }
@@ -584,7 +524,6 @@ impl PlasmaStateKeeper {
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
                             self.seal_pending_block().await;
-                            self.notify_executed_ops(&mut executed_ops).await;
 
                             tx_queue.push_front(variant);
                         }
@@ -600,7 +539,6 @@ impl PlasmaStateKeeper {
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
                             self.seal_pending_block().await;
-                            self.notify_executed_ops(&mut executed_ops).await;
 
                             tx_queue.push_front(variant);
                         }
@@ -624,8 +562,6 @@ impl PlasmaStateKeeper {
         } else {
             self.store_pending_block().await;
         }
-
-        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // Err if there is no space in current block
@@ -933,17 +869,11 @@ impl PlasmaStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
-
-        let commit_request = CommitRequest::Block(block_commit_request, notification_sender);
+        let commit_request = CommitRequest::Block(block_commit_request);
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
-
-        notification_receiver
-            .await
-            .expect("committer sender dropped");
     }
 
     /// Stores intermediate representation of a pending block in the database,
@@ -970,17 +900,11 @@ impl PlasmaStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
-
-        let commit_request = CommitRequest::PendingBlock(pending_block, notification_sender);
+        let commit_request = CommitRequest::PendingBlock(pending_block);
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
-
-        notification_receiver
-            .await
-            .expect("committer sender dropped");
     }
 
     fn check_executed_in_pending_block(

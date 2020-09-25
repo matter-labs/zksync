@@ -224,7 +224,6 @@ fn main() {
             config_opts.operator_fee_eth_addr,
             state_keeper_req_receiver,
             proposed_blocks_sender,
-            executed_tx_notify_sender,
             config_opts.available_block_chunk_sizes.clone(),
             config_opts.miniblock_timings.max_miniblock_iterations,
             config_opts.miniblock_timings.fast_miniblock_iterations,
@@ -247,6 +246,7 @@ fn main() {
             eth_send_request_sender.clone(),
             zksync_commit_notify_sender, // commiter sends only commit block notifications
             mempool_request_sender.clone(),
+            executed_tx_notify_sender,
             connection_pool.clone(),
         );
         start_api_server(
