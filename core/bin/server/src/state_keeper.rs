@@ -475,63 +475,27 @@ impl PlasmaStateKeeper {
     async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
         self.initialize(pending_block).await;
 
-        let mut last_request_processed = std::time::Instant::now();
-
         while let Some(req) = self.rx_for_blocks.next().await {
-            let start = std::time::Instant::now();
-
-            log::trace!(
-                "Received new request. Last request was processed {}ms ago",
-                (start - last_request_processed).as_millis()
-            );
-
             match req {
                 StateKeeperRequest::GetAccount(addr, sender) => {
                     sender.send(self.account(&addr)).unwrap_or_default();
-
-                    log::trace!(
-                        "GetAccount request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
-
-                    log::trace!(
-                        "GetLastUnprocessedPriorityOp request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_proposed_block(proposed_block).await;
-
-                    log::trace!(
-                        "ExecuteMiniBlock request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::GetExecutedInPendingBlock(op_id, sender) => {
                     let result = self.check_executed_in_pending_block(op_id);
                     sender.send(result).unwrap_or_default();
-
-                    log::trace!(
-                        "GetExecutedInPendingBlock request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
-
-                    log::trace!(
-                        "SealBlock request processed in {}ms",
-                        start.elapsed().as_millis()
-                    );
                 }
             }
-
-            last_request_processed = std::time::Instant::now();
         }
     }
 
@@ -933,17 +897,11 @@ impl PlasmaStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
-
-        let commit_request = CommitRequest::Block(block_commit_request, notification_sender);
+        let commit_request = CommitRequest::Block(block_commit_request);
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
-
-        notification_receiver
-            .await
-            .expect("committer sender dropped");
     }
 
     /// Stores intermediate representation of a pending block in the database,
@@ -970,17 +928,11 @@ impl PlasmaStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let (notification_sender, notification_receiver) = oneshot::channel::<()>();
-
-        let commit_request = CommitRequest::PendingBlock(pending_block, notification_sender);
+        let commit_request = CommitRequest::PendingBlock(pending_block);
         self.tx_for_commitments
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
-
-        notification_receiver
-            .await
-            .expect("committer sender dropped");
     }
 
     fn check_executed_in_pending_block(

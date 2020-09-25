@@ -209,53 +209,43 @@ pub fn start_ws_server(
         each_cache_size,
     );
 
-    std::thread::Builder::new()
-        .name("json_rpc_ws".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+    tokio::spawn(async move {
+        let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
-            let tokio_runtime = tokio::runtime::Builder::new()
-                .threaded_scheduler()
-                .enable_all()
-                .build()
-                .unwrap();
+        let mut io = PubSubHandler::new(MetaIoHandler::default());
 
-            let mut io = PubSubHandler::new(MetaIoHandler::default());
+        let req_rpc_app = super::rpc_server::RpcApp::new(
+            &config_options,
+            db_pool,
+            mempool_request_sender,
+            state_keeper_request_sender,
+            sign_verify_request_sender,
+            eth_watcher_request_sender,
+            ticker_request_sender,
+            current_zksync_info,
+        );
+        req_rpc_app.extend(&mut io);
 
-            let req_rpc_app = super::rpc_server::RpcApp::new(
-                tokio_runtime.handle().clone(),
-                &config_options,
-                db_pool,
-                mempool_request_sender,
-                state_keeper_request_sender,
-                sign_verify_request_sender,
-                eth_watcher_request_sender,
-                ticker_request_sender,
-                current_zksync_info,
-            );
-            req_rpc_app.extend(&mut io);
+        let rpc_sub_app = RpcSubApp { event_sub_sender };
 
-            let rpc_sub_app = RpcSubApp { event_sub_sender };
+        io.extend_with(rpc_sub_app.to_delegate());
 
-            io.extend_with(rpc_sub_app.to_delegate());
+        let task_executor = tokio_old::runtime::Builder::new()
+            .name_prefix("ws-executor")
+            .core_threads(100)
+            .build()
+            .expect("failed to build ws executor");
 
-            let task_executor = tokio_old::runtime::Builder::new()
-                .name_prefix("ws-executor")
-                .core_threads(100)
-                .build()
-                .expect("failed to build ws executor");
+        let server = jsonrpc_ws_server::ServerBuilder::with_meta_extractor(
+            io,
+            |context: &RequestContext| Arc::new(Session::new(context.sender())),
+        )
+        .request_middleware(super::loggers::ws_rpc::request_middleware)
+        .max_connections(1000)
+        .event_loop_executor(task_executor.executor())
+        .start(&addr)
+        .expect("Unable to start RPC ws server");
 
-            let server = jsonrpc_ws_server::ServerBuilder::with_meta_extractor(
-                io,
-                |context: &RequestContext| Arc::new(Session::new(context.sender())),
-            )
-            .request_middleware(super::loggers::ws_rpc::request_middleware)
-            .max_connections(1000)
-            .event_loop_executor(task_executor.executor())
-            .start(&addr)
-            .expect("Unable to start RPC ws server");
-
-            server.wait().expect("rpc ws server start");
-        })
-        .expect("JSON RPC ws thread");
+        server.wait().expect("rpc ws server start");
+    });
 }
