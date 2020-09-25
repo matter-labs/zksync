@@ -71,7 +71,7 @@ async fn get_ethereum_balance(
         return eth_provider
             .web3()
             .eth()
-            .balance(address.into(), None)
+            .balance(address, None)
             .compat()
             .await
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
@@ -410,7 +410,7 @@ async fn move_funds(
     let token = depositor_wallet
         .tokens
         .resolve(token_like.clone())
-        .ok_or(anyhow::anyhow!("Error resolve token"))?;
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
     let transfer_amount = deposit_amount / 10;
     let withdraw_amount = deposit_amount / 10;
@@ -538,12 +538,12 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     let token_eth = sync_depositor_wallet
         .tokens
         .resolve("ETH".into())
-        .ok_or(anyhow::anyhow!("Error resolve token"))?;
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
     let token_dai = sync_depositor_wallet
         .tokens
         .resolve("DAI".into())
-        .ok_or(anyhow::anyhow!("Error resolve token"))?;
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
     let eth_deposit_amount = U256::from(10).pow(18.into()) * 6; // 6 Ethers
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
