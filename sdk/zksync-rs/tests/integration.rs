@@ -5,13 +5,13 @@
 //!
 //! ```bash
 //! zksync server &!
-//! zksync dummy-prover &!
 //! zksync rust-sdk-tests
 //! ```
 
 use futures::compat::Future01CompatExt;
 use std::time::{Duration, Instant};
 use zksync::{
+    error::{ClientError, SignerError::NoSigningKey},
     types::BlockStatus,
     web3::{
         contract::{Contract, Options},
@@ -21,7 +21,6 @@ use zksync::{
     },
     zksync_models::abi,
     zksync_models::node::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes},
-    error::{ClientError, SignerError::NoSigningKey},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
 
@@ -162,7 +161,7 @@ async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Er
         .amount(1_000_000u64)
         .send()
         .await;
-    
+
     assert!(matches!(
         handle,
         Err(ClientError::SigningError(NoSigningKey))
@@ -374,7 +373,7 @@ async fn test_withdraw(
         .await?;
     let onchain_balance_after =
         get_ethereum_balance(eth_provider, withdraw_to.address(), token).await?;
-    
+
     let pending_to_be_onchain_balance_after: U256 = {
         let query = main_contract.query(
             "getBalanceToWithdraw",

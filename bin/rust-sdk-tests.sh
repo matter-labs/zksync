@@ -39,6 +39,8 @@ function cat_logs() {
     exit $exitcode
 }
 
+zksync dummy-prover status | grep -q 'disabled' && echo zksync dummy-prover enable
+
 zksync server &> rust-sdk-server.log &
 SERVER_PID=$!
 zksync dummy-prover &> rust-sdk-prover.log &
