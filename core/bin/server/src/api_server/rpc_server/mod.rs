@@ -83,6 +83,7 @@ pub struct RpcApp {
     cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
+    cache_of_complete_withdrawal_tx_hashes: SharedLruCache<TxHash, String>,
 
     tokio_runtime: tokio::runtime::Handle,
 
@@ -124,6 +125,7 @@ impl RpcApp {
             cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
+            cache_of_complete_withdrawal_tx_hashes: SharedLruCache::new(api_requests_caches_size),
 
             tokio_runtime,
 
@@ -404,6 +406,39 @@ impl RpcApp {
         };
 
         Ok(verified_state)
+    }
+
+    async fn eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> Result<Option<String>> {
+        let res = if let Some(complete_withdrawals_tx_hash) = self
+            .cache_of_complete_withdrawal_tx_hashes
+            .get(&withdrawal_hash)
+        {
+            Some(complete_withdrawals_tx_hash)
+        } else {
+            let mut storage = self.access_storage().await?;
+            let complete_withdrawals_tx_hash = storage
+                .chain()
+                .operations_schema()
+                .eth_tx_for_withdrawal(&withdrawal_hash)
+                .await
+                .map_err(|err| {
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: {:?}",
+                        err,
+                        withdrawal_hash,
+                    );
+                    Error::internal_error()
+                })?
+                .map(|tx_hash| format!("0x{}", hex::encode(&tx_hash)));
+
+            if let Some(complete_withdrawals_tx_hash) = complete_withdrawals_tx_hash.clone() {
+                self.cache_of_complete_withdrawal_tx_hashes
+                    .insert(withdrawal_hash, complete_withdrawals_tx_hash);
+            }
+
+            complete_withdrawals_tx_hash
+        };
+        Ok(res)
     }
 }
 
