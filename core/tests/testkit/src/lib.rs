@@ -331,7 +331,6 @@ pub fn spawn_state_keeper(
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
-    let (executed_tx_notify_sender, _executed_tx_notify_receiver) = mpsc::channel(256);
 
     let max_ops_in_block = 1000;
     let ops_chunks = vec![
@@ -354,7 +353,6 @@ pub fn spawn_state_keeper(
         *fee_account,
         state_keeper_req_receiver,
         proposed_blocks_sender,
-        executed_tx_notify_sender,
         block_chunks_sizes,
         max_miniblock_iterations,
         max_miniblock_iterations,

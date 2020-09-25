@@ -22,9 +22,10 @@ use crate::fee_ticker::TickerRequest;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
+    committer::ExecutedOpsNotify,
     mempool::MempoolRequest,
     signature_checker::VerifyTxSignatureRequest,
-    state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
+    state_keeper::StateKeeperRequest,
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 

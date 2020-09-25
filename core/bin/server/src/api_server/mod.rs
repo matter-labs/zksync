@@ -15,10 +15,8 @@ use storage::ConnectionPool;
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{
-    eth_watch::EthWatchRequest,
-    mempool::MempoolRequest,
-    signature_checker,
-    state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
+    committer::ExecutedOpsNotify, eth_watch::EthWatchRequest, mempool::MempoolRequest,
+    signature_checker, state_keeper::StateKeeperRequest,
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 

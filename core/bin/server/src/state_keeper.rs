@@ -43,11 +43,6 @@ pub enum StateKeeperRequest {
     SealBlock,
 }
 
-pub struct ExecutedOpsNotify {
-    pub operations: Vec<ExecutedOperations>,
-    pub block_number: BlockNumber,
-}
-
 #[derive(Debug)]
 struct PendingBlock {
     success_operations: Vec<ExecutedOperations>,
@@ -95,7 +90,6 @@ pub struct PlasmaStateKeeper {
 
     rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
-    executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
 
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
@@ -336,7 +330,6 @@ impl PlasmaStateKeeper {
         fee_account_address: Address,
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
-        executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
@@ -369,7 +362,6 @@ impl PlasmaStateKeeper {
             rx_for_blocks,
             tx_for_commitments,
             pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
-            executed_tx_notify_sender,
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
@@ -499,21 +491,6 @@ impl PlasmaStateKeeper {
         }
     }
 
-    async fn notify_executed_ops(&self, executed_ops: &mut Vec<ExecutedOperations>) {
-        if !executed_ops.is_empty() {
-            self.executed_tx_notify_sender
-                .clone()
-                .send(ExecutedOpsNotify {
-                    operations: executed_ops.clone(),
-                    block_number: self.state.block_number,
-                })
-                .await
-                .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
-                .unwrap_or_default();
-        }
-        executed_ops.clear();
-    }
-
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
         let mut executed_ops = Vec::new();
 
@@ -528,7 +505,6 @@ impl PlasmaStateKeeper {
                 }
                 Err(priority_op) => {
                     self.seal_pending_block().await;
-                    self.notify_executed_ops(&mut executed_ops).await;
 
                     priority_op_queue.push_front(priority_op);
                 }
@@ -548,7 +524,6 @@ impl PlasmaStateKeeper {
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
                             self.seal_pending_block().await;
-                            self.notify_executed_ops(&mut executed_ops).await;
 
                             tx_queue.push_front(variant);
                         }
@@ -564,7 +539,6 @@ impl PlasmaStateKeeper {
                             // or the withdraw operations limit, so we seal this block and
                             // the last transaction will go to the next block instead.
                             self.seal_pending_block().await;
-                            self.notify_executed_ops(&mut executed_ops).await;
 
                             tx_queue.push_front(variant);
                         }
@@ -588,8 +562,6 @@ impl PlasmaStateKeeper {
         } else {
             self.store_pending_block().await;
         }
-
-        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // Err if there is no space in current block
