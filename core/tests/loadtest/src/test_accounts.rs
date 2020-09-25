@@ -1,8 +1,8 @@
 // Built-in import
+use std::sync::atomic::{AtomicU32, Ordering};
 // External uses
 use num::BigUint;
 use rand::Rng;
-use tokio::sync::Mutex;
 // Workspace uses
 use models::{
     config_options::ConfigurationOptions,
@@ -19,7 +19,7 @@ use crate::scenarios::configs::AccountInfo;
 pub struct TestWallet {
     pub eth_provider: EthereumProvider,
     inner: Wallet,
-    nonce: Mutex<u32>,
+    nonce: AtomicU32,
 }
 
 impl TestWallet {
@@ -83,7 +83,7 @@ impl TestWallet {
         Self {
             inner,
             eth_provider,
-            nonce: Mutex::new(zk_nonce),
+            nonce: AtomicU32::new(zk_nonce),
         }
     }
 
@@ -106,7 +106,7 @@ impl TestWallet {
     pub async fn sign_change_pubkey(&self) -> Result<FranklinTx, ClientError> {
         self.inner
             .start_change_pubkey()
-            .nonce(self.pending_nonce().await)
+            .nonce(self.pending_nonce())
             .tx()
             .await
     }
@@ -118,7 +118,7 @@ impl TestWallet {
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
         self.inner
             .start_withdraw()
-            .nonce(self.pending_nonce().await)
+            .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
             .fee(0u32)
@@ -135,7 +135,7 @@ impl TestWallet {
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
         self.inner
             .start_withdraw()
-            .nonce(self.pending_nonce().await)
+            .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
             .fee(fee)
@@ -153,7 +153,7 @@ impl TestWallet {
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
         self.inner
             .start_transfer()
-            .nonce(self.pending_nonce().await)
+            .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
             .fee(fee)
@@ -169,9 +169,12 @@ impl TestWallet {
         amount: BigUint,
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
         let to = {
-            let mut to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
+            let mut rng = rand::thread_rng();
+            let count = test_accounts.len() - 1;
+
+            let mut to_idx = rng.gen_range(0, count);
             while test_accounts[to_idx].address == self.inner.address() {
-                to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
+                to_idx = rng.gen_range(0, count);
             }
             test_accounts[to_idx].address
         };
@@ -179,14 +182,9 @@ impl TestWallet {
         self.sign_transfer(to, amount, 0u32).await
     }
 
-    /// Returns appropriate nonce for the new transaction and increments nonce.
-    async fn pending_nonce(&self) -> u32 {
-        let mut nonce = self.nonce.lock().await;
-
-        let pending_nonce = *nonce;
-        *nonce = pending_nonce + 1;
-
-        pending_nonce
+    /// Returns appropriate nonce for the new transaction and increments the nonce.
+    fn pending_nonce(&self) -> u32 {
+        self.nonce.fetch_add(1, Ordering::SeqCst)
     }
 }
 

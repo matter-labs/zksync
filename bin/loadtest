@@ -23,10 +23,6 @@ case $SCENARIO in
   real-life|reallife|real_life)
       CONFIG=${2:-"$ZKSYNC_HOME/core/tests/loadtest/src/configs/reallife.json"}
       ;;
-  api-test|apitest|api_test)
-      # Config for API test is the same as for real-life.
-      CONFIG=${2:-"$ZKSYNC_HOME/core/tests/loadtest/src/configs/reallife.json"}
-      ;;
   -h | --help)
       echo "$USAGE"
       exit 0

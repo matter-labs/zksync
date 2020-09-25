@@ -138,7 +138,11 @@ impl SatelliteScenario {
 
         let fee = self
             .provider
-            .get_tx_fee(TxFeeTypes::Withdraw, wallet.address(), "ETH")
+            .get_tx_fee(
+                TxFeeTypes::Withdraw,
+                wallet.address(),
+                TestWallet::TOKEN_NAME,
+            )
             .await
             .expect("Can't get tx fee")
             .total_fee;
@@ -150,7 +154,9 @@ impl SatelliteScenario {
             .account_info(wallet.address())
             .await?
             .committed;
-        let account_balance = comitted_account_state.balances["ETH"].0.clone();
+        let account_balance = comitted_account_state.balances[TestWallet::TOKEN_NAME]
+            .0
+            .clone();
         let withdraw_amount = &account_balance - &fee;
         let withdraw_amount = closest_packable_token_amount(&withdraw_amount);
 

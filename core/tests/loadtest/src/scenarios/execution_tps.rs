@@ -139,9 +139,6 @@ async fn send_transactions_from_acc(
     let addr_hex = hex::encode(test_wallet.address());
     let wei_in_gwei = BigUint::from(1_000_000_000u32);
 
-    // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
-    // test_wallet.update_nonce_values(&provider).await?;
-
     // Perform the deposit operation.
     let deposit_amount = BigUint::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
     let op_id = deposit_single(&test_wallet, deposit_amount.clone(), &provider).await?;

@@ -261,9 +261,6 @@ impl ScenarioExecutor {
 
     /// Initializes the test, preparing the main account for the interaction.
     async fn initialize(&mut self) -> Result<(), failure::Error> {
-        // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
-        // self.main_wallet.update_nonce_values(&self.provider).await?;
-
         // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
         // the fee in such a way that it will always be sufficient).
         // Withdraw operation has more chunks, so we estimate fee for it.
