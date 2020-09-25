@@ -2,11 +2,11 @@
 
 use super::{private_key_to_pubkey_hash, read_signing_key, sign_musig};
 
+use crypto_lib::{public_key_from_private, Engine};
 use franklin_crypto::bellman::pairing::ff::{self, PrimeField, PrimeFieldRepr};
 use franklin_crypto::eddsa::PrivateKey;
 use models::{tx::TxSignature, PubKeyHash};
 use rand::{Rng, SeedableRng, XorShiftRng};
-use zksync_crypto::{public_key_from_private, Engine};
 
 fn gen_private_key_and_its_be_bytes() -> (PrivateKey<Engine>, Vec<u8>) {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

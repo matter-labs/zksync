@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
+use zksync_basic_types::{AccountId, TokenId};
 
 /// Depth of the account tree.
 pub const ACCOUNT_TREE_DEPTH: usize = 32;
@@ -47,7 +48,7 @@ pub fn used_account_subtree_depth() -> usize {
 }
 
 /// Max token id, based on the depth of the used left subtree
-pub fn max_account_id() -> u32 {
+pub fn max_account_id() -> AccountId {
     let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
     if list_count == u32::max_value() {
         list_count
@@ -57,11 +58,11 @@ pub fn max_account_id() -> u32 {
 }
 
 /// Max token id, based on the number of processable tokens
-pub fn max_token_id() -> u16 {
+pub fn max_token_id() -> TokenId {
     number_of_processable_tokens() as u16 - 1
 }
 
-pub const ETH_TOKEN_ID: u16 = 0;
+pub const ETH_TOKEN_ID: TokenId = 0;
 
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 32;
 
