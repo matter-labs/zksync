@@ -232,7 +232,7 @@ impl<T: Transport> ETHClient<T> {
             .await?)
     }
 
-    /// Gets the Ethenreum transaction receipt.
+    /// Gets the Ethereum transaction receipt.
     pub async fn tx_receipt(
         &self,
         tx_hash: H256,
