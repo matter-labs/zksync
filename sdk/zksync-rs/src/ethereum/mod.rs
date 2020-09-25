@@ -115,7 +115,7 @@ impl EthereumProvider {
         token: impl Into<TokenLike>,
     ) -> Result<bool, ClientError> {
         let token = token.into();
-        let erc20_approve_threshold: U256 = U256::from(2).pow(255.into()); // 2^255
+        let erc20_approve_threshold: U256 = U256::from(2).pow(255.into());
         let token = self
             .tokens_cache
             .resolve(token)
@@ -148,7 +148,7 @@ impl EthereumProvider {
         token: impl Into<TokenLike>,
     ) -> Result<H256, ClientError> {
         let token = token.into();
-        let max_erc20_approve_amount: U256 = U256::max_value(); // 2^256 - 1
+        let max_erc20_approve_amount: U256 = U256::max_value();
 
         let token = self
             .tokens_cache

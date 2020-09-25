@@ -1,8 +1,15 @@
-use models::node::{AccountId, Address};
+use models::node::{AccountId, Address, TokenLike};
+use num::BigUint;
 
 use crate::{
-    credentials::WalletCredentials, error::ClientError, ethereum::EthereumProvider, operations::*,
-    provider::Provider, signer::Signer, tokens_cache::TokensCache, types::AccountInfo,
+    credentials::WalletCredentials,
+    error::ClientError,
+    ethereum::EthereumProvider,
+    operations::*,
+    provider::Provider,
+    signer::Signer,
+    tokens_cache::TokensCache,
+    types::{AccountInfo, BlockStatus},
 };
 
 #[derive(Debug)]
@@ -51,9 +58,32 @@ impl Wallet {
         self.signer.address
     }
 
-    /// Returns account state info
+    /// Returns account state info.
     pub async fn account_info(&self) -> Result<AccountInfo, ClientError> {
         self.provider.account_info(self.address()).await
+    }
+
+    /// Returns balance in the account.
+    pub async fn get_balance(
+        &self,
+        block_status: BlockStatus,
+        token_like: impl Into<TokenLike>,
+    ) -> Result<BigUint, ClientError> {
+        let token = self
+            .tokens
+            .resolve(token_like.into())
+            .ok_or(ClientError::UnknownToken)?;
+
+        let account_state = match block_status {
+            BlockStatus::Committed => self.account_info().await?.committed,
+            BlockStatus::Verified => self.account_info().await?.verified,
+        };
+
+        Ok(account_state
+            .balances
+            .get(&token.symbol as &str)
+            .map(|x| x.0.clone())
+            .unwrap_or_default())
     }
 
     /// Returns the current account ID.

@@ -12,6 +12,7 @@
 use futures::compat::Future01CompatExt;
 use std::time::{Duration, Instant};
 use zksync::{
+    types::BlockStatus,
     web3::{
         contract::{Contract, Options},
         futures::Future,
@@ -20,6 +21,7 @@ use zksync::{
     },
     zksync_models::abi,
     zksync_models::node::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes},
+    error::{ClientError, SignerError::NoSigningKey},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
 
@@ -45,20 +47,6 @@ fn eth_random_account_credentials() -> (H160, H256) {
 
 fn one_ether() -> U256 {
     U256::from(10).pow(18.into())
-}
-
-async fn get_sync_committed_balance(
-    sync_wallet: &Wallet,
-    token_symbol: &str,
-) -> Result<num::BigUint, anyhow::Error> {
-    Ok(sync_wallet
-        .account_info()
-        .await?
-        .committed
-        .balances
-        .get(token_symbol)
-        .map(|x| x.0.clone())
-        .unwrap_or_default())
 }
 
 /// Auxiliary function that returns the balance of the account on Ethereum.
@@ -155,10 +143,8 @@ async fn transfer_to(
 }
 
 /// Creates a new wallet and tries to make a transfer
-/// from a new wallet with no money.
-async fn test_throwing_error_on_tx_fail(
-    zksync_depositor_wallet: &Wallet,
-) -> Result<(), anyhow::Error> {
+/// from a new wallet without SigningKey.
+async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Error> {
     let provider = Provider::new(Network::Localhost);
 
     let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
@@ -176,8 +162,11 @@ async fn test_throwing_error_on_tx_fail(
         .amount(1_000_000u64)
         .send()
         .await;
-
-    assert!(handle.is_err());
+    
+    assert!(matches!(
+        handle,
+        Err(ClientError::SigningError(NoSigningKey))
+    ));
 
     Ok(())
 }
@@ -203,7 +192,7 @@ async fn test_deposit(
         );
     };
 
-    // let balance_before = get_sync_committed_balance(sync_wallet, &token.symbol).await?;
+    // let balance_before = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
     let deposit_tx_hash = ethereum
         .deposit(
             &token.symbol as &str,
@@ -215,7 +204,7 @@ async fn test_deposit(
     wait_for_eth_tx(&ethereum, deposit_tx_hash).await;
     wait_for_deposit_and_update_account_id(sync_wallet).await;
 
-    // let balance_after = get_sync_committed_balance(sync_wallet, &token.symbol).await?;
+    // let balance_after = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
 
     if !sync_wallet.tokens.is_eth(token.address.into()) {
         assert!(ethereum.is_erc20_deposit_approved(token.address).await?);
@@ -258,8 +247,13 @@ async fn test_transfer(
         .await?
         .total_fee;
 
-    let alice_balance_before = get_sync_committed_balance(alice, token_symbol).await?;
-    let bob_balance_before = get_sync_committed_balance(bob, token_symbol).await?;
+    let alice_balance_before = alice
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+
+    let bob_balance_before = bob
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
 
     let transfer_handle = alice
         .start_transfer()
@@ -274,8 +268,12 @@ async fn test_transfer(
         .wait_for_verify()
         .await?;
 
-    let alice_balance_after = get_sync_committed_balance(alice, token_symbol).await?;
-    let bob_balance_after = get_sync_committed_balance(bob, token_symbol).await?;
+    let alice_balance_after = alice
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+    let bob_balance_after = bob
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
 
     assert_eq!(
         alice_balance_before - alice_balance_after,
@@ -293,7 +291,9 @@ async fn test_transfer_to_self(
     transfer_amount: u128,
 ) -> Result<(), anyhow::Error> {
     let transfer_amount = num::BigUint::from(transfer_amount);
-    let balance_before = get_sync_committed_balance(sync_wallet, token_symbol).await?;
+    let balance_before = sync_wallet
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
     let total_fee = sync_wallet
         .provider
         .get_tx_fee(TxFeeTypes::Transfer, sync_wallet.address(), token_symbol)
@@ -313,7 +313,9 @@ async fn test_transfer_to_self(
         .wait_for_verify()
         .await?;
 
-    let balance_after = get_sync_committed_balance(sync_wallet, token_symbol).await?;
+    let balance_after = sync_wallet
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
 
     assert_eq!(balance_before - balance_after, total_fee);
 
@@ -335,7 +337,9 @@ async fn test_withdraw(
         .get_tx_fee(TxFeeTypes::Withdraw, withdraw_to.address(), token.address)
         .await?
         .total_fee;
-    let sync_balance_before = get_sync_committed_balance(sync_wallet, &token.symbol).await?;
+    let sync_balance_before = sync_wallet
+        .get_balance(BlockStatus::Committed, &token.symbol as &str)
+        .await?;
     let onchain_balance_before =
         get_ethereum_balance(eth_provider, withdraw_to.address(), token).await?;
     let pending_to_be_onchain_balance_before: U256 = {
@@ -365,9 +369,12 @@ async fn test_withdraw(
         .wait_for_verify()
         .await?;
 
-    let sync_balance_after = get_sync_committed_balance(sync_wallet, &token.symbol).await?;
+    let sync_balance_after = sync_wallet
+        .get_balance(BlockStatus::Committed, &token.symbol as &str)
+        .await?;
     let onchain_balance_after =
         get_ethereum_balance(eth_provider, withdraw_to.address(), token).await?;
+    
     let pending_to_be_onchain_balance_after: U256 = {
         let query = main_contract.query(
             "getBalanceToWithdraw",
@@ -561,7 +568,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         dai_deposit_amount
     );
 
-    test_throwing_error_on_tx_fail(&sync_depositor_wallet).await?;
+    test_tx_fail(&sync_depositor_wallet).await?;
 
     move_funds(
         &main_contract,

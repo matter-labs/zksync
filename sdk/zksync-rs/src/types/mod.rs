@@ -32,6 +32,13 @@ pub struct DepositingAccountBalances {
     balances: HashMap<String, DepositingFunds>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BlockStatus {
+    Committed,
+    Verified,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
