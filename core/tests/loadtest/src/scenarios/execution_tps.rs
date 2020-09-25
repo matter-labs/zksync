@@ -18,7 +18,7 @@ use num::BigUint;
 use tokio::{runtime::Handle, time};
 // Workspace uses
 use models::node::tx::TxHash;
-use zksync::Provider;
+use zksync::{Network, Provider};
 // Local uses
 use crate::{
     scenarios::{
@@ -37,8 +37,7 @@ const TX_EXECUTION_TIMEOUT_SEC: u64 = 5 * 60;
 /// sends the different types of transactions, and measures the TPS for the txs execution
 /// (not including the verification).
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let rpc_addr = ctx.rpc_addr.clone();
-    let provider = Provider::from_addr(&rpc_addr);
+    let provider = Provider::new(Network::Localhost);
 
     // Load config and construct test accounts
     let config = LoadTestConfig::load(&ctx.config_path);

@@ -12,7 +12,7 @@ use std::{ops::Mul, sync::Arc, time::Duration};
 use num::BigUint;
 use tokio::runtime::Handle;
 // Workspace uses
-use zksync::Provider;
+use zksync::{Network, Provider};
 // Local uses
 use crate::{
     scenarios::{
@@ -29,8 +29,7 @@ use crate::{
 /// sends the different types of transactions, and measures the TPS for the sending
 /// process (in other words, speed of the ZKSync node mempool).
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let rpc_addr = ctx.rpc_addr.clone();
-    let provider = Provider::from_addr(&rpc_addr);
+    let provider = Provider::new(Network::Localhost);
 
     // Load config and construct test accounts
     let config = LoadTestConfig::load(&ctx.config_path);
