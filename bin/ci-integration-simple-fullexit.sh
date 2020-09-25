@@ -39,7 +39,7 @@ function cat_logs() {
     exit $exitcode
 }
 
-zksync dummy-prover status | grep -q 'disabled' && echo zksync dummy-prover enable
+zksync dummy-prover status | grep -q 'disabled' && zksync dummy-prover enable
 zksync server &> integration-server.log &
 SERVER_PID=$!
 zksync dummy-prover &> integration-prover.log &
