@@ -163,7 +163,7 @@ async fn test_throwing_error_on_tx_fail(
 
     let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
     let random_credentials =
-        WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key)?;
+        WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key, Network::Localhost)?;
     let sync_wallet = Wallet::new(provider, random_credentials).await?;
 
     let handle = sync_wallet
@@ -457,42 +457,42 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     let main_wallet = {
         let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
         let main_credentials =
-            WalletCredentials::from_eth_pk(main_eth_address, main_eth_private_key)?;
+            WalletCredentials::from_eth_pk(main_eth_address, main_eth_private_key, Network::Localhost)?;
         Wallet::new(provider.clone(), main_credentials).await?
     };
 
     let sync_depositor_wallet = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
         let random_credentials =
-            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key)?;
+            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key, Network::Localhost)?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let mut alice_wallet1 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
         let random_credentials =
-            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key)?;
+            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key, Network::Localhost)?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let mut alice_wallet2 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
         let random_credentials =
-            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key)?;
+            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key, Network::Localhost)?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let bob_wallet1 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
         let random_credentials =
-            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key)?;
+            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key, Network::Localhost)?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let bob_wallet2 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
         let random_credentials =
-            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key)?;
+            WalletCredentials::from_eth_pk(random_eth_address, random_eth_private_key, Network::Localhost)?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
