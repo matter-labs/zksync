@@ -2,6 +2,7 @@ use futures::{channel::mpsc, SinkExt};
 use log::*;
 use server::eth_watch::{EthWatch, EthWatchRequest};
 use std::time::Duration;
+use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 
 fn main() {
@@ -19,12 +20,15 @@ fn main() {
 
     let (eth_req_sender, eth_req_receiver) = mpsc::channel(256);
 
+    let db_pool = main_runtime.block_on(async { ConnectionPool::new(None).await });
+
     let watcher = EthWatch::new(
         web3,
         web3_event_loop_handle,
         contract_address,
         0,
         eth_req_receiver,
+        db_pool,
     );
 
     main_runtime.spawn(watcher.run());

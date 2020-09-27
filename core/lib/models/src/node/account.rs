@@ -106,7 +106,7 @@ impl PartialEq for Account {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AccountUpdate {
     Create {
         address: Address,
