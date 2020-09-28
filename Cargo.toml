@@ -10,14 +10,20 @@ members = [
 
     # Libraries
     "core/lib/circuit",
-    "core/lib/crypto_exports",
     "core/lib/eth_client",
     "core/lib/models",
     "core/lib/plasma",
     "core/lib/storage",
     "core/lib/vlog",
+    "core/lib/crypto",
+    "core/lib/utils",
+    "core/lib/basic_types",
+    "core/lib/prover_utils",
+    "core/lib/config",
+    "core/lib/contracts",
 
     # Test infrastructure
+    "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadtest",
 

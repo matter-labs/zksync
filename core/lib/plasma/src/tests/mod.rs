@@ -2,14 +2,17 @@ mod collect_fee;
 mod operations;
 
 use crate::state::PlasmaState;
-use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
-use models::node::tx::PackedEthSignature;
-use models::node::{
-    priv_key_from_fs, Account, AccountId, AccountUpdate, FranklinPriorityOp, FranklinTx,
-    PrivateKey, PubKeyHash, TokenId,
+use models::tx::PackedEthSignature;
+use models::{
+    Account, AccountId, AccountUpdate, FranklinPriorityOp, FranklinTx, PubKeyHash, TokenId,
 };
 use num::BigUint;
 use web3::types::H256;
+use zksync_crypto::{
+    priv_key_from_fs,
+    rand::{Rng, SeedableRng, XorShiftRng},
+    PrivateKey,
+};
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];
 

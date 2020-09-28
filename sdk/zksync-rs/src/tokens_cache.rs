@@ -1,4 +1,4 @@
-use models::node::{Address, Token, TokenLike};
+use models::{Address, Token, TokenLike};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

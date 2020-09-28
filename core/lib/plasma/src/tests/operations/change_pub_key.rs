@@ -1,8 +1,7 @@
 use crate::tests::PlasmaTestBuilder;
-use crypto_exports::rand::Rng;
-use models::node::tx::ChangePubKey;
-use models::node::{AccountUpdate, PubKeyHash};
-use models::params;
+use models::account::{AccountUpdate, PubKeyHash};
+use models::tx::ChangePubKey;
+use zksync_crypto::{params, rand::Rng};
 
 #[test]
 fn success() {

@@ -1,4 +1,4 @@
-use models::node::tx::TxHash;
+use models::tx::TxHash;
 
 #[derive(Debug)]
 pub struct SentTransactions {

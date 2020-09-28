@@ -9,16 +9,14 @@ use jsonrpc_core::{MetaIoHandler, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace uses
-use models::{
-    config_options::{ConfigurationOptions, ThreadPanicNotify},
-    node::tx::TxHash,
-    ActionType, Operation,
-};
+use models::{tx::TxHash, ActionType, Operation};
 use storage::ConnectionPool;
+use zksync_config::ConfigurationOptions;
 // Local uses
 use crate::fee_ticker::TickerRequest;
+use crate::panic_notify::ThreadPanicNotify;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},

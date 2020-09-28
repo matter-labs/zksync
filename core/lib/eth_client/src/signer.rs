@@ -1,6 +1,5 @@
-use parity_crypto::publickey::sign;
+use parity_crypto::{publickey::sign, Keccak256};
 use rlp::RlpStream;
-use tiny_keccak::keccak256;
 use web3::types::{H160, H256, U256};
 
 /// Description of a Transaction, pending or in the chain.
@@ -63,7 +62,7 @@ impl RawTransaction {
         hash.append(&U256::zero());
         hash.append(&U256::zero());
         hash.finalize_unbounded_list();
-        keccak256(&hash.out())
+        hash.out().keccak256()
     }
 
     fn encode(&self, s: &mut RlpStream) {

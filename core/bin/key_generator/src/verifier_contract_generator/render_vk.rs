@@ -7,13 +7,13 @@ use std::path::Path;
 
 use handlebars::to_json;
 
-use crypto_exports::bellman::plonk::domains::Domain;
-use crypto_exports::ff::{PrimeField, PrimeFieldRepr};
-use crypto_exports::franklin_crypto::bellman::plonk::better_cs::{
+use zksync_crypto::bellman::plonk::domains::Domain;
+use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
+use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::{
     cs::PlonkCsWidth4WithNextStepParams, keys::VerificationKey,
 };
-use crypto_exports::pairing::{CurveAffine, Engine};
-use models::node::{Engine as NodeEngine, Fr};
+use zksync_crypto::pairing::{CurveAffine, Engine};
+use zksync_crypto::{Engine as NodeEngine, Fr};
 
 pub(crate) fn rendered_key(
     key_getter_name: &str,

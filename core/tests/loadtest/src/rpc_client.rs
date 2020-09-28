@@ -4,7 +4,7 @@ use std::str::FromStr;
 use jsonrpc_core::types::response::Output;
 use num::BigUint;
 // Workspace uses
-use models::node::{
+use models::{
     tx::{FranklinTx, PackedEthSignature, TxHash},
     Address,
 };
@@ -170,7 +170,7 @@ impl RpcClient {
 
 /// Structures representing the RPC request messages.
 mod messages {
-    use models::node::{
+    use models::{
         tx::{FranklinTx, PackedEthSignature, TxEthSignature, TxHash},
         Address,
     };

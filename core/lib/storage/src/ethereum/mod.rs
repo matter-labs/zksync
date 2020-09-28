@@ -3,7 +3,7 @@ use std::{collections::VecDeque, convert::TryFrom, str::FromStr};
 // External imports
 use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
-use web3::types::{H256, U256};
+use zksync_basic_types::{H256, U256};
 // Workspace imports
 use models::{
     ethereum::{ETHOperation, InsertedOperationResponse, OperationType},

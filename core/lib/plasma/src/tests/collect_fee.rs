@@ -1,6 +1,6 @@
 use super::PlasmaTestBuilder;
 use crate::state::CollectedFee;
-use models::node::AccountUpdate;
+use models::account::AccountUpdate;
 use num::{BigUint, Zero};
 
 #[test]

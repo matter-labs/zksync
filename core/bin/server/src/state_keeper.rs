@@ -6,11 +6,11 @@ use futures::{
     SinkExt,
 };
 use tokio::task::JoinHandle;
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace uses
-use crypto_exports::ff;
 use models::{
-    node::{
+    ActionType,
+    {
         block::{
             Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
             PendingBlock as SendablePendingBlock,
@@ -19,13 +19,17 @@ use models::{
         tx::{FranklinTx, TxHash},
         Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
     },
-    ActionType, BlockCommitRequest, CommitRequest,
 };
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 use storage::ConnectionPool;
+use zksync_crypto::ff;
 // Local uses
-use crate::{gas_counter::GasCounter, mempool::ProposedBlock};
-use models::node::SignedFranklinTx;
+use crate::{
+    committer::{BlockCommitRequest, CommitRequest},
+    gas_counter::GasCounter,
+    mempool::ProposedBlock,
+};
+use models::SignedFranklinTx;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),
@@ -113,7 +117,7 @@ impl Default for PlasmaStateInitParams {
 impl PlasmaStateInitParams {
     pub fn new() -> Self {
         Self {
-            tree: AccountTree::new(models::params::account_tree_depth()),
+            tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
             acc_id_by_addr: HashMap::new(),
             last_block_number: 0,
             unprocessed_priority_op: 0,

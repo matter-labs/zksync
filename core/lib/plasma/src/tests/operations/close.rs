@@ -1,5 +1,5 @@
 use crate::tests::PlasmaTestBuilder;
-use models::node::{tx::TxSignature, Close};
+use models::tx::{Close, TxSignature};
 
 #[test]
 fn expected_fail() {

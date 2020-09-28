@@ -48,16 +48,24 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/prover`: zkSync prover application.
     - `/data_restore`: Utility to restore a state of the zkSync network from a smart contract.
     - `/key_generator`: Utility to generate verification keys for network.
+    - `/gen_token_add_contract`: Utility to generate `TokenDeployInit` smart contract, required for initial network launch.
+    - `/parse_pub_data`: Utility to parse zkSync operation pubdata.
   - `/lib`: Dependencies of the binaries above.
+    - `/basic_types`: Crate with declaration of the essential zkSync primitives, such as `address`.
     - `/circuit`: Cryptographic environment enforsing the correctness of executed transactions in the zkSync network.
-    - `/crypto_exports`: Re-exports for used external cryptographic libraries.
+    - `/config`: Utilities to load configuration options of zkSync applications.
+    - `/contracts`: Loaders for zkSync contracts interfaces and ABI.
+    - `/crypto`: Cryptographical primitives using among zkSync crates.
     - `/eth_client`: Module providing an interface to interact with an Ethereum node.
-    - `/models`: Various types declarations and primitive functions using throughout zkSync crates.
+    - `/models`: zkSync network operations, transactions and common types.
     - `/plasma`: A fast pre-circuit executor for zkSync transactions used on the Server level to generate blocks.
+    - `/prover_utils`: Utilities related to the proof generation.
     - `/storage`: An encapsulated database interface.
+    - `/utils`: Miscellaneous helpers for zkSync crates.
     - `/vlog`: An utility library for verbose logging.
   - `/tests`: Testing infrastructure for zkSync network.
     - `/loadtest`: An application for highload testing of zkSync server.
+    - `/test_account`: A representation of zkSync account which can be used for tests.
     - `/testkit`: A relatively low-level testing library and test suite for zkSync.
     - `/ts-test`: Integration tests set implemented in TypeScript. Requires a running Server and Prover applications to operate.
 - `/docker`: Dockerfiles used for development of zkSync and for packaging zkSync for a production environment.

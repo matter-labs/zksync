@@ -1,11 +1,13 @@
 // External deps
-use crypto_exports::franklin_crypto::bellman::pairing::{
+use zksync_crypto::franklin_crypto::bellman::pairing::{
     bn256::{Bn256, Fr},
     ff::{Field, PrimeField},
 };
 // Workspace deps
-use models::circuit::{account::CircuitAccountTree, utils::le_bit_vector_into_field_element};
-use models::params::CHUNK_BIT_WIDTH;
+use zksync_crypto::circuit::{
+    account::CircuitAccountTree, utils::le_bit_vector_into_field_element,
+};
+use zksync_crypto::params::CHUNK_BIT_WIDTH;
 // Local deps
 use crate::{
     account::AccountWitness,

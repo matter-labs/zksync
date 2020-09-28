@@ -1,5 +1,7 @@
 use crate::tests::PlasmaTestBuilder;
-use models::node::{AccountUpdate, Deposit, FranklinPriorityOp, FullExit};
+use models::{
+    account::AccountUpdate, priority_ops::Deposit, priority_ops::FullExit, FranklinPriorityOp,
+};
 use num::{BigUint, Zero};
 use web3::types::H160;
 

@@ -1,11 +1,11 @@
 use crate::error::ClientError;
-use crypto_exports::bellman::{pairing::ff::PrimeField, PrimeFieldRepr};
-use crypto_exports::franklin_crypto::alt_babyjubjub::fs::FsRepr;
-use models::node::{priv_key_from_fs, Fs, PrivateKey};
 use sha2::{Digest, Sha256};
+use zksync_crypto::bellman::{pairing::ff::PrimeField, PrimeFieldRepr};
+use zksync_crypto::franklin_crypto::alt_babyjubjub::fs::FsRepr;
+use zksync_crypto::{priv_key_from_fs, Fs, PrivateKey};
 
 // Public re-exports.
-pub use models::node::{
+pub use models::helpers::{
     closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
     is_token_amount_packable,
 };
