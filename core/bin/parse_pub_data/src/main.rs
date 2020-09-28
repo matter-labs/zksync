@@ -1,4 +1,4 @@
-use models::node::FranklinOp;
+use models::FranklinOp;
 
 fn main() {
     let hex_data = std::env::args()

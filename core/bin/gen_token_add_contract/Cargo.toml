@@ -8,5 +8,6 @@ edition = "2018"
 
 [dependencies]
 models = { path = "../../lib/models", version = "0.0.1" }
+zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
 
 handlebars = "3.0.1"

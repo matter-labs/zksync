@@ -7,7 +7,7 @@
 use jsonrpc_core::types::response::Output;
 
 // Workspace uses
-use models::node::{
+use models::{
     tx::{FranklinTx, PackedEthSignature, TxHash},
     Address, TokenLike, TxFeeTypes,
 };
@@ -137,6 +137,19 @@ impl Provider {
         Ok(tx_info)
     }
 
+    /// Requests and returns eth withdrawal transaction hash for some offchain withdrawal.
+    pub async fn get_eth_tx_for_withdrawal(
+        &self,
+        withdrawal_hash: TxHash,
+    ) -> Result<Option<String>, ClientError> {
+        let msg = JsonRpcRequest::eth_tx_for_withdrawal(withdrawal_hash);
+
+        let ret = self.post(&msg).await?;
+        let tx_info = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
+        Ok(tx_info)
+    }
+
     /// Performs a POST query to the JSON RPC endpoint,
     /// and decodes the response, returning the decoded `serde_json::Value`.
     /// `Ok` is returned only for successful calls, for any kind of error
@@ -183,7 +196,7 @@ impl Provider {
 }
 
 mod messages {
-    use models::node::{
+    use models::{
         tx::{FranklinTx, PackedEthSignature, TxEthSignature, TxHash},
         Address, TokenLike, TxFeeTypes,
     };
@@ -243,6 +256,12 @@ mod messages {
         pub fn contract_address() -> Self {
             let params = Vec::new();
             Self::create("contract_address", params)
+        }
+
+        pub fn eth_tx_for_withdrawal(withdrawal_hash: TxHash) -> Self {
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(withdrawal_hash).expect("serialization fail"));
+            Self::create("get_eth_tx_for_withdrawal", params)
         }
 
         pub fn get_tx_fee(tx_type: TxFeeTypes, address: Address, token_symbol: TokenLike) -> Self {

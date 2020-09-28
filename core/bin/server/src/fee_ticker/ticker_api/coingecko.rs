@@ -2,12 +2,12 @@ use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use failure::Error;
-use models::node::TokenPrice;
-use models::primitives::UnsignedRatioSerializeAsDecimal;
+use models::TokenPrice;
 use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
 use std::collections::HashMap;
+use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 #[derive(Debug)]
 pub struct CoinGeckoAPI {
@@ -131,7 +131,7 @@ struct CoinGeckoMarketChart {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::config_options::parse_env;
+    use zksync_utils::parse_env;
 
     #[test]
     fn test_coingecko_api() {

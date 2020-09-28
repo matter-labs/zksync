@@ -4,17 +4,10 @@ use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 // Workspace uses
-use models::node::{
+use models::{
     tx::{TxEthSignature, TxHash},
     Address, FranklinTx, Token, TokenLike, TxFeeTypes,
 };
-// use storage::{
-//     chain::{
-//         block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
-//         operations_ext::records::TxReceiptResponse,
-//     },
-//     ConnectionPool, StorageProcessor,
-// };
 
 // Local uses
 use crate::fee_ticker::{BatchFee, Fee};
@@ -74,22 +67,23 @@ pub trait Rpc {
 
     #[rpc(name = "get_confirmations_for_eth_op_amount", returns = "u64")]
     fn get_confirmations_for_eth_op_amount(&self) -> FutureResp<u64>;
+
+    #[rpc(name = "get_eth_tx_for_withdrawal", returns = "Option<String>")]
+    fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>>;
 }
 
 impl Rpc for RpcApp {
     fn account_info(&self, addr: Address) -> FutureResp<AccountInfoResp> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
-        let resp = async move {
-            let handle = self_.tokio_runtime.clone();
-            handle.spawn(self_._impl_account_info(addr)).await.unwrap()
-        };
+        let resp = async move { handle.spawn(self_._impl_account_info(addr)).await.unwrap() };
         Box::new(resp.boxed().compat())
     }
 
     fn ethop_info(&self, serial_id: u32) -> FutureResp<ETHOpInfoResp> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
-            let handle = self_.tokio_runtime.clone();
             handle
                 .spawn(self_._impl_ethop_info(serial_id))
                 .await
@@ -99,11 +93,9 @@ impl Rpc for RpcApp {
     }
 
     fn tx_info(&self, hash: TxHash) -> FutureResp<TransactionInfoResp> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
-        let resp = async move {
-            let handle = self_.tokio_runtime.clone();
-            handle.spawn(self_._impl_tx_info(hash)).await.unwrap()
-        };
+        let resp = async move { handle.spawn(self_._impl_tx_info(hash)).await.unwrap() };
         Box::new(resp.boxed().compat())
     }
 
@@ -113,9 +105,9 @@ impl Rpc for RpcApp {
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
-            let handle = self_.tokio_runtime.clone();
             handle
                 .spawn(self_._impl_tx_submit(tx, signature, fast_processing))
                 .await
@@ -125,9 +117,9 @@ impl Rpc for RpcApp {
     }
 
     fn submit_txs_batch(&self, txs: Vec<TxWithSignature>) -> FutureResp<Vec<TxHash>> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
-            let handle = self_.tokio_runtime.clone();
             handle
                 .spawn(self_._impl_submit_txs_batch(txs))
                 .await
@@ -137,20 +129,16 @@ impl Rpc for RpcApp {
     }
 
     fn contract_address(&self) -> FutureResp<ContractAddressResp> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
-        let resp = async move {
-            let handle = self_.tokio_runtime.clone();
-            handle.spawn(self_._impl_contract_address()).await.unwrap()
-        };
+        let resp = async move { handle.spawn(self_._impl_contract_address()).await.unwrap() };
         Box::new(resp.boxed().compat())
     }
 
     fn tokens(&self) -> FutureResp<HashMap<String, Token>> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
-        let resp = async move {
-            let handle = self_.tokio_runtime.clone();
-            handle.spawn(self_._impl_tokens()).await.unwrap()
-        };
+        let resp = async move { handle.spawn(self_._impl_tokens()).await.unwrap() };
         Box::new(resp.boxed().compat())
     }
 
@@ -160,9 +148,9 @@ impl Rpc for RpcApp {
         address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
-            let handle = self_.tokio_runtime.clone();
             handle
                 .spawn(self_._impl_get_tx_fee(tx_type, address, token_like))
                 .await
@@ -177,9 +165,9 @@ impl Rpc for RpcApp {
         addresses: Vec<Address>,
         token_like: TokenLike,
     ) -> FutureResp<BatchFee> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
-            let handle = self_.tokio_runtime.clone();
             handle
                 .spawn(self_._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like))
                 .await
@@ -189,9 +177,9 @@ impl Rpc for RpcApp {
     }
 
     fn get_token_price(&self, token_like: TokenLike) -> FutureResp<BigDecimal> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
-            let handle = self_.tokio_runtime.clone();
             handle
                 .spawn(self_._impl_get_token_price(token_like))
                 .await
@@ -201,11 +189,23 @@ impl Rpc for RpcApp {
     }
 
     fn get_confirmations_for_eth_op_amount(&self) -> FutureResp<u64> {
+        let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
-            let handle = self_.tokio_runtime.clone();
             handle
                 .spawn(self_._impl_get_confirmations_for_eth_op_amount())
+                .await
+                .unwrap()
+        };
+        Box::new(resp.boxed().compat())
+    }
+
+    fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>> {
+        let handle = self.runtime_handle.clone();
+        let self_ = self.clone();
+        let resp = async move {
+            handle
+                .spawn(self_._impl_get_eth_tx_for_withdrawal(withdrawal_hash))
                 .await
                 .unwrap()
         };

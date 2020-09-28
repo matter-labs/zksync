@@ -8,7 +8,7 @@ use futures::{
     SinkExt,
 };
 // Workspace deps
-use models::node::{Account, AccountId, Address};
+use models::{Account, AccountId, Address};
 // Local deps
 use crate::state_keeper::StateKeeperRequest;
 

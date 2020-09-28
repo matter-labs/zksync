@@ -1,5 +1,5 @@
 // External uses
-use web3::types::U256;
+use zksync_basic_types::U256;
 // Local uses
 use crate::eth_sender::{
     database::DatabaseAccess,

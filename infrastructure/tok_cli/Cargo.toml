@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 models = { path = "../../core/lib/models", version = "0.0.1" }
+zksync_config = { path = "../../core/lib/config", version = "0.1.0" }
 
 anyhow = "1.0"
 tokio = { version = "0.2", features = ["full"] }

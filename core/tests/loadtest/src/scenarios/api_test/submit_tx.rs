@@ -4,8 +4,8 @@
 use jsonrpc_core::types::{Failure, Output};
 use num::BigUint;
 // Workspace deps
-use models::node::{
-    closest_packable_token_amount,
+use models::{
+    helpers::closest_packable_token_amount,
     tx::{PackedEthSignature, Transfer, TxSignature},
     Address, FranklinTx, TokenId,
 };
