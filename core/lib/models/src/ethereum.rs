@@ -1,11 +1,12 @@
 //! Common primitives for the Ethereum network interaction.
 // Built-in deps
-use std::fmt;
-use std::str::FromStr;
+use std::{convert::TryFrom, fmt, str::FromStr};
 // External uses
-/// Local uses
+use ethabi::{decode, ParamType};
+use serde::{Deserialize, Serialize};
+// Local uses
 use crate::{Action, Operation};
-use zksync_basic_types::{H256, U256};
+use zksync_basic_types::{Log, H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
 pub type EthOpId = i64;
@@ -122,4 +123,44 @@ pub struct InsertedOperationResponse {
     /// Nonce assigned for the Ethereum operation. Meant to be used for all the
     /// transactions sent within one particular Ethereum operation.
     pub nonce: U256,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteWithdrawalsTx {
+    pub tx_hash: H256,
+    pub pending_withdrawals_queue_start_index: u32,
+    pub pending_withdrawals_queue_end_index: u32,
+}
+
+impl TryFrom<Log> for CompleteWithdrawalsTx {
+    type Error = failure::Error;
+
+    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, failure::Error> {
+        let mut decoded_event = decode(
+            &[
+                ParamType::Uint(32), // queueStartIndex
+                ParamType::Uint(32), // queueEndIndex
+            ],
+            &event.data.0,
+        )
+        .map_err(|e| failure::format_err!("Event data decode: {:?}", e))?;
+
+        Ok(CompleteWithdrawalsTx {
+            tx_hash: event
+                .transaction_hash
+                .expect("complete withdrawals transaction should have hash"),
+            pending_withdrawals_queue_start_index: decoded_event
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u32)
+                .expect("pending_withdrawals_queue_start_index value conversion failed"),
+            pending_withdrawals_queue_end_index: decoded_event
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u32)
+                .expect("pending_withdrawals_queue_end_index value conversion failed"),
+        })
+    }
 }

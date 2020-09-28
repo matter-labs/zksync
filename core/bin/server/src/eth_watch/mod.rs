@@ -27,9 +27,11 @@ use web3::{
 };
 // Workspace deps
 use models::{
+    ethereum::CompleteWithdrawalsTx,
     tx::EIP1271Signature,
     {FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
 };
+use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
 use zksync_contracts::{eip1271_contract, zksync_contract};
 use zksync_crypto::params::PRIORITY_EXPIRATION;

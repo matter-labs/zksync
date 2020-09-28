@@ -16,6 +16,7 @@ use zksync_config::{AdminServerOptions, ConfigurationOptions, ProverOptions};
 use models::{
     config::OBSERVER_MODE_PULL_INTERVAL,
     tokens::{get_genesis_token_list, Token},
+    tx::TxHash,
     TokenId,
 };
 use storage::ConnectionPool;

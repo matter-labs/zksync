@@ -2,7 +2,7 @@
 // External imports
 use failure::format_err;
 // Workspace imports
-use models::{operations::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
+use models::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
@@ -10,7 +10,7 @@ use self::records::{
     StoredExecutedTransaction, StoredOperation, StoredPendingWithdrawal,
 };
 use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};
-use web3::types::H256;
+use zksync_basic_types::H256;
 
 pub mod records;
 
