@@ -5,7 +5,7 @@ use models::node::{tx::TxSignature, Close};
 fn expected_fail() {
     let mut tb = PlasmaTestBuilder::new();
 
-    let (_, account, _) = tb.add_account(true);
+    let (_, account, _) = tb.add_account(false);
     let close = Close {
         account: account.address,
         nonce: account.nonce,

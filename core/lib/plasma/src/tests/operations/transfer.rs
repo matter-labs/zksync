@@ -149,7 +149,7 @@ fn invalid_account_id() {
     let mut tb = PlasmaTestBuilder::new();
 
     let (account_id, account, sk) = tb.add_account(true);
-    let (_, to_account, _) = tb.add_account(true);
+    let (_, to_account, _) = tb.add_account(false);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let transfer = Transfer::new_signed(

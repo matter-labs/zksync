@@ -7,7 +7,7 @@ use models::params;
 #[test]
 fn success() {
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _sk) = tb.add_account(true);
+    let (account_id, account, _sk) = tb.add_account(false);
     let old_pub_key_hash = account.pub_key_hash.clone();
     let pubkey_bytes: [u8; params::FR_ADDRESS_LEN] = tb.rng.gen();
     let new_pub_key_hash = PubKeyHash::from_bytes(&pubkey_bytes).unwrap();
@@ -37,7 +37,7 @@ fn success() {
 #[test]
 fn nonce_mismatch() {
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _sk) = tb.add_account(true);
+    let (account_id, account, _sk) = tb.add_account(false);
     let pubkey_bytes: [u8; params::FR_ADDRESS_LEN] = tb.rng.gen();
     let new_pub_key_hash = PubKeyHash::from_bytes(&pubkey_bytes).unwrap();
 
@@ -55,7 +55,7 @@ fn nonce_mismatch() {
 #[test]
 fn invalid_account_id() {
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _sk) = tb.add_account(true);
+    let (account_id, account, _sk) = tb.add_account(false);
     let pubkey_bytes: [u8; params::FR_ADDRESS_LEN] = tb.rng.gen();
     let new_pub_key_hash = PubKeyHash::from_bytes(&pubkey_bytes).unwrap();
 
