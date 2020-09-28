@@ -19,10 +19,10 @@ use zksync::{
         transports::Http,
         types::{Address, H160, H256, U256},
     },
-    zksync_models::abi,
-    zksync_models::node::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes},
+    zksync_models::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
+use zksync_contracts::{erc20_contract, zksync_contract};
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
@@ -64,11 +64,7 @@ async fn get_ethereum_balance(
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
     }
 
-    let contract = Contract::new(
-        eth_provider.web3().eth(),
-        token.address,
-        abi::erc20_contract(),
-    );
+    let contract = Contract::new(eth_provider.web3().eth(), token.address, erc20_contract());
     contract
         .query("balanceOf", address, None, Options::default(), None)
         .compat()
@@ -534,11 +530,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         }
         .parse()?;
 
-        Contract::new(
-            ethereum.web3().eth(),
-            contract_address,
-            abi::zksync_contract(),
-        )
+        Contract::new(ethereum.web3().eth(), contract_address, zksync_contract())
     };
 
     let token_eth = sync_depositor_wallet

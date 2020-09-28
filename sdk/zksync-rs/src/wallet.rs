@@ -1,4 +1,4 @@
-use models::node::{AccountId, Address, TokenLike};
+use models::{AccountId, Address, TokenLike};
 use num::BigUint;
 
 use crate::{
