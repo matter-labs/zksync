@@ -1,7 +1,8 @@
 use super::rpc_server::types::{
     BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
 };
-use crate::state_keeper::{ExecutedOpId, ExecutedOpsNotify, StateKeeperRequest};
+use crate::committer::ExecutedOpsNotify;
+use crate::state_keeper::{ExecutedOpId, StateKeeperRequest};
 use crate::utils::token_db_cache::TokenDBCache;
 use failure::{bail, format_err};
 use futures::{

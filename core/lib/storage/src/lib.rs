@@ -75,10 +75,10 @@
 // Built-in deps
 // use std::env;
 // External imports
-use sqlx::{pool::PoolConnection, postgres::Postgres, Connection, PgConnection, Transaction};
+use sqlx::{postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
 // Local imports
-use crate::connection::holder::ConnectionHolder;
+use crate::connection::{holder::ConnectionHolder, PooledConnection};
 
 // mod schema;
 #[cfg(test)]
@@ -152,7 +152,7 @@ impl<'a> StorageProcessor<'a> {
     /// Creates a `StorageProcessor` using a pool of connections.
     /// This method borrows one of the connections from the pool, and releases it
     /// after `drop`.
-    pub fn from_pool(conn: PoolConnection<Postgres>) -> Self {
+    pub fn from_pool(conn: PooledConnection) -> Self {
         Self {
             conn: ConnectionHolder::Pooled(conn),
             in_transaction: false,

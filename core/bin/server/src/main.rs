@@ -3,7 +3,11 @@ use std::cell::RefCell;
 use std::time::Duration;
 // External uses
 use clap::{App, Arg};
-use futures::{channel::mpsc, executor::block_on, future, SinkExt, StreamExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    executor::block_on,
+    future, SinkExt, StreamExt,
+};
 use tokio::{runtime::Builder, task::JoinHandle};
 use zksync_basic_types::H160;
 // Workspace uses
@@ -22,7 +26,7 @@ use server::{
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_sender,
-    eth_watch::start_eth_watch,
+    eth_watch::{start_eth_watch, EthWatchRequest},
     fee_ticker::run_ticker_task,
     leader_election,
     mempool::run_mempool_task,
@@ -160,7 +164,47 @@ fn main() {
             config_opts.clone(),
             eth_watch_req_sender.clone(),
             eth_watch_req_receiver,
+            connection_pool.clone(),
         );
+
+        // Check if the pending withdrawals table is empty
+        let no_stored_pending_withdrawals = storage
+            .chain()
+            .operations_schema()
+            .no_stored_pending_withdrawals()
+            .await
+            .expect("failed to call no_stored_pending_withdrawals function");
+        if no_stored_pending_withdrawals {
+            let eth_watcher_channel = oneshot::channel();
+
+            eth_watch_req_sender
+                .clone()
+                .send(EthWatchRequest::GetPendingWithdrawalsQueueIndex {
+                    resp: eth_watcher_channel.0,
+                })
+                .await
+                .expect("EthWatchRequest::GetPendingWithdrawalsQueueIndex request sending failed");
+
+            let pending_withdrawals_queue_index = eth_watcher_channel
+                .1
+                .await
+                .expect("EthWatchRequest::GetPendingWithdrawalsQueueIndex response error")
+                .expect("Err as result of EthWatchRequest::GetPendingWithdrawalsQueueIndex");
+
+            // Let's add to the db one 'fake' pending withdrawal with
+            // id equals to (pending_withdrawals_queue_index-1)
+            // Next withdrawals will be added to the db with correct
+            // corresponding indexes in contract's pending withdrawals queue
+            storage
+                .chain()
+                .operations_schema()
+                .add_pending_withdrawal(
+                    &TxHash::default(),
+                    Some(pending_withdrawals_queue_index as i64 - 1),
+                )
+                .await
+                .expect("can't save fake pending withdrawal in the db");
+        }
 
         let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(channel_size);
         let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(channel_size);
@@ -178,7 +222,6 @@ fn main() {
             config_opts.operator_fee_eth_addr,
             state_keeper_req_receiver,
             proposed_blocks_sender,
-            executed_tx_notify_sender,
             config_opts.available_block_chunk_sizes.clone(),
             config_opts.miniblock_timings.max_miniblock_iterations,
             config_opts.miniblock_timings.fast_miniblock_iterations,
@@ -201,6 +244,7 @@ fn main() {
             eth_send_request_sender.clone(),
             zksync_commit_notify_sender, // commiter sends only commit block notifications
             mempool_request_sender.clone(),
+            executed_tx_notify_sender,
             connection_pool.clone(),
         );
         start_api_server(
