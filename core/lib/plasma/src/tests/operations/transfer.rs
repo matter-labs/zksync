@@ -1,9 +1,10 @@
 use crate::tests::PlasmaTestBuilder;
 use models::node::{AccountUpdate, Transfer};
 use num::{BigUint, Zero};
+use web3::types::H160;
 
 #[test]
-fn success() {
+fn to_existing() {
     let token_id = 0;
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
@@ -79,7 +80,63 @@ fn insufficient_funds() {
 }
 
 #[test]
-fn success_to_self() {
+fn to_new() {
+    let token_id = 0;
+    let amount = BigUint::from(100u32);
+    let fee = BigUint::from(10u32);
+
+    let mut tb = PlasmaTestBuilder::new();
+
+    let (account_id, account, sk) = tb.add_account(true);
+    tb.set_balance(account_id, token_id, &amount + &fee);
+
+    let new_address = H160::random();
+    let new_id = tb.state.get_free_account_id();
+
+    let transfer = Transfer::new_signed(
+        account_id,
+        account.address,
+        new_address,
+        token_id,
+        amount.clone(),
+        fee.clone(),
+        account.nonce,
+        &sk,
+    )
+    .unwrap();
+
+    tb.test_tx_success(
+        transfer.into(),
+        &[
+            (
+                new_id,
+                AccountUpdate::Create {
+                    address: new_address,
+                    nonce: 0,
+                },
+            ),
+            (
+                account_id,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: account.nonce,
+                    new_nonce: account.nonce + 1,
+                    balance_update: (token_id, &amount + &fee, BigUint::zero()),
+                },
+            ),
+            (
+                new_id,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 0,
+                    new_nonce: 0,
+                    balance_update: (token_id, BigUint::zero(), amount),
+                },
+            ),
+        ],
+    )
+}
+
+#[test]
+fn to_self() {
     let token_id = 0;
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
