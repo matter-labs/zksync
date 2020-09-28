@@ -67,7 +67,7 @@ describe('Fetching Information', () => {
             expect(info.nonce).to.equal(2);
             expect(info.balances).to.have.property('DAI', '18.0');
             expect(info.balances.ETH).to.exist;
-            expect(+info.balances.ETH).to.be.within(0.79, 0.8);
+            expect(+info.balances.ETH).to.be.within(0.77, 0.8);
             expect(info.account_id).to.be.a('number');
         });
 
