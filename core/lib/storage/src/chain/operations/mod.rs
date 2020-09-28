@@ -1,13 +1,16 @@
 // Built-in deps
 // External imports
+use failure::format_err;
 // Workspace imports
-use models::{node::BlockNumber, ActionType};
+use models::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-    StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+    StoredCompleteWithdrawalsTransaction, StoredExecutedPriorityOperation,
+    StoredExecutedTransaction, StoredOperation, StoredPendingWithdrawal,
 };
 use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};
+use zksync_basic_types::H256;
 
 pub mod records;
 
@@ -204,5 +207,105 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
         Ok(())
+    }
+
+    /// Parameter id should be None if id equals to the (maximum stored id + 1)
+    pub async fn add_pending_withdrawal(
+        &mut self,
+        hash: &TxHash,
+        id: Option<i64>,
+    ) -> QueryResult<()> {
+        let pending_withdrawal_id = match id {
+            Some(id) => id,
+            None => {
+                let max_stored_pending_withdrawal_id =
+                    sqlx::query!("SELECT max(id) from pending_withdrawals",)
+                        .fetch_one(self.0.conn())
+                        .await?
+                        .max
+                        .ok_or_else(|| format_err!("there is no pending withdrawals in the db"))?;
+
+                max_stored_pending_withdrawal_id + 1
+            }
+        };
+        sqlx::query!(
+            "INSERT INTO pending_withdrawals (id, withdrawal_hash)
+            VALUES ($1, $2)
+            ON CONFLICT (id)
+            DO UPDATE
+            SET id = $1, withdrawal_hash = $2",
+            pending_withdrawal_id,
+            hash.as_ref().to_vec(),
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
+    pub async fn add_complete_withdrawals_transaction(
+        &mut self,
+        tx: CompleteWithdrawalsTx,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "INSERT INTO complete_withdrawals_transactions (tx_hash, pending_withdrawals_queue_start_index, pending_withdrawals_queue_end_index)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (tx_hash)
+            DO UPDATE
+            SET tx_hash = $1, pending_withdrawals_queue_start_index = $2, pending_withdrawals_queue_end_index = $3",
+            tx.tx_hash.as_bytes().to_vec(),
+            tx.pending_withdrawals_queue_start_index as i64,
+            tx.pending_withdrawals_queue_end_index as i64,
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
+    pub async fn no_stored_pending_withdrawals(&mut self) -> QueryResult<bool> {
+        let stored_pending_withdrawals =
+            sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM pending_withdrawals"#,)
+                .fetch_one(self.0.conn())
+                .await?
+                .count;
+
+        Ok(stored_pending_withdrawals == 0)
+    }
+
+    pub async fn eth_tx_for_withdrawal(
+        &mut self,
+        withdrawal_hash: &TxHash,
+    ) -> QueryResult<Option<H256>> {
+        let pending_withdrawal = sqlx::query_as!(
+            StoredPendingWithdrawal,
+            "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1
+            LIMIT 1",
+            withdrawal_hash.as_ref().to_vec(),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let res = match pending_withdrawal {
+            Some(pending_withdrawal) => {
+                let pending_withdrawal_id = pending_withdrawal.id;
+
+                sqlx::query_as!(
+                    StoredCompleteWithdrawalsTransaction,
+                    "SELECT * FROM complete_withdrawals_transactions
+                        WHERE pending_withdrawals_queue_start_index <= $1
+                            AND $1 < pending_withdrawals_queue_end_index
+                    LIMIT 1
+                    ",
+                    pending_withdrawal_id,
+                )
+                .fetch_optional(self.0.conn())
+                .await?
+                .map(|complete_withdrawals_transaction| {
+                    H256::from_slice(&complete_withdrawals_transaction.tx_hash)
+                })
+            }
+            None => None,
+        };
+
+        Ok(res)
     }
 }

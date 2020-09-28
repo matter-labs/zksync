@@ -1,15 +1,24 @@
-use failure::Error;
-use models::{
-    node::{
-        operations::{FranklinOp, TransferOp, TransferToNewOp},
-        reverse_updates, Account, AccountId, AccountMap, AccountTree, AccountUpdate,
-        AccountUpdates, Address, BlockNumber, Fr, FranklinPriorityOp, FranklinTx, SignedFranklinTx,
-        TokenId,
-    },
-    params,
+use failure::{bail, ensure, format_err, Error};
+use log::trace;
+use models::operations::{
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
+use models::tx::ChangePubKey;
+use models::Address;
+use models::{
+    helpers::reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
+    TokenId,
+};
+use models::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
+use models::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
 use num::BigUint;
 use std::collections::HashMap;
+use zksync_crypto::{
+    params::{self, max_account_id},
+    Fr,
+};
+use zksync_utils::BigUintSerdeWrapper;
 
 use crate::handler::TxHandler;
 
@@ -328,12 +337,76 @@ impl PlasmaState {
             FranklinPriorityOp::FullExit(op) => self.create_op(op).unwrap().into(),
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn apply_updates(&mut self, updates: &[(u32, AccountUpdate)]) {
+        for (account_id, update) in updates {
+            match update {
+                AccountUpdate::Create { address, nonce } => {
+                    let (mut account, _) = Account::create_account(*account_id, *address);
+                    account.nonce = *nonce;
+                    self.insert_account(*account_id, account);
+                }
+                AccountUpdate::Delete { address, nonce } => {
+                    let account = self
+                        .get_account(*account_id)
+                        .expect("account doesn't exist");
+                    assert_eq!(&account.address, address);
+                    assert_eq!(&account.nonce, nonce);
+                    self.remove_account(*account_id)
+                }
+                AccountUpdate::UpdateBalance {
+                    old_nonce,
+                    new_nonce,
+                    balance_update,
+                } => {
+                    let mut account = self
+                        .get_account(*account_id)
+                        .expect("account doesn't exist");
+
+                    let (token_id, old_amount, new_amount) = balance_update;
+
+                    assert_eq!(account.nonce, *old_nonce, "nonce mismatch");
+                    assert_eq!(
+                        &account.get_balance(*token_id),
+                        old_amount,
+                        "balance mismatch"
+                    );
+                    account.nonce = *new_nonce;
+                    account.set_balance(*token_id, new_amount.clone());
+
+                    self.insert_account(*account_id, account);
+                }
+                AccountUpdate::ChangePubKeyHash {
+                    old_pub_key_hash,
+                    new_pub_key_hash,
+                    old_nonce,
+                    new_nonce,
+                } => {
+                    let mut account = self
+                        .get_account(*account_id)
+                        .expect("account doesn't exist");
+
+                    assert_eq!(
+                        &account.pub_key_hash, old_pub_key_hash,
+                        "pub_key_hash mismatch"
+                    );
+                    assert_eq!(&account.nonce, old_nonce, "nonce mismatch");
+
+                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.nonce = *new_nonce;
+
+                    self.insert_account(*account_id, account);
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+    use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
     fn plasma_state_reversing_updates() {

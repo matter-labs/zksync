@@ -6,15 +6,14 @@ use std::collections::HashMap;
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 use web3::types::H256;
 // Workspace uses
-use crypto_exports::rand::{thread_rng, Rng};
-use models::node::{
+use models::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
-    priv_key_from_fs,
     tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},
-    AccountId, AccountMap, Address, BlockNumber, FranklinPriorityOp, FranklinTx, PrivateKey,
-    TokenId,
+    AccountId, AccountMap, Address, BlockNumber, FranklinPriorityOp, FranklinTx, TokenId,
 };
+use zksync_crypto::rand::{thread_rng, Rng};
+use zksync_crypto::{priv_key_from_fs, PrivateKey};
 // Local uses
 use plasma::state::PlasmaState;
 

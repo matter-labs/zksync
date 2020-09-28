@@ -1,6 +1,6 @@
-use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 
-use models::circuit::account::CircuitAccountTree;
+use zksync_crypto::circuit::account::CircuitAccountTree;
 
 use crate::operation::Operation;
 

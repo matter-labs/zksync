@@ -13,7 +13,7 @@ use futures::compat::Future01CompatExt;
 use std::time::{Duration, Instant};
 use zksync::{
     web3::types::{H160, H256, U256},
-    zksync_models::node::tx::PackedEthSignature,
+    zksync_models::tx::PackedEthSignature,
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
 

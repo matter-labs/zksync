@@ -1,6 +1,6 @@
-use models::node::{
-    closest_packable_fee_amount, is_fee_amount_packable, FranklinTx, Nonce, Token, TokenLike,
-    TxFeeTypes,
+use models::{
+    helpers::{closest_packable_fee_amount, is_fee_amount_packable},
+    FranklinTx, Nonce, Token, TokenLike,
 };
 use num::BigUint;
 

@@ -7,11 +7,8 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
 use models::{
-    config_options::{ConfigurationOptions, ThreadPanicNotify},
-    node::{
-        tx::{TxEthSignature, TxHash},
-        Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
-    },
+    tx::{TxEthSignature, TxHash},
+    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
 };
 use storage::{
     chain::{
@@ -20,7 +17,9 @@ use storage::{
     },
     ConnectionPool, StorageProcessor,
 };
+use zksync_config::ConfigurationOptions;
 // Local uses
+use crate::panic_notify::ThreadPanicNotify;
 use crate::{
     eth_watch::{EthBlockId, EthWatchRequest},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
@@ -33,7 +32,7 @@ use crate::{
     },
 };
 use bigdecimal::BigDecimal;
-use models::node::tx::EthSignData;
+use models::tx::EthSignData;
 
 pub mod error;
 mod rpc_impl;
@@ -78,11 +77,12 @@ pub(crate) async fn get_ongoing_priority_ops(
 
 #[derive(Clone)]
 pub struct RpcApp {
+    runtime_handle: tokio::runtime::Handle,
+
     cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
-
-    tokio_runtime: tokio::runtime::Handle,
+    cache_of_complete_withdrawal_tx_hashes: SharedLruCache<TxHash, String>,
 
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
@@ -103,7 +103,6 @@ pub struct RpcApp {
 impl RpcApp {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        tokio_runtime: tokio::runtime::Handle,
         config_options: &ConfigurationOptions,
         connection_pool: ConnectionPool,
         mempool_request_sender: mpsc::Sender<MempoolRequest>,
@@ -113,6 +112,9 @@ impl RpcApp {
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
+        let runtime_handle = tokio::runtime::Handle::try_current()
+            .expect("RpcApp must be created from the context of Tokio Runtime");
+
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
         let api_requests_caches_size = config_options.api_requests_caches_size;
@@ -123,11 +125,12 @@ impl RpcApp {
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
         RpcApp {
+            runtime_handle,
+
             cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
-
-            tokio_runtime,
+            cache_of_complete_withdrawal_tx_hashes: SharedLruCache::new(api_requests_caches_size),
 
             connection_pool,
 
@@ -442,6 +445,39 @@ impl RpcApp {
             None => Err(Error::invalid_params("Target account does not exist")),
         }
     }
+
+    async fn eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> Result<Option<String>> {
+        let res = if let Some(complete_withdrawals_tx_hash) = self
+            .cache_of_complete_withdrawal_tx_hashes
+            .get(&withdrawal_hash)
+        {
+            Some(complete_withdrawals_tx_hash)
+        } else {
+            let mut storage = self.access_storage().await?;
+            let complete_withdrawals_tx_hash = storage
+                .chain()
+                .operations_schema()
+                .eth_tx_for_withdrawal(&withdrawal_hash)
+                .await
+                .map_err(|err| {
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: {:?}",
+                        err,
+                        withdrawal_hash,
+                    );
+                    Error::internal_error()
+                })?
+                .map(|tx_hash| format!("0x{}", hex::encode(&tx_hash)));
+
+            if let Some(complete_withdrawals_tx_hash) = complete_withdrawals_tx_hash.clone() {
+                self.cache_of_complete_withdrawal_tx_hashes
+                    .insert(withdrawal_hash, complete_withdrawals_tx_hash);
+            }
+
+            complete_withdrawals_tx_hash
+        };
+        Ok(res)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -457,40 +493,30 @@ pub fn start_rpc_server(
     current_zksync_info: CurrentZksyncInfo,
 ) {
     let addr = config_options.json_rpc_http_server_address;
-    std::thread::Builder::new()
-        .name("json_rpc_http".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
-            let mut io = IoHandler::new();
+    tokio::spawn(async move {
+        let _panic_sentinel = ThreadPanicNotify(panic_notify);
+        let mut io = IoHandler::new();
 
-            let tokio_runtime = tokio::runtime::Builder::new()
-                .threaded_scheduler()
-                .enable_all()
-                .build()
-                .unwrap();
+        let rpc_app = RpcApp::new(
+            &config_options,
+            connection_pool,
+            mempool_request_sender,
+            state_keeper_request_sender,
+            sign_verify_request_sender,
+            eth_watcher_request_sender,
+            ticker_request_sender,
+            current_zksync_info,
+        );
+        rpc_app.extend(&mut io);
 
-            let rpc_app = RpcApp::new(
-                tokio_runtime.handle().clone(),
-                &config_options,
-                connection_pool,
-                mempool_request_sender,
-                state_keeper_request_sender,
-                sign_verify_request_sender,
-                eth_watcher_request_sender,
-                ticker_request_sender,
-                current_zksync_info,
-            );
-            rpc_app.extend(&mut io);
+        let server = ServerBuilder::new(io)
+            .request_middleware(super::loggers::http_rpc::request_middleware)
+            .threads(8)
+            .start_http(&addr)
+            .unwrap();
 
-            let server = ServerBuilder::new(io)
-                .request_middleware(super::loggers::http_rpc::request_middleware)
-                .threads(8)
-                .start_http(&addr)
-                .unwrap();
-
-            server.wait();
-        })
-        .expect("JSON-RPC http thread");
+        server.wait();
+    });
 }
 
 async fn verify_tx_info_message_signature(

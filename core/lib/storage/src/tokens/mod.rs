@@ -2,12 +2,12 @@
 use std::collections::HashMap;
 // External imports
 // Workspace imports
-use models::node::{Token, TokenId, TokenLike, TokenPrice};
+use models::{Token, TokenId, TokenLike, TokenPrice};
 // Local imports
 use self::records::{DbTickerPrice, DbToken};
 use crate::tokens::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
-use models::primitives::ratio_to_big_decimal;
+use zksync_utils::ratio_to_big_decimal;
 
 pub mod records;
 mod utils;

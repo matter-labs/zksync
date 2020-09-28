@@ -7,7 +7,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::node::{Token, TokenId, TokenLike, TokenPrice};
+use models::{Token, TokenId, TokenLike, TokenPrice};
 use num::rational::Ratio;
 use num::BigUint;
 use std::collections::HashMap;

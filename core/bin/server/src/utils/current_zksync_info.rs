@@ -1,4 +1,4 @@
-use models::node::BlockNumber;
+use models::BlockNumber;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,

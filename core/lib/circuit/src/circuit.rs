@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{
         pairing::ff::{Field, PrimeField},
         Circuit, ConstraintSystem, SynthesisError,
@@ -18,12 +18,10 @@ use crypto_exports::franklin_crypto::{
 };
 // Workspace deps
 use models::{
-    node::{
-        operations::{ChangePubKeyOp, NoopOp},
-        CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
-    },
-    params::{self, FR_BIT_WIDTH_PADDED, SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH},
+    operations::{ChangePubKeyOp, NoopOp},
+    CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
+use zksync_crypto::params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH};
 // Local deps
 use crate::{
     account::{AccountContent, AccountWitness},
@@ -2760,7 +2758,7 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
 }
 
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
-    use crypto_exports::franklin_crypto::interpolation::interpolate;
+    use zksync_crypto::franklin_crypto::interpolation::interpolate;
 
     let get_xy = |op_type: u8, op_chunks: usize| {
         let x = E::Fr::from_str(&op_type.to_string()).unwrap();

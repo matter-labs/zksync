@@ -15,7 +15,7 @@ use num::BigUint;
 use tokio::time;
 use web3::types::Address;
 // Workspace deps
-use models::node::{closest_packable_fee_amount, closest_packable_token_amount};
+use models::helpers::{closest_packable_fee_amount, closest_packable_token_amount};
 // Local deps
 use crate::{
     rpc_client::RpcClient,

@@ -1,8 +1,8 @@
 // External deps
-use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 use num::BigUint;
+use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::node::{operations::FullExitOp, FullExit};
+use models::{operations::FullExitOp, FullExit};
 use plasma::{handler::TxHandler, state::PlasmaState};
 // Local deps
 use crate::witness::{

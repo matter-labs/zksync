@@ -24,7 +24,7 @@ use futures::{
 };
 use tokio::task::JoinHandle;
 // Workspace uses
-use models::node::{
+use models::{
     mempool::{SignedTxVariant, SignedTxsBatch},
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
     SignedFranklinTx, TransferOp, TransferToNewOp,
@@ -32,7 +32,7 @@ use models::node::{
 use storage::ConnectionPool;
 // Local uses
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
-use models::config_options::ConfigurationOptions;
+use zksync_config::ConfigurationOptions;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
@@ -65,6 +65,9 @@ pub enum TxAddError {
 
     #[fail(display = "Database unavailable")]
     DbError,
+
+    #[fail(display = "Transaction batch is empty")]
+    EmptyBatch,
 
     #[fail(display = "Batch will not fit in any of supported block sizes")]
     BatchTooBig,

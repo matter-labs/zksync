@@ -7,29 +7,25 @@ edition = "2018"
 plasma = { path = "../../lib/plasma", version = "0.1.1" }
 models = { path = "../../lib/models", version = "0.0.1" }
 circuit = { path = "../../lib/circuit", version = "0.1.1"}
-crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "0.1.0" }
+zksync_config = { path = "../../lib/config", version = "0.1.0" }
+zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
+zksync_prover_utils = { path = "../../lib/prover_utils", version = "0.1.0" }
 
 hex = "0.4"
 rust-crypto = "0.2"
-
 web3 = "0.10.0"
-signal-hook = "0.1.8"
 tokio = "0.1.18"
 
-fnv = "1.0.6"
 serde = "1.0.90"
 serde_derive = "1.0.90"
 serde_json = "1.0.0"
-diesel = { version = "1.4.4", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 num = { version = "0.2", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 env_logger = "0.6"
-num-traits = "0.2"
-actix-web = "1.0"
 reqwest = { version = "0.10", features = ["blocking", "json"] }
 failure = "0.1"
 backoff = "0.1.6"
 clap = "2.33.0"
 ctrlc = { version = "3.1", features = ["termination"] }
-rand = "0.7"

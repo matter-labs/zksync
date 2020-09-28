@@ -391,9 +391,17 @@ async function testWithdraw(
     });
     console.log(`Withdraw posted: ${new Date().getTime() - startTime} ms`);
 
+    // Checking that there are no complete withdrawals tx hash for this withdrawal
+    assert(!(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+
     // Await for verification with a timeout set.
     await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
     console.log(`Withdraw verified: ${new Date().getTime() - startTime} ms`);
+
+    // Checking that there are some complete withdrawals tx hash for this withdrawal
+    await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
+    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
@@ -448,9 +456,17 @@ async function testFastWithdraw(
     });
     console.log(`Fast withdraw posted: ${new Date().getTime() - startTime} ms`);
 
+    // Checking that there are no complete withdrawals tx hash for this withdrawal
+    assert(!(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+
     // Await for verification with a timeout set.
     await promiseTimeout(VERIFY_TIMEOUT, withdrawHandle.awaitVerifyReceipt());
     console.log(`Fast withdraw verified: ${new Date().getTime() - startTime} ms`);
+
+    // Checking that there are some complete withdrawals tx hash for this withdrawal
+    await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
+    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
@@ -567,7 +583,7 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
     if (!testPassed) {
         throw new Error("testThrowingErrorOnTxFail failed");
     }
-    console.log("Test ok");
+    console.log("testThrowingErrorOnTxFail ok");
 }
 
 async function moveFunds(

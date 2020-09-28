@@ -1,8 +1,8 @@
 use crate::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
-use models::config_options::{get_env, parse_env};
-use models::prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use std::sync::{mpsc, Mutex};
 use std::time::Duration;
+use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
+use zksync_utils::{get_env, parse_env};
 
 /// We prepare some data before making proof for each block size, so we cache it in case next block
 /// would be of our size

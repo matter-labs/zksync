@@ -27,7 +27,7 @@
 //! The file hierarchy is designed to mirror the actual project structure.
 
 // External imports
-use crypto_exports::rand::{SeedableRng, XorShiftRng};
+use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 // use diesel::Connection;
 
 mod chain;

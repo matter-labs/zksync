@@ -16,8 +16,8 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 // Local uses
-use models::config_options::ThreadPanicNotify;
-use models::node::{tokens, Address, TokenId};
+use crate::panic_notify::ThreadPanicNotify;
+use models::{tokens, Address, TokenId};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {

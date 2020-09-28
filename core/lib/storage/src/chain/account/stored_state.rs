@@ -1,4 +1,4 @@
-use models::node::{Account, AccountId};
+use models::{Account, AccountId};
 
 #[derive(Debug, PartialEq)]
 pub struct StoredAccountState {

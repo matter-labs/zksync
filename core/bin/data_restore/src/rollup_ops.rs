@@ -1,7 +1,7 @@
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
 use ethabi::ParamType;
-use models::node::operations::FranklinOp;
+use models::operations::FranklinOp;
 use web3::{Transport, Web3};
 
 /// Description of a Rollup operations block
@@ -102,9 +102,9 @@ impl RollupOpsBlock {
 #[cfg(test)]
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
-    use models::node::operations::ChangePubKeyOp;
-    use models::node::tx::{ChangePubKey, TxSignature};
-    use models::node::{
+    use models::operations::ChangePubKeyOp;
+    use models::tx::{ChangePubKey, TxSignature};
+    use models::{
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
         TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };

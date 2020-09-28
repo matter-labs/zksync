@@ -1,4 +1,4 @@
-use models::node::{AccountId, Address};
+use models::{AccountId, Address};
 
 use crate::{
     credentials::WalletCredentials, error::ClientError, ethereum::EthereumProvider, operations::*,

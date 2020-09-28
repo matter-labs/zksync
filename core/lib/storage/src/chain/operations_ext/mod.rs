@@ -2,8 +2,8 @@
 // External imports
 use chrono::{DateTime, Utc};
 // Workspace imports
-use models::node::{Address, TokenId};
 use models::ActionType;
+use models::{Address, TokenId};
 // Local imports
 use self::records::{
     AccountCreatedAt, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,

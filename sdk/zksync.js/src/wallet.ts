@@ -197,9 +197,7 @@ export class Wallet {
             throw new Error("ZKSync signer is required for sending zksync transactions.");
         }
 
-        if (transfers.length < 2) {
-            throw new Error("Transactions batch must contain at least two transactions");
-        }
+        if (transfers.length == 0) return [];
 
         await this.setRequiredAccountIdFromServer("Transfer funds");
 

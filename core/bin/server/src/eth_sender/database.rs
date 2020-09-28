@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use std::str::FromStr;
 // External uses
 use num::BigUint;
-use web3::types::{H256, U256};
+use zksync_basic_types::{H256, U256};
 // Workspace uses
 use models::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},

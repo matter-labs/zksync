@@ -1,7 +1,7 @@
 // External imports
 use serde_json::Value;
 // Workspace imports
-use models::node::{AccountId, BlockNumber, FranklinOp};
+use models::{AccountId, BlockNumber, FranklinOp};
 use serde_derive::{Deserialize, Serialize};
 use sqlx::FromRow;
 // Workspace imports

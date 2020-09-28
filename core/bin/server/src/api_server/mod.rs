@@ -7,18 +7,14 @@
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
-use models::{
-    config_options::{AdminServerOptions, ConfigurationOptions},
-    Operation,
-};
+use models::Operation;
 use storage::ConnectionPool;
+use zksync_config::{AdminServerOptions, ConfigurationOptions};
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{
-    eth_watch::EthWatchRequest,
-    mempool::MempoolRequest,
-    signature_checker,
-    state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
+    committer::ExecutedOpsNotify, eth_watch::EthWatchRequest, mempool::MempoolRequest,
+    signature_checker, state_keeper::StateKeeperRequest,
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 

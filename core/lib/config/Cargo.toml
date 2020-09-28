@@ -1,0 +1,10 @@
+[package]
+name = "zksync_config"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+[dependencies]
+zksync_basic_types = { path = "../basic_types", version = "0.1.0" }
+zksync_utils = { path = "../utils", version = "0.1.0" }
+url = "2.1"

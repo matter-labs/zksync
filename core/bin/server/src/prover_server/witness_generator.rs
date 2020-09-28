@@ -1,27 +1,25 @@
 // Built-in
 use std::{thread, time};
 // External
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use failure::format_err;
 use futures::channel::mpsc;
 use log::info;
 // Workspace deps
+use crate::panic_notify::ThreadPanicNotify;
 use circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
     FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
-use models::node::block::Block;
-use models::params::{account_tree_depth, CHUNK_BIT_WIDTH};
-use models::{
-    circuit::CircuitAccountTree,
-    config_options::ThreadPanicNotify,
-    node::{BlockNumber, Fr, FranklinOp},
-};
+use models::block::Block;
+use models::{BlockNumber, FranklinOp};
 use plasma::state::CollectedFee;
-use prover::prover_data::ProverData;
 use std::time::Instant;
 use storage::StorageProcessor;
+use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
+use zksync_crypto::params::{account_tree_depth, CHUNK_BIT_WIDTH};
+use zksync_crypto::{circuit::CircuitAccountTree, Fr};
+use zksync_prover_utils::prover_data::ProverData;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
@@ -445,8 +443,8 @@ async fn build_prover_block_data(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::node::Fr;
-    use web3::types::U256;
+    use zksync_basic_types::U256;
+    use zksync_crypto::Fr;
 
     #[test]
     fn test_next_witness_block() {

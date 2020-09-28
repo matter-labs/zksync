@@ -4,7 +4,7 @@ use futures::{channel::oneshot, SinkExt};
 use jsonrpc_core::{Error, Result};
 use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
-use models::node::{
+use models::{
     tx::{TxEthSignature, TxHash},
     Address, FranklinTx, Token, TokenLike, TxFeeTypes,
 };
@@ -21,40 +21,24 @@ use super::{error::*, types::*, verify_tx_info_message_signature, RpcApp};
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
-        // TODO: this method now has a lot debug output, to be removed as soon as problem is detected.
         use std::time::Instant;
 
         let started = Instant::now();
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
 
         let state_keeper_response = oneshot::channel();
-        state_keeper_request_sender
-            .send(StateKeeperRequest::GetAccount(
-                address,
-                state_keeper_response.0,
-            ))
-            .await
-            .map_err(|err| {
-                log::warn!(
-                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    err,
-                    address,
-                );
-                Error::internal_error()
-            })?;
+        let state_keeper_future = state_keeper_request_sender.send(StateKeeperRequest::GetAccount(
+            address,
+            state_keeper_response.0,
+        ));
+
+        state_keeper_future.await.map_err(|err| {
+            vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
+            Error::internal_error()
+        })?;
 
         let committed_account_state = state_keeper_response.1.await.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                file!(),
-                line!(),
-                column!(),
-                err,
-                address,
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
             Error::internal_error()
         })?;
 
@@ -240,6 +224,14 @@ impl RpcApp {
     }
 
     pub async fn _impl_submit_txs_batch(self, txs: Vec<TxWithSignature>) -> Result<Vec<TxHash>> {
+        if txs.is_empty() {
+            return Err(Error {
+                code: RpcErrorCodes::from(TxAddError::EmptyBatch).into(),
+                message: "Transaction batch cannot be empty".to_string(),
+                data: None,
+            });
+        }
+
         for tx in &txs {
             if tx.tx.is_close() {
                 return Err(Error {
@@ -442,5 +434,12 @@ impl RpcApp {
             TokenPriceRequestType::USDForOneToken,
         )
         .await
+    }
+
+    pub async fn _impl_get_eth_tx_for_withdrawal(
+        self,
+        withdrawal_hash: TxHash,
+    ) -> Result<Option<String>> {
+        self.eth_tx_for_withdrawal(withdrawal_hash).await
     }
 }

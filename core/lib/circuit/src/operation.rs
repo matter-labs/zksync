@@ -1,10 +1,10 @@
 // External
-use crypto_exports::franklin_crypto::{
+use serde::{Deserialize, Serialize};
+use zksync_crypto::franklin_crypto::{
     bellman::pairing::ff::Field,
     jubjub::{edwards, JubjubEngine, Unknown},
     rescue::RescueEngine,
 };
-use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;
 

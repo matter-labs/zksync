@@ -18,7 +18,7 @@ use num::BigUint;
 use tokio::{runtime::Handle, time};
 use web3::transports::Http;
 // Workspace uses
-use models::node::tx::TxHash;
+use models::tx::TxHash;
 // Local uses
 use crate::{
     rpc_client::RpcClient,
