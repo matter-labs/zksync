@@ -1,0 +1,13 @@
+[package]
+name = "zksync_utils"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+num = { version = "0.2", features = ["serde"] }
+bigdecimal = { version = "0.1", features = ["serde"]}
+serde = "1.0"
+failure = "0.1"

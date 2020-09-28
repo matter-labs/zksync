@@ -7,9 +7,9 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result};
 use bigdecimal::BigDecimal;
 use chrono::{SecondsFormat, Utc};
-use crypto_exports::rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use zksync_crypto::rand::{thread_rng, Rng};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CoinMarketCapTokenQuery {

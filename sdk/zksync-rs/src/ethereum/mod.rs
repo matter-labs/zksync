@@ -2,16 +2,14 @@
 
 use eth_client::ETHClient;
 use futures::compat::Future01CompatExt;
-use models::{
-    abi,
-    node::{AccountId, TokenLike},
-};
+use models::{AccountId, TokenLike};
 use std::str::FromStr;
 use web3::contract::tokens::Tokenize;
 use web3::contract::{Contract, Options};
 use web3::transports::{EventLoopHandle, Http};
 use web3::types::{H160, H256, U256};
 use web3::Web3;
+use zksync_contracts as abi;
 
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, types::network::Network,

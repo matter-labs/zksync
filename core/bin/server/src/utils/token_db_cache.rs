@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use models::node::{Token, TokenId, TokenLike};
+use models::{Token, TokenId, TokenLike};
 use storage::ConnectionPool;
 
 #[derive(Debug, Clone)]

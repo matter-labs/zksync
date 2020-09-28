@@ -1,9 +1,9 @@
-use models::config_options::get_env;
-use models::prover_utils::EncodedProofPlonk;
 use prover::cli_utils::main_for_prover_impl;
 use prover::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
 use std::sync::mpsc;
 use std::time::Duration;
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_utils::get_env;
 
 #[derive(Debug)]
 pub struct DummyProverConfig {

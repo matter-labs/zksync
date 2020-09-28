@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use models::node::{mempool::SignedTxVariant, tx::TxHash, SignedFranklinTx};
+use models::{mempool::SignedTxVariant, tx::TxHash, SignedFranklinTx};
 // Local imports
 use self::records::MempoolTx;
 use crate::{QueryResult, StorageProcessor};

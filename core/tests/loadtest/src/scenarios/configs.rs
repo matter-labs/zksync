@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use serde_derive::Deserialize;
 use web3::types::H256;
 // Workspace uses
-use models::node::Address;
+use models::Address;
 
 /// Information about Ethereum account.
 #[derive(Debug, Clone, Deserialize)]

@@ -85,7 +85,7 @@ export class Provider {
 
     // Requests `zkSync` server to execute several transactions together.
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTxsBatch(transactions: { tx: any, signature?: TxEthSignature }[]): Promise<string[]> {
+    async submitTxsBatch(transactions: { tx: any; signature?: TxEthSignature }[]): Promise<string[]> {
         return await this.transport.request("submit_txs_batch", [transactions]);
     }
 
@@ -115,10 +115,7 @@ export class Provider {
     }
 
     async getEthTxForWithdrawal(withdrawal_hash): Promise<string> {
-        return await this.transport.request(
-            "get_eth_tx_for_withdrawal",
-            [withdrawal_hash]
-        );
+        return await this.transport.request("get_eth_tx_for_withdrawal", [withdrawal_hash]);
     }
 
     async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt> {

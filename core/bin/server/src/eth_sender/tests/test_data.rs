@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use chrono::DateTime;
 use lazy_static::lazy_static;
 // Workspace uses
-use models::node::{
+use models::{
     block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FranklinOp,
     FranklinPriorityOp, FullExit, FullExitOp, PriorityOp,
 };

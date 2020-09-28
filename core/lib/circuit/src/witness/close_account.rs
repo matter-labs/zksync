@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
         ff::{Field, PrimeField},
@@ -7,12 +7,12 @@ use crypto_exports::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::{
+use models::operations::CloseOp;
+use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
-    node::operations::CloseOp,
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH,
         NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
@@ -197,14 +197,14 @@ impl CloseAccountWitness<Bn256> {
 //
 //    use crate::circuit::FranklinCircuit;
 //    use bellman::Circuit;
-//    use crypto_exports::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-//    use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-//    use crypto_exports::franklin_crypto::circuit::test::*;
-//    use crypto_exports::franklin_crypto::eddsa::{PrivateKey, PublicKey};
-//    use crypto_exports::franklin_crypto::jubjub::FixedGenerators;
+//    use zksync_crypto::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+//    use zksync_crypto::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+//    use zksync_crypto::franklin_crypto::circuit::test::*;
+//    use zksync_crypto::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+//    use zksync_crypto::franklin_crypto::jubjub::FixedGenerators;
 //    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
 //    use models::circuit::utils::*;
-//    use models::node::tx::PackedPublicKey;
+//    use models::tx::PackedPublicKey;
 //    use models::params as franklin_constants;
 //    use rand::{Rng, SeedableRng, XorShiftRng};
 

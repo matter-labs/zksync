@@ -9,16 +9,15 @@ use futures::{
     future, SinkExt, StreamExt,
 };
 use tokio::{runtime::Builder, task::JoinHandle};
-use web3::types::H160;
+use zksync_basic_types::H160;
 // Workspace uses
+use zksync_config::{AdminServerOptions, ConfigurationOptions, ProverOptions};
+
 use models::{
-    config_options::{AdminServerOptions, ConfigurationOptions, ProverOptions},
-    node::{
-        config::OBSERVER_MODE_PULL_INTERVAL,
-        tokens::{get_genesis_token_list, Token},
-        tx::TxHash,
-        TokenId,
-    },
+    config::OBSERVER_MODE_PULL_INTERVAL,
+    tokens::{get_genesis_token_list, Token},
+    tx::TxHash,
+    TokenId,
 };
 use storage::ConnectionPool;
 // Local uses

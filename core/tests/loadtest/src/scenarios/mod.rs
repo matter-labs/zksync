@@ -8,7 +8,7 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 // External uses
 use tokio::runtime::Runtime;
 // Workspace uses
-use models::config_options::ConfigurationOptions;
+use zksync_config::ConfigurationOptions;
 // Local uses
 use super::tps_counter::TPSCounter;
 

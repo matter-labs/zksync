@@ -9,10 +9,8 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use super::{TokenPriceAPI, REQUEST_TIMEOUT};
-use models::{
-    node::{TokenLike, TokenPrice},
-    primitives::UnsignedRatioSerializeAsDecimal,
-};
+use models::{TokenLike, TokenPrice};
+use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 #[derive(Debug)]
 pub struct CoinMarketCapAPI {
@@ -81,8 +79,8 @@ pub(super) struct CoinmarketCapResponse {
 #[cfg(test)]
 mod test {
     use super::*;
-    use models::config_options::parse_env;
     use std::str::FromStr;
+    use zksync_utils::parse_env;
 
     #[test]
     // Should be run in the dev environment

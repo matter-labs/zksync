@@ -3,10 +3,8 @@ use eth_client::ETHClient;
 use ethabi::ParamType;
 use failure::{bail, ensure, format_err};
 use futures::compat::Future01CompatExt;
-use models::abi::{erc20_contract, zksync_contract};
-use models::node::block::Block;
-use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
-use models::prover_utils::EncodedProofPlonk;
+use models::block::Block;
+use models::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -16,6 +14,8 @@ use web3::types::{
     BlockNumber, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
 };
 use web3::{Transport, Web3};
+use zksync_contracts::{erc20_contract, zksync_contract};
+use zksync_crypto::proof::EncodedProofPlonk;
 
 pub fn parse_ether(eth_value: &str) -> Result<BigUint, failure::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();

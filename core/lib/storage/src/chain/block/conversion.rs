@@ -7,11 +7,11 @@ use std::convert::TryFrom;
 // External imports
 // Workspace imports
 use models::{
-    node::{
+    Action, ActionType, Operation,
+    {
         block::{ExecutedPriorityOp, ExecutedTx},
         BlockNumber, FranklinOp, FranklinTx, PriorityOp,
     },
-    Action, ActionType, Operation,
 };
 // Local imports
 use crate::{
@@ -26,7 +26,7 @@ use crate::{
     prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
-use models::node::SignedFranklinTx;
+use models::SignedFranklinTx;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {

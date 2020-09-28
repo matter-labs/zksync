@@ -12,7 +12,7 @@ use futures::{
 };
 use tokio::{task::JoinHandle, time};
 // Workspace deps
-use models::config_options::ConfigurationOptions;
+use zksync_config::ConfigurationOptions;
 // Local deps
 use crate::{
     mempool::{GetBlockRequest, MempoolRequest, ProposedBlock},

@@ -1,6 +1,6 @@
 use crate::RESCUE_PARAMS;
 use crate::{Engine, Fr};
-use crypto_exports::franklin_crypto::{
+use franklin_crypto::{
     bellman::{pairing::ff::PrimeField, BitIterator},
     circuit::multipack,
     eddsa::PublicKey,
