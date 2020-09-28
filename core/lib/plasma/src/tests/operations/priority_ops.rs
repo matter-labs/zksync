@@ -1,7 +1,6 @@
 use crate::tests::PlasmaTestBuilder;
-use models::{
-    account::AccountUpdate, priority_ops::Deposit, priority_ops::FullExit, FranklinPriorityOp,
-};
+use models::priority_ops::{Deposit, FullExit};
+use models::{account::AccountUpdate, FranklinPriorityOp};
 use num::{BigUint, Zero};
 use web3::types::H160;
 
