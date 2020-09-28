@@ -43,7 +43,9 @@ describe('Fetching Information', () => {
             approveDepositAmountForERC20: true
         });
         await Promise.all([ethDeposit.awaitReceipt(), daiDeposit.awaitReceipt()]);
-        const changePubkey = await aliceWallet.setSigningKey();
+        const changePubkey = await aliceWallet.setSigningKey({
+            feeToken: 'ETH'
+        });
         await changePubkey.awaitReceipt();
         const txHandle = await aliceWallet.syncTransfer({
             to: bob.address,
