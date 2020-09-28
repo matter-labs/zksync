@@ -4,11 +4,13 @@ use crate::state::PlasmaState;
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 use models::node::tx::PackedEthSignature;
 use models::node::{
-    priv_key_from_fs, Account, AccountId, AccountUpdate, FranklinTx, PrivateKey, PubKeyHash,
-    TokenId,
+    priv_key_from_fs, Account, AccountId, AccountUpdate, FranklinPriorityOp, FranklinTx,
+    PrivateKey, PubKeyHash, TokenId,
 };
 use num::BigUint;
 use web3::types::H256;
+
+type BoundAccountUpdates = [(AccountId, AccountUpdate)];
 
 pub struct PlasmaTestBuilder {
     rng: XorShiftRng,
@@ -65,22 +67,13 @@ impl PlasmaTestBuilder {
         self.state.insert_account(account_id, account);
     }
 
-    pub fn test_tx_success(&mut self, tx: FranklinTx, expected_updates: &[(u32, AccountUpdate)]) {
+    pub fn test_tx_success(&mut self, tx: FranklinTx, expected_updates: &BoundAccountUpdates) {
         let mut state_clone = self.state.clone();
         let op_success = self.state.execute_tx(tx).expect("transaction failed");
-
-        assert_eq!(
+        self.compare_updates(
             expected_updates,
             op_success.updates.as_slice(),
-            "unexpected updates"
-        );
-
-        state_clone.apply_updates(expected_updates);
-
-        assert_eq!(
-            self.state.root_hash(),
-            state_clone.root_hash(),
-            "returned updates don't match real state changes"
+            &mut state_clone,
         );
     }
 
@@ -94,6 +87,37 @@ impl PlasmaTestBuilder {
             error.to_string().as_str(),
             expected_error_message,
             "unexpected error message"
+        );
+    }
+
+    pub fn test_priority_op_success(
+        &mut self,
+        op: FranklinPriorityOp,
+        expected_updates: &BoundAccountUpdates,
+    ) {
+        let mut state_clone = self.state.clone();
+        let op_success = self.state.execute_priority_op(op);
+        self.compare_updates(
+            expected_updates,
+            op_success.updates.as_slice(),
+            &mut state_clone,
+        );
+    }
+
+    fn compare_updates(
+        &self,
+        expected_updates: &BoundAccountUpdates,
+        actual_updates: &BoundAccountUpdates,
+        state_clone: &mut PlasmaState,
+    ) {
+        assert_eq!(expected_updates, actual_updates, "unexpected updates");
+
+        state_clone.apply_updates(expected_updates);
+
+        assert_eq!(
+            self.state.root_hash(),
+            state_clone.root_hash(),
+            "returned updates don't match real state changes"
         );
     }
 }
