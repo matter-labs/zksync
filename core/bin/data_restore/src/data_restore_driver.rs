@@ -5,11 +5,10 @@ use web3::{
     Transport, Web3,
 };
 // Workspace deps
-use models::{
-    abi::{governance_contract, zksync_contract},
-    node::{AccountMap, AccountUpdate, Fr},
-};
+use models::{AccountMap, AccountUpdate};
 use storage::ConnectionPool;
+use zksync_contracts::{governance_contract, zksync_contract};
+use zksync_crypto::Fr;
 // Local deps
 use crate::{
     contract_functions::{get_genesis_account, get_total_verified_blocks},

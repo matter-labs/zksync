@@ -1,9 +1,6 @@
 // External imports
 // Workspace imports
-use models::{
-    node::{apply_updates, AccountMap},
-    Action, ActionType,
-};
+use models::{helpers::apply_updates, AccountMap, Action, ActionType};
 // Local imports
 use super::{block::apply_random_updates, utils::get_operation};
 use crate::tests::{create_rng, db_test};

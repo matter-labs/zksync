@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 // External uses
 // Workspace deps
-use models::node::PriorityOp;
+use models::PriorityOp;
 // Local deps
 use super::{received_ops::ReceivedPriorityOp, EthBlockId};
 

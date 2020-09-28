@@ -7,8 +7,9 @@ edition = "2018"
 [dependencies]
 models = { path = "../../core/lib/models", version = "0.0.1" }
 eth_client = { path = "../../core/lib/eth_client", version = "0.1.0" }
-crypto_exports = { path = "../../core/lib/crypto_exports", version = "0.1.0" }
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
+zksync_crypto = { path = "../../core/lib/crypto", version = "0.1.0" }
+zksync_utils = { path = "../../core/lib/utils", version = "0.1.0" }
+zksync_contracts = { path = "../../core/lib/contracts", version = "0.1.0" }
 
 bellman = { package = "bellman_ce", git = "https://github.com/matter-labs/bellman", branch = "plonk_release" }
 sha2 = "0.8"
@@ -22,7 +23,6 @@ serde_derive = "1.0.90"
 serde_json = "1.0.0"
 
 reqwest = { version = "0.10", features = ["json", "blocking"] }
-anyhow = "1.0"
 thiserror = "1.0"
 
 jsonrpc-core = "14.0.3"
@@ -31,6 +31,7 @@ num = { version = "0.2", features = ["serde"] }
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
+anyhow = "1.0"
 
 [features]
 integration-tests = []

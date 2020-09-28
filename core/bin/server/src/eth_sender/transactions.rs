@@ -5,7 +5,7 @@
 
 // Built-in deps
 // External uses
-use web3::types::TransactionReceipt;
+use zksync_basic_types::TransactionReceipt;
 // Workspace uses
 use storage::ethereum::records::ETHStats as StorageETHStats;
 

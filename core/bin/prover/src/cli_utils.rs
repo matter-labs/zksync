@@ -10,7 +10,8 @@ use std::{
 // External deps
 use clap::{App, Arg};
 // Workspace deps
-use models::config_options::{parse_env, ProverOptions};
+use zksync_config::ProverOptions;
+use zksync_utils::parse_env;
 // Local deps
 use crate::{client, start, ApiClient, ProverConfig, ProverImpl, ShutdownRequest};
 

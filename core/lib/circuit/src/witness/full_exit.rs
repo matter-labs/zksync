@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
         ff::{Field, PrimeField},
@@ -7,12 +7,12 @@ use crypto_exports::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::{
+use models::FullExitOp;
+use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
-    node::FullExitOp,
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH,
         ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,

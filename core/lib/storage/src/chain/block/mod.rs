@@ -1,14 +1,13 @@
 // Built-in deps
 // External imports
-use web3::types::U256;
+use zksync_basic_types::U256;
 // Workspace imports
-use models::node::{
+use models::{block::PendingBlock, Action, ActionType, Operation};
+use models::{
     block::{Block, ExecutedOperations},
     AccountId, BlockNumber, FranklinOp,
 };
-use models::{
-    fe_from_bytes, fe_to_bytes, node::block::PendingBlock, Action, ActionType, Operation,
-};
+use zksync_crypto::convert::{fe_from_bytes, fe_to_bytes};
 // Local imports
 use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
