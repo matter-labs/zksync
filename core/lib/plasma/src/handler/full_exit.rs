@@ -1,9 +1,7 @@
-use models::{
-    node::{AccountUpdate, AccountUpdates, FranklinOp, FullExit, FullExitOp},
-    params,
-    primitives::BigUintSerdeWrapper,
-};
+use models::{AccountUpdate, AccountUpdates, FranklinOp, FullExit, FullExitOp};
 use num::BigUint;
+use zksync_crypto::params;
+use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
     handler::TxHandler,

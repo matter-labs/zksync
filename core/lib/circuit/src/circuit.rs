@@ -18,10 +18,12 @@ use zksync_crypto::franklin_crypto::{
 };
 // Workspace deps
 use models::{
-    operations::{ChangePubKeyOp, NoopOp},
-    CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    operations::NoopOp, ChangePubKeyOp, CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
-use zksync_crypto::params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH};
+use zksync_crypto::params::{
+    self, FR_BIT_WIDTH_PADDED, SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
+};
 // Local deps
 use crate::{
     account::{AccountContent, AccountWitness},

@@ -1,7 +1,5 @@
-use models::{
-    node::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, FranklinOp},
-    params,
-};
+use models::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, FranklinOp};
+use zksync_crypto::params;
 
 use crate::{
     handler::TxHandler,

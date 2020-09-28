@@ -5,9 +5,12 @@ use models::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::operations::FranklinOp;
 use models::priority_ops::FranklinPriorityOp;
 use models::priority_ops::PriorityOp;
-use models::tx::FranklinTx;
+use models::tx::{ChangePubKey, Close, ForcedExit, FranklinTx, Transfer, Withdraw};
 use models::{AccountId, AccountMap, AccountUpdates};
-use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
+use plasma::{
+    handler::TxHandler,
+    state::{CollectedFee, OpSuccess, PlasmaState, TransferOutcome},
+};
 use web3::types::Address;
 use zksync_crypto::Fr;
 

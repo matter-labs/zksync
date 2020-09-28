@@ -23,7 +23,8 @@ use tokio::task::JoinHandle;
 // Workspace deps
 use models::{
     helpers::{pack_fee_amount, unpack_fee_amount},
-    Address, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
+    Address, ChangePubKeyOp, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
+    WithdrawOp,
 };
 use storage::ConnectionPool;
 use zksync_config::TokenPriceSource;

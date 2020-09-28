@@ -1,5 +1,5 @@
 use crate::state::{CollectedFee, OpSuccess};
-use models::node::AccountUpdates;
+use models::AccountUpdates;
 
 mod change_pubkey;
 mod close;

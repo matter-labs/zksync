@@ -1,9 +1,7 @@
 use failure::{bail, ensure};
-use models::{
-    node::{AccountUpdate, AccountUpdates, Close, CloseOp, TokenId},
-    params::{self, max_account_id},
-};
+use models::{AccountUpdate, AccountUpdates, Close, CloseOp, TokenId};
 use num::BigUint;
+use zksync_crypto::params::{self, max_account_id};
 
 use crate::{
     handler::TxHandler,

@@ -1,12 +1,10 @@
 use failure::{ensure, format_err};
 use models::{
-    node::{
-        operations::{ChangePubKeyOp, FranklinOp},
-        tx::ChangePubKey,
-        AccountUpdate, AccountUpdates,
-    },
-    params,
+    operations::{ChangePubKeyOp, FranklinOp},
+    tx::ChangePubKey,
+    AccountUpdate, AccountUpdates,
 };
+use zksync_crypto::params;
 
 use crate::{
     handler::TxHandler,

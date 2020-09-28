@@ -1,24 +1,13 @@
-use failure::{bail, ensure, format_err, Error};
-use log::trace;
-use models::operations::{
-    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
-    WithdrawOp,
-};
-use models::tx::ChangePubKey;
-use models::Address;
+use failure::Error;
 use models::{
-    helpers::reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
-    TokenId,
+    helpers::reverse_updates,
+    operations::{FranklinOp, TransferOp, TransferToNewOp},
+    Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address,
+    BlockNumber, FranklinPriorityOp, FranklinTx, SignedFranklinTx, TokenId,
 };
-use models::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
-use models::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
 use num::BigUint;
 use std::collections::HashMap;
-use zksync_crypto::{
-    params::{self, max_account_id},
-    Fr,
-};
-use zksync_utils::BigUintSerdeWrapper;
+use zksync_crypto::{params, Fr};
 
 use crate::handler::TxHandler;
 

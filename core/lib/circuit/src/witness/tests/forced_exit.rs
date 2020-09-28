@@ -1,12 +1,12 @@
 // External deps
-use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 use num::BigUint;
 // Workspace deps
-use models::node::{ForcedExit, ForcedExitOp};
+use models::{ForcedExit, ForcedExitOp};
 use plasma::{
     handler::TxHandler,
     state::{CollectedFee, PlasmaState},
 };
+use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Local deps
 use crate::witness::{
     forced_exit::ForcedExitWitness,

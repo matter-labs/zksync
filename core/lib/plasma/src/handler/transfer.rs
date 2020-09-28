@@ -1,11 +1,9 @@
 use failure::{ensure, format_err};
 use models::{
-    node::{
-        Account, AccountUpdate, AccountUpdates, Address, PubKeyHash, Transfer, TransferOp,
-        TransferToNewOp,
-    },
-    params::{self, max_account_id},
+    Account, AccountUpdate, AccountUpdates, Address, PubKeyHash, Transfer, TransferOp,
+    TransferToNewOp,
 };
+use zksync_crypto::params::{self, max_account_id};
 
 use crate::{
     handler::TxHandler,

@@ -1,8 +1,6 @@
 use failure::{ensure, format_err};
-use models::{
-    node::{AccountUpdate, AccountUpdates, FranklinOp, PubKeyHash, Withdraw, WithdrawOp},
-    params::{self, max_account_id},
-};
+use models::{AccountUpdate, AccountUpdates, FranklinOp, PubKeyHash, Withdraw, WithdrawOp};
+use zksync_crypto::params::{self, max_account_id};
 
 use crate::{
     handler::TxHandler,

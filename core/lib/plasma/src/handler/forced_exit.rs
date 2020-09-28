@@ -1,9 +1,7 @@
 use failure::{ensure, format_err};
-use models::{
-    node::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, FranklinOp, PubKeyHash},
-    params,
-    primitives::BigUintSerdeWrapper,
-};
+use models::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, FranklinOp, PubKeyHash};
+use zksync_crypto::params;
+use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
     handler::TxHandler,

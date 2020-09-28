@@ -14,7 +14,7 @@ use zksync_crypto::franklin_crypto::{
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace deps
 use models::{
-    operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
+    operations::{ChangePubKeyOp, CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp},
     tx::PackedPublicKey,
     AccountId, BlockNumber,
 };

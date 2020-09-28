@@ -7,6 +7,7 @@ use zksync_crypto::params::CHUNK_BYTES;
 mod change_pubkey_op;
 mod close_op;
 mod deposit_op;
+mod forced_exit;
 mod full_exit_op;
 mod noop_op;
 mod transfer_op;
@@ -15,7 +16,7 @@ mod withdraw_op;
 
 pub use self::{
     change_pubkey_op::ChangePubKeyOp, close_op::CloseOp, deposit_op::DepositOp,
-    full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
+    forced_exit::ForcedExitOp, full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
     transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
 };
 
@@ -30,6 +31,7 @@ pub enum FranklinOp {
     Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),
     ChangePubKeyOffchain(Box<ChangePubKeyOp>),
+    ForcedExit(Box<ForcedExitOp>),
 }
 
 impl FranklinOp {
@@ -43,6 +45,7 @@ impl FranklinOp {
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
             FranklinOp::FullExit(_) => FullExitOp::CHUNKS,
             FranklinOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
+            FranklinOp::ForcedExit(_) => ForcedExitOp::CHUNKS,
         }
     }
 
@@ -56,6 +59,7 @@ impl FranklinOp {
             FranklinOp::Transfer(op) => op.get_public_data(),
             FranklinOp::FullExit(op) => op.get_public_data(),
             FranklinOp::ChangePubKeyOffchain(op) => op.get_public_data(),
+            FranklinOp::ForcedExit(op) => op.get_public_data(),
         }
     }
 
@@ -70,6 +74,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Withdraw(op) => Some(op.get_withdrawal_data()),
             FranklinOp::FullExit(op) => Some(op.get_withdrawal_data()),
+            FranklinOp::ForcedExit(op) => Some(op.get_withdrawal_data()),
             _ => None,
         }
     }
@@ -99,6 +104,9 @@ impl FranklinOp {
             ChangePubKeyOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOffchain(Box::new(
                 ChangePubKeyOp::from_public_data(&bytes)?,
             ))),
+            ForcedExitOp::OP_CODE => Ok(FranklinOp::ForcedExit(Box::new(
+                ForcedExitOp::from_public_data(&bytes)?,
+            ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -113,6 +121,7 @@ impl FranklinOp {
             TransferOp::OP_CODE => Ok(TransferOp::CHUNKS),
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
+            ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
@@ -127,6 +136,7 @@ impl FranklinOp {
             FranklinOp::ChangePubKeyOffchain(op) => {
                 Ok(FranklinTx::ChangePubKey(Box::new(op.tx.clone())))
             }
+            FranklinOp::ForcedExit(op) => Ok(FranklinTx::ForcedExit(Box::new(op.tx.clone()))),
             _ => Err(format_err!("Wrong tx type")),
         }
     }
@@ -185,5 +195,11 @@ impl From<FullExitOp> for FranklinOp {
 impl From<ChangePubKeyOp> for FranklinOp {
     fn from(op: ChangePubKeyOp) -> Self {
         Self::ChangePubKeyOffchain(Box::new(op))
+    }
+}
+
+impl From<ForcedExitOp> for FranklinOp {
+    fn from(op: ForcedExitOp) -> Self {
+        Self::ForcedExit(Box::new(op))
     }
 }
