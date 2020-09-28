@@ -119,7 +119,6 @@ impl TestWallet {
             .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
-            .fee(0u32)
             .to(self.inner.address())
             .tx()
             .await
@@ -129,17 +128,20 @@ impl TestWallet {
     pub async fn sign_withdraw(
         &self,
         amount: BigUint,
-        fee: BigUint,
+        fee: Option<BigUint>,
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
-        self.inner
+        let mut builder = self
+            .inner
             .start_withdraw()
             .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
-            .fee(fee)
-            .to(self.inner.address())
-            .tx()
-            .await
+            .to(self.inner.address());
+        if let Some(fee) = fee {
+            builder = builder.fee(fee);
+        }
+
+        builder.tx().await
     }
 
     // Creates a signed transfer tx to a given receiver.
@@ -147,17 +149,20 @@ impl TestWallet {
         &self,
         to: impl Into<Address>,
         amount: impl Into<BigUint>,
-        fee: impl Into<BigUint>,
+        fee: Option<BigUint>,
     ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
-        self.inner
+        let mut builder = self
+            .inner
             .start_transfer()
             .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
-            .fee(fee)
-            .to(to.into())
-            .tx()
-            .await
+            .to(to.into());
+        if let Some(fee) = fee {
+            builder = builder.fee(fee);
+        }
+
+        builder.tx().await
     }
 
     // Creates a signed transfer tx to a random receiver.
@@ -177,7 +182,7 @@ impl TestWallet {
             test_accounts[to_idx].address
         };
 
-        self.sign_transfer(to, amount, 0u32).await
+        self.sign_transfer(to, amount, None).await
     }
 
     /// Returns appropriate nonce for the new transaction and increments the nonce.

@@ -370,7 +370,7 @@ impl ScenarioExecutor {
             // Fee for the transfer itself differs from the estimated fee.
             let fee = self.transfer_fee(&to_acc).await;
             let transfer = self
-                .sign_transfer(from_acc, to_acc, packable_transfer_amount, fee)
+                .sign_transfer(from_acc, to_acc, packable_transfer_amount, Some(fee))
                 .await;
 
             signed_transfers.push(transfer);
@@ -467,7 +467,7 @@ impl ScenarioExecutor {
 
             let fee = self.transfer_fee(&to_acc).await;
             let transfer = self
-                .sign_transfer(from_acc, to_acc, self.transfer_size.clone(), fee)
+                .sign_transfer(from_acc, to_acc, self.transfer_size.clone(), Some(fee))
                 .await;
 
             signed_transfers.push(transfer);
@@ -532,7 +532,7 @@ impl ScenarioExecutor {
             let transfer_amount = &account_balance - &fee;
             let transfer_amount = closest_packable_token_amount(&transfer_amount);
             let transfer = self
-                .sign_transfer(from_acc, to_acc, transfer_amount, fee)
+                .sign_transfer(from_acc, to_acc, transfer_amount, Some(fee))
                 .await;
 
             signed_transfers.push(transfer);
@@ -594,7 +594,7 @@ impl ScenarioExecutor {
 
         let (tx, eth_sign) = self
             .main_wallet
-            .sign_withdraw(withdraw_amount.clone(), fee)
+            .sign_withdraw(withdraw_amount.clone(), Some(fee))
             .await?;
         let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
@@ -682,7 +682,7 @@ impl ScenarioExecutor {
         from: &TestWallet,
         to: &TestWallet,
         amount: impl Into<BigUint>,
-        fee: impl Into<BigUint>,
+        fee: Option<BigUint>,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
         from.sign_transfer(to.address(), amount, fee).await.unwrap()
     }
