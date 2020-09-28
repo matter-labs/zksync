@@ -8,12 +8,12 @@ use circuit::exit_circuit::ZksyncExitCircuit;
 use circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
-use crypto_exports::bellman::plonk::{make_verification_key, setup, transpile_with_gates_count};
-use crypto_exports::bellman::Circuit;
-use models::config_options::AvailableBlockSizesConfig;
-use models::node::Engine;
-use models::params;
-use models::prover_utils::fs_utils::{
+use zksync_config::AvailableBlockSizesConfig;
+use zksync_crypto::bellman::plonk::{make_verification_key, setup, transpile_with_gates_count};
+use zksync_crypto::bellman::Circuit;
+use zksync_crypto::params;
+use zksync_crypto::Engine;
+use zksync_prover_utils::fs_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
     get_universal_setup_monomial_form,
 };

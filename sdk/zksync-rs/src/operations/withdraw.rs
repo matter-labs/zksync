@@ -1,7 +1,10 @@
-use models::node::{
-    closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
-    is_token_amount_packable, tx::PackedEthSignature, Address, FranklinTx, Nonce, Token, TokenLike,
-    TxFeeTypes,
+use models::{
+    helpers::{
+        closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
+        is_token_amount_packable,
+    },
+    tx::PackedEthSignature,
+    Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
 };
 use num::BigUint;
 

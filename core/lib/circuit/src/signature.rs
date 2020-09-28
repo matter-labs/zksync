@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{pairing::ff::PrimeField, ConstraintSystem, SynthesisError},
     circuit::{
         baby_eddsa::EddsaSignature,
@@ -12,7 +12,7 @@ use crypto_exports::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::params::{self as franklin_constants, FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
+use zksync_crypto::params::{self as franklin_constants, FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
 // Local deps
 use crate::{
     allocated_structures::*,

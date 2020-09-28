@@ -1,11 +1,11 @@
 //! Benchmarks for the Parallel Sparse Merkle Tree.
 
 use criterion::{black_box, BatchSize, Bencher, Criterion, Throughput};
-use models::merkle_tree::{hasher::Hasher, RescueHasher};
-use models::node::Engine;
+use zksync_crypto::merkle_tree::{hasher::Hasher, RescueHasher};
+use zksync_crypto::Engine;
 
 const SMALL_INPUT_SIZE: usize = 16; // 16 bits / 2 bytes
-const BIG_INPUT_SIZE: usize = models::params::MAX_CIRCUIT_MSG_HASH_BITS; // Biggest supported size.
+const BIG_INPUT_SIZE: usize = zksync_crypto::params::MAX_CIRCUIT_MSG_HASH_BITS; // Biggest supported size.
 
 /// Creates a boolean vector for `PedersonHasher` input.
 fn generate_input(size: usize) -> Vec<bool> {

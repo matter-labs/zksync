@@ -10,11 +10,10 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
-use models::node::{
+use models::NetworkStatus;
+use models::{
     Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
 };
-use models::NetworkStatus;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -26,10 +25,12 @@ use storage::chain::operations_ext::{
 };
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
-use web3::types::H160;
+use zksync_basic_types::H160;
+use zksync_config::ConfigurationOptions;
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
+use crate::panic_notify::ThreadPanicNotify;
 use storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
 
 #[derive(Default, Clone)]

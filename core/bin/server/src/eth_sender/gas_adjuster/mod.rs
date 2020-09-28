@@ -1,7 +1,7 @@
 // Built-in deps
 use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 // External deps
-use web3::types::U256;
+use zksync_basic_types::U256;
 // Local deps
 use crate::eth_sender::{database::Database, ethereum_interface::EthereumInterface};
 

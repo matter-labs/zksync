@@ -8,14 +8,13 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use models::config_options::ConfigurationOptions;
-use models::node::{
+use models::{
     mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
     DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
     WithdrawOp,
 };
-use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
+use server::committer::{BlockCommitRequest, CommitRequest};
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
@@ -26,14 +25,16 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
+use zksync_config::ConfigurationOptions;
+
+pub use zksync_test_account as zksync_account;
 
 pub mod eth_account;
 pub mod external_commands;
-pub mod zksync_account;
-use crypto_exports::rand::Rng;
 use itertools::Itertools;
-use models::prover_utils::EncodedProofPlonk;
 use web3::types::{TransactionReceipt, U64};
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::rand::Rng;
 
 /// Constant for testkit
 /// Real value is in `dev.env`
@@ -331,7 +332,6 @@ pub fn spawn_state_keeper(
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
-    let (executed_tx_notify_sender, _executed_tx_notify_receiver) = mpsc::channel(256);
 
     let max_ops_in_block = 1000;
     let ops_chunks = vec![
@@ -354,7 +354,6 @@ pub fn spawn_state_keeper(
         *fee_account,
         state_keeper_req_receiver,
         proposed_blocks_sender,
-        executed_tx_notify_sender,
         block_chunks_sizes,
         max_miniblock_iterations,
         max_miniblock_iterations,
@@ -1126,13 +1125,11 @@ impl TestSetup {
     async fn await_for_block_commit_request(&mut self) -> BlockCommitRequest {
         while let Some(new_block_event) = self.proposed_blocks_receiver.next().await {
             match new_block_event {
-                CommitRequest::Block(new_block, receiver) => {
-                    receiver.send(()).unwrap();
+                CommitRequest::Block(new_block) => {
                     return new_block;
                 }
-                CommitRequest::PendingBlock(_, receiver) => {
+                CommitRequest::PendingBlock(_) => {
                     // Pending blocks are ignored.
-                    receiver.send(()).unwrap();
                 }
             }
         }
@@ -1148,15 +1145,14 @@ impl TestSetup {
             .await
             .expect("StateKeeper sender dropped");
         match new_block_event {
-            CommitRequest::Block(new_block, _) => {
+            CommitRequest::Block(new_block) => {
                 panic!(
                     "Expected pending block, got full block proposed. Block: {:?}",
                     new_block
                 );
             }
-            CommitRequest::PendingBlock(_, receiver) => {
-                // Notify state keeper that we've processed the request.
-                receiver.send(()).unwrap();
+            CommitRequest::PendingBlock(_) => {
+                // Nothing to be done.
             }
         }
     }

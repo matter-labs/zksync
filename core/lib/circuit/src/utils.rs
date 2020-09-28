@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{
         pairing::{
             ff::{BitIterator, Field, PrimeField},
@@ -18,7 +18,7 @@ use crypto_exports::franklin_crypto::{
     rescue::{rescue_hash, RescueEngine},
 };
 // Workspace deps
-use models::{
+use zksync_crypto::{
     circuit::utils::le_bit_vector_into_field_element, params as franklin_constants, primitives::*,
 };
 // Local deps
@@ -398,7 +398,8 @@ pub fn calculate_empty_account_tree_hashes<E: RescueEngine>(
     tree_depth: usize,
 ) -> Vec<E::Fr> {
     // manually calcualte empty subtree hashes
-    let empty_account_packed = models::circuit::account::empty_account_as_field_elements::<E>();
+    let empty_account_packed =
+        zksync_crypto::circuit::account::empty_account_as_field_elements::<E>();
     calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &empty_account_packed)
 }
 

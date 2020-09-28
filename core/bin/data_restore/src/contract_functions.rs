@@ -1,10 +1,10 @@
 use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
-use models::node::account::Account;
-use models::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
+use models::account::Account;
 use web3::contract::{Contract, Options};
 use web3::futures::Future;
 use web3::types::{Address, BlockNumber, Transaction, U256};
 use web3::Transport;
+use zksync_crypto::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
 
 /// Returns Rollup genesis (fees) account from the input of the Rollup contract creation transaction
 ///

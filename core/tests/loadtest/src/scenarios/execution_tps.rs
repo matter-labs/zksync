@@ -17,7 +17,7 @@ use std::{
 use num::BigUint;
 use tokio::{runtime::Handle, time};
 // Workspace uses
-use models::node::tx::TxHash;
+use models::tx::TxHash;
 use zksync::{Network, Provider};
 // Local uses
 use crate::{

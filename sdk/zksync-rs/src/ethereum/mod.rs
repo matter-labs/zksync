@@ -2,10 +2,7 @@
 
 use eth_client::ETHClient;
 use futures::compat::Future01CompatExt;
-use models::{
-    abi,
-    node::{AccountId, PriorityOp, TokenLike},
-};
+use models::{AccountId, PriorityOp, TokenLike};
 use num::BigUint;
 use std::{convert::TryFrom, time::Duration};
 use std::{str::FromStr, time::Instant};
@@ -14,6 +11,7 @@ use web3::contract::{Contract, Options};
 use web3::transports::{EventLoopHandle, Http};
 use web3::types::{TransactionReceipt, H160, H256, U256};
 use web3::Web3;
+use zksync_contracts as abi;
 
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, types::network::Network,
@@ -110,8 +108,8 @@ impl EthereumProvider {
         self.eth_client
             .balance()
             .await
-            .map(u256_to_biguint)
             .map_err(|err| ClientError::NetworkError(err.to_string()))
+            .map(u256_to_biguint)
     }
 
     /// Returns the pending nonce for the Ethereum account.

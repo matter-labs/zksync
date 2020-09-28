@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-models = {  path = "../models", version = "0.0.1" }
 serde = "1.0.90"
 serde_derive = "1.0.90"
 ethabi = "9.0.0"
@@ -12,6 +11,5 @@ web3 = "0.10.0"
 parity-crypto = {version = "0.5.0", features = ["publickey"] }
 futures = { version = "0.3", features = ["compat"] }
 rlp = "0.4.0"
-tiny-keccak = "1.4.2"
 log = "0.4"
 failure = "0.1"

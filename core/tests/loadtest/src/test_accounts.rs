@@ -4,14 +4,12 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use num::BigUint;
 use rand::Rng;
 // Workspace uses
-use models::{
-    config_options::ConfigurationOptions,
-    node::{tx::PackedEthSignature, AccountId, Address, FranklinTx},
-};
+use models::{tx::PackedEthSignature, AccountId, Address, FranklinTx};
 use zksync::{
     error::ClientError, web3::types::H256, EthereumProvider, Network, Provider, Wallet,
     WalletCredentials,
 };
+use zksync_config::ConfigurationOptions;
 // Local uses
 use crate::scenarios::configs::AccountInfo;
 

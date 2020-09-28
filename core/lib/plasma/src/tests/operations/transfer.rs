@@ -1,5 +1,5 @@
 use crate::tests::PlasmaTestBuilder;
-use models::node::{AccountUpdate, Transfer};
+use models::{AccountUpdate, Transfer};
 use num::{BigUint, Zero};
 
 #[test]

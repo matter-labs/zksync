@@ -1,5 +1,5 @@
 // External deps
-use crypto_exports::franklin_crypto::{
+use zksync_crypto::franklin_crypto::{
     bellman::{
         pairing::{ff::PrimeField, Engine},
         ConstraintSystem, SynthesisError,
@@ -9,7 +9,7 @@ use crypto_exports::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::params as franklin_constants;
+use zksync_crypto::params as franklin_constants;
 // Local deps
 use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
 

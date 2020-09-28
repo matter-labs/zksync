@@ -1,6 +1,6 @@
 //! Leader election is a always live routine that continuously votes to become the leader.
 
-use models::node::config::LEADER_LOOKUP_INTERVAL;
+use models::config::LEADER_LOOKUP_INTERVAL;
 use std::path::Path;
 use std::process::Command;
 

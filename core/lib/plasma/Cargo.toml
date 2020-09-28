@@ -9,11 +9,13 @@ authors = [
 ]
 
 [dependencies]
+zksync_crypto = { path = "../crypto", version = "0.1.0" }
+zksync_utils = { path = "../utils", version = "0.1.0" }
 models = { path = "../models", version = "0.0.1" }
+
 num = { version = "0.2", features = ["serde"] }
 log = "0.4"
 failure = "0.1"
-crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
 [dev-dependencies]
 criterion = "0.3.0"
