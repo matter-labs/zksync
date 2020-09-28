@@ -1,3 +1,4 @@
+mod collect_fee;
 mod operations;
 
 use crate::state::PlasmaState;
@@ -104,7 +105,7 @@ impl PlasmaTestBuilder {
         );
     }
 
-    fn compare_updates(
+    pub fn compare_updates(
         &self,
         expected_updates: &BoundAccountUpdates,
         actual_updates: &BoundAccountUpdates,
