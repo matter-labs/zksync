@@ -15,13 +15,11 @@ use std::{
 use failure::format_err;
 use futures::{
     channel::{mpsc, oneshot},
-    compat::Future01CompatExt,
     SinkExt, StreamExt,
 };
 use tokio::{task::JoinHandle, time};
 use web3::{
     contract::{Contract, Options},
-    transports::EventLoopHandle,
     types::{Address, BlockNumber, Filter, FilterBuilder, H160},
     Transport, Web3,
 };
@@ -102,7 +100,6 @@ pub struct EthWatch<T: Transport> {
     zksync_contract: (ethabi::Contract, Contract<T>),
     eth_state: ETHState,
     web3: Web3<T>,
-    _web3_event_loop_handle: EventLoopHandle,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
 
@@ -116,7 +113,6 @@ pub struct EthWatch<T: Transport> {
 impl<T: Transport> EthWatch<T> {
     pub fn new(
         web3: Web3<T>,
-        web3_event_loop_handle: EventLoopHandle,
         zksync_contract_addr: H160,
         number_of_confirmations_for_event: u64,
         eth_watch_req: mpsc::Receiver<EthWatchRequest>,
@@ -133,7 +129,6 @@ impl<T: Transport> EthWatch<T> {
             zksync_contract,
             eth_state: ETHState::default(),
             web3,
-            _web3_event_loop_handle: web3_event_loop_handle,
             eth_watch_req,
 
             mode: WatcherMode::Working,
@@ -200,7 +195,6 @@ impl<T: Transport> EthWatch<T> {
         self.web3
             .eth()
             .logs(filter)
-            .compat()
             .await?
             .into_iter()
             .map(|event| {
@@ -227,7 +221,6 @@ impl<T: Transport> EthWatch<T> {
         self.web3
             .eth()
             .logs(filter)
-            .compat()
             .await?
             .into_iter()
             .map(|event| {
@@ -247,7 +240,6 @@ impl<T: Transport> EthWatch<T> {
         self.web3
             .eth()
             .logs(filter)
-            .compat()
             .await?
             .into_iter()
             .map(CompleteWithdrawalsTx::try_from)
@@ -430,7 +422,6 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| format_err!("Failed to query contract isValidSignature: {}", e))?;
 
@@ -453,7 +444,6 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?;
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
@@ -470,7 +460,6 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| {
                 format_err!(
@@ -488,7 +477,6 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| {
                 format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e)
@@ -520,7 +508,7 @@ impl<T: Transport> EthWatch<T> {
     }
 
     async fn poll_eth_node(&mut self) -> Result<(), failure::Error> {
-        let last_block_number = self.web3.eth().block_number().compat().await?.as_u64();
+        let last_block_number = self.web3.eth().block_number().await?.as_u64();
 
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
@@ -559,7 +547,7 @@ impl<T: Transport> EthWatch<T> {
         // block number.
         // Normally, however, this loop is not expected to last more than one iteration.
         let block = loop {
-            let block = self.web3.eth().block_number().compat().await;
+            let block = self.web3.eth().block_number().await;
 
             match block {
                 Ok(block) => {
@@ -668,13 +656,11 @@ pub fn start_eth_watch(
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
-    let (web3_event_loop_handle, transport) =
-        web3::transports::Http::new(&config_options.web3_url).unwrap();
+    let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
 
     let eth_watch = EthWatch::new(
         web3,
-        web3_event_loop_handle,
         config_options.contract_eth_addr,
         config_options.confirmations_for_eth_event,
         eth_req_receiver,

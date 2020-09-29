@@ -144,6 +144,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     pub async fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
         let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
+            .await
             .expect("Cant get franklin genesis transaction");
 
         // Setting genesis block number for events state
@@ -229,7 +230,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             }
             StorageUpdateState::None => {}
         }
-        let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract);
+        let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract).await;
         let last_verified_block = self.tree_state.state.block_number;
         info!(
             "State has been loaded\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
@@ -255,7 +256,8 @@ impl<T: Transport> DataRestoreDriver<T> {
                     // Update tree
                     self.update_tree_state(new_ops_blocks).await;
 
-                    let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract);
+                    let total_verified_blocks =
+                        get_total_verified_blocks(&self.franklin_contract).await;
                     let last_verified_block = self.tree_state.state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
@@ -366,7 +368,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// Gets new operations blocks from events, updates rollup operations stored state.
     /// Returns new rollup operations blocks
     async fn update_operations_state(&mut self) -> Vec<RollupOpsBlock> {
-        let new_blocks = self.get_new_operation_blocks_from_events();
+        let new_blocks = self.get_new_operation_blocks_from_events().await;
 
         storage_interactor::save_rollup_ops(&self.connection_pool, &new_blocks).await;
 
@@ -376,14 +378,20 @@ impl<T: Transport> DataRestoreDriver<T> {
     }
 
     /// Returns verified comitted operations blocks from verified op blocks events
-    pub fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
-        self.events_state
+    pub async fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
+        let mut blocks = Vec::new();
+
+        for event in self
+            .events_state
             .get_only_verified_committed_events()
             .iter()
-            .map(|event| {
-                RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
-                    .expect("Cant get new operation blocks from events")
-            })
-            .collect()
+        {
+            let block = RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
+                .await
+                .expect("Cant get new operation blocks from events");
+            blocks.push(block);
+        }
+
+        blocks
     }
 }

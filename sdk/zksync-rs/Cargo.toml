@@ -13,8 +13,8 @@ zksync_contracts = { path = "../../core/lib/contracts", version = "0.1.0" }
 
 bellman = { package = "bellman_ce", git = "https://github.com/matter-labs/bellman", branch = "plonk_release" }
 sha2 = "0.8"
-web3 = "0.10.0"
-ethabi = "9.0.0"
+web3 = "0.13.0"
+ethabi = "12.0.0"
 tokio = { version = "0.2", features = ["time"] }
 futures = { version = "0.3", features = ["compat"] }
 

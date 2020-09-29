@@ -59,7 +59,7 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use num::BigUint;
 use tokio::{fs, time};
-use web3::transports::{EventLoopHandle, Http};
+use web3::transports::Http;
 // Workspace deps
 use models::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
@@ -115,9 +115,6 @@ struct ScenarioExecutor {
 
     /// Satellite scenario to run alongside with the funds rotation cycles.
     satellite_scenario: Option<SatelliteScenario>,
-
-    /// Event loop handle so transport for Eth account won't be invalidated.
-    _event_loop_handle: EventLoopHandle,
 }
 
 impl ScenarioExecutor {
@@ -132,8 +129,7 @@ impl ScenarioExecutor {
             .collect();
 
         // Create a transport for Ethereum account.
-        let (_event_loop_handle, transport) =
-            Http::new(&ctx.options.web3_url).expect("http transport start");
+        let transport = Http::new(&ctx.options.web3_url).expect("http transport start");
 
         // Create main account to deposit money from and to return money back later.
         let main_account = TestAccount::from_info(&config.input_account, &transport, &ctx.options);
@@ -181,8 +177,6 @@ impl ScenarioExecutor {
             estimated_fee_for_op: 0u32.into(),
 
             satellite_scenario,
-
-            _event_loop_handle,
         }
     }
 

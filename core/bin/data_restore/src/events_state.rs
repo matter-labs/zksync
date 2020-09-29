@@ -1,10 +1,8 @@
 // External deps
 use failure::format_err;
-use futures::compat::Future01CompatExt;
 use models::NewTokenEvent;
 use std::convert::TryFrom;
 use web3::contract::Contract;
-use web3::futures::Future;
 use web3::types::Transaction;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
@@ -106,8 +104,10 @@ impl EventsState {
     ///
     /// * `web3` - Web3 provider url
     ///
-    pub fn get_last_block_number<T: Transport>(web3: &Web3<T>) -> Result<u64, failure::Error> {
-        Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
+    pub async fn get_last_block_number<T: Transport>(
+        web3: &Web3<T>,
+    ) -> Result<u64, failure::Error> {
+        Ok(web3.eth().block_number().await.map(|n| n.as_u64())?)
     }
 
     /// Returns blocks logs, added token logs and the new last watched block number
@@ -130,7 +130,7 @@ impl EventsState {
         end_eth_blocks_offset: u64,
     ) -> Result<(Vec<Log>, Vec<NewTokenEvent>, u64), failure::Error> {
         let latest_eth_block_minus_delta =
-            EventsState::get_last_block_number(web3)? - end_eth_blocks_offset;
+            EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
 
         if latest_eth_block_minus_delta == last_watched_block_number {
             return Ok((vec![], vec![], last_watched_block_number)); // No new eth blocks
@@ -155,7 +155,8 @@ impl EventsState {
             franklin_contract,
             from_block_number,
             to_block_number,
-        )?;
+        )
+        .await?;
 
         let token_logs = EventsState::get_token_added_logs(
             web3,
@@ -197,7 +198,6 @@ impl EventsState {
 
         web3.eth()
             .logs(filter)
-            .compat()
             .await?
             .into_iter()
             .map(|event| {
@@ -216,7 +216,7 @@ impl EventsState {
     /// * `from_block_number` - Start ethereum block number
     /// * `to_block_number` - End ethereum block number
     ///
-    fn get_block_logs<T: Transport>(
+    async fn get_block_logs<T: Transport>(
         web3: &Web3<T>,
         contract: &(ethabi::Contract, Contract<T>),
         from_block_number: BlockNumber,
@@ -253,7 +253,7 @@ impl EventsState {
         let result = web3
             .eth()
             .logs(filter)
-            .wait()
+            .await
             .map_err(|e| format_err!("No new logs: {}", e))?;
         Ok(result)
     }

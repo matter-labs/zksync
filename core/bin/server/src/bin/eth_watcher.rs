@@ -15,21 +15,14 @@ fn main() {
         [2..]
         .parse()
         .expect("Failed to parse CONTRACT_ADDR");
-    let (web3_event_loop_handle, transport) = web3::transports::Http::new(&web3_url).unwrap();
+    let transport = web3::transports::Http::new(&web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
 
     let (eth_req_sender, eth_req_receiver) = mpsc::channel(256);
 
     let db_pool = main_runtime.block_on(async { ConnectionPool::new(None).await });
 
-    let watcher = EthWatch::new(
-        web3,
-        web3_event_loop_handle,
-        contract_address,
-        0,
-        eth_req_receiver,
-        db_pool,
-    );
+    let watcher = EthWatch::new(web3, contract_address, 0, eth_req_receiver, db_pool);
 
     main_runtime.spawn(watcher.run());
     main_runtime.block_on(async move {

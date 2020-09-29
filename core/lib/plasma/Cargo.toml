@@ -19,7 +19,7 @@ failure = "0.1"
 
 [dev-dependencies]
 criterion = "0.3.0"
-web3 = "0.10.0"
+web3 = "0.13.0"
 
 [[bench]]
 name = "criterion"

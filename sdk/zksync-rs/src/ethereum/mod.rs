@@ -1,12 +1,11 @@
 //! Utilities for the on-chain operations, such as `Deposit` and `FullExit`.
 
 use eth_client::ETHClient;
-use futures::compat::Future01CompatExt;
 use models::{AccountId, TokenLike};
 use std::str::FromStr;
 use web3::contract::tokens::Tokenize;
 use web3::contract::{Contract, Options};
-use web3::transports::{EventLoopHandle, Http};
+use web3::transports::Http;
 use web3::types::{H160, H256, U256};
 use web3::Web3;
 use zksync_contracts as abi;
@@ -37,8 +36,6 @@ pub struct EthereumProvider {
     tokens_cache: TokensCache,
     eth_client: ETHClient<Http>,
     erc20_abi: ethabi::Contract,
-    // We have to prevent handle from drop, since it will cause event loop termination.
-    _event_loop: EventLoopHandle,
 }
 
 impl EthereumProvider {
@@ -50,7 +47,7 @@ impl EthereumProvider {
         eth_private_key: H256,
         eth_addr: H160,
     ) -> Result<Self, ClientError> {
-        let (_event_loop, transport) = Http::new(eth_web3_url.as_ref())
+        let transport = Http::new(eth_web3_url.as_ref())
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
         let network = provider.network;
@@ -85,7 +82,6 @@ impl EthereumProvider {
             eth_client,
             erc20_abi,
             tokens_cache,
-            _event_loop,
         })
     }
 
@@ -133,7 +129,6 @@ impl EthereumProvider {
             None,
         );
         let current_allowance: U256 = query
-            .compat()
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 

@@ -5,4 +5,4 @@ authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
 edition = "2018"
 
 [dependencies]
-web3 = "0.10.0"
+web3 = "0.13.0"

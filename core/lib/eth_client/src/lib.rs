@@ -5,7 +5,6 @@ extern crate serde_derive;
 use std::fmt;
 
 // External uses
-use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, BlockNumber, Bytes};
@@ -85,7 +84,6 @@ impl<T: Transport> ETHClient<T> {
         self.web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Pending))
-            .compat()
             .await
     }
 
@@ -95,16 +93,15 @@ impl<T: Transport> ETHClient<T> {
         self.web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Latest))
-            .compat()
             .await
     }
 
     pub async fn block_number(&self) -> Result<U64, Error> {
-        self.web3.eth().block_number().compat().await
+        self.web3.eth().block_number().await
     }
 
     pub async fn get_gas_price(&self) -> Result<U256, failure::Error> {
-        let mut network_gas_price = self.web3.eth().gas_price().compat().await?;
+        let mut network_gas_price = self.web3.eth().gas_price().await?;
         let percent_gas_price_factor = U256::from((self.gas_price_factor * 100.0).round() as u64);
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
         Ok(network_gas_price)
@@ -178,12 +175,7 @@ impl<T: Transport> ETHClient<T> {
         };
 
         let signed_tx = tx.sign(&self.private_key);
-        let hash = self
-            .web3
-            .web3()
-            .sha3(Bytes(signed_tx.clone()))
-            .compat()
-            .await?;
+        let hash = self.web3.web3().sha3(Bytes(signed_tx.clone())).await?;
 
         Ok(SignedCallResult {
             raw_tx: signed_tx,
@@ -215,11 +207,6 @@ impl<T: Transport> ETHClient<T> {
     /// Sends the transaction to the Ethereum blockchain.
     /// Transaction is expected to be encoded as the byte sequence.
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, failure::Error> {
-        Ok(self
-            .web3
-            .eth()
-            .send_raw_transaction(Bytes(tx))
-            .compat()
-            .await?)
+        Ok(self.web3.eth().send_raw_transaction(Bytes(tx)).await?)
     }
 }

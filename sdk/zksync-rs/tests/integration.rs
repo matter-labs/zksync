@@ -8,14 +8,12 @@
 //! zksync rust-sdk-tests
 //! ```
 
-use futures::compat::Future01CompatExt;
 use std::time::{Duration, Instant};
 use zksync::{
     error::{ClientError, SignerError::NoSigningKey},
     types::BlockStatus,
     web3::{
         contract::{Contract, Options},
-        futures::Future,
         transports::Http,
         types::{Address, H160, H256, U256},
     },
@@ -59,7 +57,6 @@ async fn get_ethereum_balance(
             .web3()
             .eth()
             .balance(address, None)
-            .compat()
             .await
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
     }
@@ -67,7 +64,6 @@ async fn get_ethereum_balance(
     let contract = Contract::new(eth_provider.web3().eth(), token.address, erc20_contract());
     contract
         .query("balanceOf", address, None, Options::default(), None)
-        .compat()
         .await
         .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }
@@ -80,7 +76,6 @@ async fn wait_for_eth_tx(ethereum: &EthereumProvider, hash: H256) {
     while web3
         .eth()
         .transaction_receipt(hash)
-        .compat()
         .await
         .unwrap()
         .is_none()
@@ -347,7 +342,7 @@ async fn test_withdraw(
         );
 
         query
-            .wait()
+            .await
             .map_err(|err| anyhow::anyhow!(format!("Contract query fail: {}", err)))?
     };
 
@@ -380,7 +375,7 @@ async fn test_withdraw(
         );
 
         query
-            .wait()
+            .await
             .map_err(|err| anyhow::anyhow!(format!("Contract query fail: {}", err)))?
     };
 

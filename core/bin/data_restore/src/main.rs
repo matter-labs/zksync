@@ -84,8 +84,7 @@ async fn main() {
         )
         .get_matches();
 
-    let (_event_loop, transport) =
-        Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
+    let transport = Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
     let governance_addr = config_opts.governance_eth_addr;
     let genesis_tx_hash = config_opts.genesis_tx_hash;
     let contract_addr = config_opts.contract_eth_addr;

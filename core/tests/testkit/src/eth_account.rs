@@ -2,7 +2,6 @@ use crate::external_commands::js_revert_reason;
 use eth_client::ETHClient;
 use ethabi::ParamType;
 use failure::{bail, ensure, format_err};
-use futures::compat::Future01CompatExt;
 use models::block::Block;
 use models::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use num::{BigUint, ToPrimitive};
@@ -11,7 +10,7 @@ use std::str::FromStr;
 use web3::api::Eth;
 use web3::contract::{Contract, Options};
 use web3::types::{
-    BlockNumber, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
+    BlockId, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
 };
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
@@ -96,7 +95,6 @@ impl<T: Transport> EthereumAccount<T> {
 
         contract
             .query("totalBlocksCommitted", (), None, default_tx_options(), None)
-            .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
@@ -110,7 +108,6 @@ impl<T: Transport> EthereumAccount<T> {
 
         contract
             .query("totalBlocksVerified", (), None, default_tx_options(), None)
-            .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
@@ -124,7 +121,6 @@ impl<T: Transport> EthereumAccount<T> {
 
         contract
             .query("exodusMode", (), None, default_tx_options(), None)
-            .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
@@ -263,7 +259,6 @@ impl<T: Transport> EthereumAccount<T> {
                 .web3
                 .eth()
                 .balance(self.address, None)
-                .compat()
                 .await?,
         ))
     }
@@ -276,7 +271,6 @@ impl<T: Transport> EthereumAccount<T> {
         );
         contract
             .query("balanceOf", self.address, None, default_tx_options(), None)
-            .compat()
             .await
             .map(u256_to_big_dec)
             .map_err(|e| format_err!("Contract query fail: {}", e))
@@ -297,7 +291,6 @@ impl<T: Transport> EthereumAccount<T> {
                 default_tx_options(),
                 None,
             )
-            .compat()
             .await
             .map(u256_to_big_dec)
             .map_err(|e| format_err!("Contract query fail: {}", e))?)
@@ -546,7 +539,6 @@ async fn get_revert_reason<T: Transport>(
     let tx = web3
         .eth()
         .transaction(TransactionId::Hash(receipt.transaction_hash))
-        .compat()
         .await?;
     if let Some(Transaction {
         from,
@@ -564,15 +556,14 @@ async fn get_revert_reason<T: Transport>(
             .call(
                 CallRequest {
                     from: Some(from),
-                    to,
+                    to: Some(to),
                     gas: Some(gas),
                     gas_price: Some(gas_price),
                     value: Some(value),
                     data: Some(input),
                 },
-                receipt.block_number.clone().map(BlockNumber::Number),
+                receipt.block_number.clone().map(BlockId::from),
             )
-            .compat()
             .await?;
 
         // For some strange reason this could happen
@@ -602,13 +593,11 @@ async fn send_raw_tx_wait_confirmation<T: Transport>(
 ) -> Result<TransactionReceipt, failure::Error> {
     let tx_hash = eth
         .send_raw_transaction(raw_tx.into())
-        .compat()
         .await
         .map_err(|e| format_err!("Failed to send raw tx: {}", e))?;
     loop {
         if let Some(receipt) = eth
             .transaction_receipt(tx_hash)
-            .compat()
             .await
             .map_err(|e| format_err!("Failed to get receipt from eth node: {}", e))?
         {
@@ -639,7 +628,6 @@ pub async fn get_executed_tx_fee<T: Transport>(
 
     let tx = eth
         .transaction(TransactionId::Hash(receipt.transaction_hash))
-        .compat()
         .await?
         .ok_or_else(|| format_err!("Transaction not found: 0x{:x?}", receipt.transaction_hash))?;
 

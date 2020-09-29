@@ -359,7 +359,7 @@ async fn exit_test() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
 
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let test_accounts_info = test_accounts_info[0..2].to_vec();

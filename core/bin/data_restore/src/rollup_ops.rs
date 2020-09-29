@@ -23,11 +23,11 @@ impl RollupOpsBlock {
     /// * `web3` - Web3 provider url
     /// * `event_data` - Rollup contract event description
     ///
-    pub fn get_rollup_ops_block<T: Transport>(
+    pub async fn get_rollup_ops_block<T: Transport>(
         web3: &Web3<T>,
         event_data: &BlockEvent,
     ) -> Result<Self, failure::Error> {
-        let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
+        let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash).await?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
         let fee_account_argument_id = 1;

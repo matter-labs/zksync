@@ -1,10 +1,9 @@
 // Built-in deps
 // External uses
 use failure::ensure;
-use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
-use web3::transports::{EventLoopHandle, Http};
+use web3::transports::Http;
 use zksync_basic_types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use super::ExecutedTxStatus;
@@ -62,13 +61,11 @@ pub(super) trait EthereumInterface {
 #[derive(Debug)]
 pub struct EthereumHttpClient {
     eth_client: ETHClient<Http>,
-    // We have to prevent handle from drop, since it will cause event loop termination.
-    _event_loop: EventLoopHandle,
 }
 
 impl EthereumHttpClient {
     pub fn new(options: &ConfigurationOptions) -> Result<Self, failure::Error> {
-        let (_event_loop, transport) = Http::new(&options.web3_url)?;
+        let transport = Http::new(&options.web3_url)?;
 
         let eth_client = ETHClient::new(
             transport,
@@ -82,10 +79,7 @@ impl EthereumHttpClient {
             options.gas_price_factor,
         );
 
-        Ok(Self {
-            eth_client,
-            _event_loop,
-        })
+        Ok(Self { eth_client })
     }
 
     /// Sleep is required before each Ethereum query because infura blocks requests that are made too often
@@ -103,7 +97,6 @@ impl EthereumInterface for EthereumHttpClient {
             .web3
             .eth()
             .transaction_receipt(*hash)
-            .compat()
             .await?;
 
         match receipt {
@@ -137,7 +130,7 @@ impl EthereumInterface for EthereumHttpClient {
 
     async fn block_number(&self) -> Result<u64, failure::Error> {
         self.sleep();
-        let block_number = self.eth_client.web3.eth().block_number().compat().await?;
+        let block_number = self.eth_client.web3.eth().block_number().await?;
         Ok(block_number.as_u64())
     }
 

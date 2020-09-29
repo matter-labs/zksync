@@ -40,8 +40,7 @@ const TX_EXECUTION_TIMEOUT_SEC: u64 = 5 * 60;
 pub fn run_scenario(mut ctx: ScenarioContext) {
     // Load config and construct test accounts
     let config = LoadTestConfig::load(&ctx.config_path);
-    let (_event_loop_handle, transport) =
-        Http::new(&ctx.options.web3_url).expect("http transport start");
+    let transport = Http::new(&ctx.options.web3_url).expect("http transport start");
     let test_accounts =
         TestAccount::construct_test_accounts(&config.input_accounts, transport, &ctx.options);
 

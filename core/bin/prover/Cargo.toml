@@ -14,7 +14,7 @@ zksync_prover_utils = { path = "../../lib/prover_utils", version = "0.1.0" }
 
 hex = "0.4"
 rust-crypto = "0.2"
-web3 = "0.10.0"
+web3 = "0.13.0"
 tokio = "0.1.18"
 
 serde = "1.0.90"

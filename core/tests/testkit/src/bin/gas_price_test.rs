@@ -192,7 +192,7 @@ async fn gas_price_test() {
 
     let contracts = deploy_test_contracts();
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
         commit_account_info.private_key,

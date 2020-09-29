@@ -14,7 +14,7 @@
 use std::time::Duration;
 // External deps
 use num::BigUint;
-use web3::transports::{EventLoopHandle, Http};
+use web3::transports::Http;
 // Workspace deps
 use models::{helpers::closest_packable_fee_amount, tx::PackedEthSignature, FranklinTx};
 use testkit::zksync_account::ZksyncAccount;
@@ -46,9 +46,6 @@ pub struct TestExecutor {
 
     /// Estimated fee amount for any zkSync operation.
     estimated_fee_for_op: BigUint,
-
-    /// Event loop handle so transport for Eth account won't be invalidated.
-    _event_loop_handle: EventLoopHandle,
 }
 
 impl TestExecutor {
@@ -58,8 +55,7 @@ impl TestExecutor {
         let config = RealLifeConfig::load(&ctx.config_path);
 
         // Create a transport for Ethereum account.
-        let (_event_loop_handle, transport) =
-            Http::new(&ctx.options.web3_url).expect("http transport start");
+        let transport = Http::new(&ctx.options.web3_url).expect("http transport start");
 
         // Create main account to deposit money from and to return money back later.
         let main_account = TestAccount::from_info(&config.input_account, &transport, &ctx.options);
@@ -69,8 +65,6 @@ impl TestExecutor {
             main_account,
             verify_timeout: Duration::from_secs(config.block_timeout),
             estimated_fee_for_op: 0u32.into(),
-
-            _event_loop_handle,
         }
     }
 
