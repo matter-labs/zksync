@@ -3,6 +3,7 @@ use models::account::{AccountUpdate, PubKeyHash};
 use models::tx::ChangePubKey;
 use zksync_crypto::{params, rand::Rng};
 
+/// Check ChangePubKey operation on new account
 #[test]
 fn success() {
     let mut tb = PlasmaTestBuilder::new();
@@ -33,6 +34,7 @@ fn success() {
     )
 }
 
+/// Check that ChangePubKey fails if nonce is invalid
 #[test]
 fn nonce_mismatch() {
     let mut tb = PlasmaTestBuilder::new();
@@ -51,6 +53,8 @@ fn nonce_mismatch() {
     tb.test_tx_fail(change_pub_key.into(), "Nonce mismatch");
 }
 
+/// Check that ChangePubKey fails if account address
+/// does not correspond to account_id
 #[test]
 fn invalid_account_id() {
     let mut tb = PlasmaTestBuilder::new();

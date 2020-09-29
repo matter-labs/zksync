@@ -3,6 +3,8 @@ use crate::state::CollectedFee;
 use models::account::AccountUpdate;
 use num::{BigUint, Zero};
 
+/// Checks if fees are collected correctly.
+/// Fees are not only in ETH and may be zero.
 #[test]
 fn success() {
     let mut tb = PlasmaTestBuilder::new();
@@ -52,6 +54,7 @@ fn success() {
     tb.compare_updates(&expected_updates, &actual_updates, &mut state_clone)
 }
 
+/// Checks that collect_fee panics if the collecting account does not exist.
 #[test]
 #[should_panic(expected = "Fee account should be present in the account tree: 145")]
 fn invalid_account() {

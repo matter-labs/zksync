@@ -2,6 +2,7 @@ use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use models::{account::AccountUpdate, tx::Withdraw};
 use num::{BigUint, Zero};
 
+/// Check withdraw operation
 #[test]
 fn success() {
     let token_id = 0;
@@ -38,6 +39,7 @@ fn success() {
     )
 }
 
+/// Check Withdraw failure if not enough funds
 #[test]
 fn insufficient_funds() {
     let token_id = 0;
@@ -64,6 +66,7 @@ fn insufficient_funds() {
     tb.test_tx_fail(withdraw.into(), "Not enough balance");
 }
 
+/// Check Withdraw failure if nonce is incorrect
 #[test]
 fn nonce_mismatch() {
     let token_id = 0;
@@ -90,6 +93,8 @@ fn nonce_mismatch() {
     tb.test_tx_fail(withdraw.into(), "Nonce mismatch")
 }
 
+/// Check Withdraw failure if account address
+/// does not correspond to accound_id
 #[test]
 fn invalid_account_id() {
     let token_id = 0;

@@ -1,6 +1,8 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use models::tx::{Close, TxSignature};
 
+/// Checks that Close operations fails
+/// because it is disabled
 #[test]
 fn expected_fail() {
     let mut tb = PlasmaTestBuilder::new();

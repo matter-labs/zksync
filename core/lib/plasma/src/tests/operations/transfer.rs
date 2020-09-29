@@ -3,6 +3,7 @@ use models::{AccountUpdate, Transfer};
 use num::{BigUint, Zero};
 use web3::types::H160;
 
+/// Check Transfer operation to existing account
 #[test]
 fn to_existing() {
     let token_id = 0;
@@ -51,6 +52,7 @@ fn to_existing() {
     )
 }
 
+/// Check Transfer failure if not enough funds
 #[test]
 fn insufficient_funds() {
     let token_id = 0;
@@ -79,6 +81,7 @@ fn insufficient_funds() {
     tb.test_tx_fail(transfer.into(), "Not enough balance");
 }
 
+/// Check Transfer operation to new account
 #[test]
 fn to_new() {
     let token_id = 0;
@@ -135,6 +138,7 @@ fn to_new() {
     )
 }
 
+/// Check Transfer operation from account to itself
 #[test]
 fn to_self() {
     let token_id = 0;
@@ -171,6 +175,7 @@ fn to_self() {
     )
 }
 
+/// Check Transfer failure if nonce is incorrect
 #[test]
 fn nonce_mismatch() {
     let token_id = 0;
@@ -197,6 +202,8 @@ fn nonce_mismatch() {
     tb.test_tx_fail(transfer.into(), "Nonce mismatch")
 }
 
+/// Check Transfer failure if account address
+/// does not correspond to accound_id
 #[test]
 fn invalid_account_id() {
     let token_id = 0;

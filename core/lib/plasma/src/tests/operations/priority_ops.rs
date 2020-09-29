@@ -4,6 +4,7 @@ use models::{account::AccountUpdate, FranklinPriorityOp};
 use num::{BigUint, Zero};
 use web3::types::H160;
 
+/// Check Deposit to existing account
 #[test]
 fn deposit_to_existing() {
     let token = 0;
@@ -31,6 +32,7 @@ fn deposit_to_existing() {
     )
 }
 
+/// Check Deposit to new account
 #[test]
 fn deposit_to_new() {
     let token = 0;
@@ -62,6 +64,7 @@ fn deposit_to_new() {
     )
 }
 
+/// Check failure of FullExit operation for non-existent account
 #[test]
 fn full_exit_non_existent() {
     let token = 0;
@@ -77,6 +80,7 @@ fn full_exit_non_existent() {
     tb.test_priority_op_success(FranklinPriorityOp::FullExit(full_exit), &[])
 }
 
+/// Check successfull FullExit
 #[test]
 fn full_exit_success() {
     let token = 0;
