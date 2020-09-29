@@ -292,7 +292,7 @@ impl PlasmaState {
         let account_balance = self
             .get_account(priority_op.account_id)
             .filter(|account| account.address == priority_op.eth_address)
-            .map(|acccount| acccount.get_balance(priority_op.token))
+            .map(|account| account.get_balance(priority_op.token))
             .map(BigUintSerdeWrapper);
 
         trace!("Balance: {:?}", account_balance);
