@@ -1,10 +1,16 @@
+//!
+//! The network where the zkSync resides.
+//!
+
 use std::fmt;
 use std::str::FromStr;
 
 use serde::Deserialize;
 use serde::Serialize;
 
+///
 /// Network to be used for a zkSync client.
+///
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum Network {
