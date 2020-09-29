@@ -14,8 +14,7 @@ use zksync_config::ConfigurationOptions;
 use super::tps_counter::TPSCounter;
 
 pub(crate) mod configs;
-mod execution_tps;
-mod outgoing_tps;
+mod deprecated;
 mod real_life;
 mod utils;
 
@@ -36,8 +35,8 @@ impl ScenarioType {
     /// Returns the scenario function given its type.
     pub fn into_scenario(self) -> Scenario {
         match self {
-            Self::OutgoingTps => Box::new(outgoing_tps::run_scenario),
-            Self::ExecutionTps => Box::new(execution_tps::run_scenario),
+            Self::OutgoingTps => Box::new(deprecated::outgoing_tps::run_scenario),
+            Self::ExecutionTps => Box::new(deprecated::execution_tps::run_scenario),
             Self::RealLife => Box::new(real_life::run_scenario),
         }
     }
