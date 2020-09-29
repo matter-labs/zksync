@@ -6,12 +6,10 @@ use rand::Rng;
 // Workspace uses
 use models::{tx::PackedEthSignature, AccountId, Address, FranklinTx};
 use zksync::{
-    error::ClientError, web3::types::H256, EthereumProvider, Network, Provider, Wallet,
-    WalletCredentials,
+    error::ClientError, web3::types::H256, EthereumProvider, Network, Wallet, WalletCredentials,
 };
-use zksync_config::ConfigurationOptions;
 // Local uses
-use crate::scenarios::configs::AccountInfo;
+use crate::scenarios::{configs::AccountInfo, ExecutionContext};
 
 #[derive(Debug)]
 pub struct TestWallet {
@@ -23,49 +21,43 @@ pub struct TestWallet {
 impl TestWallet {
     pub const TOKEN_NAME: &'static str = "ETH";
 
-    pub async fn from_info(
-        info: &AccountInfo,
-        provider: Provider,
-        config: &ConfigurationOptions,
-    ) -> Self {
+    pub async fn from_info(ctx: &ExecutionContext, info: &AccountInfo) -> Self {
         let credentials =
             WalletCredentials::from_eth_pk(info.address, info.private_key, Network::Localhost)
                 .unwrap();
 
-        let inner = Wallet::new(provider, credentials).await.unwrap();
-        Self::from_wallet(inner, &config.web3_url).await
+        let inner = Wallet::new(ctx.provider.clone(), credentials)
+            .await
+            .unwrap();
+        Self::from_wallet(inner, &ctx.options.web3_url).await
     }
 
     // Parses and builds a new wallets list.
-    pub async fn from_info_list(
-        input: &[AccountInfo],
-        provider: Provider,
-        config: &ConfigurationOptions,
-    ) -> Vec<Self> {
+    pub async fn from_info_list(ctx: &ExecutionContext, input: &[AccountInfo]) -> Vec<Self> {
         let mut wallets = Vec::new();
 
         for info in input {
-            let wallet = Self::from_info(info, provider.clone(), config).await;
+            let wallet = Self::from_info(ctx, info).await;
             wallets.push(wallet)
         }
         wallets
     }
 
     // Creates a random wallet.
-    pub async fn new_random(provider: Provider, config: &ConfigurationOptions) -> Self {
+    pub async fn new_random(ctx: &ExecutionContext) -> Self {
         let eth_private_key = gen_random_eth_private_key();
         let address_from_pk =
             PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
 
         let inner = Wallet::new(
-            provider,
+            ctx.provider.clone(),
             WalletCredentials::from_eth_pk(address_from_pk, eth_private_key, Network::Localhost)
                 .unwrap(),
         )
         .await
         .unwrap();
 
-        Self::from_wallet(inner, &config.web3_url).await
+        Self::from_wallet(inner, &ctx.options.web3_url).await
     }
 
     async fn from_wallet(inner: Wallet, web3_url: impl AsRef<str>) -> Self {

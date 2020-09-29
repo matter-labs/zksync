@@ -123,27 +123,19 @@ impl ScenarioExecutor {
 
         // Generate random accounts to rotate funds within.
         let accounts = (0..config.n_accounts)
-            .map(|_| {
-                ctx.rt
-                    .block_on(TestWallet::new_random(provider.clone(), &ctx.options))
-            })
+            .map(|_| ctx.rt.block_on(TestWallet::new_random(&ctx.execution)))
             .collect();
 
         // Create main account to deposit money from and to return money back later.
-        let main_wallet = ctx.rt.block_on(TestWallet::from_info(
-            &config.input_account,
-            provider.clone(),
-            &ctx.options,
-        ));
+        let main_wallet = ctx
+            .rt
+            .block_on(TestWallet::from_info(&ctx.execution, &config.input_account));
 
         // Load additional accounts for the satellite scenario.
         let additional_accounts: Vec<_> = config
             .additional_accounts
             .iter()
-            .map(|acc| {
-                ctx.rt
-                    .block_on(TestWallet::from_info(acc, provider.clone(), &ctx.options))
-            })
+            .map(|acc| ctx.rt.block_on(TestWallet::from_info(&ctx.execution, acc)))
             .collect();
 
         let block_sizes = Self::get_block_sizes(config.use_all_block_sizes);

@@ -8,6 +8,7 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 // External uses
 use tokio::runtime::Runtime;
 // Workspace uses
+use zksync::Provider;
 use zksync_config::ConfigurationOptions;
 // Local uses
 use super::tps_counter::TPSCounter;
@@ -67,28 +68,33 @@ impl FromStr for ScenarioType {
 
 #[derive(Debug)]
 pub struct ScenarioContext {
-    pub options: ConfigurationOptions,
+    pub execution: ExecutionContext,
     pub config_path: PathBuf,
-    pub rpc_addr: String,
     pub tps_counter: Arc<TPSCounter>,
     pub rt: Runtime,
 }
 
 impl ScenarioContext {
     pub fn new(
+        provider: Provider,
         options: ConfigurationOptions,
         config_path: PathBuf,
-        rpc_addr: String,
         rt: Runtime,
     ) -> Self {
         let tps_counter = Arc::new(TPSCounter::default());
 
         Self {
-            options,
+            execution: ExecutionContext { provider, options },
             config_path,
-            rpc_addr,
             tps_counter,
             rt,
         }
     }
+}
+
+#[derive(Debug)]
+pub struct ExecutionContext {
+    pub provider: Provider,
+    pub options: ConfigurationOptions,
+    // Place for the modern TPS monitor
 }

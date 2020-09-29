@@ -34,9 +34,8 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Load config and construct test accounts
     let config = LoadTestConfig::load(&ctx.config_path);
     let test_accounts = ctx.rt.block_on(TestWallet::from_info_list(
+        &ctx.execution,
         &config.input_accounts,
-        provider.clone(),
-        &ctx.options,
     ));
 
     let verify_timeout_sec = Duration::from_secs(config.verify_timeout_sec);

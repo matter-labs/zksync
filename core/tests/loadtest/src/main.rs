@@ -23,11 +23,11 @@
 //!   ```
 
 // Built-in import
-use std::env;
 use structopt::StructOpt;
 // External uses
 use tokio::runtime::Builder;
 // Workspace uses
+use zksync::{Network, Provider};
 use zksync_config::ConfigurationOptions;
 // Local uses
 use self::{cli::CliOptions, scenarios::ScenarioContext};
@@ -46,17 +46,14 @@ fn main() {
         .build()
         .expect("failed to construct tokio runtime");
 
-    let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
-
-    log::info!("JSON RPC address: {}", rpc_addr);
-
     let env_config = ConfigurationOptions::from_env();
     let CliOptions {
         test_spec_path,
         scenario_type,
     } = CliOptions::from_args();
 
-    let context = ScenarioContext::new(env_config, test_spec_path, rpc_addr, tokio_runtime);
+    let provider = Provider::new(Network::Localhost);
+    let context = ScenarioContext::new(provider, env_config, test_spec_path, tokio_runtime);
 
     let scenario = scenario_type.into_scenario();
 
