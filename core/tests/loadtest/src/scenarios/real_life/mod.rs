@@ -73,7 +73,7 @@ use crate::{
     monitor::Monitor,
     scenarios::{
         configs::RealLifeConfig,
-        utils::{deposit_single, wait_for_verify, DynamicChunks},
+        utils::{wait_for_verify, DynamicChunks},
         ScenarioContext,
     },
     sent_transactions::SentTransactions,
@@ -189,6 +189,8 @@ impl ScenarioExecutor {
     /// Infallible test runner which performs the emergency exit if any step of the test
     /// fails.
     pub async fn run(&mut self) {
+        tokio::spawn(self.monitor.run_counter());
+
         if let Err(error) = self.run_test().await {
             log::error!("Loadtest erred with the following error: {}", error);
         } else {
@@ -320,7 +322,7 @@ impl ScenarioExecutor {
         }
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(&self.main_wallet, amount_to_deposit).await?;
+        self.main_wallet.deposit(amount_to_deposit).await?;
 
         log::info!("Deposit sent and verified");
 
@@ -620,6 +622,8 @@ impl ScenarioExecutor {
     }
 
     async fn finish(&mut self) -> Result<(), failure::Error> {
+        log::info!("{:#?}", &self.monitor.take_logs().await);
+
         Ok(())
     }
 

@@ -18,8 +18,10 @@ use num::BigUint;
 use tokio::{runtime::Handle, time};
 // Workspace uses
 use models::tx::TxHash;
+use zksync::Provider;
 // Local uses
 use crate::{
+    monitor::Monitor,
     scenarios::{
         configs::LoadTestConfig,
         utils::{deposit_single, rand_amount, wait_for_verify},
@@ -56,7 +58,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Send the transactions and block until all of them are sent.
     let sent_txs = ctx.rt.block_on(send_transactions(
         test_wallets,
-        provider.clone(),
+        ctx.monitor.clone(),
         config,
         ctx.rt.handle().clone(),
         ctx.tps_counter,
@@ -65,7 +67,11 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Wait until all the transactions are verified.
     log::info!("Waiting for all transactions to be verified");
     ctx.rt
-        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &provider))
+        .block_on(wait_for_verify(
+            sent_txs,
+            verify_timeout_sec,
+            &ctx.monitor.provider,
+        ))
         .expect("Verifying failed");
     log::info!("Loadtest completed.");
 }
@@ -73,22 +79,17 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 // Sends the configured deposits, withdraws and transfers from each account concurrently.
 async fn send_transactions(
     test_wallets: Vec<TestWallet>,
-    provider: Provider,
+    monitor: Monitor,
     ctx: LoadTestConfig,
     rt_handle: Handle,
     tps_counter: Arc<TPSCounter>,
 ) -> SentTransactions {
+    tokio::spawn(monitor.run_counter());
     // Send transactions from every account.
 
     let join_handles: Vec<_> = test_wallets
         .into_iter()
-        .map(|account| {
-            rt_handle.spawn(send_transactions_from_acc(
-                account,
-                ctx.clone(),
-                provider.clone(),
-            ))
-        })
+        .map(|account| rt_handle.spawn(send_transactions_from_acc(account, ctx.clone())))
         .collect();
 
     // Collect all the sent transactions (so we'll be able to wait for their confirmation).
@@ -106,7 +107,7 @@ async fn send_transactions(
                 let task_handle = rt_handle.spawn(await_txs_execution(
                     sent_txs.tx_hashes.clone(),
                     Arc::clone(&tps_counter),
-                    provider.clone(),
+                    monitor.provider.clone(),
                 ));
 
                 txs_await_handles.push(task_handle);
@@ -129,7 +130,6 @@ async fn send_transactions(
 async fn send_transactions_from_acc(
     mut test_wallet: TestWallet,
     ctx: LoadTestConfig,
-    provider: Provider,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
     let addr_hex = hex::encode(test_wallet.address());
@@ -201,7 +201,7 @@ async fn send_transactions_from_acc(
     );
 
     for (tx, eth_sign) in tx_queue {
-        let tx_hash = provider.send_tx(tx, eth_sign).await?;
+        let tx_hash = test_wallet.monitor.send_tx(tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
     }
 

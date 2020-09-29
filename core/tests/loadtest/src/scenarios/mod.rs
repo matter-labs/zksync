@@ -84,8 +84,10 @@ impl ScenarioContext {
     ) -> Self {
         let tps_counter = Arc::new(TPSCounter::default());
 
+        let monitor = Monitor::new(provider);
+
         Self {
-            monitor: Monitor { provider },
+            monitor,
             options,
             config_path,
             tps_counter,

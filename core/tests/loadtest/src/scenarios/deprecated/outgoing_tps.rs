@@ -12,9 +12,9 @@ use std::{ops::Mul, sync::Arc, time::Duration};
 use num::BigUint;
 use tokio::runtime::Handle;
 // Workspace uses
-use zksync::{Network, Provider};
 // Local uses
 use crate::{
+    monitor::Monitor,
     scenarios::{
         configs::LoadTestConfig,
         utils::{deposit_single, rand_amount, wait_for_verify},
@@ -32,7 +32,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Load config and construct test accounts
     let config = LoadTestConfig::load(&ctx.config_path);
     let test_accounts = ctx.rt.block_on(TestWallet::from_info_list(
-        ctx.monitor,
+        ctx.monitor.clone(),
         &config.input_accounts,
         &ctx.options,
     ));
@@ -49,7 +49,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Send the transactions and block until all of them are sent.
     let sent_txs = ctx.rt.block_on(send_transactions(
         test_accounts,
-        ctx.monitor.provider.clone(),
+        ctx.monitor.clone(),
         config,
         ctx.rt.handle().clone(),
         ctx.tps_counter,
@@ -70,11 +70,12 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 // Sends the configured deposits, withdraws and transfers from each account concurrently.
 async fn send_transactions(
     test_accounts: Vec<TestWallet>,
-    provider: Provider,
+    monitor: Monitor,
     ctx: LoadTestConfig,
     rt_handle: Handle,
     tps_counter: Arc<TPSCounter>,
 ) -> SentTransactions {
+    tokio::spawn(monitor.run_counter());
     // Send transactions from every account.
 
     let join_handles = test_accounts
@@ -83,7 +84,6 @@ async fn send_transactions(
             rt_handle.spawn(send_transactions_from_acc(
                 account,
                 ctx.clone(),
-                provider.clone(),
                 Arc::clone(&tps_counter),
             ))
         })
@@ -107,7 +107,6 @@ async fn send_transactions(
 async fn send_transactions_from_acc(
     mut test_wallet: TestWallet,
     ctx: LoadTestConfig,
-    provider: Provider,
     tps_counter: Arc<TPSCounter>,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
@@ -183,7 +182,7 @@ async fn send_transactions_from_acc(
     );
 
     for (tx, eth_sign) in tx_queue {
-        let tx_hash = provider.send_tx(tx, eth_sign).await?;
+        let tx_hash = test_wallet.monitor.send_tx(tx, eth_sign).await?;
         tps_counter.increment();
         sent_txs.add_tx_hash(tx_hash);
     }

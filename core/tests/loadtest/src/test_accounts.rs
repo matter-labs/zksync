@@ -4,10 +4,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use num::BigUint;
 use rand::Rng;
 // Workspace uses
-use models::{tx::PackedEthSignature, AccountId, Address, FranklinTx};
+use models::{tx::PackedEthSignature, AccountId, Address, FranklinTx, PriorityOp};
 use zksync::{
-    error::ClientError, web3::types::H256, EthereumProvider, Network, Provider, Wallet,
-    WalletCredentials,
+    error::ClientError, utils::biguint_to_u256, web3::types::H256, EthereumProvider, Network,
+    Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
 // Local uses
@@ -187,6 +187,22 @@ impl TestWallet {
         };
 
         self.sign_transfer(to, amount, None).await
+    }
+
+    // Deposits tokens from Ethereum to the contract.
+    pub async fn deposit(&self, amount: impl Into<BigUint>) -> Result<PriorityOp, ClientError> {
+        let eth_tx_hash = self
+            .eth_provider
+            .deposit(
+                Self::TOKEN_NAME,
+                biguint_to_u256(amount.into()),
+                self.address(),
+            )
+            .await?;
+
+        self.monitor
+            .get_priority_op(&self.eth_provider, eth_tx_hash)
+            .await
     }
 
     /// Returns appropriate nonce for the new transaction and increments the nonce.
