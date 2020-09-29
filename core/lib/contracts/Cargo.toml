@@ -1,10 +1,13 @@
 [package]
 name = "zksync_contracts"
-version = "0.1.0"
-authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+version = "1.0.0"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
 
 [dependencies]
 ethabi = "12.0.0"

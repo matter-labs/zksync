@@ -1,22 +1,29 @@
 [package]
 name = "server"
-version = "0.0.1"
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
 
 [dependencies]
-eth_client = { path = "../../lib/eth_client", version = "0.1.0"  }
-plasma = { path = "../../lib/plasma", version = "0.1.1" }
-models = { path = "../../lib/models", version = "0.0.1" }
-storage = { path = "../../lib/storage", version = "0.0.1" }
-circuit = { path = "../../lib/circuit", version = "0.1.1"}
-vlog = { path = "../../lib/vlog", version = "0.1.0"}
+eth_client = { path = "../../lib/eth_client", version = "1.0" }
+plasma = { path = "../../lib/plasma", version = "1.0" }
+models = { path = "../../lib/models", version = "1.0" }
+storage = { path = "../../lib/storage", version = "1.0" }
+circuit = { path = "../../lib/circuit", version = "1.0" }
+vlog = { path = "../../lib/vlog", version = "1.0" }
 
-zksync_basic_types = { path = "../../lib/basic_types", version = "0.1.0" }
-zksync_crypto = { path = "../../lib/crypto", version = "0.1.0" }
-zksync_config = { path = "../../lib/config", version = "0.1.0" }
-zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
-zksync_contracts = { path = "../../lib/contracts", version = "0.1.0" }
-zksync_prover_utils = { path = "../../lib/prover_utils", version = "0.1.0" }
+zksync_basic_types = { path = "../../lib/basic_types", version = "1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
 
 hex = "0.4"
 ethabi = "12.0.0"
@@ -62,4 +69,4 @@ lru-cache = "0.1.2"
 
 [dev-dependencies]
 lazy_static = "1.4"
-prover = { path = "../prover", version = "0.0.1" }
+prover = { path = "../prover", version = "1.0" }

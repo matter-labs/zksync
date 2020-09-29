@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "circuit"
-version = "0.1.1"
+version = "1.0.0"
 dependencies = [
  "bigdecimal",
  "hex",
@@ -1234,7 +1234,7 @@ dependencies = [
 
 [[package]]
 name = "data_restore"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "clap",
@@ -1403,7 +1403,7 @@ dependencies = [
 
 [[package]]
 name = "eth_client"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "ethabi 12.0.0",
  "failure",
@@ -1815,7 +1815,7 @@ checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 
 [[package]]
 name = "gen_token_add_contract"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "handlebars",
  "models",
@@ -2465,7 +2465,7 @@ dependencies = [
 
 [[package]]
 name = "key_generator"
-version = "0.1.1"
+version = "1.0.0"
 dependencies = [
  "circuit",
  "clap",
@@ -2537,7 +2537,7 @@ checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "loadtest"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "env_logger 0.6.2",
@@ -2771,7 +2771,7 @@ dependencies = [
 
 [[package]]
 name = "models"
-version = "0.0.1"
+version = "1.0.0"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -3145,7 +3145,7 @@ dependencies = [
 
 [[package]]
 name = "parse_pub_data"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "hex",
  "models",
@@ -3272,7 +3272,7 @@ checksum = "d36492546b6af1463394d46f0c834346f31548646f6ba10849802c9c9a27ac33"
 
 [[package]]
 name = "plasma"
-version = "0.1.1"
+version = "1.0.0"
 dependencies = [
  "criterion",
  "failure",
@@ -3415,7 +3415,7 @@ dependencies = [
 
 [[package]]
 name = "prover"
-version = "0.0.1"
+version = "1.0.0"
 dependencies = [
  "backoff",
  "chrono",
@@ -4062,7 +4062,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.1"
+version = "1.0.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
@@ -4421,7 +4421,7 @@ checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
 name = "storage"
-version = "0.0.1"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "bigdecimal",
@@ -4566,7 +4566,7 @@ dependencies = [
 
 [[package]]
 name = "testkit"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "env_logger 0.6.2",
  "eth_client",
@@ -5301,7 +5301,7 @@ checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 
 [[package]]
 name = "vlog"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "log 0.4.11",
 ]
@@ -5675,14 +5675,14 @@ dependencies = [
 
 [[package]]
 name = "zksync_basic_types"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "web3 0.13.0",
 ]
 
 [[package]]
 name = "zksync_config"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "url 2.1.1",
  "zksync_basic_types",
@@ -5691,7 +5691,7 @@ dependencies = [
 
 [[package]]
 name = "zksync_contracts"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "ethabi 12.0.0",
  "serde_json",
@@ -5699,7 +5699,7 @@ dependencies = [
 
 [[package]]
 name = "zksync_crypto"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "failure",
  "fnv",
@@ -5716,7 +5716,7 @@ dependencies = [
 
 [[package]]
 name = "zksync_prover_utils"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "backoff",
  "circuit",
@@ -5731,7 +5731,7 @@ dependencies = [
 
 [[package]]
 name = "zksync_test_account"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "models",
  "num",
@@ -5741,7 +5741,7 @@ dependencies = [
 
 [[package]]
 name = "zksync_utils"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bigdecimal",
  "failure",

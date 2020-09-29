@@ -1,20 +1,26 @@
 [package]
 name = "testkit"
-version = "0.1.0"
-authors = ["Vitaly Drogan <vd@matterlabs.dev>"]
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our tests.
 
 [dependencies]
-server = { path = "../../bin/server", version = "0.0.1" }
-prover = { path = "../../bin/prover", version = "0.0.1" }
-models = { path = "../../lib/models", version = "0.0.1" }
-zksync_config = { path = "../../lib/config", version = "0.1.0" }
-zksync_crypto = { path = "../../lib/crypto", version = "0.1.0" }
-zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
-zksync_contracts = { path = "../../lib/contracts", version = "0.1.0" }
-eth_client = { path = "../../lib/eth_client", version = "0.1.0"  }
+server = { path = "../../bin/server", version = "1.0" }
+prover = { path = "../../bin/prover", version = "1.0" }
+models = { path = "../../lib/models", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+eth_client = { path = "../../lib/eth_client", version = "1.0" }
 
-zksync_test_account = { path = "../test_account", version = "0.1.0" }
+zksync_test_account = { path = "../test_account", version = "1.0" }
 
 tokio = { version = "0.2", features = ["full"] }
 log = "0.4"
