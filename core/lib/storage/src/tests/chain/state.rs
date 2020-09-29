@@ -34,13 +34,13 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
 
     // Store the states in schema.
     StateSchema(&mut storage)
-        .commit_state_update(1, &updates_block_1)
+        .commit_state_update(1, &updates_block_1, 0)
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(2, &updates_block_2)
+        .commit_state_update(2, &updates_block_2, 0)
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(3, &updates_block_3)
+        .commit_state_update(3, &updates_block_3, 0)
         .await?;
 
     // We have to store the operations as well (and for verify below too).

@@ -229,6 +229,7 @@ pub async fn test_operation_and_wanted_prover_data(
                     nonce: validator_account.nonce,
                 },
             )],
+            0,
         )
         .await
         .unwrap();
