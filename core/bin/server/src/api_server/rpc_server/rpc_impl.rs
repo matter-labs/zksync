@@ -13,7 +13,6 @@ use models::{
 use crate::{
     fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
-    state_keeper::StateKeeperRequest,
 };
 use bigdecimal::BigDecimal;
 
