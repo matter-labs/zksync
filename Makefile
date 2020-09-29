@@ -188,6 +188,9 @@ js-tests:
 	@cd sdk/zksync.js && yarn tests
 	@cd infrastructure/fee-seller && yarn tests
 
+rust-sdk-tests:
+	@bin/rust-sdk-tests.sh
+
 # Devops: main
 
 # Promote build

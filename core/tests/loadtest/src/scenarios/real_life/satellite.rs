@@ -163,7 +163,9 @@ impl SatelliteScenario {
         let withdraw_amount = &account_balance - &fee;
         let withdraw_amount = closest_packable_token_amount(&withdraw_amount);
 
-        let (tx, eth_sign) = wallet.sign_withdraw(withdraw_amount.clone(), Some(fee)).await?;
+        let (tx, eth_sign) = wallet
+            .sign_withdraw(withdraw_amount.clone(), Some(fee))
+            .await?;
         let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);

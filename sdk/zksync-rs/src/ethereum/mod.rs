@@ -126,11 +126,7 @@ impl EthereumProvider {
         token: impl Into<TokenLike>,
     ) -> Result<bool, ClientError> {
         let token = token.into();
-        let erc20_approve_threshold: U256 =
-            "57896044618658097711785492504343953926634992332820282019728792003956564819968"
-                .parse()
-                .unwrap(); // 2^255
-
+        let erc20_approve_threshold: U256 = U256::from(2).pow(255.into());
         let token = self
             .tokens_cache
             .resolve(token)
@@ -163,10 +159,7 @@ impl EthereumProvider {
         token: impl Into<TokenLike>,
     ) -> Result<H256, ClientError> {
         let token = token.into();
-        let max_erc20_approve_amount: U256 =
-            "115792089237316195423570985008687907853269984665640564039457584007913129639935"
-                .parse()
-                .unwrap(); // 2^256 - 1
+        let max_erc20_approve_amount: U256 = U256::max_value();
 
         let token = self
             .tokens_cache
@@ -267,10 +260,10 @@ impl EthereumProvider {
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
             let mut options = Options::default();
-            options.gas = Some(200_000.into());
+            options.gas = Some(300_000.into());
             let params = (token_info.address, amount, sync_address);
             self.eth_client
-                .sign_call_tx("depositETH", params, options)
+                .sign_call_tx("depositERC20", params, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
