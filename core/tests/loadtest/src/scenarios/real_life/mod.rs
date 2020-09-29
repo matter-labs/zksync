@@ -65,12 +65,12 @@ use models::{
     tx::PackedEthSignature,
     FranklinTx, TxFeeTypes,
 };
-use zksync::{Network, Provider};
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local deps
 use self::satellite::SatelliteScenario;
 use crate::{
+    monitor::Monitor,
     scenarios::{
         configs::RealLifeConfig,
         utils::{deposit_single, wait_for_verify, DynamicChunks},
@@ -84,7 +84,7 @@ mod satellite;
 
 #[derive(Debug)]
 struct ScenarioExecutor {
-    provider: Provider,
+    monitor: Monitor,
 
     /// Main account to deposit ETH from / return ETH back to.
     main_wallet: TestWallet,
@@ -117,25 +117,34 @@ struct ScenarioExecutor {
 
 impl ScenarioExecutor {
     /// Creates a real-life scenario executor.
-    pub fn new(ctx: &mut ScenarioContext, provider: Provider) -> Self {
+    pub fn new(ctx: &mut ScenarioContext) -> Self {
+        let monitor = ctx.monitor.clone();
         // Load the config for the test from JSON file.
         let config = RealLifeConfig::load(&ctx.config_path);
 
         // Generate random accounts to rotate funds within.
         let accounts = (0..config.n_accounts)
-            .map(|_| ctx.rt.block_on(TestWallet::new_random(&ctx.execution)))
+            .map(|_| {
+                ctx.rt
+                    .block_on(TestWallet::new_random(monitor.clone(), &ctx.options))
+            })
             .collect();
 
         // Create main account to deposit money from and to return money back later.
-        let main_wallet = ctx
-            .rt
-            .block_on(TestWallet::from_info(&ctx.execution, &config.input_account));
+        let main_wallet = ctx.rt.block_on(TestWallet::from_info(
+            monitor.clone(),
+            &config.input_account,
+            &ctx.options,
+        ));
 
         // Load additional accounts for the satellite scenario.
         let additional_accounts: Vec<_> = config
             .additional_accounts
             .iter()
-            .map(|acc| ctx.rt.block_on(TestWallet::from_info(&ctx.execution, acc)))
+            .map(|acc| {
+                ctx.rt
+                    .block_on(TestWallet::from_info(monitor.clone(), acc, &ctx.options))
+            })
             .collect();
 
         let block_sizes = Self::get_block_sizes(config.use_all_block_sizes);
@@ -151,14 +160,14 @@ impl ScenarioExecutor {
         let verify_timeout = Duration::from_secs(config.block_timeout);
 
         let satellite_scenario = Some(SatelliteScenario::new(
-            provider.clone(),
+            monitor.clone(),
             additional_accounts,
             transfer_size.clone(),
             verify_timeout,
         ));
 
         Self {
-            provider,
+            monitor,
 
             main_wallet,
             accounts,
@@ -311,7 +320,7 @@ impl ScenarioExecutor {
         }
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(&self.main_wallet, amount_to_deposit, &self.provider).await?;
+        deposit_single(&self.main_wallet, amount_to_deposit).await?;
 
         log::info!("Deposit sent and verified");
 
@@ -325,9 +334,9 @@ impl ScenarioExecutor {
         // `zkSync` account.
         let (change_pubkey_tx, eth_sign) = (self.main_wallet.sign_change_pubkey().await?, None);
         let mut sent_txs = SentTransactions::new();
-        let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
+        let tx_hash = self.monitor.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
-        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.monitor.provider).await?;
 
         log::info!("Main account pubkey changed");
 
@@ -380,7 +389,7 @@ impl ScenarioExecutor {
             // This has to be done synchronously, since we're sending from the same account
             // and truly async sending will result in a nonce mismatch errors.
             for (tx, eth_sign) in tx_batch {
-                let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
+                let tx_hash = self.monitor.send_tx(tx.clone(), eth_sign.clone()).await?;
                 sent_txs.add_tx_hash(tx_hash);
             }
 
@@ -388,7 +397,7 @@ impl ScenarioExecutor {
             verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.monitor.provider).await?;
 
             log::info!(
                 "Sent and verified {}/{} txs ({} on this iteration)",
@@ -406,6 +415,7 @@ impl ScenarioExecutor {
         let mut tx_futures = vec![];
         for wallet in self.accounts.iter_mut() {
             let resp = self
+                .monitor
                 .provider
                 .account_info(wallet.address())
                 .await
@@ -414,7 +424,7 @@ impl ScenarioExecutor {
             wallet.update_account_id().await?;
 
             let change_pubkey_tx = wallet.sign_change_pubkey().await?;
-            let tx_future = self.provider.send_tx(change_pubkey_tx, None);
+            let tx_future = self.monitor.send_tx(change_pubkey_tx, None);
 
             tx_futures.push(tx_future);
         }
@@ -424,7 +434,12 @@ impl ScenarioExecutor {
         // Calculate the estimated amount of blocks for all the txs to be processed.
         let max_block_size = *self.block_sizes.iter().max().unwrap();
         let n_blocks = (self.accounts.len() / max_block_size + 1) as u32;
-        wait_for_verify(sent_txs, self.verify_timeout * n_blocks, &self.provider).await?;
+        wait_for_verify(
+            sent_txs,
+            self.verify_timeout * n_blocks,
+            &self.monitor.provider,
+        )
+        .await?;
 
         log::info!("All the accounts are prepared");
 
@@ -475,7 +490,7 @@ impl ScenarioExecutor {
             let mut tx_futures = vec![];
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
-                let tx_future = self.provider.send_tx(tx.clone(), eth_sign.clone());
+                let tx_future = self.monitor.send_tx(tx.clone(), eth_sign.clone());
 
                 tx_futures.push(tx_future);
             }
@@ -486,7 +501,7 @@ impl ScenarioExecutor {
             verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.monitor.provider).await?;
 
             log::info!(
                 "Sent and verified {}/{} txs ({} on this iteration)",
@@ -514,6 +529,7 @@ impl ScenarioExecutor {
             let fee = self.transfer_fee(&to_acc).await;
 
             let comitted_account_state = self
+                .monitor
                 .provider
                 .account_info(from_acc.address())
                 .await?
@@ -540,7 +556,7 @@ impl ScenarioExecutor {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
             for (tx, eth_sign) in tx_batch {
-                let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
+                let tx_hash = self.monitor.send_tx(tx.clone(), eth_sign.clone()).await?;
                 sent_txs.add_tx_hash(tx_hash);
             }
 
@@ -548,7 +564,7 @@ impl ScenarioExecutor {
             verified += sent_txs_amount;
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.monitor.provider).await?;
 
             log::info!(
                 "Sent and verified {}/{} txs ({} on this iteration)",
@@ -569,6 +585,7 @@ impl ScenarioExecutor {
         let fee = self.withdraw_fee(&self.main_wallet).await;
 
         let comitted_account_state = self
+            .monitor
             .provider
             .account_info(self.main_wallet.address())
             .await?
@@ -588,11 +605,11 @@ impl ScenarioExecutor {
             .main_wallet
             .sign_withdraw(withdraw_amount.clone(), Some(fee))
             .await?;
-        let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
+        let tx_hash = self.monitor.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
 
-        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.monitor.provider).await?;
 
         log::info!("Withdrawing funds completed");
 
@@ -645,6 +662,7 @@ impl ScenarioExecutor {
     /// Obtains a fee required for the transfer operation.
     async fn transfer_fee(&self, to: &TestWallet) -> BigUint {
         let fee = self
+            .monitor
             .provider
             .get_tx_fee(TxFeeTypes::Transfer, to.address(), TestWallet::TOKEN_NAME)
             .await
@@ -657,6 +675,7 @@ impl ScenarioExecutor {
     /// Obtains a fee required for the withdraw operation.
     async fn withdraw_fee(&self, to: &TestWallet) -> BigUint {
         let fee = self
+            .monitor
             .provider
             .get_tx_fee(TxFeeTypes::Withdraw, to.address(), TestWallet::TOKEN_NAME)
             .await
@@ -707,9 +726,7 @@ impl ScenarioExecutor {
 /// Runs the real-life test scenario.
 /// For description, see the module doc-comment.
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let provider = Provider::new(Network::Localhost);
-
-    let mut scenario = ScenarioExecutor::new(&mut ctx, provider);
+    let mut scenario = ScenarioExecutor::new(&mut ctx);
 
     // Run the scenario.
     log::info!("Starting the real-life test");

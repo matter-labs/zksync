@@ -12,7 +12,7 @@ use tokio::time;
 // Workspace uses
 use zksync::{ethereum::PriorityOpHolder, utils::biguint_to_u256, Provider};
 // Local uses
-use crate::{sent_transactions::SentTransactions, test_accounts::TestWallet};
+use crate::{monitor::Monitor, sent_transactions::SentTransactions, test_accounts::TestWallet};
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 
@@ -26,7 +26,6 @@ pub fn rand_amount(from: u64, to: u64) -> BigUint {
 pub async fn deposit_single(
     test_wallet: &TestWallet,
     deposit_amount: BigUint,
-    provider: &Provider,
 ) -> Result<u64, failure::Error> {
     let deposit_amount = biguint_to_u256(deposit_amount);
 
@@ -44,13 +43,13 @@ pub async fn deposit_single(
         .priority_op()
         .expect("no priority op log in deposit");
 
-    wait_for_deposit_executed(priority_op.serial_id, &provider).await
+    wait_for_deposit_executed(priority_op.serial_id, &test_wallet.monitor).await
 }
 
 /// Waits until the deposit priority operation is executed.
 pub async fn wait_for_deposit_executed(
     serial_id: u64,
-    provider: &Provider,
+    monitor: &Monitor,
 ) -> Result<u64, failure::Error> {
     let mut executed = false;
     // We poll the operation status twice a second until timeout is reached.
@@ -62,7 +61,7 @@ pub async fn wait_for_deposit_executed(
     // Polling cycle.
     while !executed && start.elapsed() < timeout {
         timer.tick().await;
-        let state = provider.ethop_info(serial_id as u32).await?;
+        let state = monitor.provider.ethop_info(serial_id as u32).await?;
         executed = state.executed;
     }
 

@@ -18,7 +18,6 @@ use num::BigUint;
 use tokio::{runtime::Handle, time};
 // Workspace uses
 use models::tx::TxHash;
-use zksync::{Network, Provider};
 // Local uses
 use crate::{
     scenarios::{
@@ -37,13 +36,12 @@ const TX_EXECUTION_TIMEOUT_SEC: u64 = 5 * 60;
 /// sends the different types of transactions, and measures the TPS for the txs execution
 /// (not including the verification).
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let provider = Provider::new(Network::Localhost);
-
     // Load config and construct test accounts
     let config = LoadTestConfig::load(&ctx.config_path);
     let test_wallets = ctx.rt.block_on(TestWallet::from_info_list(
-        &ctx.execution,
+        ctx.monitor.clone(),
         &config.input_accounts,
+        &ctx.options,
     ));
 
     let verify_timeout_sec = Duration::from_secs(config.verify_timeout_sec);
@@ -139,7 +137,7 @@ async fn send_transactions_from_acc(
 
     // Perform the deposit operation.
     let deposit_amount = BigUint::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
-    let op_id = deposit_single(&test_wallet, deposit_amount.clone(), &provider).await?;
+    let op_id = deposit_single(&test_wallet, deposit_amount.clone()).await?;
 
     log::info!(
         "Account {}: initial deposit completed (amount: {})",
@@ -157,7 +155,7 @@ async fn send_transactions_from_acc(
     // Add the deposit operations.
     for _ in 0..ctx.n_deposits {
         let amount = rand_amount(ctx.deposit_from_amount_gwei, ctx.deposit_to_amount_gwei);
-        let op_id = deposit_single(&test_wallet, amount.mul(&wei_in_gwei), &provider).await?;
+        let op_id = deposit_single(&test_wallet, amount.mul(&wei_in_gwei)).await?;
         sent_txs.add_op_id(op_id);
     }
 

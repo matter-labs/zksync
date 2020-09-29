@@ -18,9 +18,9 @@ use models::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
     TxFeeTypes,
 };
-use zksync::Provider;
 // Local deps
 use crate::{
+    monitor::Monitor,
     scenarios::utils::{deposit_single, wait_for_verify},
     sent_transactions::SentTransactions,
     test_accounts::TestWallet,
@@ -28,7 +28,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct SatelliteScenario {
-    provider: Provider,
+    monitor: Monitor,
     wallets: Vec<TestWallet>,
     deposit_size: BigUint,
     verify_timeout: Duration,
@@ -37,13 +37,13 @@ pub struct SatelliteScenario {
 
 impl SatelliteScenario {
     pub fn new(
-        provider: Provider,
+        monitor: Monitor,
         wallets: Vec<TestWallet>,
         deposit_size: BigUint,
         verify_timeout: Duration,
     ) -> Self {
         Self {
-            provider,
+            monitor,
             wallets,
             deposit_size,
             verify_timeout,
@@ -117,7 +117,7 @@ impl SatelliteScenario {
         }
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(wallet, amount_to_deposit, &self.provider).await?;
+        deposit_single(wallet, amount_to_deposit).await?;
 
         // Now when deposits are done it is time to update account id.
         wallet.update_account_id().await?;
@@ -127,9 +127,9 @@ impl SatelliteScenario {
         // `zkSync` account.
         let (change_pubkey_tx, eth_sign) = (wallet.sign_change_pubkey().await?, None);
         let mut sent_txs = SentTransactions::new();
-        let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
+        let tx_hash = self.monitor.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
-        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.monitor.provider).await?;
 
         Ok(())
     }
@@ -140,6 +140,7 @@ impl SatelliteScenario {
         let current_balance = wallet.eth_provider.balance().await?;
 
         let fee = self
+            .monitor
             .provider
             .get_tx_fee(
                 TxFeeTypes::Withdraw,
@@ -153,6 +154,7 @@ impl SatelliteScenario {
         let fee = closest_packable_fee_amount(&fee);
 
         let comitted_account_state = self
+            .monitor
             .provider
             .account_info(wallet.address())
             .await?
@@ -166,11 +168,11 @@ impl SatelliteScenario {
         let (tx, eth_sign) = wallet
             .sign_withdraw(withdraw_amount.clone(), Some(fee))
             .await?;
-        let tx_hash = self.provider.send_tx(tx.clone(), eth_sign.clone()).await?;
+        let tx_hash = self.monitor.send_tx(tx.clone(), eth_sign.clone()).await?;
         let mut sent_txs = SentTransactions::new();
         sent_txs.add_tx_hash(tx_hash);
 
-        wait_for_verify(sent_txs, self.verify_timeout, &self.provider).await?;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.monitor.provider).await?;
 
         let expected_balance = current_balance + withdraw_amount;
 

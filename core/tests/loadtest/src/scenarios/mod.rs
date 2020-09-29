@@ -12,6 +12,7 @@ use zksync::Provider;
 use zksync_config::ConfigurationOptions;
 // Local uses
 use super::tps_counter::TPSCounter;
+use crate::monitor::Monitor;
 
 pub(crate) mod configs;
 mod deprecated;
@@ -67,7 +68,8 @@ impl FromStr for ScenarioType {
 
 #[derive(Debug)]
 pub struct ScenarioContext {
-    pub execution: ExecutionContext,
+    pub monitor: Monitor,
+    pub options: ConfigurationOptions,
     pub config_path: PathBuf,
     pub tps_counter: Arc<TPSCounter>,
     pub rt: Runtime,
@@ -83,17 +85,11 @@ impl ScenarioContext {
         let tps_counter = Arc::new(TPSCounter::default());
 
         Self {
-            execution: ExecutionContext { provider, options },
+            monitor: Monitor { provider },
+            options,
             config_path,
             tps_counter,
             rt,
         }
     }
-}
-
-#[derive(Debug)]
-pub struct ExecutionContext {
-    pub provider: Provider,
-    pub options: ConfigurationOptions,
-    // Place for the modern TPS monitor
 }
