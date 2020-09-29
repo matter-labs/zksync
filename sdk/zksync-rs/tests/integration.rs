@@ -5,17 +5,24 @@
 //!
 //! ```bash
 //! zksync server &!
-//! zksync dummy-prover &!
-//! zksync sdk-test
+//! zksync rust-sdk-tests
 //! ```
 
 use futures::compat::Future01CompatExt;
 use std::time::{Duration, Instant};
 use zksync::{
-    web3::types::{H160, H256, U256},
-    zksync_models::tx::PackedEthSignature,
+    error::{ClientError, SignerError::NoSigningKey},
+    types::BlockStatus,
+    web3::{
+        contract::{Contract, Options},
+        futures::Future,
+        transports::Http,
+        types::{Address, H160, H256, U256},
+    },
+    zksync_models::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
+use zksync_contracts::{erc20_contract, zksync_contract};
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
@@ -29,7 +36,6 @@ fn eth_main_account_credentials() -> (H160, H256) {
 }
 
 fn eth_random_account_credentials() -> (H160, H256) {
-    // let addr = ETH_ADDR.parse().unwrap();
     let mut eth_private_key = H256::default();
     eth_private_key.randomize();
 
@@ -40,6 +46,30 @@ fn eth_random_account_credentials() -> (H160, H256) {
 
 fn one_ether() -> U256 {
     U256::from(10).pow(18.into())
+}
+
+/// Auxiliary function that returns the balance of the account on Ethereum.
+async fn get_ethereum_balance(
+    eth_provider: &EthereumProvider,
+    address: Address,
+    token: &Token,
+) -> Result<U256, anyhow::Error> {
+    if token.symbol == "ETH" {
+        return eth_provider
+            .web3()
+            .eth()
+            .balance(address, None)
+            .compat()
+            .await
+            .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
+    }
+
+    let contract = Contract::new(eth_provider.web3().eth(), token.address, erc20_contract());
+    contract
+        .query("balanceOf", address, None, Options::default(), None)
+        .compat()
+        .await
+        .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }
 
 async fn wait_for_eth_tx(ethereum: &EthereumProvider, hash: H256) {
@@ -84,7 +114,11 @@ async fn wait_for_deposit_and_update_account_id(wallet: &mut Wallet) {
     assert!(wallet.account_id().is_some(), "Account ID was not set");
 }
 
-async fn transfer_eth_to(to: H160) {
+async fn transfer_to(
+    token_like: impl Into<TokenLike>,
+    amount: impl Into<U256>,
+    to: H160,
+) -> Result<(), anyhow::Error> {
     let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
 
     let provider = Provider::new(Network::Localhost);
@@ -92,12 +126,466 @@ async fn transfer_eth_to(to: H160) {
         WalletCredentials::from_eth_pk(main_eth_address, main_eth_private_key, Network::Localhost)
             .unwrap();
 
-    let wallet = Wallet::new(provider, credentials).await.unwrap();
-    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await.unwrap();
-
-    let hash = ethereum.transfer("ETH", one_ether(), to).await.unwrap();
+    let wallet = Wallet::new(provider, credentials).await?;
+    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let hash = ethereum
+        .transfer(token_like.into(), amount.into(), to)
+        .await
+        .unwrap();
 
     wait_for_eth_tx(&ethereum, hash).await;
+    Ok(())
+}
+
+/// Creates a new wallet and tries to make a transfer
+/// from a new wallet without SigningKey.
+async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Error> {
+    let provider = Provider::new(Network::Localhost);
+
+    let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
+    let random_credentials = WalletCredentials::from_eth_pk(
+        random_eth_address,
+        random_eth_private_key,
+        Network::Localhost,
+    )?;
+    let sync_wallet = Wallet::new(provider, random_credentials).await?;
+
+    let handle = sync_wallet
+        .start_transfer()
+        .to(zksync_depositor_wallet.address())
+        .token("ETH")?
+        .amount(1_000_000u64)
+        .send()
+        .await;
+
+    assert!(matches!(
+        handle,
+        Err(ClientError::SigningError(NoSigningKey))
+    ));
+
+    Ok(())
+}
+
+/// Checks the correctness of the `Deposit` operation.
+async fn test_deposit(
+    deposit_wallet: &Wallet,
+    sync_wallet: &mut Wallet,
+    token: &Token,
+    amount: u128,
+) -> Result<(), anyhow::Error> {
+    let ethereum = deposit_wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+
+    if !deposit_wallet.tokens.is_eth(token.address.into()) {
+        if !ethereum.is_erc20_deposit_approved(token.address).await? {
+            let tx_approve_deposits = ethereum.approve_erc20_token_deposits(token.address).await?;
+            wait_for_eth_tx(&ethereum, tx_approve_deposits).await;
+        }
+
+        assert!(
+            ethereum.is_erc20_deposit_approved(token.address).await?,
+            "Token should be approved"
+        );
+    };
+
+    // let balance_before = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
+    let deposit_tx_hash = ethereum
+        .deposit(
+            &token.symbol as &str,
+            U256::from(amount),
+            sync_wallet.address(),
+        )
+        .await?;
+
+    wait_for_eth_tx(&ethereum, deposit_tx_hash).await;
+    wait_for_deposit_and_update_account_id(sync_wallet).await;
+
+    // let balance_after = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
+
+    if !sync_wallet.tokens.is_eth(token.address.into()) {
+        assert!(ethereum.is_erc20_deposit_approved(token.address).await?);
+    }
+
+    // To be sure that the deposit is committed, we need to listen to the event `NewPriorityRequest`
+    // rust SDK doesn't support getting this information yet, but it will be added soon.
+    // assert_eq!(balance_after - balance_before, u256_to_big_dec(amount / 2));
+
+    Ok(())
+}
+
+/// Checks the correctness of the `ChangePubKey` operation.
+async fn test_change_pubkey(sync_wallet: &Wallet) -> Result<(), anyhow::Error> {
+    if !sync_wallet.is_signing_key_set().await? {
+        let handle = sync_wallet.start_change_pubkey().send().await?;
+
+        handle
+            .commit_timeout(Duration::from_secs(60))
+            .wait_for_commit()
+            .await?;
+    }
+    assert!(sync_wallet.is_signing_key_set().await?);
+    Ok(())
+}
+
+/// Makes a transfer from Alice to Bob inside zkSync
+/// checks the correctness of the amount of money before the transaction and after.
+async fn test_transfer(
+    alice: &Wallet,
+    bob: &Wallet,
+    token_symbol: &str,
+    transfer_amount: u128,
+) -> Result<(), anyhow::Error> {
+    let transfer_amount = num::BigUint::from(transfer_amount);
+
+    let total_fee = alice
+        .provider
+        .get_tx_fee(TxFeeTypes::Transfer, bob.address(), token_symbol)
+        .await?
+        .total_fee;
+
+    let alice_balance_before = alice
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+
+    let bob_balance_before = bob
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+
+    let transfer_handle = alice
+        .start_transfer()
+        .to(bob.address())
+        .token(token_symbol)?
+        .amount(transfer_amount.clone())
+        .send()
+        .await?;
+
+    transfer_handle
+        .verify_timeout(Duration::from_secs(180))
+        .wait_for_verify()
+        .await?;
+
+    let alice_balance_after = alice
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+    let bob_balance_after = bob
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+
+    assert_eq!(
+        alice_balance_before - alice_balance_after,
+        transfer_amount.clone() + total_fee
+    );
+    assert_eq!(bob_balance_after - bob_balance_before, transfer_amount);
+    Ok(())
+}
+
+/// Makes a transaction from the account to its own address
+/// checks if the expected amount of fee has been spent.
+async fn test_transfer_to_self(
+    sync_wallet: &Wallet,
+    token_symbol: &str,
+    transfer_amount: u128,
+) -> Result<(), anyhow::Error> {
+    let transfer_amount = num::BigUint::from(transfer_amount);
+    let balance_before = sync_wallet
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+    let total_fee = sync_wallet
+        .provider
+        .get_tx_fee(TxFeeTypes::Transfer, sync_wallet.address(), token_symbol)
+        .await?
+        .total_fee;
+
+    let transfer_handle = sync_wallet
+        .start_transfer()
+        .to(sync_wallet.address())
+        .token(token_symbol)?
+        .amount(transfer_amount)
+        .send()
+        .await?;
+
+    transfer_handle
+        .verify_timeout(Duration::from_secs(180))
+        .wait_for_verify()
+        .await?;
+
+    let balance_after = sync_wallet
+        .get_balance(BlockStatus::Committed, token_symbol)
+        .await?;
+
+    assert_eq!(balance_before - balance_after, total_fee);
+
+    Ok(())
+}
+
+/// Makes a withdraw operation on L2
+/// checks the correctness of their execution.
+async fn test_withdraw(
+    eth_provider: &EthereumProvider,
+    main_contract: &Contract<Http>,
+    sync_wallet: &Wallet,
+    withdraw_to: &Wallet,
+    token: &Token,
+    amount: u128,
+) -> Result<(), anyhow::Error> {
+    let total_fee = sync_wallet
+        .provider
+        .get_tx_fee(TxFeeTypes::Withdraw, withdraw_to.address(), token.address)
+        .await?
+        .total_fee;
+    let sync_balance_before = sync_wallet
+        .get_balance(BlockStatus::Committed, &token.symbol as &str)
+        .await?;
+    let onchain_balance_before =
+        get_ethereum_balance(eth_provider, withdraw_to.address(), token).await?;
+    let pending_to_be_onchain_balance_before: U256 = {
+        let query = main_contract.query(
+            "getBalanceToWithdraw",
+            (withdraw_to.address(), token.id),
+            None,
+            Options::default(),
+            None,
+        );
+
+        query
+            .wait()
+            .map_err(|err| anyhow::anyhow!(format!("Contract query fail: {}", err)))?
+    };
+
+    let withdraw_handle = sync_wallet
+        .start_withdraw()
+        .to(withdraw_to.address())
+        .token(token.address)?
+        .amount(amount)
+        .send()
+        .await?;
+
+    withdraw_handle
+        .verify_timeout(Duration::from_secs(180))
+        .wait_for_verify()
+        .await?;
+
+    let sync_balance_after = sync_wallet
+        .get_balance(BlockStatus::Committed, &token.symbol as &str)
+        .await?;
+    let onchain_balance_after =
+        get_ethereum_balance(eth_provider, withdraw_to.address(), token).await?;
+
+    let pending_to_be_onchain_balance_after: U256 = {
+        let query = main_contract.query(
+            "getBalanceToWithdraw",
+            (withdraw_to.address(), token.id),
+            None,
+            Options::default(),
+            None,
+        );
+
+        query
+            .wait()
+            .map_err(|err| anyhow::anyhow!(format!("Contract query fail: {}", err)))?
+    };
+
+    assert_eq!(
+        onchain_balance_after - onchain_balance_before + pending_to_be_onchain_balance_after
+            - pending_to_be_onchain_balance_before,
+        U256::from(amount)
+    );
+    assert_eq!(
+        sync_balance_before - sync_balance_after,
+        num::BigUint::from(amount) + total_fee
+    );
+
+    Ok(())
+}
+
+/// Makes transfers for different types of operations
+/// checks the correctness of their execution.
+async fn move_funds(
+    main_contract: &Contract<Http>,
+    eth_provider: &EthereumProvider,
+    depositor_wallet: &Wallet,
+    alice: &mut Wallet,
+    bob: &Wallet,
+    token_like: impl Into<TokenLike>,
+    deposit_amount: u128,
+) -> Result<(), anyhow::Error> {
+    let token_like = token_like.into();
+    let token = depositor_wallet
+        .tokens
+        .resolve(token_like.clone())
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
+
+    let transfer_amount = deposit_amount / 10;
+    let withdraw_amount = deposit_amount / 10;
+
+    test_deposit(depositor_wallet, alice, &token, deposit_amount).await?;
+    println!("Deposit ok, Token: {}", token.symbol);
+
+    test_change_pubkey(alice).await?;
+    println!("Change pubkey ok");
+
+    test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
+    println!("Transfer to new ok, Token: {}", token.symbol);
+
+    test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
+    println!("Transfer ok, Token: {}", token.symbol);
+
+    test_transfer_to_self(&alice, &token.symbol, transfer_amount).await?;
+    println!("Transfer to self ok, Token: {}", token.symbol);
+
+    test_withdraw(
+        &eth_provider,
+        &main_contract,
+        &alice,
+        &bob,
+        &token,
+        withdraw_amount,
+    )
+    .await?;
+    println!("Withdraw ok, Token: {}", token.symbol);
+
+    // Currently fast withdraw aren't supported by zksync-rs, but they will be in the near future.
+    // test_fast_withdraw(eth, main_contract, &bob, &bob, &token, withdraw_amount);
+    // println!("Fast withdraw ok, Token: {}", token.symbol);
+
+    // Currently multi transactions aren't supported by zksync-rs, but they will be in the near future.
+    // test_multi_transfer(alice, bob, &token.symbol, transfersAmount / 2);
+    // println!("Batched transfers ok, Token: {}, token.symbol");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg_attr(not(feature = "integration-tests"), ignore)]
+async fn comprehensive_test() -> Result<(), anyhow::Error> {
+    let provider = Provider::new(Network::Localhost);
+
+    let main_wallet = {
+        let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
+        let main_credentials = WalletCredentials::from_eth_pk(
+            main_eth_address,
+            main_eth_private_key,
+            Network::Localhost,
+        )?;
+        Wallet::new(provider.clone(), main_credentials).await?
+    };
+
+    let sync_depositor_wallet = {
+        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
+        let random_credentials = WalletCredentials::from_eth_pk(
+            random_eth_address,
+            random_eth_private_key,
+            Network::Localhost,
+        )?;
+        Wallet::new(provider.clone(), random_credentials).await?
+    };
+
+    let mut alice_wallet1 = {
+        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
+        let random_credentials = WalletCredentials::from_eth_pk(
+            random_eth_address,
+            random_eth_private_key,
+            Network::Localhost,
+        )?;
+        Wallet::new(provider.clone(), random_credentials).await?
+    };
+
+    let mut alice_wallet2 = {
+        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
+        let random_credentials = WalletCredentials::from_eth_pk(
+            random_eth_address,
+            random_eth_private_key,
+            Network::Localhost,
+        )?;
+        Wallet::new(provider.clone(), random_credentials).await?
+    };
+
+    let bob_wallet1 = {
+        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
+        let random_credentials = WalletCredentials::from_eth_pk(
+            random_eth_address,
+            random_eth_private_key,
+            Network::Localhost,
+        )?;
+        Wallet::new(provider.clone(), random_credentials).await?
+    };
+
+    let bob_wallet2 = {
+        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
+        let random_credentials = WalletCredentials::from_eth_pk(
+            random_eth_address,
+            random_eth_private_key,
+            Network::Localhost,
+        )?;
+        Wallet::new(provider.clone(), random_credentials).await?
+    };
+
+    let ethereum = main_wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+
+    let main_contract = {
+        let address_response = provider.contract_address().await?;
+        let contract_address = if address_response.main_contract.starts_with("0x") {
+            &address_response.main_contract[2..]
+        } else {
+            &address_response.main_contract
+        }
+        .parse()?;
+
+        Contract::new(ethereum.web3().eth(), contract_address, zksync_contract())
+    };
+
+    let token_eth = sync_depositor_wallet
+        .tokens
+        .resolve("ETH".into())
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
+
+    let token_dai = sync_depositor_wallet
+        .tokens
+        .resolve("DAI".into())
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
+
+    let eth_deposit_amount = U256::from(10).pow(18.into()) * 6; // 6 Ethers
+    let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
+
+    transfer_to("ETH", eth_deposit_amount, sync_depositor_wallet.address()).await?;
+    transfer_to("DAI", dai_deposit_amount, sync_depositor_wallet.address()).await?;
+
+    assert_eq!(
+        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_eth).await?,
+        eth_deposit_amount
+    );
+
+    assert_eq!(
+        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_dai).await?,
+        dai_deposit_amount
+    );
+
+    test_tx_fail(&sync_depositor_wallet).await?;
+
+    move_funds(
+        &main_contract,
+        &ethereum,
+        &sync_depositor_wallet,
+        &mut alice_wallet1,
+        &bob_wallet1,
+        "DAI",
+        // 200 DAI
+        200_000_000_000_000_000_000u128,
+    )
+    .await?;
+
+    move_funds(
+        &main_contract,
+        &ethereum,
+        &sync_depositor_wallet,
+        &mut alice_wallet2,
+        &bob_wallet2,
+        "ETH",
+        // 1 Ether (10^18 WEI)
+        1_000_000_000_000_000_000u128,
+    )
+    .await?;
+
+    Ok(())
 }
 
 #[tokio::test]
@@ -107,51 +595,46 @@ async fn simple_workflow() -> Result<(), anyhow::Error> {
 
     // Transfer funds from "rich" account to a randomly created one (so we won't reuse the same
     // account in subsequent test runs).
-    transfer_eth_to(eth_address).await;
+    transfer_to("ETH", one_ether(), eth_address).await?;
 
     let provider = Provider::new(Network::Localhost);
     let credentials =
         WalletCredentials::from_eth_pk(eth_address, eth_private_key, Network::Localhost).unwrap();
 
-    let mut wallet = Wallet::new(provider, credentials).await.unwrap();
-    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await.unwrap();
+    let mut wallet = Wallet::new(provider, credentials).await?;
+    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
 
     let deposit_tx_hash = ethereum
         .deposit("ETH", one_ether() / 2, wallet.address())
-        .await
-        .unwrap();
+        .await?;
 
     wait_for_eth_tx(&ethereum, deposit_tx_hash).await;
 
     // Update stored wallet ID after we initialized a wallet via deposit.
     wait_for_deposit_and_update_account_id(&mut wallet).await;
 
-    if !wallet.is_signing_key_set().await.unwrap() {
-        let handle = wallet.start_change_pubkey().send().await.unwrap();
+    if !wallet.is_signing_key_set().await? {
+        let handle = wallet.start_change_pubkey().send().await?;
 
         handle
             .commit_timeout(Duration::from_secs(60))
             .wait_for_commit()
-            .await
-            .unwrap();
+            .await?;
     }
 
     // Perform transfer to self.
     let handle = wallet
         .start_transfer()
         .to(wallet.address())
-        .token("ETH")
-        .unwrap()
+        .token("ETH")?
         .amount(1_000_000u64)
         .send()
-        .await
-        .unwrap();
+        .await?;
 
     handle
         .verify_timeout(Duration::from_secs(180))
         .wait_for_verify()
-        .await
-        .unwrap();
+        .await?;
 
     Ok(())
 }
