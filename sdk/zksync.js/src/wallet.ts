@@ -163,8 +163,6 @@ export class Wallet {
 
         for (let i = 0; i < transfers.length; i++) {
             const transfer = transfers[i];
-
-            const tokenId = this.provider.tokenSet.resolveTokenId(transfer.token);
             const nonce = nextNonce;
             nextNonce += 1;
 
@@ -177,51 +175,20 @@ export class Wallet {
                 transfer.fee = fullFee.totalFee;
             }
 
-            const transactionData = {
-                accountId: this.accountId,
-                from: this.address(),
+            const { tx, ethereumSignature } = await this.signSyncTransfer({
                 to: transfer.to,
-                tokenId,
+                token: transfer.token,
                 amount: transfer.amount,
                 fee: transfer.fee,
                 nonce
-            };
+            });
 
-            const stringAmount = this.provider.tokenSet.formatToken(
-                transfer.token,
-                transfer.amount
-            );
-            const stringFee = this.provider.tokenSet.formatToken(
-                transfer.token,
-                transfer.fee
-            );
-            const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
-            const humanReadableTxInfo =
-                `Transfer ${stringAmount} ${stringToken}\n` +
-                `To: ${transfer.to.toLowerCase()}\n` +
-                `Nonce: ${nonce}\n` +
-                `Fee: ${stringFee} ${stringToken}\n` +
-                `Account Id: ${this.accountId}`;
-
-            const txMessageEthSignature = await this.getEthMessageSignature(
-                humanReadableTxInfo
-            );
-
-            const signedTransferTransaction = this.signer.signSyncTransfer(
-                transactionData
-            );
-
-            signedTransfers.push({tx: signedTransferTransaction, signature: txMessageEthSignature});
+            signedTransfers.push({tx, signature: ethereumSignature});
         }
 
         const transactionHashes = await this.provider.submitTxsBatch(signedTransfers);
-        return transactionHashes.map(function(txHash, idx) {
-                return new Transaction(
-                    signedTransfers[idx],
-                    txHash,
-                    this.provider
-                )
-            }, this
+        return transactionHashes.map((txHash, idx) =>
+            new Transaction(signedTransfers[idx], txHash, this.provider)
         );
     }
 
