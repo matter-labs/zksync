@@ -1,4 +1,4 @@
-use crate::tests::PlasmaTestBuilder;
+use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use models::{AccountUpdate, Transfer};
 use num::{BigUint, Zero};
 use web3::types::H160;
@@ -11,10 +11,10 @@ fn to_existing() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (from_account_id, from_account, from_sk) = tb.add_account(true);
+    let (from_account_id, from_account, from_sk) = tb.add_account(Unlocked);
     tb.set_balance(from_account_id, token_id, &amount + &fee);
 
-    let (to_account_id, to_account, _to_sk) = tb.add_account(false);
+    let (to_account_id, to_account, _to_sk) = tb.add_account(Locked);
 
     let transfer = Transfer::new_signed(
         from_account_id,
@@ -59,10 +59,10 @@ fn insufficient_funds() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (from_account_id, from_account, from_sk) = tb.add_account(true);
+    let (from_account_id, from_account, from_sk) = tb.add_account(Unlocked);
     tb.set_balance(from_account_id, token_id, amount.clone()); // balance is insufficient to pay fees
 
-    let (_to_account_id, to_account, _to_sk) = tb.add_account(false);
+    let (_to_account_id, to_account, _to_sk) = tb.add_account(Locked);
 
     let transfer = Transfer::new_signed(
         from_account_id,
@@ -87,7 +87,7 @@ fn to_new() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let new_address = H160::random();
@@ -143,7 +143,7 @@ fn to_self() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let transfer = Transfer::new_signed(
@@ -179,7 +179,7 @@ fn nonce_mismatch() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let transfer = Transfer::new_signed(
@@ -205,8 +205,8 @@ fn invalid_account_id() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
-    let (_, to_account, _) = tb.add_account(false);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
+    let (_, to_account, _) = tb.add_account(Locked);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let transfer = Transfer::new_signed(

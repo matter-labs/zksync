@@ -1,4 +1,4 @@
-use crate::tests::PlasmaTestBuilder;
+use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use models::priority_ops::{Deposit, FullExit};
 use models::{account::AccountUpdate, FranklinPriorityOp};
 use num::{BigUint, Zero};
@@ -9,7 +9,7 @@ fn deposit_to_existing() {
     let token = 0;
     let amount = BigUint::from(100u32);
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _) = tb.add_account(false);
+    let (account_id, account, _) = tb.add_account(Locked);
 
     let deposit = Deposit {
         from: account.address,
@@ -82,7 +82,7 @@ fn full_exit_success() {
     let token = 0;
     let amount = BigUint::from(145u32);
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _) = tb.add_account(false);
+    let (account_id, account, _) = tb.add_account(Locked);
     tb.set_balance(account_id, token, amount.clone());
 
     let full_exit = FullExit {

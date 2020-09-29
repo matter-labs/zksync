@@ -1,4 +1,4 @@
-use super::PlasmaTestBuilder;
+use super::{AccountState::*, PlasmaTestBuilder};
 use crate::state::CollectedFee;
 use models::account::AccountUpdate;
 use num::{BigUint, Zero};
@@ -6,7 +6,7 @@ use num::{BigUint, Zero};
 #[test]
 fn success() {
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _) = tb.add_account(false);
+    let (account_id, account, _) = tb.add_account(Locked);
     tb.set_balance(account_id, 0, 145u32);
 
     let nonce = account.nonce;
@@ -53,7 +53,7 @@ fn success() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Fee account should be present in the account tree: 145")]
 fn invalid_account() {
     let mut tb = PlasmaTestBuilder::new();
     tb.state.collect_fee(&[], 145);

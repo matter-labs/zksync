@@ -16,6 +16,11 @@ use zksync_crypto::{
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];
 
+pub enum AccountState {
+    Locked,
+    Unlocked,
+}
+
 pub struct PlasmaTestBuilder {
     rng: XorShiftRng,
     state: PlasmaState,
@@ -35,7 +40,7 @@ impl PlasmaTestBuilder {
         }
     }
 
-    pub fn add_account(&mut self, unlock: bool) -> (AccountId, Account, PrivateKey) {
+    pub fn add_account(&mut self, state: AccountState) -> (AccountId, Account, PrivateKey) {
         let account_id = self.state.get_free_account_id();
 
         let sk = priv_key_from_fs(self.rng.gen());
@@ -46,7 +51,7 @@ impl PlasmaTestBuilder {
 
         let mut account = Account::default();
         account.address = address;
-        if unlock {
+        if let AccountState::Unlocked = state {
             account.pub_key_hash = PubKeyHash::from_privkey(&sk);
         }
 

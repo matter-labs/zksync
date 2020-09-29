@@ -1,4 +1,4 @@
-use crate::tests::PlasmaTestBuilder;
+use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use models::{account::AccountUpdate, tx::Withdraw};
 use num::{BigUint, Zero};
 
@@ -10,7 +10,7 @@ fn success() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let withdraw = Withdraw::new_signed(
@@ -46,7 +46,7 @@ fn insufficient_funds() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
     tb.set_balance(account_id, token_id, amount.clone());
 
     let withdraw = Withdraw::new_signed(
@@ -72,7 +72,7 @@ fn nonce_mismatch() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let withdraw = Withdraw::new_signed(
@@ -98,8 +98,8 @@ fn invalid_account_id() {
 
     let mut tb = PlasmaTestBuilder::new();
 
-    let (account_id, account, sk) = tb.add_account(true);
-    let (_, to_account, _) = tb.add_account(true);
+    let (account_id, account, sk) = tb.add_account(Unlocked);
+    let (_, to_account, _) = tb.add_account(Locked);
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let withdraw = Withdraw::new_signed(
