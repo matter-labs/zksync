@@ -92,8 +92,6 @@ impl FullExitOp {
     }
 
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
-        let mut result = Vec::with_capacity(1);
-        result.push(self.priority_op.account_id);
-        result
+        vec![self.priority_op.account_id]
     }
 }

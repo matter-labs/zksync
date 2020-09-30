@@ -63,12 +63,7 @@ pub fn acc_create_random_updates<R: Rng>(
     .into_iter()
 }
 
-pub fn get_operation(
-    block_number: BlockNumber,
-    action: Action,
-    _accounts_updated: Vec<(u32, AccountUpdate)>,
-    block_size: usize,
-) -> Operation {
+pub fn get_operation(block_number: BlockNumber, action: Action, block_size: usize) -> Operation {
     Operation {
         id: None,
         action,
@@ -88,7 +83,6 @@ pub fn get_operation(
 pub fn get_operation_with_txs(
     block_number: BlockNumber,
     action: Action,
-    _accounts_updated: Vec<(u32, AccountUpdate)>,
     block_size: usize,
     txs: Vec<ExecutedOperations>,
 ) -> Operation {

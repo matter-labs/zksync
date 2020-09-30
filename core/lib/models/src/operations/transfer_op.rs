@@ -86,9 +86,6 @@ impl TransferOp {
     }
 
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
-        let mut result = Vec::with_capacity(2);
-        result.push(self.from);
-        result.push(self.to);
-        result
+        vec![self.from, self.to]
     }
 }

@@ -154,12 +154,10 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         accounts_map = new_accounts_map;
 
         BlockSchema(&mut storage)
-            .execute_operation(get_operation(
-                block_number,
-                Action::Commit,
-                updates,
-                block_size,
-            ))
+            .execute_operation(get_operation(block_number, Action::Commit, block_size))
+            .await?;
+        StateSchema(&mut storage)
+            .commit_state_update(block_number, &updates, 0)
             .await?;
 
         ProverSchema(&mut storage)
@@ -171,7 +169,6 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 Action::Verify {
                     proof: Default::default(),
                 },
-                Vec::new(),
                 block_size,
             ))
             .await?;
