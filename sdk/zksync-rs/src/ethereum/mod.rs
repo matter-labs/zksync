@@ -1,7 +1,6 @@
 //! Utilities for the on-chain operations, such as `Deposit` and `FullExit`.
 
 use eth_client::ETHClient;
-use futures::compat::Future01CompatExt;
 use models::{AccountId, PriorityOp, TokenLike};
 use num::BigUint;
 use std::{convert::TryFrom, time::Duration};

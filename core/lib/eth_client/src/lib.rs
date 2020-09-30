@@ -109,11 +109,7 @@ impl<T: Transport> ETHClient<T> {
 
     /// Returns the account balance.
     pub async fn balance(&self) -> Result<U256, Error> {
-        self.web3
-            .eth()
-            .balance(self.sender_account, None)
-            .compat()
-            .await
+        self.web3.eth().balance(self.sender_account, None).await
     }
 
     /// Encodes the transaction data (smart contract method and its input) to the bytes
@@ -224,11 +220,6 @@ impl<T: Transport> ETHClient<T> {
         &self,
         tx_hash: H256,
     ) -> Result<Option<TransactionReceipt>, failure::Error> {
-        Ok(self
-            .web3
-            .eth()
-            .transaction_receipt(tx_hash)
-            .compat()
-            .await?)
+        Ok(self.web3.eth().transaction_receipt(tx_hash).await?)
     }
 }
