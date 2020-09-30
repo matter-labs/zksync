@@ -64,6 +64,7 @@ enum WatcherMode {
     Backoff(Instant),
 }
 
+#[derive(Debug)]
 pub enum EthWatchRequest {
     PollETHNode,
     IsPubkeyChangeAuthorized {

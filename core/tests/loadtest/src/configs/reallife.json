@@ -1,7 +1,7 @@
 {
-    "n_accounts": 100,
+    "n_accounts": 10,
     "transfer_size": 100,
-    "cycles_amount": 5,
+    "cycles_amount": 2,
     "block_timeout": 120,
     "use_all_block_sizes": true,
     "input_account": {

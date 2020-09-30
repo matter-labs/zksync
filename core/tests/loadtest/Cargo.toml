@@ -13,7 +13,7 @@ publish = false # We don't want to publish our tests.
 [dependencies]
 models = { path = "../../lib/models", version = "1.0" }
 server = { path = "../../bin/server", version = "1.0" }
-testkit = { path = "../testkit", version = "1.0" }
+zksync = { path = "../../../sdk/zksync-rs", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 

@@ -7,7 +7,7 @@ use std::fmt;
 // External uses
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
-use web3::types::{Address, BlockNumber, Bytes};
+use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt};
 use web3::types::{H160, H256, U256, U64};
 use web3::{Error, Transport, Web3};
 
@@ -105,6 +105,15 @@ impl<T: Transport> ETHClient<T> {
         let percent_gas_price_factor = U256::from((self.gas_price_factor * 100.0).round() as u64);
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
         Ok(network_gas_price)
+    }
+
+    /// Returns the account balance.
+    pub async fn balance(&self) -> Result<U256, Error> {
+        self.web3
+            .eth()
+            .balance(self.sender_account, None)
+            .compat()
+            .await
     }
 
     /// Encodes the transaction data (smart contract method and its input) to the bytes
@@ -208,5 +217,18 @@ impl<T: Transport> ETHClient<T> {
     /// Transaction is expected to be encoded as the byte sequence.
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, failure::Error> {
         Ok(self.web3.eth().send_raw_transaction(Bytes(tx)).await?)
+    }
+
+    /// Gets the Ethereum transaction receipt.
+    pub async fn tx_receipt(
+        &self,
+        tx_hash: H256,
+    ) -> Result<Option<TransactionReceipt>, failure::Error> {
+        Ok(self
+            .web3
+            .eth()
+            .transaction_receipt(tx_hash)
+            .compat()
+            .await?)
     }
 }

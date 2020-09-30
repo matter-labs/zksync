@@ -5,7 +5,8 @@
 //!
 //! ```bash
 //! zksync server &!
-//! zksync rust-sdk-tests
+//! zksync dummy-prover &!
+//! zksync sdk-test
 //! ```
 
 use std::time::{Duration, Instant};
@@ -68,25 +69,6 @@ async fn get_ethereum_balance(
         .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }
 
-async fn wait_for_eth_tx(ethereum: &EthereumProvider, hash: H256) {
-    let timeout = Duration::from_secs(10);
-    let mut poller = tokio::time::interval(std::time::Duration::from_millis(100));
-    let web3 = ethereum.web3();
-    let start = Instant::now();
-    while web3
-        .eth()
-        .transaction_receipt(hash)
-        .await
-        .unwrap()
-        .is_none()
-    {
-        if start.elapsed() > timeout {
-            panic!("Timeout elapsed while waiting for Ethereum transaction");
-        }
-        poller.tick().await;
-    }
-}
-
 async fn wait_for_deposit_and_update_account_id(wallet: &mut Wallet) {
     let timeout = Duration::from_secs(60);
     let mut poller = tokio::time::interval(std::time::Duration::from_millis(100));
@@ -128,7 +110,7 @@ async fn transfer_to(
         .await
         .unwrap();
 
-    wait_for_eth_tx(&ethereum, hash).await;
+    ethereum.wait_for_tx(hash).await?;
     Ok(())
 }
 
@@ -173,7 +155,7 @@ async fn test_deposit(
     if !deposit_wallet.tokens.is_eth(token.address.into()) {
         if !ethereum.is_erc20_deposit_approved(token.address).await? {
             let tx_approve_deposits = ethereum.approve_erc20_token_deposits(token.address).await?;
-            wait_for_eth_tx(&ethereum, tx_approve_deposits).await;
+            ethereum.wait_for_tx(tx_approve_deposits).await?;
         }
 
         assert!(
@@ -191,7 +173,7 @@ async fn test_deposit(
         )
         .await?;
 
-    wait_for_eth_tx(&ethereum, deposit_tx_hash).await;
+    ethereum.wait_for_tx(deposit_tx_hash).await?;
     wait_for_deposit_and_update_account_id(sync_wallet).await;
 
     // let balance_after = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
@@ -603,7 +585,7 @@ async fn simple_workflow() -> Result<(), anyhow::Error> {
         .deposit("ETH", one_ether() / 2, wallet.address())
         .await?;
 
-    wait_for_eth_tx(&ethereum, deposit_tx_hash).await;
+    ethereum.wait_for_tx(deposit_tx_hash).await?;
 
     // Update stored wallet ID after we initialized a wallet via deposit.
     wait_for_deposit_and_update_account_id(&mut wallet).await;
