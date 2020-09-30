@@ -1,8 +1,11 @@
+mod collect_fee;
 mod operations;
 
 use crate::state::PlasmaState;
 use models::tx::PackedEthSignature;
-use models::{Account, AccountId, AccountUpdate, FranklinTx, PubKeyHash, TokenId};
+use models::{
+    Account, AccountId, AccountUpdate, FranklinPriorityOp, FranklinTx, PubKeyHash, TokenId,
+};
 use num::BigUint;
 use web3::types::H256;
 use zksync_crypto::{
@@ -10,6 +13,13 @@ use zksync_crypto::{
     rand::{Rng, SeedableRng, XorShiftRng},
     PrivateKey,
 };
+
+type BoundAccountUpdates = [(AccountId, AccountUpdate)];
+
+pub enum AccountState {
+    Locked,
+    Unlocked,
+}
 
 pub struct PlasmaTestBuilder {
     rng: XorShiftRng,
@@ -30,7 +40,7 @@ impl PlasmaTestBuilder {
         }
     }
 
-    pub fn add_account(&mut self, unlock: bool) -> (AccountId, Account, PrivateKey) {
+    pub fn add_account(&mut self, state: AccountState) -> (AccountId, Account, PrivateKey) {
         let account_id = self.state.get_free_account_id();
 
         let sk = priv_key_from_fs(self.rng.gen());
@@ -41,7 +51,7 @@ impl PlasmaTestBuilder {
 
         let mut account = Account::default();
         account.address = address;
-        if unlock {
+        if let AccountState::Unlocked = state {
             account.pub_key_hash = PubKeyHash::from_privkey(&sk);
         }
 
@@ -66,22 +76,13 @@ impl PlasmaTestBuilder {
         self.state.insert_account(account_id, account);
     }
 
-    pub fn test_tx_success(&mut self, tx: FranklinTx, expected_updates: &[(u32, AccountUpdate)]) {
+    pub fn test_tx_success(&mut self, tx: FranklinTx, expected_updates: &BoundAccountUpdates) {
         let mut state_clone = self.state.clone();
         let op_success = self.state.execute_tx(tx).expect("transaction failed");
-
-        assert_eq!(
+        self.compare_updates(
             expected_updates,
             op_success.updates.as_slice(),
-            "unexpected updates"
-        );
-
-        state_clone.apply_updates(expected_updates);
-
-        assert_eq!(
-            self.state.root_hash(),
-            state_clone.root_hash(),
-            "returned updates don't match real state changes"
+            &mut state_clone,
         );
     }
 
@@ -95,6 +96,37 @@ impl PlasmaTestBuilder {
             error.to_string().as_str(),
             expected_error_message,
             "unexpected error message"
+        );
+    }
+
+    pub fn test_priority_op_success(
+        &mut self,
+        op: FranklinPriorityOp,
+        expected_updates: &BoundAccountUpdates,
+    ) {
+        let mut state_clone = self.state.clone();
+        let op_success = self.state.execute_priority_op(op);
+        self.compare_updates(
+            expected_updates,
+            op_success.updates.as_slice(),
+            &mut state_clone,
+        );
+    }
+
+    pub fn compare_updates(
+        &self,
+        expected_updates: &BoundAccountUpdates,
+        actual_updates: &BoundAccountUpdates,
+        state_clone: &mut PlasmaState,
+    ) {
+        assert_eq!(expected_updates, actual_updates, "unexpected updates");
+
+        state_clone.apply_updates(expected_updates);
+
+        assert_eq!(
+            self.state.root_hash(),
+            state_clone.root_hash(),
+            "returned updates don't match real state changes"
         );
     }
 }
