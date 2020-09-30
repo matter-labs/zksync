@@ -8,11 +8,11 @@ use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
-use models::{
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     block::{Block, ExecutedOperations, PendingBlock},
     AccountUpdates, Action, BlockNumber, Operation,
 };
-use storage::ConnectionPool;
 
 #[derive(Debug)]
 pub enum CommitRequest {

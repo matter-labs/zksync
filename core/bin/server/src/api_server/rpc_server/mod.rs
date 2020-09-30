@@ -7,18 +7,18 @@ use futures::{
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use models::{
-    tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
-};
-use storage::{
+use zksync_config::ConfigurationOptions;
+use zksync_storage::{
     chain::{
         block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
         operations_ext::records::TxReceiptResponse,
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_config::ConfigurationOptions;
+use zksync_types::{
+    tx::{TxEthSignature, TxHash},
+    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
+};
 // Local uses
 use crate::panic_notify::ThreadPanicNotify;
 use crate::{
@@ -34,7 +34,7 @@ use crate::{
     },
 };
 use bigdecimal::BigDecimal;
-use models::tx::EthSignData;
+use zksync_types::tx::EthSignData;
 
 pub mod error;
 mod rpc_impl;

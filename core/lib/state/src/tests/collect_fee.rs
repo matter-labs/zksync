@@ -1,7 +1,7 @@
 use super::{AccountState::*, PlasmaTestBuilder};
 use crate::state::CollectedFee;
-use models::account::AccountUpdate;
 use num::{BigUint, Zero};
+use zksync_types::account::AccountUpdate;
 
 /// Checks if fees are collected correctly.
 /// Fees are not only in ETH and may be zero.

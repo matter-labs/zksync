@@ -1,8 +1,8 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
-use models::priority_ops::{Deposit, FullExit};
-use models::{account::AccountUpdate, FranklinPriorityOp};
 use num::{BigUint, Zero};
 use web3::types::H160;
+use zksync_types::priority_ops::{Deposit, FullExit};
+use zksync_types::{account::AccountUpdate, FranklinPriorityOp};
 
 /// Check Deposit to existing account
 #[test]

@@ -4,8 +4,8 @@ use std::cmp::Ordering;
 use num::bigint::ToBigInt;
 use zksync_basic_types::Address;
 // Workspace imports
-use models::PubKeyHash;
-use models::{AccountUpdate, TokenId};
+use zksync_types::PubKeyHash;
+use zksync_types::{AccountUpdate, TokenId};
 // Local imports
 use crate::chain::account::records::*;
 

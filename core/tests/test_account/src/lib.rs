@@ -3,11 +3,11 @@ use std::{fmt, sync::Mutex};
 // External uses
 use num::BigUint;
 // Workspace uses
-use models::tx::{ChangePubKey, PackedEthSignature, TxSignature};
-use models::{AccountId, Address, Close, Nonce, PubKeyHash, TokenId, Transfer, Withdraw};
 use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
+use zksync_types::tx::{ChangePubKey, PackedEthSignature, TxSignature};
+use zksync_types::{AccountId, Address, Close, Nonce, PubKeyHash, TokenId, Transfer, Withdraw};
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {

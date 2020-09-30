@@ -7,7 +7,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::operations::DepositOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -19,6 +18,7 @@ use zksync_crypto::{
         TX_TYPE_BIT_WIDTH,
     },
 };
+use zksync_types::operations::DepositOp;
 // Local deps
 use crate::{
     operation::{

@@ -2,8 +2,8 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, run_upgrade_franklin};
 use crate::zksync_account::ZksyncAccount;
 use std::time::Instant;
-use testkit::*;
 use web3::transports::Http;
+use zksync_testkit::*;
 
 async fn migration_test() {
     let testkit_config = get_testkit_config_from_env();

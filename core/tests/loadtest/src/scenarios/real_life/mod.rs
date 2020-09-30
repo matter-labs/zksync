@@ -60,13 +60,13 @@ use futures::future::try_join_all;
 use num::BigUint;
 use tokio::{fs, time};
 // Workspace deps
-use models::{
+use zksync::{Network, Provider};
+use zksync_config::ConfigurationOptions;
+use zksync_types::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
     tx::PackedEthSignature,
     FranklinTx, TxFeeTypes,
 };
-use zksync::{Network, Provider};
-use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local deps
 use self::satellite::SatelliteScenario;

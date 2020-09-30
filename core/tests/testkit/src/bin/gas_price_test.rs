@@ -11,13 +11,8 @@
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
-use models::{
-    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
-};
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::str::FromStr;
-use testkit::*;
 use web3::transports::Http;
 use web3::types::U256;
 use zksync_crypto::params::{
@@ -25,6 +20,11 @@ use zksync_crypto::params::{
     FEE_MANTISSA_BIT_WIDTH,
 };
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+use zksync_testkit::*;
+use zksync_types::{
+    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
+    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 /// Constant for gas_price_test

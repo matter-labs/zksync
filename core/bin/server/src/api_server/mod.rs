@@ -7,9 +7,9 @@
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
-use models::Operation;
-use storage::ConnectionPool;
 use zksync_config::{AdminServerOptions, ConfigurationOptions};
+use zksync_storage::ConnectionPool;
+use zksync_types::Operation;
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{

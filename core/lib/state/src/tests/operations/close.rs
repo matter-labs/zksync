@@ -1,5 +1,5 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
-use models::tx::{Close, TxSignature};
+use zksync_types::tx::{Close, TxSignature};
 
 /// Checks that Close operations fails
 /// because it is disabled

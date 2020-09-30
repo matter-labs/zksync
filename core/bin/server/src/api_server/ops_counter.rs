@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 // Workspace deps.
-use models::{tx::ChangePubKey, AccountId};
+use zksync_types::{tx::ChangePubKey, AccountId};
 
 const ONE_DAY: Duration = Duration::from_secs(60 * 60 * 24);
 const MAX_OPS_PER_DAY: usize = 10;

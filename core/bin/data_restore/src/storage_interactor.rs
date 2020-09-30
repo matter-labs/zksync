@@ -3,15 +3,15 @@ use std::{convert::TryFrom, str::FromStr};
 // External deps
 use web3::types::H256;
 // Workspace deps
-use models::{
-    Action, NewTokenEvent, Operation,
-    {block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
-};
-use storage::{
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_storage::{
     data_restore::records::{NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock},
     ConnectionPool,
 };
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_types::{
+    Action, NewTokenEvent, Operation,
+    {block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
+};
 // Local deps
 use crate::{
     data_restore_driver::StorageUpdateState,

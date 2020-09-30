@@ -6,12 +6,9 @@ use std::{thread, time};
 use num::BigUint;
 use zksync_crypto::pairing::ff::PrimeField;
 // Workspace deps
-use circuit::{
+use zksync_circuit::{
     circuit::FranklinCircuit,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
-};
-use models::{
-    block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
 };
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::{
@@ -20,8 +17,11 @@ use zksync_crypto::{
     Engine, Fr,
 };
 use zksync_prover_utils::prover_data::ProverData;
+use zksync_types::{
+    block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
+};
 // Local deps
-use prover::{
+use zksync_prover::{
     plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
     ProverImpl,
 };
@@ -62,7 +62,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         let jh = thread::spawn(move || {
             rx.recv().expect("on receive from exit error channel"); // mock receive exit error.
         });
-        prover::start(p, tx, Default::default());
+        zksync_prover::start(p, tx, Default::default());
         jh.join().expect("failed to join recv");
         done_tx.send(()).expect("unexpected failure");
     });
@@ -109,7 +109,7 @@ fn prover_proves_a_block_and_publishes_result() {
         thread::spawn(move || {
             rx.recv().unwrap();
         });
-        prover::start(p, tx, Default::default());
+        zksync_prover::start(p, tx, Default::default());
     });
 
     let timeout = time::Duration::from_secs(60 * 10);
@@ -180,7 +180,7 @@ impl<F> fmt::Debug for MockApiClient<F> {
     }
 }
 
-impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
+impl<F: Fn() -> Option<ProverData>> zksync_prover::ApiClient for MockApiClient<F> {
     fn block_to_prove(&self, _block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)

@@ -7,7 +7,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::FullExitOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -18,6 +17,7 @@ use zksync_crypto::{
         ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
 };
+use zksync_types::FullExitOp;
 // Local deps
 use crate::{
     operation::{

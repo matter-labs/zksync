@@ -4,7 +4,7 @@ use futures::{channel::oneshot, SinkExt};
 use jsonrpc_core::{Error, Result};
 use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
-use models::{
+use zksync_types::{
     tx::{TxEthSignature, TxHash},
     Address, FranklinTx, Token, TokenLike, TxFeeTypes,
 };

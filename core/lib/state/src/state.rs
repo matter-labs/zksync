@@ -1,23 +1,23 @@
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
-use models::operations::{
-    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
-    WithdrawOp,
-};
-use models::tx::ChangePubKey;
-use models::Address;
-use models::{
-    helpers::reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
-    TokenId,
-};
-use models::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
-use models::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
 use num::BigUint;
 use std::collections::HashMap;
 use zksync_crypto::{
     params::{self, max_account_id},
     Fr,
 };
+use zksync_types::operations::{
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
+    WithdrawOp,
+};
+use zksync_types::tx::ChangePubKey;
+use zksync_types::Address;
+use zksync_types::{
+    helpers::reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
+    TokenId,
+};
+use zksync_types::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
+use zksync_types::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
 use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ pub struct OpSuccess {
 }
 
 #[derive(Debug, Clone)]
-pub struct PlasmaState {
+pub struct ZksyncState {
     /// Accounts stored in a sparse Merkle tree
     balance_tree: AccountTree,
 
@@ -60,7 +60,7 @@ impl TransferOutcome {
     }
 }
 
-impl PlasmaState {
+impl ZksyncState {
     pub fn empty() -> Self {
         let tree_depth = params::account_tree_depth();
         let balance_tree = AccountTree::new(tree_depth);
@@ -1005,7 +1005,7 @@ mod tests {
         // Delete 0, update balance of 1, create account 2
         // Reverse updates
 
-        let initial_plasma_state = PlasmaState::from_acc_map(AccountMap::default(), 0);
+        let initial_plasma_state = ZksyncState::from_acc_map(AccountMap::default(), 0);
 
         let updates = {
             let mut updates = AccountUpdates::new();

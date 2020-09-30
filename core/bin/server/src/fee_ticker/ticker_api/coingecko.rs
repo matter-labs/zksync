@@ -2,11 +2,11 @@ use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use failure::Error;
-use models::TokenPrice;
 use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
 use std::collections::HashMap;
+use zksync_types::TokenPrice;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 #[derive(Debug)]

@@ -17,8 +17,8 @@ use std::{
 use num::BigUint;
 use tokio::{runtime::Handle, time};
 // Workspace uses
-use models::tx::TxHash;
 use zksync::{Network, Provider};
+use zksync_types::tx::TxHash;
 // Local uses
 use crate::{
     scenarios::{

@@ -17,15 +17,15 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use lru_cache::LruCache;
-use models::tx::TxHash;
-use models::BlockNumber;
-use models::{block::ExecutedOperations, AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
-use storage::chain::operations::records::StoredExecutedPriorityOperation;
-use storage::chain::operations_ext::records::TxReceiptResponse;
-use storage::ConnectionPool;
 use zksync_basic_types::Address;
+use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
+use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
+use zksync_storage::ConnectionPool;
+use zksync_types::tx::TxHash;
+use zksync_types::BlockNumber;
+use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation};
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
 const TX_SUB_PREFIX: &str = "txsub";

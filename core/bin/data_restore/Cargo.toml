@@ -1,5 +1,5 @@
 [package]
-name = "data_restore"
+name = "zksync_data_restore"
 version = "1.0.0"
 edition = "2018"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
@@ -24,9 +24,9 @@ clap = "2.33.0"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 tokio = { version = "0.2", features = ["full"] }
 
-plasma = { path = "../../lib/plasma", version = "1.0" }
-models = { path = "../../lib/models", version = "1.0" }
-storage = { path = "../../lib/storage", version = "1.0" }
+zksync_state ={ path = "../../lib/state", version = "1.0" }
+zksync_types ={ path = "../../lib/types", version = "1.0" }
+zksync_storage ={ path = "../../lib/storage", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }

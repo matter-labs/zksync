@@ -14,11 +14,11 @@ use std::time::{Duration, Instant};
 use num::BigUint;
 use tokio::time;
 // Workspace deps
-use models::{
+use zksync::Provider;
+use zksync_types::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
     TxFeeTypes,
 };
-use zksync::Provider;
 // Local deps
 use crate::{
     scenarios::utils::{deposit_single, wait_for_verify},

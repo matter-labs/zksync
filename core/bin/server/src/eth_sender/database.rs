@@ -10,11 +10,11 @@ use std::str::FromStr;
 use num::BigUint;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
-use models::{
+use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Operation,
 };
-use storage::{ConnectionPool, StorageProcessor};
 // Local uses
 use super::transactions::ETHStats;
 

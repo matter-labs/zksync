@@ -6,7 +6,7 @@
 use std::convert::TryFrom;
 // External imports
 // Workspace imports
-use models::{
+use zksync_types::{
     Action, ActionType, Operation,
     {
         block::{ExecutedPriorityOp, ExecutedTx},
@@ -26,7 +26,7 @@ use crate::{
     prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
-use models::SignedFranklinTx;
+use zksync_types::SignedFranklinTx;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {

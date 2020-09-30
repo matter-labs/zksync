@@ -3,12 +3,12 @@
 
 use clap::{App, Arg};
 use log::info;
-use models::{AccountId, Address, TokenId, TokenLike};
 use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;
-use storage::ConnectionPool;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_storage::ConnectionPool;
+use zksync_types::{AccountId, Address, TokenId, TokenLike};
 
 #[derive(Serialize, Debug)]
 struct ExitProofData {
@@ -86,7 +86,7 @@ async fn main() {
     info!("Resotred state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
-        prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
+        zksync_prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
             .expect("Failed to generate exit proof");
 
     let proof_data = ExitProofData {

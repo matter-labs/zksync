@@ -1,7 +1,7 @@
 // External imports
 // Workspace imports
-use models::AccountMap;
-use models::Action;
+use zksync_types::AccountMap;
+use zksync_types::Action;
 // Local imports
 use super::{block::apply_random_updates, utils::get_operation};
 use crate::tests::{create_rng, db_test};

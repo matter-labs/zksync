@@ -1,17 +1,17 @@
 mod collect_fee;
 mod operations;
 
-use crate::state::PlasmaState;
-use models::tx::PackedEthSignature;
-use models::{
-    Account, AccountId, AccountUpdate, FranklinPriorityOp, FranklinTx, PubKeyHash, TokenId,
-};
+use crate::state::ZksyncState;
 use num::BigUint;
 use web3::types::H256;
 use zksync_crypto::{
     priv_key_from_fs,
     rand::{Rng, SeedableRng, XorShiftRng},
     PrivateKey,
+};
+use zksync_types::tx::PackedEthSignature;
+use zksync_types::{
+    Account, AccountId, AccountUpdate, FranklinPriorityOp, FranklinTx, PubKeyHash, TokenId,
 };
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];
@@ -23,7 +23,7 @@ pub enum AccountState {
 
 pub struct PlasmaTestBuilder {
     rng: XorShiftRng,
-    state: PlasmaState,
+    state: ZksyncState,
 }
 
 impl Default for PlasmaTestBuilder {
@@ -36,7 +36,7 @@ impl PlasmaTestBuilder {
     pub fn new() -> Self {
         Self {
             rng: XorShiftRng::from_seed([1, 2, 3, 4]),
-            state: PlasmaState::empty(),
+            state: ZksyncState::empty(),
         }
     }
 
@@ -117,7 +117,7 @@ impl PlasmaTestBuilder {
         &self,
         expected_updates: &BoundAccountUpdates,
         actual_updates: &BoundAccountUpdates,
-        state_clone: &mut PlasmaState,
+        state_clone: &mut ZksyncState,
     ) {
         assert_eq!(expected_updates, actual_updates, "unexpected updates");
 

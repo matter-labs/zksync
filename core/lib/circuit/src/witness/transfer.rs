@@ -8,7 +8,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::operations::TransferOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -21,6 +20,7 @@ use zksync_crypto::{
     },
     primitives::convert_to_float,
 };
+use zksync_types::operations::TransferOp;
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},

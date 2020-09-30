@@ -1,5 +1,5 @@
 // Workspace imports
-use models::{ethereum::OperationType, Operation};
+use zksync_types::{ethereum::OperationType, Operation};
 // Local imports
 use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
 

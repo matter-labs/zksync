@@ -19,7 +19,7 @@ use web3::{
 };
 
 // Workspace uses
-use models::{tokens, TokenId};
+use zksync_types::{tokens, TokenId};
 
 /// Token that contains information to add to the server
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

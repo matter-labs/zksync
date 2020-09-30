@@ -24,12 +24,12 @@ use futures::{
 };
 use tokio::task::JoinHandle;
 // Workspace uses
-use models::{
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
     AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
     SignedFranklinTx, TransferOp, TransferToNewOp,
 };
-use storage::ConnectionPool;
 // Local uses
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
 use zksync_config::ConfigurationOptions;

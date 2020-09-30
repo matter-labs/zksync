@@ -3,10 +3,10 @@
 // External uses
 use prometheus_exporter_base::{render_prometheus, MetricType, PrometheusMetric};
 // Workspace uses
-use models::ActionType;
-use storage::ConnectionPool;
 use tokio::task::JoinHandle;
 use zksync_config::ConfigurationOptions;
+use zksync_storage::ConnectionPool;
+use zksync_types::ActionType;
 
 #[must_use]
 pub fn start_prometheus_exporter(

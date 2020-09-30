@@ -7,10 +7,10 @@ use web3::transports::Http;
 use zksync_basic_types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use super::ExecutedTxStatus;
-use eth_client::{ETHClient, SignedCallResult};
 use std::time::Duration;
 use zksync_config::ConfigurationOptions;
 use zksync_contracts::zksync_contract;
+use zksync_eth_client::{ETHClient, SignedCallResult};
 
 /// Sleep time between consecutive requests.
 const SLEEP_DURATION: Duration = Duration::from_millis(250);

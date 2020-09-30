@@ -1,7 +1,7 @@
 // External imports
 
 // Workspace imports
-use models::BlockNumber;
+use zksync_types::BlockNumber;
 // Local imports
 use crate::{QueryResult, StorageProcessor};
 

@@ -1,4 +1,4 @@
-use models::FranklinOp;
+use zksync_types::FranklinOp;
 
 fn main() {
     let hex_data = std::env::args()

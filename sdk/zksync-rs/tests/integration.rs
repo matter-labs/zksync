@@ -18,7 +18,7 @@ use zksync::{
         transports::Http,
         types::{Address, H160, H256, U256},
     },
-    zksync_models::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes},
+    zksync_types::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
 use zksync_contracts::{erc20_contract, zksync_contract};

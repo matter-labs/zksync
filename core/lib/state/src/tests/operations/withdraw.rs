@@ -1,6 +1,6 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
-use models::{account::AccountUpdate, tx::Withdraw};
 use num::{BigUint, Zero};
+use zksync_types::{account::AccountUpdate, tx::Withdraw};
 
 /// Check withdraw operation
 #[test]

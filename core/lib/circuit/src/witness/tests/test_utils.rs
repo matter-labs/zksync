@@ -5,11 +5,11 @@ use zksync_crypto::franklin_crypto::{
     circuit::test::TestConstraintSystem,
 };
 // Workspace deps
-use models::{Account, AccountId, AccountMap, Address};
-use plasma::state::{CollectedFee, PlasmaState};
 use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
 use zksync_crypto::{Engine, Fr};
+use zksync_state::state::{CollectedFee, ZksyncState};
 use zksync_test_account::ZksyncAccount;
+use zksync_types::{Account, AccountId, AccountMap, Address};
 // Local deps
 use crate::{circuit::FranklinCircuit, witness::Witness};
 
@@ -42,13 +42,13 @@ pub fn incorrect_fr() -> Fr {
     Fr::from_str("12345").unwrap()
 }
 
-/// Helper structure to generate `PlasmaState` and `CircuitAccountTree`.
+/// Helper structure to generate `ZksyncState` and `CircuitAccountTree`.
 #[derive(Debug)]
-pub struct PlasmaStateGenerator;
+pub struct ZksyncStateGenerator;
 
-impl PlasmaStateGenerator {
-    fn create_state(accounts: AccountMap) -> (PlasmaState, CircuitAccountTree) {
-        let plasma_state = PlasmaState::from_acc_map(accounts, 1);
+impl ZksyncStateGenerator {
+    fn create_state(accounts: AccountMap) -> (ZksyncState, CircuitAccountTree) {
+        let plasma_state = ZksyncState::from_acc_map(accounts, 1);
 
         let mut circuit_account_tree =
             CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
@@ -59,7 +59,7 @@ impl PlasmaStateGenerator {
         (plasma_state, circuit_account_tree)
     }
 
-    pub fn generate(accounts: &[WitnessTestAccount]) -> (PlasmaState, CircuitAccountTree) {
+    pub fn generate(accounts: &[WitnessTestAccount]) -> (ZksyncState, CircuitAccountTree) {
         let accounts: Vec<_> = accounts
             .iter()
             .map(|acc| (acc.id, acc.account.clone()))
@@ -130,10 +130,10 @@ pub fn generic_test_scenario<W, F>(
     apply_op_on_plasma: F,
 ) where
     W: Witness,
-    F: FnOnce(&mut PlasmaState, &W::OperationType) -> Vec<CollectedFee>,
+    F: FnOnce(&mut ZksyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZksyncStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma
@@ -175,10 +175,10 @@ pub fn corrupted_input_test_scenario<W, F>(
 ) where
     W: Witness,
     W::CalculateOpsInput: Clone + std::fmt::Debug,
-    F: FnOnce(&mut PlasmaState, &W::OperationType) -> Vec<CollectedFee>,
+    F: FnOnce(&mut ZksyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZksyncStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma
@@ -232,7 +232,7 @@ pub fn incorrect_op_test_scenario<W, F>(
     F: FnOnce() -> Vec<CollectedFee>,
 {
     // Initialize WitnessBuilder.
-    let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
+    let (_, mut circuit_account_tree) = ZksyncStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Collect fees without actually applying the tx on plasma

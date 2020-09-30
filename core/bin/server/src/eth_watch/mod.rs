@@ -24,15 +24,15 @@ use web3::{
     Transport, Web3,
 };
 // Workspace deps
-use models::{
+use zksync_config::ConfigurationOptions;
+use zksync_contracts::{eip1271_contract, zksync_contract};
+use zksync_crypto::params::PRIORITY_EXPIRATION;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     ethereum::CompleteWithdrawalsTx,
     tx::EIP1271Signature,
     {FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
 };
-use storage::ConnectionPool;
-use zksync_config::ConfigurationOptions;
-use zksync_contracts::{eip1271_contract, zksync_contract};
-use zksync_crypto::params::PRIORITY_EXPIRATION;
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
 

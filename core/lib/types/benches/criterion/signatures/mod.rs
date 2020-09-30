@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
-use models::tx::{PackedEthSignature, TxSignature};
 use zksync_basic_types::H256;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+use zksync_types::tx::{PackedEthSignature, TxSignature};
 
 fn bench_signature_zksync_musig_verify(b: &mut Bencher<'_>) {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

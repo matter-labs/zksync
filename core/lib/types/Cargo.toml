@@ -1,5 +1,5 @@
 [package]
-name = "plasma"
+name = "zksync_types"
 version = "1.0.0"
 edition = "2018"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
@@ -12,17 +12,33 @@ categories = ["cryptography"]
 [dependencies]
 zksync_crypto = { path = "../crypto", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
-models = { path = "../models", version = "1.0" }
+zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 num = { version = "0.2", features = ["serde"] }
-log = "0.4"
+bigdecimal = { version = "0.1", features = ["serde"]}
+hex = "0.4"
 failure = "0.1"
+log = "0.4"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+
+serde = "1.0.90"
+serde_bytes = "0.11.1"
+serde_json = "1.0.0"
+
+# Crypto stuff
+parity-crypto = {version = "0.6.2", features = ["publickey"] }
+ethabi = "12.0.0"
 
 [dev-dependencies]
 criterion = "0.3.0"
-web3 = "0.13.0"
+secp256k1 = {version = "0.17.2", features = ["std", "recovery"] }
 
 [[bench]]
 name = "criterion"
 harness = false
 path = "benches/criterion/lib.rs"
+
+[features]
+default=[]
+run_benches=[]
+

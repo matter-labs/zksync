@@ -1,9 +1,9 @@
-use models::BlockNumber;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
 };
-use storage::ConnectionPool;
+use zksync_storage::ConnectionPool;
+use zksync_types::BlockNumber;
 
 /// This struct knows current verified block number.
 /// It's like storage, but in memory.

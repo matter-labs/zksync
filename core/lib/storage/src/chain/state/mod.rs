@@ -4,7 +4,7 @@ use std::{cmp, collections::HashMap};
 use num::BigInt;
 use sqlx::types::BigDecimal;
 // Workspace imports
-use models::{
+use zksync_types::{
     helpers::{apply_updates, reverse_updates},
     AccountId, AccountMap, AccountUpdate, AccountUpdates, PubKeyHash,
 };

@@ -1,8 +1,8 @@
-use models::{
+use num::BigUint;
+use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
     FranklinTx, Nonce, Token, TokenLike,
 };
-use num::BigUint;
 
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
 

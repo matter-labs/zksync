@@ -2,9 +2,9 @@
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use models::block::Block;
-use models::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
-use models::{NewTokenEvent, Operation};
+use zksync_types::block::Block;
+use zksync_types::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
+use zksync_types::{NewTokenEvent, Operation};
 // Local imports
 use self::records::{
     NewBlockEvent, NewFranklinOp, NewStorageState, StoredBlockEvent, StoredFranklinOp,

@@ -1,7 +1,7 @@
-use models::{AccountId, Address, Nonce, PubKeyHash, Token};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token};
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
 pub mod network;

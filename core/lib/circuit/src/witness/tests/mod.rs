@@ -10,7 +10,7 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::{
+use zksync_types::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
     Address, Deposit, FullExit,
 };
@@ -19,7 +19,7 @@ use crate::{
     circuit::FranklinCircuit,
     witness::{
         tests::test_utils::{
-            check_circuit, check_circuit_non_panicking, PlasmaStateGenerator, WitnessTestAccount,
+            check_circuit, check_circuit_non_panicking, WitnessTestAccount, ZksyncStateGenerator,
             FEE_ACCOUNT_ID,
         },
         utils::{SigDataInput, WitnessBuilder},
@@ -45,7 +45,7 @@ mod withdraw;
 /// - Withdraw some funds.
 ///
 /// Returns the resulting `WitnessBuilder` and the hash obtained
-/// from `PlasmaState` for further correctness checks.
+/// from `ZksyncState` for further correctness checks.
 fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     const ETH_TOKEN: u16 = 0;
     const NNM_TOKEN: u16 = 2;
@@ -149,7 +149,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     let full_exit_success = true;
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZksyncStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Fees to be collected.

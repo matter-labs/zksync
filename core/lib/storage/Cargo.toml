@@ -1,5 +1,5 @@
 [package]
-name = "storage"
+name = "zksync_storage"
 version = "1.0.0"
 edition = "2018"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
@@ -14,7 +14,7 @@ default = []
 db_test = []
 
 [dependencies]
-models = { path = "../models", version = "1.0" }
+zksync_types ={ path = "../types", version = "1.0" }
 zksync_crypto = { path = "../crypto", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }

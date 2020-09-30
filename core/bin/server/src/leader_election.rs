@@ -1,8 +1,8 @@
 //! Leader election is a always live routine that continuously votes to become the leader.
 
-use models::config::LEADER_LOOKUP_INTERVAL;
 use std::path::Path;
 use std::process::Command;
+use zksync_types::config::LEADER_LOOKUP_INTERVAL;
 
 /// Blocks thread until node is leader .
 ///

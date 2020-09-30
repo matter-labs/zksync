@@ -1,7 +1,7 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
-use models::{AccountUpdate, Transfer};
 use num::{BigUint, Zero};
 use web3::types::H160;
+use zksync_types::{AccountUpdate, Transfer};
 
 /// Check Transfer operation to existing account
 #[test]

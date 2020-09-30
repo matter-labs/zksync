@@ -1,11 +1,11 @@
 // External deps
 use failure::format_err;
-use models::NewTokenEvent;
 use std::convert::TryFrom;
 use web3::contract::Contract;
 use web3::types::Transaction;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
+use zksync_types::NewTokenEvent;
 // Workspace deps
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use crate::events::{BlockEvent, EventType};

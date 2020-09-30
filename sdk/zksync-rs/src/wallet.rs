@@ -1,5 +1,5 @@
-use models::{AccountId, Address, TokenLike};
 use num::BigUint;
+use zksync_types::{AccountId, Address, TokenLike};
 
 use crate::{
     credentials::WalletCredentials,

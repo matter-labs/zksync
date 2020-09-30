@@ -7,7 +7,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::operations::ChangePubKeyOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -18,6 +17,7 @@ use zksync_crypto::{
         NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
 };
+use zksync_types::operations::ChangePubKeyOp;
 // Local deps
 use crate::{
     operation::{

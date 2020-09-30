@@ -9,7 +9,7 @@ use log::*;
 use reqwest::Url;
 // Workspace deps
 use crate::client;
-use circuit::circuit::FranklinCircuit;
+use zksync_circuit::circuit::FranklinCircuit;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::Engine;
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};

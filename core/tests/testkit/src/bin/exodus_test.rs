@@ -12,12 +12,12 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
 use log::*;
-use models::{AccountId, AccountMap};
 use num::BigUint;
 use std::time::Instant;
-use testkit::*;
 use web3::transports::Http;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_testkit::*;
+use zksync_types::{AccountId, AccountMap};
 
 const PRIORITY_EXPIRATION: u64 = 101;
 

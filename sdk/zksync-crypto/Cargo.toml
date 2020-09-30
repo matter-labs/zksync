@@ -35,7 +35,7 @@ wee_alloc = { version = "0.4.2", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
-models = { path = "../../core/lib/models" }
+models = { path = "../../core/lib/types" }
 crypto_lib = { package = "zksync_crypto", path = "../../core/lib/crypto" }
 
 [profile.release]

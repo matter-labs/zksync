@@ -917,26 +917,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "circuit"
-version = "1.0.0"
-dependencies = [
- "bigdecimal",
- "hex",
- "log 0.4.11",
- "models",
- "num",
- "plasma",
- "rayon",
- "rust-crypto",
- "serde",
- "serde_derive",
- "serde_json",
- "web3 0.13.0",
- "zksync_crypto",
- "zksync_test_account",
-]
-
-[[package]]
 name = "clap"
 version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1235,31 +1215,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data_restore"
-version = "1.0.0"
-dependencies = [
- "chrono",
- "clap",
- "env_logger 0.6.2",
- "ethabi 12.0.0",
- "failure",
- "hex",
- "log 0.4.11",
- "models",
- "num",
- "plasma",
- "serde_json",
- "storage",
- "tiny-keccak 1.5.0",
- "tokio 0.2.22",
- "web3 0.13.0",
- "zksync_config",
- "zksync_contracts",
- "zksync_crypto",
- "zksync_utils",
-]
-
-[[package]]
 name = "db_test_macro"
 version = "0.1.0"
 dependencies = [
@@ -1401,20 +1356,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d2f06b9cac1506ece98fe3231e3cc9c4410ec3d5b1f24ae1c8946f0742cdefc"
 dependencies = [
  "version_check 0.9.2",
-]
-
-[[package]]
-name = "eth_client"
-version = "1.0.0"
-dependencies = [
- "ethabi 12.0.0",
- "failure",
- "log 0.4.11",
- "parity-crypto",
- "rlp",
- "serde",
- "serde_derive",
- "web3 0.13.0",
 ]
 
 [[package]]
@@ -1820,7 +1761,7 @@ name = "gen_token_add_contract"
 version = "1.0.0"
 dependencies = [
  "handlebars",
- "models",
+ "zksync_types",
  "zksync_utils",
 ]
 
@@ -2478,19 +2419,19 @@ dependencies = [
 name = "key_generator"
 version = "1.0.0"
 dependencies = [
- "circuit",
  "clap",
  "env_logger 0.6.2",
  "handlebars",
  "hex",
  "log 0.4.11",
- "models",
  "rust-crypto",
  "serde_json",
  "time 0.1.44",
+ "zksync_circuit",
  "zksync_config",
  "zksync_crypto",
  "zksync_prover_utils",
+ "zksync_types",
  "zksync_utils",
 ]
 
@@ -2558,19 +2499,19 @@ dependencies = [
  "hyper 0.13.8",
  "jsonrpc-core",
  "log 0.4.11",
- "models",
  "num",
  "rand 0.4.6",
  "reqwest",
  "serde",
  "serde_derive",
  "serde_json",
- "server",
  "structopt",
  "tokio 0.2.22",
  "web3 0.13.0",
  "zksync",
  "zksync_config",
+ "zksync_server",
+ "zksync_types",
  "zksync_utils",
 ]
 
@@ -2778,28 +2719,6 @@ checksum = "07b88fb9795d4d36d62a012dfbf49a8f5cf12751f36d31a9dbe66d528e58979e"
 dependencies = [
  "socket2",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "models"
-version = "1.0.0"
-dependencies = [
- "bigdecimal",
- "chrono",
- "criterion",
- "ethabi 12.0.0",
- "failure",
- "hex",
- "log 0.4.11",
- "num",
- "parity-crypto",
- "secp256k1",
- "serde",
- "serde_bytes",
- "serde_json",
- "zksync_basic_types",
- "zksync_crypto",
- "zksync_utils",
 ]
 
 [[package]]
@@ -3159,7 +3078,7 @@ name = "parse_pub_data"
 version = "1.0.0"
 dependencies = [
  "hex",
- "models",
+ "zksync_types",
 ]
 
 [[package]]
@@ -3280,20 +3199,6 @@ name = "pkg-config"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d36492546b6af1463394d46f0c834346f31548646f6ba10849802c9c9a27ac33"
-
-[[package]]
-name = "plasma"
-version = "1.0.0"
-dependencies = [
- "criterion",
- "failure",
- "log 0.4.11",
- "models",
- "num",
- "web3 0.13.0",
- "zksync_crypto",
- "zksync_utils",
-]
 
 [[package]]
 name = "plotters"
@@ -3422,35 +3327,6 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "prover"
-version = "1.0.0"
-dependencies = [
- "backoff",
- "chrono",
- "circuit",
- "clap",
- "ctrlc",
- "env_logger 0.6.2",
- "failure",
- "hex",
- "log 0.4.11",
- "models",
- "num",
- "plasma",
- "reqwest",
- "rust-crypto",
- "serde",
- "serde_derive",
- "serde_json",
- "tokio 0.1.22",
- "web3 0.13.0",
- "zksync_config",
- "zksync_crypto",
- "zksync_prover_utils",
- "zksync_utils",
 ]
 
 [[package]]
@@ -4072,62 +3948,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "server"
-version = "1.0.0"
-dependencies = [
- "actix-cors",
- "actix-rt",
- "actix-web",
- "actix-web-httpauth",
- "async-trait",
- "bigdecimal",
- "chrono",
- "circuit",
- "clap",
- "ctrlc",
- "env_logger 0.6.2",
- "eth_client",
- "ethabi 12.0.0",
- "failure",
- "futures 0.1.29",
- "futures 0.3.5",
- "hex",
- "itertools 0.8.2",
- "jsonrpc-core",
- "jsonrpc-core-client",
- "jsonrpc-derive",
- "jsonrpc-http-server",
- "jsonrpc-pubsub",
- "jsonrpc-ws-server",
- "jsonwebtoken",
- "lazy_static",
- "log 0.4.11",
- "lru-cache",
- "models",
- "num",
- "plasma",
- "prometheus_exporter_base",
- "prover",
- "rand 0.7.3",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
- "storage",
- "tiny-keccak 1.5.0",
- "tokio 0.1.22",
- "tokio 0.2.22",
- "vlog",
- "web3 0.13.0",
- "zksync_basic_types",
- "zksync_config",
- "zksync_contracts",
- "zksync_crypto",
- "zksync_prover_utils",
- "zksync_utils",
-]
-
-[[package]]
 name = "sha-1"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4431,35 +4251,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
-name = "storage"
-version = "1.0.0"
-dependencies = [
- "async-trait",
- "bigdecimal",
- "chrono",
- "db_test_macro",
- "deadpool",
- "env_logger 0.6.2",
- "failure",
- "hex",
- "itertools 0.8.2",
- "log 0.4.11",
- "models",
- "num",
- "parity-crypto",
- "serde",
- "serde_derive",
- "serde_json",
- "sqlx",
- "tokio 0.2.22",
- "zksync_basic_types",
- "zksync_config",
- "zksync_crypto",
- "zksync_test_account",
- "zksync_utils",
-]
-
-[[package]]
 name = "stream-cipher"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4573,33 +4364,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb6bfa289a4d7c5766392812c0a1f4c1ba45afa1ad47803c11e1f407d846d75f"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "testkit"
-version = "1.0.0"
-dependencies = [
- "env_logger 0.6.2",
- "eth_client",
- "ethabi 12.0.0",
- "failure",
- "futures 0.3.5",
- "itertools 0.9.0",
- "log 0.4.11",
- "models",
- "num",
- "prover",
- "serde",
- "serde_derive",
- "serde_json",
- "server",
- "tokio 0.2.22",
- "web3 0.13.0",
- "zksync_config",
- "zksync_contracts",
- "zksync_crypto",
- "zksync_test_account",
- "zksync_utils",
 ]
 
 [[package]]
@@ -4739,7 +4503,6 @@ dependencies = [
  "anyhow",
  "env_logger 0.7.1",
  "jsonwebtoken",
- "models",
  "reqwest",
  "serde",
  "serde_json",
@@ -4748,6 +4511,7 @@ dependencies = [
  "url 2.1.1",
  "web3 0.10.0",
  "zksync_config",
+ "zksync_types",
 ]
 
 [[package]]
@@ -5665,11 +5429,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bellman_ce",
- "eth_client",
  "ethabi 12.0.0",
  "futures 0.3.5",
  "jsonrpc-core",
- "models",
  "num",
  "reqwest",
  "serde",
@@ -5681,6 +5443,8 @@ dependencies = [
  "web3 0.13.0",
  "zksync_contracts",
  "zksync_crypto",
+ "zksync_eth_client",
+ "zksync_types",
  "zksync_utils",
 ]
 
@@ -5689,6 +5453,26 @@ name = "zksync_basic_types"
 version = "1.0.0"
 dependencies = [
  "web3 0.13.0",
+]
+
+[[package]]
+name = "zksync_circuit"
+version = "1.0.0"
+dependencies = [
+ "bigdecimal",
+ "hex",
+ "log 0.4.11",
+ "num",
+ "rayon",
+ "rust-crypto",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "web3 0.13.0",
+ "zksync_crypto",
+ "zksync_state",
+ "zksync_test_account",
+ "zksync_types",
 ]
 
 [[package]]
@@ -5726,28 +5510,244 @@ dependencies = [
 ]
 
 [[package]]
+name = "zksync_data_restore"
+version = "1.0.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "env_logger 0.6.2",
+ "ethabi 12.0.0",
+ "failure",
+ "hex",
+ "log 0.4.11",
+ "num",
+ "serde_json",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.22",
+ "web3 0.13.0",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_crypto",
+ "zksync_state",
+ "zksync_storage",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_eth_client"
+version = "1.0.0"
+dependencies = [
+ "ethabi 12.0.0",
+ "failure",
+ "log 0.4.11",
+ "parity-crypto",
+ "rlp",
+ "serde",
+ "serde_derive",
+ "web3 0.13.0",
+]
+
+[[package]]
+name = "zksync_prover"
+version = "1.0.0"
+dependencies = [
+ "backoff",
+ "chrono",
+ "clap",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "failure",
+ "hex",
+ "log 0.4.11",
+ "num",
+ "reqwest",
+ "rust-crypto",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tokio 0.1.22",
+ "web3 0.13.0",
+ "zksync_circuit",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_prover_utils",
+ "zksync_state",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
 name = "zksync_prover_utils"
 version = "1.0.0"
 dependencies = [
  "backoff",
- "circuit",
  "failure",
  "lazy_static",
  "log 0.4.11",
  "reqwest",
  "serde",
  "zksync_basic_types",
+ "zksync_circuit",
  "zksync_crypto",
+]
+
+[[package]]
+name = "zksync_server"
+version = "1.0.0"
+dependencies = [
+ "actix-cors",
+ "actix-rt",
+ "actix-web",
+ "actix-web-httpauth",
+ "async-trait",
+ "bigdecimal",
+ "chrono",
+ "clap",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "ethabi 12.0.0",
+ "failure",
+ "futures 0.1.29",
+ "futures 0.3.5",
+ "hex",
+ "itertools 0.8.2",
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "jsonrpc-http-server",
+ "jsonrpc-pubsub",
+ "jsonrpc-ws-server",
+ "jsonwebtoken",
+ "lazy_static",
+ "log 0.4.11",
+ "lru-cache",
+ "num",
+ "prometheus_exporter_base",
+ "rand 0.7.3",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tiny-keccak 1.5.0",
+ "tokio 0.1.22",
+ "tokio 0.2.22",
+ "vlog",
+ "web3 0.13.0",
+ "zksync_basic_types",
+ "zksync_circuit",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_crypto",
+ "zksync_eth_client",
+ "zksync_prover",
+ "zksync_prover_utils",
+ "zksync_state",
+ "zksync_storage",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_state"
+version = "1.0.0"
+dependencies = [
+ "criterion",
+ "failure",
+ "log 0.4.11",
+ "num",
+ "web3 0.13.0",
+ "zksync_crypto",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_storage"
+version = "1.0.0"
+dependencies = [
+ "async-trait",
+ "bigdecimal",
+ "chrono",
+ "db_test_macro",
+ "deadpool",
+ "env_logger 0.6.2",
+ "failure",
+ "hex",
+ "itertools 0.8.2",
+ "log 0.4.11",
+ "num",
+ "parity-crypto",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sqlx",
+ "tokio 0.2.22",
+ "zksync_basic_types",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_test_account",
+ "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
 name = "zksync_test_account"
 version = "1.0.0"
 dependencies = [
- "models",
  "num",
  "zksync_basic_types",
  "zksync_crypto",
+ "zksync_types",
+]
+
+[[package]]
+name = "zksync_testkit"
+version = "1.0.0"
+dependencies = [
+ "env_logger 0.6.2",
+ "ethabi 12.0.0",
+ "failure",
+ "futures 0.3.5",
+ "itertools 0.9.0",
+ "log 0.4.11",
+ "num",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tokio 0.2.22",
+ "web3 0.13.0",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_crypto",
+ "zksync_eth_client",
+ "zksync_prover",
+ "zksync_server",
+ "zksync_test_account",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_types"
+version = "1.0.0"
+dependencies = [
+ "bigdecimal",
+ "chrono",
+ "criterion",
+ "ethabi 12.0.0",
+ "failure",
+ "hex",
+ "log 0.4.11",
+ "num",
+ "parity-crypto",
+ "secp256k1",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "zksync_basic_types",
+ "zksync_crypto",
+ "zksync_utils",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 //! Module with utilities for prover scaler service.
 
 // Workspace deps
-use storage::ConnectionPool;
+use zksync_storage::ConnectionPool;
 
 /// Scaler oracle provides information for prover scaler
 /// service about required amount of provers for server

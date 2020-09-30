@@ -7,13 +7,13 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::{Token, TokenId, TokenLike, TokenPrice};
 use num::rational::Ratio;
 use num::BigUint;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use storage::ConnectionPool;
 use tokio::sync::Mutex;
+use zksync_storage::ConnectionPool;
+use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 
 pub mod coingecko;
 pub mod coinmarkercap;

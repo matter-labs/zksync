@@ -1,9 +1,6 @@
 use crate::external_commands::js_revert_reason;
-use eth_client::ETHClient;
 use ethabi::ParamType;
 use failure::{bail, ensure, format_err};
-use models::block::Block;
-use models::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -15,6 +12,9 @@ use web3::types::{
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_eth_client::ETHClient;
+use zksync_types::block::Block;
+use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 
 pub fn parse_ether(eth_value: &str) -> Result<BigUint, failure::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();

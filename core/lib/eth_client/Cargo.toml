@@ -1,5 +1,5 @@
 [package]
-name = "eth_client"
+name = "zksync_eth_client"
 version = "1.0.0"
 edition = "2018"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]

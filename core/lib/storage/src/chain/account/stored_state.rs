@@ -1,4 +1,4 @@
-use models::{Account, AccountId};
+use zksync_types::{Account, AccountId};
 
 #[derive(Debug, PartialEq)]
 pub struct StoredAccountState {

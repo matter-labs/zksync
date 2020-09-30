@@ -13,16 +13,16 @@ use zksync_basic_types::H160;
 // Workspace uses
 use zksync_config::{AdminServerOptions, ConfigurationOptions, ProverOptions};
 
-use models::{
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     config::OBSERVER_MODE_PULL_INTERVAL,
     tokens::{get_genesis_token_list, Token},
     tx::TxHash,
     TokenId,
 };
-use storage::ConnectionPool;
 // Local uses
-use server::prometheus_exporter::start_prometheus_exporter;
-use server::{
+use zksync_server::prometheus_exporter::start_prometheus_exporter;
+use zksync_server::{
     api_server::start_api_server,
     block_proposer::run_block_proposer_task,
     committer::run_committer,
@@ -33,7 +33,7 @@ use server::{
     mempool::run_mempool_task,
     observer_mode,
     prover_server::start_prover_server,
-    state_keeper::{start_state_keeper, PlasmaStateKeeper},
+    state_keeper::{start_state_keeper, ZksyncStateKeeper},
     utils::current_zksync_info::CurrentZksyncInfo,
 };
 
@@ -63,7 +63,7 @@ fn main() {
             let pool = ConnectionPool::new(Some(1)).await;
 
             log::info!("Generating genesis block.");
-            PlasmaStateKeeper::create_genesis_block(
+            ZksyncStateKeeper::create_genesis_block(
                 pool.clone(),
                 &config_opts.operator_fee_eth_addr,
             )
@@ -218,7 +218,7 @@ fn main() {
             .state_keeper_init
             .get_pending_block(&mut storage)
             .await;
-        let state_keeper = PlasmaStateKeeper::new(
+        let state_keeper = ZksyncStateKeeper::new(
             observer_mode_final_state.state_keeper_init,
             config_opts.operator_fee_eth_addr,
             state_keeper_req_receiver,

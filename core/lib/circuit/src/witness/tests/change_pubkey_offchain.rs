@@ -1,8 +1,8 @@
 // External deps
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::operations::ChangePubKeyOp;
-use plasma::state::CollectedFee;
+use zksync_state::state::CollectedFee;
+use zksync_types::operations::ChangePubKeyOp;
 // Local deps
 use crate::witness::{
     change_pubkey_offchain::ChangePubkeyOffChainWitness,

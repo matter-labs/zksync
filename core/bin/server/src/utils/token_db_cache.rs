@@ -2,8 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use models::{Token, TokenId, TokenLike};
-use storage::ConnectionPool;
+use zksync_storage::ConnectionPool;
+use zksync_types::{Token, TokenId, TokenLike};
 
 #[derive(Debug, Clone)]
 pub struct TokenDBCache {

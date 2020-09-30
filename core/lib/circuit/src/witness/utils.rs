@@ -13,12 +13,6 @@ use zksync_crypto::franklin_crypto::{
 };
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace deps
-use models::{
-    operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
-    tx::PackedPublicKey,
-    AccountId, BlockNumber,
-};
-use plasma::state::CollectedFee;
 use zksync_crypto::{
     circuit::{
         account::{Balance, CircuitAccount, CircuitAccountTree},
@@ -30,6 +24,12 @@ use zksync_crypto::{
     },
     primitives::GetBits,
     Engine,
+};
+use zksync_state::state::CollectedFee;
+use zksync_types::{
+    operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
+    tx::PackedPublicKey,
+    AccountId, BlockNumber,
 };
 // Local deps
 use crate::{

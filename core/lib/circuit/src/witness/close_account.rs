@@ -7,7 +7,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::operations::CloseOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -18,6 +17,7 @@ use zksync_crypto::{
         NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
 };
+use zksync_types::operations::CloseOp;
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
@@ -192,8 +192,8 @@ impl CloseAccountWitness<Bn256> {
 //mod test {
 //    use super::*;
 //    use crate::witness::utils::public_data_commitment;
-//    use models::merkle_tree::PedersenHasher;
-//    use models::primitives::bytes_into_be_bits;
+//    use zksync_types::merkle_tree::PedersenHasher;
+//    use zksync_types::primitives::bytes_into_be_bits;
 //
 //    use crate::circuit::FranklinCircuit;
 //    use bellman::Circuit;
@@ -202,10 +202,10 @@ impl CloseAccountWitness<Bn256> {
 //    use zksync_crypto::franklin_crypto::circuit::test::*;
 //    use zksync_crypto::franklin_crypto::eddsa::{PrivateKey, PublicKey};
 //    use zksync_crypto::franklin_crypto::jubjub::FixedGenerators;
-//    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
-//    use models::circuit::utils::*;
-//    use models::tx::PackedPublicKey;
-//    use models::params as franklin_constants;
+//    use zksync_types::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
+//    use zksync_types::circuit::utils::*;
+//    use zksync_types::tx::PackedPublicKey;
+//    use zksync_types::params as franklin_constants;
 //    use rand::{Rng, SeedableRng, XorShiftRng};
 
 //    #[test]

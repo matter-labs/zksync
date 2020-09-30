@@ -1,7 +1,5 @@
 //! Utilities for the on-chain operations, such as `Deposit` and `FullExit`.
 
-use eth_client::ETHClient;
-use models::{AccountId, PriorityOp, TokenLike};
 use num::BigUint;
 use std::{convert::TryFrom, time::Duration};
 use std::{str::FromStr, time::Instant};
@@ -11,6 +9,8 @@ use web3::transports::Http;
 use web3::types::{TransactionReceipt, H160, H256, U256};
 use web3::Web3;
 use zksync_contracts as abi;
+use zksync_eth_client::ETHClient;
+use zksync_types::{AccountId, PriorityOp, TokenLike};
 
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, types::network::Network,

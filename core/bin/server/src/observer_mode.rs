@@ -1,35 +1,35 @@
 //! Observer mode continuously checks the database and keeps updated state of the accounts in memory.
 //! The state is then fed to other actors when server transitions to the leader mode.
 
-use crate::state_keeper::PlasmaStateInitParams;
-use circuit::witness::{
-    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
-};
+use crate::state_keeper::ZksyncStateInitParams;
 use log::info;
-use models::{BlockNumber, FranklinOp};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use zksync_circuit::witness::{
+    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
+    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+};
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
+use zksync_types::{BlockNumber, FranklinOp};
 
 /// The state being observed during observer mode. Meant to be used later to initialize server actors.
 pub struct ObservedState {
-    /// Used to initialize `PlasmaStateKeeper`
-    pub state_keeper_init: PlasmaStateInitParams,
+    /// Used to initialize `ZksyncStateKeeper`
+    pub state_keeper_init: ZksyncStateInitParams,
     /// Used to initialize pool of prover_server.
     pub circuit_acc_tree: CircuitAccountTree,
     /// Block number corresponding to the state in `circuit_acc_tree`.
     pub circuit_tree_block: BlockNumber,
 
-    pub connection_pool: storage::ConnectionPool,
+    pub connection_pool: zksync_storage::ConnectionPool,
 }
 
 impl ObservedState {
-    fn new(connection_pool: storage::ConnectionPool) -> Self {
+    fn new(connection_pool: zksync_storage::ConnectionPool) -> Self {
         Self {
-            state_keeper_init: PlasmaStateInitParams::new(),
+            state_keeper_init: ZksyncStateInitParams::new(),
             circuit_acc_tree: CircuitAccountTree::new(zksync_crypto::params::account_tree_depth()),
             circuit_tree_block: 0,
             connection_pool,
@@ -41,7 +41,7 @@ impl ObservedState {
         self.init_circuit_tree().await?;
         info!("updated circuit tree to block: {}", self.circuit_tree_block);
         let mut storage = self.connection_pool.access_storage().await?;
-        self.state_keeper_init = PlasmaStateInitParams::restore_from_db(&mut storage).await?;
+        self.state_keeper_init = ZksyncStateInitParams::restore_from_db(&mut storage).await?;
         info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
@@ -156,7 +156,7 @@ impl ObservedState {
 /// # Panics
 /// Panics on failed connection to db.
 pub async fn run(
-    conn_pool: storage::ConnectionPool,
+    conn_pool: zksync_storage::ConnectionPool,
     interval: Duration,
     stop: mpsc::Receiver<()>,
 ) -> ObservedState {

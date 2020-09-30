@@ -17,14 +17,14 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use eth_client::SignedCallResult;
-use models::{
+use zksync_config::{ConfigurationOptions, EthSenderOptions};
+use zksync_eth_client::SignedCallResult;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     config,
     ethereum::{ETHOperation, OperationType},
     Action, Operation,
 };
-use storage::ConnectionPool;
-use zksync_config::{ConfigurationOptions, EthSenderOptions};
 // Local uses
 use self::{
     database::Database,

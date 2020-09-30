@@ -8,8 +8,8 @@ use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
 use zksync_basic_types::{H256, U256};
 // Workspace uses
-use eth_client::SignedCallResult;
-use models::{
+use zksync_eth_client::SignedCallResult;
+use zksync_types::{
     config_options::EthSenderOptions,
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Action, Operation,
@@ -51,7 +51,8 @@ impl MockDatabase {
         let unconfirmed_operations: HashMap<i64, ETHOperation> =
             restore_state.iter().map(|op| (op.id, op.clone())).collect();
 
-        let gas_price_limit: u64 = models::config_options::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
+        let gas_price_limit: u64 =
+            zksync_types::config_options::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
 
         Self {
             restore_state,
@@ -465,7 +466,7 @@ pub(in crate::eth_sender) fn create_signed_withdraw_tx(
 
     let raw_tx = eth_sender.ethereum.encode_tx_data(
         "completeWithdrawals",
-        models::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+        zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
     );
     let signed_tx = eth_sender
         .ethereum

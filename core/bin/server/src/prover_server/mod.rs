@@ -7,10 +7,10 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{info, trace};
 // Workspace deps
-use models::BlockNumber;
-use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
+use zksync_storage::ConnectionPool;
+use zksync_types::BlockNumber;
 // Local deps
 use crate::panic_notify::ThreadPanicNotify;
 use crate::prover_server::scaler::ScalerOracle;
@@ -20,7 +20,7 @@ mod witness_generator;
 
 #[derive(Debug)]
 struct AppState {
-    connection_pool: storage::ConnectionPool,
+    connection_pool: zksync_storage::ConnectionPool,
     scaler_oracle: Arc<RwLock<ScalerOracle>>,
     prover_timeout: Duration,
 }
@@ -43,7 +43,7 @@ impl AppState {
         }
     }
 
-    async fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor<'_>> {
+    async fn access_storage(&self) -> actix_web::Result<zksync_storage::StorageProcessor<'_>> {
         self.connection_pool
             .access_storage_fragile()
             .await
@@ -252,7 +252,7 @@ async fn required_replicas(
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_prover_server(
-    connection_pool: storage::ConnectionPool,
+    connection_pool: zksync_storage::ConnectionPool,
     prover_timeout: time::Duration,
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,

@@ -10,28 +10,28 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::NetworkStatus;
-use models::{
-    Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
-};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use storage::chain::block::records::BlockDetails;
-use storage::chain::operations_ext::{
-    records::{PriorityOpReceiptResponse, TxReceiptResponse},
-    SearchDirection,
-};
-use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use zksync_basic_types::H160;
 use zksync_config::ConfigurationOptions;
+use zksync_storage::chain::block::records::BlockDetails;
+use zksync_storage::chain::operations_ext::{
+    records::{PriorityOpReceiptResponse, TxReceiptResponse},
+    SearchDirection,
+};
+use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::NetworkStatus;
+use zksync_types::{
+    Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
+};
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
 use crate::panic_notify::ThreadPanicNotify;
-use storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
+use zksync_storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);

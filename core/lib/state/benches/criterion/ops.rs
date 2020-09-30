@@ -1,4 +1,4 @@
-//! Benchmarks for the `PlasmaState` operations execution time.
+//! Benchmarks for the `ZksyncState` operations execution time.
 
 // Built-in deps
 use std::collections::HashMap;
@@ -6,16 +6,16 @@ use std::collections::HashMap;
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 use web3::types::H256;
 // Workspace uses
-use models::{
+use zksync_crypto::rand::{thread_rng, Rng};
+use zksync_crypto::{priv_key_from_fs, PrivateKey};
+use zksync_types::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
     tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},
     AccountId, AccountMap, Address, BlockNumber, FranklinPriorityOp, FranklinTx, TokenId,
 };
-use zksync_crypto::rand::{thread_rng, Rng};
-use zksync_crypto::{priv_key_from_fs, PrivateKey};
 // Local uses
-use plasma::state::PlasmaState;
+use zksync_state::state::ZksyncState;
 
 const ETH_TOKEN_ID: TokenId = 0x00;
 // The amount is not important, since we always work with 1 account.
@@ -42,8 +42,8 @@ fn generate_account() -> (H256, PrivateKey, Account) {
     (eth_sk, sk, account)
 }
 
-/// Creates a `PlasmaState` object and fills it with accounts.
-fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, PlasmaState) {
+/// Creates a `ZksyncState` object and fills it with accounts.
+fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, ZksyncState) {
     let mut accounts = AccountMap::default();
     let mut keys = HashMap::new();
 
@@ -54,12 +54,12 @@ fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, PlasmaState) {
         keys.insert(account_id, (sk, eth_sk));
     }
 
-    let state = PlasmaState::from_acc_map(accounts, CURRENT_BLOCK);
+    let state = ZksyncState::from_acc_map(accounts, CURRENT_BLOCK);
 
     (keys, state)
 }
 
-/// Bench for `PlasmaState::apply_transfer_to_new_op`.
+/// Bench for `ZksyncState::apply_transfer_to_new_op`.
 fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
     let (private_key, _) = keys.get(&0).expect("Can't key the private key");
@@ -92,7 +92,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     );
 }
 
-/// Bench for `PlasmaState::apply_transfer_op`.
+/// Bench for `ZksyncState::apply_transfer_op`.
 fn apply_transfer_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
     let (private_key, _) = keys.get(&0).expect("Can't key the private key");
@@ -127,7 +127,7 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
     );
 }
 
-/// Bench for `PlasmaState::apply_full_exit_op`.
+/// Bench for `ZksyncState::apply_full_exit_op`.
 fn apply_full_exit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
@@ -152,7 +152,7 @@ fn apply_full_exit_tx(b: &mut Bencher<'_>) {
     );
 }
 
-/// Bench for `PlasmaState::apply_deposit_op`.
+/// Bench for `ZksyncState::apply_deposit_op`.
 fn apply_deposit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
@@ -178,7 +178,7 @@ fn apply_deposit_tx(b: &mut Bencher<'_>) {
     );
 }
 
-/// Bench for `PlasmaState::apply_withdraw_op`.
+/// Bench for `ZksyncState::apply_withdraw_op`.
 fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
 
@@ -210,9 +210,9 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     );
 }
 
-// There is no bench for `PlasmaState::apply_close_op`, since closing accounts is currently disabled.
+// There is no bench for `ZksyncState::apply_close_op`, since closing accounts is currently disabled.
 
-/// Bench for `PlasmaState::apply_change_pubkey_op`.
+/// Bench for `ZksyncState::apply_change_pubkey_op`.
 fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
 
@@ -253,7 +253,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     );
 }
 
-/// Bench for `PlasmaState::insert_account`.
+/// Bench for `ZksyncState::insert_account`.
 ///
 /// While this method is not directly performing an operation, it is used in every operation,
 /// and it seems to be the most expensive part of all the methods above.
@@ -275,24 +275,24 @@ fn insert_account(b: &mut Bencher<'_>) {
 pub fn bench_ops(c: &mut Criterion) {
     const INPUT_SIZE: Throughput = Throughput::Elements(1);
 
-    let mut group = c.benchmark_group("PlasmaState operations");
+    let mut group = c.benchmark_group("ZksyncState operations");
 
     // Setup the input size so the throughput will be reported.
     group.throughput(INPUT_SIZE);
 
     group.bench_function(
-        "PlasmaState::apply_transfer_to_new_op bench",
+        "ZksyncState::apply_transfer_to_new_op bench",
         apply_transfer_to_new_op,
     );
-    group.bench_function("PlasmaState::apply_transfer_tx bench", apply_transfer_tx);
-    group.bench_function("PlasmaState::apply_withdraw_tx bench", apply_withdraw_tx);
+    group.bench_function("ZksyncState::apply_transfer_tx bench", apply_transfer_tx);
+    group.bench_function("ZksyncState::apply_withdraw_tx bench", apply_withdraw_tx);
     group.bench_function(
-        "PlasmaState::apply_change_pubkey_op bench",
+        "ZksyncState::apply_change_pubkey_op bench",
         apply_change_pubkey_op,
     );
-    group.bench_function("PlasmaState::apply_deposit_tx bench", apply_deposit_tx);
-    group.bench_function("PlasmaState::apply_full_exit_tx bench", apply_full_exit_tx);
-    group.bench_function("PlasmaState::insert_account bench", insert_account);
+    group.bench_function("ZksyncState::apply_deposit_tx bench", apply_deposit_tx);
+    group.bench_function("ZksyncState::apply_full_exit_tx bench", apply_full_exit_tx);
+    group.bench_function("ZksyncState::insert_account bench", insert_account);
 
     group.finish();
 }

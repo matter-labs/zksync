@@ -1,7 +1,7 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
-use models::account::{AccountUpdate, PubKeyHash};
-use models::tx::ChangePubKey;
 use zksync_crypto::{params, rand::Rng};
+use zksync_types::account::{AccountUpdate, PubKeyHash};
+use zksync_types::tx::ChangePubKey;
 
 /// Check ChangePubKey operation on new account
 #[test]

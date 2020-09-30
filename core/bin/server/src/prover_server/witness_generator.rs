@@ -6,20 +6,20 @@ use futures::channel::mpsc;
 use log::info;
 // Workspace deps
 use crate::panic_notify::ThreadPanicNotify;
-use circuit::witness::{
+use std::time::Instant;
+use zksync_circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
     TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
-use models::block::Block;
-use models::{BlockNumber, FranklinOp};
-use plasma::state::CollectedFee;
-use std::time::Instant;
-use storage::StorageProcessor;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 use zksync_crypto::params::{account_tree_depth, CHUNK_BIT_WIDTH};
 use zksync_crypto::{circuit::CircuitAccountTree, Fr};
 use zksync_prover_utils::prover_data::ProverData;
+use zksync_state::state::CollectedFee;
+use zksync_storage::StorageProcessor;
+use zksync_types::block::Block;
+use zksync_types::{BlockNumber, FranklinOp};
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
@@ -28,7 +28,7 @@ use zksync_prover_utils::prover_data::ProverData;
 /// start_block, start_block + block_step, start_block + 2*block_step, ...
 pub struct WitnessGenerator {
     /// Connection to the database.
-    conn_pool: storage::ConnectionPool,
+    conn_pool: zksync_storage::ConnectionPool,
     /// Routine refresh interval.
     rounds_interval: time::Duration,
 
@@ -45,7 +45,7 @@ enum BlockInfo {
 impl WitnessGenerator {
     /// Creates a new `WitnessGenerator` object.
     pub fn new(
-        conn_pool: storage::ConnectionPool,
+        conn_pool: zksync_storage::ConnectionPool,
         rounds_interval: time::Duration,
         start_block: BlockNumber,
         block_step: BlockNumber,
@@ -275,7 +275,7 @@ impl WitnessGenerator {
 
 async fn build_prover_block_data(
     account_tree: &mut CircuitAccountTree,
-    transaction: &mut storage::StorageProcessor<'_>,
+    transaction: &mut zksync_storage::StorageProcessor<'_>,
     block: &Block,
 ) -> Result<ProverData, failure::Error> {
     let block_number = block.block_number;

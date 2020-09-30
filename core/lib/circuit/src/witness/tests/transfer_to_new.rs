@@ -2,8 +2,8 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::operations::TransferToNewOp;
-use plasma::state::CollectedFee;
+use zksync_state::state::CollectedFee;
+use zksync_types::operations::TransferToNewOp;
 // Local deps
 use crate::witness::{
     tests::test_utils::{

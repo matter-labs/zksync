@@ -1,9 +1,9 @@
 use futures::{channel::mpsc, SinkExt};
 use log::*;
-use server::eth_watch::{EthWatch, EthWatchRequest};
 use std::time::Duration;
-use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
+use zksync_server::eth_watch::{EthWatch, EthWatchRequest};
+use zksync_storage::ConnectionPool;
 
 fn main() {
     let mut main_runtime = Runtime::new().expect("main runtime start");
