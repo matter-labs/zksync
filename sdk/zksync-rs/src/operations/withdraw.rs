@@ -69,6 +69,7 @@ impl<'a> WithdrawBuilder<'a> {
             .wallet
             .signer
             .sign_withdraw(token, amount, fee, to, nonce)
+            .await
             .map_err(ClientError::SigningError)?;
 
         let tx = FranklinTx::Withdraw(Box::new(withdraw));

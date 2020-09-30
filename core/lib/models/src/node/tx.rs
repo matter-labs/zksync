@@ -958,6 +958,11 @@ impl PackedEthSignature {
         Ok(PackedEthSignature(ETHSignature::from(bytes_array)))
     }
 
+    /// Todo.
+    pub fn signature(&self) -> ETHSignature {
+        return self.0.clone();
+    }
+
     /// Signs message using ethereum private key, results are identical to signature created
     /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
     pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {

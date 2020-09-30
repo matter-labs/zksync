@@ -1,7 +1,8 @@
-use parity_crypto::publickey::sign;
+use crate::error::SignerError;
+use crate::EthereumSigner;
+use models::node::tx::TxEthSignature;
 use rlp::RlpStream;
-use tiny_keccak::keccak256;
-use web3::types::{H160, H256, U256};
+use web3::types::{H160, U256};
 
 /// Description of a Transaction, pending or in the chain.
 #[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
@@ -38,9 +39,9 @@ fn find_first_nonzero(vector: &[u8]) -> usize {
 
 impl RawTransaction {
     /// Signs and returns the RLP-encoded transaction
-    pub fn sign(&self, private_key: &H256) -> Vec<u8> {
-        let hash = self.hash();
-        let sig = ecdsa_sign(hash, &private_key, self.chain_id);
+    pub async fn sign(&self, ethereum_signer: &EthereumSigner) -> Result<Vec<u8>, SignerError> {
+        let tx_data = self.tx_data();
+        let sig = ecdsa_sign(tx_data, &ethereum_signer, self.chain_id).await?;
         let mut tx = RlpStream::new();
         tx.begin_unbounded_list();
         self.encode(&mut tx);
@@ -52,18 +53,18 @@ impl RawTransaction {
         let s = &sig.s[s_start..];
         tx.append(&s);
         tx.finalize_unbounded_list();
-        tx.out()
+        Ok(tx.out())
     }
 
-    fn hash(&self) -> [u8; 32] {
-        let mut hash = RlpStream::new();
-        hash.begin_unbounded_list();
-        self.encode(&mut hash);
-        hash.append(&vec![self.chain_id]);
-        hash.append(&U256::zero());
-        hash.append(&U256::zero());
-        hash.finalize_unbounded_list();
-        keccak256(&hash.out())
+    fn tx_data(&self) -> Vec<u8> {
+        let mut tx_data = RlpStream::new();
+        tx_data.begin_unbounded_list();
+        self.encode(&mut tx_data);
+        tx_data.append(&vec![self.chain_id]);
+        tx_data.append(&U256::zero());
+        tx_data.append(&U256::zero());
+        tx_data.finalize_unbounded_list();
+        tx_data.out()
     }
 
     fn encode(&self, s: &mut RlpStream) {
@@ -80,15 +81,22 @@ impl RawTransaction {
     }
 }
 
-fn ecdsa_sign(hash: [u8; 32], private_key: &H256, chain_id: u8) -> EcdsaSig {
-    let sig = sign(&(*private_key).into(), &hash.into()).expect("failed to sign eth message");
+async fn ecdsa_sign(
+    message: Vec<u8>,
+    ethereum_signer: &EthereumSigner,
+    chain_id: u8,
+) -> Result<EcdsaSig, SignerError> {
+    let tx_eth_signature = ethereum_signer.sign(&message).await?;
 
-    //debug!("V m8 {:?}", v);
-
-    EcdsaSig {
-        v: vec![sig.v() as u8 + chain_id * 2 + 35],
-        r: sig.r().to_vec(),
-        s: sig.s().to_vec(),
+    if let TxEthSignature::EthereumSignature(packed_signature) = tx_eth_signature {
+        let sig = packed_signature.signature();
+        Ok(EcdsaSig {
+            v: vec![sig.v() as u8 + chain_id * 2 + 35],
+            r: sig.r().to_vec(),
+            s: sig.s().to_vec(),
+        })
+    } else {
+        Err(SignerError::SigningFailed("TODO".to_string()))
     }
 }
 

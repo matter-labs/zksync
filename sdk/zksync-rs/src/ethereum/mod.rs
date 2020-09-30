@@ -1,5 +1,6 @@
 //! Utilities for the on-chain operations, such as `Deposit` and `FullExit`.
 
+use eth_client::eth_signer::EthereumSigner;
 use eth_client::ETHClient;
 use futures::compat::Future01CompatExt;
 use models::{
@@ -49,7 +50,7 @@ impl EthereumProvider {
         provider: &Provider,
         tokens_cache: TokensCache,
         eth_web3_url: impl AsRef<str>,
-        eth_private_key: H256,
+        eth_signer: EthereumSigner,
         eth_addr: H160,
     ) -> Result<Self, ClientError> {
         let (_event_loop, transport) = Http::new(eth_web3_url.as_ref())
@@ -68,7 +69,7 @@ impl EthereumProvider {
             transport,
             abi::zksync_contract(),
             eth_addr,
-            eth_private_key,
+            eth_signer,
             contract_address
                 .parse()
                 .map_err(|err| ClientError::MalformedResponse(format!("{}", err)))?,

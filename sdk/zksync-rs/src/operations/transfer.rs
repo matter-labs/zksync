@@ -69,6 +69,7 @@ impl<'a> TransferBuilder<'a> {
             .wallet
             .signer
             .sign_transfer(token, amount, fee, to, nonce)
+            .await
             .map_err(ClientError::SigningError)?;
 
         let tx = FranklinTx::Transfer(Box::new(transfer));

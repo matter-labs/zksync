@@ -60,6 +60,7 @@ impl<'a> ChangePubKeyBuilder<'a> {
             .wallet
             .signer
             .sign_change_pubkey_tx(nonce, self.onchain_auth)
+            .await
             .map_err(ClientError::SigningError)?;
 
         let tx = FranklinTx::ChangePubKey(Box::new(change_pubkey));

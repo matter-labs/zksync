@@ -1,3 +1,4 @@
+use eth_client::error::SignerError;
 pub use jsonrpc_core::types::response::Failure as RpcFailure;
 use thiserror::Error;
 
@@ -36,14 +37,4 @@ pub enum ClientError {
 
     #[error("Provided value is not packable")]
     NotPackableValue,
-}
-
-#[derive(Debug, Error)]
-pub enum SignerError {
-    #[error("Ethereum private key required to perform an operation")]
-    MissingEthPrivateKey,
-    #[error("Signing failed: {0}")]
-    SigningFailed(String),
-    #[error("Signing key is not set in account")]
-    NoSigningKey,
 }

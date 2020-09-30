@@ -1,5 +1,6 @@
 // Built-in deps
 // External uses
+use eth_client::eth_signer::EthereumSigner;
 use failure::ensure;
 use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
@@ -69,14 +70,17 @@ pub struct EthereumHttpClient {
 impl EthereumHttpClient {
     pub fn new(options: &ConfigurationOptions) -> Result<Self, failure::Error> {
         let (_event_loop, transport) = Http::new(&options.web3_url)?;
+        let ethereum_signer = EthereumSigner::from_key(
+            options
+                .operator_private_key
+                .expect("Operator private key is required for eth_sender"),
+        );
 
         let eth_client = ETHClient::new(
             transport,
             zksync_contract(),
             options.operator_commit_eth_addr,
-            options
-                .operator_private_key
-                .expect("Operator private key is required for eth_sender"),
+            ethereum_signer,
             options.contract_eth_addr,
             options.chain_id,
             options.gas_price_factor,

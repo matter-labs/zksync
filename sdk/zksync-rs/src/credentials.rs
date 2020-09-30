@@ -1,9 +1,10 @@
 use crate::{error::ClientError, types::network::Network, utils::private_key_from_seed};
+use eth_client::eth_signer::EthereumSigner;
 use models::node::{tx::PackedEthSignature, PrivateKey};
 use web3::types::{Address, H256};
 
 pub struct WalletCredentials {
-    pub(crate) eth_private_key: Option<H256>,
+    pub(crate) eth_signer: Option<EthereumSigner>,
     pub(crate) eth_address: Address,
     pub(crate) zksync_private_key: PrivateKey,
 }
@@ -57,9 +58,10 @@ impl WalletCredentials {
 
         let signature_bytes = signature.serialize_packed();
         let zksync_pk = private_key_from_seed(&signature_bytes)?;
+        let eth_signer = EthereumSigner::from_key(eth_private_key);
 
         Ok(Self {
-            eth_private_key: Some(eth_private_key),
+            eth_signer: Some(eth_signer),
             eth_address,
             zksync_private_key: zksync_pk,
         })
@@ -78,7 +80,7 @@ impl WalletCredentials {
         let zksync_pk = private_key_from_seed(seed)?;
 
         Ok(Self {
-            eth_private_key: None,
+            eth_signer: None,
             eth_address,
             zksync_private_key: zksync_pk,
         })
@@ -96,9 +98,11 @@ impl WalletCredentials {
         private_key: PrivateKey,
         eth_private_key: Option<H256>,
     ) -> Self {
+        let eth_signer = eth_private_key.map(|eth_pk| EthereumSigner::from_key(eth_pk));
+
         Self {
             eth_address,
-            eth_private_key,
+            eth_signer,
             zksync_private_key: private_key,
         }
     }
