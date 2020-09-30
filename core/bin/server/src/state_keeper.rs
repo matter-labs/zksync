@@ -868,7 +868,6 @@ impl PlasmaStateKeeper {
             #[rustfmt::skip]
             account_updates: pending_block
                 .account_updates
-                .clone()
                 [pending_block.stored_account_updates..]
                 .to_vec(),
             first_update_order_id: pending_block.stored_account_updates,
@@ -910,7 +909,6 @@ impl PlasmaStateKeeper {
             account_updates: self
                 .pending_block
                 .account_updates
-                .clone()
                 [self.pending_block.stored_account_updates..]
                 .to_vec(),
             first_update_order_id: self.pending_block.stored_account_updates,
