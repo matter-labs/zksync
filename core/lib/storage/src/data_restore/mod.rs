@@ -3,12 +3,12 @@
 use itertools::Itertools;
 // Workspace imports
 use zksync_types::block::Block;
+use zksync_types::Operation;
 use zksync_types::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
-use zksync_types::{NewTokenEvent, Operation};
 // Local imports
 use self::records::{
-    NewBlockEvent, NewFranklinOp, NewStorageState, StoredBlockEvent, StoredFranklinOp,
-    StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState,
+    NewBlockEvent, NewFranklinOp, NewStorageState, NewTokenEvent, StoredBlockEvent,
+    StoredFranklinOp, StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState,
 };
 use crate::{
     chain::{block::BlockSchema, state::StateSchema},

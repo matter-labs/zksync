@@ -9,16 +9,25 @@ use zksync_storage::{
     ConnectionPool,
 };
 use zksync_types::{
-    Action, NewTokenEvent, Operation,
+    Action, Operation,
     {block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
 };
 // Local deps
 use crate::{
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
-    events_state::EventsState,
+    events_state::{EventsState, NewTokenEvent},
     rollup_ops::RollupOpsBlock,
 };
+
+impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEvent {
+    fn from(event: &NewTokenEvent) -> Self {
+        Self {
+            address: event.address,
+            id: event.id,
+        }
+    }
+}
 
 /// Saves genesis account state in storage
 ///
@@ -119,9 +128,10 @@ pub async fn save_events_state(
 
     let block_number = last_watched_eth_block_number.to_string();
 
+    let tokens: Vec<_> = tokens.iter().map(From::from).collect();
     storage
         .data_restore_schema()
-        .save_events_state(new_events.as_slice(), tokens, &block_number)
+        .save_events_state(new_events.as_slice(), &tokens, &block_number)
         .await
         .expect("Cant update events state");
 }

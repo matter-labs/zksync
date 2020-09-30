@@ -3,9 +3,15 @@ use serde_json::Value;
 // Workspace imports
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use zksync_types::{AccountId, BlockNumber, FranklinOp};
+use zksync_types::{AccountId, Address, BlockNumber, FranklinOp, TokenId};
 // Workspace imports
 // Local imports
+
+#[derive(Debug)]
+pub struct NewTokenEvent {
+    pub address: Address,
+    pub id: TokenId,
+}
 
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredRollupOpsBlock {

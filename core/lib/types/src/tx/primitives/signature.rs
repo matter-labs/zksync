@@ -9,7 +9,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 use zksync_crypto::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
-use zksync_crypto::primitives::{pedersen_hash_tx_msg, rescue_hash_tx_msg};
+use zksync_crypto::primitives::rescue_hash_tx_msg;
 
 use crate::tx::{PackedPublicKey, PackedSignature};
 
@@ -29,38 +29,6 @@ impl TxSignature {
         self.verify_musig_rescue(msg)
     }
 
-    #[allow(dead_code)]
-    pub fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
-        let hashed_msg = pedersen_hash_tx_msg(msg);
-        let valid = self.pub_key.0.verify_musig_pedersen(
-            &hashed_msg,
-            &self.signature.0,
-            FixedGenerators::SpendingKeyGenerator,
-            &JUBJUB_PARAMS,
-        );
-        if valid {
-            Some(self.pub_key.0.clone())
-        } else {
-            None
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
-        let hashed_msg = pedersen_hash_tx_msg(msg);
-        let valid = self.pub_key.0.verify_musig_sha256(
-            &hashed_msg,
-            &self.signature.0,
-            FixedGenerators::SpendingKeyGenerator,
-            &JUBJUB_PARAMS,
-        );
-        if valid {
-            Some(self.pub_key.0.clone())
-        } else {
-            None
-        }
-    }
-
     pub fn verify_musig_rescue(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = rescue_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_rescue(
@@ -74,40 +42,6 @@ impl TxSignature {
             Some(self.pub_key.0.clone())
         } else {
             None
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
-        let hashed_msg = pedersen_hash_tx_msg(msg);
-        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
-        let signature = pk.musig_pedersen_sign(
-            &hashed_msg,
-            &seed,
-            FixedGenerators::SpendingKeyGenerator,
-            &JUBJUB_PARAMS,
-        );
-
-        Self {
-            pub_key: PackedPublicKey(public_key_from_private(pk)),
-            signature: PackedSignature(signature),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
-        let hashed_msg = pedersen_hash_tx_msg(msg);
-        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
-        let signature = pk.musig_sha256_sign(
-            &hashed_msg,
-            &seed,
-            FixedGenerators::SpendingKeyGenerator,
-            &JUBJUB_PARAMS,
-        );
-
-        Self {
-            pub_key: PackedPublicKey(public_key_from_private(pk)),
-            signature: PackedSignature(signature),
         }
     }
 

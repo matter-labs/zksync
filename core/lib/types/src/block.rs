@@ -150,6 +150,7 @@ impl Block {
             .expect("Write commit bytes");
         H256::from(be_bytes)
     }
+
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         let mut executed_tx_pub_data = self
             .block_transactions
@@ -213,7 +214,7 @@ impl Block {
     }
 }
 
-// Get smallest block size given
+/// Gets smallest block size given the list of supported chunk sizes.
 pub fn smallest_block_size_for_chunks(
     chunks_used: usize,
     available_block_sizes: &[usize],

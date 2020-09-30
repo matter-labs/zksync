@@ -161,48 +161,6 @@ fn test_musig_rescue_signing_verification() {
 }
 
 #[test]
-fn test_musig_pedersen_signing_verification() {
-    let (pk, messages) = gen_pk_and_msg();
-
-    for msg in &messages {
-        let signature = TxSignature::sign_musig_pedersen(&pk, msg);
-
-        if let Some(sign_pub_key) = signature.verify_musig_pedersen(msg) {
-            let pub_key =
-                PublicKey::from_private(&pk, FixedGenerators::SpendingKeyGenerator, &JUBJUB_PARAMS);
-            assert!(
-                sign_pub_key.0.eq(&pub_key.0),
-                "Signature pub key is wrong, msg: {}",
-                hex::encode(&msg)
-            );
-        } else {
-            panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
-        }
-    }
-}
-
-#[test]
-fn test_musig_sha256_signing_verification() {
-    let (pk, messages) = gen_pk_and_msg();
-
-    for msg in &messages {
-        let signature = TxSignature::sign_musig_sha256(&pk, msg);
-
-        if let Some(sign_pub_key) = signature.verify_musig_sha256(msg) {
-            let pub_key =
-                PublicKey::from_private(&pk, FixedGenerators::SpendingKeyGenerator, &JUBJUB_PARAMS);
-            assert!(
-                sign_pub_key.0.eq(&pub_key.0),
-                "Signature pub key is wrong, msg: {}",
-                hex::encode(&msg)
-            );
-        } else {
-            panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
-        }
-    }
-}
-
-#[test]
 fn test_ethereum_signature_verify_with_serialization() {
     let address: Address = "52312AD6f01657413b2eaE9287f6B9ADaD93D5FE".parse().unwrap();
     let message = "hello world";

@@ -24,15 +24,24 @@ use zksync_storage::chain::operations_ext::{
     SearchDirection,
 };
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::NetworkStatus;
 use zksync_types::{
-    Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
+    Account, AccountId, Address, BlockNumber, ExecutedOperations, FranklinPriorityOp, PriorityOp,
+    Token, TokenId,
 };
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
 use crate::panic_notify::ThreadPanicNotify;
 use zksync_storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkStatus {
+    pub next_block_at_max: Option<u64>,
+    pub last_committed: BlockNumber,
+    pub last_verified: BlockNumber,
+    pub total_transactions: u32,
+    pub outstanding_txs: u32,
+}
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);

@@ -15,14 +15,12 @@ zksync_utils = { path = "../utils", version = "1.0" }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 num = { version = "0.2", features = ["serde"] }
-bigdecimal = { version = "0.1", features = ["serde"]}
 hex = "0.4"
 failure = "0.1"
 log = "0.4"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 
 serde = "1.0.90"
-serde_bytes = "0.11.1"
 serde_json = "1.0.0"
 
 # Crypto stuff
