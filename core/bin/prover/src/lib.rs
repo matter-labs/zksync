@@ -83,14 +83,14 @@ pub trait ProverImpl<C: ApiClient> {
 }
 
 pub trait ApiClient: Debug {
-    fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error>;
-    fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
+    fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, anyhow::Error>;
+    fn working_on(&self, job_id: i32) -> Result<(), anyhow::Error>;
     fn prover_data(
         &self,
         block: i64,
-    ) -> Result<zksync_circuit::circuit::FranklinCircuit<'_, Engine>, failure::Error>;
-    fn publish(&self, block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error>;
-    fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error>;
+    ) -> Result<zksync_circuit::circuit::FranklinCircuit<'_, Engine>, anyhow::Error>;
+    fn publish(&self, block: i64, p: EncodedProofPlonk) -> Result<(), anyhow::Error>;
+    fn prover_stopped(&self, prover_run_id: i32) -> Result<(), anyhow::Error>;
 }
 
 #[derive(Debug)]

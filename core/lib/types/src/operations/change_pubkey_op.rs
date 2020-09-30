@@ -1,7 +1,7 @@
 use crate::tx::ChangePubKey;
 use crate::AccountId;
 use crate::PubKeyHash;
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::params::{
@@ -38,7 +38,7 @@ impl ChangePubKeyOp {
         }
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         let mut offset = 1;
 
         let mut len = ACCOUNT_ID_BIT_WIDTH / 8;

@@ -24,7 +24,7 @@ serde_json = "1.0.0"
 num = { version = "0.2", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
-failure = "0.1"
+anyhow = "1.0"
 itertools = "0.8"
 hex = "0.4"
 

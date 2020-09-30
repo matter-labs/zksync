@@ -1,6 +1,6 @@
 use crate::AccountId;
 use crate::Deposit;
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
@@ -32,7 +32,7 @@ impl DepositOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(
             bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for deposit pubdata"

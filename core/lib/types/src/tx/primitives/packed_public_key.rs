@@ -1,4 +1,4 @@
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::{edwards, AltJubjubBn256},
@@ -17,7 +17,7 @@ impl PackedPublicKey {
         Ok(packed_point.to_vec())
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(bytes.len() == 32, "PublicKey size mismatch");
 
         Ok(PackedPublicKey(PublicKey::<Engine>(

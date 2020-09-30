@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use zksync_crypto::params;
 
-use failure::ensure;
+use anyhow::ensure;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff;
 use zksync_crypto::franklin_crypto::eddsa::PublicKey;
@@ -33,13 +33,13 @@ impl PubKeyHash {
         format!("sync:{}", hex::encode(&self.data))
     }
 
-    pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
+    pub fn from_hex(s: &str) -> Result<Self, anyhow::Error> {
         ensure!(s.starts_with("sync:"), "PubKeyHash should start with sync:");
         let bytes = hex::decode(&s[5..])?;
         Self::from_bytes(&bytes)
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
         Ok(PubKeyHash {
             data: bytes.try_into().unwrap(),

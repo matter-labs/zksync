@@ -1,5 +1,5 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
-use failure::format_err;
+use anyhow::format_err;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -19,19 +19,19 @@ pub fn get_keys_root_dir() -> PathBuf {
     out_dir
 }
 
-fn base_universal_setup_dir() -> Result<PathBuf, failure::Error> {
+fn base_universal_setup_dir() -> Result<PathBuf, anyhow::Error> {
     let mut dir = PathBuf::new();
     // root is used by default for provers
     dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
     dir.push("keys");
     dir.push("setup");
-    failure::ensure!(dir.exists(), "Universal setup dir does not exits");
+    anyhow::ensure!(dir.exists(), "Universal setup dir does not exits");
     Ok(dir)
 }
 
 fn get_universal_setup_file_buff_reader(
     setup_file_name: &str,
-) -> Result<BufReader<File>, failure::Error> {
+) -> Result<BufReader<File>, anyhow::Error> {
     let setup_file = {
         let mut path = base_universal_setup_dir()?;
         path.push(&setup_file_name);
@@ -49,8 +49,8 @@ fn get_universal_setup_file_buff_reader(
 /// Returns universal setup in the monomial form of the given power of two (range: SETUP_MIN_POW2..=SETUP_MAX_POW2). Checks if file exists
 pub fn get_universal_setup_monomial_form(
     power_of_two: u32,
-) -> Result<Crs<Engine, CrsForMonomialForm>, failure::Error> {
-    failure::ensure!(
+) -> Result<Crs<Engine, CrsForMonomialForm>, anyhow::Error> {
+    anyhow::ensure!(
         (SETUP_MIN_POW2..=SETUP_MAX_POW2).contains(&power_of_two),
         "setup power of two is not in the correct range"
     );
@@ -63,8 +63,8 @@ pub fn get_universal_setup_monomial_form(
 /// Returns universal setup in lagrange form of the given power of two (range: SETUP_MIN_POW2..=SETUP_MAX_POW2). Checks if file exists
 pub fn get_universal_setup_lagrange_form(
     power_of_two: u32,
-) -> Result<Crs<Engine, CrsForLagrangeForm>, failure::Error> {
-    failure::ensure!(
+) -> Result<Crs<Engine, CrsForLagrangeForm>, anyhow::Error> {
+    anyhow::ensure!(
         (SETUP_MIN_POW2..=SETUP_MAX_POW2).contains(&power_of_two),
         "setup power of two is not in the correct range"
     );

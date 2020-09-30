@@ -1,7 +1,7 @@
 use crate::tx::TxSignature;
 use crate::AccountId;
 use crate::Close;
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES};
@@ -25,7 +25,7 @@ impl CloseOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(
             bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for close pubdata"

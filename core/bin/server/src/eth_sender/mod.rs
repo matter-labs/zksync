@@ -117,7 +117,7 @@ enum TxCheckMode {
 ///
 /// # Failure policy
 ///
-/// By default, `ETHSender` expects no transactions to fail, and thus upon a failure it will
+/// By default, `ETHSender` expects no transactions to fail, and thus upon a anyhow it will
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
@@ -343,7 +343,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
+    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), anyhow::Error> {
         let current_block = self.ethereum.block_number().await?;
         let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self
@@ -406,7 +406,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         );
         self.ethereum.send_tx(&signed_tx).await.unwrap_or_else(|e| {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
-            // and resent. We can't do anything about this failure either, since it's most probably is not
+            // and resent. We can't do anything about this anyhow either, since it's most probably is not
             // related to the node logic, so we just log this error and pretend to have this operation
             // processed.
             log::warn!("Error while sending the operation: {}", e);
@@ -447,12 +447,12 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     /// - If the transaction is either pending or completed, stops the execution (as
     ///   there is nothing to do with the operation yet).
     /// - If the transaction is stuck, sends a supplement transaction for it.
-    /// - If the transaction is failed, handles the failure according to the failure
+    /// - If the transaction is failed, handles the anyhow according to the anyhow
     ///   processing policy.
     async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
-    ) -> Result<OperationCommitment, failure::Error> {
+    ) -> Result<OperationCommitment, anyhow::Error> {
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
@@ -499,8 +499,8 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                         op.op,
                         receipt,
                     );
-                    // Process the failure according to the chosen policy.
-                    self.failure_handler(&receipt);
+                    // Process the anyhow according to the chosen policy.
+                    self.anyhow_handler(&receipt);
                 }
             }
         }
@@ -538,14 +538,14 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         Ok(OperationCommitment::Pending)
     }
 
-    /// Handles a transaction execution failure by reporting the issue to the log
+    /// Handles a transaction execution anyhow by reporting the issue to the log
     /// and terminating the node.
-    fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
+    fn anyhow_handler(&self, receipt: &TransactionReceipt) -> ! {
         log::error!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );
-        panic!("Cannot operate after unexpected TX failure");
+        panic!("Cannot operate after unexpected TX anyhow");
     }
 
     /// Helper method encapsulating the logic of determining the next deadline block.
@@ -561,7 +561,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         op: &ETHOperation,
         tx_hash: &H256,
         current_block: u64,
-    ) -> Result<TxCheckOutcome, failure::Error> {
+    ) -> Result<TxCheckOutcome, anyhow::Error> {
         let status = self.ethereum.get_tx_status(tx_hash).await?;
 
         let outcome = match status {
@@ -576,7 +576,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             }
             // Non-successful execution.
             Some(status) => {
-                // Transaction failed, report the failure with details.
+                // Transaction failed, report the anyhow with details.
 
                 // TODO check confirmations for fail
                 assert!(
@@ -602,7 +602,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn sign_new_tx(
         ethereum: &ETH,
         op: &ETHOperation,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -663,7 +663,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         &mut self,
         deadline_block: u64,
         stuck_tx: &mut ETHOperation,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         let tx_options = self.tx_options_from_stuck_tx(stuck_tx).await?;
 
         let raw_tx = stuck_tx.encoded_tx_data.clone();
@@ -681,7 +681,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn tx_options_from_stuck_tx(
         &mut self,
         stuck_tx: &ETHOperation,
-    ) -> Result<Options, failure::Error> {
+    ) -> Result<Options, anyhow::Error> {
         let old_tx_gas_price = stuck_tx.last_used_gas_price;
 
         let new_gas_price = self

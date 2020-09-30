@@ -66,7 +66,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                         eth_sign_data: sign_data,
                     })
                 })
-                .collect::<Result<Vec<SignedFranklinTx>, failure::Error>>()?;
+                .collect::<Result<Vec<SignedFranklinTx>, anyhow::Error>>()?;
 
             match batch_id {
                 Some(batch_id) => {
@@ -104,7 +104,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Returns id of the inserted batch
     pub async fn insert_batch(&mut self, txs: &[SignedFranklinTx]) -> QueryResult<i64> {
         if txs.is_empty() {
-            failure::bail!("Cannot insert an empty batch");
+            anyhow::bail!("Cannot insert an empty batch");
         }
 
         // The first transaction of the batch would be inserted manually
@@ -140,7 +140,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             )
             .fetch_optional(self.0.conn())
             .await?
-            .ok_or_else(|| failure::format_err!("Can't get maximal batch_id from mempool_txs"))?
+            .ok_or_else(|| anyhow::format_err!("Can't get maximal batch_id from mempool_txs"))?
             .batch_id
         };
 
@@ -228,7 +228,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Though it's unlikely that mempool schema will ever contain a committed
     /// transaction, it's better to ensure that we won't process the same transaction
     /// again. One possible scenario for having already-processed txs in the database
-    /// is a failure of `remove_txs` method, which won't cause a panic on server, but will
+    /// is a anyhow of `remove_txs` method, which won't cause a panic on server, but will
     /// left txs in the database.
     ///
     /// This method is expected to be initially invoked on the server start, and then

@@ -1,6 +1,6 @@
 use super::FranklinTx;
 use crate::FranklinPriorityOp;
-use failure::format_err;
+use anyhow::format_err;
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::CHUNK_BYTES;
 
@@ -74,7 +74,7 @@ impl FranklinOp {
         }
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         let op_type: u8 = *bytes.first().ok_or_else(|| format_err!("Empty pubdata"))?;
         match op_type {
             NoopOp::OP_CODE => Ok(FranklinOp::Noop(NoopOp::from_public_data(&bytes)?)),
@@ -103,7 +103,7 @@ impl FranklinOp {
         }
     }
 
-    pub fn public_data_length(op_type: u8) -> Result<usize, failure::Error> {
+    pub fn public_data_length(op_type: u8) -> Result<usize, anyhow::Error> {
         match op_type {
             NoopOp::OP_CODE => Ok(NoopOp::CHUNKS),
             DepositOp::OP_CODE => Ok(DepositOp::CHUNKS),
@@ -118,7 +118,7 @@ impl FranklinOp {
         .map(|chunks| chunks * CHUNK_BYTES)
     }
 
-    pub fn try_get_tx(&self) -> Result<FranklinTx, failure::Error> {
+    pub fn try_get_tx(&self) -> Result<FranklinTx, anyhow::Error> {
         match self {
             FranklinOp::Transfer(op) => Ok(FranklinTx::Transfer(Box::new(op.tx.clone()))),
             FranklinOp::TransferToNew(op) => Ok(FranklinTx::Transfer(Box::new(op.tx.clone()))),
@@ -131,7 +131,7 @@ impl FranklinOp {
         }
     }
 
-    pub fn try_get_priority_op(&self) -> Result<FranklinPriorityOp, failure::Error> {
+    pub fn try_get_priority_op(&self) -> Result<FranklinPriorityOp, anyhow::Error> {
         match self {
             FranklinOp::Deposit(op) => Ok(FranklinPriorityOp::Deposit(op.priority_op.clone())),
             FranklinOp::FullExit(op) => Ok(FranklinPriorityOp::FullExit(op.priority_op.clone())),

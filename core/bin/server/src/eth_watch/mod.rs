@@ -12,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 // External uses
-use failure::format_err;
+use anyhow::format_err;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
@@ -90,10 +90,10 @@ pub enum EthWatchRequest {
         address: Address,
         message: Vec<u8>,
         signature: EIP1271Signature,
-        resp: oneshot::Sender<Result<bool, failure::Error>>,
+        resp: oneshot::Sender<Result<bool, anyhow::Error>>,
     },
     GetPendingWithdrawalsQueueIndex {
-        resp: oneshot::Sender<Result<u32, failure::Error>>,
+        resp: oneshot::Sender<Result<u32, anyhow::Error>>,
     },
 }
 
@@ -191,7 +191,7 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<(EthBlockId, PriorityOp)>, failure::Error> {
+    ) -> Result<Vec<(EthBlockId, PriorityOp)>, anyhow::Error> {
         let filter = self.get_priority_op_event_filter(from, to);
         self.web3
             .eth()
@@ -201,7 +201,9 @@ impl<T: Transport> EthWatch<T> {
             .map(|event| {
                 let block_number: u64 = event
                     .block_number
-                    .ok_or_else(|| failure::err_msg("No block number set in the queue event log"))?
+                    .ok_or_else(|| {
+                        anyhow::format_err!("No block number set in the queue event log")
+                    })?
                     .as_u64();
 
                 let priority_op = PriorityOp::try_from(event).map_err(|e| {
@@ -217,7 +219,7 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<PriorityOp>, failure::Error> {
+    ) -> Result<Vec<PriorityOp>, anyhow::Error> {
         let filter = self.get_priority_op_event_filter(from, to);
         self.web3
             .eth()
@@ -236,7 +238,7 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<CompleteWithdrawalsTx>, failure::Error> {
+    ) -> Result<Vec<CompleteWithdrawalsTx>, anyhow::Error> {
         let filter = self.get_complete_withdrawals_event_filter(from, to);
         self.web3
             .eth()
@@ -250,7 +252,7 @@ impl<T: Transport> EthWatch<T> {
     async fn get_unconfirmed_ops(
         &mut self,
         current_ethereum_block: u64,
-    ) -> Result<Vec<(EthBlockId, PriorityOp)>, failure::Error> {
+    ) -> Result<Vec<(EthBlockId, PriorityOp)>, anyhow::Error> {
         // We want to scan the interval of blocks from the latest one up to the oldest one which may
         // have unconfirmed priority ops.
         // `+ 1` is added because if we subtract number of confirmations, we'll obtain the last block
@@ -278,7 +280,7 @@ impl<T: Transport> EthWatch<T> {
     async fn store_complete_withdrawals(
         &mut self,
         complete_withdrawals_txs: Vec<CompleteWithdrawalsTx>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let mut storage = self
             .db_pool
             .access_storage_fragile()
@@ -300,7 +302,7 @@ impl<T: Transport> EthWatch<T> {
     async fn restore_state_from_eth(
         &mut self,
         last_ethereum_block: u64,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let current_ethereum_block =
             last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
 
@@ -343,7 +345,7 @@ impl<T: Transport> EthWatch<T> {
         Ok(())
     }
 
-    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> Result<(), failure::Error> {
+    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> Result<(), anyhow::Error> {
         debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
         let previous_block_with_accepted_events = (self.eth_state.last_ethereum_block() + 1)
@@ -413,7 +415,7 @@ impl<T: Transport> EthWatch<T> {
         address: Address,
         message: Vec<u8>,
         signature: EIP1271Signature,
-    ) -> Result<bool, failure::Error> {
+    ) -> Result<bool, anyhow::Error> {
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
@@ -434,7 +436,7 @@ impl<T: Transport> EthWatch<T> {
         address: Address,
         nonce: Nonce,
         pub_key_hash: &PubKeyHash,
-    ) -> Result<bool, failure::Error> {
+    ) -> Result<bool, anyhow::Error> {
         let auth_fact: Vec<u8> = self
             .zksync_contract
             .1
@@ -450,7 +452,7 @@ impl<T: Transport> EthWatch<T> {
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
-    async fn pending_withdrawals_queue_index(&self) -> Result<u32, failure::Error> {
+    async fn pending_withdrawals_queue_index(&self) -> Result<u32, anyhow::Error> {
         let first_pending_withdrawal_index: u32 = self
             .zksync_contract
             .1
@@ -508,7 +510,7 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
-    async fn poll_eth_node(&mut self) -> Result<(), failure::Error> {
+    async fn poll_eth_node(&mut self) -> Result<(), anyhow::Error> {
         let last_block_number = self.web3.eth().block_number().await?.as_u64();
 
         if last_block_number > self.eth_state.last_ethereum_block() {
@@ -518,7 +520,7 @@ impl<T: Transport> EthWatch<T> {
         Ok(())
     }
 
-    fn is_backoff_requested(&self, error: &failure::Error) -> bool {
+    fn is_backoff_requested(&self, error: &anyhow::Error) -> bool {
         error.to_string().contains("429 Too Many Requests")
     }
 

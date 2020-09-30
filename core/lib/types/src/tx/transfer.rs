@@ -8,7 +8,7 @@ use num::BigUint;
 
 use crate::account::PubKeyHash;
 use crate::Engine;
-use failure::bail;
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
@@ -80,7 +80,7 @@ impl Transfer {
         fee: BigUint,
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, failure::Error> {
+    ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(account_id, from, to, token, amount, fee, nonce, None);
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {

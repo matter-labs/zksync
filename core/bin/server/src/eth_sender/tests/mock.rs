@@ -79,7 +79,7 @@ impl MockDatabase {
         assert!(self.unconfirmed_operations.borrow().get(&tx.id).is_none());
     }
 
-    fn next_nonce(&self) -> Result<i64, failure::Error> {
+    fn next_nonce(&self) -> Result<i64, anyhow::Error> {
         let old_value = self.nonce.get();
         let new_value = old_value + 1;
         self.nonce.set(new_value);
@@ -89,7 +89,7 @@ impl MockDatabase {
 }
 
 impl DatabaseAccess for MockDatabase {
-    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error> {
+    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error> {
         Ok((self.restore_state.clone(), Vec::new()))
     }
 
@@ -100,7 +100,7 @@ impl DatabaseAccess for MockDatabase {
         deadline_block: i64,
         used_gas_price: U256,
         encoded_tx_data: Vec<u8>,
-    ) -> Result<InsertedOperationResponse, failure::Error> {
+    ) -> Result<InsertedOperationResponse, anyhow::Error> {
         let id = self.pending_op_id.get();
         let new_id = id + 1;
         self.pending_op_id.set(new_id);
@@ -132,7 +132,7 @@ impl DatabaseAccess for MockDatabase {
     }
 
     /// Adds a tx hash entry associated with some Ethereum operation to the database.
-    fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> Result<(), failure::Error> {
+    fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> Result<(), anyhow::Error> {
         assert!(
             self.unconfirmed_operations
                 .borrow()
@@ -153,7 +153,7 @@ impl DatabaseAccess for MockDatabase {
         eth_op_id: EthOpId,
         new_deadline_block: i64,
         new_gas_value: U256,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         assert!(
             self.unconfirmed_operations
                 .borrow()
@@ -170,7 +170,7 @@ impl DatabaseAccess for MockDatabase {
         Ok(())
     }
 
-    fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
+    fn confirm_operation(&self, hash: &H256) -> Result<(), anyhow::Error> {
         let mut unconfirmed_operations = self.unconfirmed_operations.borrow_mut();
         let mut op_idx: Option<i64> = None;
         for operation in unconfirmed_operations.values_mut() {
@@ -196,23 +196,23 @@ impl DatabaseAccess for MockDatabase {
         Ok(())
     }
 
-    fn load_gas_price_limit(&self) -> Result<U256, failure::Error> {
+    fn load_gas_price_limit(&self) -> Result<U256, anyhow::Error> {
         Ok(self.gas_price_limit.get())
     }
 
-    fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error> {
+    fn update_gas_price_limit(&self, value: U256) -> Result<(), anyhow::Error> {
         self.gas_price_limit.set(value);
 
         Ok(())
     }
 
-    fn load_stats(&self) -> Result<ETHStats, failure::Error> {
+    fn load_stats(&self) -> Result<ETHStats, anyhow::Error> {
         Ok(self.stats.borrow().clone())
     }
 
-    fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
+    fn transaction<F, T>(&self, f: F) -> Result<T, anyhow::Error>
     where
-        F: FnOnce() -> Result<T, failure::Error>,
+        F: FnOnce() -> Result<T, anyhow::Error>,
     {
         f()
     }
@@ -279,7 +279,7 @@ impl MockEthereum {
         self.tx_statuses.borrow_mut().insert(tx_hash, status);
     }
 
-    /// Same as `add_successfull_execution`, but marks the transaction as a failure.
+    /// Same as `add_successfull_execution`, but marks the transaction as a anyhow.
     pub fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
         self.block_number += confirmations;
 
@@ -293,19 +293,19 @@ impl MockEthereum {
 }
 
 impl EthereumInterface for MockEthereum {
-    fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
+    fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
         Ok(self.tx_statuses.borrow().get(hash).cloned())
     }
 
-    fn block_number(&self) -> Result<u64, failure::Error> {
+    fn block_number(&self) -> Result<u64, anyhow::Error> {
         Ok(self.block_number)
     }
 
-    fn gas_price(&self) -> Result<U256, failure::Error> {
+    fn gas_price(&self) -> Result<U256, anyhow::Error> {
         Ok(self.gas_price)
     }
 
-    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
+    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error> {
         self.sent_txs
             .borrow_mut()
             .insert(signed_tx.hash, signed_tx.clone());
@@ -321,7 +321,7 @@ impl EthereumInterface for MockEthereum {
         &self,
         raw_tx: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         let gas_price = options.gas_price.unwrap_or(self.gas_price);
         let nonce = options.nonce.expect("Nonce must be set for every tx");
 

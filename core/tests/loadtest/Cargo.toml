@@ -25,7 +25,7 @@ futures = { version = "0.3" }
 tokio = { version = "0.2", features = ["full"] }
 
 hex = "0.4"
-failure = "0.1"
+anyhow = "1.0"
 num = { version = "0.2", features = ["serde"] }
 rand = "0.4"
 log = "0.4"

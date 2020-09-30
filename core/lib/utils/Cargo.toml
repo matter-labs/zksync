@@ -13,4 +13,4 @@ categories = ["cryptography"]
 num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
 serde = "1.0"
-failure = "0.1"
+anyhow = "1.0"

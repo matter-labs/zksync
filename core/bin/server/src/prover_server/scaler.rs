@@ -21,7 +21,7 @@ impl ScalerOracle {
     }
 
     /// Decides how many prover entities should be created depending on the amount of pending blocks.
-    pub async fn provers_required(&mut self) -> Result<u32, failure::Error> {
+    pub async fn provers_required(&mut self) -> Result<u32, anyhow::Error> {
         // Currently the logic of this method is very simple:
         // We require a prover for each pending block or IDLE_RROVERS amount if there are not so many
         // pending jobs.

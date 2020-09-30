@@ -2491,9 +2491,9 @@ checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 name = "loadtest"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "env_logger 0.6.2",
- "failure",
  "futures 0.3.5",
  "hex",
  "log 0.4.11",
@@ -5479,7 +5479,7 @@ dependencies = [
 name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
- "failure",
+ "anyhow",
  "fnv",
  "franklin-crypto",
  "hex",
@@ -5496,11 +5496,11 @@ dependencies = [
 name = "zksync_data_restore"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "clap",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
- "failure",
  "hex",
  "log 0.4.11",
  "num",
@@ -5521,8 +5521,8 @@ dependencies = [
 name = "zksync_eth_client"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "ethabi 12.0.0",
- "failure",
  "log 0.4.11",
  "parity-crypto",
  "rlp",
@@ -5534,12 +5534,12 @@ dependencies = [
 name = "zksync_prover"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "backoff",
  "chrono",
  "clap",
  "ctrlc",
  "env_logger 0.6.2",
- "failure",
  "hex",
  "log 0.4.11",
  "num",
@@ -5562,8 +5562,8 @@ dependencies = [
 name = "zksync_prover_utils"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "backoff",
- "failure",
  "lazy_static",
  "log 0.4.11",
  "reqwest",
@@ -5581,6 +5581,7 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "actix-web-httpauth",
+ "anyhow",
  "async-trait",
  "bigdecimal",
  "chrono",
@@ -5588,7 +5589,6 @@ dependencies = [
  "ctrlc",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
- "failure",
  "futures 0.1.29",
  "futures 0.3.5",
  "hex",
@@ -5609,6 +5609,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "thiserror",
  "tiny-keccak 1.5.0",
  "tokio 0.1.22",
  "tokio 0.2.22",
@@ -5632,8 +5633,8 @@ dependencies = [
 name = "zksync_state"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "criterion",
- "failure",
  "log 0.4.11",
  "num",
  "web3 0.13.0",
@@ -5646,12 +5647,12 @@ dependencies = [
 name = "zksync_storage"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "db_test_macro",
  "deadpool",
  "env_logger 0.6.2",
- "failure",
  "hex",
  "itertools 0.8.2",
  "log 0.4.11",
@@ -5683,9 +5684,9 @@ dependencies = [
 name = "zksync_testkit"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
- "failure",
  "futures 0.3.5",
  "itertools 0.9.0",
  "log 0.4.11",
@@ -5709,10 +5710,10 @@ dependencies = [
 name = "zksync_types"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "criterion",
  "ethabi 12.0.0",
- "failure",
  "hex",
  "log 0.4.11",
  "num",
@@ -5729,8 +5730,8 @@ dependencies = [
 name = "zksync_utils"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "bigdecimal",
- "failure",
  "num",
  "serde",
 ]

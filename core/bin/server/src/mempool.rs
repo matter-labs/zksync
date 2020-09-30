@@ -17,12 +17,12 @@
 // Built-in deps
 use std::collections::{HashMap, VecDeque};
 // External uses
-use failure::Fail;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_storage::ConnectionPool;
@@ -35,45 +35,45 @@ use zksync_types::{
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
 use zksync_config::ConfigurationOptions;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
 pub enum TxAddError {
-    #[fail(display = "Tx nonce is too low.")]
+    #[error("Tx nonce is too low.")]
     NonceMismatch,
 
-    #[fail(display = "Tx is incorrect")]
+    #[error("Tx is incorrect")]
     IncorrectTx,
 
-    #[fail(display = "Transaction fee is too low")]
+    #[error("Transaction fee is too low")]
     TxFeeTooLow,
 
-    #[fail(display = "Transactions batch summary fee is too low")]
+    #[error("Transactions batch summary fee is too low")]
     TxBatchFeeTooLow,
 
-    #[fail(display = "EIP1271 signature could not be verified")]
+    #[error("EIP1271 signature could not be verified")]
     EIP1271SignatureVerificationFail,
 
-    #[fail(display = "MissingEthSignature")]
+    #[error("MissingEthSignature")]
     MissingEthSignature,
 
-    #[fail(display = "Eth signature is incorrect")]
+    #[error("Eth signature is incorrect")]
     IncorrectEthSignature,
 
-    #[fail(display = "Change pubkey tx is not authorized onchain")]
+    #[error("Change pubkey tx is not authorized onchain")]
     ChangePkNotAuthorized,
 
-    #[fail(display = "Internal error")]
+    #[error("Internal error")]
     Other,
 
-    #[fail(display = "Database unavailable")]
+    #[error("Database unavailable")]
     DbError,
 
-    #[fail(display = "Transaction batch is empty")]
+    #[error("Transaction batch is empty")]
     EmptyBatch,
 
-    #[fail(display = "Batch will not fit in any of supported block sizes")]
+    #[error("Batch will not fit in any of supported block sizes")]
     BatchTooBig,
 
-    #[fail(display = "The number of withdrawals in the batch is too big")]
+    #[error("The number of withdrawals in the batch is too big")]
     BatchWithdrawalsOverload,
 }
 

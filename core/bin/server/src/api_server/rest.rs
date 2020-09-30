@@ -129,7 +129,7 @@ impl AppState {
             })
     }
 
-    fn db_error(error: failure::Error) -> HttpResponse {
+    fn db_error(error: anyhow::Error) -> HttpResponse {
         vlog::warn!("DB error: '{}';", error);
         HttpResponse::InternalServerError().finish()
     }
@@ -428,7 +428,7 @@ async fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpRespons
 pub(crate) async fn get_unconfirmed_op_by_hash(
     eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
     eth_hash: &[u8],
-) -> Result<Option<(EthBlockId, PriorityOp)>, failure::Error> {
+) -> Result<Option<(EthBlockId, PriorityOp)>, anyhow::Error> {
     let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
 
     let eth_watcher_response = oneshot::channel();
@@ -447,13 +447,13 @@ pub(crate) async fn get_unconfirmed_op_by_hash(
                 hex::encode(&eth_hash)
             );
 
-            failure::format_err!("Internal Server Error: '{}'", err)
+            anyhow::format_err!("Internal Server Error: '{}'", err)
         })?;
 
     eth_watcher_response
         .1
         .await
-        .map_err(|err| failure::format_err!("Failed to send response: {}", err))
+        .map_err(|err| anyhow::format_err!("Failed to send response: {}", err))
 }
 
 /// Converts a non-executed priority operation into a

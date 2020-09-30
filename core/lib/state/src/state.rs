@@ -1,4 +1,4 @@
-use failure::{bail, ensure, format_err, Error};
+use anyhow::{bail, ensure, format_err, Error};
 use log::trace;
 use num::BigUint;
 use std::collections::HashMap;
@@ -228,7 +228,7 @@ impl ZksyncState {
 
                     // Create the same error for each transaction.
                     let errors = (0..txs.len())
-                        .map(|_| Err(failure::format_err!("{}", error_msg)))
+                        .map(|_| Err(anyhow::format_err!("{}", error_msg)))
                         .collect();
 
                     // Stop execution and return an error.
@@ -908,7 +908,7 @@ impl ZksyncState {
                 .map(TransferOutcome::into_franklin_op),
             FranklinTx::Withdraw(tx) => self.create_withdraw_op(*tx).map(Into::into),
             FranklinTx::ChangePubKey(tx) => self.create_change_pubkey_op(*tx).map(Into::into),
-            FranklinTx::Close(_) => failure::bail!("Close op is disabled"),
+            FranklinTx::Close(_) => anyhow::bail!("Close op is disabled"),
         }
     }
 

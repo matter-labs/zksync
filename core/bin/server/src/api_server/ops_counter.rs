@@ -47,7 +47,7 @@ impl ChangePubKeyOpsCounter {
     }
 
     /// Checks whether the provided transaction should be executed or considered spam.
-    pub fn check_allowanse(&mut self, tx: &ChangePubKey) -> Result<(), failure::Error> {
+    pub fn check_allowanse(&mut self, tx: &ChangePubKey) -> Result<(), anyhow::Error> {
         // First, check if we have to reset all the stats.
         if self.last_reset.elapsed() >= ONE_DAY {
             // One day has passed, reset all the account stats.
@@ -62,7 +62,7 @@ impl ChangePubKeyOpsCounter {
             .and_modify(|e| *e += 1)
             .or_insert(1);
         if *account_ops_count > MAX_OPS_PER_DAY {
-            failure::bail!("Limit for ChangePubKey operations was reached for this account. Try again tomorrow");
+            anyhow::bail!("Limit for ChangePubKey operations was reached for this account. Try again tomorrow");
         }
         Ok(())
     }

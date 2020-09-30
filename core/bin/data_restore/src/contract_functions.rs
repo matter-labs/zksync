@@ -11,7 +11,7 @@ use zksync_types::account::Account;
 ///
 /// * `transaction` - Ethereum Rollup contract creation transaction description
 ///
-pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account, failure::Error> {
+pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account, anyhow::Error> {
     const ENCODED_INIT_PARAMETERS_WIDTH: usize =
         6 * INPUT_DATA_ADDRESS_BYTES_WIDTH + INPUT_DATA_ROOT_HASH_BYTES_WIDTH;
 
@@ -48,7 +48,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
         encoded_init_parameters.as_slice(),
     )
     .map_err(|_| {
-        failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+        anyhow::Error::from(Box::new(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "can't get decoded init parameters from contract creation transaction",
         )))
@@ -61,7 +61,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
     }
     .ok_or_else(|| Err("Invalid token in parameters"))
     .map_err(|_: Result<Account, _>| {
-        failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+        anyhow::Error::from(Box::new(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "can't get decoded init parameter from contract creation transaction",
         )))

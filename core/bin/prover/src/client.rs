@@ -2,9 +2,9 @@
 use std::str::FromStr;
 use std::time::{self, Duration};
 // External deps
+use anyhow::bail;
+use anyhow::format_err;
 use backoff::Operation;
-use failure::bail;
-use failure::format_err;
 use log::*;
 use reqwest::Url;
 // Workspace deps
@@ -51,9 +51,9 @@ impl ApiClient {
 
     fn with_retries<T>(
         &self,
-        op: &dyn Fn() -> Result<T, failure::Error>,
-    ) -> Result<T, failure::Error> {
-        let mut wrap_to_backoff_operation = || -> Result<T, backoff::Error<failure::Error>> {
+        op: &dyn Fn() -> Result<T, anyhow::Error>,
+    ) -> Result<T, anyhow::Error> {
+        let mut wrap_to_backoff_operation = || -> Result<T, backoff::Error<anyhow::Error>> {
             op().map_err(backoff::Error::Transient)
         };
 
@@ -84,8 +84,8 @@ impl ApiClient {
         backoff
     }
 
-    pub fn register_prover(&self, block_size: usize) -> Result<i32, failure::Error> {
-        let op = || -> Result<i32, failure::Error> {
+    pub fn register_prover(&self, block_size: usize) -> Result<i32, anyhow::Error> {
+        let op = || -> Result<i32, anyhow::Error> {
             info!("Registering prover...");
             let res = self
                 .http_client
@@ -110,8 +110,8 @@ impl ApiClient {
 }
 
 impl crate::ApiClient for ApiClient {
-    fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
-        let op = || -> Result<Option<(i64, i32)>, failure::Error> {
+    fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, anyhow::Error> {
+        let op = || -> Result<Option<(i64, i32)>, anyhow::Error> {
             trace!("sending block_to_prove");
             let res = self
                 .http_client
@@ -136,7 +136,7 @@ impl crate::ApiClient for ApiClient {
         Ok(self.with_retries(&op)?)
     }
 
-    fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
+    fn working_on(&self, job_id: i32) -> Result<(), anyhow::Error> {
         trace!("sending working_on {}", job_id);
         let res = self
             .http_client
@@ -153,8 +153,8 @@ impl crate::ApiClient for ApiClient {
         }
     }
 
-    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
-        let op = || -> Result<ProverData, failure::Error> {
+    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, anyhow::Error> {
+        let op = || -> Result<ProverData, anyhow::Error> {
             trace!("sending prover_data");
             let res = self
                 .http_client
@@ -174,8 +174,8 @@ impl crate::ApiClient for ApiClient {
         Ok(prover_data.into_circuit(block))
     }
 
-    fn publish(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), failure::Error> {
-        let op = move || -> Result<(), failure::Error> {
+    fn publish(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), anyhow::Error> {
+        let op = move || -> Result<(), anyhow::Error> {
             trace!("Trying publish proof {}", block);
             let proof = proof.clone();
             let res = self
@@ -213,7 +213,7 @@ impl crate::ApiClient for ApiClient {
         Ok(self.with_retries(&op)?)
     }
 
-    fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
+    fn prover_stopped(&self, prover_run_id: i32) -> Result<(), anyhow::Error> {
         self.http_client
             .post(self.stopped_url.as_str())
             .json(&prover_run_id)

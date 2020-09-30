@@ -5,7 +5,7 @@ use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
-use failure::bail;
+use anyhow::bail;
 use num::{BigUint, ToPrimitive};
 use zksync_basic_types::U256;
 // Workspace deps
@@ -203,7 +203,7 @@ pub fn convert_to_float(
     exponent_length: usize,
     mantissa_length: usize,
     exponent_base: u32,
-) -> Result<Vec<bool>, failure::Error> {
+) -> Result<Vec<bool>, anyhow::Error> {
     let exponent_base = u128::from(exponent_base);
 
     let mut max_exponent = 1u128;

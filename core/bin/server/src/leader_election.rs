@@ -9,7 +9,7 @@ use zksync_types::config::LEADER_LOOKUP_INTERVAL;
 /// # Panics
 ///
 /// Panics on failed connection to db.
-pub fn block_until_leader() -> Result<(), failure::Error> {
+pub fn block_until_leader() -> Result<(), anyhow::Error> {
     if Path::new("/etc/podinfo/labels").exists() {
         log::info!("Kubernetes detected, checking if node is leader");
         loop {

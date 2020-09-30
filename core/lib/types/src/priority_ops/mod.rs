@@ -1,7 +1,7 @@
 use super::AccountId;
 use super::TokenId;
+use anyhow::{bail, ensure, format_err};
 use ethabi::{decode, ParamType};
-use failure::{bail, ensure, format_err};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
@@ -50,7 +50,7 @@ impl FranklinPriorityOp {
         pub_data: &[u8],
         op_type_id: u8,
         sender: Address,
-    ) -> Result<Self, failure::Error> {
+    ) -> Result<Self, anyhow::Error> {
         // see contracts/contracts/Operations.sol
         match op_type_id {
             DepositOp::OP_CODE => {
@@ -146,9 +146,9 @@ pub struct PriorityOp {
 }
 
 impl TryFrom<Log> for PriorityOp {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
-    fn try_from(event: Log) -> Result<PriorityOp, failure::Error> {
+    fn try_from(event: Log) -> Result<PriorityOp, anyhow::Error> {
         let mut dec_ev = decode(
             &[
                 ParamType::Address,

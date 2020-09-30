@@ -1,5 +1,5 @@
 use crate::rollup_ops::RollupOpsBlock;
-use failure::format_err;
+use anyhow::format_err;
 use web3::types::Address;
 use zksync_crypto::Fr;
 use zksync_state::state::{CollectedFee, OpSuccess, ZksyncState};
@@ -73,7 +73,7 @@ impl TreeState {
     pub fn update_tree_states_from_ops_block(
         &mut self,
         ops_block: &RollupOpsBlock,
-    ) -> Result<(Block, AccountUpdates), failure::Error> {
+    ) -> Result<(Block, AccountUpdates), anyhow::Error> {
         let operations = ops_block.ops.clone();
 
         let mut accounts_updated = Vec::new();

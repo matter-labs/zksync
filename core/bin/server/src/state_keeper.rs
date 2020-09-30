@@ -153,7 +153,7 @@ impl ZksyncStateInitParams {
 
     pub async fn restore_from_db(
         storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<Self, failure::Error> {
+    ) -> Result<Self, anyhow::Error> {
         let mut init_params = Self::new();
         init_params.load_from_db(storage).await?;
 
@@ -163,7 +163,7 @@ impl ZksyncStateInitParams {
     async fn load_account_tree(
         &mut self,
         storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<BlockNumber, failure::Error> {
+    ) -> Result<BlockNumber, anyhow::Error> {
         let (last_cached_block_number, accounts) = if let Some((block, _)) = storage
             .chain()
             .block_schema()
@@ -209,7 +209,7 @@ impl ZksyncStateInitParams {
             .state_schema()
             .load_committed_state(None)
             .await
-            .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
+            .map_err(|e| anyhow::format_err!("couldn't load committed state: {}", e))?;
 
         if block_number != last_cached_block_number {
             if let Some((_, account_updates)) = storage
@@ -252,7 +252,7 @@ impl ZksyncStateInitParams {
     async fn load_from_db(
         &mut self,
         storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let block_number = self.load_account_tree(storage).await?;
         self.last_block_number = block_number;
         self.unprocessed_priority_op =
@@ -269,13 +269,13 @@ impl ZksyncStateInitParams {
     pub async fn load_state_diff(
         &mut self,
         storage: &mut zksync_storage::StorageProcessor<'_>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let state_diff = storage
             .chain()
             .state_schema()
             .load_state_diff(self.last_block_number, None)
             .await
-            .map_err(|e| failure::format_err!("failed to load committed state: {}", e))?;
+            .map_err(|e| anyhow::format_err!("failed to load committed state: {}", e))?;
 
         if let Some((block_number, updates)) = state_diff {
             for (id, update) in updates.into_iter() {
@@ -308,7 +308,7 @@ impl ZksyncStateInitParams {
     async fn unprocessed_priority_op_id(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
-    ) -> Result<u64, failure::Error> {
+    ) -> Result<u64, anyhow::Error> {
         let storage_op = storage
             .chain()
             .operations_schema()
@@ -318,7 +318,7 @@ impl ZksyncStateInitParams {
             Ok(storage_op
                 .into_op(storage)
                 .await
-                .map_err(|e| failure::format_err!("could not convert storage_op: {}", e))?
+                .map_err(|e| anyhow::format_err!("could not convert storage_op: {}", e))?
                 .block
                 .processed_priority_ops
                 .1)
@@ -885,7 +885,7 @@ impl ZksyncStateKeeper {
     /// so the executed transactions are persisted and won't be lost.
     async fn store_pending_block(&mut self) {
         // Create a pending block object to send.
-        // Note that failed operations are not included, as per any operation failure
+        // Note that failed operations are not included, as per any operation anyhow
         // the full block is created immediately.
         let pending_block = SendablePendingBlock {
             number: self.state.block_number,

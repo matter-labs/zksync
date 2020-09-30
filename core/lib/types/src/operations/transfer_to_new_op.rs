@@ -3,7 +3,7 @@ use crate::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
     Transfer,
 };
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::params::{
@@ -36,7 +36,7 @@ impl TransferToNewOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(
             bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for transfer to new pubdata"

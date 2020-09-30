@@ -1,6 +1,6 @@
 // Built-in deps
 // External imports
-use failure::format_err;
+use anyhow::format_err;
 // Workspace imports
 use zksync_types::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
 // Local imports

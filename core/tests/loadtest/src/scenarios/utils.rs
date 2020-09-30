@@ -27,7 +27,7 @@ pub async fn deposit_single(
     test_wallet: &TestWallet,
     deposit_amount: BigUint,
     provider: &Provider,
-) -> Result<u64, failure::Error> {
+) -> Result<u64, anyhow::Error> {
     let deposit_amount = biguint_to_u256(deposit_amount);
 
     let tx_hash = test_wallet
@@ -51,7 +51,7 @@ pub async fn deposit_single(
 pub async fn wait_for_deposit_executed(
     serial_id: u64,
     provider: &Provider,
-) -> Result<u64, failure::Error> {
+) -> Result<u64, anyhow::Error> {
     let mut executed = false;
     // We poll the operation status twice a second until timeout is reached.
     let start = Instant::now();
@@ -68,7 +68,7 @@ pub async fn wait_for_deposit_executed(
 
     // Check for the successful execution.
     if !executed {
-        failure::bail!("Deposit operation timeout");
+        anyhow::bail!("Deposit operation timeout");
     }
 
     Ok(serial_id)
@@ -79,7 +79,7 @@ pub async fn wait_for_verify(
     sent_txs: SentTransactions,
     timeout: Duration,
     provider: &Provider,
-) -> Result<(), failure::Error> {
+) -> Result<(), anyhow::Error> {
     let serial_ids = sent_txs.op_serial_ids;
 
     let start = Instant::now();
@@ -95,7 +95,7 @@ pub async fn wait_for_verify(
                 break;
             }
             if start.elapsed() > timeout {
-                failure::bail!("[wait_for_verify] Timeout")
+                anyhow::bail!("[wait_for_verify] Timeout")
             }
             timer.tick().await;
         }
@@ -110,7 +110,7 @@ pub async fn wait_for_verify(
                 break;
             }
             if start.elapsed() > timeout {
-                failure::bail!("[wait_for_verify] Timeout")
+                anyhow::bail!("[wait_for_verify] Timeout")
             }
             timer.tick().await;
         }

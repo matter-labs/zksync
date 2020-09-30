@@ -1,7 +1,7 @@
 // Built-in uses
 use std::time::Duration;
 // External uses
-use failure::format_err;
+use anyhow::format_err;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};

@@ -1,7 +1,7 @@
 use crate::{AccountId, Nonce};
 
 use crate::account::PubKeyHash;
-use failure::ensure;
+use anyhow::ensure;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::params::max_account_id;
@@ -39,7 +39,7 @@ impl ChangePubKey {
         account_id: AccountId,
         nonce: Nonce,
         new_pubkey_hash: &PubKeyHash,
-    ) -> Result<Vec<u8>, failure::Error> {
+    ) -> Result<Vec<u8>, anyhow::Error> {
         const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 152;
         let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
         eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");

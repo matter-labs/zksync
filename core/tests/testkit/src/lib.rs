@@ -3,7 +3,7 @@
 use crate::eth_account::{get_executed_tx_fee, parse_ether, ETHExecResult, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
-use failure::bail;
+use anyhow::bail;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
@@ -1175,7 +1175,7 @@ impl TestSetup {
 
     pub async fn execute_commit_and_verify_block(
         &mut self,
-    ) -> Result<BlockExecutionResult, failure::Error> {
+    ) -> Result<BlockExecutionResult, anyhow::Error> {
         self.state_keeper_request_sender
             .clone()
             .send(StateKeeperRequest::SealBlock)
@@ -1309,15 +1309,15 @@ impl TestSetup {
         self.commit_account.is_exodus().await.expect("Exodus query")
     }
 
-    pub async fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
+    pub async fn total_blocks_committed(&self) -> Result<u64, anyhow::Error> {
         self.accounts.eth_accounts[0].total_blocks_committed().await
     }
 
-    pub async fn total_blocks_verified(&self) -> Result<u64, failure::Error> {
+    pub async fn total_blocks_verified(&self) -> Result<u64, anyhow::Error> {
         self.accounts.eth_accounts[0].total_blocks_verified().await
     }
 
-    pub async fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), failure::Error> {
+    pub async fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), anyhow::Error> {
         self.commit_account.revert_blocks(blocks_to_revert).await?;
         Ok(())
     }

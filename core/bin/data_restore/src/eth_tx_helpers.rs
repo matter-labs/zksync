@@ -1,5 +1,5 @@
 // External uses
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use web3::types::H256;
 use web3::types::{Transaction, TransactionId};
 use web3::{Transport, Web3};
@@ -14,7 +14,7 @@ pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 ///
 pub fn get_input_data_from_ethereum_transaction(
     transaction: &Transaction,
-) -> Result<Vec<u8>, failure::Error> {
+) -> Result<Vec<u8>, anyhow::Error> {
     let input_data = transaction.clone().input.0;
     ensure!(
         input_data.len() > FUNC_NAME_HASH_LENGTH,
@@ -31,7 +31,7 @@ pub fn get_input_data_from_ethereum_transaction(
 ///
 pub fn get_block_number_from_ethereum_transaction(
     transaction: &Transaction,
-) -> Result<u64, failure::Error> {
+) -> Result<u64, anyhow::Error> {
     Ok(transaction
         .clone()
         .block_number
@@ -49,7 +49,7 @@ pub fn get_block_number_from_ethereum_transaction(
 pub async fn get_ethereum_transaction<T: Transport>(
     web3: &Web3<T>,
     transaction_hash: &H256,
-) -> Result<Transaction, failure::Error> {
+) -> Result<Transaction, anyhow::Error> {
     let tx_id = TransactionId::Hash(*transaction_hash);
     let web3_transaction = web3
         .eth()

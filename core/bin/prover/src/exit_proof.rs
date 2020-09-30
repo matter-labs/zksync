@@ -1,6 +1,6 @@
 //! Generate exit proof for exodus mode given account and token
 
-use failure::format_err;
+use anyhow::format_err;
 use log::info;
 use num::BigUint;
 use std::time::Instant;
@@ -16,7 +16,7 @@ pub fn create_exit_proof(
     account_id: AccountId,
     owner: Address,
     token_id: TokenId,
-) -> Result<(EncodedProofPlonk, BigUint), failure::Error> {
+) -> Result<(EncodedProofPlonk, BigUint), anyhow::Error> {
     let timer = Instant::now();
     let mut circuit_account_tree =
         CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());

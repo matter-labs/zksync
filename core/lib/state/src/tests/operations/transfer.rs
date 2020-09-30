@@ -52,7 +52,7 @@ fn to_existing() {
     )
 }
 
-/// Check Transfer failure if not enough funds
+/// Check Transfer anyhow if not enough funds
 #[test]
 fn insufficient_funds() {
     let token_id = 0;
@@ -175,7 +175,7 @@ fn to_self() {
     )
 }
 
-/// Check Transfer failure if nonce is incorrect
+/// Check Transfer anyhow if nonce is incorrect
 #[test]
 fn nonce_mismatch() {
     let token_id = 0;
@@ -202,7 +202,7 @@ fn nonce_mismatch() {
     tb.test_tx_fail(transfer.into(), "Nonce mismatch")
 }
 
-/// Check Transfer failure if account address
+/// Check Transfer anyhow if account address
 /// does not correspond to accound_id
 #[test]
 fn invalid_account_id() {

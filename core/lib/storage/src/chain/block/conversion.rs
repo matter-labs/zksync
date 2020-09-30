@@ -62,7 +62,7 @@ impl StoredOperation {
 }
 
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self) -> Result<ExecutedTx, failure::Error> {
+    pub fn into_executed_tx(self) -> Result<ExecutedTx, anyhow::Error> {
         let tx: FranklinTx = serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
         let franklin_op: Option<FranklinOp> =
             serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");

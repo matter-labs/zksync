@@ -1,5 +1,5 @@
 use crate::Engine;
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::{
@@ -25,7 +25,7 @@ impl PackedSignature {
         Ok(packed_signature.to_vec())
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(bytes.len() == 64, "Signature size mismatch");
         let (r_bar, s_bar) = bytes.split_at(32);
 

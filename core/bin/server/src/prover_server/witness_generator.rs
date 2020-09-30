@@ -1,7 +1,7 @@
 // Built-in
 use std::{thread, time};
 // External
-use failure::format_err;
+use anyhow::format_err;
 use futures::channel::mpsc;
 // Workspace deps
 use crate::panic_notify::ThreadPanicNotify;
@@ -80,7 +80,7 @@ impl WitnessGenerator {
     async fn should_work_on_block(
         &self,
         block_number: BlockNumber,
-    ) -> Result<BlockInfo, failure::Error> {
+    ) -> Result<BlockInfo, anyhow::Error> {
         let mut storage = self.conn_pool.access_storage_fragile().await?;
         let mut transaction = storage.start_transaction().await?;
         let block = transaction
@@ -109,7 +109,7 @@ impl WitnessGenerator {
         &self,
         block: BlockNumber,
         storage: &mut StorageProcessor<'_>,
-    ) -> Result<CircuitAccountTree, failure::Error> {
+    ) -> Result<CircuitAccountTree, anyhow::Error> {
         let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
 
         if let Some((cached_block, account_tree_cache)) = storage
@@ -192,7 +192,7 @@ impl WitnessGenerator {
         Ok(circuit_account_tree)
     }
 
-    async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), failure::Error> {
+    async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), anyhow::Error> {
         let timer = Instant::now();
         let mut storage = self.conn_pool.access_storage_fragile().await?;
         let mut transaction = storage.start_transaction().await?;
@@ -277,7 +277,7 @@ async fn build_prover_block_data(
     account_tree: &mut CircuitAccountTree,
     transaction: &mut zksync_storage::StorageProcessor<'_>,
     block: &Block,
-) -> Result<ProverData, failure::Error> {
+) -> Result<ProverData, anyhow::Error> {
     let block_number = block.block_number;
     let block_size = block.block_chunks_size;
 
@@ -290,7 +290,7 @@ async fn build_prover_block_data(
         .block_schema()
         .get_block_operations(block_number)
         .await
-        .map_err(|e| failure::format_err!("failed to get block operations {}", e))?;
+        .map_err(|e| anyhow::format_err!("failed to get block operations {}", e))?;
 
     let mut operations = vec![];
     let mut pub_data = vec![];

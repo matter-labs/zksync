@@ -1,7 +1,7 @@
 use zksync_crypto::public_key_from_private;
 
 use crate::Engine;
-use failure::ensure;
+use anyhow::ensure;
 use serde::{Deserialize, Serialize};
 use zksync_crypto::franklin_crypto::{
     eddsa::{PrivateKey, PublicKey, Seed},
@@ -68,7 +68,7 @@ impl TxSignature {
     /// Deserialize signature from packed bytes representation.
     /// [0..32] - packed pubkey of the signer.
     /// [32..96] - packed r,s of the signature
-    pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(bytes.len() == 32 + 64, "packed signature length mismatch");
         Ok(Self {
             pub_key: PackedPublicKey::deserialize_packed(&bytes[0..32])?,

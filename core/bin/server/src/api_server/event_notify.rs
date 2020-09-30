@@ -4,7 +4,7 @@ use super::rpc_server::types::{
 use crate::committer::ExecutedOpsNotify;
 use crate::state_keeper::{ExecutedOpId, StateKeeperRequest};
 use crate::utils::token_db_cache::TokenDBCache;
-use failure::{bail, format_err};
+use anyhow::{bail, format_err};
 use futures::{
     channel::{mpsc, oneshot},
     compat::Future01CompatExt,
@@ -81,7 +81,7 @@ impl OperationNotifier {
     async fn check_op_executed_current_block(
         &self,
         op_id: ExecutedOpId,
-    ) -> Result<Option<(BlockNumber, bool, Option<String>)>, failure::Error> {
+    ) -> Result<Option<(BlockNumber, bool, Option<String>)>, anyhow::Error> {
         let response = oneshot::channel();
         self.state_keeper_requests
             .clone()
@@ -93,7 +93,7 @@ impl OperationNotifier {
         Ok(state_keeper_resp?)
     }
 
-    fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), failure::Error> {
+    fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), anyhow::Error> {
         let str_sub_id = if let SubscriptionId::String(str_sub_id) = sub_id.clone() {
             str_sub_id
         } else {
@@ -142,7 +142,7 @@ impl OperationNotifier {
     async fn handle_notify_req(
         &mut self,
         new_sub: EventNotifierRequest,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         match new_sub {
             EventNotifierRequest::Sub(event_sub) => match event_sub {
                 EventSubscribeRequest::Transaction {
@@ -177,7 +177,7 @@ impl OperationNotifier {
     async fn get_executed_priority_operation(
         &mut self,
         serial_id: u32,
-    ) -> Result<Option<StoredExecutedPriorityOperation>, failure::Error> {
+    ) -> Result<Option<StoredExecutedPriorityOperation>, anyhow::Error> {
         let res = if let Some(executed_op) = self
             .cache_of_executed_priority_operations
             .get_mut(&serial_id)
@@ -201,7 +201,7 @@ impl OperationNotifier {
         Ok(res)
     }
 
-    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, failure::Error> {
+    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, anyhow::Error> {
         let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
             block_info.clone()
         } else {
@@ -253,7 +253,7 @@ impl OperationNotifier {
         serial_id: u64,
         action: ActionType,
         sub: Subscriber<ETHOpInfoResp>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let sub_id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
             ETHOP_SUB_PREFIX,
@@ -341,7 +341,7 @@ impl OperationNotifier {
     async fn get_tx_receipt(
         &mut self,
         hash: &TxHash,
-    ) -> Result<Option<TxReceiptResponse>, failure::Error> {
+    ) -> Result<Option<TxReceiptResponse>, anyhow::Error> {
         let res = if let Some(tx_receipt) = self
             .cache_of_transaction_receipts
             .get_mut(&hash.as_ref().to_vec())
@@ -372,7 +372,7 @@ impl OperationNotifier {
         hash: TxHash,
         action: ActionType,
         sub: Subscriber<TransactionInfoResp>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
             TX_SUB_PREFIX,
@@ -454,7 +454,7 @@ impl OperationNotifier {
         address: Address,
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let mut storage = self.db_pool.access_storage_fragile().await?;
         let account_state = storage
             .chain()
@@ -509,7 +509,7 @@ impl OperationNotifier {
         ops: Vec<ExecutedOperations>,
         action: ActionType,
         block_number: BlockNumber,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         for tx in ops {
             match tx {
                 ExecutedOperations::Tx(tx) => {
@@ -554,7 +554,7 @@ impl OperationNotifier {
     fn handle_new_executed_batch(
         &mut self,
         exec_batch: ExecutedOpsNotify,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         self.handle_executed_operations(
             exec_batch.operations,
             ActionType::COMMIT,
@@ -562,7 +562,7 @@ impl OperationNotifier {
         )
     }
 
-    async fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
+    async fn handle_new_block(&mut self, op: Operation) -> Result<(), anyhow::Error> {
         let action = op.action.get_type();
 
         self.handle_executed_operations(

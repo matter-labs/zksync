@@ -19,15 +19,15 @@ impl ToString for TxHash {
 }
 
 impl FromStr for TxHash {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        failure::ensure!(
+        anyhow::ensure!(
             s.starts_with("sync-tx:"),
             "TxHash should start with sync-tx:"
         );
         let bytes = hex::decode(&s[8..])?;
-        failure::ensure!(bytes.len() == 32, "Size mismatch");
+        anyhow::ensure!(bytes.len() == 32, "Size mismatch");
         Ok(TxHash {
             data: bytes.as_slice().try_into().unwrap(),
         })

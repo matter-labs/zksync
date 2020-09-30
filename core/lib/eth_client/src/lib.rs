@@ -97,7 +97,7 @@ impl<T: Transport> ETHClient<T> {
         self.web3.eth().block_number().await
     }
 
-    pub async fn get_gas_price(&self) -> Result<U256, failure::Error> {
+    pub async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
         let mut network_gas_price = self.web3.eth().gas_price().await?;
         let percent_gas_price_factor = U256::from((self.gas_price_factor * 100.0).round() as u64);
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
@@ -126,7 +126,7 @@ impl<T: Transport> ETHClient<T> {
         &self,
         data: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         self.sign_prepared_tx_for_addr(data, self.contract_addr, options)
             .await
     }
@@ -138,7 +138,7 @@ impl<T: Transport> ETHClient<T> {
         data: Vec<u8>,
         contract_addr: H160,
         options: Options,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         // fetch current gas_price
         let gas_price = match options.gas_price {
             Some(gas_price) => gas_price,
@@ -194,7 +194,7 @@ impl<T: Transport> ETHClient<T> {
         func: &str,
         params: P,
         options: Options,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         let f = self
             .contract
             .function(func)
@@ -208,7 +208,7 @@ impl<T: Transport> ETHClient<T> {
 
     /// Sends the transaction to the Ethereum blockchain.
     /// Transaction is expected to be encoded as the byte sequence.
-    pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, failure::Error> {
+    pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
         Ok(self.web3.eth().send_raw_transaction(Bytes(tx)).await?)
     }
 
@@ -216,7 +216,7 @@ impl<T: Transport> ETHClient<T> {
     pub async fn tx_receipt(
         &self,
         tx_hash: H256,
-    ) -> Result<Option<TransactionReceipt>, failure::Error> {
+    ) -> Result<Option<TransactionReceipt>, anyhow::Error> {
         Ok(self.web3.eth().transaction_receipt(tx_hash).await?)
     }
 }

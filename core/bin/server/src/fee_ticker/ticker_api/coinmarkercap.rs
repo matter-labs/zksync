@@ -1,9 +1,9 @@
 // Built-in deps
 use std::collections::HashMap;
 // External deps
+use anyhow::format_err;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use failure::format_err;
 use num::{rational::Ratio, BigUint};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ impl CoinMarketCapAPI {
 
 #[async_trait]
 impl TokenPriceAPI for CoinMarketCapAPI {
-    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, failure::Error> {
+    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, anyhow::Error> {
         let request_url = self
             .base_url
             .join(&format!(
@@ -40,8 +40,8 @@ impl TokenPriceAPI for CoinMarketCapAPI {
 
         let mut api_response = api_request_future
             .await
-            .map_err(|_| failure::format_err!("Coinmarketcap API request timeout"))?
-            .map_err(|err| failure::format_err!("Coinmarketcap API request failed: {}", err))?
+            .map_err(|_| anyhow::format_err!("Coinmarketcap API request timeout"))?
+            .map_err(|err| anyhow::format_err!("Coinmarketcap API request failed: {}", err))?
             .json::<CoinmarketCapResponse>()
             .await?;
         let mut token_info = api_response

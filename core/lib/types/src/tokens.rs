@@ -69,7 +69,7 @@ impl Token {
     }
 }
 
-pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>, failure::Error> {
+pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>, anyhow::Error> {
     let mut file_path = parse_env::<PathBuf>("ZKSYNC_HOME");
     file_path.push("etc");
     file_path.push("tokens");

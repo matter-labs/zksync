@@ -33,14 +33,14 @@ impl fmt::Display for OperationType {
 }
 
 impl FromStr for OperationType {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let op = match s {
             "commit" => Self::Commit,
             "verify" => Self::Verify,
             "withdraw" => Self::Withdraw,
-            _ => failure::bail!("Unknown type of operation: {}", s),
+            _ => anyhow::bail!("Unknown type of operation: {}", s),
         };
 
         Ok(op)
@@ -133,9 +133,9 @@ pub struct CompleteWithdrawalsTx {
 }
 
 impl TryFrom<Log> for CompleteWithdrawalsTx {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
-    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, failure::Error> {
+    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, anyhow::Error> {
         let mut decoded_event = decode(
             &[
                 ParamType::Uint(32), // queueStartIndex
@@ -143,7 +143,7 @@ impl TryFrom<Log> for CompleteWithdrawalsTx {
             ],
             &event.data.0,
         )
-        .map_err(|e| failure::format_err!("Event data decode: {:?}", e))?;
+        .map_err(|e| anyhow::format_err!("Event data decode: {:?}", e))?;
 
         Ok(CompleteWithdrawalsTx {
             tx_hash: event
