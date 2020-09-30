@@ -864,13 +864,11 @@ impl PlasmaStateKeeper {
             ),
             accounts_updated: pending_block.account_updates.clone(),
         };
+        let first_update_order_id = pending_block.stored_account_updates;
+        let account_updates = pending_block.account_updates[first_update_order_id..].to_vec();
         let applied_updates_request = AppliedUpdatesRequest {
-            #[rustfmt::skip]
-            account_updates: pending_block
-                .account_updates
-                [pending_block.stored_account_updates..]
-                .to_vec(),
-            first_update_order_id: pending_block.stored_account_updates,
+            account_updates,
+            first_update_order_id,
         };
         pending_block.stored_account_updates = pending_block.account_updates.len();
         self.state.block_number += 1;
@@ -904,14 +902,11 @@ impl PlasmaStateKeeper {
             success_operations: self.pending_block.success_operations.clone(),
             failed_txs: self.pending_block.failed_txs.clone(),
         };
+        let first_update_order_id = self.pending_block.stored_account_updates;
+        let account_updates = self.pending_block.account_updates[first_update_order_id..].to_vec();
         let applied_updates_request = AppliedUpdatesRequest {
-            #[rustfmt::skip]
-            account_updates: self
-                .pending_block
-                .account_updates
-                [self.pending_block.stored_account_updates..]
-                .to_vec(),
-            first_update_order_id: self.pending_block.stored_account_updates,
+            account_updates,
+            first_update_order_id,
         };
         self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
