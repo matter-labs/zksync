@@ -73,8 +73,9 @@ impl<'a> WithdrawBuilder<'a> {
             .signer
             .sign_withdraw(token, amount, fee, to, nonce)
             .await
-            .map_err(ClientError::SigningError)?;
-
+            .map(|(tx, sign)| (FranklinTx::Withdraw(Box::new(tx)), sign))
+            .map_err(ClientError::SigningError)
+    }
 
     /// Sends the transaction, returning the handle for its awaiting.
     pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {

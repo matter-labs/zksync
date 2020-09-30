@@ -73,7 +73,9 @@ impl<'a> TransferBuilder<'a> {
             .signer
             .sign_transfer(token, amount, fee, to, nonce)
             .await
-            .map_err(ClientError::SigningError)?;
+            .map(|(tx, signature)| (FranklinTx::Transfer(Box::new(tx)), signature))
+            .map_err(ClientError::SigningError)
+    }
 
     /// Sends the transaction, returning the handle for its awaiting.
     pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {

@@ -1,7 +1,7 @@
 // Built-in imports
 use eth_client::error::SignerError;
 use eth_client::eth_signer::EthereumSigner;
-use models::node::tx::TxEthSignature;
+use models::tx::TxEthSignature;
 use std::fmt;
 // External uses
 use num::BigUint;

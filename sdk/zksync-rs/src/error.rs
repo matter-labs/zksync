@@ -1,4 +1,4 @@
-use eth_client::error::SignerError;
+pub use eth_client::error::SignerError;
 pub use jsonrpc_core::types::response::Failure as RpcFailure;
 use thiserror::Error;
 

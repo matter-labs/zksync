@@ -61,7 +61,9 @@ impl<'a> ChangePubKeyBuilder<'a> {
             .signer
             .sign_change_pubkey_tx(nonce, self.onchain_auth)
             .await
-            .map_err(ClientError::SigningError)?;
+            .map(|tx| FranklinTx::ChangePubKey(Box::new(tx)))
+            .map_err(ClientError::SigningError)
+    }
 
     /// Sends the transaction, returning the handle for its awaiting.
     pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
