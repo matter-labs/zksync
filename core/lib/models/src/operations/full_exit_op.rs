@@ -2,7 +2,7 @@ use crate::FullExit;
 use failure::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
+use zksync_basic_types::{AccountId, Address};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
@@ -89,5 +89,11 @@ impl FullExitOp {
             },
             withdraw_amount: Some(amount.into()),
         })
+    }
+
+    pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
+        let mut result = Vec::with_capacity(1);
+        result.push(self.priority_op.account_id);
+        result
     }
 }

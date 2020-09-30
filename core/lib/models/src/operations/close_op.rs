@@ -48,4 +48,10 @@ impl CloseOp {
             account_id,
         })
     }
+
+    pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
+        let mut result = Vec::with_capacity(1);
+        result.push(self.account_id);
+        result
+    }
 }

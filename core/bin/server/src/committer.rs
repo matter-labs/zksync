@@ -197,24 +197,14 @@ async fn commit_block(
 
     let op = Operation {
         action: Action::Commit,
-        block: block.clone(),
-        accounts_updated,
+        block,
         id: None,
     };
     info!("commit block #{}", op.block.block_number);
     let op = transaction
         .chain()
         .block_schema()
-        .execute_operation(Operation {
-            action: Action::Commit,
-            block,
-
-            // Block schema shouldn't save account_updates in the db for
-            // commit because we do that iteratively in the statekeeper
-            accounts_updated: Vec::new(),
-
-            id: None,
-        })
+        .execute_operation(op.clone())
         .await
         .expect("committer must commit the op into db");
 
@@ -225,13 +215,13 @@ async fn commit_block(
 
     // we notify about commit operation as soon as it is executed, we don't wait for eth confirmations
     op_notify_sender
-        .send(op.clone())
+        .send(op)
         .await
         .map_err(|e| warn!("Failed notify about commit op confirmation: {}", e))
         .unwrap_or_default();
 
     mempool_req_sender
-        .send(MempoolRequest::UpdateNonces(op.accounts_updated))
+        .send(MempoolRequest::UpdateNonces(accounts_updated))
         .await
         .map_err(|e| warn!("Failed notify mempool about account updates: {}", e))
         .unwrap_or_default();
@@ -287,7 +277,6 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool
                         proof: Box::new(proof),
                     },
                     block,
-                    accounts_updated: Vec::new(),
                     id: None,
                 };
                 let op = transaction

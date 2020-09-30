@@ -328,7 +328,6 @@ pub async fn test_operation_and_wanted_prover_data(
             id: None,
             action: models::Action::Commit,
             block: block.clone(),
-            accounts_updated,
         },
         zksync_prover_utils::prover_data::ProverData {
             public_data_commitment,
