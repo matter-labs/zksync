@@ -2496,12 +2496,9 @@ dependencies = [
  "failure",
  "futures 0.3.5",
  "hex",
- "hyper 0.13.8",
- "jsonrpc-core",
  "log 0.4.11",
  "num",
  "rand 0.4.6",
- "reqwest",
  "serde",
  "serde_json",
  "structopt",
@@ -5650,7 +5647,6 @@ name = "zksync_storage"
 version = "1.0.0"
 dependencies = [
  "async-trait",
- "bigdecimal",
  "chrono",
  "db_test_macro",
  "deadpool",
