@@ -575,7 +575,7 @@ impl PlasmaStateKeeper {
     }
 
     // Err if there is no space in current block
-    async fn apply_priority_op(
+    fn apply_priority_op(
         &mut self,
         priority_op: PriorityOp,
     ) -> Result<ExecutedOperations, PriorityOp> {
@@ -627,7 +627,7 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
-    async fn apply_batch(
+    fn apply_batch(
         &mut self,
         txs: &[SignedFranklinTx],
         batch_id: i64,
@@ -726,7 +726,7 @@ impl PlasmaStateKeeper {
         Ok(executed_operations)
     }
 
-    async fn apply_tx(&mut self, tx: &SignedFranklinTx) -> Result<ExecutedOperations, ()> {
+    fn apply_tx(&mut self, tx: &SignedFranklinTx) -> Result<ExecutedOperations, ()> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
