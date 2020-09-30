@@ -273,8 +273,6 @@ pub fn public_data_commitment<E: JubjubEngine>(
     let mut hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
-    log::debug!("Initial hash hex {}", hex::encode(hash_result));
-
     let mut packed_old_root_bits = vec![];
     let old_root_bits: Vec<bool> = BitIterator::new(initial_root.unwrap().into_repr()).collect();
     for _ in 0..256 - old_root_bits.len() {
@@ -311,8 +309,6 @@ pub fn public_data_commitment<E: JubjubEngine>(
     hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
-    log::debug!("hash with new root as hex {}", hex::encode(hash_result));
-
     let mut final_bytes = vec![];
     let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits.to_vec());
     final_bytes.extend(hash_result.iter());
@@ -322,8 +318,6 @@ pub fn public_data_commitment<E: JubjubEngine>(
     h.input(&final_bytes);
     hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
-
-    log::debug!("final hash as hex {}", hex::encode(hash_result));
 
     hash_result[0] &= 0x1f; // temporary solution, this nullifies top bits to be encoded into field element correctly
 

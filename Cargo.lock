@@ -5450,14 +5450,11 @@ name = "zksync_circuit"
 version = "1.0.0"
 dependencies = [
  "bigdecimal",
- "hex",
  "log 0.4.11",
  "num",
  "rayon",
  "rust-crypto",
  "serde",
- "serde_json",
- "web3 0.13.0",
  "zksync_crypto",
  "zksync_state",
  "zksync_test_account",

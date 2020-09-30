@@ -360,8 +360,6 @@ pub fn print_boolean_vec(bits: &[Boolean]) {
         }
         bytes.push(b);
     }
-
-    log::debug!("Hex: {}", hex::encode(&bytes));
 }
 
 pub fn resize_grow_only<T: Clone>(to_resize: &mut Vec<T>, new_size: usize, pad_with: T) {
