@@ -18,7 +18,7 @@ use zksync_crypto::{
         account::{Balance, CircuitAccount, CircuitAccountTree},
         utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element},
     },
-    merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
+    merkle_tree::{hasher::Hasher, RescueHasher},
     params::{
         total_tokens, used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS,
     },
@@ -223,11 +223,7 @@ pub fn generate_dummy_sig_data(
     )
 }
 
-pub fn generate_sig_witness(
-    bits: &[bool],
-    _phasher: &PedersenHasher<Bn256>,
-    _params: &AltJubjubBn256,
-) -> (Fr, Fr, Fr) {
+pub fn generate_sig_witness(bits: &[bool]) -> (Fr, Fr, Fr) {
     let mut sig_bits_to_hash = bits.to_vec();
     assert!(sig_bits_to_hash.len() < MAX_CIRCUIT_MSG_HASH_BITS);
 
@@ -239,49 +235,6 @@ pub fn generate_sig_witness(
     let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
     let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
     (first_sig_part, second_sig_part, third_sig_part)
-}
-
-pub fn generate_sig_data(
-    bits: &[bool],
-    phasher: &PedersenHasher<Bn256>,
-    private_key: &PrivateKey<Bn256>,
-    rescue_params: &Bn256RescueParams,
-    jubjub_params: &AltJubjubBn256,
-) -> (SignatureData, Fr, Fr, Fr) {
-    let p_g = FixedGenerators::SpendingKeyGenerator;
-    let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() <= MAX_CIRCUIT_MSG_HASH_BITS);
-
-    sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
-    log::debug!(
-        "inside generation after resize: {}",
-        hex::encode(be_bit_vector_into_bytes(&sig_bits_to_hash))
-    );
-
-    let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
-    let remaining = remaining.to_vec();
-    let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
-    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
-    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
-    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
-    let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
-
-    let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-    sig_bits.reverse();
-    sig_bits.resize(256, false);
-
-    log::debug!(
-        "inside generation: {}",
-        hex::encode(be_bit_vector_into_bytes(&sig_bits))
-    );
-    let signature_data = sign_rescue(&sig_bits, &private_key, p_g, rescue_params, jubjub_params);
-
-    (
-        signature_data,
-        first_sig_part,
-        second_sig_part,
-        third_sig_part,
-    )
 }
 
 pub fn public_data_commitment<E: JubjubEngine>(
@@ -499,11 +452,7 @@ impl SigDataInput {
         };
         let sig_bits: Vec<bool> = zksync_crypto::primitives::bytes_into_be_bits(&tx_bytes);
 
-        let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(
-            &sig_bits,
-            &zksync_crypto::params::PEDERSEN_HASHER,
-            &zksync_crypto::params::JUBJUB_PARAMS,
-        );
+        let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(&sig_bits);
 
         let signer_packed_key_bytes = match pub_key.serialize_packed() {
             Ok(v) => v,

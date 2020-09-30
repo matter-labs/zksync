@@ -3,8 +3,7 @@ use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throu
 // Local uses
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::primitives::{
-    bytes_into_be_bits, get_bits_le_fixed_u128, pack_bits_into_bytes,
-    pack_bits_into_bytes_in_order, BitIteratorLe, GetBits,
+    bytes_into_be_bits, pack_bits_into_bytes, pack_bits_into_bytes_in_order, BitIteratorLe, GetBits,
 };
 use zksync_types::{Account, Address, PubKeyHash};
 
@@ -16,15 +15,6 @@ fn bench_u64_get_bits_le(b: &mut Bencher<'_>) {
 
     b.iter(|| {
         let _ = black_box(value).get_bits_le();
-    });
-}
-
-fn bench_get_bits_le_fixed_u128(b: &mut Bencher<'_>) {
-    let value: u128 = 0xDEAD_BEEF_DEAD_BEEF_DEAD_BEEF_DEAD_BEEF;
-    let n = 128;
-
-    b.iter(|| {
-        let _ = get_bits_le_fixed_u128(black_box(value), n);
     });
 }
 
@@ -106,7 +96,6 @@ fn bench_circuit_account_transform(b: &mut Bencher<'_>) {
 
 pub fn bench_primitives(c: &mut Criterion) {
     c.bench_function("u64_get_bits_le", bench_u64_get_bits_le);
-    c.bench_function("get_bits_le_fixed_u128", bench_get_bits_le_fixed_u128);
 
     let mut group = c.benchmark_group("Bit Converters");
 
