@@ -252,12 +252,15 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
             verified_at: None,
         };
 
-        let (new_accounts_map, _) = apply_random_updates(accounts_map.clone(), &mut rng);
+        let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
         accounts_map = new_accounts_map;
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
             .execute_operation(get_unique_operation(block_number, Action::Commit))
+            .await?;
+        StateSchema(&mut storage)
+            .commit_state_update(block_number, &updates, 0)
             .await?;
 
         // Store & confirm the operation in the ethereum schema, as it's used for obtaining
@@ -392,12 +395,15 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create and apply several blocks to work with.
     for block_number in 1..=n_committed {
-        let (new_accounts_map, _) = apply_random_updates(accounts_map.clone(), &mut rng);
+        let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
         accounts_map = new_accounts_map;
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
             .execute_operation(get_unique_operation(block_number, Action::Commit))
+            .await?;
+        StateSchema(&mut storage)
+            .commit_state_update(block_number, &updates, 0)
             .await?;
 
         // Store & confirm the operation in the ethereum schema, as it's used for obtaining
