@@ -2,9 +2,15 @@
 
 [package]
 name = "zksync-crypto"
-version = "0.1.0"
-authors = ["Vitalii Drohan <vitaliy.drogan@gmail.com>"]
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # This library is not published stand-alone, it is bundled with `zksync.js`.
 
 [lib]
 crate-type = ["cdylib"]
@@ -35,7 +41,7 @@ wee_alloc = { version = "0.4.2", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
-models = { path = "../../core/lib/types" }
+zksync_types = { path = "../../core/lib/types" }
 crypto_lib = { package = "zksync_crypto", path = "../../core/lib/crypto" }
 
 [profile.release]
