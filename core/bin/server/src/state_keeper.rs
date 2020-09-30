@@ -397,13 +397,11 @@ impl PlasmaStateKeeper {
                 match operation {
                     ExecutedOperations::Tx(tx) => {
                         self.apply_tx(&tx.signed_tx)
-                            .await
                             .expect("Tx from the restored pending block was not executed");
                         txs_count += 1;
                     }
                     ExecutedOperations::PriorityOp(op) => {
                         self.apply_priority_op(op.priority_op)
-                            .await
                             .expect("Priority op from the restored pending block was not executed");
                         priority_op_count += 1;
                     }
@@ -509,7 +507,7 @@ impl PlasmaStateKeeper {
             .into_iter()
             .collect::<VecDeque<_>>();
         while let Some(priority_op) = priority_op_queue.pop_front() {
-            match self.apply_priority_op(priority_op).await {
+            match self.apply_priority_op(priority_op) {
                 Ok(exec_op) => {
                     executed_ops.push(exec_op);
                 }
@@ -525,7 +523,7 @@ impl PlasmaStateKeeper {
         while let Some(variant) = tx_queue.pop_front() {
             match &variant {
                 SignedTxVariant::Tx(tx) => {
-                    match self.apply_tx(tx).await {
+                    match self.apply_tx(tx) {
                         Ok(exec_op) => {
                             executed_ops.push(exec_op);
                         }
@@ -540,7 +538,7 @@ impl PlasmaStateKeeper {
                     }
                 }
                 SignedTxVariant::Batch(batch) => {
-                    match self.apply_batch(&batch.txs, batch.batch_id).await {
+                    match self.apply_batch(&batch.txs, batch.batch_id) {
                         Ok(mut ops) => {
                             executed_ops.append(&mut ops);
                         }
