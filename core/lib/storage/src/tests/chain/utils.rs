@@ -115,7 +115,8 @@ pub fn get_eth_sing_data(message: String) -> EthSignData {
     let keypair = Random.generate();
     let private_key = keypair.secret();
 
-    let signature = PackedEthSignature::sign(private_key.deref(), message.as_bytes()).unwrap();
+    let signature =
+        PackedEthSignature::sign(private_key.deref(), message.as_bytes(), true).unwrap();
 
     EthSignData {
         message,

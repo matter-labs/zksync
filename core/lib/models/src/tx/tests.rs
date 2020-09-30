@@ -229,7 +229,7 @@ fn test_ethereum_signature_verify_with_serialization() {
 
     let recovered_address = deserialized_signature
         .signature
-        .signature_recover_signer(message.as_bytes())
+        .signature_recover_signer(message.as_bytes(), true)
         .expect("signature verification");
 
     assert_eq!(address, recovered_address, "recovered address mismatch");
@@ -257,7 +257,7 @@ fn test_ethereum_signature_verify_examples() {
             PackedEthSignature::deserialize_packed(&hex::decode(&signature[2..]).unwrap())
                 .expect("signature deserialize");
         let signer_address = signature
-            .signature_recover_signer(&msg)
+            .signature_recover_signer(&msg, true)
             .expect("signature verification");
         assert_eq!(address, signer_address, "signer address mismatch");
     }
@@ -280,7 +280,7 @@ fn test_ethereum_signature_sign() {
     for (msg, correct_signature) in examples {
         println!("message: 0x{}", hex::encode(&msg));
         let correct_signature = hex::decode(correct_signature).unwrap();
-        let signature = PackedEthSignature::sign(&private_key, &msg)
+        let signature = PackedEthSignature::sign(&private_key, &msg, true)
             .expect("sign verify")
             .serialize_packed()
             .to_vec();

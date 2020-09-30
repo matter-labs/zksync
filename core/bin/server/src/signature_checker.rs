@@ -89,7 +89,7 @@ async fn verify_eth_signature(
         match &sign_data.signature {
             TxEthSignature::EthereumSignature(packed_signature) => {
                 let signer_account = packed_signature
-                    .signature_recover_signer(sign_data.message.as_bytes())
+                    .signature_recover_signer(sign_data.message.as_bytes(), true)
                     .or(Err(TxAddError::IncorrectEthSignature))?;
 
                 if signer_account != request.tx.account() {

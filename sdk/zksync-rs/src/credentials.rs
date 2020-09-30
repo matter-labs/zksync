@@ -56,7 +56,7 @@ impl WalletCredentials {
         }
 
         // Generate seed, and then zkSync private key.
-        let signature = PackedEthSignature::sign(&eth_private_key, &eth_sign_message)
+        let signature = PackedEthSignature::sign(&eth_private_key, &eth_sign_message, true)
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
         let signature_bytes = signature.serialize_packed();

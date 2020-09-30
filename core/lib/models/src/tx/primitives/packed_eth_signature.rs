@@ -46,9 +46,13 @@ impl PackedEthSignature {
 
     /// Signs message using ethereum private key, results are identical to signature created
     /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
-    pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {
+    pub fn sign(
+        private_key: &H256,
+        msg: &[u8],
+        with_prefix: bool,
+    ) -> Result<PackedEthSignature, failure::Error> {
         let secret_key = (*private_key).into();
-        let signed_bytes = Self::message_to_signed_bytes(msg);
+        let signed_bytes = Self::message_to_signed_bytes(msg, with_prefix);
         let signature = sign(&secret_key, &signed_bytes)?;
         Ok(PackedEthSignature(signature))
     }
@@ -57,8 +61,12 @@ impl PackedEthSignature {
         self.0.clone()
     }
 
-    fn message_to_signed_bytes(msg: &[u8]) -> H256 {
-        let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+    fn message_to_signed_bytes(msg: &[u8], with_prefix: bool) -> H256 {
+        let prefix = if with_prefix {
+            format!("\x19Ethereum Signed Message:\n{}", msg.len())
+        } else {
+            String::new()
+        };
         let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
         bytes.extend_from_slice(prefix.as_bytes());
         bytes.extend_from_slice(msg);
@@ -68,8 +76,12 @@ impl PackedEthSignature {
     /// Checks signature and returns ethereum address of the signer.
     /// message should be the same message that was passed to `eth.sign`(or similar) method
     /// as argument. No hashing and prefixes required.
-    pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
-        let signed_bytes = Self::message_to_signed_bytes(msg);
+    pub fn signature_recover_signer(
+        &self,
+        msg: &[u8],
+        with_prefix: bool,
+    ) -> Result<Address, failure::Error> {
+        let signed_bytes = Self::message_to_signed_bytes(msg, with_prefix);
         let public_key = recover(&self.0, &signed_bytes)?;
         Ok(public_to_address(&public_key))
     }

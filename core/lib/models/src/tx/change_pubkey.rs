@@ -69,7 +69,7 @@ impl ChangePubKey {
         self.eth_signature.as_ref().and_then(|sign| {
             Self::get_eth_signed_data(self.account_id, self.nonce, &self.new_pk_hash)
                 .ok()
-                .and_then(|msg| sign.signature_recover_signer(&msg).ok())
+                .and_then(|msg| sign.signature_recover_signer(&msg, true).ok())
         })
     }
 

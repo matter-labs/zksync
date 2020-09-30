@@ -14,9 +14,13 @@ impl EthereumSigner {
         Self::PrivateKey(PrivateKeySigner { private_key })
     }
 
-    pub async fn sign(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
+    pub async fn sign(
+        &self,
+        message: &[u8],
+        with_prefix: bool,
+    ) -> Result<TxEthSignature, SignerError> {
         match self {
-            EthereumSigner::PrivateKey(pk_signer) => pk_signer.sign(message),
+            EthereumSigner::PrivateKey(pk_signer) => pk_signer.sign(message, with_prefix),
             // EthereumSigner::JsonRpc(JsonRpcSigner) => JsonRpcSigner.sign(message)
         }
     }
@@ -34,8 +38,8 @@ pub struct PrivateKeySigner {
 }
 
 impl PrivateKeySigner {
-    pub fn sign(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
-        let pack = PackedEthSignature::sign(&self.private_key, message)
+    pub fn sign(&self, message: &[u8], with_prefix: bool) -> Result<TxEthSignature, SignerError> {
+        let pack = PackedEthSignature::sign(&self.private_key, message, with_prefix)
             .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
         Ok(TxEthSignature::EthereumSignature(pack))
     }

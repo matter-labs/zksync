@@ -86,7 +86,7 @@ async fn ecdsa_sign(
     ethereum_signer: &EthereumSigner,
     chain_id: u8,
 ) -> Result<EcdsaSig, SignerError> {
-    let tx_eth_signature = ethereum_signer.sign(&message).await?;
+    let tx_eth_signature = ethereum_signer.sign(&message, false).await?;
 
     if let TxEthSignature::EthereumSignature(packed_signature) = tx_eth_signature {
         let sig = packed_signature.signature();

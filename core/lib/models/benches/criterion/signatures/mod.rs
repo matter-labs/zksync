@@ -34,14 +34,14 @@ fn bench_signature_verify_eth_packed(b: &mut Bencher<'_>) {
         .gen_iter::<u8>()
         .take(TYPICAL_ETH_SIGNATURE_LEN)
         .collect::<Vec<_>>();
-    let signature = PackedEthSignature::sign(&pk, &message).unwrap();
+    let signature = PackedEthSignature::sign(&pk, &message, true).unwrap();
 
     let setup = || (signature.clone(), message.clone());
 
     b.iter_batched(
         setup,
         |(signature, msg)| {
-            let _ = black_box(signature.signature_recover_signer(&msg));
+            let _ = black_box(signature.signature_recover_signer(&msg, true));
         },
         BatchSize::SmallInput,
     );

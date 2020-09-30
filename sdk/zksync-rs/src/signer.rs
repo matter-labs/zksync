@@ -84,7 +84,7 @@ impl Signer {
                     .map_err(signing_failed_error)?;
 
             let eth_signature = eth_signer
-                .sign(&sign_bytes)
+                .sign(&sign_bytes, true)
                 .await
                 .map_err(signing_failed_error)?;
 
@@ -136,7 +136,7 @@ impl Signer {
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
                 let msg = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
-                let signature = signer.sign(&msg.as_bytes()).await?; // TODO rename
+                let signature = signer.sign(&msg.as_bytes(), true).await?; // TODO rename
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
@@ -175,7 +175,7 @@ impl Signer {
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
                 let msg = withdraw.get_ethereum_sign_message(&token.symbol, token.decimals);
-                let signature = signer.sign(&msg.as_bytes()).await?; // TODO rename
+                let signature = signer.sign(&msg.as_bytes(), true).await?; // TODO rename
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
