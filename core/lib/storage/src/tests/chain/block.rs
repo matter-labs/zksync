@@ -162,7 +162,7 @@ fn ethereum_tx_hash(ethereum_op_id: i64) -> H256 {
 fn get_unique_operation(
     block_number: BlockNumber,
     action: Action,
-    accounts_updated: Vec<(u32, AccountUpdate)>,
+    _accounts_updated: Vec<(u32, AccountUpdate)>,
 ) -> Operation {
     Operation {
         id: None,
@@ -177,7 +177,6 @@ fn get_unique_operation(
             1_000_000.into(),
             1_500_000.into(),
         ),
-        accounts_updated,
     }
 }
 
