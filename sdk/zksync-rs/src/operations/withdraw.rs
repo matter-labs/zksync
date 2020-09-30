@@ -1,6 +1,10 @@
-use models::node::{
-    closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
-    is_token_amount_packable, Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
+use models::{
+    helpers::{
+        closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
+        is_token_amount_packable,
+    },
+    tx::PackedEthSignature,
+    Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
 };
 use num::BigUint;
 
@@ -17,7 +21,7 @@ pub struct WithdrawBuilder<'a> {
 }
 
 impl<'a> WithdrawBuilder<'a> {
-    /// Initializes a transfer transaction building process.
+    /// Initializes a withdraw transaction building process.
     pub fn new(wallet: &'a Wallet) -> Self {
         Self {
             wallet,
@@ -29,8 +33,8 @@ impl<'a> WithdrawBuilder<'a> {
         }
     }
 
-    /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+    /// Directly returns the signed withdraw transaction for the subsequent usage.
+    pub async fn tx(self) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
         let token = self
             .token
             .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
@@ -65,19 +69,21 @@ impl<'a> WithdrawBuilder<'a> {
             }
         };
 
-        let (withdraw, eth_signature) = self
-            .wallet
+        self.wallet
             .signer
             .sign_withdraw(token, amount, fee, to, nonce)
             .await
             .map_err(ClientError::SigningError)?;
 
-        let tx = FranklinTx::Withdraw(Box::new(withdraw));
-        let tx_hash = self.wallet.provider.send_tx(tx, eth_signature).await?;
 
-        let handle = SyncTransactionHandle::new(tx_hash, self.wallet.provider.clone());
+    /// Sends the transaction, returning the handle for its awaiting.
+    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+        let provider = self.wallet.provider.clone();
 
-        Ok(handle)
+        let (tx, eth_signature) = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, eth_signature).await?;
+
+        Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
 
     /// Sets the transaction token. Returns an error if token is not supported by zkSync.

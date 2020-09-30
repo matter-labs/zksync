@@ -1,6 +1,6 @@
 use crate::error::SignerError;
 use crate::EthereumSigner;
-use models::node::tx::TxEthSignature;
+use models::tx::TxEthSignature;
 use rlp::RlpStream;
 use web3::types::{H160, U256};
 

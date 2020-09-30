@@ -28,12 +28,11 @@ use structopt::StructOpt;
 // External uses
 use tokio::runtime::Builder;
 // Workspace uses
-use models::config_options::ConfigurationOptions;
+use zksync_config::ConfigurationOptions;
 // Local uses
 use self::{cli::CliOptions, scenarios::ScenarioContext};
 
 mod cli;
-mod rpc_client;
 mod scenarios;
 mod sent_transactions;
 mod test_accounts;

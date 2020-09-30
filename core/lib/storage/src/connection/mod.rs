@@ -3,12 +3,12 @@ use std::env;
 use std::fmt;
 // External imports
 use async_trait::async_trait;
-use deadpool::managed::{Manager, RecycleResult};
+use deadpool::managed::{Manager, PoolConfig, RecycleResult, Timeouts};
 use sqlx::{Connection, Error as SqlxError, PgConnection};
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
 use crate::StorageProcessor;
-use models::config_options::parse_env;
+use zksync_utils::parse_env;
 
 pub mod holder;
 
@@ -23,7 +23,11 @@ struct DbPool {
 
 impl DbPool {
     fn create(url: impl Into<String>, max_size: usize) -> Pool {
-        Pool::new(DbPool { url: url.into() }, max_size)
+        let pool_config = PoolConfig {
+            max_size,
+            timeouts: Timeouts::wait_millis(20_000), // wait 20 seconds before returning error
+        };
+        Pool::from_config(DbPool { url: url.into() }, pool_config)
     }
 }
 

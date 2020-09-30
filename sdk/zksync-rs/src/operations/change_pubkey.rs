@@ -1,5 +1,6 @@
-use models::node::{
-    closest_packable_fee_amount, is_fee_amount_packable, FranklinTx, Nonce, Token, TokenLike,
+use models::{
+    helpers::{closest_packable_fee_amount, is_fee_amount_packable},
+    FranklinTx, Nonce, Token, TokenLike,
 };
 use num::BigUint;
 
@@ -15,7 +16,7 @@ pub struct ChangePubKeyBuilder<'a> {
 }
 
 impl<'a> ChangePubKeyBuilder<'a> {
-    /// Initializes a transfer transaction building process.
+    /// Initializes a change public key transaction building process.
     pub fn new(wallet: &'a Wallet) -> Self {
         Self {
             wallet,
@@ -26,8 +27,8 @@ impl<'a> ChangePubKeyBuilder<'a> {
         }
     }
 
-    /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+    /// Directly returns the signed change public key transaction for the subsequent usage.
+    pub async fn tx(self) -> Result<FranklinTx, ClientError> {
         // Currently fees aren't supported by ChangePubKey tx, but they will be in the near future.
         // let fee = match self.fee {
         //     Some(fee) => fee,
@@ -56,19 +57,20 @@ impl<'a> ChangePubKeyBuilder<'a> {
             }
         };
 
-        let change_pubkey = self
-            .wallet
+        self.wallet
             .signer
             .sign_change_pubkey_tx(nonce, self.onchain_auth)
             .await
             .map_err(ClientError::SigningError)?;
 
-        let tx = FranklinTx::ChangePubKey(Box::new(change_pubkey));
-        let tx_hash = self.wallet.provider.send_tx(tx, None).await?;
+    /// Sends the transaction, returning the handle for its awaiting.
+    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+        let provider = self.wallet.provider.clone();
 
-        let handle = SyncTransactionHandle::new(tx_hash, self.wallet.provider.clone());
+        let tx = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, None).await?;
 
-        Ok(handle)
+        Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
 
     /// Sets the transaction fee token. Returns an error if token is not supported by zkSync.

@@ -8,11 +8,10 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 // External uses
 use tokio::runtime::Runtime;
 // Workspace uses
-use models::config_options::ConfigurationOptions;
+use zksync_config::ConfigurationOptions;
 // Local uses
 use super::tps_counter::TPSCounter;
 
-mod api_test;
 pub(crate) mod configs;
 mod execution_tps;
 mod outgoing_tps;
@@ -30,8 +29,6 @@ pub enum ScenarioType {
     ExecutionTps,
     /// Run the real-life scenario.
     RealLife,
-    /// Run the API integration test scenario.
-    ApiTest,
 }
 
 impl ScenarioType {
@@ -41,7 +38,6 @@ impl ScenarioType {
             Self::OutgoingTps => Box::new(outgoing_tps::run_scenario),
             Self::ExecutionTps => Box::new(execution_tps::run_scenario),
             Self::RealLife => Box::new(real_life::run_scenario),
-            Self::ApiTest => Box::new(api_test::run_scenario),
         }
     }
 }
@@ -54,7 +50,6 @@ impl FromStr for ScenarioType {
             "outgoing" | "outgoing_tps" => Self::OutgoingTps,
             "execution" | "execution_tps" => Self::ExecutionTps,
             "reallife" | "real-life" | "real_life" => Self::RealLife,
-            "apitest" | "api-test" | "api_test" => Self::ApiTest,
             other => {
                 failure::bail!(
                     "Unknown scenario type '{}'. \

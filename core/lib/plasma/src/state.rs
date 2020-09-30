@@ -1,21 +1,24 @@
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
-use models::node::operations::{
+use models::operations::{
     ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
     WithdrawOp,
 };
-use models::node::tx::ChangePubKey;
-use models::node::Address;
-use models::node::{
-    reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
+use models::tx::ChangePubKey;
+use models::Address;
+use models::{
+    helpers::reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
+    TokenId,
 };
-use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
-use models::node::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
-use models::params;
-use models::params::max_account_id;
-use models::primitives::BigUintSerdeWrapper;
+use models::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
+use models::{Close, Deposit, FranklinTx, FullExit, SignedFranklinTx, Transfer, Withdraw};
 use num::BigUint;
 use std::collections::HashMap;
+use zksync_crypto::{
+    params::{self, max_account_id},
+    Fr,
+};
+use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Debug)]
 pub struct OpSuccess {
@@ -289,7 +292,7 @@ impl PlasmaState {
         let account_balance = self
             .get_account(priority_op.account_id)
             .filter(|account| account.address == priority_op.eth_address)
-            .map(|acccount| acccount.get_balance(priority_op.token))
+            .map(|account| account.get_balance(priority_op.token))
             .map(BigUintSerdeWrapper);
 
         trace!("Balance: {:?}", account_balance);
@@ -985,7 +988,7 @@ impl PlasmaState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+    use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
     fn plasma_state_reversing_updates() {

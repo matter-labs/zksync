@@ -8,8 +8,13 @@ edition = "2018"
 server = { path = "../../bin/server", version = "0.0.1" }
 prover = { path = "../../bin/prover", version = "0.0.1" }
 models = { path = "../../lib/models", version = "0.0.1" }
-crypto_exports = { path = "../../lib/crypto_exports", version = "0.1.0" }
+zksync_config = { path = "../../lib/config", version = "0.1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "0.1.0" }
+zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "0.1.0" }
 eth_client = { path = "../../lib/eth_client", version = "0.1.0"  }
+
+zksync_test_account = { path = "../test_account", version = "0.1.0" }
 
 tokio = { version = "0.2", features = ["full"] }
 futures = { version = "0.3", features = ["compat"] }

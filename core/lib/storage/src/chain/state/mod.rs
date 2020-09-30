@@ -4,9 +4,9 @@ use std::{cmp, collections::HashMap};
 use num::BigInt;
 use sqlx::types::BigDecimal;
 // Workspace imports
-use models::node::{
-    apply_updates, reverse_updates, AccountId, AccountMap, AccountUpdate, AccountUpdates,
-    PubKeyHash,
+use models::{
+    helpers::{apply_updates, reverse_updates},
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, PubKeyHash,
 };
 // Local imports
 use crate::chain::{

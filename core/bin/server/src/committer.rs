@@ -9,13 +9,22 @@ use tokio::{task::JoinHandle, time};
 use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
 use models::{
-    node::{
-        block::{ExecutedOperations, PendingBlock},
-        BlockNumber,
-    },
-    Action, BlockCommitRequest, CommitRequest, Operation,
+    block::{Block, ExecutedOperations, PendingBlock},
+    AccountUpdates, Action, BlockNumber, Operation,
 };
 use storage::ConnectionPool;
+
+#[derive(Debug)]
+pub enum CommitRequest {
+    PendingBlock(PendingBlock),
+    Block(BlockCommitRequest),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlockCommitRequest {
+    pub block: Block,
+    pub accounts_updated: AccountUpdates,
+}
 
 pub struct ExecutedOpsNotify {
     pub operations: Vec<ExecutedOperations>,

@@ -7,7 +7,9 @@ edition = "2018"
 [dependencies]
 models = { path = "../../lib/models", version = "0.0.1" }
 server = { path = "../../bin/server", version = "0.0.1" }
-testkit = { path = "../testkit", version = "0.1.0"}
+zksync = { path = "../../../sdk/zksync-rs", version = "0.1.0" }
+zksync_config = { path = "../../lib/config", version = "0.1.0" }
+zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
 
 serde = "1.0.90"
 serde_derive = "1.0.90"

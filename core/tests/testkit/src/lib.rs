@@ -8,14 +8,13 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use models::config_options::ConfigurationOptions;
-use models::node::{
+use models::{
     mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
     DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
     WithdrawOp,
 };
-use models::{BlockCommitRequest, CommitRequest};
 use num::BigUint;
+use server::committer::{BlockCommitRequest, CommitRequest};
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
@@ -26,14 +25,16 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
+use zksync_config::ConfigurationOptions;
+
+pub use zksync_test_account as zksync_account;
 
 pub mod eth_account;
 pub mod external_commands;
-pub mod zksync_account;
-use crypto_exports::rand::Rng;
 use itertools::Itertools;
-use models::prover_utils::EncodedProofPlonk;
 use web3::types::{TransactionReceipt, U64};
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::rand::Rng;
 
 /// Constant for testkit
 /// Real value is in `dev.env`

@@ -8,8 +8,8 @@ mod utils;
 const PACKED_POINT_SIZE: usize = 32;
 const PACKED_SIGNATURE_SIZE: usize = 64;
 
-pub use crypto_exports::franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
-use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
+pub use franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
+use franklin_crypto::rescue::bn256::Bn256RescueParams;
 
 pub type Fs = <Engine as JubjubEngine>::Fs;
 
@@ -20,7 +20,7 @@ thread_local! {
 
 use wasm_bindgen::prelude::*;
 
-use crypto_exports::franklin_crypto::{
+use franklin_crypto::{
     alt_babyjubjub::{fs::FsRepr, AltJubjubBn256, FixedGenerators},
     bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
     eddsa::{PrivateKey, PublicKey, Seed},

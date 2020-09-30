@@ -7,11 +7,12 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{info, trace};
 // Workspace deps
-use models::config_options::ConfigurationOptions;
-use models::{config_options::ThreadPanicNotify, node::BlockNumber};
-use prover::client;
+use models::BlockNumber;
 use storage::ConnectionPool;
+use zksync_config::ConfigurationOptions;
+use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
 // Local deps
+use crate::panic_notify::ThreadPanicNotify;
 use crate::prover_server::scaler::ScalerOracle;
 
 mod scaler;
@@ -57,10 +58,7 @@ async fn status() -> actix_web::Result<String> {
     Ok("alive".into())
 }
 
-async fn register(
-    data: web::Data<AppState>,
-    r: web::Json<client::ProverReq>,
-) -> actix_web::Result<String> {
+async fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
     info!("register request for prover with name: {}", r.name);
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
@@ -79,7 +77,7 @@ async fn register(
 
 async fn block_to_prove(
     data: web::Data<AppState>,
-    r: web::Json<client::ProverReq>,
+    r: web::Json<ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
     trace!("request block to prove from worker: {}", r.name);
     if r.name == "" {
@@ -99,12 +97,12 @@ async fn block_to_prove(
             "satisfied request block {} to prove from worker: {}",
             prover_run.block_number, r.name
         );
-        Ok(HttpResponse::Ok().json(client::BlockToProveRes {
+        Ok(HttpResponse::Ok().json(BlockToProveRes {
             prover_run_id: prover_run.id,
             block: prover_run.block_number,
         }))
     } else {
-        Ok(HttpResponse::Ok().json(client::BlockToProveRes {
+        Ok(HttpResponse::Ok().json(BlockToProveRes {
             prover_run_id: 0,
             block: 0,
         }))
@@ -135,7 +133,7 @@ async fn prover_data(
 
 async fn working_on(
     data: web::Data<AppState>,
-    r: web::Json<client::WorkingOnReq>,
+    r: web::Json<WorkingOnReq>,
 ) -> actix_web::Result<HttpResponse> {
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
@@ -161,7 +159,7 @@ async fn working_on(
 
 async fn publish(
     data: web::Data<AppState>,
-    r: web::Json<client::PublishReq>,
+    r: web::Json<PublishReq>,
 ) -> actix_web::Result<HttpResponse> {
     info!("Received a proof for block: {}", r.block);
     let mut storage = data

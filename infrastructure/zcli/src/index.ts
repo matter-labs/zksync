@@ -25,7 +25,7 @@ async function main() {
             throw new Error('--json option and positional arguments are mutually exclusive');
         }
         if (!config.defaultWallet && !json) {
-            throw new Error('recipient is not provided');
+            throw new Error('sender is not provided');
         }
         if (operation == 'deposit') {
             recipient = recipient || config.defaultWallet || '';

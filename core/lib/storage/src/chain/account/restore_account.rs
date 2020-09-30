@@ -1,10 +1,10 @@
 // Built-in deps
 // External imports
 use num::bigint::ToBigInt;
-use web3::types::Address;
+use zksync_basic_types::Address;
 // Workspace imports
-use models::node::PubKeyHash;
-use models::node::{Account, AccountId, TokenId};
+use models::PubKeyHash;
+use models::{Account, AccountId, TokenId};
 // Local imports
 use super::records::*;
 

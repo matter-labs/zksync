@@ -6,8 +6,9 @@ use std::fmt;
 // External uses
 use num::BigUint;
 // Workspace uses
-use models::node::tx::{ChangePubKey, PackedEthSignature};
-use models::node::{AccountId, Address, Nonce, PrivateKey, PubKeyHash, Token, Transfer, Withdraw};
+use models::tx::{ChangePubKey, PackedEthSignature};
+use models::{AccountId, Address, Nonce, PubKeyHash, Token, Transfer, Withdraw};
+use zksync_crypto::PrivateKey;
 
 fn signing_failed_error(err: impl ToString) -> SignerError {
     SignerError::SigningFailed(err.to_string())

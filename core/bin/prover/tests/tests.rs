@@ -3,26 +3,26 @@ use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
-use crypto_exports::pairing::ff::PrimeField;
 use num::BigUint;
+use zksync_crypto::pairing::ff::PrimeField;
 // Workspace deps
 use circuit::{
     circuit::FranklinCircuit,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
 use models::{
-    circuit::{account::CircuitAccount, CircuitAccountTree},
-    config_options::ConfigurationOptions,
-    node::{
-        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
-        Engine, Fr,
-    },
-    prover_utils::EncodedProofPlonk,
+    block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
 };
+use zksync_config::ConfigurationOptions;
+use zksync_crypto::{
+    circuit::{account::CircuitAccount, CircuitAccountTree},
+    proof::EncodedProofPlonk,
+    Engine, Fr,
+};
+use zksync_prover_utils::prover_data::ProverData;
 // Local deps
 use prover::{
     plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
-    prover_data::ProverData,
     ProverImpl,
 };
 
@@ -119,7 +119,8 @@ fn prover_proves_a_block_and_publishes_result() {
 }
 
 fn new_test_data_for_prover() -> ProverData {
-    let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
+    let mut circuit_account_tree =
+        CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
     let fee_account_id = 0;
 
     // Init the fee account.

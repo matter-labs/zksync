@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 // External uses
 use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
-use web3::types::{H256, U256};
+use zksync_basic_types::{H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
@@ -465,7 +465,7 @@ pub(in crate::eth_sender) fn create_signed_withdraw_tx(
 
     let raw_tx = eth_sender.ethereum.encode_tx_data(
         "completeWithdrawals",
-        models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+        models::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
     );
     let signed_tx = eth_sender
         .ethereum

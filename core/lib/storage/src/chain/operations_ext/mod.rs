@@ -1,8 +1,8 @@
 // Built-in deps
 // External imports
 // Workspace imports
-use models::node::{Address, TokenId};
 use models::ActionType;
+use models::{Address, TokenId};
 // Local imports
 use self::records::{
     PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,

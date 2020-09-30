@@ -1,7 +1,7 @@
 use crate::error::SignerError;
-use models::node::tx::PackedEthSignature;
-use models::node::tx::TxEthSignature;
-use models::node::H256;
+use models::tx::PackedEthSignature;
+use models::tx::TxEthSignature;
+use models::H256;
 
 #[derive(Clone)]
 pub enum EthereumSigner {

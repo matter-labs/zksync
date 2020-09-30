@@ -2,8 +2,6 @@ pub mod cli_utils;
 pub mod client;
 pub mod exit_proof;
 pub mod plonk_step_by_step_prover;
-pub mod prover_data;
-pub mod serialization;
 
 // Built-in deps
 use std::sync::{
@@ -16,9 +14,10 @@ use std::{
     thread,
 };
 // External deps
-use rand::Rng;
+use zksync_crypto::rand::Rng;
 // Workspace deps
-use models::{config_options::ProverOptions, node::Engine, prover_utils::EncodedProofPlonk};
+use zksync_config::ProverOptions;
+use zksync_crypto::{proof::EncodedProofPlonk, Engine};
 
 const ABSENT_PROVER_ID: i32 = -1;
 
@@ -180,7 +179,7 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
         log::trace!("round completed.");
 
         // Randomly generated shift to desynchronize multiple provers started at the same time.
-        let mut rng = rand::thread_rng();
+        let mut rng = zksync_crypto::rand::thread_rng();
         let sleep_shift_ms = rng.gen_range(0, 300);
         let sleep_duration = cycle_wait_interval + Duration::from_millis(sleep_shift_ms);
         thread::sleep(sleep_duration);
@@ -194,7 +193,7 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
 ) {
     let mut job_id = 0;
     loop {
-        let mut rng = rand::thread_rng();
+        let mut rng = zksync_crypto::rand::thread_rng();
 
         // Randomly generated shift, so multiple provers won't spam the server at the same time.
         let sleep_shift_ms = rng.gen_range(0, 500);

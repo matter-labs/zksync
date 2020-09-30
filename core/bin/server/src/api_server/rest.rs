@@ -10,11 +10,10 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
-use models::node::{
+use models::NetworkStatus;
+use models::{
     Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
 };
-use models::NetworkStatus;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -26,10 +25,12 @@ use storage::chain::operations_ext::{
 };
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
-use web3::types::H160;
+use zksync_basic_types::H160;
+use zksync_config::ConfigurationOptions;
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
+use crate::panic_notify::ThreadPanicNotify;
 use storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
 
 #[derive(Default, Clone)]
@@ -567,17 +568,22 @@ async fn handle_get_account_transactions_history(
         return Err(HttpResponse::BadRequest().finish().into());
     }
 
-    let mut storage = data.access_storage().await?;
-    let tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
-        vlog::warn!(
-            "Internal Server Error: '{}'; input: ({}, {}, {})",
-            err,
-            address,
-            offset,
-            limit,
-        );
-        HttpResponse::InternalServerError().finish()
-    })?;
+    let tokens = data
+        .access_storage()
+        .await?
+        .tokens_schema()
+        .load_tokens()
+        .await
+        .map_err(|err| {
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: ({}, {}, {})",
+                err,
+                address,
+                offset,
+                limit,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
 
     let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
     // Fetch ongoing deposits, since they must be reported within the transactions history.
@@ -621,7 +627,9 @@ async fn handle_get_account_transactions_history(
         offset = offset.saturating_sub(num_account_ongoing_deposits);
     }
 
-    let mut transactions_history = storage
+    let mut transactions_history = data
+        .access_storage()
+        .await?
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
@@ -743,41 +751,15 @@ async fn handle_get_account_transactions_history_newer_than(
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
-    let mut storage = data.access_storage().await?;
-    let mut transaction = storage
-        .start_transaction()
-        .await
-        .map_err(AppState::db_error)?;
-
-    let tx_id = parse_tx_id(&tx_id, &mut transaction).await?;
 
     let direction = SearchDirection::Newer;
-    let mut transactions_history = transaction
-        .chain()
-        .operations_ext_schema()
-        .get_account_transactions_history_from(&address, tx_id, direction, limit)
-        .await
-        .map_err(|err| {
-            vlog::warn!(
-                "Internal Server Error: '{}'; input: ({}, {:?}, {})",
-                err,
-                address,
-                tx_id,
-                limit,
-            );
-            HttpResponse::InternalServerError().finish()
-        })?;
-
-    limit -= transactions_history.len() as u64;
-
-    if limit > 0 {
-        // We've got some free space, so load unconfirmed operations to
-        // fill the rest of the limit.
-
-        let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
-        let tokens = transaction
-            .tokens_schema()
-            .load_tokens()
+    let mut transactions_history = {
+        let mut storage = data.access_storage().await?;
+        let tx_id = parse_tx_id(&tx_id, &mut storage).await?;
+        storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions_history_from(&address, tx_id, direction, limit)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -788,8 +770,16 @@ async fn handle_get_account_transactions_history_newer_than(
                     limit,
                 );
                 HttpResponse::InternalServerError().finish()
-            })?;
+            })?
+    };
 
+    limit -= transactions_history.len() as u64;
+
+    if limit > 0 {
+        // We've got some free space, so load unconfirmed operations to
+        // fill the rest of the limit.
+
+        let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
         // Fetch ongoing deposits, since they must be reported within the transactions history.
         let mut ongoing_ops = get_ongoing_priority_ops(&eth_watcher_request_sender, address)
             .await
@@ -807,6 +797,22 @@ async fn handle_get_account_transactions_history_newer_than(
         // Sort operations by block number from smaller (older) to greater (newer).
         ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
 
+        let tokens = data
+            .access_storage()
+            .await?
+            .tokens_schema()
+            .load_tokens()
+            .await
+            .map_err(|err| {
+                vlog::warn!(
+                    "Internal Server Error: '{}'; input: ({}, {:?}, {})",
+                    err,
+                    address,
+                    tx_id,
+                    limit,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
         // Collect the unconfirmed priority operations with respect to the
         // `limit` parameters.
         let mut txs: Vec<_> = ongoing_ops
@@ -820,8 +826,6 @@ async fn handle_get_account_transactions_history_newer_than(
         // Unprocessed operations must be in the end (as the newest ones).
         transactions_history.append(&mut txs);
     }
-
-    transaction.commit().await.map_err(AppState::db_error)?;
 
     Ok(HttpResponse::Ok().json(transactions_history))
 }
@@ -851,11 +855,12 @@ async fn handle_get_tx_by_hash(
 ) -> ActixResult<HttpResponse> {
     let hash =
         try_parse_hash(&hash_hex_with_prefix).ok_or_else(|| HttpResponse::BadRequest().finish())?;
-    let mut storage = data.access_storage().await?;
 
     let mut res;
 
-    res = storage
+    res = data
+        .access_storage()
+        .await?
         .chain()
         .operations_ext_schema()
         .get_tx_by_hash(hash.as_slice())
@@ -890,10 +895,16 @@ async fn handle_get_tx_by_hash(
     // If eth watcher has a priority op with given hash, transform it
     // to TxByHashResponse and assign it to res.
     if let Some((eth_block, priority_op)) = unconfirmed_op {
-        let tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}';", err);
-            HttpResponse::InternalServerError().finish()
-        })?;
+        let tokens = data
+            .access_storage()
+            .await?
+            .tokens_schema()
+            .load_tokens()
+            .await
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}';", err);
+                HttpResponse::InternalServerError().finish()
+            })?;
 
         res = deposit_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
     }

@@ -6,13 +6,13 @@ use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::transports::{EventLoopHandle, Http};
-use web3::types::{TransactionReceipt, H256, U256};
+use zksync_basic_types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use super::ExecutedTxStatus;
 use eth_client::{ETHClient, SignedCallResult};
-use models::abi::zksync_contract;
-use models::config_options::ConfigurationOptions;
 use std::time::Duration;
+use zksync_config::ConfigurationOptions;
+use zksync_contracts::zksync_contract;
 
 /// Sleep time between consecutive requests.
 const SLEEP_DURATION: Duration = Duration::from_millis(250);

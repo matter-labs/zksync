@@ -1,12 +1,10 @@
-pub mod network;
-
-use models::{
-    node::{AccountId, Address, Nonce, PubKeyHash, Token},
-    primitives::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper},
-};
+use models::{AccountId, Address, Nonce, PubKeyHash, Token};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
+
+pub mod network;
 
 pub type Tokens = HashMap<String, Token>;
 
@@ -30,6 +28,13 @@ pub struct DepositingFunds {
 #[serde(rename_all = "camelCase")]
 pub struct DepositingAccountBalances {
     balances: HashMap<String, DepositingFunds>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BlockStatus {
+    Committed,
+    Verified,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,11 +64,25 @@ pub struct TransactionInfo {
     pub block: Option<BlockInfo>,
 }
 
+impl TransactionInfo {
+    /// Indicates whether this transaction is verified.
+    pub fn is_verified(&self) -> bool {
+        self.executed && self.block.as_ref().filter(|x| x.verified).is_some()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EthOpInfo {
     pub executed: bool,
     pub block: Option<BlockInfo>,
+}
+
+impl EthOpInfo {
+    /// Indicates whether this operation is verified.
+    pub fn is_verified(&self) -> bool {
+        self.executed && self.block.as_ref().filter(|x| x.verified).is_some()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

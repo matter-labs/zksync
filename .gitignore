@@ -13,6 +13,7 @@ yarn-error.log
 target
 a.out 
 .gitconfig
+tags
 
 zksync_pk.key
 dist
@@ -43,3 +44,5 @@ Cargo.lock
 loadtest_accounts_*
 
 go_to_env.sh
+
+core/lib/storage/.env
