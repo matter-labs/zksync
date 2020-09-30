@@ -467,20 +467,20 @@ pub fn start_rpc_server(
     current_zksync_info: CurrentZksyncInfo,
 ) {
     let addr = config_options.json_rpc_http_server_address;
-    tokio::spawn(async move {
+
+    let rpc_app = RpcApp::new(
+        &config_options,
+        connection_pool,
+        mempool_request_sender,
+        state_keeper_request_sender,
+        sign_verify_request_sender,
+        eth_watcher_request_sender,
+        ticker_request_sender,
+        current_zksync_info,
+    );
+    std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
         let mut io = IoHandler::new();
-
-        let rpc_app = RpcApp::new(
-            &config_options,
-            connection_pool,
-            mempool_request_sender,
-            state_keeper_request_sender,
-            sign_verify_request_sender,
-            eth_watcher_request_sender,
-            ticker_request_sender,
-            current_zksync_info,
-        );
         rpc_app.extend(&mut io);
 
         let server = ServerBuilder::new(io)
@@ -488,7 +488,6 @@ pub fn start_rpc_server(
             .threads(8)
             .start_http(&addr)
             .unwrap();
-
         server.wait();
     });
 }

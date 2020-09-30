@@ -33,7 +33,6 @@ use zksync_config::ConfigurationOptions;
 use self::{cli::CliOptions, scenarios::ScenarioContext};
 
 mod cli;
-mod rpc_client;
 mod scenarios;
 mod sent_transactions;
 mod test_accounts;
