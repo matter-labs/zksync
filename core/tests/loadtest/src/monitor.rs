@@ -118,9 +118,8 @@ impl Monitor {
         let tx_hash = self.provider.send_tx(tx, eth_signature).await?;
 
         let monitor = self.clone();
-        let tx_hash2 = tx_hash.clone();
         let handle = tokio::spawn(async move {
-            if let Err(e) = monitor.clone().monitor_tx(tx_hash2).await {
+            if let Err(e) = monitor.clone().monitor_tx(tx_hash).await {
                 log::warn!("Monitored transaction execution failed. {}", e);
                 monitor.log_event(Event::TxErrored).await;
             }
@@ -161,12 +160,10 @@ impl Monitor {
     }
 
     pub(crate) fn run_counter(&self) -> impl Future<Output = ()> {
-        let mut check_timer = tokio::time::interval(Self::SAMPLE_INTERVAL);
-
         let monitor = self.clone();
         async move {
             loop {
-                check_timer.tick().await;
+                tokio::time::delay_for(Self::SAMPLE_INTERVAL).await;
                 monitor.inner().await.store_stats();
             }
         }
@@ -186,14 +183,14 @@ impl Monitor {
         // Wait for the transaction to execute.
         await_condition!(
             Self::POLLING_INTERVAL,
-            self.provider.tx_info(tx_hash.clone()).await?.executed
+            self.provider.tx_info(tx_hash).await?.executed
         );
         self.log_event(Event::TxExecuted).await;
 
         // Wait for the transaction to verify.
         await_condition!(
             Self::POLLING_INTERVAL,
-            self.provider.tx_info(tx_hash.clone()).await?.is_verified()
+            self.provider.tx_info(tx_hash).await?.is_verified()
         );
         self.log_event(Event::TxVerified).await;
 

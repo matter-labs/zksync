@@ -50,7 +50,7 @@ impl SyncTransactionHandle {
 
     /// Returns the transaction hash.
     pub fn hash(&self) -> TxHash {
-        self.hash.clone()
+        self.hash
     }
 
     /// Sets the timeout for commit operation.
@@ -83,7 +83,7 @@ impl SyncTransactionHandle {
                 }
             }
 
-            let response = self.provider.tx_info(self.hash.clone()).await?;
+            let response = self.provider.tx_info(self.hash).await?;
             if let Some(block) = &response.block {
                 if block.committed {
                     return Ok(response);
@@ -106,7 +106,7 @@ impl SyncTransactionHandle {
                 }
             }
 
-            let response = self.provider.tx_info(self.hash.clone()).await?;
+            let response = self.provider.tx_info(self.hash).await?;
             if let Some(block) = &response.block {
                 if block.verified {
                     return Ok(response);

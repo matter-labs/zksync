@@ -103,7 +103,7 @@ pub async fn wait_for_verify(
     let tx_hashes = sent_txs.tx_hashes;
     for hash in tx_hashes.iter() {
         loop {
-            let state = provider.tx_info(hash.clone()).await?;
+            let state = provider.tx_info(*hash).await?;
             if state.is_verified() {
                 log::debug!("{} is verified", hash.to_string());
                 break;

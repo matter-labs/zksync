@@ -118,7 +118,7 @@ impl OperationNotifier {
             }
             TX_SUB_PREFIX => {
                 let hash = TxHash::from_str(sub_unique_id)?;
-                if let Some(mut subs) = self.tx_subs.remove(&(hash.clone(), sub_action)) {
+                if let Some(mut subs) = self.tx_subs.remove(&(hash, sub_action)) {
                     subs.retain(|sub| sub.id != sub_id);
                     if !subs.is_empty() {
                         self.tx_subs.insert((hash, sub_action), subs);
@@ -384,7 +384,7 @@ impl OperationNotifier {
         // Maybe tx was executed already.
         if action == ActionType::COMMIT {
             if let Some((block_number, success, fail_reason)) = self
-                .check_op_executed_current_block(ExecutedOpId::Transaction(hash.clone()))
+                .check_op_executed_current_block(ExecutedOpId::Transaction(hash))
                 .await?
             {
                 let sink = sub.assign_id(id).map_err(|_| format_err!("SubIdAssign"))?;
@@ -434,10 +434,7 @@ impl OperationNotifier {
             }
         }
 
-        let mut subs = self
-            .tx_subs
-            .remove(&(hash.clone(), action))
-            .unwrap_or_default();
+        let mut subs = self.tx_subs.remove(&(hash, action)).unwrap_or_default();
         if subs.len() < MAX_LISTENERS_PER_ENTITY {
             let sink = sub
                 .assign_id(id.clone())

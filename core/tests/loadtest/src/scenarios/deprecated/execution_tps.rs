@@ -226,7 +226,7 @@ async fn await_txs_execution(
         let mut timer = time::interval(polling_interval);
         loop {
             let state = provider
-                .tx_info(tx_hash.clone())
+                .tx_info(tx_hash)
                 .await
                 .expect("[wait_for_verify] call tx_info");
 

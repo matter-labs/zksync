@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryInto, str::FromStr};
 
-#[derive(Debug, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct TxHash {
     pub(crate) data: [u8; 32],
 }
