@@ -253,7 +253,7 @@ pub fn generate_sig_data(
     assert!(sig_bits_to_hash.len() <= MAX_CIRCUIT_MSG_HASH_BITS);
 
     sig_bits_to_hash.resize(MAX_CIRCUIT_MSG_HASH_BITS, false);
-    debug!(
+    log::debug!(
         "inside generation after resize: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits_to_hash))
     );
@@ -270,7 +270,7 @@ pub fn generate_sig_data(
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
-    debug!(
+    log::debug!(
         "inside generation: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
@@ -320,7 +320,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     let mut hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
-    debug!("Initial hash hex {}", hex::encode(hash_result));
+    log::debug!("Initial hash hex {}", hex::encode(hash_result));
 
     let mut packed_old_root_bits = vec![];
     let old_root_bits: Vec<bool> = BitIterator::new(initial_root.unwrap().into_repr()).collect();
@@ -358,7 +358,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
-    debug!("hash with new root as hex {}", hex::encode(hash_result));
+    log::debug!("hash with new root as hex {}", hex::encode(hash_result));
 
     let mut final_bytes = vec![];
     let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits.to_vec());
@@ -370,7 +370,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
-    debug!("final hash as hex {}", hex::encode(hash_result));
+    log::debug!("final hash as hex {}", hex::encode(hash_result));
 
     hash_result[0] &= 0x1f; // temporary solution, this nullifies top bits to be encoded into field element correctly
 

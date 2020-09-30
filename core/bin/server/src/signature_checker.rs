@@ -119,7 +119,7 @@ async fn verify_eth_signature(
                     .1
                     .await
                     .expect("Failed receiving response from eth watch")
-                    .map_err(|e| warn!("Err in eth watch: {}", e))
+                    .map_err(|e| log::warn!("Err in eth watch: {}", e))
                     .or(Err(TxAddError::EIP1271SignatureVerificationFail))?;
 
                 if !signature_correct {

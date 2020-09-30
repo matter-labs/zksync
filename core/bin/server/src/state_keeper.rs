@@ -258,9 +258,10 @@ impl ZksyncStateInitParams {
         self.unprocessed_priority_op =
             Self::unprocessed_priority_op_id(storage, block_number).await?;
 
-        info!(
+        log::info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            self.last_block_number, self.unprocessed_priority_op
+            self.last_block_number,
+            self.unprocessed_priority_op
         );
         Ok(())
     }
@@ -373,7 +374,7 @@ impl ZksyncStateKeeper {
         };
 
         let root = keeper.state.root_hash();
-        info!("created state keeper, root hash = {}", root);
+        log::info!("created state keeper, root hash = {}", root);
 
         keeper
     }
@@ -464,7 +465,7 @@ impl ZksyncStateKeeper {
             .expect("Unable to commit transaction in statekeeper");
         let state = ZksyncState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
-        info!("Genesis block created, state: {}", state.root_hash());
+        log::info!("Genesis block created, state: {}", state.root_hash());
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }
 
@@ -703,7 +704,7 @@ impl ZksyncStateKeeper {
                     executed_operations.push(exec_result);
                 }
                 Err(e) => {
-                    warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                    log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                     let failed_tx = ExecutedTx {
                         signed_tx: tx.clone(),
                         success: false,
@@ -797,7 +798,7 @@ impl ZksyncStateKeeper {
                 exec_result
             }
             Err(e) => {
-                warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
                     signed_tx: tx.clone(),
                     success: false,
@@ -865,7 +866,7 @@ impl ZksyncStateKeeper {
         };
         self.state.block_number += 1;
 
-        info!(
+        log::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),

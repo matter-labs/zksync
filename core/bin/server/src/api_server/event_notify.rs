@@ -443,7 +443,7 @@ impl OperationNotifier {
                 .assign_id(id.clone())
                 .map_err(|_| format_err!("SubIdAssign"))?;
             subs.push(SubscriptionSender { id, sink });
-            trace!("tx sub added: {}", hash.to_string());
+            log::trace!("tx sub added: {}", hash.to_string());
         }
         self.tx_subs.insert((hash, action), subs);
         Ok(())
@@ -600,16 +600,18 @@ impl OperationNotifier {
                     {
                         result
                     } else {
-                        warn!(
+                        log::warn!(
                             "Failed to restore resp account state: id: {}, block: {}",
-                            id, op.block.block_number
+                            id,
+                            op.block.block_number
                         );
                         continue;
                     }
                 } else {
-                    warn!(
+                    log::warn!(
                         "Account is updated but not stored in DB, id: {}, block: {}",
-                        id, op.block.block_number
+                        id,
+                        op.block.block_number
                     );
                     continue;
                 };
@@ -653,14 +655,14 @@ pub fn start_sub_notifier(
                     if let Some(new_block) = new_block {
                         notifier.handle_new_block(new_block)
                             .await
-                            .map_err(|e| warn!("Failed to handle new block: {}",e))
+                            .map_err(|e| log::warn!("Failed to handle new block: {}",e))
                             .unwrap_or_default();
                     }
                 },
                 new_exec_batch = executed_tx_stream.next() => {
                     if let Some(new_exec_batch) = new_exec_batch {
                         notifier.handle_new_executed_batch(new_exec_batch)
-                            .map_err(|e| warn!("Failed to handle new exec batch: {}",e))
+                            .map_err(|e| log::warn!("Failed to handle new exec batch: {}",e))
                             .unwrap_or_default();
                     }
                 },
@@ -668,7 +670,7 @@ pub fn start_sub_notifier(
                     if let Some(new_sub) = new_sub {
                         notifier.handle_notify_req(new_sub)
                             .await
-                            .map_err(|e| warn!("Failed to handle notify request: {}",e))
+                            .map_err(|e| log::warn!("Failed to handle notify request: {}",e))
                             .unwrap_or_default();
                     }
                 },

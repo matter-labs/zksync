@@ -5,6 +5,7 @@ use failure::Error;
 use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use zksync_types::TokenPrice;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;

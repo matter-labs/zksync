@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate serde_derive;
-
 // Built-in deps
 use std::fmt;
 

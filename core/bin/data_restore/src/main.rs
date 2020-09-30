@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate log;
-
 pub mod contract_functions;
 pub mod data_restore_driver;
 pub mod eth_tx_helpers;
@@ -54,7 +51,7 @@ async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
 
 #[tokio::main]
 async fn main() {
-    info!("Restoring zkSync state from the contract");
+    log::info!("Restoring zkSync state from the contract");
     env_logger::init();
     let connection_pool = ConnectionPool::new(Some(1)).await;
     let config_opts = ConfigurationOptions::from_env();

@@ -22,6 +22,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
+use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_storage::ConnectionPool;
@@ -379,8 +380,8 @@ impl Mempool {
             .await;
         let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left);
 
-        trace!("Proposed priority ops for block: {:#?}", priority_ops);
-        trace!("Proposed txs for block: {:#?}", txs);
+        log::trace!("Proposed priority ops for block: {:#?}", priority_ops);
+        log::trace!("Proposed txs for block: {:#?}", txs);
         ProposedBlock { priority_ops, txs }
     }
 

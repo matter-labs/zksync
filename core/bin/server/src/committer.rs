@@ -4,6 +4,7 @@ use std::time::Duration;
 use failure::format_err;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::eth_sender::ETHSenderRequest;
@@ -62,7 +63,7 @@ async fn handle_new_commit_task(
                         block_number,
                     })
                     .await
-                    .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+                    .map_err(|e| log::warn!("Failed to send executed tx notify batch: {}", e))
                     .unwrap_or_default();
             }
             CommitRequest::PendingBlock(pending_block) => {
@@ -84,7 +85,7 @@ async fn handle_new_commit_task(
                         block_number,
                     })
                     .await
-                    .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+                    .map_err(|e| log::warn!("Failed to send executed tx notify batch: {}", e))
                     .unwrap_or_default();
             }
         }
@@ -155,7 +156,7 @@ async fn commit_block(
         accounts_updated,
         id: None,
     };
-    info!("commit block #{}", op.block.block_number);
+    log::info!("commit block #{}", op.block.block_number);
     let op = transaction
         .chain()
         .block_schema()
@@ -172,13 +173,13 @@ async fn commit_block(
     op_notify_sender
         .send(op.clone())
         .await
-        .map_err(|e| warn!("Failed notify about commit op confirmation: {}", e))
+        .map_err(|e| log::warn!("Failed notify about commit op confirmation: {}", e))
         .unwrap_or_default();
 
     mempool_req_sender
         .send(MempoolRequest::UpdateNonces(op.accounts_updated))
         .await
-        .map_err(|e| warn!("Failed notify mempool about account updates: {}", e))
+        .map_err(|e| log::warn!("Failed notify mempool about account updates: {}", e))
         .unwrap_or_default();
 
     transaction
@@ -219,7 +220,7 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool
                     .await
                     .expect("Unable to start DB transaction");
 
-                info!("New proof for block: {}", block_number);
+                log::info!("New proof for block: {}", block_number);
                 let block = transaction
                     .chain()
                     .block_schema()

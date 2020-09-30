@@ -2,7 +2,6 @@
 //! The state is then fed to other actors when server transitions to the leader mode.
 
 use crate::state_keeper::ZksyncStateInitParams;
-use log::info;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -39,10 +38,10 @@ impl ObservedState {
     /// Init state by pulling verified and committed state from db.
     async fn init(&mut self) -> Result<(), failure::Error> {
         self.init_circuit_tree().await?;
-        info!("updated circuit tree to block: {}", self.circuit_tree_block);
+        log::info!("updated circuit tree to block: {}", self.circuit_tree_block);
         let mut storage = self.connection_pool.access_storage().await?;
         self.state_keeper_init = ZksyncStateInitParams::restore_from_db(&mut storage).await?;
-        info!(
+        log::info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
         );
@@ -72,14 +71,14 @@ impl ObservedState {
         let old = self.circuit_tree_block;
         self.update_circuit_account_tree().await?;
         if old != self.circuit_tree_block {
-            info!("updated circuit tree to block: {}", self.circuit_tree_block);
+            log::info!("updated circuit tree to block: {}", self.circuit_tree_block);
         }
         let old = self.state_keeper_init.last_block_number;
 
         let mut storage = self.connection_pool.access_storage().await?;
         self.state_keeper_init.load_state_diff(&mut storage).await?;
         if old != self.state_keeper_init.last_block_number {
-            info!(
+            log::info!(
                 "updated state keeper init params to block: {}",
                 self.state_keeper_init.last_block_number
             );
@@ -160,7 +159,7 @@ pub async fn run(
     interval: Duration,
     stop: mpsc::Receiver<()>,
 ) -> ObservedState {
-    info!("starting observer mode");
+    log::info!("starting observer mode");
     let mut observed_state = ObservedState::new(conn_pool);
     observed_state
         .init()

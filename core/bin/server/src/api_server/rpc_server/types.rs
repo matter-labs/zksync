@@ -2,6 +2,7 @@ use std::collections::HashMap;
 // External uses
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
+use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_types::{
     tx::TxEthSignature, Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce,

@@ -2,7 +2,6 @@
 //! correct verified state should be present in the db (could be restored using `data-restore` module)
 
 use clap::{App, Arg};
-use log::info;
 use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;
@@ -53,7 +52,7 @@ async fn main() {
     };
 
     let timer = Instant::now();
-    info!("Restoring state from db");
+    log::info!("Restoring state from db");
     let connection_pool = ConnectionPool::new(Some(1)).await;
     let mut storage = connection_pool
         .access_storage()
@@ -83,7 +82,7 @@ async fn main() {
         .expect("Failed to load verified state")
         .1;
 
-    info!("Resotred state from db: {} s", timer.elapsed().as_secs());
+    log::info!("Resotred state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
         zksync_prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)

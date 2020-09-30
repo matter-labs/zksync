@@ -547,6 +547,7 @@ async fn verify_tx_info_message_signature(
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn tx_fee_type_serialization() {

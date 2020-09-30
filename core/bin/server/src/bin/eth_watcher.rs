@@ -1,5 +1,4 @@
 use futures::{channel::mpsc, SinkExt};
-use log::*;
 use std::time::Duration;
 use tokio::{runtime::Runtime, time};
 use zksync_server::eth_watch::{EthWatch, EthWatchRequest};
@@ -9,7 +8,7 @@ fn main() {
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
     env_logger::init();
-    info!("ETH watcher started");
+    log::info!("ETH watcher started");
     let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
     let contract_address = std::env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env var not found")
         [2..]

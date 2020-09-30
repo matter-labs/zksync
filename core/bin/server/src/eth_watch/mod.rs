@@ -338,7 +338,7 @@ impl<T: Transport> EthWatch<T> {
 
         self.set_new_state(new_state);
 
-        trace!("ETH state: {:#?}", self.eth_state);
+        log::trace!("ETH state: {:#?}", self.eth_state);
 
         Ok(())
     }
@@ -372,7 +372,7 @@ impl<T: Transport> EthWatch<T> {
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
         for priority_op in priority_op_events.into_iter() {
-            debug!("New priority op: {:?}", priority_op);
+            log::debug!("New priority op: {:?}", priority_op);
             priority_queue.insert(priority_op.serial_id, priority_op.into());
         }
 

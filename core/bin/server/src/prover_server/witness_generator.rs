@@ -3,7 +3,6 @@ use std::{thread, time};
 // External
 use failure::format_err;
 use futures::channel::mpsc;
-use log::info;
 // Workspace deps
 use crate::panic_notify::ThreadPanicNotify;
 use std::time::Instant;
@@ -201,7 +200,7 @@ impl WitnessGenerator {
         let mut circuit_account_tree = self
             .load_account_tree(block.block_number - 1, &mut transaction)
             .await?;
-        trace!(
+        log::trace!(
             "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
@@ -209,7 +208,7 @@ impl WitnessGenerator {
         let timer = Instant::now();
         let witness =
             build_prover_block_data(&mut circuit_account_tree, &mut transaction, &block).await?;
-        trace!(
+        log::trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
@@ -242,9 +241,10 @@ impl WitnessGenerator {
     /// Updates witness data in database in an infinite loop,
     /// awaiting `rounds_interval` time between updates.
     async fn maintain(self) {
-        info!(
+        log::info!(
             "preparing prover data routine started with start_block({}), block_step({})",
-            self.start_block, self.block_step
+            self.start_block,
+            self.block_step
         );
         let mut current_block = self.start_block;
         loop {
@@ -281,7 +281,7 @@ async fn build_prover_block_data(
     let block_number = block.block_number;
     let block_size = block.block_chunks_size;
 
-    info!("building prover data for block {}", &block_number);
+    log::info!("building prover data for block {}", &block_number);
 
     let mut witness_accum = WitnessBuilder::new(account_tree, block.fee_account, block_number);
 

@@ -73,7 +73,7 @@ pub fn unpack_point_if_possible<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         &r_y.get_number(),
         &jubjub_params,
     )?;
-    debug!(
+    log::debug!(
         "r_recovered.x={:?} \n r_recovered.y={:?}",
         r_recovered.get_x().get_value(),
         r_recovered.get_y().get_value()
@@ -147,12 +147,12 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         pk: signer_key.point.clone(),
     };
 
-    debug!(
+    log::debug!(
         "signature_r_x={:?} \n signature_r_y={:?}",
         signature.r.get_x().get_value(),
         signature.r.get_y().get_value()
     );
-    debug!("s={:?}", signature.s.get_value());
+    log::debug!("s={:?}", signature.s.get_value());
 
     let serialized_tx_bits = {
         let mut temp_bits = op_data.first_sig_msg.get_bits_le();
@@ -189,9 +189,9 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         generator,
     )?;
 
-    debug!("is_sig_verified={:?}", is_sig_verified.get_value());
-    debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
-    debug!(
+    log::debug!("is_sig_verified={:?}", is_sig_verified.get_value());
+    log::debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
+    log::debug!(
         "signer_key.is_correctly_unpacked={:?}",
         signer_key.is_correctly_unpacked.get_value()
     );

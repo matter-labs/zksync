@@ -56,9 +56,9 @@ where
     //     return None;
     // }
     let (sig_r_x, sig_r_y) = signature.r.into_xy();
-    debug!("signature.s: {}", signature.s);
-    debug!("signature.r.x: {}", sig_r_x);
-    debug!("signature.r.y: {}", sig_r_y);
+    log::debug!("signature.s: {}", signature.s);
+    log::debug!("signature.r.x: {}", sig_r_x);
+    log::debug!("signature.r.y: {}", sig_r_y);
 
     convert_signature_to_representation(signature)
 }
@@ -93,9 +93,9 @@ where
     //     return None;
     // }
     let (sig_r_x, sig_r_y) = signature.r.into_xy();
-    debug!("signature.s: {}", signature.s);
-    debug!("signature.r.x: {}", sig_r_x);
-    debug!("signature.r.y: {}", sig_r_y);
+    log::debug!("signature.s: {}", signature.s);
+    log::debug!("signature.r.x: {}", sig_r_x);
+    log::debug!("signature.r.y: {}", sig_r_y);
 
     convert_signature_to_representation(signature)
 }
@@ -361,7 +361,7 @@ pub fn print_boolean_vec(bits: &[Boolean]) {
         bytes.push(b);
     }
 
-    debug!("Hex: {}", hex::encode(&bytes));
+    log::debug!("Hex: {}", hex::encode(&bytes));
 }
 
 pub fn resize_grow_only<T: Clone>(to_resize: &mut Vec<T>, new_size: usize, pad_with: T) {

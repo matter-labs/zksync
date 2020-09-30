@@ -19,6 +19,7 @@ use num::{
     traits::{Inv, Pow},
     BigUint,
 };
+use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 // Workspace deps
 use zksync_config::TokenPriceSource;

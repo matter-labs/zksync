@@ -11,7 +11,6 @@ categories = ["cryptography"]
 
 [dependencies]
 serde = "1.0.90"
-serde_derive = "1.0.90"
 ethabi = "12.0.0"
 web3 = "0.13.0"
 parity-crypto = {version = "0.6.2", features = ["publickey"] }
