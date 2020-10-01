@@ -39,10 +39,8 @@ pub struct BlockSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Executes an operation:
-    /// 1. Store the operation.
-    /// 2. Modify the state according to the operation changes:
-    ///   - Commit => store account updates.
-    ///   - Verify => apply account updates.
+    /// 1. Stores the operation.
+    /// 2. Applies account updates for the verify operation.
     pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
         let mut transaction = self.0.start_transaction().await?;
 
@@ -50,9 +48,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         match &op.action {
             Action::Commit => {
-                StateSchema(&mut transaction)
-                    .commit_state_update(block_number, &op.accounts_updated)
-                    .await?;
                 BlockSchema(&mut transaction).save_block(op.block).await?;
             }
             Action::Verify { proof } => {

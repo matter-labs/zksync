@@ -4,6 +4,7 @@ use models::AccountMap;
 use models::Action;
 // Local imports
 use super::{block::apply_random_updates, utils::get_operation};
+use crate::chain::state::StateSchema;
 use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{account::AccountSchema, block::BlockSchema},
@@ -23,8 +24,12 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let (accounts_block, updates_block) = apply_random_updates(AccountMap::default(), &mut rng);
 
     // Execute and commit block with them.
+    // Also store account updates.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, updates_block, block_size))
+        .execute_operation(get_operation(1, Action::Commit, block_size))
+        .await?;
+    StateSchema(&mut storage)
+        .commit_state_update(1, &updates_block, 0)
         .await?;
 
     // Get the accounts by their addresses.
@@ -72,7 +77,6 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             Action::Verify {
                 proof: Default::default(),
             },
-            Vec::new(),
             block_size,
         ))
         .await?;

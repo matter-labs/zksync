@@ -2156,6 +2156,69 @@
       ]
     }
   },
+  "a154c713c54d22beec24fd99856956ab851fc6daf5692ffc6e0255c7dc6f16c1": {
+    "query": "\n                SELECT * FROM account_pubkey_updates\n                WHERE account_id = $1 AND block_number > $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "pubkey_update_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "update_order_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "account_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "old_pubkey_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "new_pubkey_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "old_nonce",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "new_nonce",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "a270c88373710266a4904a7e5e1e418edebed57af308cf8233f6a7331331c5e4": {
     "query": "\n            SELECT * FROM tokens\n            ORDER BY id ASC\n            ",
     "describe": {

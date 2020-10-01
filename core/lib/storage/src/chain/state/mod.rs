@@ -50,13 +50,17 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         &mut self,
         block_number: u32,
         accounts_updated: &[(u32, AccountUpdate)],
+        first_update_order_id: usize,
     ) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
 
         // Simply go through the every account update, and update the corresponding table.
         // This may look scary, but every match arm is very simple by its nature.
 
-        for (update_order_id, (id, upd)) in accounts_updated.iter().enumerate() {
+        let update_order_ids =
+            first_update_order_id..first_update_order_id + accounts_updated.len();
+
+        for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             log::debug!(
                 "Committing state update for account {} in block {}",
                 id,

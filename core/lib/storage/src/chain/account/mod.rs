@@ -110,6 +110,18 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         .fetch_all(transaction.conn())
         .await?;
 
+        let account_pubkey_diff = sqlx::query_as!(
+            StorageAccountPubkeyUpdate,
+            "
+                SELECT * FROM account_pubkey_updates
+                WHERE account_id = $1 AND block_number > $2
+            ",
+            i64::from(account_id),
+            last_block
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
         // Chain the diffs, converting them into `StorageAccountDiff`.
         let account_diff = {
             let mut account_diff = Vec::new();
@@ -123,7 +135,13 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
+            account_diff.extend(
+                account_pubkey_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
             account_diff.sort_by(StorageAccountDiff::cmp_order);
+
             account_diff
                 .into_iter()
                 .map(Into::into)
