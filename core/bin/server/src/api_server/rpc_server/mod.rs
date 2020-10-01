@@ -1,4 +1,3 @@
-use std::sync::{Arc, RwLock};
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -22,7 +21,6 @@ use zksync_config::ConfigurationOptions;
 // Local uses
 use crate::panic_notify::ThreadPanicNotify;
 use crate::{
-    api_server::ops_counter::ChangePubKeyOpsCounter,
     eth_watch::{EthBlockId, EthWatchRequest},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
@@ -98,8 +96,8 @@ pub struct RpcApp {
     pub token_cache: TokenDBCache,
     pub current_zksync_info: CurrentZksyncInfo,
 
-    /// Counter for ChangePubKey operations to filter the spam.
-    ops_counter: Arc<RwLock<ChangePubKeyOpsCounter>>,
+    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
+    forced_exit_minimum_account_age: chrono::Duration,
 }
 
 impl RpcApp {
@@ -122,6 +120,10 @@ impl RpcApp {
         let api_requests_caches_size = config_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
 
+        let forced_exit_minimum_account_age =
+            chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
+                .expect("Unable to convert std::Duration to chrono::Duration");
+
         RpcApp {
             runtime_handle,
 
@@ -142,7 +144,7 @@ impl RpcApp {
             token_cache,
             current_zksync_info,
 
-            ops_counter: Arc::new(RwLock::new(ChangePubKeyOpsCounter::new())),
+            forced_exit_minimum_account_age,
         }
     }
 
@@ -418,6 +420,41 @@ impl RpcApp {
         };
 
         Ok(result)
+    }
+
+    /// For forced exits, we must check that target account exists for more
+    /// than 24 hours in order to give new account owners give an opportunity
+    /// to set the signing key. While `ForcedExit` operation doesn't do anything
+    /// bad to the account, it's more user-friendly to only allow this operation
+    /// after we're somewhat sure that zkSync account is not owned by anybody.
+    async fn check_forced_exit(&self, forced_exit: &models::ForcedExit) -> Result<()> {
+        let target_account_address = forced_exit.target;
+        let mut storage = self.access_storage().await?;
+        let account_age = storage
+            .chain()
+            .operations_ext_schema()
+            .account_created_on(&target_account_address)
+            .await
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, forced_exit);
+                Error::internal_error()
+            })?;
+
+        match account_age {
+            Some(age) => {
+                if (chrono::Utc::now() - age) >= self.forced_exit_minimum_account_age {
+                    // Account does exist long enough, everything is OK.
+                    Ok(())
+                } else {
+                    let err = format!(
+                        "Target account exists less than required minimum amount ({} hours)",
+                        self.forced_exit_minimum_account_age.num_hours()
+                    );
+                    Err(Error::invalid_params(err))
+                }
+            }
+            None => Err(Error::invalid_params("Target account does not exist")),
+        }
     }
 
     async fn eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> Result<Option<String>> {
