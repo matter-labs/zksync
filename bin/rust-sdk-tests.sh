@@ -48,4 +48,4 @@ PROVER_PID=$!
 
 sleep 10
 echo Performing rust SDK tests...
-cargo test -p zksync --release -- --ignored
+cargo test -p zksync --release -- --ignored --test-threads=1

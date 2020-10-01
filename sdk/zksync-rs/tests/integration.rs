@@ -8,6 +8,17 @@
 //! zksync dummy-prover &!
 //! zksync sdk-test
 //! ```
+//!
+//! Note: If tests are failing, first check the following two things:
+//!
+//! 1. If tests are failing with an error "cannot operate after unexpected tx failure",
+//!    ensure that dummy prover is enabled.
+//! 2. If tests are failing with an error "replacement transaction underpriced",
+//!    ensure that tests are ran in one thread. Running the tests with many threads won't
+//!    work, since many thread will attempt in sending transactions from one (main) Ethereum
+//!    account, which may result in nonce mismatch.
+//!    Also, if there will be many tests running at once, and the server will die, it will be
+//!    hard to distinguish which test exactly caused this problem.
 
 use futures::compat::Future01CompatExt;
 use models::FranklinTx;
