@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 models = { path = "../../core/lib/models", version = "0.0.1" }
 eth_client = { path = "../../core/lib/eth_client", version = "0.1.0" }
+eth_signer = { path = "../../core/lib/eth_signer", version = "0.1.0" }
 zksync_crypto = { path = "../../core/lib/crypto", version = "0.1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "0.1.0" }
 zksync_contracts = { path = "../../core/lib/contracts", version = "0.1.0" }

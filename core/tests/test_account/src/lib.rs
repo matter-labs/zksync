@@ -127,15 +127,14 @@ impl ZksyncAccount {
         if increment_nonce {
             *stored_nonce += 1;
         }
-
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            transfer
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-            true,
-        )
-        .expect("Signing the transfer unexpectedly failed");
+        // todo1 comment
+        let message_with_prefix = {
+            let message = transfer.get_ethereum_sign_message(token_symbol, 18);
+            let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
+            [prefix.as_bytes(), message.as_bytes()].concat()
+        };
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message_with_prefix)
+            .expect("Signing the transfer unexpectedly failed");
         (transfer, eth_signature)
     }
 
@@ -169,15 +168,13 @@ impl ZksyncAccount {
         if increment_nonce {
             *stored_nonce += 1;
         }
-
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            withdraw
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-            true,
-        )
-        .expect("Signing the withdraw unexpectedly failed");
+        let message_with_prefix = {
+            let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
+            let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
+            [prefix.as_bytes(), message.as_bytes()].concat()
+        };
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message_with_prefix)
+            .expect("Signing the withdraw unexpectedly failed");
         (withdraw, eth_signature)
     }
 
@@ -212,10 +209,15 @@ impl ZksyncAccount {
         let eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes =
-                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                    .expect("Failed to construct change pubkey signed message.");
-            let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes, true)
+            let sign_bytes = {
+                let message =
+                    ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
+                        .expect("Failed to construct change pubkey signed message.");
+                let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
+                [prefix.as_bytes(), &message].concat()
+            };
+
+            let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)
         };

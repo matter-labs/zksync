@@ -280,7 +280,12 @@ fn test_ethereum_signature_sign() {
     for (msg, correct_signature) in examples {
         println!("message: 0x{}", hex::encode(&msg));
         let correct_signature = hex::decode(correct_signature).unwrap();
-        let signature = PackedEthSignature::sign(&private_key, &msg, true)
+        // todo1 make comment
+        let message_with_prefix = {
+            let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+            [prefix.as_bytes(), &msg].concat()
+        };
+        let signature = PackedEthSignature::sign(&private_key, &message_with_prefix)
             .expect("sign verify")
             .serialize_packed()
             .to_vec();

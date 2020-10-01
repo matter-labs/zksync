@@ -13,7 +13,7 @@ zksync_crypto = { path = "../../lib/crypto", version = "0.1.0" }
 zksync_utils = { path = "../../lib/utils", version = "0.1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "0.1.0" }
 eth_client = { path = "../../lib/eth_client", version = "0.1.0"  }
-
+eth_signer = { path = "../../lib/eth_signer", version = "0.1.0"  }
 zksync_test_account = { path = "../test_account", version = "0.1.0" }
 
 tokio = { version = "0.2", features = ["full"] }

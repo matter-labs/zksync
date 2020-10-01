@@ -12,12 +12,8 @@ use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt};
 use web3::types::{H160, H256, U256, U64};
 use web3::{Error, Transport, Web3};
 
-use crate::eth_signer::EthereumSigner;
-
-pub mod error;
-pub mod eth_signer;
 pub mod signer;
-
+use eth_signer::EthereumSigner;
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
 ///

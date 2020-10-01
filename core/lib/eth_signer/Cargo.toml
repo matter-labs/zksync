@@ -1,0 +1,20 @@
+[package]
+name = "eth_signer"
+version = "0.1.0"
+authors = ["Vladyslav-Bochok <vladbochok1@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+models = { path = "../models", version = "0.0.1" }
+
+
+serde = "1.0.90"
+serde_derive = "1.0.90"
+serde_json = "1.0.0"
+
+reqwest = { version = "0.10", features = ["json", "blocking"] }
+thiserror = "1.0"
+
+jsonrpc-core = "14.0.3"

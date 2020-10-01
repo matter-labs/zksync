@@ -44,45 +44,26 @@ impl PackedEthSignature {
         Ok(PackedEthSignature(ETHSignature::from(bytes_array)))
     }
 
-    /// Signs message using ethereum private key, results are identical to signature created
-    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
-    pub fn sign(
-        private_key: &H256,
-        msg: &[u8],
-        with_prefix: bool,
-    ) -> Result<PackedEthSignature, failure::Error> {
-        let secret_key = (*private_key).into();
-        let signed_bytes = Self::message_to_signed_bytes(msg, with_prefix);
-        let signature = sign(&secret_key, &signed_bytes)?;
-        Ok(PackedEthSignature(signature))
-    }
-
+    // TODO
     pub fn signature(&self) -> ETHSignature {
         self.0.clone()
     }
 
-    fn message_to_signed_bytes(msg: &[u8], with_prefix: bool) -> H256 {
-        let prefix = if with_prefix {
-            format!("\x19Ethereum Signed Message:\n{}", msg.len())
-        } else {
-            String::new()
-        };
-        let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
-        bytes.extend_from_slice(prefix.as_bytes());
-        bytes.extend_from_slice(msg);
-        bytes.keccak256().into()
+    /// Signs message using ethereum private key, results are identical to signature created
+    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
+    pub fn sign(private_key: &H256, message: &[u8]) -> Result<PackedEthSignature, failure::Error> {
+        let secret_key = (*private_key).into();
+        let hash = message.keccak256().into();
+        let signature = sign(&secret_key, &hash)?; // TODO rename sign method
+        Ok(PackedEthSignature(signature))
     }
 
     /// Checks signature and returns ethereum address of the signer.
     /// message should be the same message that was passed to `eth.sign`(or similar) method
     /// as argument. No hashing and prefixes required.
-    pub fn signature_recover_signer(
-        &self,
-        msg: &[u8],
-        with_prefix: bool,
-    ) -> Result<Address, failure::Error> {
-        let signed_bytes = Self::message_to_signed_bytes(msg, with_prefix);
-        let public_key = recover(&self.0, &signed_bytes)?;
+    pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
+        let hash = msg.keccak256().into();
+        let public_key = recover(&self.0, &hash)?;
         Ok(public_to_address(&public_key))
     }
 

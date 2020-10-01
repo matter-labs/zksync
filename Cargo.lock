@@ -1263,6 +1263,7 @@ dependencies = [
 name = "eth_client"
 version = "0.1.0"
 dependencies = [
+ "eth_signer",
  "ethabi",
  "failure",
  "futures 0.3.5",
@@ -1274,6 +1275,19 @@ dependencies = [
  "serde_derive",
  "thiserror",
  "web3",
+]
+
+[[package]]
+name = "eth_signer"
+version = "0.1.0"
+dependencies = [
+ "jsonrpc-core",
+ "models",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -3796,6 +3810,7 @@ dependencies = [
  "ctrlc",
  "env_logger 0.6.2",
  "eth_client",
+ "eth_signer",
  "ethabi",
  "failure",
  "futures 0.1.29",
@@ -4275,6 +4290,7 @@ version = "0.1.0"
 dependencies = [
  "env_logger 0.6.2",
  "eth_client",
+ "eth_signer",
  "ethabi",
  "failure",
  "futures 0.3.5",
@@ -5308,6 +5324,7 @@ dependencies = [
  "anyhow",
  "bellman_ce",
  "eth_client",
+ "eth_signer",
  "ethabi",
  "futures 0.3.5",
  "jsonrpc-core",

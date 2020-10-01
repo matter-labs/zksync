@@ -12,7 +12,7 @@
 use futures::compat::Future01CompatExt;
 use std::time::{Duration, Instant};
 use zksync::{
-    error::{ClientError, SignerError::NoSigningKey},
+    error::ClientError,
     types::BlockStatus,
     web3::{
         contract::{Contract, Options},
@@ -141,7 +141,7 @@ async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Er
 
     assert!(matches!(
         handle,
-        Err(ClientError::SigningError(NoSigningKey))
+        Err(ClientError::SigningError(_no_signing_key))
     ));
 
     Ok(())

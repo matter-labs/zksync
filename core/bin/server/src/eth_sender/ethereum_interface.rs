@@ -1,6 +1,6 @@
 // Built-in deps
 // External uses
-use eth_client::eth_signer::EthereumSigner;
+use eth_signer::EthereumSigner;
 use failure::ensure;
 use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;

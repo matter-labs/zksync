@@ -88,8 +88,13 @@ async fn verify_eth_signature(
     if let Some(sign_data) = &request.eth_sign_data {
         match &sign_data.signature {
             TxEthSignature::EthereumSignature(packed_signature) => {
+                let message_with_prefix = format!(
+                    "\x19Ethereum Signed Message:\n{}{}",
+                    sign_data.message.len(),
+                    &sign_data.message
+                );
                 let signer_account = packed_signature
-                    .signature_recover_signer(sign_data.message.as_bytes(), true)
+                    .signature_recover_signer(message_with_prefix.as_bytes())
                     .or(Err(TxAddError::IncorrectEthSignature))?;
 
                 if signer_account != request.tx.account() {

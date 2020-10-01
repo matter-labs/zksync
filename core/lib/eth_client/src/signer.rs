@@ -1,5 +1,5 @@
-use crate::error::SignerError;
-use crate::EthereumSigner;
+use eth_signer::error::SignerError;
+use eth_signer::EthereumSigner;
 use models::tx::TxEthSignature;
 use rlp::RlpStream;
 use web3::types::{H160, U256};
@@ -86,7 +86,7 @@ async fn ecdsa_sign(
     ethereum_signer: &EthereumSigner,
     chain_id: u8,
 ) -> Result<EcdsaSig, SignerError> {
-    let tx_eth_signature = ethereum_signer.sign(&message, false).await?;
+    let tx_eth_signature = ethereum_signer.sign(&message).await?;
 
     if let TxEthSignature::EthereumSignature(packed_signature) = tx_eth_signature {
         let sig = packed_signature.signature();
