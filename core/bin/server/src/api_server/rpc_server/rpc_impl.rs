@@ -13,7 +13,6 @@ use models::{
 use crate::{
     fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
-    state_keeper::StateKeeperRequest,
 };
 use bigdecimal::BigDecimal;
 
@@ -24,33 +23,8 @@ impl RpcApp {
         use std::time::Instant;
 
         let started = Instant::now();
-        let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
 
-        let state_keeper_response = oneshot::channel();
-        let state_keeper_future = state_keeper_request_sender.send(StateKeeperRequest::GetAccount(
-            address,
-            state_keeper_response.0,
-        ));
-
-        state_keeper_future.await.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
-            Error::internal_error()
-        })?;
-
-        let committed_account_state = state_keeper_response.1.await.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
-            Error::internal_error()
-        })?;
-
-        let (id, committed) = if let Some((id, account)) = committed_account_state {
-            let restored_state =
-                ResponseAccountState::try_restore(account, &self.token_cache).await?;
-            (Some(id), restored_state)
-        } else {
-            (None, Default::default())
-        };
-
-        let verified = self.get_verified_account_state(&address).await?;
+        let account_state = self.get_account_state(&address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
         let depositing =
@@ -64,9 +38,9 @@ impl RpcApp {
 
         Ok(AccountInfoResp {
             address,
-            id,
-            committed,
-            verified,
+            id: account_state.account_id,
+            committed: account_state.committed,
+            verified: account_state.verified,
             depositing,
         })
     }

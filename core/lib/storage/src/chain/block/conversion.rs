@@ -21,7 +21,6 @@ use crate::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
         },
-        state::StateSchema,
     },
     prover::ProverSchema,
     QueryResult, StorageProcessor,
@@ -49,15 +48,7 @@ impl StoredOperation {
             .await?
             .expect("Block for action does not exist");
 
-        let accounts_updated = StateSchema(conn)
-            .load_state_diff_for_block(block_number)
-            .await?;
-        Ok(Operation {
-            id,
-            action,
-            block,
-            accounts_updated,
-        })
+        Ok(Operation { id, action, block })
     }
 }
 
