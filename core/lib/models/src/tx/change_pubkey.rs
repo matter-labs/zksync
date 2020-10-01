@@ -27,6 +27,7 @@ pub struct ChangePubKey {
     #[serde(with = "BigUintSerdeAsRadix10Str", default)]
     pub fee: BigUint,
     pub nonce: Nonce,
+    #[serde(default)]
     pub signature: TxSignature,
     pub eth_signature: Option<PackedEthSignature>,
     #[serde(skip)]

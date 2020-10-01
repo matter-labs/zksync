@@ -3,11 +3,9 @@
 # Usage:
 # zksync upgrade-testnet-contracts --contracts Verifier,ZkSync
 
-. .confirm_action
-
 # Upgrade testnet current contracts
 
-zksync build-contracts
+zksync build-contracts confirm_action
 
 echo "Upgrading contracts, results will be inserted to the db $DATABASE_URL"
 
