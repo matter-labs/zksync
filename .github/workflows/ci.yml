@@ -61,6 +61,9 @@ jobs:
     - name: rust-tests
       run: f cargo test --release
 
+    - name: rust-sdk-tests
+      run: zksync rust-sdk-tests
+
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && f cargo test --release
 

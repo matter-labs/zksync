@@ -208,21 +208,22 @@ pub fn start_ws_server(
         each_cache_size,
     );
 
-    tokio::spawn(async move {
+    let req_rpc_app = super::rpc_server::RpcApp::new(
+        &config_options,
+        db_pool,
+        mempool_request_sender,
+        state_keeper_request_sender,
+        sign_verify_request_sender,
+        eth_watcher_request_sender,
+        ticker_request_sender,
+        current_zksync_info,
+    );
+
+    std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
         let mut io = PubSubHandler::new(MetaIoHandler::default());
 
-        let req_rpc_app = super::rpc_server::RpcApp::new(
-            &config_options,
-            db_pool,
-            mempool_request_sender,
-            state_keeper_request_sender,
-            sign_verify_request_sender,
-            eth_watcher_request_sender,
-            ticker_request_sender,
-            current_zksync_info,
-        );
         req_rpc_app.extend(&mut io);
 
         let rpc_sub_app = RpcSubApp { event_sub_sender };

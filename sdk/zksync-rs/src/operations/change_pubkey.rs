@@ -17,7 +17,7 @@ pub struct ChangePubKeyBuilder<'a> {
 }
 
 impl<'a> ChangePubKeyBuilder<'a> {
-    /// Initializes a transfer transaction building process.
+    /// Initializes a change public key transaction building process.
     pub fn new(wallet: &'a Wallet) -> Self {
         Self {
             wallet,
@@ -29,7 +29,7 @@ impl<'a> ChangePubKeyBuilder<'a> {
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+    pub async fn tx(self) -> Result<FranklinTx, ClientError> {
         let fee_token = self
             .fee_token
             .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
@@ -64,18 +64,22 @@ impl<'a> ChangePubKeyBuilder<'a> {
             }
         };
 
-        let change_pubkey = self
-            .wallet
-            .signer
-            .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee)
-            .map_err(ClientError::SigningError)?;
+        Ok(FranklinTx::from(
+            self.wallet
+                .signer
+                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee)
+                .map_err(ClientError::SigningError)?,
+        ))
+    }
 
-        let tx = FranklinTx::ChangePubKey(Box::new(change_pubkey));
-        let tx_hash = self.wallet.provider.send_tx(tx, None).await?;
+    /// Sends the transaction, returning the handle for its awaiting.
+    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+        let provider = self.wallet.provider.clone();
 
-        let handle = SyncTransactionHandle::new(tx_hash, self.wallet.provider.clone());
+        let tx = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, None).await?;
 
-        Ok(handle)
+        Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
 
     /// Sets the transaction fee token. Returns an error if token is not supported by zkSync.
