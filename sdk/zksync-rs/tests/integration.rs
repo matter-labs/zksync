@@ -10,7 +10,9 @@
 //! ```
 
 use futures::compat::Future01CompatExt;
+use models::FranklinTx;
 use std::time::{Duration, Instant};
+use zksync::operations::SyncTransactionHandle;
 use zksync::{
     error::{ClientError, SignerError::NoSigningKey},
     types::BlockStatus,
@@ -435,6 +437,42 @@ async fn move_funds(
     Ok(())
 }
 
+/// Auxiliary function that generates a new wallet, performs an initial deposit and changes the public key.
+async fn init_account_with_one_ether() -> Result<Wallet, anyhow::Error> {
+    let (eth_address, eth_private_key) = eth_random_account_credentials();
+
+    // Transfer funds from "rich" account to a randomly created one (so we won't reuse the same
+    // account in subsequent test runs).
+    transfer_to("ETH", one_ether(), eth_address).await?;
+
+    let provider = Provider::new(Network::Localhost);
+    let credentials =
+        WalletCredentials::from_eth_pk(eth_address, eth_private_key, Network::Localhost).unwrap();
+
+    let mut wallet = Wallet::new(provider, credentials).await?;
+    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+
+    let deposit_tx_hash = ethereum
+        .deposit("ETH", one_ether() / 2, wallet.address())
+        .await?;
+
+    ethereum.wait_for_tx(deposit_tx_hash).await?;
+
+    // Update stored wallet ID after we initialized a wallet via deposit.
+    wait_for_deposit_and_update_account_id(&mut wallet).await;
+
+    if !wallet.is_signing_key_set().await? {
+        let handle = wallet.start_change_pubkey().send().await?;
+
+        handle
+            .commit_timeout(Duration::from_secs(60))
+            .wait_for_commit()
+            .await?;
+    }
+
+    Ok(wallet)
+}
+
 #[tokio::test]
 #[cfg_attr(not(feature = "integration-tests"), ignore)]
 async fn comprehensive_test() -> Result<(), anyhow::Error> {
@@ -571,42 +609,13 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
 #[tokio::test]
 #[cfg_attr(not(feature = "integration-tests"), ignore)]
-async fn simple_workflow() -> Result<(), anyhow::Error> {
-    let (eth_address, eth_private_key) = eth_random_account_credentials();
+async fn simple_transfer() -> Result<(), anyhow::Error> {
+    let wallet = init_account_with_one_ether().await?;
 
-    // Transfer funds from "rich" account to a randomly created one (so we won't reuse the same
-    // account in subsequent test runs).
-    transfer_to("ETH", one_ether(), eth_address).await?;
-
-    let provider = Provider::new(Network::Localhost);
-    let credentials =
-        WalletCredentials::from_eth_pk(eth_address, eth_private_key, Network::Localhost).unwrap();
-
-    let mut wallet = Wallet::new(provider, credentials).await?;
-    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
-
-    let deposit_tx_hash = ethereum
-        .deposit("ETH", one_ether() / 2, wallet.address())
-        .await?;
-
-    ethereum.wait_for_tx(deposit_tx_hash).await?;
-
-    // Update stored wallet ID after we initialized a wallet via deposit.
-    wait_for_deposit_and_update_account_id(&mut wallet).await;
-
-    if !wallet.is_signing_key_set().await? {
-        let handle = wallet.start_change_pubkey().send().await?;
-
-        handle
-            .commit_timeout(Duration::from_secs(60))
-            .wait_for_commit()
-            .await?;
-    }
-
-    // Perform transfer to self.
+    // Perform a transfer to itself.
     let handle = wallet
         .start_transfer()
-        .to(wallet.address())
+        .to(wallet.signer.address)
         .token("ETH")?
         .amount(1_000_000u64)
         .send()
@@ -616,6 +625,61 @@ async fn simple_workflow() -> Result<(), anyhow::Error> {
         .verify_timeout(Duration::from_secs(180))
         .wait_for_verify()
         .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg_attr(not(feature = "integration-tests"), ignore)]
+async fn batch_transfer() -> Result<(), anyhow::Error> {
+    let wallet = init_account_with_one_ether().await?;
+
+    const RECIPIENT_COUNT: usize = 4;
+    let recipients = vec![eth_random_account_credentials().0; RECIPIENT_COUNT];
+
+    let token_like = TokenLike::Symbol("ETH".to_owned());
+    let token = wallet
+        .tokens
+        .resolve(token_like.clone())
+        .expect("ETH token resolving failed");
+
+    let mut nonce = wallet.account_info().await?.committed.nonce;
+
+    // Sign a transfer for each recipient created above
+    let mut signed_transfers = Vec::with_capacity(recipients.len());
+
+    for recipient in recipients.into_iter() {
+        let fee = wallet
+            .provider
+            .get_tx_fee(TxFeeTypes::Transfer, recipient, token_like.clone())
+            .await?
+            .total_fee;
+
+        let (transfer, signature) = wallet
+            .signer
+            .sign_transfer(token.clone(), 1_000_000u64.into(), fee, recipient, nonce)
+            .expect("Transfer signing error");
+
+        signed_transfers.push((FranklinTx::Transfer(Box::new(transfer)), signature));
+
+        nonce += 1;
+    }
+
+    // Send the batch and store its transaction hashes
+    let handles = wallet
+        .provider
+        .send_txs_batch(signed_transfers)
+        .await?
+        .into_iter()
+        .map(|tx_hash| SyncTransactionHandle::new(tx_hash, wallet.provider.clone()))
+        .collect::<Vec<SyncTransactionHandle>>();
+
+    for handle in handles.into_iter() {
+        handle
+            .verify_timeout(Duration::from_secs(180))
+            .wait_for_verify()
+            .await?;
+    }
 
     Ok(())
 }
