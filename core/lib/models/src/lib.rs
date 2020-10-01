@@ -93,7 +93,6 @@ pub struct Operation {
     pub id: Option<i64>,
     pub action: Action,
     pub block: Block,
-    pub accounts_updated: AccountUpdates,
 }
 
 pub const ACTION_COMMIT: &str = "COMMIT";

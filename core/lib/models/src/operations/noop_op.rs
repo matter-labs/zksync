@@ -1,5 +1,6 @@
 use failure::ensure;
 use serde::{Deserialize, Serialize};
+use zksync_basic_types::AccountId;
 use zksync_crypto::params::CHUNK_BYTES;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,5 +22,9 @@ impl NoopOp {
         let mut data = Vec::new();
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
+    }
+
+    pub(crate) fn get_updated_account_ids(&self) -> Vec<AccountId> {
+        Vec::new()
     }
 }

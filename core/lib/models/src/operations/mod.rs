@@ -19,6 +19,7 @@ pub use self::{
     forced_exit::ForcedExitOp, full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
     transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
 };
+use zksync_basic_types::AccountId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -146,6 +147,19 @@ impl FranklinOp {
             FranklinOp::Deposit(op) => Ok(FranklinPriorityOp::Deposit(op.priority_op.clone())),
             FranklinOp::FullExit(op) => Ok(FranklinPriorityOp::FullExit(op.priority_op.clone())),
             _ => Err(format_err!("Wrong operation type")),
+        }
+    }
+
+    pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
+        match self {
+            FranklinOp::Noop(op) => op.get_updated_account_ids(),
+            FranklinOp::Deposit(op) => op.get_updated_account_ids(),
+            FranklinOp::TransferToNew(op) => op.get_updated_account_ids(),
+            FranklinOp::Withdraw(op) => op.get_updated_account_ids(),
+            FranklinOp::Close(op) => op.get_updated_account_ids(),
+            FranklinOp::Transfer(op) => op.get_updated_account_ids(),
+            FranklinOp::FullExit(op) => op.get_updated_account_ids(),
+            FranklinOp::ChangePubKeyOffchain(op) => op.get_updated_account_ids(),
         }
     }
 }

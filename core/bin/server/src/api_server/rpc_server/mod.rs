@@ -393,22 +393,33 @@ impl RpcApp {
         })
     }
 
-    async fn get_verified_account_state(&self, address: &Address) -> Result<ResponseAccountState> {
+    async fn get_account_state(&self, address: &Address) -> Result<AccountStateInfo> {
         let mut storage = self.access_storage().await?;
-        let account = storage
+        let account_info = storage
             .chain()
             .account_schema()
             .account_state_by_address(address)
             .await
             .map_err(|_| Error::internal_error())?;
 
-        let verified_state = if let Some((_, account)) = account.verified {
-            ResponseAccountState::try_restore(account, &self.token_cache).await?
-        } else {
-            Default::default()
+        let mut result = AccountStateInfo {
+            account_id: None,
+            committed: Default::default(),
+            verified: Default::default(),
         };
 
-        Ok(verified_state)
+        if let Some((account_id, commited_state)) = account_info.committed {
+            result.account_id = Some(account_id);
+            result.committed =
+                ResponseAccountState::try_restore(commited_state, &self.token_cache).await?;
+        };
+
+        if let Some((_, verified_state)) = account_info.verified {
+            result.verified =
+                ResponseAccountState::try_restore(verified_state, &self.token_cache).await?;
+        };
+
+        Ok(result)
     }
 
     /// For forced exits, we must check that target account exists for more
