@@ -16,7 +16,6 @@ use crate::monitor::Monitor;
 
 pub(crate) mod configs;
 mod deprecated;
-mod real_life;
 mod utils;
 
 pub type Scenario = Box<dyn Fn(ScenarioContext)>;
@@ -38,7 +37,7 @@ impl ScenarioType {
         match self {
             Self::OutgoingTps => Box::new(deprecated::outgoing_tps::run_scenario),
             Self::ExecutionTps => Box::new(deprecated::execution_tps::run_scenario),
-            Self::RealLife => Box::new(real_life::run_scenario),
+            Self::RealLife => Box::new(deprecated::real_life::run_scenario),
         }
     }
 }
