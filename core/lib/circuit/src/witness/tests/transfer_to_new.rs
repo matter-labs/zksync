@@ -72,7 +72,7 @@ fn test_transfer_to_new_success() {
 #[test]
 #[ignore]
 fn corrupted_ops_input() {
-    // Incorrect signature data will lead to `op_valid` constraint anyhow.
+    // Incorrect signature data will lead to `op_valid` constraint failure.
     // See `circuit.rs` for details.
     const EXPECTED_PANIC_MSG: &str = "op_valid is true";
 

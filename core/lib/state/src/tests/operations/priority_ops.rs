@@ -64,7 +64,7 @@ fn deposit_to_new() {
     )
 }
 
-/// Check anyhow of FullExit operation for non-existent account
+/// Check failure of FullExit operation for non-existent account
 #[test]
 fn full_exit_non_existent() {
     let token = 0;

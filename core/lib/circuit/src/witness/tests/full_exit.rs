@@ -41,7 +41,7 @@ fn test_full_exit_success() {
 
 #[test]
 #[ignore]
-fn test_full_exit_anyhow_no_account_in_tree() {
+fn test_full_exit_failure_no_account_in_tree() {
     // Input data.
     let accounts = &[];
     let account = WitnessTestAccount::new_empty(1); // Will not be included into ZksyncState

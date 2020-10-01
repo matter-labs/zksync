@@ -100,7 +100,7 @@ fn test_incorrect_deposit_address() {
         account_id: account.id,
     };
 
-    // Attempt to apply incorrect operation should result in an assertion anyhow.
+    // Attempt to apply incorrect operation should result in an assertion failure.
     generic_test_scenario::<DepositWitness<Bn256>, _>(
         &accounts,
         deposit_op,

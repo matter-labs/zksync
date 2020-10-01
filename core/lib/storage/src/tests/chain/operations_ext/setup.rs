@@ -290,7 +290,7 @@ impl TransactionsHistoryTestSetup {
 
     /// This method is important, since it seems that during database roundtrip timestamp
     /// can be rounded and loose several microseconds in precision, which have lead to the
-    /// test anyhows (txs were using `chrono::Utc::now()` and had difference of 1-2 microsecond
+    /// test failures (txs were using `chrono::Utc::now()` and had difference of 1-2 microsecond
     /// between them, which was lost after loading from the DB => multiple txs had the same
     /// timestamp and order could vary from call to call).
     fn get_tx_time(&mut self) -> DateTime<Utc> {

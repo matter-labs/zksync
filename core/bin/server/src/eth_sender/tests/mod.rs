@@ -449,10 +449,10 @@ fn operations_order() {
     }
 }
 
-/// Check that upon a transaction anyhow the incident causes a panic by default.
+/// Check that upon a transaction failure the incident causes a panic by default.
 #[test]
 #[should_panic(expected = "Cannot operate after unexpected TX failure")]
-fn transaction_anyhow() {
+fn transaction_failure() {
     let (mut eth_sender, mut sender, _) = default_eth_sender();
 
     // Workflow for the test is similar to `operation_commitment_workflow`.

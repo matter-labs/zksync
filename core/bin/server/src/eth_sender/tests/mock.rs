@@ -279,7 +279,7 @@ impl MockEthereum {
         self.tx_statuses.borrow_mut().insert(tx_hash, status);
     }
 
-    /// Same as `add_successfull_execution`, but marks the transaction as a anyhow.
+    /// Same as `add_successfull_execution`, but marks the transaction as a failure.
     pub fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
         self.block_number += confirmations;
 

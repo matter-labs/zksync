@@ -117,7 +117,7 @@ enum TxCheckMode {
 ///
 /// # Failure policy
 ///
-/// By default, `ETHSender` expects no transactions to fail, and thus upon a anyhow it will
+/// By default, `ETHSender` expects no transactions to fail, and thus upon a failure it will
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
@@ -406,7 +406,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         );
         self.ethereum.send_tx(&signed_tx).await.unwrap_or_else(|e| {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
-            // and resent. We can't do anything about this anyhow either, since it's most probably is not
+            // and resent. We can't do anything about this failure either, since it's most probably is not
             // related to the node logic, so we just log this error and pretend to have this operation
             // processed.
             log::warn!("Error while sending the operation: {}", e);
@@ -447,7 +447,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     /// - If the transaction is either pending or completed, stops the execution (as
     ///   there is nothing to do with the operation yet).
     /// - If the transaction is stuck, sends a supplement transaction for it.
-    /// - If the transaction is failed, handles the anyhow according to the anyhow
+    /// - If the transaction is failed, handles the failure according to the failure
     ///   processing policy.
     async fn perform_commitment_step(
         &mut self,
@@ -499,8 +499,8 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                         op.op,
                         receipt,
                     );
-                    // Process the anyhow according to the chosen policy.
-                    self.anyhow_handler(&receipt);
+                    // Process the failure according to the chosen policy.
+                    self.failure_handler(&receipt);
                 }
             }
         }
@@ -538,9 +538,9 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         Ok(OperationCommitment::Pending)
     }
 
-    /// Handles a transaction execution anyhow by reporting the issue to the log
+    /// Handles a transaction execution failure by reporting the issue to the log
     /// and terminating the node.
-    fn anyhow_handler(&self, receipt: &TransactionReceipt) -> ! {
+    fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
         log::error!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
@@ -576,7 +576,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             }
             // Non-successful execution.
             Some(status) => {
-                // Transaction failed, report the anyhow with details.
+                // Transaction failed, report the failure with details.
 
                 // TODO check confirmations for fail
                 assert!(

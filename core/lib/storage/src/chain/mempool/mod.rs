@@ -228,7 +228,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Though it's unlikely that mempool schema will ever contain a committed
     /// transaction, it's better to ensure that we won't process the same transaction
     /// again. One possible scenario for having already-processed txs in the database
-    /// is a anyhow of `remove_txs` method, which won't cause a panic on server, but will
+    /// is a failure of `remove_txs` method, which won't cause a panic on server, but will
     /// left txs in the database.
     ///
     /// This method is expected to be initially invoked on the server start, and then

@@ -111,7 +111,7 @@ impl EthereumInterface for EthereumHttpClient {
                     .saturating_sub(tx_block_number.as_u64());
                 let success = status.as_u64() == 1;
 
-                // Set the receipt only for anyhows.
+                // Set the receipt only for failures.
                 let receipt = if success {
                     None
                 } else {

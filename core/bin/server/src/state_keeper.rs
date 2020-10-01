@@ -885,7 +885,7 @@ impl ZksyncStateKeeper {
     /// so the executed transactions are persisted and won't be lost.
     async fn store_pending_block(&mut self) {
         // Create a pending block object to send.
-        // Note that failed operations are not included, as per any operation anyhow
+        // Note that failed operations are not included, as per any operation failure
         // the full block is created immediately.
         let pending_block = SendablePendingBlock {
             number: self.state.block_number,
