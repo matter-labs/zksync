@@ -179,7 +179,7 @@ price:
 	@node contracts/scripts/check-price.js
 
 prover-tests:
-	f cargo test -p prover --release -- --ignored
+	f cargo test -p zksync_prover --release -- --ignored
 
 js-tests:
 	@cd sdk/zksync.js && yarn tests
