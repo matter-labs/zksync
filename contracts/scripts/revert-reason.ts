@@ -31,11 +31,15 @@ async function reason() {
     if (!tx) {
         console.log("tx not found");
     } else {
-        const parsedTransaction = franklinInterface.parseTransaction({ data: tx.data });
-        if (parsedTransaction) {
-            console.log("parsed tx: ", parsedTransaction);
-        } else {
-            console.log("tx:", tx);
+        try {
+            const parsedTransaction = franklinInterface.parseTransaction({data: tx.data});
+            if (parsedTransaction) {
+                console.log("parsed tx: ", parsedTransaction);
+            } else {
+                console.log("tx:", tx);
+            }
+        } catch (e) {
+            console.log("zkSync transaction is not parsed");
         }
 
         const transaction = await provider.getTransaction(hash);
