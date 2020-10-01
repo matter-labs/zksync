@@ -160,6 +160,7 @@ impl FranklinOp {
             FranklinOp::Transfer(op) => op.get_updated_account_ids(),
             FranklinOp::FullExit(op) => op.get_updated_account_ids(),
             FranklinOp::ChangePubKeyOffchain(op) => op.get_updated_account_ids(),
+            FranklinOp::ForcedExit(op) => op.get_updated_account_ids(),
         }
     }
 }

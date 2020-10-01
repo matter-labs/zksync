@@ -101,4 +101,8 @@ impl ForcedExitOp {
             withdraw_amount: Some(amount.into()),
         })
     }
+
+    pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
+        vec![self.target_account_id, self.tx.initiator_account_id]
+    }
 }
