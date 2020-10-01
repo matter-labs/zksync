@@ -64,7 +64,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         });
         zksync_prover::start(p, tx, Default::default());
         jh.join().expect("failed to join recv");
-        done_tx.send(()).expect("unexpected anyhow");
+        done_tx.send(()).expect("unexpected failure");
     });
 
     let timeout = time::Duration::from_secs(10);

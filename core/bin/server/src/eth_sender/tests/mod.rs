@@ -451,7 +451,7 @@ fn operations_order() {
 
 /// Check that upon a transaction anyhow the incident causes a panic by default.
 #[test]
-#[should_panic(expected = "Cannot operate after unexpected TX anyhow")]
+#[should_panic(expected = "Cannot operate after unexpected TX failure")]
 fn transaction_anyhow() {
     let (mut eth_sender, mut sender, _) = default_eth_sender();
 

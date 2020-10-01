@@ -545,7 +545,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );
-        panic!("Cannot operate after unexpected TX anyhow");
+        panic!("Cannot operate after unexpected TX failure");
     }
 
     /// Helper method encapsulating the logic of determining the next deadline block.

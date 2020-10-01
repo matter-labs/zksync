@@ -110,12 +110,12 @@ fn main() {
                         OBSERVER_MODE_PULL_INTERVAL,
                         stop_observer_mode_rx,
                     );
-                    observed_state_tx.send(state).expect("unexpected anyhow");
+                    observed_state_tx.send(state).expect("unexpected failure");
                 })
                 .expect("failed to start observer mode");
             leader_election::block_until_leader().expect("voting for leader fail");
-            stop_observer_mode_tx.send(()).expect("unexpected anyhow");
-            let observer_mode_final_state = observed_state_rx.recv().expect("unexpected anyhow");
+            stop_observer_mode_tx.send(()).expect("unexpected failure");
+            let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
             jh.join().unwrap();
             observer_mode_final_state.await
         };
