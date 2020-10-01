@@ -22,8 +22,9 @@ pub struct ChangePubKey {
     pub account_id: AccountId,
     pub account: Address,
     pub new_pk_hash: PubKeyHash,
+    #[serde(default)]
     pub fee_token: TokenId,
-    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    #[serde(with = "BigUintSerdeAsRadix10Str", default)]
     pub fee: BigUint,
     pub nonce: Nonce,
     pub signature: TxSignature,
