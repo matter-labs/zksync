@@ -224,20 +224,24 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
 
     let nonce = 0;
 
-    let eth_signature = {
-        let sign_bytes = ChangePubKey::get_eth_signed_data(0, nonce, &to_change.pub_key_hash)
+    let mut change_pubkey = ChangePubKey::new(
+        0,
+        to_change.address,
+        PubKeyHash::from_privkey(&new_sk),
+        0,
+        Default::default(),
+        nonce,
+        None,
+        None,
+    );
+
+    change_pubkey.eth_signature = {
+        let sign_bytes = change_pubkey
+            .get_eth_signed_data()
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
             PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
         Some(eth_signature)
-    };
-
-    let change_pubkey = ChangePubKey {
-        account_id: 0,
-        account: to_change.address,
-        new_pk_hash: PubKeyHash::from_privkey(&new_sk),
-        nonce,
-        eth_signature,
     };
 
     let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(change_pubkey));

@@ -1,36 +1,51 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use models::account::{AccountUpdate, PubKeyHash};
 use models::tx::ChangePubKey;
-use zksync_crypto::{params, rand::Rng};
 
 /// Check ChangePubKey operation on new account
 #[test]
 fn success() {
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _sk) = tb.add_account(Locked);
+    let token_id = 1;
+    let balance = 10u32;
+    let (account_id, account, sk) = tb.add_account(Locked);
+    tb.set_balance(account_id, token_id, balance);
     let old_pub_key_hash = account.pub_key_hash.clone();
-    let pubkey_bytes: [u8; params::FR_ADDRESS_LEN] = tb.rng.gen();
-    let new_pub_key_hash = PubKeyHash::from_bytes(&pubkey_bytes).unwrap();
+    let new_pub_key_hash = PubKeyHash::from_privkey(&sk);
 
-    let change_pub_key = ChangePubKey {
+    let change_pub_key = ChangePubKey::new_signed(
         account_id,
-        account: account.address,
-        new_pk_hash: new_pub_key_hash.clone(),
-        nonce: account.nonce,
-        eth_signature: None,
-    };
+        account.address,
+        new_pub_key_hash.clone(),
+        token_id,
+        balance.into(),
+        account.nonce,
+        None,
+        &sk,
+    )
+    .expect("Failed to sign ChangePubkey");
 
     tb.test_tx_success(
         change_pub_key.into(),
-        &[(
-            account_id,
-            AccountUpdate::ChangePubKeyHash {
-                old_nonce: account.nonce,
-                new_nonce: account.nonce + 1,
-                old_pub_key_hash,
-                new_pub_key_hash,
-            },
-        )],
+        &[
+            (
+                account_id,
+                AccountUpdate::ChangePubKeyHash {
+                    old_nonce: account.nonce,
+                    new_nonce: account.nonce + 1,
+                    old_pub_key_hash,
+                    new_pub_key_hash,
+                },
+            ),
+            (
+                account_id,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: account.nonce + 1,
+                    new_nonce: account.nonce + 1,
+                    balance_update: (token_id, balance.into(), 0u32.into()),
+                },
+            ),
+        ],
     )
 }
 
@@ -38,17 +53,20 @@ fn success() {
 #[test]
 fn nonce_mismatch() {
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _sk) = tb.add_account(Locked);
-    let pubkey_bytes: [u8; params::FR_ADDRESS_LEN] = tb.rng.gen();
-    let new_pub_key_hash = PubKeyHash::from_bytes(&pubkey_bytes).unwrap();
+    let (account_id, account, sk) = tb.add_account(Locked);
+    let new_pub_key_hash = PubKeyHash::from_privkey(&sk);
 
-    let change_pub_key = ChangePubKey {
+    let change_pub_key = ChangePubKey::new_signed(
         account_id,
-        account: account.address,
-        new_pk_hash: new_pub_key_hash,
-        nonce: account.nonce + 1,
-        eth_signature: None,
-    };
+        account.address,
+        new_pub_key_hash,
+        0,
+        0u32.into(),
+        account.nonce + 1,
+        None,
+        &sk,
+    )
+    .expect("Failed to sign ChangePubkey");
 
     tb.test_tx_fail(change_pub_key.into(), "Nonce mismatch");
 }
@@ -58,17 +76,20 @@ fn nonce_mismatch() {
 #[test]
 fn invalid_account_id() {
     let mut tb = PlasmaTestBuilder::new();
-    let (account_id, account, _sk) = tb.add_account(Locked);
-    let pubkey_bytes: [u8; params::FR_ADDRESS_LEN] = tb.rng.gen();
-    let new_pub_key_hash = PubKeyHash::from_bytes(&pubkey_bytes).unwrap();
+    let (account_id, account, sk) = tb.add_account(Locked);
+    let new_pub_key_hash = PubKeyHash::from_privkey(&sk);
 
-    let change_pub_key = ChangePubKey {
-        account_id: account_id + 1,
-        account: account.address,
-        new_pk_hash: new_pub_key_hash,
-        nonce: account.nonce,
-        eth_signature: None,
-    };
+    let change_pub_key = ChangePubKey::new_signed(
+        account_id + 1,
+        account.address,
+        new_pub_key_hash,
+        0,
+        0u32.into(),
+        account.nonce + 1,
+        None,
+        &sk,
+    )
+    .expect("Failed to sign ChangePubkey");
 
     tb.test_tx_fail(
         change_pub_key.into(),

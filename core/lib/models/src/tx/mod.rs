@@ -1,5 +1,6 @@
 mod change_pubkey;
 mod close;
+mod forced_exit;
 mod franklin_tx;
 mod transfer;
 mod withdraw;
@@ -13,6 +14,7 @@ mod tests;
 pub use self::{
     change_pubkey::ChangePubKey,
     close::Close,
+    forced_exit::ForcedExit,
     franklin_tx::{EthSignData, FranklinTx, SignedFranklinTx},
     transfer::Transfer,
     withdraw::Withdraw,

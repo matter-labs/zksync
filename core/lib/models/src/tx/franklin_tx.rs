@@ -1,8 +1,8 @@
 use crate::Nonce;
 
 use crate::{
-    tx::{ChangePubKey, Close, Transfer, TxEthSignature, TxHash, Withdraw},
-    CloseOp, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
+    tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
+    CloseOp, ForcedExitOp, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
 use num::BigUint;
 use parity_crypto::digest::sha256;
@@ -30,6 +30,7 @@ pub enum FranklinTx {
     Withdraw(Box<Withdraw>),
     Close(Box<Close>),
     ChangePubKey(Box<ChangePubKey>),
+    ForcedExit(Box<ForcedExit>),
 }
 
 impl From<Transfer> for FranklinTx {
@@ -53,6 +54,12 @@ impl From<Close> for FranklinTx {
 impl From<ChangePubKey> for FranklinTx {
     fn from(change_pub_key: ChangePubKey) -> Self {
         Self::ChangePubKey(Box::new(change_pub_key))
+    }
+}
+
+impl From<ForcedExit> for FranklinTx {
+    fn from(tx: ForcedExit) -> Self {
+        Self::ForcedExit(Box::new(tx))
     }
 }
 
@@ -80,6 +87,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
             FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
+            FranklinTx::ForcedExit(tx) => tx.get_bytes(),
         };
 
         let hash = sha256(&bytes);
@@ -94,6 +102,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(tx) => tx.from,
             FranklinTx::Close(tx) => tx.account,
             FranklinTx::ChangePubKey(tx) => tx.account,
+            FranklinTx::ForcedExit(tx) => tx.target,
         }
     }
 
@@ -103,6 +112,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
             FranklinTx::ChangePubKey(tx) => tx.nonce,
+            FranklinTx::ForcedExit(tx) => tx.nonce,
         }
     }
 
@@ -112,6 +122,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(tx) => tx.check_correctness(),
             FranklinTx::Close(tx) => tx.check_correctness(),
             FranklinTx::ChangePubKey(tx) => tx.check_correctness(),
+            FranklinTx::ForcedExit(tx) => tx.check_correctness(),
         }
     }
 
@@ -121,6 +132,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
             FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
+            FranklinTx::ForcedExit(tx) => tx.get_bytes(),
         }
     }
 
@@ -130,6 +142,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
             FranklinTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
+            FranklinTx::ForcedExit(_) => ForcedExitOp::CHUNKS,
         }
     }
 
@@ -163,6 +176,12 @@ impl FranklinTx {
                     withdraw.fee.clone(),
                 ))
             }
+            FranklinTx::ForcedExit(forced_exit) => Some((
+                TxFeeTypes::Withdraw,
+                TokenLike::Id(forced_exit.token),
+                forced_exit.target,
+                forced_exit.fee.clone(),
+            )),
             FranklinTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),

@@ -88,13 +88,19 @@ describe("Operations unit tests", function () {
             "823B747710C5bC9b8A47243f2c3d1805F1aA00c5" +  // owner
             "3132" +                                      // tokenId
             "101112131415161718191a1b1c1d1e00";           // amount -- not matching but should be ignored     
-        expect(await testContract.testFullExitMatch(offchain)).to.equal(false)        
+        expect(await testContract.testFullExitMatch(offchain)).to.equal(false)
     });
 
     // Parital exit
 
     it("should convert PartialExit pubdata", async () => {
         await testContract.testPartialExit()
+    });
+
+    // Forced exit
+
+    it("should convert ForcedExit pubdata", async () => {
+        await testContract.testForcedExit()
     });
 
 });

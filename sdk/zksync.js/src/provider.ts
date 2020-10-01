@@ -11,6 +11,7 @@ import {
     TokenAddress,
     TxEthSignature,
     Fee,
+    ChangePubKeyFee,
 } from "./types";
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from "./utils";
 
@@ -176,7 +177,7 @@ export class Provider {
     }
 
     async getTransactionFee(
-        txType: "Withdraw" | "Transfer" | "FastWithdraw",
+        txType: "Withdraw" | "Transfer" | "FastWithdraw" | ChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {
