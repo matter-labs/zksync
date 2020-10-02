@@ -32,7 +32,7 @@ impl<'a> ChangePubKeyBuilder<'a> {
     pub async fn tx(self) -> Result<FranklinTx, ClientError> {
         let fee_token = self
             .fee_token
-            .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
+            .ok_or_else(|| ClientError::MissingRequiredField("fee_token".into()))?;
 
         let fee = match self.fee {
             Some(fee) => fee,

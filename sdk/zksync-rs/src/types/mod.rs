@@ -37,7 +37,7 @@ pub enum BlockStatus {
     Verified,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
     pub address: Address,
@@ -139,7 +139,9 @@ pub struct OngoingDeposits {
 pub enum OutputFeeType {
     Transfer,
     TransferToNew,
+    FastWithdraw,
     Withdraw,
+    ChangePubKey { onchain_pubkey_auth: bool },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
