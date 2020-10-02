@@ -12,8 +12,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: restore-selfhosted-runner-cache
-      run: tar xf ~/runner-cache.tar || true
+    - name: link-setup-keys
+      run: ln -s ~/setup keys/setup
 
     - name: setup-env
       run: |
@@ -75,9 +75,6 @@ jobs:
 
     - name: circuit-tests
       run: zksync circuit-tests "" `nproc`
-
-    - name: update-selfhosted-cache
-      run: tar cf ~/runner-cache.tar keys/setup target sdk/zksync-crypto/target
 
     services:
       geth:
