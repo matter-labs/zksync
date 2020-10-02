@@ -12,12 +12,12 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
 use log::*;
-use models::{AccountId, AccountMap};
 use num::BigUint;
 use std::time::Instant;
-use testkit::*;
 use web3::transports::Http;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_testkit::*;
+use zksync_types::{AccountId, AccountMap};
 
 const PRIORITY_EXPIRATION: u64 = 101;
 
@@ -359,7 +359,7 @@ async fn exit_test() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
 
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let test_accounts_info = test_accounts_info[0..2].to_vec();

@@ -1,22 +1,22 @@
 //! Generate exit proof for exodus mode given account and token
 
-use circuit::exit_circuit::create_exit_circuit_with_public_input;
-use failure::format_err;
+use anyhow::format_err;
 use log::info;
-use models::{AccountId, AccountMap, Address, TokenId};
 use num::BigUint;
 use std::time::Instant;
+use zksync_circuit::exit_circuit::create_exit_circuit_with_public_input;
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_prover_utils::gen_verified_proof_for_exit_circuit;
+use zksync_types::{AccountId, AccountMap, Address, TokenId};
 
 pub fn create_exit_proof(
     accounts: AccountMap,
     account_id: AccountId,
     owner: Address,
     token_id: TokenId,
-) -> Result<(EncodedProofPlonk, BigUint), failure::Error> {
+) -> Result<(EncodedProofPlonk, BigUint), anyhow::Error> {
     let timer = Instant::now();
     let mut circuit_account_tree =
         CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());

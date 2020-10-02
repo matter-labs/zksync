@@ -1,10 +1,9 @@
 use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
-use models::account::Account;
 use web3::contract::{Contract, Options};
-use web3::futures::Future;
-use web3::types::{Address, BlockNumber, Transaction, U256};
+use web3::types::{Address, BlockId, Transaction, U256};
 use web3::Transport;
 use zksync_crypto::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
+use zksync_types::account::Account;
 
 /// Returns Rollup genesis (fees) account from the input of the Rollup contract creation transaction
 ///
@@ -12,7 +11,7 @@ use zksync_crypto::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH
 ///
 /// * `transaction` - Ethereum Rollup contract creation transaction description
 ///
-pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account, failure::Error> {
+pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account, anyhow::Error> {
     const ENCODED_INIT_PARAMETERS_WIDTH: usize =
         6 * INPUT_DATA_ADDRESS_BYTES_WIDTH + INPUT_DATA_ROOT_HASH_BYTES_WIDTH;
 
@@ -49,7 +48,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
         encoded_init_parameters.as_slice(),
     )
     .map_err(|_| {
-        failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+        anyhow::Error::from(Box::new(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "can't get decoded init parameters from contract creation transaction",
         )))
@@ -62,7 +61,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
     }
     .ok_or_else(|| Err("Invalid token in parameters"))
     .map_err(|_: Result<Account, _>| {
-        failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+        anyhow::Error::from(Box::new(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "can't get decoded init parameter from contract creation transaction",
         )))
@@ -76,19 +75,19 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
 /// * `web3` - Web3 provider url
 /// * `franklin_contract` - Rollup contract
 ///
-pub fn get_total_verified_blocks<T: Transport>(
+pub async fn get_total_verified_blocks<T: Transport>(
     franklin_contract: &(ethabi::Contract, Contract<T>),
 ) -> u32 {
     franklin_contract
         .1
-        .query::<U256, Option<Address>, Option<BlockNumber>, ()>(
+        .query::<U256, Option<Address>, Option<BlockId>, ()>(
             "totalBlocksVerified",
             (),
             None,
             Options::default(),
             None,
         )
-        .wait()
+        .await
         .unwrap()
         .as_u32()
 }

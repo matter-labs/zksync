@@ -3,7 +3,7 @@
 // Local imports
 use crate::tests::db_test;
 use crate::{tokens::TokensSchema, QueryResult, StorageProcessor};
-use models::{Token, TokenLike};
+use zksync_types::{Token, TokenLike};
 
 /// Verifies the token save & load mechanism.
 #[db_test]

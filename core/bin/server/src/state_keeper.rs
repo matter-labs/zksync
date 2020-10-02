@@ -8,7 +8,10 @@ use futures::{
 use tokio::task::JoinHandle;
 use zksync_basic_types::Address;
 // Workspace uses
-use models::{
+use zksync_crypto::ff;
+use zksync_state::state::{CollectedFee, OpSuccess, ZksyncState};
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     ActionType,
     {
         block::{
@@ -20,16 +23,13 @@ use models::{
         Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
     },
 };
-use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
-use zksync_crypto::ff;
 // Local uses
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     gas_counter::GasCounter,
     mempool::ProposedBlock,
 };
-use models::SignedFranklinTx;
-use storage::ConnectionPool;
+use zksync_types::SignedFranklinTx;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),
@@ -86,9 +86,9 @@ impl PendingBlock {
 }
 
 /// Responsible for tx processing and block forming.
-pub struct PlasmaStateKeeper {
+pub struct ZksyncStateKeeper {
     /// Current plasma state
-    state: PlasmaState,
+    state: ZksyncState,
 
     fee_account_id: AccountId,
     current_unprocessed_priority_op: u64,
@@ -104,20 +104,20 @@ pub struct PlasmaStateKeeper {
     max_number_of_withdrawals_per_block: usize,
 }
 
-pub struct PlasmaStateInitParams {
+pub struct ZksyncStateInitParams {
     pub tree: AccountTree,
     pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
 }
 
-impl Default for PlasmaStateInitParams {
+impl Default for ZksyncStateInitParams {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl PlasmaStateInitParams {
+impl ZksyncStateInitParams {
     pub fn new() -> Self {
         Self {
             tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
@@ -129,7 +129,7 @@ impl PlasmaStateInitParams {
 
     pub async fn get_pending_block(
         &self,
-        storage: &mut storage::StorageProcessor<'_>,
+        storage: &mut zksync_storage::StorageProcessor<'_>,
     ) -> Option<SendablePendingBlock> {
         let pending_block = storage
             .chain()
@@ -155,8 +155,8 @@ impl PlasmaStateInitParams {
     }
 
     pub async fn restore_from_db(
-        storage: &mut storage::StorageProcessor<'_>,
-    ) -> Result<Self, failure::Error> {
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+    ) -> Result<Self, anyhow::Error> {
         let mut init_params = Self::new();
         init_params.load_from_db(storage).await?;
 
@@ -165,8 +165,8 @@ impl PlasmaStateInitParams {
 
     async fn load_account_tree(
         &mut self,
-        storage: &mut storage::StorageProcessor<'_>,
-    ) -> Result<BlockNumber, failure::Error> {
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+    ) -> Result<BlockNumber, anyhow::Error> {
         let (last_cached_block_number, accounts) = if let Some((block, _)) = storage
             .chain()
             .block_schema()
@@ -212,7 +212,7 @@ impl PlasmaStateInitParams {
             .state_schema()
             .load_committed_state(None)
             .await
-            .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
+            .map_err(|e| anyhow::format_err!("couldn't load committed state: {}", e))?;
 
         if block_number != last_cached_block_number {
             if let Some((_, account_updates)) = storage
@@ -254,30 +254,31 @@ impl PlasmaStateInitParams {
 
     async fn load_from_db(
         &mut self,
-        storage: &mut storage::StorageProcessor<'_>,
-    ) -> Result<(), failure::Error> {
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+    ) -> Result<(), anyhow::Error> {
         let block_number = self.load_account_tree(storage).await?;
         self.last_block_number = block_number;
         self.unprocessed_priority_op =
             Self::unprocessed_priority_op_id(storage, block_number).await?;
 
-        info!(
+        log::info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            self.last_block_number, self.unprocessed_priority_op
+            self.last_block_number,
+            self.unprocessed_priority_op
         );
         Ok(())
     }
 
     pub async fn load_state_diff(
         &mut self,
-        storage: &mut storage::StorageProcessor<'_>,
-    ) -> Result<(), failure::Error> {
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+    ) -> Result<(), anyhow::Error> {
         let state_diff = storage
             .chain()
             .state_schema()
             .load_state_diff(self.last_block_number, None)
             .await
-            .map_err(|e| failure::format_err!("failed to load committed state: {}", e))?;
+            .map_err(|e| anyhow::format_err!("failed to load committed state: {}", e))?;
 
         if let Some((block_number, updates)) = state_diff {
             for (id, update) in updates.into_iter() {
@@ -308,9 +309,9 @@ impl PlasmaStateInitParams {
     }
 
     async fn unprocessed_priority_op_id(
-        storage: &mut storage::StorageProcessor<'_>,
+        storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
-    ) -> Result<u64, failure::Error> {
+    ) -> Result<u64, anyhow::Error> {
         let storage_op = storage
             .chain()
             .operations_schema()
@@ -320,7 +321,7 @@ impl PlasmaStateInitParams {
             Ok(storage_op
                 .into_op(storage)
                 .await
-                .map_err(|e| failure::format_err!("could not convert storage_op: {}", e))?
+                .map_err(|e| anyhow::format_err!("could not convert storage_op: {}", e))?
                 .block
                 .processed_priority_ops
                 .1)
@@ -330,10 +331,10 @@ impl PlasmaStateInitParams {
     }
 }
 
-impl PlasmaStateKeeper {
+impl ZksyncStateKeeper {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        initial_state: PlasmaStateInitParams,
+        initial_state: ZksyncStateInitParams,
         fee_account_address: Address,
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
@@ -351,7 +352,7 @@ impl PlasmaStateKeeper {
         };
         assert!(is_sorted);
 
-        let state = PlasmaState::new(
+        let state = ZksyncState::new(
             initial_state.tree,
             initial_state.acc_id_by_addr,
             initial_state.last_block_number + 1,
@@ -362,7 +363,7 @@ impl PlasmaStateKeeper {
             .expect("Fee account should be present in the account tree");
         // Keeper starts with the NEXT block
         let max_block_size = *available_block_chunk_sizes.iter().max().unwrap();
-        let keeper = PlasmaStateKeeper {
+        let keeper = ZksyncStateKeeper {
             state,
             fee_account_id,
             current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
@@ -376,7 +377,7 @@ impl PlasmaStateKeeper {
         };
 
         let root = keeper.state.root_hash();
-        info!("created state keeper, root hash = {}", root);
+        log::info!("created state keeper, root hash = {}", root);
 
         keeper
     }
@@ -466,9 +467,9 @@ impl PlasmaStateKeeper {
             .commit()
             .await
             .expect("Unable to commit transaction in statekeeper");
-        let state = PlasmaState::from_acc_map(accounts, last_committed + 1);
+        let state = ZksyncState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
-        info!("Genesis block created, state: {}", state.root_hash());
+        log::info!("Genesis block created, state: {}", state.root_hash());
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }
 
@@ -704,7 +705,7 @@ impl PlasmaStateKeeper {
                     executed_operations.push(exec_result);
                 }
                 Err(e) => {
-                    warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                    log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                     let failed_tx = ExecutedTx {
                         signed_tx: tx.clone(),
                         success: false,
@@ -798,7 +799,7 @@ impl PlasmaStateKeeper {
                 exec_result
             }
             Err(e) => {
-                warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
                     signed_tx: tx.clone(),
                     success: false,
@@ -873,7 +874,7 @@ impl PlasmaStateKeeper {
         pending_block.stored_account_updates = pending_block.account_updates.len();
         self.state.block_number += 1;
 
-        info!(
+        log::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
@@ -967,7 +968,7 @@ impl PlasmaStateKeeper {
 
 #[must_use]
 pub fn start_state_keeper(
-    sk: PlasmaStateKeeper,
+    sk: ZksyncStateKeeper,
     pending_block: Option<SendablePendingBlock>,
 ) -> JoinHandle<()> {
     tokio::spawn(sk.run(pending_block))

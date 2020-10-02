@@ -11,12 +11,12 @@ use futures::{
 };
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
-use models::{tx::TxEthSignature, FranklinTx, SignedFranklinTx};
+use zksync_types::{tx::TxEthSignature, FranklinTx, SignedFranklinTx};
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 use crate::mempool::TxAddError;
 use crate::panic_notify::ThreadPanicNotify;
-use models::tx::EthSignData;
+use zksync_types::tx::EthSignData;
 
 /// Wrapper on a `FranklinTx` which guarantees that
 /// transaction was checked and signatures associated with
@@ -119,7 +119,7 @@ async fn verify_eth_signature(
                     .1
                     .await
                     .expect("Failed receiving response from eth watch")
-                    .map_err(|e| warn!("Err in eth watch: {}", e))
+                    .map_err(|e| log::warn!("Err in eth watch: {}", e))
                     .or(Err(TxAddError::EIP1271SignatureVerificationFail))?;
 
                 if !signature_correct {

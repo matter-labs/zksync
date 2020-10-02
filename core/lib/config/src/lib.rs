@@ -4,10 +4,11 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 // External uses
+use url::Url;
+// Workspace uses
 use zksync_basic_types::{H160, H256};
 use zksync_utils::{get_env, parse_env, parse_env_with};
 // Local uses
-use url::Url;
 
 /// Configuration options for `eth_sender`.
 #[derive(Debug, Clone)]

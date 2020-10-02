@@ -1,23 +1,23 @@
 use crate::rollup_ops::RollupOpsBlock;
-use failure::format_err;
-use models::account::Account;
-use models::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::operations::FranklinOp;
-use models::priority_ops::FranklinPriorityOp;
-use models::priority_ops::PriorityOp;
-use models::tx::{ChangePubKey, Close, ForcedExit, FranklinTx, Transfer, Withdraw};
-use models::{AccountId, AccountMap, AccountUpdates};
-use plasma::{
-    handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState, TransferOutcome},
-};
+use anyhow::format_err;
 use web3::types::Address;
 use zksync_crypto::Fr;
+use zksync_state::{
+    handler::TxHandler,
+    state::{CollectedFee, OpSuccess, TransferOutcome, ZksyncState},
+};
+use zksync_types::account::Account;
+use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use zksync_types::operations::FranklinOp;
+use zksync_types::priority_ops::FranklinPriorityOp;
+use zksync_types::priority_ops::PriorityOp;
+use zksync_types::tx::{ChangePubKey, Close, ForcedExit, FranklinTx, Transfer, Withdraw};
+use zksync_types::{AccountId, AccountMap, AccountUpdates};
 
 /// Rollup accounts states
 pub struct TreeState {
     /// Accounts stored in a spase merkle tree
-    pub state: PlasmaState,
+    pub state: ZksyncState,
     /// Current unprocessed priority op number
     pub current_unprocessed_priority_op: u64,
     /// The last fee account address
@@ -30,7 +30,7 @@ impl TreeState {
     /// Returns empty self state
     pub fn new(available_block_chunk_sizes: Vec<usize>) -> Self {
         Self {
-            state: PlasmaState::empty(),
+            state: ZksyncState::empty(),
             current_unprocessed_priority_op: 0,
             last_fee_account_address: Address::default(),
             available_block_chunk_sizes,
@@ -53,7 +53,7 @@ impl TreeState {
         fee_account: AccountId,
         available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
-        let state = PlasmaState::from_acc_map(accounts, current_block);
+        let state = ZksyncState::from_acc_map(accounts, current_block);
         let last_fee_account_address = state
             .get_account(fee_account)
             .expect("Cant get fee account from tree state")
@@ -76,7 +76,7 @@ impl TreeState {
     pub fn update_tree_states_from_ops_block(
         &mut self,
         ops_block: &RollupOpsBlock,
-    ) -> Result<(Block, AccountUpdates), failure::Error> {
+    ) -> Result<(Block, AccountUpdates), anyhow::Error> {
         let operations = ops_block.ops.clone();
 
         let mut accounts_updated = Vec::new();
@@ -111,7 +111,7 @@ impl TreeState {
                     let raw_op = TransferOutcome::TransferToNew(*op.clone());
 
                     let (fee, updates) =
-                        <PlasmaState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
+                        <ZksyncState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
                             .map_err(|e| format_err!("TransferToNew fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
@@ -145,7 +145,7 @@ impl TreeState {
 
                     let tx = FranklinTx::Transfer(Box::new(op.tx.clone()));
                     let (fee, updates) =
-                        <PlasmaState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
+                        <ZksyncState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
                             .map_err(|e| format_err!("Withdraw fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
@@ -172,7 +172,7 @@ impl TreeState {
 
                     let tx = FranklinTx::Withdraw(Box::new(op.tx.clone()));
                     let (fee, updates) =
-                        <PlasmaState as TxHandler<Withdraw>>::apply_op(&mut self.state, &op)
+                        <ZksyncState as TxHandler<Withdraw>>::apply_op(&mut self.state, &op)
                             .map_err(|e| format_err!("Withdraw fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
@@ -202,7 +202,7 @@ impl TreeState {
 
                     let tx = FranklinTx::ForcedExit(Box::new(op.tx.clone()));
                     let (fee, updates) =
-                        <PlasmaState as TxHandler<ForcedExit>>::apply_op(&mut self.state, &op)
+                        <ZksyncState as TxHandler<ForcedExit>>::apply_op(&mut self.state, &op)
                             .map_err(|e| format_err!("ForcedExit fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
@@ -229,7 +229,7 @@ impl TreeState {
 
                     let tx = FranklinTx::Close(Box::new(op.tx.clone()));
                     let (fee, updates) =
-                        <PlasmaState as TxHandler<Close>>::apply_op(&mut self.state, &op)
+                        <ZksyncState as TxHandler<Close>>::apply_op(&mut self.state, &op)
                             .map_err(|e| format_err!("Close fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
@@ -266,7 +266,7 @@ impl TreeState {
 
                     let tx = FranklinTx::ChangePubKey(Box::new(op.tx.clone()));
                     let (fee, updates) =
-                        <PlasmaState as TxHandler<ChangePubKey>>::apply_op(&mut self.state, &op)
+                        <ZksyncState as TxHandler<ChangePubKey>>::apply_op(&mut self.state, &op)
                             .map_err(|e| format_err!("ChangePubKeyOffChain fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
@@ -431,10 +431,10 @@ impl TreeState {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
-    use models::{
+    use num::BigUint;
+    use zksync_types::{
         Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
-    use num::BigUint;
 
     #[test]
     fn test_update_tree_with_one_tx_per_block() {

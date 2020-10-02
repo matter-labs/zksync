@@ -17,8 +17,8 @@ use std::{
 use num::BigUint;
 use tokio::{runtime::Handle, time};
 // Workspace uses
-use models::tx::TxHash;
 use zksync::{Network, Provider};
+use zksync_types::tx::TxHash;
 // Local uses
 use crate::{
     scenarios::{
@@ -133,7 +133,7 @@ async fn send_transactions_from_acc(
     mut test_wallet: TestWallet,
     ctx: LoadTestConfig,
     provider: Provider,
-) -> Result<SentTransactions, failure::Error> {
+) -> Result<SentTransactions, anyhow::Error> {
     let mut sent_txs = SentTransactions::new();
     let addr_hex = hex::encode(test_wallet.address());
     let wei_in_gwei = BigUint::from(1_000_000_000u32);

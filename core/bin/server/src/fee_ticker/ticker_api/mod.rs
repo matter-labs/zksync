@@ -1,19 +1,19 @@
 use crate::eth_sender::ETHSenderRequest;
 use crate::utils::token_db_cache::TokenDBCache;
+use anyhow::format_err;
 use async_trait::async_trait;
 use chrono::Utc;
-use failure::format_err;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::{Token, TokenId, TokenLike, TokenPrice};
 use num::rational::Ratio;
 use num::BigUint;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use storage::ConnectionPool;
 use tokio::sync::Mutex;
+use zksync_storage::ConnectionPool;
+use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 
 pub mod coingecko;
 pub mod coinmarkercap;
@@ -28,19 +28,19 @@ pub const CONNECTION_TIMEOUT: Duration = Duration::from_millis(700);
 
 #[async_trait]
 pub trait TokenPriceAPI {
-    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, failure::Error>;
+    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, anyhow::Error>;
 }
 
 /// Api responsible for querying for TokenPrices
 #[async_trait]
 pub trait FeeTickerAPI {
     /// Get last price from ticker
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, failure::Error>;
+    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error>;
 
     /// Get current gas price in ETH
-    async fn get_gas_price_wei(&self) -> Result<BigUint, failure::Error>;
+    async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error>;
 
-    async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error>;
+    async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error>;
 }
 
 #[derive(Debug, Clone)]
@@ -110,7 +110,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         &self,
         token_id: TokenId,
         price: TokenPrice,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let mut storage = self
             .db_pool
             .access_storage_fragile()
@@ -144,7 +144,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         if !is_price_historical {
             self._update_stored_value(token_id, price)
                 .await
-                .map_err(|e| warn!("Failed to update historical ticker price: {}", e))
+                .map_err(|e| log::warn!("Failed to update historical ticker price: {}", e))
                 .unwrap_or_default();
         }
     }
@@ -156,7 +156,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
             if !cached_entry.is_cache_entry_expired() {
                 price_cache.insert(token_id, cached_entry.clone());
                 if cached_entry.is_price_historical {
-                    warn!("Using historical price for token_id: {}", token_id);
+                    log::warn!("Using historical price for token_id: {}", token_id);
                 }
                 return Some(cached_entry.price);
             }
@@ -167,7 +167,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
     async fn get_historical_ticker_price(
         &self,
         token_id: TokenId,
-    ) -> Result<Option<TokenPrice>, failure::Error> {
+    ) -> Result<Option<TokenPrice>, anyhow::Error> {
         let mut storage = self
             .db_pool
             .access_storage_fragile()
@@ -185,7 +185,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
 #[async_trait]
 impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
     /// Get last price from ticker
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, failure::Error> {
+    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error> {
         let token = self
             .token_db_cache
             .get_token(token.clone())
@@ -208,7 +208,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             .token_price_api
             .get_price(&token.symbol)
             .await
-            .map_err(|e| warn!("Failed to get price: {}", e));
+            .map_err(|e| log::warn!("Failed to get price: {}", e));
         if let Ok(api_price) = api_price {
             self.update_stored_value(token.id, api_price.clone(), false)
                 .await;
@@ -218,7 +218,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         let historical_price = self
             .get_historical_ticker_price(token.id)
             .await
-            .map_err(|e| warn!("Failed to get historical ticker price: {}", e));
+            .map_err(|e| log::warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
             self.update_stored_value(token.id, historical_price.clone(), true)
@@ -226,11 +226,11 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(historical_price);
         }
 
-        failure::bail!("Token price api is not available right now.")
+        anyhow::bail!("Token price api is not available right now.")
     }
 
     /// Get current gas price in ETH
-    async fn get_gas_price_wei(&self) -> Result<BigUint, failure::Error> {
+    async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
         let mut cached_value = self.gas_price_cache.lock().await;
 
         if let Some((cached_gas_price, cache_time)) = cached_value.take() {
@@ -253,7 +253,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         Ok(eth_sender_resp)
     }
 
-    async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+    async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
         self.token_db_cache
             .get_token(token.clone())
             .await?

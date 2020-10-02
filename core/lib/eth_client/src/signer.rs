@@ -1,5 +1,6 @@
 use parity_crypto::{publickey::sign, Keccak256};
 use rlp::RlpStream;
+use serde::{Deserialize, Serialize};
 use web3::types::{H160, H256, U256};
 
 /// Description of a Transaction, pending or in the chain.

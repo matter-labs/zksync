@@ -1,7 +1,7 @@
 // External imports
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
-use models::{
+use zksync_types::{
     mempool::SignedTxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
     Address, FranklinTx, SignedFranklinTx,

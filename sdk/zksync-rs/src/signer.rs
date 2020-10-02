@@ -4,9 +4,9 @@ use std::fmt;
 use num::BigUint;
 use web3::types::H256;
 // Workspace uses
-use models::tx::{ChangePubKey, PackedEthSignature};
-use models::{AccountId, Address, Nonce, PubKeyHash, Token, Transfer, Withdraw};
 use zksync_crypto::PrivateKey;
+use zksync_types::tx::{ChangePubKey, PackedEthSignature};
+use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token, Transfer, Withdraw};
 
 use crate::error::SignerError;
 

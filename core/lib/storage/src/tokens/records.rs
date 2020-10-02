@@ -1,13 +1,12 @@
 // External imports
-use serde_derive::{Deserialize, Serialize};
-use sqlx::FromRow;
+use serde::{Deserialize, Serialize};
+use sqlx::{types::BigDecimal, FromRow};
 // Workspace imports
 // Local imports
 use crate::tokens::utils::{address_to_stored_string, stored_str_address_to_address};
-use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
-use models::tokens::TokenPrice;
-use models::{Token, TokenId};
+use zksync_types::tokens::TokenPrice;
+use zksync_types::{Token, TokenId};
 use zksync_utils::big_decimal_to_ratio;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, FromRow)]

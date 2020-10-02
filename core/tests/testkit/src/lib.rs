@@ -3,22 +3,12 @@
 use crate::eth_account::{get_executed_tx_fee, parse_ether, ETHExecResult, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
-use failure::bail;
+use anyhow::bail;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use models::{
-    mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
-    DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
-    WithdrawOp,
-};
 use num::BigUint;
-use server::committer::{BlockCommitRequest, CommitRequest};
-use server::mempool::ProposedBlock;
-use server::state_keeper::{
-    start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
-};
 use std::collections::HashMap;
 use std::thread::JoinHandle;
 use std::time::Instant;
@@ -26,6 +16,16 @@ use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
 use zksync_config::ConfigurationOptions;
+use zksync_server::committer::{BlockCommitRequest, CommitRequest};
+use zksync_server::mempool::ProposedBlock;
+use zksync_server::state_keeper::{
+    start_state_keeper, StateKeeperRequest, ZksyncStateInitParams, ZksyncStateKeeper,
+};
+use zksync_types::{
+    mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
+    DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
+    WithdrawOp,
+};
 
 pub use zksync_test_account as zksync_account;
 
@@ -334,9 +334,9 @@ impl<T: Transport> AccountSet<T> {
 }
 
 /// Initialize plasma state with one account - fee account.
-pub fn genesis_state(fee_account_address: &Address) -> PlasmaStateInitParams {
+pub fn genesis_state(fee_account_address: &Address) -> ZksyncStateInitParams {
     let operator_account = Account::default_with_address(fee_account_address);
-    let mut params = PlasmaStateInitParams::new();
+    let mut params = ZksyncStateInitParams::new();
     params.insert_account(0, operator_account);
     params
 }
@@ -381,7 +381,7 @@ pub fn spawn_state_keeper(
     block_chunks_sizes.dedup();
 
     let max_miniblock_iterations = *block_chunks_sizes.iter().max().unwrap();
-    let state_keeper = PlasmaStateKeeper::new(
+    let state_keeper = ZksyncStateKeeper::new(
         genesis_state(fee_account),
         *fee_account,
         state_keeper_req_receiver,
@@ -607,7 +607,7 @@ pub async fn perform_basic_tests() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
         commit_account_info.private_key,
@@ -1290,7 +1290,7 @@ impl TestSetup {
 
     pub async fn execute_commit_and_verify_block(
         &mut self,
-    ) -> Result<BlockExecutionResult, failure::Error> {
+    ) -> Result<BlockExecutionResult, anyhow::Error> {
         self.state_keeper_request_sender
             .clone()
             .send(StateKeeperRequest::SealBlock)
@@ -1424,15 +1424,15 @@ impl TestSetup {
         self.commit_account.is_exodus().await.expect("Exodus query")
     }
 
-    pub async fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
+    pub async fn total_blocks_committed(&self) -> Result<u64, anyhow::Error> {
         self.accounts.eth_accounts[0].total_blocks_committed().await
     }
 
-    pub async fn total_blocks_verified(&self) -> Result<u64, failure::Error> {
+    pub async fn total_blocks_verified(&self) -> Result<u64, anyhow::Error> {
         self.accounts.eth_accounts[0].total_blocks_verified().await
     }
 
-    pub async fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), failure::Error> {
+    pub async fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), anyhow::Error> {
         self.commit_account.revert_blocks(blocks_to_revert).await?;
         Ok(())
     }
@@ -1487,7 +1487,7 @@ impl TestSetup {
             .get_account_id()
             .expect("Account should have id to exit");
         // restore account state
-        prover::exit_proof::create_exit_proof(accounts, owner_id, owner.address, token.0)
+        zksync_prover::exit_proof::create_exit_proof(accounts, owner_id, owner.address, token.0)
             .expect("Failed to generate exit proof")
     }
 }

@@ -60,13 +60,13 @@ use futures::future::try_join_all;
 use num::BigUint;
 use tokio::{fs, time};
 // Workspace deps
-use models::{
+use zksync::{Network, Provider};
+use zksync_config::ConfigurationOptions;
+use zksync_types::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
     tx::PackedEthSignature,
     FranklinTx, TxFeeTypes,
 };
-use zksync::{Network, Provider};
-use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local deps
 use self::satellite::SatelliteScenario;
@@ -236,7 +236,7 @@ impl ScenarioExecutor {
     }
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
-    pub async fn run_test(&mut self) -> Result<(), failure::Error> {
+    pub async fn run_test(&mut self) -> Result<(), anyhow::Error> {
         self.save_accounts().await;
 
         self.initialize().await?;
@@ -259,7 +259,7 @@ impl ScenarioExecutor {
     }
 
     /// Initializes the test, preparing the main account for the interaction.
-    async fn initialize(&mut self) -> Result<(), failure::Error> {
+    async fn initialize(&mut self) -> Result<(), anyhow::Error> {
         // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
         // the fee in such a way that it will always be sufficient).
         // Withdraw operation has more chunks, so we estimate fee for it.
@@ -285,7 +285,7 @@ impl ScenarioExecutor {
     }
 
     /// Runs the initial deposit of the money onto the main account.
-    async fn deposit(&mut self) -> Result<(), failure::Error> {
+    async fn deposit(&mut self) -> Result<(), anyhow::Error> {
         let change_pubkey_fee = self.change_pubkey_fee(&self.main_wallet).await;
 
         // Amount of money we need to deposit.
@@ -357,7 +357,7 @@ impl ScenarioExecutor {
 
     /// Splits the money from the main account between the intermediate accounts
     /// with the `TransferToNew` operations.
-    async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
+    async fn initial_transfer(&mut self) -> Result<(), anyhow::Error> {
         log::info!(
             "Starting initial transfer. {} ETH will be send to each of {} new accounts",
             format_ether(&self.transfer_size),
@@ -459,7 +459,7 @@ impl ScenarioExecutor {
     /// accounts multiple times.
     /// Sine the money amount is always the same, after execution of this step every
     /// intermediate account should have the same balance as it has before.
-    async fn funds_rotation(&mut self) -> Result<(), failure::Error> {
+    async fn funds_rotation(&mut self) -> Result<(), anyhow::Error> {
         for step_number in 1..=self.cycles_amount {
             log::info!("Starting funds rotation cycle {}", step_number);
 
@@ -471,7 +471,7 @@ impl ScenarioExecutor {
 
     /// Transfers the money between intermediate accounts. For each account with
     /// ID `N`, money are transferred to the account with ID `N + 1`.
-    async fn funds_rotation_step(&mut self) -> Result<(), failure::Error> {
+    async fn funds_rotation_step(&mut self) -> Result<(), anyhow::Error> {
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
 
         for from_id in 0..self.n_accounts {
@@ -524,7 +524,7 @@ impl ScenarioExecutor {
     }
 
     /// Transfers all the money from the intermediate accounts back to the main account.
-    async fn collect_funds(&mut self) -> Result<(), failure::Error> {
+    async fn collect_funds(&mut self) -> Result<(), anyhow::Error> {
         log::info!("Starting collecting funds back to the main account");
 
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
@@ -585,7 +585,7 @@ impl ScenarioExecutor {
     }
 
     /// Withdraws the money from the main account back to the Ethereum.
-    async fn withdraw(&mut self) -> Result<(), failure::Error> {
+    async fn withdraw(&mut self) -> Result<(), anyhow::Error> {
         let current_balance = self.main_wallet.eth_provider.balance().await?;
 
         let fee = self.withdraw_fee(&self.main_wallet).await;
@@ -624,7 +624,7 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    async fn finish(&mut self) -> Result<(), failure::Error> {
+    async fn finish(&mut self) -> Result<(), anyhow::Error> {
         Ok(())
     }
 
@@ -634,7 +634,7 @@ impl ScenarioExecutor {
         &self,
         current_balance: BigUint,
         withdraw_amount: BigUint,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         log::info!("Awaiting for ETH funds to be received");
 
         let expected_balance = current_balance + withdraw_amount;
@@ -652,7 +652,7 @@ impl ScenarioExecutor {
                 break;
             }
             if start.elapsed() > timeout {
-                failure::bail!(
+                anyhow::bail!(
                     "ETH funds were not received for {} minutes",
                     timeout_minutes
                 );

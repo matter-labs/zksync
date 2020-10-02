@@ -6,18 +6,18 @@ use futures::{
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use models::{
-    tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
-};
-use storage::{
+use zksync_config::ConfigurationOptions;
+use zksync_storage::{
     chain::{
         block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
         operations_ext::records::TxReceiptResponse,
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_config::ConfigurationOptions;
+use zksync_types::{
+    tx::{TxEthSignature, TxHash},
+    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
+};
 // Local uses
 use crate::panic_notify::ThreadPanicNotify;
 use crate::{
@@ -32,7 +32,7 @@ use crate::{
     },
 };
 use bigdecimal::BigDecimal;
-use models::tx::EthSignData;
+use zksync_types::tx::EthSignData;
 
 pub mod error;
 mod rpc_impl;
@@ -427,7 +427,7 @@ impl RpcApp {
     /// to set the signing key. While `ForcedExit` operation doesn't do anything
     /// bad to the account, it's more user-friendly to only allow this operation
     /// after we're somewhat sure that zkSync account is not owned by anybody.
-    async fn check_forced_exit(&self, forced_exit: &models::ForcedExit) -> Result<()> {
+    async fn check_forced_exit(&self, forced_exit: &zksync_types::ForcedExit) -> Result<()> {
         let target_account_address = forced_exit.target;
         let mut storage = self.access_storage().await?;
         let account_age = storage
@@ -595,6 +595,7 @@ async fn verify_tx_info_message_signature(
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn tx_fee_type_serialization() {

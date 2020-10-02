@@ -3,7 +3,7 @@
 use sqlx::Acquire;
 use zksync_basic_types::Address;
 // Workspace imports
-use models::{Account, AccountId, AccountUpdates};
+use zksync_types::{Account, AccountId, AccountUpdates};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;

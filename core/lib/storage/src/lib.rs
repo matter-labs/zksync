@@ -95,7 +95,7 @@ pub mod tokens;
 pub mod utils;
 
 pub use crate::connection::ConnectionPool;
-pub type QueryResult<T> = Result<T, failure::Error>;
+pub type QueryResult<T> = Result<T, anyhow::Error>;
 
 /// Storage processor is the main storage interaction point.
 /// It holds down the connection (either direct or pooled) to the database
@@ -119,7 +119,7 @@ impl<'a> StorageProcessor<'a> {
 
     pub async fn start_transaction<'c: 'b, 'b>(
         &'c mut self,
-    ) -> Result<StorageProcessor<'b>, failure::Error> {
+    ) -> Result<StorageProcessor<'b>, anyhow::Error> {
         let transaction = self.conn().begin().await?;
 
         let mut processor = StorageProcessor::from_transaction(transaction);

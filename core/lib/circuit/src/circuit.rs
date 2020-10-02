@@ -17,12 +17,12 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::{
-    operations::NoopOp, ChangePubKeyOp, CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp,
-    TransferToNewOp, WithdrawOp,
-};
 use zksync_crypto::params::{
     self, FR_BIT_WIDTH_PADDED, SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
+};
+use zksync_types::{
+    operations::{ChangePubKeyOp, NoopOp},
+    CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 // Local deps
 use crate::{
@@ -1089,9 +1089,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "no nonce overflow"),
             &cur.account.nonce.get_number(),
         )?);
-        debug!("lhs_valid_withdraw_begin");
+        log::debug!("lhs_valid_withdraw_begin");
         let lhs_valid = multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_valid_flags)?;
-        debug!("lhs_valid_withdraw_end");
+        log::debug!("lhs_valid_withdraw_end");
 
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_base_valid);
@@ -1208,7 +1208,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let is_base_valid = {
             let mut base_valid_flags = Vec::new();
 
-            debug!(
+            log::debug!(
                 "is_pubdata_chunk_correct {:?}",
                 is_pubdata_chunk_correct.get_value()
             );
@@ -1822,7 +1822,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             serialized_tx_bits,
             &op_data,
         )?;
-        debug!(
+        log::debug!(
             "is_serialized_tx_correct: {:?}",
             is_serialized_tx_correct.get_value()
         );
@@ -1831,7 +1831,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &[is_serialized_tx_correct, is_sig_verified.clone()],
         )?;
 
-        debug!("is_sig_verified: {:?}", is_sig_verified.get_value());
+        log::debug!("is_sig_verified: {:?}", is_sig_verified.get_value());
 
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
@@ -1844,25 +1844,25 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
-        debug!(
+        log::debug!(
             "signer_key.pubkey.get_hash(): {:?}",
             signer_key.pubkey.get_hash().get_number().get_value()
         );
-        debug!(
+        log::debug!(
             "signer_key.pubkey.get_x(): {:?}",
             signer_key.pubkey.get_x().get_number().get_value()
         );
 
-        debug!(
+        log::debug!(
             "signer_key.pubkey.get_y(): {:?}",
             signer_key.pubkey.get_y().get_number().get_value()
         );
 
-        debug!(
+        log::debug!(
             "lhs.account.pub_key_hash: {:?}",
             lhs.account.pub_key_hash.get_number().get_value()
         );
-        debug!("is_signer_valid: {:?}", is_signer_valid.get_value());
+        log::debug!("is_signer_valid: {:?}", is_signer_valid.get_value());
 
         lhs_valid_flags.push(is_signer_valid);
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;

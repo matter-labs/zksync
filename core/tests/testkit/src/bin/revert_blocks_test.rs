@@ -1,8 +1,8 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
-use testkit::*;
 use web3::transports::Http;
+use zksync_testkit::*;
 
 /// Executes blocks with some basic operations with new state keeper
 /// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
@@ -16,7 +16,7 @@ async fn execute_blocks_with_new_state_keeper(
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
         commit_account_info.private_key,

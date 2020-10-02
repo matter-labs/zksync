@@ -2,12 +2,12 @@
 // External imports
 use zksync_basic_types::U256;
 // Workspace imports
-use models::{block::PendingBlock, Action, ActionType, Operation};
-use models::{
+use zksync_crypto::convert::{fe_from_bytes, fe_to_bytes};
+use zksync_types::{block::PendingBlock, Action, ActionType, Operation};
+use zksync_types::{
     block::{Block, ExecutedOperations},
     AccountId, BlockNumber, FranklinOp,
 };
-use zksync_crypto::convert::{fe_from_bytes, fe_to_bytes};
 // Local imports
 use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,

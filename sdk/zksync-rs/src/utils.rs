@@ -7,15 +7,13 @@ use sha2::{Digest, Sha256};
 use zksync_crypto::bellman::{pairing::ff::PrimeField, PrimeFieldRepr};
 use zksync_crypto::franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use zksync_crypto::{priv_key_from_fs, Fs, PrivateKey};
-
-use models::AccountId;
-use models::U256;
+use zksync_types::{AccountId, U256};
 
 use crate::error::ClientError;
 use crate::wallet::Wallet;
 
 // Public re-exports.
-pub use models::helpers::{
+pub use zksync_types::helpers::{
     closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
     is_token_amount_packable,
 };

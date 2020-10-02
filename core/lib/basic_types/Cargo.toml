@@ -1,8 +1,13 @@
 [package]
 name = "zksync_basic_types"
-version = "0.1.0"
-authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+version = "1.0.0"
 edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
 
 [dependencies]
-web3 = "0.10.0"
+web3 = "0.13.0"

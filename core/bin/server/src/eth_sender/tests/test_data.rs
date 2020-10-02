@@ -5,11 +5,11 @@ use std::time::SystemTime;
 use chrono::DateTime;
 use lazy_static::lazy_static;
 // Workspace uses
-use models::{
+use zksync_types::{
     block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FranklinOp,
     FranklinPriorityOp, FullExit, FullExitOp, PriorityOp,
 };
-use models::{Action, Operation};
+use zksync_types::{Action, Operation};
 
 /// Creates a dummy operation as a test input for `ETHSender` tests.
 fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {

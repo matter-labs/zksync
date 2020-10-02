@@ -43,7 +43,7 @@ impl ScenarioType {
 }
 
 impl FromStr for ScenarioType {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let scenario = match s {
@@ -51,7 +51,7 @@ impl FromStr for ScenarioType {
             "execution" | "execution_tps" => Self::ExecutionTps,
             "reallife" | "real-life" | "real_life" => Self::RealLife,
             other => {
-                failure::bail!(
+                anyhow::bail!(
                     "Unknown scenario type '{}'. \
                      Available options are: \
                      'outgoing_tps', 'execution_tps', 'real_life', \

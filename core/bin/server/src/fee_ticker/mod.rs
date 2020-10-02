@@ -19,15 +19,16 @@ use num::{
     traits::{Inv, Pow},
     BigUint,
 };
+use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 // Workspace deps
-use models::{
+use zksync_config::TokenPriceSource;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     helpers::{pack_fee_amount, unpack_fee_amount},
     Address, ChangePubKeyOp, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
     WithdrawOp,
 };
-use storage::ConnectionPool;
-use zksync_config::TokenPriceSource;
 use zksync_utils::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str};
 // Local deps
 use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
@@ -41,7 +42,7 @@ use crate::{
     },
     state_keeper::StateKeeperRequest,
 };
-use models::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
+use zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
 
 mod ticker_api;
 mod ticker_info;
@@ -148,11 +149,11 @@ pub enum TickerRequest {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-        response: oneshot::Sender<Result<Fee, failure::Error>>,
+        response: oneshot::Sender<Result<Fee, anyhow::Error>>,
     },
     GetTokenPrice {
         token: TokenLike,
-        response: oneshot::Sender<Result<BigDecimal, failure::Error>>,
+        response: oneshot::Sender<Result<BigDecimal, anyhow::Error>>,
         req_type: TokenPriceRequestType,
     },
 }
@@ -275,7 +276,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         &self,
         token: TokenLike,
         req_rype: TokenPriceRequestType,
-    ) -> Result<BigDecimal, failure::Error> {
+    ) -> Result<BigDecimal, anyhow::Error> {
         let factor = match req_rype {
             TokenPriceRequestType::USDForOneWei => {
                 let token_decimals = self.api.get_token(token.clone()).await?.decimals;
@@ -300,7 +301,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         tx_type: TxFeeTypes,
         token: TokenLike,
         recipient: Address,
-    ) -> Result<Fee, failure::Error> {
+    ) -> Result<Fee, anyhow::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token).await?;
         let token_risk_factor = self
@@ -366,8 +367,8 @@ mod test {
     use bigdecimal::BigDecimal;
     use chrono::Utc;
     use futures::executor::block_on;
-    use models::{Address, Token, TokenId, TokenPrice};
     use std::str::FromStr;
+    use zksync_types::{Address, Token, TokenId, TokenPrice};
     use zksync_utils::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
     #[derive(Debug, Clone)]
@@ -459,7 +460,7 @@ mod test {
     struct MockApiProvider;
     #[async_trait]
     impl FeeTickerAPI for MockApiProvider {
-        async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, failure::Error> {
+        async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error> {
             for test_token in TestToken::all_tokens() {
                 if TokenLike::Id(test_token.id) == token {
                     let token_price = TokenPrice {
@@ -473,11 +474,11 @@ mod test {
         }
 
         /// Get current gas price in ETH
-        async fn get_gas_price_wei(&self) -> Result<BigUint, failure::Error> {
+        async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
             Ok(BigUint::from(10u32).pow(7u32)) // 10 GWei
         }
 
-        async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+        async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
             for test_token in TestToken::all_tokens() {
                 if TokenLike::Id(test_token.id) == token {
                     return Ok(Token::new(

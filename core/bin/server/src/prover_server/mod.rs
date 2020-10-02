@@ -5,12 +5,12 @@ use std::time::{self, Duration};
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
-use log::{info, trace};
+use serde::{Deserialize, Serialize};
 // Workspace deps
-use models::BlockNumber;
-use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
+use zksync_storage::ConnectionPool;
+use zksync_types::BlockNumber;
 // Local deps
 use crate::panic_notify::ThreadPanicNotify;
 use crate::prover_server::scaler::ScalerOracle;
@@ -20,7 +20,7 @@ mod witness_generator;
 
 #[derive(Debug)]
 struct AppState {
-    connection_pool: storage::ConnectionPool,
+    connection_pool: zksync_storage::ConnectionPool,
     scaler_oracle: Arc<RwLock<ScalerOracle>>,
     prover_timeout: Duration,
 }
@@ -43,7 +43,7 @@ impl AppState {
         }
     }
 
-    async fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor<'_>> {
+    async fn access_storage(&self) -> actix_web::Result<zksync_storage::StorageProcessor<'_>> {
         self.connection_pool
             .access_storage_fragile()
             .await
@@ -59,7 +59,7 @@ async fn status() -> actix_web::Result<String> {
 }
 
 async fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
-    info!("register request for prover with name: {}", r.name);
+    log::info!("register request for prover with name: {}", r.name);
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -79,7 +79,7 @@ async fn block_to_prove(
     data: web::Data<AppState>,
     r: web::Json<ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
-    trace!("request block to prove from worker: {}", r.name);
+    log::trace!("request block to prove from worker: {}", r.name);
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -93,9 +93,10 @@ async fn block_to_prove(
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
     if let Some(prover_run) = ret {
-        info!(
+        log::info!(
             "satisfied request block {} to prove from worker: {}",
-            prover_run.block_number, r.name
+            prover_run.block_number,
+            r.name
         );
         Ok(HttpResponse::Ok().json(BlockToProveRes {
             prover_run_id: prover_run.id,
@@ -113,7 +114,7 @@ async fn prover_data(
     data: web::Data<AppState>,
     block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    trace!("Got request for prover_data for block {}", *block);
+    log::trace!("Got request for prover_data for block {}", *block);
     let mut storage = data
         .access_storage()
         .await
@@ -123,10 +124,10 @@ async fn prover_data(
         Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
     };
     if witness.is_some() {
-        info!("Sent prover_data for block {}", *block);
+        log::info!("Sent prover_data for block {}", *block);
     } else {
         // No witness, we should just wait
-        warn!("No witness for block {}", *block);
+        log::warn!("No witness for block {}", *block);
     }
     Ok(HttpResponse::Ok().json(witness))
 }
@@ -137,7 +138,7 @@ async fn working_on(
 ) -> actix_web::Result<HttpResponse> {
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
-    trace!(
+    log::trace!(
         "Received heartbeat for prover_run with id: {}",
         r.prover_run_id
     );
@@ -161,7 +162,7 @@ async fn publish(
     data: web::Data<AppState>,
     r: web::Json<PublishReq>,
 ) -> actix_web::Result<HttpResponse> {
-    info!("Received a proof for block: {}", r.block);
+    log::info!("Received a proof for block: {}", r.block);
     let mut storage = data
         .access_storage()
         .await
@@ -202,9 +203,10 @@ async fn stopped(
             actix_web::error::ErrorBadRequest("unknown prover ID")
         })?;
 
-    info!(
+    log::info!(
         "Prover instance '{}' with ID {} send a stopping notification",
-        prover_description.worker, prover_id
+        prover_description.worker,
+        prover_id
     );
 
     storage
@@ -252,7 +254,7 @@ async fn required_replicas(
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_prover_server(
-    connection_pool: storage::ConnectionPool,
+    connection_pool: zksync_storage::ConnectionPool,
     prover_timeout: time::Duration,
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
@@ -284,9 +286,10 @@ pub fn start_prover_server(
                 for offset in 0..config_options.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
                     let block_step = config_options.witness_generators as u32;
-                    info!(
+                    log::info!(
                         "Starting witness generator ({},{})",
-                        start_block, block_step
+                        start_block,
+                        block_step
                     );
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         connection_pool.clone(),

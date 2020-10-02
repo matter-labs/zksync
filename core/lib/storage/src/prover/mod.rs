@@ -3,8 +3,8 @@ use std::time;
 // External imports
 use sqlx::Done;
 // Workspace imports
-use models::BlockNumber;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_types::BlockNumber;
 // Local imports
 use self::records::{ActiveProver, ProverRun, StoredProof};
 use crate::prover::records::StorageBlockWitness;

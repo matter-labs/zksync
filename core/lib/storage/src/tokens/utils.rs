@@ -1,4 +1,4 @@
-use models::Address;
+use zksync_types::Address;
 
 pub fn address_to_stored_string(address: &Address) -> String {
     format!("0x{:x}", address)

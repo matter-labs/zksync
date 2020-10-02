@@ -6,7 +6,7 @@
 use std::convert::TryFrom;
 // External imports
 // Workspace imports
-use models::{
+use zksync_types::{
     Action, ActionType, Operation,
     {
         block::{ExecutedPriorityOp, ExecutedTx},
@@ -25,7 +25,7 @@ use crate::{
     prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
-use models::SignedFranklinTx;
+use zksync_types::SignedFranklinTx;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
@@ -53,7 +53,7 @@ impl StoredOperation {
 }
 
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self) -> Result<ExecutedTx, failure::Error> {
+    pub fn into_executed_tx(self) -> Result<ExecutedTx, anyhow::Error> {
         let tx: FranklinTx = serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
         let franklin_op: Option<FranklinOp> =
             serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");

@@ -7,7 +7,7 @@
 use jsonrpc_core::types::response::Output;
 
 // Workspace uses
-use models::{
+use zksync_types::{
     tx::{FranklinTx, PackedEthSignature, TxHash},
     Address, TokenLike, TxFeeTypes,
 };
@@ -210,11 +210,11 @@ impl Provider {
 }
 
 mod messages {
-    use models::{
+    use serde_derive::Serialize;
+    use zksync_types::{
         tx::{FranklinTx, PackedEthSignature, TxEthSignature, TxHash},
         Address, TokenLike, TxFeeTypes,
     };
-    use serde_derive::Serialize;
 
     #[derive(Debug, Serialize)]
     pub struct JsonRpcRequest {

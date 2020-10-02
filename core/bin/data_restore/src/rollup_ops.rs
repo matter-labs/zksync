@@ -1,8 +1,8 @@
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
 use ethabi::ParamType;
-use models::operations::FranklinOp;
 use web3::{Transport, Web3};
+use zksync_types::operations::FranklinOp;
 
 /// Description of a Rollup operations block
 #[derive(Debug, Clone)]
@@ -23,11 +23,11 @@ impl RollupOpsBlock {
     /// * `web3` - Web3 provider url
     /// * `event_data` - Rollup contract event description
     ///
-    pub fn get_rollup_ops_block<T: Transport>(
+    pub async fn get_rollup_ops_block<T: Transport>(
         web3: &Web3<T>,
         event_data: &BlockEvent,
-    ) -> Result<Self, failure::Error> {
-        let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
+    ) -> Result<Self, anyhow::Error> {
+        let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash).await?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
 
         let fee_account_argument_id = 1;
@@ -45,7 +45,7 @@ impl RollupOpsBlock {
             input_data.as_slice(),
         )
         .map_err(|_| {
-            failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+            anyhow::Error::from(Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "can't get decoded parameters from commitment transaction",
             )))
@@ -79,7 +79,7 @@ impl RollupOpsBlock {
     ///
     /// * `data` - Franklin Contract event input data
     ///
-    pub fn get_rollup_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, failure::Error> {
+    pub fn get_rollup_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, anyhow::Error> {
         let mut current_pointer = 0;
         let mut ops = vec![];
         while current_pointer < data.len() {
@@ -102,13 +102,13 @@ impl RollupOpsBlock {
 #[cfg(test)]
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
-    use models::operations::ChangePubKeyOp;
-    use models::tx::{ChangePubKey, TxSignature};
-    use models::{
+    use num::BigUint;
+    use zksync_types::operations::ChangePubKeyOp;
+    use zksync_types::tx::{ChangePubKey, TxSignature};
+    use zksync_types::{
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
         TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
-    use num::BigUint;
 
     #[test]
     fn test_deposit() {

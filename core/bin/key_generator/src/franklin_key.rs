@@ -2,10 +2,10 @@
 use std::fs::{remove_file, File};
 use std::path::Path;
 // Workspace deps
-use circuit::account::AccountWitness;
-use circuit::circuit::FranklinCircuit;
-use circuit::exit_circuit::ZksyncExitCircuit;
-use circuit::operation::{
+use zksync_circuit::account::AccountWitness;
+use zksync_circuit::circuit::FranklinCircuit;
+use zksync_circuit::exit_circuit::ZksyncExitCircuit;
+use zksync_circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
 use zksync_config::AvailableBlockSizesConfig;
