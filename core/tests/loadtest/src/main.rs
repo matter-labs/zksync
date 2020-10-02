@@ -53,10 +53,12 @@ fn main() -> Result<(), anyhow::Error> {
         private_key: "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110".parse()?,
     };
     let scenario = ng::scenarios::SimpleScenario {
-        transfer_size: 100_u64.into(),
-        wallets: 100,
+        transfer_size: 1_000,
+        wallets: 1_00,
     };
     tokio_runtime.block_on(scenario.run(monitor, main_account, env_config.clone()))?;
+
+    return Ok(());
 
     let CliOptions {
         test_spec_path,
@@ -69,6 +71,4 @@ fn main() -> Result<(), anyhow::Error> {
     let scenario = scenario_type.into_scenario();
 
     scenario(context);
-
-    Ok(())
 }

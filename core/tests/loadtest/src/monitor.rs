@@ -77,10 +77,10 @@ impl MonitorInner {
 
         let mut stats = Summary::default();
         if self.current_stats != stats {
-            swap(&mut self.current_stats, &mut stats);
+            log::info!("Got stats: {:?} {:?}", now, self.current_stats);
             self.journal.push((now, self.current_stats));
 
-            log::info!("Got stats: {:?} {:?}", now, stats);
+            swap(&mut self.current_stats, &mut stats);
         }
     }
 }

@@ -99,15 +99,14 @@ impl TestWallet {
     }
 
     /// Returns sufficient fee required to process each kind of transactions in zkSync network.
-    pub async fn sufficient_fee(
-        &self,
-    ) -> Result<BigUint, ClientError> {
+    pub async fn sufficient_fee(&self) -> Result<BigUint, ClientError> {
         let fee = self
             .monitor
             .provider
             .get_tx_fee(TxFeeTypes::Transfer, Address::zero(), Self::TOKEN_NAME)
             .await?
-            .total_fee * BigUint::from(Self::FEE_FACTOR);
+            .total_fee
+            * BigUint::from(Self::FEE_FACTOR);
 
         Ok(closest_packable_fee_amount(&fee))
     }

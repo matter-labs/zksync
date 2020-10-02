@@ -16,7 +16,7 @@ use crate::monitor::Monitor;
 
 pub(crate) mod configs;
 mod deprecated;
-mod utils;
+pub(crate) mod utils;
 
 pub type Scenario = Box<dyn Fn(ScenarioContext)>;
 

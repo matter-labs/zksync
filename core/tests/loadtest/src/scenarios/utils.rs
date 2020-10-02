@@ -126,41 +126,56 @@ pub async fn wait_for_verify(
 /// created over an array of 43 elements, sizes of batches will be 10,
 /// 20, 10 again and then 3 (remaining elements).
 #[derive(Debug)]
-pub struct DynamicChunks<T> {
-    iterable: Vec<T>,
+pub struct DynamicChunks<T, I>
+where
+    I: Iterator<Item = T>,
+{
+    iterable: I,
     chunk_sizes: Vec<usize>,
-    pos: usize,
     chunk_size_id: usize,
 }
 
-impl<T> DynamicChunks<T> {
-    pub fn new(iterable: Vec<T>, chunk_sizes: &[usize]) -> Self {
+impl<T, I> DynamicChunks<T, I>
+where
+    I: Iterator<Item = T>,
+{
+    pub fn new<J>(iterable: J, chunk_sizes: &[usize]) -> Self
+    where
+        J: IntoIterator<Item = T, IntoIter = I>,
+    {
         assert!(!chunk_sizes.is_empty());
 
         Self {
-            iterable,
+            iterable: iterable.into_iter(),
             chunk_sizes: chunk_sizes.to_vec(),
-            pos: 0,
             chunk_size_id: 0,
         }
     }
 }
 
-impl<T: Clone> Iterator for DynamicChunks<T> {
+impl<T, I> Iterator for DynamicChunks<T, I>
+where
+    I: Iterator<Item = T>,
+{
     type Item = Vec<T>;
 
     fn next(&mut self) -> Option<Vec<T>> {
-        if self.pos >= self.iterable.len() {
-            return None;
-        }
-
         let chunk_size = self.chunk_sizes[self.chunk_size_id];
         self.chunk_size_id = (self.chunk_size_id + 1) % self.chunk_sizes.len();
 
-        let start_pos = self.pos;
-        let end_pos = std::cmp::min(start_pos + chunk_size, self.iterable.len());
-        self.pos = end_pos;
+        let mut items = Vec::new();
+        for _ in 0..chunk_size {
+            if let Some(value) = self.iterable.next() {
+                items.push(value);
+            } else {
+                break;
+            }
+        }
 
-        Some(self.iterable[start_pos..end_pos].to_vec())
+        if items.is_empty() {
+            None
+        } else {
+            Some(items)
+        }
     }
 }
