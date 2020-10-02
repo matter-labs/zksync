@@ -63,8 +63,22 @@ impl Signer {
         &self,
         nonce: Nonce,
         auth_onchain: bool,
+        fee_token: Token,
+        fee: BigUint,
     ) -> Result<ChangePubKey, SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        let mut change_pubkey = ChangePubKey::new_signed(
+            account_id,
+            self.address,
+            self.pubkey_hash.clone(),
+            fee_token.id,
+            fee,
+            nonce,
+            None,
+            &self.private_key,
+        )
+        .map_err(signing_failed_error)?;
 
         let eth_signature = if auth_onchain {
             None
@@ -73,20 +87,15 @@ impl Signer {
                 .eth_private_key
                 .ok_or(SignerError::MissingEthPrivateKey)?;
 
-            let sign_bytes =
-                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                    .map_err(signing_failed_error)?;
+            let sign_bytes = change_pubkey
+                .get_eth_signed_data()
+                .map_err(signing_failed_error)?;
             let eth_signature = PackedEthSignature::sign(&eth_private_key, &sign_bytes)
                 .map_err(signing_failed_error)?;
             Some(eth_signature)
         };
-        let change_pubkey = ChangePubKey {
-            account_id,
-            account: self.address,
-            new_pk_hash: self.pubkey_hash.clone(),
-            nonce,
-            eth_signature,
-        };
+
+        change_pubkey.eth_signature = eth_signature;
 
         if !auth_onchain {
             assert!(

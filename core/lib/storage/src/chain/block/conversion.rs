@@ -21,7 +21,6 @@ use crate::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
         },
-        state::StateSchema,
     },
     prover::ProverSchema,
     QueryResult, StorageProcessor,
@@ -49,15 +48,7 @@ impl StoredOperation {
             .await?
             .expect("Block for action does not exist");
 
-        let accounts_updated = StateSchema(conn)
-            .load_state_diff_for_block(block_number)
-            .await?;
-        Ok(Operation {
-            id,
-            action,
-            block,
-            accounts_updated,
-        })
+        Ok(Operation { id, action, block })
     }
 }
 
@@ -166,6 +157,10 @@ impl NewExecutedTransaction {
                 FranklinTx::Close(_) => (
                     serde_json::from_value(tx["account"].clone()).unwrap(),
                     serde_json::from_value(tx["account"].clone()).unwrap(),
+                ),
+                FranklinTx::ForcedExit(_) => (
+                    serde_json::from_value(tx["target"].clone()).unwrap(),
+                    serde_json::from_value(tx["target"].clone()).unwrap(),
                 ),
             };
 

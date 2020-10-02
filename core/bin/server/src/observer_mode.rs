@@ -131,18 +131,18 @@ impl ObservedState {
                 FranklinOp::Close(close) => {
                     CloseAccountWitness::apply_tx(&mut self.circuit_acc_tree, &close);
                 }
-                FranklinOp::FullExit(full_exit_op) => {
-                    let success = full_exit_op.withdraw_amount.is_some();
-                    FullExitWitness::apply_tx(
-                        &mut self.circuit_acc_tree,
-                        &(*full_exit_op, success),
-                    );
+                FranklinOp::FullExit(full_exit) => {
+                    let success = full_exit.withdraw_amount.is_some();
+                    FullExitWitness::apply_tx(&mut self.circuit_acc_tree, &(*full_exit, success));
                 }
-                FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
+                FranklinOp::ChangePubKeyOffchain(change_pubkey) => {
                     ChangePubkeyOffChainWitness::apply_tx(
                         &mut self.circuit_acc_tree,
-                        &change_pkhash_op,
+                        &change_pubkey,
                     );
+                }
+                FranklinOp::ForcedExit(forced_exit) => {
+                    ForcedExitWitness::apply_tx(&mut self.circuit_acc_tree, &forced_exit);
                 }
                 FranklinOp::Noop(_) => {}
             }

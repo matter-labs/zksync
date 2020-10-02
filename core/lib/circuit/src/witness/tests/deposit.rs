@@ -32,7 +32,8 @@ fn test_deposit_in_empty_leaf() {
         deposit_op,
         (),
         |plasma_state, op| {
-            plasma_state.apply_deposit_op(op);
+            <PlasmaState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                .expect("Deposit failed");
             vec![]
         },
     );
@@ -70,7 +71,8 @@ fn test_deposit_existing_account() {
             deposit_op,
             (),
             |plasma_state, op| {
-                plasma_state.apply_deposit_op(op);
+                <PlasmaState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                    .expect("Deposit failed");
                 vec![]
             },
         );
@@ -106,7 +108,8 @@ fn test_incorrect_deposit_address() {
         deposit_op,
         (),
         |plasma_state, op| {
-            plasma_state.apply_deposit_op(op);
+            <PlasmaState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                .expect("Deposit failed");
             vec![]
         },
     );

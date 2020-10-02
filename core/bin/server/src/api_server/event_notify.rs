@@ -566,14 +566,20 @@ impl OperationNotifier {
         let action = op.action.get_type();
 
         self.handle_executed_operations(
-            op.block.block_transactions,
+            op.block.block_transactions.clone(),
             action,
             op.block.block_number,
         )?;
 
         let mut storage = self.db_pool.access_storage_fragile().await?;
 
-        let updated_accounts = op.accounts_updated.iter().map(|(id, _)| *id);
+        let updated_accounts: Vec<AccountId> = op
+            .block
+            .block_transactions
+            .iter()
+            .map(|exec_op| exec_op.get_updated_account_ids())
+            .flatten()
+            .collect();
 
         for id in updated_accounts {
             if let Some(subs) = self.account_subs.remove(&(id, action)) {

@@ -34,13 +34,13 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
 
     // Store the states in schema.
     StateSchema(&mut storage)
-        .commit_state_update(1, &updates_block_1)
+        .commit_state_update(1, &updates_block_1, 0)
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(2, &updates_block_2)
+        .commit_state_update(2, &updates_block_2, 0)
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(3, &updates_block_3)
+        .commit_state_update(3, &updates_block_3, 0)
         .await?;
 
     // We have to store the operations as well (and for verify below too).
@@ -154,12 +154,10 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         accounts_map = new_accounts_map;
 
         BlockSchema(&mut storage)
-            .execute_operation(get_operation(
-                block_number,
-                Action::Commit,
-                updates,
-                block_size,
-            ))
+            .execute_operation(get_operation(block_number, Action::Commit, block_size))
+            .await?;
+        StateSchema(&mut storage)
+            .commit_state_update(block_number, &updates, 0)
             .await?;
 
         ProverSchema(&mut storage)
@@ -171,7 +169,6 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 Action::Verify {
                     proof: Default::default(),
                 },
-                Vec::new(),
                 block_size,
             ))
             .await?;

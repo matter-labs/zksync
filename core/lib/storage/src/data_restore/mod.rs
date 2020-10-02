@@ -78,7 +78,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
         StateSchema(&mut transaction)
-            .commit_state_update(0, &[(0, genesis_acc_update)])
+            .commit_state_update(0, &[(0, genesis_acc_update)], 0)
             .await?;
         StateSchema(&mut transaction).apply_state_update(0).await?;
         transaction.commit().await?;

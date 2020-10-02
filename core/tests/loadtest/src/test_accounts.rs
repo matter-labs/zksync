@@ -101,10 +101,12 @@ impl TestWallet {
     }
 
     // Creates a signed change public key transaction.
-    pub async fn sign_change_pubkey(&self) -> Result<FranklinTx, ClientError> {
+    pub async fn sign_change_pubkey(&self, fee: BigUint) -> Result<FranklinTx, ClientError> {
         self.inner
             .start_change_pubkey()
             .nonce(self.pending_nonce())
+            .fee_token(Self::TOKEN_NAME)?
+            .fee(fee)
             .tx()
             .await
     }

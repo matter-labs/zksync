@@ -14,12 +14,12 @@ pub mod tx;
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{
-    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    ChangePubKeyOp, CloseOp, DepositOp, ForcedExitOp, FranklinOp, FullExitOp, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
-pub use self::tx::{Close, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
+pub use self::tx::{Close, ForcedExit, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
 
 pub use zksync_basic_types::*;
 
@@ -69,7 +69,6 @@ pub struct Operation {
     pub id: Option<i64>,
     pub action: Action,
     pub block: Block,
-    pub accounts_updated: AccountUpdates,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]

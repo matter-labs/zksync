@@ -79,6 +79,8 @@ type ChangePubKey = {
         newPkHash: string;
         nonce: number;
         type: string;
+        feeToken: number;
+        fee: string;
     };
     success: boolean;
     fail_reason?: string;

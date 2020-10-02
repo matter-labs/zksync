@@ -2,6 +2,7 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
+use zksync_state::{handler::TxHandler, state::PlasmaState};
 use zksync_types::{operations::FullExitOp, FullExit};
 // Local deps
 use crate::witness::{
@@ -33,7 +34,8 @@ fn test_full_exit_success() {
         (full_exit_op, success),
         (),
         |plasma_state, op| {
-            plasma_state.apply_full_exit_op(&op.0);
+            <PlasmaState as TxHandler<FullExit>>::apply_op(plasma_state, &op.0)
+                .expect("FullExit failed");
             vec![]
         },
     );
@@ -60,7 +62,8 @@ fn test_full_exit_failure_no_account_in_tree() {
         (full_exit_op, success),
         (),
         |plasma_state, op| {
-            plasma_state.apply_full_exit_op(&op.0);
+            <PlasmaState as TxHandler<FullExit>>::apply_op(plasma_state, &op.0)
+                .expect("FullExit failed");
             vec![]
         },
     );

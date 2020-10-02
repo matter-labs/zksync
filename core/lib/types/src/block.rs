@@ -71,6 +71,12 @@ impl ExecutedOperations {
         self.get_executed_op()
             .map(|op| op.eth_witness().unwrap_or_else(Vec::new))
     }
+
+    pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
+        self.get_executed_op()
+            .map(|op| op.get_updated_account_ids())
+            .unwrap_or_else(Vec::new)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -82,4 +82,8 @@ impl TransferToNewOp {
             to: to_id,
         })
     }
+
+    pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
+        vec![self.from, self.to]
+    }
 }

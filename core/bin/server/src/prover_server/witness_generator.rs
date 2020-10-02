@@ -8,8 +8,8 @@ use crate::panic_notify::ThreadPanicNotify;
 use std::time::Instant;
 use zksync_circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
-    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
+    FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 use zksync_crypto::params::{account_tree_depth, CHUNK_BIT_WIDTH};
@@ -383,10 +383,31 @@ async fn build_prover_block_data(
                     &change_pkhash_op,
                 );
 
-                let change_pkhash_operations = change_pkhash_witness.calculate_operations(());
+                let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
+                    .map_err(|e| format_err!("{}", e))?;
+                let change_pkhash_operations = change_pkhash_witness.calculate_operations(input);
 
                 operations.extend(change_pkhash_operations);
+                fees.push(CollectedFee {
+                    token: change_pkhash_op.tx.fee_token,
+                    amount: change_pkhash_op.tx.fee,
+                });
                 pub_data.extend(change_pkhash_witness.get_pubdata());
+            }
+            FranklinOp::ForcedExit(forced_exit) => {
+                let forced_exit_witness =
+                    ForcedExitWitness::apply_tx(&mut witness_accum.account_tree, &forced_exit);
+
+                let input = SigDataInput::from_forced_exit_op(&forced_exit)
+                    .map_err(|e| format_err!("{}", e))?;
+                let forced_exit_operations = forced_exit_witness.calculate_operations(input);
+
+                operations.extend(forced_exit_operations);
+                fees.push(CollectedFee {
+                    token: forced_exit.tx.token,
+                    amount: forced_exit.tx.fee,
+                });
+                pub_data.extend(forced_exit_witness.get_pubdata());
             }
             FranklinOp::Noop(_) => {} // Noops are handled below
         }

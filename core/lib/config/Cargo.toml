@@ -13,3 +13,4 @@ categories = ["cryptography"]
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
 url = "2.1"
+log = "0.4"

@@ -25,7 +25,7 @@ use zksync_types::{
 };
 // Local uses
 use crate::{
-    committer::{BlockCommitRequest, CommitRequest},
+    committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     gas_counter::GasCounter,
     mempool::ProposedBlock,
 };
@@ -62,6 +62,8 @@ struct PendingBlock {
     fast_processing_required: bool,
     /// Fee should be applied only when sealing the block (because of corresponding logic in the circuit)
     collected_fees: Vec<CollectedFee>,
+    /// Number of stored account updates in the db (from `account_updates` field)
+    stored_account_updates: usize,
 }
 
 impl PendingBlock {
@@ -78,6 +80,7 @@ impl PendingBlock {
             gas_counter: GasCounter::new(),
             fast_processing_required: false,
             collected_fees: Vec::new(),
+            stored_account_updates: 0,
         }
     }
 }
@@ -405,6 +408,7 @@ impl ZksyncStateKeeper {
                     }
                 }
             }
+            self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
             log::info!(
                 "Executed restored proposed block: {} transactions, {} priority operations, {} failed transactions",
@@ -449,7 +453,7 @@ impl ZksyncStateKeeper {
         transaction
             .chain()
             .state_schema()
-            .commit_state_update(0, &[(0, db_account_update)])
+            .commit_state_update(0, &[(0, db_account_update)], 0)
             .await
             .expect("db fail");
         transaction
@@ -681,10 +685,7 @@ impl ZksyncStateKeeper {
                     self.pending_block.chunks_left -= chunks_needed;
                     self.pending_block.account_updates.append(&mut updates);
                     if let Some(fee) = fee {
-                        let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
-                        self.pending_block
-                            .account_updates
-                            .extend(fee_updates.into_iter());
+                        self.pending_block.collected_fees.push(fee);
                     }
                     let block_index = self.pending_block.pending_op_block_index;
                     self.pending_block.pending_op_block_index += 1;
@@ -862,8 +863,15 @@ impl ZksyncStateKeeper {
                 commit_gas_limit,
                 verify_gas_limit,
             ),
-            accounts_updated: pending_block.account_updates,
+            accounts_updated: pending_block.account_updates.clone(),
         };
+        let first_update_order_id = pending_block.stored_account_updates;
+        let account_updates = pending_block.account_updates[first_update_order_id..].to_vec();
+        let applied_updates_request = AppliedUpdatesRequest {
+            account_updates,
+            first_update_order_id,
+        };
+        pending_block.stored_account_updates = pending_block.account_updates.len();
         self.state.block_number += 1;
 
         log::info!(
@@ -874,7 +882,7 @@ impl ZksyncStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let commit_request = CommitRequest::Block(block_commit_request);
+        let commit_request = CommitRequest::Block((block_commit_request, applied_updates_request));
         self.tx_for_commitments
             .send(commit_request)
             .await
@@ -895,6 +903,13 @@ impl ZksyncStateKeeper {
             success_operations: self.pending_block.success_operations.clone(),
             failed_txs: self.pending_block.failed_txs.clone(),
         };
+        let first_update_order_id = self.pending_block.stored_account_updates;
+        let account_updates = self.pending_block.account_updates[first_update_order_id..].to_vec();
+        let applied_updates_request = AppliedUpdatesRequest {
+            account_updates,
+            first_update_order_id,
+        };
+        self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
         log::trace!(
             "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
@@ -905,7 +920,7 @@ impl ZksyncStateKeeper {
             pending_block.pending_block_iteration
         );
 
-        let commit_request = CommitRequest::PendingBlock(pending_block);
+        let commit_request = CommitRequest::PendingBlock((pending_block, applied_updates_request));
         self.tx_for_commitments
             .send(commit_request)
             .await

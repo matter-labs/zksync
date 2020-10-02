@@ -52,6 +52,13 @@ impl ResponseAccountState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct AccountStateInfo {
+    pub account_id: Option<AccountId>,
+    pub committed: ResponseAccountState,
+    pub verified: ResponseAccountState,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositingFunds {

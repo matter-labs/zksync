@@ -510,6 +510,20 @@ impl SigDataInput {
         )
     }
 
+    pub fn from_change_pubkey_op(change_pubkey_op: &ChangePubKeyOp) -> Result<Self, String> {
+        let sign_packed = change_pubkey_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &change_pubkey_op.tx.get_bytes(),
+            &change_pubkey_op.tx.signature.pub_key,
+        )
+    }
+
     pub fn from_withdraw_op(withdraw_op: &WithdrawOp) -> Result<Self, String> {
         let sign_packed = withdraw_op
             .tx
@@ -521,6 +535,20 @@ impl SigDataInput {
             &sign_packed,
             &withdraw_op.tx.get_bytes(),
             &withdraw_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_forced_exit_op(forced_exit_op: &ForcedExitOp) -> Result<Self, String> {
+        let sign_packed = forced_exit_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &forced_exit_op.tx.get_bytes(),
+            &forced_exit_op.tx.signature.pub_key,
         )
     }
 

@@ -1,6 +1,7 @@
 use num::BigUint;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
+    tokens::TxFeeTypes,
     FranklinTx, Nonce, Token, TokenLike,
 };
 
@@ -27,23 +28,29 @@ impl<'a> ChangePubKeyBuilder<'a> {
         }
     }
 
-    /// Directly returns the signed change public key transaction for the subsequent usage.
+    /// Sends the transaction, returning the handle for its awaiting.
     pub async fn tx(self) -> Result<FranklinTx, ClientError> {
-        // Currently fees aren't supported by ChangePubKey tx, but they will be in the near future.
-        // let fee = match self.fee {
-        //     Some(fee) => fee,
-        //     None => {
-        //         let fee = self
-        //             .wallet
-        //             .provider
-        //             .get_tx_fee(TxFeeTypes::Transfer, self.wallet.address(), fee_token.id)
-        //             .await?;
-        //         fee.total_fee
-        //     }
-        // };
-        // let _fee_token = self
-        //     .fee_token
-        //     .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
+        let fee_token = self
+            .fee_token
+            .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
+
+        let fee = match self.fee {
+            Some(fee) => fee,
+            None => {
+                let fee = self
+                    .wallet
+                    .provider
+                    .get_tx_fee(
+                        TxFeeTypes::ChangePubKey {
+                            onchain_pubkey_auth: self.onchain_auth,
+                        },
+                        self.wallet.address(),
+                        fee_token.id,
+                    )
+                    .await?;
+                fee.total_fee
+            }
+        };
 
         let nonce = match self.nonce {
             Some(nonce) => nonce,
@@ -57,11 +64,12 @@ impl<'a> ChangePubKeyBuilder<'a> {
             }
         };
 
-        self.wallet
-            .signer
-            .sign_change_pubkey_tx(nonce, self.onchain_auth)
-            .map(|tx| FranklinTx::ChangePubKey(Box::new(tx)))
-            .map_err(ClientError::SigningError)
+        Ok(FranklinTx::from(
+            self.wallet
+                .signer
+                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee)
+                .map_err(ClientError::SigningError)?,
+        ))
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
