@@ -4,7 +4,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use num::BigUint;
 use rand::Rng;
 // Workspace uses
-use models::{tx::PackedEthSignature, AccountId, Address, FranklinTx, PriorityOp};
+use models::{
+    helpers::closest_packable_fee_amount, tx::PackedEthSignature, AccountId, Address, FranklinTx,
+    PriorityOp, TxFeeTypes,
+};
 use zksync::{
     error::ClientError, utils::biguint_to_u256, web3::types::H256, EthereumProvider, Network,
     Wallet, WalletCredentials,
@@ -92,6 +95,22 @@ impl TestWallet {
     /// Returns the wallet address.
     pub fn address(&self) -> Address {
         self.inner.address()
+    }
+
+    /// Returns minimum fee required to process transaction in zkSync network.
+    pub async fn min_tx_fee(
+        &self,
+        fee_type: TxFeeTypes,
+        address: Address,
+    ) -> Result<BigUint, ClientError> {
+        let fee = self
+            .monitor
+            .provider
+            .get_tx_fee(fee_type, address, Self::TOKEN_NAME)
+            .await?
+            .total_fee;
+
+        Ok(closest_packable_fee_amount(&fee))
     }
 
     /// Returns the current account ID.

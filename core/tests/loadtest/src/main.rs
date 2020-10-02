@@ -30,33 +30,47 @@ use tokio::runtime::Builder;
 use zksync::{Network, Provider};
 use zksync_config::ConfigurationOptions;
 // Local uses
-use self::{cli::CliOptions, scenarios::ScenarioContext};
+use self::{
+    cli::CliOptions, monitor::Monitor, scenarios::configs::AccountInfo, scenarios::ScenarioContext,
+};
 
 mod cli;
 mod monitor;
+mod ng;
 mod scenarios;
 mod sent_transactions;
 mod test_accounts;
 mod tps_counter;
 
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
-    let tokio_runtime = Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .expect("failed to construct tokio runtime");
+    let mut tokio_runtime = Builder::new().threaded_scheduler().enable_all().build()?;
 
     let env_config = ConfigurationOptions::from_env();
-    let CliOptions {
-        test_spec_path,
-        scenario_type,
-    } = CliOptions::from_args();
+    let monitor = Monitor::new(Provider::new(Network::Localhost));
+    let main_account = AccountInfo {
+        address: "36615Cf349d7F6344891B1e7CA7C72883F5dc049".parse()?,
+        private_key: "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110".parse()?,
+    };
+    let scenario = ng::scenarios::SimpleScenario {
+        transfer_size: 100_u64.into(),
+        wallets: 100,
+    };
+    tokio_runtime.block_on(scenario.run(monitor, main_account, env_config))?;
 
-    let provider = Provider::new(Network::Localhost);
-    let context = ScenarioContext::new(provider, env_config, test_spec_path, tokio_runtime);
+    // .run(monitor, main_account, env_config)
 
-    let scenario = scenario_type.into_scenario();
+    // let CliOptions {
+    //     test_spec_path,
+    //     scenario_type,
+    // } = CliOptions::from_args();
 
-    scenario(context);
+    // let provider = Provider::new(Network::Localhost);
+    // let context = ScenarioContext::new(provider, env_config, test_spec_path, tokio_runtime);
+
+    // let scenario = scenario_type.into_scenario();
+
+    // scenario(context);
+
+    Ok(())
 }

@@ -222,7 +222,7 @@ impl Monitor {
         Ok(())
     }
 
-    async fn wait_for_verify(&self) {
+    pub async fn wait_for_verify(&self) {
         let tasks = self
             .inner()
             .await
