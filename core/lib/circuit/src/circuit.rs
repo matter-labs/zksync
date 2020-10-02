@@ -17,10 +17,12 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use zksync_crypto::params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH};
+use zksync_crypto::params::{
+    self, FR_BIT_WIDTH_PADDED, SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
+};
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
-    CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 // Local deps
 use crate::{

@@ -309,12 +309,12 @@ impl ZksyncState {
     }
 
     /// Converts the `FranklinTx` object to a `FranklinOp`, without applying it.
-    pub fn franklin_tx_to_franklin_op(&self, tx: FranklinTx) -> Result<FranklinOp, failure::Error> {
+    pub fn franklin_tx_to_franklin_op(&self, tx: FranklinTx) -> Result<FranklinOp, anyhow::Error> {
         match tx {
             FranklinTx::Transfer(tx) => self.create_op(*tx).map(TransferOutcome::into_franklin_op),
             FranklinTx::Withdraw(tx) => self.create_op(*tx).map(Into::into),
             FranklinTx::ChangePubKey(tx) => self.create_op(*tx).map(Into::into),
-            FranklinTx::Close(_) => failure::bail!("Close op is disabled"),
+            FranklinTx::Close(_) => anyhow::bail!("Close op is disabled"),
             FranklinTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
         }
     }

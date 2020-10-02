@@ -1,28 +1,28 @@
-use failure::{bail, ensure};
-use models::{AccountUpdate, AccountUpdates, Close, CloseOp, TokenId};
+use anyhow::{bail, ensure};
 use num::BigUint;
 use zksync_crypto::params::{self, max_account_id};
+use zksync_types::{AccountUpdate, AccountUpdates, Close, CloseOp, TokenId};
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState},
+    state::{CollectedFee, OpSuccess, ZksyncState},
 };
 
-impl TxHandler<Close> for PlasmaState {
+impl TxHandler<Close> for ZksyncState {
     type Op = CloseOp;
 
-    fn create_op(&self, _tx: Close) -> Result<Self::Op, failure::Error> {
+    fn create_op(&self, _tx: Close) -> Result<Self::Op, anyhow::Error> {
         panic!("Attempt to create disabled closed op");
     }
 
-    fn apply_tx(&mut self, _tx: Close) -> Result<OpSuccess, failure::Error> {
+    fn apply_tx(&mut self, _tx: Close) -> Result<OpSuccess, anyhow::Error> {
         bail!("Account closing is disabled");
     }
 
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         ensure!(
             op.account_id <= max_account_id(),
             "Close account id is bigger than max supported"

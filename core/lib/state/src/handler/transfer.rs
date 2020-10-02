@@ -1,19 +1,19 @@
-use failure::{ensure, format_err};
-use models::{
+use anyhow::{ensure, format_err};
+use zksync_crypto::params::{self, max_account_id};
+use zksync_types::{
     Account, AccountUpdate, AccountUpdates, Address, PubKeyHash, Transfer, TransferOp,
     TransferToNewOp,
 };
-use zksync_crypto::params::{self, max_account_id};
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState, TransferOutcome},
+    state::{CollectedFee, OpSuccess, TransferOutcome, ZksyncState},
 };
 
-impl TxHandler<Transfer> for PlasmaState {
+impl TxHandler<Transfer> for ZksyncState {
     type Op = TransferOutcome;
 
-    fn create_op(&self, tx: Transfer) -> Result<Self::Op, failure::Error> {
+    fn create_op(&self, tx: Transfer) -> Result<Self::Op, anyhow::Error> {
         ensure!(
             tx.token <= params::max_token_id(),
             "Token id is not supported"
@@ -49,7 +49,7 @@ impl TxHandler<Transfer> for PlasmaState {
         Ok(outcome)
     }
 
-    fn apply_tx(&mut self, tx: Transfer) -> Result<OpSuccess, failure::Error> {
+    fn apply_tx(&mut self, tx: Transfer) -> Result<OpSuccess, anyhow::Error> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<Transfer>>::apply_op(self, &op)?;
@@ -63,7 +63,7 @@ impl TxHandler<Transfer> for PlasmaState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         match op {
             TransferOutcome::Transfer(transfer_op) => self.apply_transfer_op(&transfer_op),
             TransferOutcome::TransferToNew(transfer_to_new_op) => {
@@ -73,11 +73,11 @@ impl TxHandler<Transfer> for PlasmaState {
     }
 }
 
-impl PlasmaState {
+impl ZksyncState {
     fn apply_transfer_op(
         &mut self,
         op: &TransferOp,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         ensure!(
             op.from <= max_account_id(),
             "Transfer from account id is bigger than max supported"
@@ -149,7 +149,7 @@ impl PlasmaState {
     fn apply_transfer_op_to_self(
         &mut self,
         op: &TransferOp,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         ensure!(
             op.from <= max_account_id(),
             "Transfer to self from account id is bigger than max supported"
@@ -199,7 +199,7 @@ impl PlasmaState {
     fn apply_transfer_to_new_op(
         &mut self,
         op: &TransferToNewOp,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         let mut updates = Vec::new();
 
         ensure!(

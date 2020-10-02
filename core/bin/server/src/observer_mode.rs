@@ -6,8 +6,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use zksync_circuit::witness::{
-    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
+    FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;

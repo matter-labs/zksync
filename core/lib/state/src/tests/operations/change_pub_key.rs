@@ -1,5 +1,4 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
-use zksync_crypto::{params, rand::Rng};
 use zksync_types::account::{AccountUpdate, PubKeyHash};
 use zksync_types::tx::ChangePubKey;
 

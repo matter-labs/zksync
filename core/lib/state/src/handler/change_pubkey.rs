@@ -1,20 +1,20 @@
-use failure::{ensure, format_err};
-use models::{
+use anyhow::{ensure, format_err};
+use zksync_crypto::params;
+use zksync_types::{
     operations::{ChangePubKeyOp, FranklinOp},
     tx::ChangePubKey,
     AccountUpdate, AccountUpdates,
 };
-use zksync_crypto::params;
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState},
+    state::{CollectedFee, OpSuccess, ZksyncState},
 };
 
-impl TxHandler<ChangePubKey> for PlasmaState {
+impl TxHandler<ChangePubKey> for ZksyncState {
     type Op = ChangePubKeyOp;
 
-    fn create_op(&self, tx: ChangePubKey) -> Result<Self::Op, failure::Error> {
+    fn create_op(&self, tx: ChangePubKey) -> Result<Self::Op, anyhow::Error> {
         let (account_id, account) = self
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
@@ -39,7 +39,7 @@ impl TxHandler<ChangePubKey> for PlasmaState {
         Ok(change_pk_op)
     }
 
-    fn apply_tx(&mut self, tx: ChangePubKey) -> Result<OpSuccess, failure::Error> {
+    fn apply_tx(&mut self, tx: ChangePubKey) -> Result<OpSuccess, anyhow::Error> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<ChangePubKey>>::apply_op(self, &op)?;
@@ -53,7 +53,7 @@ impl TxHandler<ChangePubKey> for PlasmaState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         let mut updates = Vec::new();
         let mut account = self.get_account(op.account_id).unwrap();
 

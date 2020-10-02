@@ -10,13 +10,13 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use plasma::{
+use zksync_state::{
     handler::TxHandler,
-    state::{PlasmaState, TransferOutcome},
+    state::{TransferOutcome, ZksyncState},
 };
 use zksync_types::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
-    Address, Deposit, FullExit,
+    Address, Deposit, FullExit, Transfer, Withdraw,
 };
 // Local deps
 use crate::{
@@ -162,7 +162,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 
     // Apply deposit ops.
     for deposit_op in deposit_ops {
-        <PlasmaState as TxHandler<Deposit>>::apply_op(&mut plasma_state, &deposit_op)
+        <ZksyncState as TxHandler<Deposit>>::apply_op(&mut plasma_state, &deposit_op)
             .expect("Deposit failed");
 
         let witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
@@ -174,7 +174,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 
     // Apply transfer op.
     let raw_op = TransferOutcome::Transfer(transfer_op.clone());
-    let fee = <PlasmaState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
+    let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
         .expect("Operation failed")
         .0
         .unwrap();
@@ -188,7 +188,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 
     // Apply transfer to new op.
     let raw_op = TransferOutcome::TransferToNew(transfer_to_new_op.clone());
-    let fee = <PlasmaState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
+    let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
         .expect("Operation failed")
         .0
         .unwrap();
@@ -202,7 +202,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
 
     // Apply withdraw op.
-    let fee = <PlasmaState as TxHandler<Withdraw>>::apply_op(&mut plasma_state, &withdraw_op)
+    let fee = <ZksyncState as TxHandler<Withdraw>>::apply_op(&mut plasma_state, &withdraw_op)
         .expect("Operation failed")
         .0
         .unwrap();
@@ -216,7 +216,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 
     // Apply full exit op.
 
-    <PlasmaState as TxHandler<FullExit>>::apply_op(&mut plasma_state, &full_exit_op)
+    <ZksyncState as TxHandler<FullExit>>::apply_op(&mut plasma_state, &full_exit_op)
         .expect("Operation failed");
 
     let witness = FullExitWitness::apply_tx(

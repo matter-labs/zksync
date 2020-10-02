@@ -1,16 +1,16 @@
-use failure::{ensure, format_err};
-use models::{AccountUpdate, AccountUpdates, FranklinOp, PubKeyHash, Withdraw, WithdrawOp};
+use anyhow::{ensure, format_err};
 use zksync_crypto::params::{self, max_account_id};
+use zksync_types::{AccountUpdate, AccountUpdates, FranklinOp, PubKeyHash, Withdraw, WithdrawOp};
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState},
+    state::{CollectedFee, OpSuccess, ZksyncState},
 };
 
-impl TxHandler<Withdraw> for PlasmaState {
+impl TxHandler<Withdraw> for ZksyncState {
     type Op = WithdrawOp;
 
-    fn create_op(&self, tx: Withdraw) -> Result<Self::Op, failure::Error> {
+    fn create_op(&self, tx: Withdraw) -> Result<Self::Op, anyhow::Error> {
         ensure!(
             tx.token <= params::max_token_id(),
             "Token id is not supported"
@@ -35,7 +35,7 @@ impl TxHandler<Withdraw> for PlasmaState {
         Ok(withdraw_op)
     }
 
-    fn apply_tx(&mut self, tx: Withdraw) -> Result<OpSuccess, failure::Error> {
+    fn apply_tx(&mut self, tx: Withdraw) -> Result<OpSuccess, anyhow::Error> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<Withdraw>>::apply_op(self, &op)?;
@@ -49,7 +49,7 @@ impl TxHandler<Withdraw> for PlasmaState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         ensure!(
             op.account_id <= max_account_id(),
             "Withdraw account id is bigger than max supported"

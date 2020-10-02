@@ -1,15 +1,15 @@
-use models::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, FranklinOp};
 use zksync_crypto::params;
+use zksync_types::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, FranklinOp};
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState},
+    state::{CollectedFee, OpSuccess, ZksyncState},
 };
 
-impl TxHandler<Deposit> for PlasmaState {
+impl TxHandler<Deposit> for ZksyncState {
     type Op = DepositOp;
 
-    fn create_op(&self, priority_op: Deposit) -> Result<Self::Op, failure::Error> {
+    fn create_op(&self, priority_op: Deposit) -> Result<Self::Op, anyhow::Error> {
         assert!(
             priority_op.token <= params::max_token_id(),
             "Deposit token is out of range, this should be enforced by contract"
@@ -28,7 +28,7 @@ impl TxHandler<Deposit> for PlasmaState {
         Ok(op)
     }
 
-    fn apply_tx(&mut self, priority_op: Deposit) -> Result<OpSuccess, failure::Error> {
+    fn apply_tx(&mut self, priority_op: Deposit) -> Result<OpSuccess, anyhow::Error> {
         let op = self.create_op(priority_op)?;
 
         let (fee, updates) = <Self as TxHandler<Deposit>>::apply_op(self, &op)?;
@@ -44,7 +44,7 @@ impl TxHandler<Deposit> for PlasmaState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         let mut updates = Vec::new();
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {

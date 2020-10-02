@@ -1,5 +1,5 @@
 use crate::state::{CollectedFee, OpSuccess};
-use models::AccountUpdates;
+use zksync_types::AccountUpdates;
 
 mod change_pubkey;
 mod close;
@@ -22,14 +22,14 @@ pub trait TxHandler<Tx> {
     type Op;
 
     /// Creates an operation wrapper from the given transaction.
-    fn create_op(&self, tx: Tx) -> Result<Self::Op, failure::Error>;
+    fn create_op(&self, tx: Tx) -> Result<Self::Op, anyhow::Error>;
 
     /// Applies the transaction.
-    fn apply_tx(&mut self, tx: Tx) -> Result<OpSuccess, failure::Error>;
+    fn apply_tx(&mut self, tx: Tx) -> Result<OpSuccess, anyhow::Error>;
 
     /// Applies the operation.
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error>;
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error>;
 }

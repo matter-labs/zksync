@@ -27,7 +27,7 @@ use zksync_crypto::{
 };
 use zksync_state::state::CollectedFee;
 use zksync_types::{
-    operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
+    operations::{ChangePubKeyOp, CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp},
     tx::PackedPublicKey,
     AccountId, BlockNumber,
 };

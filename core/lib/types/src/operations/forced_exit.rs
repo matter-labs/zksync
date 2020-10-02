@@ -3,7 +3,7 @@ use crate::{
     helpers::{pack_fee_amount, unpack_fee_amount},
     ForcedExit,
 };
-use failure::{ensure, format_err};
+use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
@@ -59,7 +59,7 @@ impl ForcedExitOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         ensure!(
             bytes.len() == Self::CHUNKS * CHUNK_BYTES,
             "Wrong bytes length for forced exit pubdata"

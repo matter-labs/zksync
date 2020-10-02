@@ -2,6 +2,7 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
+use zksync_state::{handler::TxHandler, state::ZksyncState};
 use zksync_types::{operations::DepositOp, Deposit};
 // Local deps
 use crate::witness::{
@@ -32,7 +33,7 @@ fn test_deposit_in_empty_leaf() {
         deposit_op,
         (),
         |plasma_state, op| {
-            <PlasmaState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+            <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
                 .expect("Deposit failed");
             vec![]
         },
@@ -71,7 +72,7 @@ fn test_deposit_existing_account() {
             deposit_op,
             (),
             |plasma_state, op| {
-                <PlasmaState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
                     .expect("Deposit failed");
                 vec![]
             },
@@ -108,7 +109,7 @@ fn test_incorrect_deposit_address() {
         deposit_op,
         (),
         |plasma_state, op| {
-            <PlasmaState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+            <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
                 .expect("Deposit failed");
             vec![]
         },

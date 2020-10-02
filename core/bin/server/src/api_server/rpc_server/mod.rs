@@ -427,7 +427,7 @@ impl RpcApp {
     /// to set the signing key. While `ForcedExit` operation doesn't do anything
     /// bad to the account, it's more user-friendly to only allow this operation
     /// after we're somewhat sure that zkSync account is not owned by anybody.
-    async fn check_forced_exit(&self, forced_exit: &models::ForcedExit) -> Result<()> {
+    async fn check_forced_exit(&self, forced_exit: &zksync_types::ForcedExit) -> Result<()> {
         let target_account_address = forced_exit.target;
         let mut storage = self.access_storage().await?;
         let account_age = storage

@@ -1,17 +1,17 @@
-use models::{AccountUpdate, AccountUpdates, FranklinOp, FullExit, FullExitOp};
 use num::BigUint;
 use zksync_crypto::params;
+use zksync_types::{AccountUpdate, AccountUpdates, FranklinOp, FullExit, FullExitOp};
 use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState},
+    state::{CollectedFee, OpSuccess, ZksyncState},
 };
 
-impl TxHandler<FullExit> for PlasmaState {
+impl TxHandler<FullExit> for ZksyncState {
     type Op = FullExitOp;
 
-    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, failure::Error> {
+    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, anyhow::Error> {
         // NOTE: Authorization of the FullExit is verified on the contract.
         assert!(
             priority_op.token <= params::max_token_id(),
@@ -33,7 +33,7 @@ impl TxHandler<FullExit> for PlasmaState {
         Ok(op)
     }
 
-    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, failure::Error> {
+    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, anyhow::Error> {
         let op = self.create_op(priority_op)?;
 
         let (fee, updates) = <Self as TxHandler<FullExit>>::apply_op(self, &op)?;
@@ -49,7 +49,7 @@ impl TxHandler<FullExit> for PlasmaState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
             amount.clone()

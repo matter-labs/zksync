@@ -1,17 +1,19 @@
-use failure::{ensure, format_err};
-use models::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, FranklinOp, PubKeyHash};
+use anyhow::{ensure, format_err};
 use zksync_crypto::params;
+use zksync_types::{
+    AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, FranklinOp, PubKeyHash,
+};
 use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, PlasmaState},
+    state::{CollectedFee, OpSuccess, ZksyncState},
 };
 
-impl TxHandler<ForcedExit> for PlasmaState {
+impl TxHandler<ForcedExit> for ZksyncState {
     type Op = ForcedExitOp;
 
-    fn create_op(&self, tx: ForcedExit) -> Result<Self::Op, failure::Error> {
+    fn create_op(&self, tx: ForcedExit) -> Result<Self::Op, anyhow::Error> {
         // Check the tx signature.
         let initiator_account = self
             .get_account(tx.initiator_account_id)
@@ -52,7 +54,7 @@ impl TxHandler<ForcedExit> for PlasmaState {
         Ok(forced_exit_op)
     }
 
-    fn apply_tx(&mut self, tx: ForcedExit) -> Result<OpSuccess, failure::Error> {
+    fn apply_tx(&mut self, tx: ForcedExit) -> Result<OpSuccess, anyhow::Error> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<ForcedExit>>::apply_op(self, &op)?;
@@ -66,7 +68,7 @@ impl TxHandler<ForcedExit> for PlasmaState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), failure::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         ensure!(
             op.tx.initiator_account_id <= params::max_account_id(),
             "Incorrect initiator account ID"
