@@ -39,7 +39,7 @@ impl WalletCredentials {
         let eth_sign_message = if let Network::Mainnet = network {
             MESSAGE.into()
         } else {
-            format!("{}\nChainID: {}.", MESSAGE, network.chain_id())
+            format!("{}\nChain ID: {}.", MESSAGE, network.chain_id())
         }
         .into_bytes();
 

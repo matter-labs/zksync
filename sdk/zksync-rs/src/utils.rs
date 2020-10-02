@@ -1,10 +1,19 @@
-use crate::error::ClientError;
+use std::time::Duration;
+use std::time::Instant;
+
 use num::BigUint;
 use sha2::{Digest, Sha256};
+
 use zksync_crypto::bellman::{pairing::ff::PrimeField, PrimeFieldRepr};
 use zksync_crypto::franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use zksync_crypto::{priv_key_from_fs, Fs, PrivateKey};
 use zksync_types::U256;
+
+use models::AccountId;
+use models::U256;
+
+use crate::error::ClientError;
+use crate::wallet::Wallet;
 
 // Public re-exports.
 pub use zksync_types::helpers::{
@@ -42,6 +51,36 @@ pub fn private_key_from_seed(seed: &[u8]) -> Result<PrivateKey, ClientError> {
             }
         }
     }
+}
+
+///
+/// Waits until there is a zkSync account ID associated with the `wallet`.
+///
+/// Should be used after making the initial deposit or transfer to a newly created account.
+///
+pub async fn wait_for_account_id(wallet: &mut Wallet, timeout_ms: u64) -> Option<AccountId> {
+    let timeout = Duration::from_millis(timeout_ms);
+    let mut poller = tokio::time::interval(Duration::from_millis(100));
+    let start = Instant::now();
+
+    while wallet
+        .provider
+        .account_info(wallet.address())
+        .await
+        .ok()?
+        .id
+        .is_none()
+    {
+        if start.elapsed() > timeout {
+            return None;
+        }
+
+        poller.tick().await;
+    }
+
+    wallet.update_account_id().await.ok()?;
+
+    wallet.account_id()
 }
 
 /// Converts `U256` into the corresponding `BigUint` value.
