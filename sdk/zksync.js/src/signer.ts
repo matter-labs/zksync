@@ -107,13 +107,13 @@ export class Signer {
         fee: BigNumberish;
         nonce: number;
     }): ForcedExit {
-        const typeBytes = Buffer.from([8]);
+        const typeBytes = new Uint8Array([8]);
         const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
         const targetBytes = serializeAddress(forcedExit.target);
         const tokenIdBytes = serializeTokenId(forcedExit.tokenId);
         const feeBytes = serializeFeePacked(forcedExit.fee);
         const nonceBytes = serializeNonce(forcedExit.nonce);
-        const msgBytes = Buffer.concat([
+        const msgBytes = ethers.utils.concat([
             typeBytes,
             initiatorAccountIdBytes,
             targetBytes,
@@ -141,14 +141,14 @@ export class Signer {
         fee: BigNumberish;
         nonce: number;
     }): ChangePubKey {
-        const typeBytes = Buffer.from([7]); // Tx type (1 byte)
+        const typeBytes = new Uint8Array([7]); // Tx type (1 byte)
         const accountIdBytes = serializeAccountId(changePubKey.accountId);
         const accountBytes = serializeAddress(changePubKey.account);
         const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
         const tokenIdBytes = serializeTokenId(changePubKey.feeTokenId);
         const feeBytes = serializeFeePacked(changePubKey.fee);
         const nonceBytes = serializeNonce(changePubKey.nonce);
-        const msgBytes = Buffer.concat([
+        const msgBytes = ethers.utils.concat([
             typeBytes,
             accountIdBytes,
             accountBytes,
