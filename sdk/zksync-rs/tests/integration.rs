@@ -207,9 +207,13 @@ async fn test_deposit(
 }
 
 /// Checks the correctness of the `ChangePubKey` operation.
-async fn test_change_pubkey(sync_wallet: &Wallet) -> Result<(), anyhow::Error> {
+async fn test_change_pubkey(sync_wallet: &Wallet, token_symbol: &str) -> Result<(), anyhow::Error> {
     if !sync_wallet.is_signing_key_set().await? {
-        let handle = sync_wallet.start_change_pubkey().send().await?;
+        let handle = sync_wallet
+            .start_change_pubkey()
+            .fee_token(token_symbol)?
+            .send()
+            .await?;
 
         handle
             .commit_timeout(Duration::from_secs(60))
@@ -414,7 +418,7 @@ async fn move_funds(
     test_deposit(depositor_wallet, alice, &token, deposit_amount).await?;
     println!("Deposit ok, Token: {}", token.symbol);
 
-    test_change_pubkey(alice).await?;
+    test_change_pubkey(alice, &token.symbol).await?;
     println!("Change pubkey ok");
 
     test_transfer(alice, bob, &token.symbol, transfer_amount).await?;
@@ -473,7 +477,11 @@ async fn init_account_with_one_ether() -> Result<Wallet, anyhow::Error> {
     wait_for_deposit_and_update_account_id(&mut wallet).await;
 
     if !wallet.is_signing_key_set().await? {
-        let handle = wallet.start_change_pubkey().send().await?;
+        let handle = wallet
+            .start_change_pubkey()
+            .fee_token("ETH")?
+            .send()
+            .await?;
 
         handle
             .commit_timeout(Duration::from_secs(60))

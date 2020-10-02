@@ -139,7 +139,9 @@ pub struct OngoingDeposits {
 pub enum OutputFeeType {
     Transfer,
     TransferToNew,
+    FastWithdraw,
     Withdraw,
+    ChangePubKey { onchain_pubkey_auth: bool },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
