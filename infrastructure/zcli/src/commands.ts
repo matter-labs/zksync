@@ -168,7 +168,9 @@ class TxSubmitter {
     private async transfer(txDetails: TxDetails, fast: boolean) {
         const { to, token, amount } = txDetails;
         if (!(await this.syncWallet.isSigningKeySet())) {
-            const changePubkey = await this.syncWallet.setSigningKey();
+            const changePubkey = await this.syncWallet.setSigningKey({
+                feeToken: token
+            });
             await changePubkey.awaitReceipt();
         }
         const txHandle = await this.syncWallet.syncTransfer({

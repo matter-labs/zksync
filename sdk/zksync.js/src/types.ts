@@ -88,12 +88,25 @@ export interface Withdraw {
     signature: Signature;
 }
 
+export interface ForcedExit {
+    type: "ForcedExit";
+    initiatorAccountId: number;
+    target: Address;
+    token: number;
+    fee: BigNumberish;
+    nonce: number;
+    signature: Signature;
+}
+
 export interface ChangePubKey {
     type: "ChangePubKey";
     accountId: number;
     account: Address;
     newPkHash: PubKeyHash;
+    feeToken: number;
+    fee: BigNumberish;
     nonce: number;
+    signature: Signature;
     ethSignature: string;
 }
 
@@ -105,7 +118,7 @@ export interface CloseAccount {
 }
 
 export interface SignedTransaction {
-    tx: Transfer | Withdraw | ChangePubKey | CloseAccount;
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit;
     ethereumSignature?: TxEthSignature;
 }
 
@@ -142,9 +155,20 @@ export interface Tokens {
     };
 }
 
+export interface ChangePubKeyFee {
+    // Note: Ignore, since it just looks more intuitive if `"ChangePubKey"` is kept as a string literal)
+    // prettier-ignore
+    "ChangePubKey": {
+        // Denotes how authorization of operation is performed:
+        // 'true' if it's done by sending an Ethereum transaction,
+        // 'false' if it's done by providing an Ethereum signature in zkSync transaction.
+        onchainPubkeyAuth: boolean;
+    };
+}
+
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: "Withdraw" | "Transfer" | "TransferToNew" | "FastWithdraw";
+    feeType: "Withdraw" | "Transfer" | "TransferToNew" | "FastWithdraw" | ChangePubKeyFee;
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)

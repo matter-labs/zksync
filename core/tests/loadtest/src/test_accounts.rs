@@ -26,6 +26,7 @@ pub struct TestWallet {
 
 impl TestWallet {
     pub const TOKEN_NAME: &'static str = "ETH";
+    const FEE_FACTOR: u64 = 3;
 
     pub async fn from_info(
         monitor: Monitor,
@@ -97,18 +98,16 @@ impl TestWallet {
         self.inner.address()
     }
 
-    /// Returns minimum fee required to process transaction in zkSync network.
-    pub async fn min_tx_fee(
+    /// Returns sufficient fee required to process each kind of transactions in zkSync network.
+    pub async fn sufficient_fee(
         &self,
-        fee_type: TxFeeTypes,
-        address: Address,
     ) -> Result<BigUint, ClientError> {
         let fee = self
             .monitor
             .provider
-            .get_tx_fee(fee_type, address, Self::TOKEN_NAME)
+            .get_tx_fee(TxFeeTypes::Transfer, Address::zero(), Self::TOKEN_NAME)
             .await?
-            .total_fee;
+            .total_fee * BigUint::from(Self::FEE_FACTOR);
 
         Ok(closest_packable_fee_amount(&fee))
     }
@@ -124,10 +123,12 @@ impl TestWallet {
     }
 
     // Creates a signed change public key transaction.
-    pub async fn sign_change_pubkey(&self) -> Result<FranklinTx, ClientError> {
+    pub async fn sign_change_pubkey(&self, fee: BigUint) -> Result<FranklinTx, ClientError> {
         self.inner
             .start_change_pubkey()
             .nonce(self.pending_nonce())
+            .fee_token(Self::TOKEN_NAME)?
+            .fee(fee)
             .tx()
             .await
     }

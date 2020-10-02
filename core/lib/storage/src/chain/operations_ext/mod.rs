@@ -1,11 +1,13 @@
 // Built-in deps
 // External imports
+use chrono::{DateTime, Utc};
 // Workspace imports
 use models::ActionType;
 use models::{Address, TokenId};
 // Local imports
 use self::records::{
-    PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
+    AccountCreatedAt, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,
+    TxReceiptResponse,
 };
 use crate::tokens::TokensSchema;
 use crate::StorageProcessor;
@@ -259,6 +261,53 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         };
 
         Ok(None)
+    }
+
+    /// Loads the date and time of the moment when the first transaction for the account was executed.
+    /// Can be `None` if there were no transactions associated with provided address.
+    pub async fn account_created_on(
+        &mut self,
+        address: &Address,
+    ) -> QueryResult<Option<DateTime<Utc>>> {
+        // This query loads the `committed_at` field from both `executed_transactions` and
+        // `executed_priority_operations` tables and returns the oldest result.
+        let first_history_entry = sqlx::query_as!(
+            AccountCreatedAt,
+            r#"
+            select 
+                created_at as "created_at!"
+            from (
+                    select
+                        created_at
+                    from
+                        executed_transactions
+                    where
+                        from_account = $1
+                        or
+                        to_account = $1
+                        or
+                        primary_account_address = $1
+                    union all
+                    select
+                        created_at
+                    from 
+                        executed_priority_operations
+                    where 
+                        from_account = $1
+                        or
+                        to_account = $1
+            ) t
+            order by
+                created_at asc
+            limit 
+                1
+            "#,
+            address.as_ref(),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        Ok(first_history_entry.map(|entry| entry.created_at))
     }
 
     /// Loads the range of the transactions applied to the account starting

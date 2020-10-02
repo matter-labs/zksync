@@ -43,7 +43,9 @@ describe('Fetching Information', () => {
             approveDepositAmountForERC20: true
         });
         await Promise.all([ethDeposit.awaitReceipt(), daiDeposit.awaitReceipt()]);
-        const changePubkey = await aliceWallet.setSigningKey();
+        const changePubkey = await aliceWallet.setSigningKey({
+            feeToken: 'ETH'
+        });
         await changePubkey.awaitReceipt();
         const txHandle = await aliceWallet.syncTransfer({
             to: bob.address,
@@ -65,7 +67,7 @@ describe('Fetching Information', () => {
             expect(info.nonce).to.equal(2);
             expect(info.balances).to.have.property('DAI', '18.0');
             expect(info.balances.ETH).to.exist;
-            expect(+info.balances.ETH).to.be.within(0.79, 0.8);
+            expect(+info.balances.ETH).to.be.within(0.77, 0.8);
             expect(info.account_id).to.be.a('number');
         });
 

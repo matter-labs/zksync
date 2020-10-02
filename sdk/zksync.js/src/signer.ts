@@ -10,9 +10,9 @@ import {
     serializeAmountPacked,
     serializeFeePacked,
     serializeNonce,
-    serializeAmountFull
+    serializeAmountFull,
 } from "./utils";
-import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw } from "./types";
+import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from "./types";
 
 export class Signer {
     readonly privateKey: Uint8Array;
@@ -55,7 +55,7 @@ export class Signer {
             amount: BigNumber.from(transfer.amount).toString(),
             fee: BigNumber.from(transfer.fee).toString(),
             nonce: transfer.nonce,
-            signature
+            signature,
         };
     }
 
@@ -84,7 +84,7 @@ export class Signer {
             tokenIdBytes,
             amountBytes,
             feeBytes,
-            nonceBytes
+            nonceBytes,
         ]);
         const signature = signTransactionBytes(this.privateKey, msgBytes);
         return {
@@ -96,7 +96,78 @@ export class Signer {
             amount: BigNumber.from(withdraw.amount).toString(),
             fee: BigNumber.from(withdraw.fee).toString(),
             nonce: withdraw.nonce,
-            signature
+            signature,
+        };
+    }
+
+    signSyncForcedExit(forcedExit: {
+        initiatorAccountId: number;
+        target: Address;
+        tokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+    }): ForcedExit {
+        const typeBytes = Buffer.from([8]);
+        const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
+        const targetBytes = serializeAddress(forcedExit.target);
+        const tokenIdBytes = serializeTokenId(forcedExit.tokenId);
+        const feeBytes = serializeFeePacked(forcedExit.fee);
+        const nonceBytes = serializeNonce(forcedExit.nonce);
+        const msgBytes = Buffer.concat([
+            typeBytes,
+            initiatorAccountIdBytes,
+            targetBytes,
+            tokenIdBytes,
+            feeBytes,
+            nonceBytes,
+        ]);
+        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        return {
+            type: "ForcedExit",
+            initiatorAccountId: forcedExit.initiatorAccountId,
+            target: forcedExit.target,
+            token: forcedExit.tokenId,
+            fee: BigNumber.from(forcedExit.fee).toString(),
+            nonce: forcedExit.nonce,
+            signature,
+        };
+    }
+
+    signSyncChangePubKey(changePubKey: {
+        accountId: number;
+        account: Address;
+        newPkHash: PubKeyHash;
+        feeTokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+    }): ChangePubKey {
+        const typeBytes = Buffer.from([7]); // Tx type (1 byte)
+        const accountIdBytes = serializeAccountId(changePubKey.accountId);
+        const accountBytes = serializeAddress(changePubKey.account);
+        const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
+        const tokenIdBytes = serializeTokenId(changePubKey.feeTokenId);
+        const feeBytes = serializeFeePacked(changePubKey.fee);
+        const nonceBytes = serializeNonce(changePubKey.nonce);
+        const msgBytes = Buffer.concat([
+            typeBytes,
+            accountIdBytes,
+            accountBytes,
+            pubKeyHashBytes,
+            tokenIdBytes,
+            feeBytes,
+            nonceBytes,
+        ]);
+        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        return {
+            type: "ChangePubKey",
+            accountId: changePubKey.accountId,
+            account: changePubKey.account,
+            newPkHash: changePubKey.newPkHash,
+            feeToken: changePubKey.feeTokenId,
+            fee: BigNumber.from(changePubKey.fee).toString(),
+            nonce: changePubKey.nonce,
+            signature,
+            ethSignature: null,
         };
     }
 

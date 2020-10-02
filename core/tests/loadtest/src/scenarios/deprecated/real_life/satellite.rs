@@ -33,6 +33,7 @@ pub struct SatelliteScenario {
     deposit_size: BigUint,
     verify_timeout: Duration,
     estimated_fee_for_op: BigUint,
+    change_pubkey_fee: BigUint,
 }
 
 impl SatelliteScenario {
@@ -48,11 +49,13 @@ impl SatelliteScenario {
             deposit_size,
             verify_timeout,
             estimated_fee_for_op: 0u32.into(),
+            change_pubkey_fee: 0u32.into(),
         }
     }
 
-    pub fn set_estimated_fee(&mut self, estimated_fee_for_op: BigUint) {
-        self.estimated_fee_for_op = estimated_fee_for_op
+    pub fn set_estimated_fee(&mut self, estimated_fee_for_op: BigUint, change_pubkey_fee: BigUint) {
+        self.estimated_fee_for_op = estimated_fee_for_op;
+        self.change_pubkey_fee = change_pubkey_fee;
     }
 
     pub async fn run(&mut self) -> Result<(), failure::Error> {
@@ -108,7 +111,8 @@ impl SatelliteScenario {
     async fn deposit(&mut self, account_id: usize) -> Result<(), failure::Error> {
         let wallet = &mut self.wallets[account_id];
 
-        let amount_to_deposit = self.deposit_size.clone() + self.estimated_fee_for_op.clone();
+        let amount_to_deposit =
+            &self.deposit_size + &self.estimated_fee_for_op + &self.change_pubkey_fee;
 
         // Ensure that account does have enough money.
         let account_balance = wallet.eth_provider.balance().await?;
@@ -125,7 +129,12 @@ impl SatelliteScenario {
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (wallet.sign_change_pubkey().await?, None);
+        let (change_pubkey_tx, eth_sign) = (
+            wallet
+                .sign_change_pubkey(self.change_pubkey_fee.clone())
+                .await?,
+            None,
+        );
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.monitor.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);

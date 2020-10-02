@@ -23,7 +23,8 @@ use tokio::task::JoinHandle;
 // Workspace deps
 use models::{
     helpers::{pack_fee_amount, unpack_fee_amount},
-    Address, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
+    Address, ChangePubKeyOp, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
+    WithdrawOp,
 };
 use storage::ConnectionPool;
 use zksync_config::TokenPriceSource;
@@ -59,6 +60,12 @@ const BASE_WITHDRAW_COST: u64 = VerifyCost::WITHDRAW_COST
     + GasCounter::COMPLETE_WITHDRAWALS_COST
     + 1000 * (WithdrawOp::CHUNKS as u64)
     + (GasCounter::COMPLETE_WITHDRAWALS_BASE_COST / MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL);
+const BASE_CHANGE_PUBKEY_OFFCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_OFFCHAIN
+    + VerifyCost::CHANGE_PUBKEY_COST
+    + 1000 * (ChangePubKeyOp::CHUNKS as u64);
+const BASE_CHANGE_PUBKEY_ONCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_ONCHAIN
+    + crate::gas_counter::VerifyCost::CHANGE_PUBKEY_COST
+    + 1000 * (ChangePubKeyOp::CHUNKS as u64);
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
@@ -72,6 +79,7 @@ pub enum OutputFeeType {
     TransferToNew,
     Withdraw,
     FastWithdraw,
+    ChangePubKey { onchain_pubkey_auth: bool },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -179,6 +187,18 @@ pub fn run_ticker_task(
             ),
             (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
             (OutputFeeType::FastWithdraw, fast_withdrawal_cost.into()),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: false,
+                },
+                BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: true,
+                },
+                BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+            ),
         ]
         .into_iter()
         .collect(),
@@ -300,6 +320,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
+            TxFeeTypes::ChangePubKey {
+                onchain_pubkey_auth,
+            } => (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth,
+                },
+                ChangePubKeyOp::CHUNKS,
+            ),
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
@@ -403,6 +431,18 @@ mod test {
                     BigUint::from(BASE_TRANSFER_TO_NEW_COST),
                 ),
                 (OutputFeeType::Withdraw, BigUint::from(BASE_WITHDRAW_COST)),
+                (
+                    OutputFeeType::ChangePubKey {
+                        onchain_pubkey_auth: false,
+                    },
+                    BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                ),
+                (
+                    OutputFeeType::ChangePubKey {
+                        onchain_pubkey_auth: true,
+                    },
+                    BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+                ),
             ]
             .into_iter()
             .collect(),

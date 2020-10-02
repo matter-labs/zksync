@@ -157,7 +157,11 @@ async fn send_transactions_from_acc(
     );
 
     // Add the `ChangePubKey` operation.
-    tx_queue.push((test_wallet.sign_change_pubkey().await?, None));
+    let change_pubkey_fee = BigUint::from(0u32); // TODO: This scenario doesn't currently work anyway.
+    tx_queue.push((
+        test_wallet.sign_change_pubkey(change_pubkey_fee).await?,
+        None,
+    ));
 
     // Add the transfer operations.
     for _ in 0..ctx.n_transfers {

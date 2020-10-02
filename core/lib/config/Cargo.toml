@@ -8,3 +8,4 @@ edition = "2018"
 zksync_basic_types = { path = "../basic_types", version = "0.1.0" }
 zksync_utils = { path = "../utils", version = "0.1.0" }
 url = "2.1"
+log = "0.4"

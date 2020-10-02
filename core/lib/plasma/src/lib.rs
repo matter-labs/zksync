@@ -1,3 +1,4 @@
+pub mod handler;
 pub mod state;
 
 #[cfg(test)]

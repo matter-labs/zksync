@@ -18,6 +18,11 @@ pub struct AccountTransaction {
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
+pub struct AccountCreatedAt {
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct TransactionsHistoryItem {
     pub tx_id: String,
     pub hash: Option<String>,

@@ -112,6 +112,11 @@ impl WitnessTestAccount {
         }
     }
 
+    pub fn set_empty_pubkey_hash(&mut self) {
+        self.zksync_account.pubkey_hash = Default::default();
+        self.account.pub_key_hash = Default::default();
+    }
+
     pub fn new_empty(id: AccountId) -> Self {
         Self::new(id, 0)
     }

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Usage:
+# zksync upgrade-testnet-contracts --contracts Verifier,ZkSync
+
+# Upgrade testnet current contracts
+
+zksync build-contracts confirm_action
+
+echo "Upgrading contracts, results will be inserted to the db $DATABASE_URL"
+
+
+replace_env_variable() {
+  pushd $ZKSYNC_HOME > /dev/null
+  grep "$1" deploy.log &>/dev/null && python3 bin/replace-env-variable.py ./$ENV_FILE $(grep "$1" deploy.log)
+  . .setup_env
+  popd > /dev/null
+}
+
+cd contracts/
+yarn upgrade-testnet-no-build $@ | tee ../deploy.log
+replace_env_variable "GOVERNANCE_TARGET_ADDR"
+replace_env_variable "VERIFIER_TARGET_ADDR"
+replace_env_variable "CONTRACT_TARGET_ADDR"

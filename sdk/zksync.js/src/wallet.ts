@@ -24,6 +24,7 @@ import {
     getSignedBytesFromMessage,
     signMessagePersonalAPI,
     ERC20_DEPOSIT_GAS_LIMIT,
+    getEthSignatureType,
 } from "./utils";
 
 class ZKSyncTxError extends Error {
@@ -138,17 +139,62 @@ export class Wallet {
         };
     }
 
-    async syncMultiTransfer(transfers: {
-        to: Address;
+    async signSyncForcedExit(forcedExit: {
+        target: Address;
         token: TokenLike;
-        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<SignedTransaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for sending zksync transactions.");
+        }
+        await this.setRequiredAccountIdFromServer("perform a Forced Exit");
+
+        const tokenId = await this.provider.tokenSet.resolveTokenId(forcedExit.token);
+
+        const transactionData = {
+            initiatorAccountId: this.accountId,
+            target: forcedExit.target,
+            tokenId,
+            fee: forcedExit.fee,
+            nonce: forcedExit.nonce,
+        };
+
+        const signedForcedExitTransaction = this.signer.signSyncForcedExit(transactionData);
+
+        return {
+            tx: signedForcedExitTransaction,
+        };
+    }
+
+    async syncForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
-    }[]): Promise<Transaction[]> {
+    }): Promise<Transaction> {
+        forcedExit.nonce = forcedExit.nonce != null ? await this.getNonce(forcedExit.nonce) : await this.getNonce();
+        if (forcedExit.fee == null) {
+            // Fee for forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw).
+            const fullFee = await this.provider.getTransactionFee("Withdraw", forcedExit.target, forcedExit.token);
+            forcedExit.fee = fullFee.totalFee;
+        }
+
+        const signedForcedExitTransaction = await this.signSyncForcedExit(forcedExit as any);
+        return submitSignedTransaction(signedForcedExitTransaction, this.provider);
+    }
+
+    async syncMultiTransfer(
+        transfers: {
+            to: Address;
+            token: TokenLike;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce?: Nonce;
+        }[]
+    ): Promise<Transaction[]> {
         if (!this.signer) {
-            throw new Error(
-                "ZKSync signer is required for sending zksync transactions."
-            );
+            throw new Error("ZKSync signer is required for sending zksync transactions.");
         }
 
         if (transfers.length == 0) return [];
@@ -157,71 +203,32 @@ export class Wallet {
 
         let signedTransfers = [];
 
-        let nextNonce = transfers[0].nonce != null
-            ? await this.getNonce(transfers[0].nonce)
-            : await this.getNonce();
+        let nextNonce = transfers[0].nonce != null ? await this.getNonce(transfers[0].nonce) : await this.getNonce();
 
         for (let i = 0; i < transfers.length; i++) {
             const transfer = transfers[i];
-
-            const tokenId = this.provider.tokenSet.resolveTokenId(transfer.token);
             const nonce = nextNonce;
             nextNonce += 1;
 
             if (transfer.fee == null) {
-                const fullFee = await this.provider.getTransactionFee(
-                    "Transfer",
-                    transfer.to,
-                    transfer.token
-                );
+                const fullFee = await this.provider.getTransactionFee("Transfer", transfer.to, transfer.token);
                 transfer.fee = fullFee.totalFee;
             }
 
-            const transactionData = {
-                accountId: this.accountId,
-                from: this.address(),
+            const { tx, ethereumSignature } = await this.signSyncTransfer({
                 to: transfer.to,
-                tokenId,
+                token: transfer.token,
                 amount: transfer.amount,
                 fee: transfer.fee,
                 nonce
-            };
+            });
 
-            const stringAmount = this.provider.tokenSet.formatToken(
-                transfer.token,
-                transfer.amount
-            );
-            const stringFee = this.provider.tokenSet.formatToken(
-                transfer.token,
-                transfer.fee
-            );
-            const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
-            const humanReadableTxInfo =
-                `Transfer ${stringAmount} ${stringToken}\n` +
-                `To: ${transfer.to.toLowerCase()}\n` +
-                `Nonce: ${nonce}\n` +
-                `Fee: ${stringFee} ${stringToken}\n` +
-                `Account Id: ${this.accountId}`;
-
-            const txMessageEthSignature = await this.getEthMessageSignature(
-                humanReadableTxInfo
-            );
-
-            const signedTransferTransaction = this.signer.signSyncTransfer(
-                transactionData
-            );
-
-            signedTransfers.push({tx: signedTransferTransaction, signature: txMessageEthSignature});
+            signedTransfers.push({tx, signature: ethereumSignature});
         }
 
         const transactionHashes = await this.provider.submitTxsBatch(signedTransfers);
-        return transactionHashes.map(function(txHash, idx) {
-                return new Transaction(
-                    signedTransfers[idx],
-                    txHash,
-                    this.provider
-                )
-            }, this
+        return transactionHashes.map((txHash, idx) =>
+            new Transaction(signedTransfers[idx], txHash, this.provider)
         );
     }
 
@@ -316,35 +323,66 @@ export class Wallet {
         return currentPubKeyHash === signerPubKeyHash;
     }
 
-    async signSetSigningKey(nonce: number, onchainAuth = false): Promise<SignedTransaction> {
+    async signSetSigningKey(changePubKey: {
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        onchainAuth: boolean;
+    }): Promise<SignedTransaction> {
         if (!this.signer) {
             throw new Error("ZKSync signer is required for current pubkey calculation.");
         }
 
+        const feeTokenId = await this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
         const newPubKeyHash = this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer("Set Signing Key");
 
-        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, nonce, this.accountId);
-        const ethSignature = onchainAuth ? null : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
+        const ethSignature = changePubKey.onchainAuth
+            ? null
+            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
-        const changePubKeyTx: ChangePubKey = {
-            type: "ChangePubKey",
+        const changePubKeyTx: ChangePubKey = this.signer.signSyncChangePubKey({
             accountId: this.accountId,
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
-            nonce,
-            ethSignature,
-        };
+            nonce: changePubKey.nonce,
+            feeTokenId,
+            fee: BigNumber.from(changePubKey.fee).toString(),
+        });
+
+        changePubKeyTx.ethSignature = ethSignature;
 
         return {
             tx: changePubKeyTx,
         };
     }
 
-    async setSigningKey(nonce: Nonce = "committed", onchainAuth = false): Promise<Transaction> {
-        const numNonce = await this.getNonce(nonce);
-        const txData = await this.signSetSigningKey(numNonce, onchainAuth);
+    async setSigningKey(changePubKey: {
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        onchainAuth?: boolean;
+    }): Promise<Transaction> {
+        changePubKey.nonce =
+            changePubKey.nonce != null ? await this.getNonce(changePubKey.nonce) : await this.getNonce();
+
+        if (changePubKey.onchainAuth == null) {
+            changePubKey.onchainAuth = false;
+        }
+
+        if (changePubKey.fee == null) {
+            const feeType = {
+                ChangePubKey: {
+                    onchainPubkeyAuth: changePubKey.onchainAuth,
+                },
+            };
+            const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
+            changePubKey.fee = fullFee.totalFee;
+        }
+
+        const txData = await this.signSetSigningKey(changePubKey as any);
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         if (currentPubKeyHash === (txData.tx as ChangePubKey).newPkHash) {
@@ -600,7 +638,6 @@ class ETHOperation {
                 if (priorityQueueLog && priorityQueueLog.args.serialId != null) {
                     this.priorityOpId = priorityQueueLog.args.serialId;
                 }
-                // tslint:disable-next-line:no-empty
             } catch {}
         }
         if (!this.priorityOpId) {

@@ -56,21 +56,19 @@ fn main() -> Result<(), anyhow::Error> {
         transfer_size: 100_u64.into(),
         wallets: 100,
     };
-    tokio_runtime.block_on(scenario.run(monitor, main_account, env_config))?;
+    tokio_runtime.block_on(scenario.run(monitor, main_account, env_config.clone()))?;
 
-    // .run(monitor, main_account, env_config)
+    let CliOptions {
+        test_spec_path,
+        scenario_type,
+    } = CliOptions::from_args();
 
-    // let CliOptions {
-    //     test_spec_path,
-    //     scenario_type,
-    // } = CliOptions::from_args();
+    let provider = Provider::new(Network::Localhost);
+    let context = ScenarioContext::new(provider, env_config, test_spec_path, tokio_runtime);
 
-    // let provider = Provider::new(Network::Localhost);
-    // let context = ScenarioContext::new(provider, env_config, test_spec_path, tokio_runtime);
+    let scenario = scenario_type.into_scenario();
 
-    // let scenario = scenario_type.into_scenario();
-
-    // scenario(context);
+    scenario(context);
 
     Ok(())
 }

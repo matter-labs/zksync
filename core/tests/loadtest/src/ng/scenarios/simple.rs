@@ -2,8 +2,7 @@ use futures::prelude::*;
 use num::BigUint;
 use structopt::StructOpt;
 
-use models::{helpers::closest_packable_fee_amount, Address, TxFeeTypes};
-use zksync::error::ClientError;
+use models::{helpers::closest_packable_fee_amount};
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 
@@ -40,7 +39,7 @@ impl SimpleScenario {
 
         // Compute sufficient fee amount.
         let sufficient_fee = main_wallet
-            .min_tx_fee(TxFeeTypes::FastWithdraw, wallets[0].address())
+            .sufficient_fee()
             .await?;
 
         dbg!(&sufficient_fee);
@@ -55,7 +54,7 @@ impl SimpleScenario {
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
         monitor
-            .send_tx(main_wallet.sign_change_pubkey().await?, None)
+            .send_tx(main_wallet.sign_change_pubkey(sufficient_fee.clone()).await?, None)
             .await?;
 
         // Wait for all the transactions to get verified.
