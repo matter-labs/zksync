@@ -1,3 +1,4 @@
+import "@ethersproject/shims/dist";
 import { Wallet } from "./wallet";
 import { Provider, ETHProxy, getDefaultProvider } from "./provider";
 import { Signer } from "./signer";

@@ -6,7 +6,7 @@
     "outDir": "./build",
 
     "declaration": true,
-
+    "esModuleInterop": true,
     "preserveSymlinks": true,
     "preserveWatchOutput": true
   },
