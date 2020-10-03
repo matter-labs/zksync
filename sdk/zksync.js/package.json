@@ -1,6 +1,6 @@
 {
     "name": "@teamnumio/zksync",
-    "version": "0.0.4",
+    "version": "0.0.6",
     "license": "MIT",
     "publishConfig": {
         "registry": "https://npm.pkg.github.com/TeamNumio"
@@ -17,7 +17,7 @@
         "axios": "^0.19.0",
         "ethers": "^5.0.14",
         "websocket": "^1.0.32",
-        "websocket-as-promised": "^1.0.1"
+        "websocket-as-promised": "^0.10.1"
     },
     "devDependencies": {
         "@rollup/plugin-commonjs": "^15.0.0",
