@@ -1,15 +1,26 @@
 {
-	"name": "zksync-crypto",
-	"version": "0.3.2",
-	"browser": "dist/zksync-crypto-bundler.js",
-	"main": "dist/zksync-crypto-node.js",
+	"name": "@teamnumio/zksync-crypto",
+	"version": "0.0.2",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com/TeamNumio"
+	},
+	"repository": {
+		"type": "git",
+		"url": "ssh://git@github.com:TeamNumio/zksync.git"
+	},
 	"files": [
-		"dist/*.ts",
-		"dist/*.wasm",
-		"dist/*.js"
+		"dist/*"
 	],
 	"scripts": {
-		"build": "./build.sh",
+		"build": "./build-package.sh",
 		"test": "f cargo test"
+	},
+	"dependencies": {
+		"@polkadot/util": "^3.3.1"
+	},
+	"react-native": {
+		"./build/zksync_crypto_asm_stub.js": "./dist/zksync_crypto_asm.js"
 	}
 }

@@ -11,7 +11,7 @@ node_modules
 yarn-error.log
 *.log
 target
-a.out 
+a.out
 .gitconfig
 
 zksync_pk.key
@@ -43,3 +43,6 @@ Cargo.lock
 loadtest_accounts_*
 
 go_to_env.sh
+# Env
+.env
+.npmrc

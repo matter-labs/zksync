@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = "0.2.59"
+wasm-bindgen = "=0.2.65"
 crypto_exports = { path = "../../core/lib/crypto_exports", version = "0.1.0" }
 hex = "0.4"
 sha2 = "0.8"
@@ -29,12 +29,16 @@ console_error_panic_hook = { version = "0.1.1", optional = true }
 # allocator, however.
 #
 # Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
-wee_alloc = { version = "0.4.2", optional = true }
+wee_alloc = "0.4.3"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
+rand = { version = "0.7.3", features = ["wasm-bindgen"] }
 models = { path = "../../core/lib/models" }
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
