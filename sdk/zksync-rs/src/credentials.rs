@@ -40,11 +40,10 @@ impl WalletCredentials {
         // Add chain_id to the message to prevent replay attacks between networks
         // This is added for testnets only
         let eth_sign_message = if let Network::Mainnet = network {
-                MESSAGE.into()
-            } else {
-                format!("{}\nChainID: {}.", MESSAGE, network.chain_id())
-            };
-    
+            MESSAGE.into()
+        } else {
+            format!("{}\nChainID: {}.", MESSAGE, network.chain_id())
+        };
 
         // Check that private key is correct and corresponds to the provided address.
         let address_from_pk = PackedEthSignature::address_from_private_key(&eth_private_key);

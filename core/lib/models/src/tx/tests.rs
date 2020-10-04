@@ -252,7 +252,7 @@ fn test_ethereum_signature_verify_examples() {
         println!("addr: {}, msg: {}, sign: {}", address, msg, signature);
         let address = address[2..].parse::<Address>().unwrap();
         let msg = hex::decode(&msg[2..]).unwrap();
-      
+
         let signature =
             PackedEthSignature::deserialize_packed(&hex::decode(&signature[2..]).unwrap())
                 .expect("signature deserialize");

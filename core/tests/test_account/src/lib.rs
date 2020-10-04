@@ -205,9 +205,8 @@ impl ZksyncAccount {
             let message = ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
                 .expect("Failed to construct change pubkey signed message.");
 
-            let eth_signature =
-                PackedEthSignature::sign(&self.eth_private_key, &message)
-                    .expect("Signature should succeed");
+            let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message)
+                .expect("Signature should succeed");
             Some(eth_signature)
         };
         let change_pubkey = ChangePubKey {

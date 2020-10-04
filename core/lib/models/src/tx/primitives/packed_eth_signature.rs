@@ -57,7 +57,6 @@ impl PackedEthSignature {
         bytes.keccak256().into()
     }
 
-
     /// Signs message using ethereum private key, results are identical to signature created
     /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
     pub fn sign(private_key: &H256, message: &[u8]) -> Result<PackedEthSignature, failure::Error> {

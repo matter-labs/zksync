@@ -79,8 +79,9 @@ impl Signer {
                 .as_ref()
                 .ok_or(SignerError::MissingEthPrivateKey)?; // TODO1 Change error code
 
-            let sign_bytes = ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                        .map_err(signing_failed_error)?;
+            let sign_bytes =
+                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
+                    .map_err(signing_failed_error)?;
 
             let eth_signature = eth_signer
                 .sign_message(&sign_bytes)
@@ -133,7 +134,7 @@ impl Signer {
         .map_err(signing_failed_error)?;
 
         let eth_signature = match &self.eth_signer {
-            Some(signer) => { 
+            Some(signer) => {
                 let message = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
                 let signature = signer.sign_message(&message.as_bytes()).await?;
 

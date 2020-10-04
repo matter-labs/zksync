@@ -227,8 +227,8 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let eth_signature = {
         let message = ChangePubKey::get_eth_signed_data(0, nonce, &to_change.pub_key_hash)
             .expect("Failed to construct ChangePubKey signed message.");
-        let eth_signature = PackedEthSignature::sign(eth_private_key, &message)
-            .expect("Signing failed");
+        let eth_signature =
+            PackedEthSignature::sign(eth_private_key, &message).expect("Signing failed");
         Some(eth_signature)
     };
 
