@@ -299,7 +299,7 @@ impl TreeState {
         // As we restoring an already executed block, this value isn't important.
         let gas_limit = 0.into();
 
-        let block = Block::new_from_availabe_block_sizes(
+        let block = Block::new_from_available_block_sizes(
             ops_block.block_num,
             self.state.root_hash(),
             ops_block.fee_account,

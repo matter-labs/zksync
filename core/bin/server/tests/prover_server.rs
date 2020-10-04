@@ -258,7 +258,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let fee_updates = state.collect_fee(&fees, validator_account_id);
     accounts_updated.extend(fee_updates.into_iter());
 
-    let block = Block::new_from_availabe_block_sizes(
+    let block = Block::new_from_available_block_sizes(
         state.block_number,
         state.root_hash(),
         validator_account_id,
