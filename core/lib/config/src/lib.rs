@@ -4,10 +4,11 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 // External uses
+use url::Url;
+// Workspace uses
 use zksync_basic_types::{H160, H256};
 use zksync_utils::{get_env, parse_env, parse_env_with};
 // Local uses
-use url::Url;
 
 /// Configuration options for `eth_sender`.
 #[derive(Debug, Clone)]
@@ -161,6 +162,7 @@ pub struct ConfigurationOptions {
     pub witness_generators: usize,
     /// Fee increase coefficient for fast processing of withdrawal.
     pub ticker_fast_processing_coeff: f64,
+    pub forced_exit_minimum_account_age: Duration,
 }
 
 impl ConfigurationOptions {
@@ -174,6 +176,13 @@ impl ConfigurationOptions {
             .collect::<Vec<_>>();
 
         available_block_chunk_sizes.sort();
+
+        let forced_exit_minimum_account_age =
+            Duration::from_secs(parse_env::<u64>("FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS"));
+
+        if forced_exit_minimum_account_age.as_secs() == 0 {
+            log::error!("Forced exit minimum account age is set to 0, this is an incorrect value for production");
+        }
 
         Self {
             rest_api_server_address: parse_env("REST_API_BIND"),
@@ -207,6 +216,7 @@ impl ConfigurationOptions {
             token_price_source: TokenPriceSource::from_env(),
             witness_generators: parse_env("WITNESS_GENERATORS"),
             ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
+            forced_exit_minimum_account_age,
         }
     }
 }

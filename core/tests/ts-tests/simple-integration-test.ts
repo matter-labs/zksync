@@ -156,8 +156,98 @@ async function testTransfer(
     feeInfo.globalFee = feeInfo.globalFee.add(fee);
 }
 
-async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber, feeInfo: any) {
-    const fee = await syncProvider.getTransactionsBatchFee(["Transfer", "Transfer"], [syncWallet2.address(), syncWallet2.address()], token);
+async function testForcedExit(
+    contract: Contract,
+    syncWallet: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber,
+    feeInfo: any
+) {
+    const targetEthWallet = ethers.Wallet.createRandom().connect(ethersProvider);
+    const targetWallet = await Wallet.fromEthSigner(targetEthWallet, syncProvider);
+
+    // Do a transfer to new operation.
+    const transferFullFee = await syncProvider.getTransactionFee("Transfer", targetWallet.address(), token);
+    const transferFee = transferFullFee.totalFee;
+
+    const transferToNewHandle = await syncWallet.syncTransfer({
+        to: targetWallet.address(),
+        token,
+        amount,
+        fee: transferFee,
+    });
+    await transferToNewHandle.awaitReceipt();
+
+    // We performed a transfer here, so we must add its fee to the global expected fee.
+    feeInfo.globalFee = feeInfo.globalFee.add(transferFee);
+
+    const initiatorBeforeWithdraw = await syncWallet.getBalance(token);
+    const targetBeforeWithdraw = await targetWallet.getBalance(token);
+    const onchainBalanceBeforeWithdraw = await targetWallet.getEthereumBalance(token);
+
+    // Then do a ForcedExit operation.
+    const fullFee = await syncProvider.getTransactionFee("Withdraw", targetWallet.address(), token);
+    const fee = fullFee.totalFee;
+
+    const startTime = new Date().getTime();
+    const forcedExitHandle = await syncWallet.syncForcedExit({
+        target: targetWallet.address(),
+        token,
+        fee,
+    });
+    console.log(`ForcedExit posted: ${new Date().getTime() - startTime} ms`);
+
+    // Await for verification with a timeout set.
+    await promiseTimeout(VERIFY_TIMEOUT, forcedExitHandle.awaitVerifyReceipt());
+    console.log(`ForcedExit verified: ${new Date().getTime() - startTime} ms`);
+
+    const initiatorAfterWithdraw = await syncWallet.getBalance(token);
+    const targetAfterWithdraw = await targetWallet.getBalance(token);
+    const onchainBalanceAfterWithdraw = await targetWallet.getEthereumBalance(token);
+
+    const tokenId = await targetWallet.provider.tokenSet.resolveTokenId(token);
+    const pendingToBeOnchainBalance = await contract.getBalanceToWithdraw(await targetWallet.address(), tokenId);
+
+    feeInfo.globalFee = feeInfo.globalFee.add(fee);
+
+    if (!initiatorBeforeWithdraw.sub(initiatorAfterWithdraw).eq(fee)) {
+        throw new Error("Wrong amount on initiator wallet after ForcedExit");
+    }
+    if (!targetBeforeWithdraw.sub(targetAfterWithdraw).eq(amount)) {
+        throw new Error("Wrong amount on target wallet after ForcedExit");
+    }
+    if (!onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
+        throw new Error("Wrong amount onchain after ForcedExit");
+    }
+
+    // Cause we awaited for verifying we must check the collected fees
+    const operatorBalanceAfter = await getOperatorBalance(token);
+    if (!operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).eq(feeInfo.globalFee)) {
+        console.log(
+            "The collected fee is not right :: expected(",
+            feeInfo.globalFee.toString(),
+            "), found(",
+            operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(),
+            ")"
+        );
+        throw new Error("The collected fee is not right");
+    }
+    feeInfo.lastVerifiedOperatorBalance = operatorBalanceAfter;
+    feeInfo.globalFee = BigNumber.from(0);
+}
+
+async function testMultiTransfer(
+    syncWallet1: Wallet,
+    syncWallet2: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber,
+    feeInfo: any
+) {
+    const fee = await syncProvider.getTransactionsBatchFee(
+        ["Transfer", "Transfer"],
+        [syncWallet2.address(), syncWallet2.address()],
+        token
+    );
 
     // First, execute batched transfers successfully.
 
@@ -165,22 +255,25 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
         const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
         const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
         const startTime = new Date().getTime();
-        const transferHandles = await syncWallet1.syncMultiTransfer([{
-            to: syncWallet2.address(),
-            token,
-            amount,
-            fee: fee.div(2),
-        }, {
-            to: syncWallet2.address(),
-            token,
-            amount,
-            fee: fee.div(2),
-        }]);
-        console.log(`Batched transfers posted: ${(new Date().getTime()) - startTime} ms`);
+        const transferHandles = await syncWallet1.syncMultiTransfer([
+            {
+                to: syncWallet2.address(),
+                token,
+                amount,
+                fee: fee.div(2),
+            },
+            {
+                to: syncWallet2.address(),
+                token,
+                amount,
+                fee: fee.div(2),
+            },
+        ]);
+        console.log(`Batched transfers posted: ${new Date().getTime() - startTime} ms`);
         for (let i = 0; i < transferHandles.length; i++) {
             await transferHandles[i].awaitReceipt();
         }
-        console.log(`Batched transfer committed: ${(new Date().getTime()) - startTime} ms`);
+        console.log(`Batched transfer committed: ${new Date().getTime() - startTime} ms`);
         const wallet1AfterTransfer = await syncWallet1.getBalance(token);
         const wallet2AfterTransfer = await syncWallet2.getBalance(token);
 
@@ -201,26 +294,29 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
         const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
         const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
         const startTime = new Date().getTime();
-        const transferHandles = await syncWallet1.syncMultiTransfer([{
-            to: syncWallet2.address(),
-            token,
-            amount,
-            fee: fee.div(2),
-        }, {
-            to: syncWallet2.address(),
-            token,
-            amount: amount.mul(10000), // Set too big amount for the 2nd transaction.
-            fee: fee.div(2),
-        }]);
-        console.log(`Batched transfers (that should fail) posted: ${(new Date().getTime()) - startTime} ms`);
+        const transferHandles = await syncWallet1.syncMultiTransfer([
+            {
+                to: syncWallet2.address(),
+                token,
+                amount,
+                fee: fee.div(2),
+            },
+            {
+                to: syncWallet2.address(),
+                token,
+                amount: amount.mul(10000), // Set too big amount for the 2nd transaction.
+                fee: fee.div(2),
+            },
+        ]);
+        console.log(`Batched transfers (that should fail) posted: ${new Date().getTime() - startTime} ms`);
         for (let i = 0; i < transferHandles.length; i++) {
             try {
                 await transferHandles[i].awaitReceipt();
             } catch (e) {
-                console.log('Error (expected) on sync tx fail:', e.message);
+                console.log("Error (expected) on sync tx fail:", e.message);
             }
         }
-        console.log(`Batched transfers (that should fail) committed: ${(new Date().getTime()) - startTime} ms`);
+        console.log(`Batched transfers (that should fail) committed: ${new Date().getTime() - startTime} ms`);
         const wallet1AfterTransfer = await syncWallet1.getBalance(token);
         const wallet2AfterTransfer = await syncWallet2.getBalance(token);
 
@@ -233,38 +329,45 @@ async function testMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token
     }
 }
 
-async function testFailedMultiTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, amount: BigNumber) {
+async function testFailedMultiTransfer(
+    syncWallet1: Wallet,
+    syncWallet2: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber
+) {
     let testPassed = true;
     try {
         const startTime = new Date().getTime();
-        const transferHandles = await syncWallet1.syncMultiTransfer([{
-            to: syncWallet2.address(),
-            token,
-            amount,
-            fee: utils.parseEther('0'),
-        }, {
-            to: syncWallet2.address(),
-            token,
-            amount,
-            fee: utils.parseEther('0'),
-        }]);
-        console.log(`  Batched transfers posted: ${(new Date().getTime()) - startTime} ms`);
+        const transferHandles = await syncWallet1.syncMultiTransfer([
+            {
+                to: syncWallet2.address(),
+                token,
+                amount,
+                fee: utils.parseEther("0"),
+            },
+            {
+                to: syncWallet2.address(),
+                token,
+                amount,
+                fee: utils.parseEther("0"),
+            },
+        ]);
+        console.log(`  Batched transfers posted: ${new Date().getTime() - startTime} ms`);
         for (let i = 0; i < transferHandles.length; i++) {
             await transferHandles[i].awaitVerifyReceipt();
         }
-        console.log(`  Batched transfer committed: ${(new Date().getTime()) - startTime} ms`);
+        console.log(`  Batched transfer committed: ${new Date().getTime() - startTime} ms`);
         testPassed = false;
     } catch (e) {
-        assert(e.jrpcError.message == 'Transactions batch summary fee is too low');
-        console.log('  Error (expected) on tx batch fail:', e.jrpcError.message);
+        assert(e.jrpcError.message == "Transactions batch summary fee is too low");
+        console.log("  Error (expected) on tx batch fail:", e.jrpcError.message);
     }
 
     if (!testPassed) {
         throw new Error("testFailedMultiTransfer failed !!!");
     }
-    console.log("testFailedMultiTransfer ok")
+    console.log("testFailedMultiTransfer ok");
 }
-
 
 async function testWithdraw(
     contract: Contract,
@@ -317,7 +420,13 @@ async function testWithdraw(
     // Cause we awaited for verifying we must check the collected fees
     const operatorBalanceAfter = await getOperatorBalance(token);
     if (!operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).eq(feeInfo.globalFee)) {
-        console.log("The collected fee is not right :: expected(", feeInfo.globalFee.toString(), "), found(", operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(), ")");
+        console.log(
+            "The collected fee is not right :: expected(",
+            feeInfo.globalFee.toString(),
+            "), found(",
+            operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(),
+            ")"
+        );
         throw new Error("The collected fee is not right");
     }
     feeInfo.lastVerifiedOperatorBalance = operatorBalanceAfter;
@@ -376,37 +485,70 @@ async function testFastWithdraw(
     // Cause we awaited for verifying we must check the collected fees
     const operatorBalanceAfter = await getOperatorBalance(token);
     if (!operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).eq(feeInfo.globalFee)) {
-        console.log("The collected fee is not right :: expected(", feeInfo.globalFee.toString(), "), found(", operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(), ")");
+        console.log(
+            "The collected fee is not right :: expected(",
+            feeInfo.globalFee.toString(),
+            "), found(",
+            operatorBalanceAfter.sub(feeInfo.lastVerifiedOperatorBalance).toString(),
+            ")"
+        );
         throw new Error("The collected fee is not right");
     }
     feeInfo.lastVerifiedOperatorBalance = operatorBalanceAfter;
     feeInfo.globalFee = BigNumber.from(0);
 }
 
-async function testChangePubkeyOnchain(syncWallet: Wallet) {
+async function testChangePubkeyOnchain(syncWallet: Wallet, feeToken: types.TokenLike, feeInfo: any) {
     if (!(await syncWallet.isSigningKeySet())) {
+        const feeType = {
+            ChangePubKey: {
+                onchainPubkeyAuth: true,
+            },
+        };
+        let fullFee = await syncProvider.getTransactionFee(feeType, syncWallet.address(), feeToken);
+        let fee = fullFee.totalFee;
+
         const startTime = new Date().getTime();
         await (await syncWallet.onchainAuthSigningKey("committed")).wait();
-        const changePubkeyHandle = await syncWallet.setSigningKey("committed", true);
+        const changePubkeyHandle = await syncWallet.setSigningKey({
+            feeToken,
+            fee,
+            onchainAuth: true,
+        });
         console.log(`Change pubkey onchain posted: ${new Date().getTime() - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey onchain committed: ${new Date().getTime() - startTime} ms`);
         if (!(await syncWallet.isSigningKeySet())) {
             throw new Error("Change pubkey onchain failed");
         }
+
+        feeInfo.globalFee = feeInfo.globalFee.add(fee);
     }
 }
 
-async function testChangePubkeyOffchain(syncWallet: Wallet) {
+async function testChangePubkeyOffchain(syncWallet: Wallet, feeToken: types.TokenLike, feeInfo: any) {
     if (!(await syncWallet.isSigningKeySet())) {
+        const feeType = {
+            ChangePubKey: {
+                onchainPubkeyAuth: false,
+            },
+        };
+        let fullFee = await syncProvider.getTransactionFee(feeType, syncWallet.address(), feeToken);
+        let fee = fullFee.totalFee;
+
         const startTime = new Date().getTime();
-        const changePubkeyHandle = await syncWallet.setSigningKey();
+        const changePubkeyHandle = await syncWallet.setSigningKey({
+            feeToken,
+            fee,
+        });
         console.log(`Change pubkey offchain posted: ${new Date().getTime() - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey offchain committed: ${new Date().getTime() - startTime} ms`);
         if (!(await syncWallet.isSigningKeySet())) {
             throw new Error("Change pubkey offchain failed");
         }
+
+        feeInfo.globalFee = feeInfo.globalFee.add(fee);
     }
 }
 
@@ -446,7 +588,6 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
 
 async function moveFunds(
     contract: Contract,
-    ethProxy: ETHProxy,
     depositWallet: Wallet,
     syncWallet1: Wallet,
     syncWallet2: Wallet,
@@ -455,7 +596,7 @@ async function moveFunds(
 ) {
     const feeInfo = {
         lastVerifiedOperatorBalance: await getOperatorBalance(token),
-        globalFee: BigNumber.from(0)
+        globalFee: BigNumber.from(0),
     };
     const depositAmount = utils.parseEther(depositAmountETH);
 
@@ -467,15 +608,17 @@ async function moveFunds(
     console.log(`Auto approved deposit ok, Token: ${token}`);
     await testDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Forever approved deposit ok, Token: ${token}`);
-    await testChangePubkeyOnchain(syncWallet1);
+    await testChangePubkeyOnchain(syncWallet1, token, feeInfo);
     console.log(`Change pubkey onchain ok`);
+    await testForcedExit(contract, syncWallet1, token, transfersAmount, feeInfo);
+    console.log(`ForcedExit OK`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, feeInfo);
     console.log(`Transfer to new ok, Token: ${token}`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, feeInfo);
     console.log(`Transfer ok, Token: ${token}`);
     await testTransferToSelf(syncWallet1, token, transfersAmount, feeInfo);
     console.log(`Transfer to self with fee ok, Token: ${token}`);
-    await testChangePubkeyOffchain(syncWallet2);
+    await testChangePubkeyOffchain(syncWallet2, token, feeInfo);
     console.log(`Change pubkey offchain ok`);
 
     await testMultiTransfer(syncWallet1, syncWallet2, token, transfersAmount.div(2), feeInfo); // `.div(2)` because we do 2 transfers inside.
@@ -562,16 +705,27 @@ async function checkFailedTransactionResending(
 ) {
     const feeInfo = {
         lastVerifiedOperatorBalance: await getOperatorBalance("ETH"),
-        globalFee: BigNumber.from(0)
+        globalFee: BigNumber.from(0),
     };
     console.log("Checking invalid transaction resending");
     const amount = utils.parseEther("0.2");
 
-    const fullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
-    const fee = fullFee.totalFee;
+    const transferFullFee = await syncProvider.getTransactionFee("Transfer", syncWallet2.address(), "ETH");
+    const transferFee = transferFullFee.totalFee;
 
-    await testAutoApprovedDeposit(depositWallet, syncWallet1, "ETH", amount.div(2).add(fee));
-    await testChangePubkeyOnchain(syncWallet1);
+    const changePubkeyFeeType = {
+        ChangePubKey: { onchainPubkeyAuth: false },
+    };
+    const changePubKeyFullFee = await syncProvider.getTransactionFee(changePubkeyFeeType, syncWallet1.address(), "ETH");
+    const changePubKeyFee = changePubKeyFullFee.totalFee;
+
+    await testAutoApprovedDeposit(
+        depositWallet,
+        syncWallet1,
+        "ETH",
+        amount.div(2).add(transferFee).add(changePubKeyFee)
+    );
+    await testChangePubkeyOnchain(syncWallet1, "ETH", feeInfo);
     let testPassed = true;
     try {
         await testTransfer(syncWallet1, syncWallet2, "ETH", amount, feeInfo);
@@ -647,8 +801,13 @@ async function checkFailedTransactionResending(
         await await ethWallet.sendTransaction({ to: ethWallet5.address, value: utils.parseEther("6.0") });
         const syncWallet5 = await Wallet.fromEthSigner(ethWallet5, syncProvider);
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "200.0");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "1.0");
+        console.log("Move funds ERC-20 start");
+        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "200.0");
+        console.log("Move funds ERC-20 OK");
+
+        console.log("Move funds ETH start");
+        await moveFunds(contract, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "1.0");
+        console.log("Move funds ETH OK");
 
         await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
 

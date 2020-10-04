@@ -3,22 +3,31 @@ use std::{convert::TryFrom, str::FromStr};
 // External deps
 use web3::types::H256;
 // Workspace deps
-use models::{
-    Action, NewTokenEvent, Operation,
-    {block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
-};
-use storage::{
+use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_storage::{
     data_restore::records::{NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock},
     ConnectionPool,
 };
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_types::{
+    Action, Operation,
+    {block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
+};
 // Local deps
 use crate::{
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
-    events_state::EventsState,
+    events_state::{EventsState, NewTokenEvent},
     rollup_ops::RollupOpsBlock,
 };
+
+impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEvent {
+    fn from(event: &NewTokenEvent) -> Self {
+        Self {
+            address: event.address,
+            id: event.id,
+        }
+    }
+}
 
 /// Saves genesis account state in storage
 ///
@@ -64,35 +73,42 @@ pub async fn update_tree_state(
 ) {
     let mut storage = connection_pool.access_storage().await.expect("db failed");
 
-    if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
-        storage
-            .data_restore_schema()
-            .save_block_transactions(block)
-            .await
-            .expect("Cant save block transactions");
-    } else {
-        let commit_op = Operation {
-            action: Action::Commit,
-            block: block.clone(),
-            accounts_updated,
-            id: None,
-        };
+    let mut transaction = storage
+        .start_transaction()
+        .await
+        .expect("Failed initializing a DB transaction");
 
-        let verify_op = Operation {
-            action: Action::Verify {
-                proof: Box::new(EncodedProofPlonk::default()),
-            },
-            block,
-            accounts_updated: Vec::new(),
-            id: None,
-        };
+    let commit_op = Operation {
+        action: Action::Commit,
+        block: block.clone(),
+        id: None,
+    };
 
-        storage
-            .data_restore_schema()
-            .save_block_operations(commit_op, verify_op)
-            .await
-            .expect("Cant execute verify operation");
-    }
+    let verify_op = Operation {
+        action: Action::Verify {
+            proof: Box::new(EncodedProofPlonk::default()),
+        },
+        block: block.clone(),
+        id: None,
+    };
+
+    transaction
+        .chain()
+        .state_schema()
+        .commit_state_update(block.block_number, &accounts_updated, 0)
+        .await
+        .expect("Cant execute verify operation");
+
+    transaction
+        .data_restore_schema()
+        .save_block_operations(commit_op, verify_op)
+        .await
+        .expect("Cant execute verify operation");
+
+    transaction
+        .commit()
+        .await
+        .expect("Unable to commit DB transaction");
 }
 
 /// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
@@ -119,9 +135,10 @@ pub async fn save_events_state(
 
     let block_number = last_watched_eth_block_number.to_string();
 
+    let tokens: Vec<_> = tokens.iter().map(From::from).collect();
     storage
         .data_restore_schema()
-        .save_events_state(new_events.as_slice(), tokens, &block_number)
+        .save_events_state(new_events.as_slice(), &tokens, &block_number)
         .await
         .expect("Cant update events state");
 }

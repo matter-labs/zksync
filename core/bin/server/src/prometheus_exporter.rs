@@ -1,12 +1,19 @@
 //! This module handles metric export to the Prometheus server
 
+use std::io::{Error, ErrorKind};
 // External uses
 use prometheus_exporter_base::{render_prometheus, MetricType, PrometheusMetric};
 // Workspace uses
-use models::ActionType;
-use storage::ConnectionPool;
 use tokio::task::JoinHandle;
 use zksync_config::ConfigurationOptions;
+use zksync_storage::ConnectionPool;
+use zksync_types::ActionType;
+
+fn convert_err(err: anyhow::Error) -> std::io::Error {
+    // Prometheus required `failure::Error`, so we convert anyhow to the type
+    // which can be converted into `failure::Error`.
+    Error::new(ErrorKind::Other, err.to_string())
+}
 
 #[must_use]
 pub fn start_prometheus_exporter(
@@ -17,7 +24,7 @@ pub fn start_prometheus_exporter(
 
     tokio::spawn(render_prometheus(addr, (), |_, _| async move {
         let mut storage = connection_pool.access_storage_fragile().await?;
-        let mut transaction = storage.start_transaction().await?;
+        let mut transaction = storage.start_transaction().await.map_err(convert_err)?;
         let mut block_schema = transaction.chain().block_schema();
 
         let pc = PrometheusMetric::new(
@@ -31,7 +38,8 @@ pub fn start_prometheus_exporter(
                 None,
                 block_schema
                     .count_operations(ActionType::COMMIT, false)
-                    .await?,
+                    .await
+                    .map_err(convert_err)?,
                 None,
             ),
         );
@@ -47,7 +55,8 @@ pub fn start_prometheus_exporter(
                 None,
                 block_schema
                     .count_operations(ActionType::VERIFY, false)
-                    .await?,
+                    .await
+                    .map_err(convert_err)?,
                 None,
             ),
         );
@@ -63,7 +72,8 @@ pub fn start_prometheus_exporter(
                 None,
                 block_schema
                     .count_operations(ActionType::COMMIT, true)
-                    .await?,
+                    .await
+                    .map_err(convert_err)?,
                 None,
             ),
         );
@@ -79,12 +89,13 @@ pub fn start_prometheus_exporter(
                 None,
                 block_schema
                     .count_operations(ActionType::VERIFY, true)
-                    .await?,
+                    .await
+                    .map_err(convert_err)?,
                 None,
             ),
         );
 
-        transaction.commit().await?;
+        transaction.commit().await.map_err(convert_err)?;
 
         Ok(s)
     }))

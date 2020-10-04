@@ -1,5 +1,4 @@
 // Workspace deps
-use models::operations::TransferToNewOp;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
@@ -20,6 +19,7 @@ use zksync_crypto::{
     },
     primitives::convert_to_float,
 };
+use zksync_types::operations::TransferToNewOp;
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
@@ -29,7 +29,7 @@ use crate::{
         Witness,
     },
 };
-use models::operations::ChangePubKeyOp;
+use zksync_types::operations::ChangePubKeyOp;
 
 pub struct TransferToNewData {
     pub amount: u128,
@@ -226,7 +226,7 @@ impl TransferToNewWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, transfer_to_new: &TransferToNewData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        debug!("Initial root = {}", before_root);
+        log::debug!("Initial root = {}", before_root);
         let (audit_path_from_before, audit_balance_path_from_before) = get_audits(
             tree,
             transfer_to_new.from_account_address,
@@ -258,9 +258,9 @@ impl TransferToNewWitness<Bn256> {
 
         let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-        debug!("test_transfer_to_new.fee {}", transfer_to_new.fee);
+        log::debug!("test_transfer_to_new.fee {}", transfer_to_new.fee);
         let fee_as_field_element = Fr::from_str(&transfer_to_new.fee.to_string()).unwrap();
-        debug!(
+        log::debug!(
             "test transfer_to_new fee_as_field_element = {}",
             fee_as_field_element
         );
@@ -273,7 +273,7 @@ impl TransferToNewWitness<Bn256> {
         .unwrap();
 
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-        debug!("fee_encoded in test_transfer_to_new {}", fee_encoded);
+        log::debug!("fee_encoded in test_transfer_to_new {}", fee_encoded);
         //applying first transfer part
         let (
             account_witness_from_before,
@@ -294,7 +294,7 @@ impl TransferToNewWitness<Bn256> {
         );
 
         let intermediate_root = tree.root_hash();
-        debug!("Intermediate root = {}", intermediate_root);
+        log::debug!("Intermediate root = {}", intermediate_root);
 
         let (audit_path_from_intermediate, audit_balance_path_from_intermediate) = get_audits(
             tree,

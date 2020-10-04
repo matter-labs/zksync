@@ -4,18 +4,18 @@ use std::{net, str::FromStr, thread, time, time::Duration};
 use futures::channel::mpsc;
 use zksync_crypto::pairing::ff::{Field, PrimeField};
 // Workspace deps
-use circuit::witness::{deposit::DepositWitness, Witness};
-use models::{block::Block, Address};
 use num::BigUint;
-use prover::{client, ApiClient};
+use zksync_circuit::witness::{deposit::DepositWitness, Witness};
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
+use zksync_prover::{client, ApiClient};
+use zksync_types::{block::Block, Address};
 // Local deps
-use circuit::witness::utils::get_used_subtree_root_hash;
-use server::prover_server;
+use zksync_circuit::witness::utils::get_used_subtree_root_hash;
+use zksync_server::prover_server;
 
-async fn connect_to_db() -> storage::ConnectionPool {
-    storage::ConnectionPool::new(Some(1)).await
+async fn connect_to_db() -> zksync_storage::ConnectionPool {
+    zksync_storage::ConnectionPool::new(Some(1)).await
 }
 
 async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
@@ -167,7 +167,7 @@ async fn api_client_simple_simulation() {
 pub async fn test_operation_and_wanted_prover_data(
     block_size_chunks: usize,
 ) -> (
-    models::Operation,
+    zksync_types::Operation,
     zksync_prover_utils::prover_data::ProverData,
 ) {
     let mut circuit_tree = zksync_crypto::circuit::CircuitAccountTree::new(
@@ -182,12 +182,12 @@ pub async fn test_operation_and_wanted_prover_data(
         .expect("Failed to connect to db");
 
     // Fee account
-    let mut accounts = models::AccountMap::default();
-    let validator_account = models::Account::default_with_address(&Address::random());
+    let mut accounts = zksync_types::AccountMap::default();
+    let validator_account = zksync_types::Account::default_with_address(&Address::random());
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
-    let mut state = plasma::state::PlasmaState::from_acc_map(accounts, 1);
+    let mut state = zksync_state::state::ZksyncState::from_acc_map(accounts, 1);
     println!(
         "acc_number 0, acc {:?}",
         zksync_crypto::circuit::account::CircuitAccount::from(validator_account.clone())
@@ -200,7 +200,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let initial_root = circuit_tree.root_hash();
     let initial_root2 = circuit_tree.root_hash();
     let initial_used_subtree_root = get_used_subtree_root_hash(&circuit_tree);
-    let deposit_priority_op = models::FranklinPriorityOp::Deposit(models::Deposit {
+    let deposit_priority_op = zksync_types::FranklinPriorityOp::Deposit(zksync_types::Deposit {
         from: validator_account.address,
         token: 0,
         amount: BigUint::from(10u32),
@@ -224,11 +224,12 @@ pub async fn test_operation_and_wanted_prover_data(
             0,
             &[(
                 0,
-                models::AccountUpdate::Create {
+                zksync_types::AccountUpdate::Create {
                     address: validator_account.address,
                     nonce: validator_account.nonce,
                 },
             )],
+            0,
         )
         .await
         .unwrap();
@@ -239,10 +240,10 @@ pub async fn test_operation_and_wanted_prover_data(
         .await
         .unwrap();
 
-    ops.push(models::ExecutedOperations::PriorityOp(Box::new(
-        models::ExecutedPriorityOp {
+    ops.push(zksync_types::ExecutedOperations::PriorityOp(Box::new(
+        zksync_types::ExecutedPriorityOp {
             op: op_success.executed_op,
-            priority_op: models::PriorityOp {
+            priority_op: zksync_types::PriorityOp {
                 serial_id: 0,
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
@@ -257,7 +258,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let fee_updates = state.collect_fee(&fees, validator_account_id);
     accounts_updated.extend(fee_updates.into_iter());
 
-    let block = Block::new_from_availabe_block_sizes(
+    let block = Block::new_from_available_block_sizes(
         state.block_number,
         state.root_hash(),
         validator_account_id,
@@ -271,10 +272,10 @@ pub async fn test_operation_and_wanted_prover_data(
     let mut pub_data = vec![];
     let mut operations = vec![];
 
-    if let models::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
+    if let zksync_types::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
         let deposit_witness = DepositWitness::apply_tx(
             &mut circuit_tree,
-            &models::operations::DepositOp {
+            &zksync_types::operations::DepositOp {
                 priority_op: deposit_op,
                 account_id: 0,
             },
@@ -286,7 +287,7 @@ pub async fn test_operation_and_wanted_prover_data(
     }
 
     for _ in 0..block_size_chunks - operations.len() {
-        operations.push(circuit::witness::noop::noop_operation(
+        operations.push(zksync_circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
         ));
@@ -308,13 +309,13 @@ pub async fn test_operation_and_wanted_prover_data(
     }
     let _: zksync_crypto::Fr = circuit_tree.root_hash();
     let (root_after_fee, validator_account_witness) =
-        circuit::witness::utils::apply_fee(&mut circuit_tree, block.fee_account, 0, 0);
+        zksync_circuit::witness::utils::apply_fee(&mut circuit_tree, block.fee_account, 0, 0);
 
     assert_eq!(root_after_fee, block.new_root_hash);
     let (validator_audit_path, _) =
-        circuit::witness::utils::get_audits(&circuit_tree, block.fee_account as u32, 0);
+        zksync_circuit::witness::utils::get_audits(&circuit_tree, block.fee_account as u32, 0);
     let public_data_commitment =
-        circuit::witness::utils::public_data_commitment::<zksync_crypto::Engine>(
+        zksync_circuit::witness::utils::public_data_commitment::<zksync_crypto::Engine>(
             &pub_data,
             Some(initial_root),
             Some(root_after_fee),
@@ -323,11 +324,10 @@ pub async fn test_operation_and_wanted_prover_data(
         );
 
     (
-        models::Operation {
+        zksync_types::Operation {
             id: None,
-            action: models::Action::Commit,
+            action: zksync_types::Action::Commit,
             block: block.clone(),
-            accounts_updated,
         },
         zksync_prover_utils::prover_data::ProverData {
             public_data_commitment,

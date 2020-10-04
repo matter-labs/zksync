@@ -12,9 +12,9 @@ set -e
 echo "Update server-env-custom configmap for zskync env: $ZKSYNC_ENV"
 
 update_configmap() {
-  (kubectl create configmap server-env-custom --from-env-file=etc/env/$ZKSYNC_ENV.env -n $1 -o yaml --dry-run=client | kubectl diff -f -) || true
+  (kubectl create configmap server-env-custom --from-env-file=etc/env/$ZKSYNC_ENV.env -n $1 -o yaml --dry-run | kubectl diff -f -) || true
   .confirm_action
-  kubectl create configmap server-env-custom --from-env-file=etc/env/$ZKSYNC_ENV.env -n $1 -o yaml --dry-run=client | kubectl apply -f -
+  kubectl create configmap server-env-custom --from-env-file=etc/env/$ZKSYNC_ENV.env -n $1 -o yaml --dry-run | kubectl apply -f -
 }
 
 case $ZKSYNC_ENV in

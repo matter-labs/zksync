@@ -14,11 +14,11 @@ use std::time::{Duration, Instant};
 use num::BigUint;
 use tokio::time;
 // Workspace deps
-use models::{
+use zksync::Provider;
+use zksync_types::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
     TxFeeTypes,
 };
-use zksync::Provider;
 // Local deps
 use crate::{
     scenarios::utils::{deposit_single, wait_for_verify},
@@ -33,6 +33,7 @@ pub struct SatelliteScenario {
     deposit_size: BigUint,
     verify_timeout: Duration,
     estimated_fee_for_op: BigUint,
+    change_pubkey_fee: BigUint,
 }
 
 impl SatelliteScenario {
@@ -48,14 +49,16 @@ impl SatelliteScenario {
             deposit_size,
             verify_timeout,
             estimated_fee_for_op: 0u32.into(),
+            change_pubkey_fee: 0u32.into(),
         }
     }
 
-    pub fn set_estimated_fee(&mut self, estimated_fee_for_op: BigUint) {
-        self.estimated_fee_for_op = estimated_fee_for_op
+    pub fn set_estimated_fee(&mut self, estimated_fee_for_op: BigUint, change_pubkey_fee: BigUint) {
+        self.estimated_fee_for_op = estimated_fee_for_op;
+        self.change_pubkey_fee = change_pubkey_fee;
     }
 
-    pub async fn run(&mut self) -> Result<(), failure::Error> {
+    pub async fn run(&mut self) -> Result<(), anyhow::Error> {
         self.initialize().await?;
 
         // Deposit & withdraw phase.
@@ -71,11 +74,11 @@ impl SatelliteScenario {
         Ok(())
     }
 
-    async fn initialize(&mut self) -> Result<(), failure::Error> {
+    async fn initialize(&mut self) -> Result<(), anyhow::Error> {
         Ok(())
     }
 
-    async fn deposit_withdraw(&mut self, account_id: usize) -> Result<(), failure::Error> {
+    async fn deposit_withdraw(&mut self, account_id: usize) -> Result<(), anyhow::Error> {
         log::info!(
             "Satellite deposit/withdraw iteration {} started",
             account_id
@@ -90,7 +93,7 @@ impl SatelliteScenario {
         Ok(())
     }
 
-    async fn deposit_full_exit(&mut self, account_id: usize) -> Result<(), failure::Error> {
+    async fn deposit_full_exit(&mut self, account_id: usize) -> Result<(), anyhow::Error> {
         log::info!(
             "Satellite deposit/full exit iteration {} started",
             account_id
@@ -105,10 +108,11 @@ impl SatelliteScenario {
         Ok(())
     }
 
-    async fn deposit(&mut self, account_id: usize) -> Result<(), failure::Error> {
+    async fn deposit(&mut self, account_id: usize) -> Result<(), anyhow::Error> {
         let wallet = &mut self.wallets[account_id];
 
-        let amount_to_deposit = self.deposit_size.clone() + self.estimated_fee_for_op.clone();
+        let amount_to_deposit =
+            &self.deposit_size + &self.estimated_fee_for_op + &self.change_pubkey_fee;
 
         // Ensure that account does have enough money.
         let account_balance = wallet.eth_provider.balance().await?;
@@ -125,7 +129,12 @@ impl SatelliteScenario {
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (wallet.sign_change_pubkey().await?, None);
+        let (change_pubkey_tx, eth_sign) = (
+            wallet
+                .sign_change_pubkey(self.change_pubkey_fee.clone())
+                .await?,
+            None,
+        );
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
@@ -134,7 +143,7 @@ impl SatelliteScenario {
         Ok(())
     }
 
-    async fn withdraw(&mut self, account_id: usize) -> Result<(), failure::Error> {
+    async fn withdraw(&mut self, account_id: usize) -> Result<(), anyhow::Error> {
         let wallet = &mut self.wallets[account_id];
 
         let current_balance = wallet.eth_provider.balance().await?;
@@ -187,7 +196,7 @@ impl SatelliteScenario {
                 break;
             }
             if start.elapsed() > timeout {
-                failure::bail!(
+                anyhow::bail!(
                     "ETH funds were not received for {} minutes",
                     timeout_minutes
                 );
@@ -198,7 +207,7 @@ impl SatelliteScenario {
         Ok(())
     }
 
-    async fn full_exit(&mut self, account_id: usize) -> Result<(), failure::Error> {
+    async fn full_exit(&mut self, account_id: usize) -> Result<(), anyhow::Error> {
         let wallet = &mut self.wallets[account_id];
 
         let zksync_account_id = wallet.account_id().expect("No account ID set");

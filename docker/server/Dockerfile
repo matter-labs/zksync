@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y libpq5 ca-certificates && rm -rf /var/l
 EXPOSE 3000
 EXPOSE 3031
 EXPOSE 3030
-COPY --from=builder /usr/src/zksync/target/release/server /usr/bin
+COPY --from=builder /usr/src/zksync/target/release/zksync_server /usr/bin
 COPY contracts/build/ /contracts/build/
 COPY bin/kube-is-leader.sh /bin/
 ENTRYPOINT ["server"]

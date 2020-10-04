@@ -6,7 +6,7 @@
 use std::convert::TryFrom;
 // External imports
 // Workspace imports
-use models::{
+use zksync_types::{
     Action, ActionType, Operation,
     {
         block::{ExecutedPriorityOp, ExecutedTx},
@@ -21,12 +21,11 @@ use crate::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
         },
-        state::StateSchema,
     },
     prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
-use models::SignedFranklinTx;
+use zksync_types::SignedFranklinTx;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
@@ -49,20 +48,12 @@ impl StoredOperation {
             .await?
             .expect("Block for action does not exist");
 
-        let accounts_updated = StateSchema(conn)
-            .load_state_diff_for_block(block_number)
-            .await?;
-        Ok(Operation {
-            id,
-            action,
-            block,
-            accounts_updated,
-        })
+        Ok(Operation { id, action, block })
     }
 }
 
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self) -> Result<ExecutedTx, failure::Error> {
+    pub fn into_executed_tx(self) -> Result<ExecutedTx, anyhow::Error> {
         let tx: FranklinTx = serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
         let franklin_op: Option<FranklinOp> =
             serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");
@@ -166,6 +157,10 @@ impl NewExecutedTransaction {
                 FranklinTx::Close(_) => (
                     serde_json::from_value(tx["account"].clone()).unwrap(),
                     serde_json::from_value(tx["account"].clone()).unwrap(),
+                ),
+                FranklinTx::ForcedExit(_) => (
+                    serde_json::from_value(tx["target"].clone()).unwrap(),
+                    serde_json::from_value(tx["target"].clone()).unwrap(),
                 ),
             };
 

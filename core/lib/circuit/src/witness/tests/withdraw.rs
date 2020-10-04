@@ -2,8 +2,9 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::{operations::WithdrawOp, Address};
-use plasma::state::CollectedFee;
+use zksync_state::state::CollectedFee;
+use zksync_state::{handler::TxHandler, state::ZksyncState};
+use zksync_types::{operations::WithdrawOp, tx::Withdraw, Address};
 // Local deps
 use crate::witness::{
     tests::test_utils::{
@@ -55,9 +56,10 @@ fn test_withdraw() {
             withdraw_op,
             input,
             |plasma_state, op| {
-                let (fee, _) = plasma_state
-                    .apply_withdraw_op(&op)
-                    .expect("transfer should be success");
+                let fee = <ZksyncState as TxHandler<Withdraw>>::apply_op(plasma_state, &op)
+                    .expect("Operation failed")
+                    .0
+                    .unwrap();
                 vec![fee]
             },
         );
@@ -104,9 +106,10 @@ fn corrupted_ops_input() {
             input,
             EXPECTED_PANIC_MSG,
             |plasma_state, op| {
-                let (fee, _) = plasma_state
-                    .apply_withdraw_op(&op)
-                    .expect("transfer should be success");
+                let fee = <ZksyncState as TxHandler<Withdraw>>::apply_op(plasma_state, &op)
+                    .expect("Operation failed")
+                    .0
+                    .unwrap();
                 vec![fee]
             },
         );

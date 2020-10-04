@@ -1,8 +1,8 @@
 // Built-in deps
 // External imports
-use failure::format_err;
+use anyhow::format_err;
 // Workspace imports
-use models::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
+use zksync_types::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,

@@ -1,8 +1,8 @@
 use crate::SignerError;
-use models::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
-use models::{Address, H256};
 use parity_crypto::{publickey::sign, Keccak256};
 use rlp::RlpStream;
+use types::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
+use types::{Address, H256};
 
 #[derive(Clone)]
 pub struct PrivateKeySigner {

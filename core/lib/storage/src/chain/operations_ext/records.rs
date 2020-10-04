@@ -1,6 +1,6 @@
 // External imports
 use chrono::prelude::*;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
@@ -15,6 +15,11 @@ pub struct AccountTransaction {
     pub fail_reason: Option<String>,
     pub committed: bool,
     pub verified: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
+pub struct AccountCreatedAt {
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]

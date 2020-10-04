@@ -10,28 +10,38 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt,
 };
-use models::NetworkStatus;
-use models::{
-    Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PriorityOp, Token, TokenId,
-};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use storage::chain::block::records::BlockDetails;
-use storage::chain::operations_ext::{
-    records::{PriorityOpReceiptResponse, TxReceiptResponse},
-    SearchDirection,
-};
-use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use zksync_basic_types::H160;
 use zksync_config::ConfigurationOptions;
+use zksync_storage::chain::block::records::BlockDetails;
+use zksync_storage::chain::operations_ext::{
+    records::{PriorityOpReceiptResponse, TxReceiptResponse},
+    SearchDirection,
+};
+use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::{
+    Account, AccountId, Address, BlockNumber, ExecutedOperations, FranklinPriorityOp, PriorityOp,
+    Token, TokenId,
+};
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
 use crate::panic_notify::ThreadPanicNotify;
-use storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
+use zksync_storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkStatus {
+    pub next_block_at_max: Option<u64>,
+    pub last_committed: BlockNumber,
+    pub last_verified: BlockNumber,
+    pub total_transactions: u32,
+    pub outstanding_txs: u32,
+}
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -119,7 +129,7 @@ impl AppState {
             })
     }
 
-    fn db_error(error: failure::Error) -> HttpResponse {
+    fn db_error(error: anyhow::Error) -> HttpResponse {
         vlog::warn!("DB error: '{}';", error);
         HttpResponse::InternalServerError().finish()
     }
@@ -418,7 +428,7 @@ async fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpRespons
 pub(crate) async fn get_unconfirmed_op_by_hash(
     eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
     eth_hash: &[u8],
-) -> Result<Option<(EthBlockId, PriorityOp)>, failure::Error> {
+) -> Result<Option<(EthBlockId, PriorityOp)>, anyhow::Error> {
     let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
 
     let eth_watcher_response = oneshot::channel();
@@ -437,13 +447,13 @@ pub(crate) async fn get_unconfirmed_op_by_hash(
                 hex::encode(&eth_hash)
             );
 
-            failure::format_err!("Internal Server Error: '{}'", err)
+            anyhow::format_err!("Internal Server Error: '{}'", err)
         })?;
 
     eth_watcher_response
         .1
         .await
-        .map_err(|err| failure::format_err!("Failed to send response: {}", err))
+        .map_err(|err| anyhow::format_err!("Failed to send response: {}", err))
 }
 
 /// Converts a non-executed priority operation into a

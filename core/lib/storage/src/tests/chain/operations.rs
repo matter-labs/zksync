@@ -1,6 +1,6 @@
 // External imports
 // Workspace imports
-use models::ActionType;
+use zksync_types::ActionType;
 // Local imports
 use crate::tests::db_test;
 use crate::{

@@ -1,10 +1,10 @@
 use crate::{error::ClientError, types::network::Network, utils::private_key_from_seed};
 
 use eth_signer::EthereumSigner;
-use models::tx::PackedEthSignature;
-
+use types::tx::PackedEthSignature;
 use web3::types::{Address, H256};
 use zksync_crypto::PrivateKey;
+use zksync_types::tx::PackedEthSignature;
 
 pub struct WalletCredentials {
     pub(crate) eth_signer: Option<EthereumSigner>,
@@ -42,8 +42,9 @@ impl WalletCredentials {
         let eth_sign_message = if let Network::Mainnet = network {
             MESSAGE.into()
         } else {
-            format!("{}\nChainID: {}.", MESSAGE, network.chain_id())
-        };
+            format!("{}\nChain ID: {}.", MESSAGE, network.chain_id())
+        }
+        .into_bytes();
 
         // Check that private key is correct and corresponds to the provided address.
         let address_from_pk = PackedEthSignature::address_from_private_key(&eth_private_key);

@@ -7,7 +7,7 @@
 use jsonrpc_core::types::response::Output;
 
 // Workspace uses
-use models::{
+use zksync_types::{
     tx::{FranklinTx, PackedEthSignature, TxHash},
     Address, TokenLike, TxFeeTypes,
 };
@@ -73,7 +73,7 @@ impl Provider {
     }
 
     /// Submits a transaction to the zkSync network.
-    /// Returns the hash of created transaction.
+    /// Returns the hash of the created transaction.
     pub async fn send_tx(
         &self,
         tx: FranklinTx,
@@ -85,6 +85,20 @@ impl Provider {
         let tx_hash = serde_json::from_value(ret)
             .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
         Ok(tx_hash)
+    }
+
+    /// Submits a batch transaction to the zkSync network.
+    /// Returns the hashes of the created transactions.
+    pub async fn send_txs_batch(
+        &self,
+        txs_signed: Vec<(FranklinTx, Option<PackedEthSignature>)>,
+    ) -> Result<Vec<TxHash>, ClientError> {
+        let msg = JsonRpcRequest::submit_tx_batch(txs_signed);
+
+        let ret = self.post(&msg).await?;
+        let tx_hashes = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
+        Ok(tx_hashes)
     }
 
     /// Requests and returns information about a ZKSync account given its address.
@@ -196,11 +210,11 @@ impl Provider {
 }
 
 mod messages {
-    use models::{
+    use serde_derive::Serialize;
+    use zksync_types::{
         tx::{FranklinTx, PackedEthSignature, TxEthSignature, TxHash},
         Address, TokenLike, TxFeeTypes,
     };
-    use serde_derive::Serialize;
 
     #[derive(Debug, Serialize)]
     pub struct JsonRpcRequest {
@@ -221,13 +235,13 @@ mod messages {
         }
 
         pub fn account_info(address: Address) -> Self {
-            let mut params = Vec::new();
+            let mut params = Vec::with_capacity(1);
             params.push(serde_json::to_value(address).expect("serialization fail"));
             Self::create("account_info", params)
         }
 
         pub fn submit_tx(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
-            let mut params = Vec::new();
+            let mut params = Vec::with_capacity(2);
             params.push(serde_json::to_value(tx).expect("serialization fail"));
             params.push(
                 serde_json::to_value(eth_signature.map(TxEthSignature::EthereumSignature))
@@ -236,36 +250,51 @@ mod messages {
             Self::create("tx_submit", params)
         }
 
+        pub fn submit_tx_batch(txs_signed: Vec<(FranklinTx, Option<PackedEthSignature>)>) -> Self {
+            let mut params = Vec::with_capacity(1);
+
+            let txs_signed = txs_signed.into_iter().map(|(tx, eth_signature)| {
+                serde_json::json!({
+                    "tx": serde_json::to_value(tx).expect("serialization fail"),
+                    "signature": serde_json::to_value(eth_signature.map(TxEthSignature::EthereumSignature))
+                        .expect("serialization fail"),
+                })
+            }).collect();
+            params.push(serde_json::Value::Array(txs_signed));
+
+            Self::create("submit_txs_batch", params)
+        }
+
         pub fn ethop_info(serial_id: u32) -> Self {
-            let mut params = Vec::new();
+            let mut params = Vec::with_capacity(1);
             params.push(serde_json::to_value(serial_id).expect("serialization fail"));
             Self::create("ethop_info", params)
         }
 
         pub fn tx_info(tx_hash: TxHash) -> Self {
-            let mut params = Vec::new();
+            let mut params = Vec::with_capacity(1);
             params.push(serde_json::to_value(tx_hash).expect("serialization fail"));
             Self::create("tx_info", params)
         }
 
         pub fn tokens() -> Self {
-            let params = Vec::new();
+            let params = Vec::with_capacity(0);
             Self::create("tokens", params)
         }
 
         pub fn contract_address() -> Self {
-            let params = Vec::new();
+            let params = Vec::with_capacity(0);
             Self::create("contract_address", params)
         }
 
         pub fn eth_tx_for_withdrawal(withdrawal_hash: TxHash) -> Self {
-            let mut params = Vec::new();
+            let mut params = Vec::with_capacity(1);
             params.push(serde_json::to_value(withdrawal_hash).expect("serialization fail"));
             Self::create("get_eth_tx_for_withdrawal", params)
         }
 
         pub fn get_tx_fee(tx_type: TxFeeTypes, address: Address, token_symbol: TokenLike) -> Self {
-            let mut params = Vec::new();
+            let mut params = Vec::with_capacity(3);
             params.push(serde_json::to_value(tx_type).expect("serialization fail"));
             params.push(serde_json::to_value(address).expect("serialization fail"));
             params.push(serde_json::to_value(token_symbol).expect("serialization fail"));

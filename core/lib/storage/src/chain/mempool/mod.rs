@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use models::{mempool::SignedTxVariant, tx::TxHash, SignedFranklinTx};
+use zksync_types::{mempool::SignedTxVariant, tx::TxHash, SignedFranklinTx};
 // Local imports
 use self::records::MempoolTx;
 use crate::{QueryResult, StorageProcessor};
@@ -66,7 +66,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                         eth_sign_data: sign_data,
                     })
                 })
-                .collect::<Result<Vec<SignedFranklinTx>, failure::Error>>()?;
+                .collect::<Result<Vec<SignedFranklinTx>, anyhow::Error>>()?;
 
             match batch_id {
                 Some(batch_id) => {
@@ -104,7 +104,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Returns id of the inserted batch
     pub async fn insert_batch(&mut self, txs: &[SignedFranklinTx]) -> QueryResult<i64> {
         if txs.is_empty() {
-            failure::bail!("Cannot insert an empty batch");
+            anyhow::bail!("Cannot insert an empty batch");
         }
 
         // The first transaction of the batch would be inserted manually
@@ -140,7 +140,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             )
             .fetch_optional(self.0.conn())
             .await?
-            .ok_or_else(|| failure::format_err!("Can't get maximal batch_id from mempool_txs"))?
+            .ok_or_else(|| anyhow::format_err!("Can't get maximal batch_id from mempool_txs"))?
             .batch_id
         };
 

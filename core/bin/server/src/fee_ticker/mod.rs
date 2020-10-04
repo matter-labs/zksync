@@ -19,14 +19,16 @@ use num::{
     traits::{Inv, Pow},
     BigUint,
 };
+use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 // Workspace deps
-use models::{
-    helpers::{pack_fee_amount, unpack_fee_amount},
-    Address, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
-};
-use storage::ConnectionPool;
 use zksync_config::TokenPriceSource;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
+    helpers::{pack_fee_amount, unpack_fee_amount},
+    Address, ChangePubKeyOp, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
+    WithdrawOp,
+};
 use zksync_utils::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10Str};
 // Local deps
 use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
@@ -40,7 +42,7 @@ use crate::{
     },
     state_keeper::StateKeeperRequest,
 };
-use models::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
+use zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
 
 mod ticker_api;
 mod ticker_info;
@@ -59,6 +61,12 @@ const BASE_WITHDRAW_COST: u64 = VerifyCost::WITHDRAW_COST
     + GasCounter::COMPLETE_WITHDRAWALS_COST
     + 1000 * (WithdrawOp::CHUNKS as u64)
     + (GasCounter::COMPLETE_WITHDRAWALS_BASE_COST / MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL);
+const BASE_CHANGE_PUBKEY_OFFCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_OFFCHAIN
+    + VerifyCost::CHANGE_PUBKEY_COST
+    + 1000 * (ChangePubKeyOp::CHUNKS as u64);
+const BASE_CHANGE_PUBKEY_ONCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_ONCHAIN
+    + crate::gas_counter::VerifyCost::CHANGE_PUBKEY_COST
+    + 1000 * (ChangePubKeyOp::CHUNKS as u64);
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
@@ -72,6 +80,7 @@ pub enum OutputFeeType {
     TransferToNew,
     Withdraw,
     FastWithdraw,
+    ChangePubKey { onchain_pubkey_auth: bool },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -140,11 +149,11 @@ pub enum TickerRequest {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-        response: oneshot::Sender<Result<Fee, failure::Error>>,
+        response: oneshot::Sender<Result<Fee, anyhow::Error>>,
     },
     GetTokenPrice {
         token: TokenLike,
-        response: oneshot::Sender<Result<BigDecimal, failure::Error>>,
+        response: oneshot::Sender<Result<BigDecimal, anyhow::Error>>,
         req_type: TokenPriceRequestType,
     },
 }
@@ -179,6 +188,18 @@ pub fn run_ticker_task(
             ),
             (OutputFeeType::Withdraw, BASE_WITHDRAW_COST.into()),
             (OutputFeeType::FastWithdraw, fast_withdrawal_cost.into()),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: false,
+                },
+                BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: true,
+                },
+                BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+            ),
         ]
         .into_iter()
         .collect(),
@@ -255,7 +276,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         &self,
         token: TokenLike,
         req_rype: TokenPriceRequestType,
-    ) -> Result<BigDecimal, failure::Error> {
+    ) -> Result<BigDecimal, anyhow::Error> {
         let factor = match req_rype {
             TokenPriceRequestType::USDForOneWei => {
                 let token_decimals = self.api.get_token(token.clone()).await?.decimals;
@@ -280,7 +301,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         tx_type: TxFeeTypes,
         token: TokenLike,
         recipient: Address,
-    ) -> Result<Fee, failure::Error> {
+    ) -> Result<Fee, anyhow::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token).await?;
         let token_risk_factor = self
@@ -300,6 +321,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
+            TxFeeTypes::ChangePubKey {
+                onchain_pubkey_auth,
+            } => (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth,
+                },
+                ChangePubKeyOp::CHUNKS,
+            ),
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
@@ -338,8 +367,8 @@ mod test {
     use bigdecimal::BigDecimal;
     use chrono::Utc;
     use futures::executor::block_on;
-    use models::{Address, Token, TokenId, TokenPrice};
     use std::str::FromStr;
+    use zksync_types::{Address, Token, TokenId, TokenPrice};
     use zksync_utils::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
     #[derive(Debug, Clone)]
@@ -403,6 +432,18 @@ mod test {
                     BigUint::from(BASE_TRANSFER_TO_NEW_COST),
                 ),
                 (OutputFeeType::Withdraw, BigUint::from(BASE_WITHDRAW_COST)),
+                (
+                    OutputFeeType::ChangePubKey {
+                        onchain_pubkey_auth: false,
+                    },
+                    BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                ),
+                (
+                    OutputFeeType::ChangePubKey {
+                        onchain_pubkey_auth: true,
+                    },
+                    BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+                ),
             ]
             .into_iter()
             .collect(),
@@ -419,7 +460,7 @@ mod test {
     struct MockApiProvider;
     #[async_trait]
     impl FeeTickerAPI for MockApiProvider {
-        async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, failure::Error> {
+        async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error> {
             for test_token in TestToken::all_tokens() {
                 if TokenLike::Id(test_token.id) == token {
                     let token_price = TokenPrice {
@@ -433,11 +474,11 @@ mod test {
         }
 
         /// Get current gas price in ETH
-        async fn get_gas_price_wei(&self) -> Result<BigUint, failure::Error> {
+        async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
             Ok(BigUint::from(10u32).pow(7u32)) // 10 GWei
         }
 
-        async fn get_token(&self, token: TokenLike) -> Result<Token, failure::Error> {
+        async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
             for test_token in TestToken::all_tokens() {
                 if TokenLike::Id(test_token.id) == token {
                     return Ok(Token::new(

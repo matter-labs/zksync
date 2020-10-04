@@ -3,12 +3,12 @@ use std::str::FromStr;
 // External imports
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use models::{
+use zksync_crypto::Fr;
+use zksync_types::{
     ethereum::{ETHOperation, OperationType},
     Action, Operation,
     {block::Block, BlockNumber},
 };
-use zksync_crypto::Fr;
 // Local imports
 use crate::tests::db_test;
 use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, QueryResult, StorageProcessor};
@@ -31,7 +31,6 @@ pub fn get_commit_operation(block_number: BlockNumber) -> Operation {
             1_000_000.into(),
             1_500_000.into(),
         ),
-        accounts_updated: Default::default(),
     }
 }
 
@@ -53,7 +52,6 @@ pub fn get_verify_operation(block_number: BlockNumber) -> Operation {
             1_000_000.into(),
             1_500_000.into(),
         ),
-        accounts_updated: Default::default(),
     }
 }
 

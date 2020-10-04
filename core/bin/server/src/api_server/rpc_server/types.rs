@@ -2,8 +2,9 @@ use std::collections::HashMap;
 // External uses
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
+use serde::{Deserialize, Serialize};
 // Workspace uses
-use models::{
+use zksync_types::{
     tx::TxEthSignature, Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce,
     PriorityOp, PubKeyHash,
 };
@@ -49,6 +50,13 @@ impl ResponseAccountState {
             pub_key_hash: account.pub_key_hash,
         })
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct AccountStateInfo {
+    pub account_id: Option<AccountId>,
+    pub committed: ResponseAccountState,
+    pub verified: ResponseAccountState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

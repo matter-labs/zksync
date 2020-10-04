@@ -8,19 +8,19 @@ pub fn fe_to_bytes<F: PrimeField>(value: &F) -> Vec<u8> {
     buf
 }
 
-pub fn fe_from_bytes<F: PrimeField>(value: &[u8]) -> Result<F, failure::Error> {
+pub fn fe_from_bytes<F: PrimeField>(value: &[u8]) -> Result<F, anyhow::Error> {
     let mut repr = F::Repr::default();
 
     // `repr.as_ref()` converts `repr` to a list of `u64`. Each element has 8 bytes,
     // so to obtain size in bytes, we multiply the array size with the size of `u64`.
     let expected_input_size = repr.as_ref().len() * 8;
     if value.len() != expected_input_size {
-        failure::bail!("Incorrect input size")
+        anyhow::bail!("Incorrect input size")
     }
     repr.read_be(value)
-        .map_err(|e| failure::format_err!("Cannot parse value {:?}: {}", value, e))?;
+        .map_err(|e| anyhow::format_err!("Cannot parse value {:?}: {}", value, e))?;
     F::from_repr(repr).map_err(|e| {
-        failure::format_err!("Cannot convert into prime field value {:?}: {}", value, e)
+        anyhow::format_err!("Cannot convert into prime field value {:?}: {}", value, e)
     })
 }
 
@@ -31,7 +31,7 @@ pub fn fe_to_hex<F: PrimeField>(value: &F) -> String {
     hex::encode(&buf)
 }
 
-pub fn fe_from_hex<F: PrimeField>(value: &str) -> Result<F, failure::Error> {
+pub fn fe_from_hex<F: PrimeField>(value: &str) -> Result<F, anyhow::Error> {
     let value = if value.starts_with("0x") {
         &value[2..]
     } else {
@@ -41,7 +41,7 @@ pub fn fe_from_hex<F: PrimeField>(value: &str) -> Result<F, failure::Error> {
     // Buffer is reversed and read as little endian, since we pad it with zeros to
     // match the expected length.
     let mut buf = hex::decode(&value)
-        .map_err(|e| failure::format_err!("could not decode hex: {}, reason: {}", value, e))?;
+        .map_err(|e| anyhow::format_err!("could not decode hex: {}, reason: {}", value, e))?;
     buf.reverse();
     let mut repr = F::Repr::default();
 
@@ -49,9 +49,9 @@ pub fn fe_from_hex<F: PrimeField>(value: &str) -> Result<F, failure::Error> {
     // so to obtain size in bytes, we multiply the array size with the size of `u64`.
     buf.resize(repr.as_ref().len() * 8, 0);
     repr.read_le(&buf[..])
-        .map_err(|e| failure::format_err!("could not read {}: {}", value, e))?;
+        .map_err(|e| anyhow::format_err!("could not read {}: {}", value, e))?;
     F::from_repr(repr)
-        .map_err(|e| failure::format_err!("could not convert into prime field: {}: {}", value, e))
+        .map_err(|e| anyhow::format_err!("could not convert into prime field: {}: {}", value, e))
 }
 
 #[cfg(test)]

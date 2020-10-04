@@ -2,8 +2,11 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::operations::TransferOp;
-use plasma::state::CollectedFee;
+use zksync_state::{
+    handler::TxHandler,
+    state::{CollectedFee, TransferOutcome, ZksyncState},
+};
+use zksync_types::{operations::TransferOp, tx::Transfer};
 // Local deps
 use crate::witness::{
     tests::test_utils::{
@@ -61,9 +64,11 @@ fn test_transfer_success() {
             transfer_op,
             input,
             |plasma_state, op| {
-                let (fee, _) = plasma_state
-                    .apply_transfer_op(&op)
-                    .expect("transfer should be success");
+                let raw_op = TransferOutcome::Transfer(op.clone());
+                let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
+                    .expect("Operation failed")
+                    .0
+                    .unwrap();
                 vec![fee]
             },
         );
@@ -103,9 +108,11 @@ fn test_transfer_to_self() {
         transfer_op,
         input,
         |plasma_state, op| {
-            let (fee, _) = plasma_state
-                .apply_transfer_op(&op)
-                .expect("transfer should be success");
+            let raw_op = TransferOutcome::Transfer(op.clone());
+            let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
+                .expect("Operation failed")
+                .0
+                .unwrap();
             vec![fee]
         },
     );
@@ -152,9 +159,11 @@ fn corrupted_ops_input() {
             input,
             EXPECTED_PANIC_MSG,
             |plasma_state, op| {
-                let (fee, _) = plasma_state
-                    .apply_transfer_op(&op)
-                    .expect("transfer should be success");
+                let raw_op = TransferOutcome::Transfer(op.clone());
+                let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
+                    .expect("Operation failed")
+                    .0
+                    .unwrap();
                 vec![fee]
             },
         );

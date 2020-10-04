@@ -107,7 +107,7 @@ async fn send_transactions_from_acc(
     ctx: LoadTestConfig,
     provider: Provider,
     tps_counter: Arc<TPSCounter>,
-) -> Result<SentTransactions, failure::Error> {
+) -> Result<SentTransactions, anyhow::Error> {
     let mut sent_txs = SentTransactions::new();
     let addr_hex = hex::encode(test_wallet.address());
     let wei_in_gwei = BigUint::from(1_000_000_000u32);
@@ -156,7 +156,11 @@ async fn send_transactions_from_acc(
     );
 
     // Add the `ChangePubKey` operation.
-    tx_queue.push((test_wallet.sign_change_pubkey().await?, None));
+    let change_pubkey_fee = BigUint::from(0u32); // TODO: This scenario doesn't currently work anyway.
+    tx_queue.push((
+        test_wallet.sign_change_pubkey(change_pubkey_fee).await?,
+        None,
+    ));
 
     // Add the transfer operations.
     for _ in 0..ctx.n_transfers {

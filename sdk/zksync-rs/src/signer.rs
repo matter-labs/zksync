@@ -1,14 +1,14 @@
 // Built-in imports
 use eth_signer::error::SignerError;
 use eth_signer::EthereumSigner;
-use models::tx::TxEthSignature;
 use std::fmt;
+use types::tx::TxEthSignature;
 // External uses
 use num::BigUint;
 // Workspace uses
-use models::tx::{ChangePubKey, PackedEthSignature};
-use models::{AccountId, Address, Nonce, PubKeyHash, Token, Transfer, Withdraw};
 use zksync_crypto::PrivateKey;
+use zksync_types::tx::{ChangePubKey, PackedEthSignature};
+use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token, Transfer, Withdraw};
 
 fn signing_failed_error(err: impl ToString) -> SignerError {
     SignerError::SigningFailed(err.to_string())
@@ -68,8 +68,22 @@ impl Signer {
         &self,
         nonce: Nonce,
         auth_onchain: bool,
+        fee_token: Token,
+        fee: BigUint,
     ) -> Result<ChangePubKey, SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        let mut change_pubkey = ChangePubKey::new_signed(
+            account_id,
+            self.address,
+            self.pubkey_hash.clone(),
+            fee_token.id,
+            fee,
+            nonce,
+            None,
+            &self.private_key,
+        )
+        .map_err(signing_failed_error)?;
 
         let eth_signature = if auth_onchain {
             None
@@ -79,10 +93,9 @@ impl Signer {
                 .as_ref()
                 .ok_or(SignerError::MissingEthPrivateKey)?; // TODO1 Change error code
 
-            let sign_bytes =
-                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                    .map_err(signing_failed_error)?;
-
+            let sign_bytes = change_pubkey
+                .get_eth_signed_data()
+                .map_err(signing_failed_error)?;
             let eth_signature = eth_signer
                 .sign_message(&sign_bytes)
                 .await
@@ -93,13 +106,8 @@ impl Signer {
                 _ => None,
             }
         };
-        let change_pubkey = ChangePubKey {
-            account_id,
-            account: self.address,
-            new_pk_hash: self.pubkey_hash.clone(),
-            nonce,
-            eth_signature,
-        };
+
+        change_pubkey.eth_signature = eth_signature;
 
         if !auth_onchain {
             assert!(

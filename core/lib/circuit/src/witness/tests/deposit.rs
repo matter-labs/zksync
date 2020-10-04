@@ -2,7 +2,8 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::{operations::DepositOp, Deposit};
+use zksync_state::{handler::TxHandler, state::ZksyncState};
+use zksync_types::{operations::DepositOp, Deposit};
 // Local deps
 use crate::witness::{
     deposit::DepositWitness,
@@ -10,13 +11,13 @@ use crate::witness::{
 };
 
 /// Checks that deposit can be applied to a new account.
-/// Here we generate an empty PlasmaState (with no accounts), and make a deposit to a new account.
+/// Here we generate an empty ZksyncState (with no accounts), and make a deposit to a new account.
 #[test]
 #[ignore]
 fn test_deposit_in_empty_leaf() {
     // Input data.
     let accounts = &[];
-    let account = WitnessTestAccount::new_empty(1); // Will not be included into PlasmaState
+    let account = WitnessTestAccount::new_empty(1); // Will not be included into ZksyncState
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: account.account.address,
@@ -32,14 +33,15 @@ fn test_deposit_in_empty_leaf() {
         deposit_op,
         (),
         |plasma_state, op| {
-            plasma_state.apply_deposit_op(op);
+            <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                .expect("Deposit failed");
             vec![]
         },
     );
 }
 
 /// Checks that deposit can be applied to an existing account.
-/// Here we generate a PlasmaState with one account, and make a deposit to this account.
+/// Here we generate a ZksyncState with one account, and make a deposit to this account.
 #[test]
 #[ignore]
 fn test_deposit_existing_account() {
@@ -70,7 +72,8 @@ fn test_deposit_existing_account() {
             deposit_op,
             (),
             |plasma_state, op| {
-                plasma_state.apply_deposit_op(op);
+                <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                    .expect("Deposit failed");
                 vec![]
             },
         );
@@ -106,7 +109,8 @@ fn test_incorrect_deposit_address() {
         deposit_op,
         (),
         |plasma_state, op| {
-            plasma_state.apply_deposit_op(op);
+            <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                .expect("Deposit failed");
             vec![]
         },
     );

@@ -1,24 +1,25 @@
 use crate::external_commands::js_revert_reason;
+
+use anyhow::{bail, ensure, format_err};
 use eth_client::ETHClient;
 use eth_signer::EthereumSigner;
 use ethabi::ParamType;
-use failure::{bail, ensure, format_err};
-use futures::compat::Future01CompatExt;
-use models::block::Block;
-use models::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use web3::api::Eth;
 use web3::contract::{Contract, Options};
 use web3::types::{
-    BlockNumber, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
+    BlockId, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
 };
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_eth_client::ETHClient;
+use zksync_types::block::Block;
+use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 
-pub fn parse_ether(eth_value: &str) -> Result<BigUint, failure::Error> {
+pub fn parse_ether(eth_value: &str) -> Result<BigUint, anyhow::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();
     ensure!(split.len() == 1 || split.len() == 2, "Wrong eth value");
     let string_wei_value = if split.len() == 1 {
@@ -89,7 +90,7 @@ impl<T: Transport> EthereumAccount<T> {
         }
     }
 
-    pub async fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
+    pub async fn total_blocks_committed(&self) -> Result<u64, anyhow::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             self.main_contract_eth_client.contract_addr,
@@ -98,12 +99,11 @@ impl<T: Transport> EthereumAccount<T> {
 
         contract
             .query("totalBlocksCommitted", (), None, default_tx_options(), None)
-            .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
-    pub async fn total_blocks_verified(&self) -> Result<u64, failure::Error> {
+    pub async fn total_blocks_verified(&self) -> Result<u64, anyhow::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             self.main_contract_eth_client.contract_addr,
@@ -112,12 +112,11 @@ impl<T: Transport> EthereumAccount<T> {
 
         contract
             .query("totalBlocksVerified", (), None, default_tx_options(), None)
-            .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
-    pub async fn is_exodus(&self) -> Result<bool, failure::Error> {
+    pub async fn is_exodus(&self) -> Result<bool, anyhow::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             self.main_contract_eth_client.contract_addr,
@@ -126,7 +125,6 @@ impl<T: Transport> EthereumAccount<T> {
 
         contract
             .query("exodusMode", (), None, default_tx_options(), None)
-            .compat()
             .await
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
@@ -135,7 +133,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         account_id: AccountId,
         token_address: Address,
-    ) -> Result<(TransactionReceipt, PriorityOp), failure::Error> {
+    ) -> Result<(TransactionReceipt, PriorityOp), anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -163,7 +161,7 @@ impl<T: Transport> EthereumAccount<T> {
         token_id: TokenId,
         amount: &BigUint,
         proof: EncodedProofPlonk,
-    ) -> Result<ETHExecResult, failure::Error> {
+    ) -> Result<ETHExecResult, anyhow::Error> {
         let mut options = Options::default();
         options.gas = Some(3_000_000.into()); // `exit` function requires more gas to operate.
 
@@ -191,7 +189,7 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn cancel_outstanding_deposits_for_exodus_mode(
         &self,
         number: u64,
-    ) -> Result<ETHExecResult, failure::Error> {
+    ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -211,7 +209,7 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn change_pubkey_priority_op(
         &self,
         new_pubkey_hash: &PubKeyHash,
-    ) -> Result<PriorityOp, failure::Error> {
+    ) -> Result<PriorityOp, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -237,7 +235,7 @@ impl<T: Transport> EthereumAccount<T> {
         amount: BigUint,
         to: &Address,
         nonce: Option<U256>,
-    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), failure::Error> {
+    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -259,18 +257,17 @@ impl<T: Transport> EthereumAccount<T> {
         Ok((vec![receipt], priority_op))
     }
 
-    pub async fn eth_balance(&self) -> Result<BigUint, failure::Error> {
+    pub async fn eth_balance(&self) -> Result<BigUint, anyhow::Error> {
         Ok(u256_to_big_dec(
             self.main_contract_eth_client
                 .web3
                 .eth()
                 .balance(self.address, None)
-                .compat()
                 .await?,
         ))
     }
 
-    pub async fn erc20_balance(&self, token_contract: &Address) -> Result<BigUint, failure::Error> {
+    pub async fn erc20_balance(&self, token_contract: &Address) -> Result<BigUint, anyhow::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             *token_contract,
@@ -278,13 +275,12 @@ impl<T: Transport> EthereumAccount<T> {
         );
         contract
             .query("balanceOf", self.address, None, default_tx_options(), None)
-            .compat()
             .await
             .map(u256_to_big_dec)
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
-    pub async fn balances_to_withdraw(&self, token: TokenId) -> Result<BigUint, failure::Error> {
+    pub async fn balances_to_withdraw(&self, token: TokenId) -> Result<BigUint, anyhow::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             self.main_contract_eth_client.contract_addr,
@@ -299,7 +295,6 @@ impl<T: Transport> EthereumAccount<T> {
                 default_tx_options(),
                 None,
             )
-            .compat()
             .await
             .map(u256_to_big_dec)
             .map_err(|e| format_err!("Contract query fail: {}", e))?)
@@ -309,7 +304,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         token_contract: Address,
         amount: BigUint,
-    ) -> Result<TransactionReceipt, failure::Error> {
+    ) -> Result<TransactionReceipt, anyhow::Error> {
         let eth_signer = EthereumSigner::from_key(self.private_key);
         let erc20_client = ETHClient::new(
             self.main_contract_eth_client.web3.transport().clone(),
@@ -346,7 +341,7 @@ impl<T: Transport> EthereumAccount<T> {
         token_contract: Address,
         amount: BigUint,
         to: &Address,
-    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), failure::Error> {
+    ) -> Result<(Vec<TransactionReceipt>, PriorityOp), anyhow::Error> {
         let approve_receipt = self.approve_erc20(token_contract, amount.clone()).await?;
 
         let signed_tx = self
@@ -367,7 +362,7 @@ impl<T: Transport> EthereumAccount<T> {
         Ok((vec![approve_receipt, receipt], priority_op))
     }
 
-    pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, failure::Error> {
+    pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, anyhow::Error> {
         let witness_data = block.get_eth_witness_data();
         let signed_tx = self
             .main_contract_eth_client
@@ -393,7 +388,7 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     // Verifies block using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
-    pub async fn verify_block(&self, block: &Block) -> Result<ETHExecResult, failure::Error> {
+    pub async fn verify_block(&self, block: &Block) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -413,7 +408,7 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     // Completes pending withdrawals.
-    pub async fn complete_withdrawals(&self) -> Result<ETHExecResult, failure::Error> {
+    pub async fn complete_withdrawals(&self) -> Result<ETHExecResult, anyhow::Error> {
         let max_withdrawals_to_complete: u64 = 999;
         let signed_tx = self
             .main_contract_eth_client
@@ -433,7 +428,7 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn revert_blocks(
         &self,
         blocks_to_revert: u64,
-    ) -> Result<ETHExecResult, failure::Error> {
+    ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -449,7 +444,7 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    pub async fn trigger_exodus_if_needed(&self) -> Result<ETHExecResult, failure::Error> {
+    pub async fn trigger_exodus_if_needed(&self) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx("triggerExodusIfNeeded", (), default_tx_options())
@@ -461,7 +456,7 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    pub async fn eth_block_number(&self) -> Result<u64, failure::Error> {
+    pub async fn eth_block_number(&self) -> Result<u64, anyhow::Error> {
         Ok(self.main_contract_eth_client.block_number().await?.as_u64())
     }
 
@@ -469,7 +464,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         fact: &[u8],
         nonce: Nonce,
-    ) -> Result<TransactionReceipt, failure::Error> {
+    ) -> Result<TransactionReceipt, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -509,7 +504,7 @@ impl ETHExecResult {
         }
     }
 
-    pub fn success_result(self) -> Result<TransactionReceipt, failure::Error> {
+    pub fn success_result(self) -> Result<TransactionReceipt, anyhow::Error> {
         if self.success {
             Ok(self.receipt)
         } else {
@@ -545,11 +540,10 @@ impl ETHExecResult {
 async fn get_revert_reason<T: Transport>(
     receipt: &TransactionReceipt,
     web3: &Web3<T>,
-) -> Result<String, failure::Error> {
+) -> Result<String, anyhow::Error> {
     let tx = web3
         .eth()
         .transaction(TransactionId::Hash(receipt.transaction_hash))
-        .compat()
         .await?;
     if let Some(Transaction {
         from,
@@ -567,15 +561,14 @@ async fn get_revert_reason<T: Transport>(
             .call(
                 CallRequest {
                     from: Some(from),
-                    to,
+                    to: Some(to),
                     gas: Some(gas),
                     gas_price: Some(gas_price),
                     value: Some(value),
                     data: Some(input),
                 },
-                receipt.block_number.clone().map(BlockNumber::Number),
+                receipt.block_number.clone().map(BlockId::from),
             )
-            .compat()
             .await?;
 
         // For some strange reason this could happen
@@ -602,16 +595,14 @@ async fn get_revert_reason<T: Transport>(
 async fn send_raw_tx_wait_confirmation<T: Transport>(
     eth: Eth<T>,
     raw_tx: Vec<u8>,
-) -> Result<TransactionReceipt, failure::Error> {
+) -> Result<TransactionReceipt, anyhow::Error> {
     let tx_hash = eth
         .send_raw_transaction(raw_tx.into())
-        .compat()
         .await
         .map_err(|e| format_err!("Failed to send raw tx: {}", e))?;
     loop {
         if let Some(receipt) = eth
             .transaction_receipt(tx_hash)
-            .compat()
             .await
             .map_err(|e| format_err!("Failed to get receipt from eth node: {}", e))?
         {
@@ -632,7 +623,7 @@ fn default_tx_options() -> Options {
 pub async fn get_executed_tx_fee<T: Transport>(
     eth: Eth<T>,
     receipt: &TransactionReceipt,
-) -> Result<BigUint, failure::Error> {
+) -> Result<BigUint, anyhow::Error> {
     let gas_used = receipt.gas_used.ok_or_else(|| {
         format_err!(
             "Not used gas in the receipt: 0x{:x?}",
@@ -642,7 +633,6 @@ pub async fn get_executed_tx_fee<T: Transport>(
 
     let tx = eth
         .transaction(TransactionId::Hash(receipt.transaction_hash))
-        .compat()
         .await?
         .ok_or_else(|| format_err!("Transaction not found: 0x{:x?}", receipt.transaction_hash))?;
 

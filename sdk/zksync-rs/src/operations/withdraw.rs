@@ -1,4 +1,5 @@
-use models::{
+use num::BigUint;
+use zksync_types::{
     helpers::{
         closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
         is_token_amount_packable,
@@ -6,7 +7,6 @@ use models::{
     tx::PackedEthSignature,
     Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
 };
-use num::BigUint;
 
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
 

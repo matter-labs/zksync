@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use zksync::{tokens_cache::TokensCache, web3::types::H160, zksync_models::Token};
+use zksync::{tokens_cache::TokensCache, web3::types::H160, zksync_types::Token};
 
 #[test]
 fn test_tokens_cache() {

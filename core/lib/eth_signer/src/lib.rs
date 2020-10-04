@@ -2,8 +2,8 @@
 extern crate serde_derive;
 
 use error::SignerError;
-use models::tx::{RawTransaction, TxEthSignature};
-use models::{Address, H256};
+use types::tx::{RawTransaction, TxEthSignature};
+use types::{Address, H256};
 
 use json_rpc_signer::JsonRpcSigner;
 use pk_signer::PrivateKeySigner;

@@ -1,5 +1,11 @@
 # zkSync changelog
 
+### Contracts v3 and protocol (4.09.2020)
+
+- Change pubkey operation requires fee for processing.
+- Added support for the forced exit operation which allows user to force a withdrawal from another account
+  that does not have signing key set and is older than 24h.
+
 ### zksync.js 0.6.5
 
 - Support of fast withdrawals was added. Corresponding optional field was added to the object passed to the `withdrawFromSyncToEthereum` method

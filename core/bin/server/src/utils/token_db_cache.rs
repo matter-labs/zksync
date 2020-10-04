@@ -2,8 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use models::{Token, TokenId, TokenLike};
-use storage::ConnectionPool;
+use zksync_storage::ConnectionPool;
+use zksync_types::{Token, TokenId, TokenLike};
 
 #[derive(Debug, Clone)]
 pub struct TokenDBCache {
@@ -23,7 +23,7 @@ impl TokenDBCache {
     pub async fn get_token(
         &self,
         token_query: impl Into<TokenLike>,
-    ) -> Result<Option<Token>, failure::Error> {
+    ) -> Result<Option<Token>, anyhow::Error> {
         let token_like = token_query.into();
 
         let cached_value = {
@@ -45,13 +45,13 @@ impl TokenDBCache {
                 .db_pool
                 .access_storage_fragile()
                 .await
-                .map_err(|e| failure::format_err!("Failed to access storage: {}", e))?;
+                .map_err(|e| anyhow::format_err!("Failed to access storage: {}", e))?;
 
             let db_token = storage
                 .tokens_schema()
                 .get_token(token_like)
                 .await
-                .map_err(|e| failure::format_err!("Tokens load failed: {}", e))?;
+                .map_err(|e| anyhow::format_err!("Tokens load failed: {}", e))?;
 
             if let Some(token) = &db_token {
                 self.tokens.write().await.insert(token.id, token.clone());

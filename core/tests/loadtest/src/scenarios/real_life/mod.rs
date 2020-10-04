@@ -60,13 +60,13 @@ use futures::future::try_join_all;
 use num::BigUint;
 use tokio::{fs, time};
 // Workspace deps
-use models::{
+use zksync::{Network, Provider};
+use zksync_config::ConfigurationOptions;
+use zksync_types::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
     tx::PackedEthSignature,
     FranklinTx, TxFeeTypes,
 };
-use zksync::{Network, Provider};
-use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local deps
 use self::satellite::SatelliteScenario;
@@ -236,7 +236,7 @@ impl ScenarioExecutor {
     }
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
-    pub async fn run_test(&mut self) -> Result<(), failure::Error> {
+    pub async fn run_test(&mut self) -> Result<(), anyhow::Error> {
         self.save_accounts().await;
 
         self.initialize().await?;
@@ -259,11 +259,13 @@ impl ScenarioExecutor {
     }
 
     /// Initializes the test, preparing the main account for the interaction.
-    async fn initialize(&mut self) -> Result<(), failure::Error> {
+    async fn initialize(&mut self) -> Result<(), anyhow::Error> {
         // Then, we have to get the fee value (assuming that dev-ticker is used, we estimate
         // the fee in such a way that it will always be sufficient).
         // Withdraw operation has more chunks, so we estimate fee for it.
         let mut fee = self.withdraw_fee(&self.main_wallet).await;
+        // Change pubkey fee is different, so we calculate it separately.
+        let change_pubkey_fee = self.change_pubkey_fee(&self.main_wallet).await;
 
         // To be sure that we will have enough funds for all the transfers,
         // we will request 1.2x of the suggested fees. All the unspent funds
@@ -276,14 +278,16 @@ impl ScenarioExecutor {
         self.estimated_fee_for_op = fee.clone();
 
         if let Some(scenario) = self.satellite_scenario.as_mut() {
-            scenario.set_estimated_fee(fee);
+            scenario.set_estimated_fee(fee, change_pubkey_fee);
         };
 
         Ok(())
     }
 
     /// Runs the initial deposit of the money onto the main account.
-    async fn deposit(&mut self) -> Result<(), failure::Error> {
+    async fn deposit(&mut self) -> Result<(), anyhow::Error> {
+        let change_pubkey_fee = self.change_pubkey_fee(&self.main_wallet).await;
+
         // Amount of money we need to deposit.
         // Initialize it with the raw amount: only sum of transfers per account.
         // Fees are taken into account below.
@@ -299,8 +303,10 @@ impl ScenarioExecutor {
         // Total amount of cycles is amount of funds rotation cycles + one for initial transfers +
         // one for collecting funds back to the main account.
         amount_to_deposit += fee_for_all_accounts * (self.cycles_amount + 2);
-        // Also the fee is required to perform a final withdraw
-        amount_to_deposit += self.estimated_fee_for_op.clone();
+        // Also we must add fee for every `ChangePubKey` operation (1 per each account).
+        amount_to_deposit += &change_pubkey_fee * BigUint::from(self.n_accounts as u64);
+        // Also the fee is required to perform a final withdraw and change pubkey op.
+        amount_to_deposit += &self.estimated_fee_for_op + &change_pubkey_fee;
 
         let account_balance = self.main_wallet.eth_provider.balance().await?;
         log::info!(
@@ -331,7 +337,12 @@ impl ScenarioExecutor {
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (self.main_wallet.sign_change_pubkey().await?, None);
+        let (change_pubkey_tx, eth_sign) = (
+            self.main_wallet
+                .sign_change_pubkey(change_pubkey_fee)
+                .await?,
+            None,
+        );
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.provider.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
@@ -346,12 +357,14 @@ impl ScenarioExecutor {
 
     /// Splits the money from the main account between the intermediate accounts
     /// with the `TransferToNew` operations.
-    async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
+    async fn initial_transfer(&mut self) -> Result<(), anyhow::Error> {
         log::info!(
             "Starting initial transfer. {} ETH will be send to each of {} new accounts",
             format_ether(&self.transfer_size),
             self.n_accounts
         );
+
+        let change_pubkey_fee = self.change_pubkey_fee(&self.main_wallet).await;
 
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
 
@@ -360,9 +373,10 @@ impl ScenarioExecutor {
             let to_acc = &self.accounts[to_idx];
 
             // Transfer size is (transfer_amount) + (fee for every tx to be sent) + (fee for final transfer
-            // back to the main account).
-            let transfer_amount = self.transfer_size.clone()
-                + self.estimated_fee_for_op.clone() * (self.cycles_amount + 1);
+            // back to the main account) + (fee for ChangePubKey op).
+            let transfer_amount = &self.transfer_size
+                + &self.estimated_fee_for_op * (self.cycles_amount + 1)
+                + &change_pubkey_fee;
 
             // Make amount packable.
             let packable_transfer_amount = closest_packable_fee_amount(&transfer_amount);
@@ -421,7 +435,7 @@ impl ScenarioExecutor {
             assert!(resp.id.is_some(), "Account ID is none for new account");
             wallet.update_account_id().await?;
 
-            let change_pubkey_tx = wallet.sign_change_pubkey().await?;
+            let change_pubkey_tx = wallet.sign_change_pubkey(BigUint::from(0u32)).await?;
             let tx_future = self.provider.send_tx(change_pubkey_tx, None);
 
             tx_futures.push(tx_future);
@@ -445,7 +459,7 @@ impl ScenarioExecutor {
     /// accounts multiple times.
     /// Sine the money amount is always the same, after execution of this step every
     /// intermediate account should have the same balance as it has before.
-    async fn funds_rotation(&mut self) -> Result<(), failure::Error> {
+    async fn funds_rotation(&mut self) -> Result<(), anyhow::Error> {
         for step_number in 1..=self.cycles_amount {
             log::info!("Starting funds rotation cycle {}", step_number);
 
@@ -457,7 +471,7 @@ impl ScenarioExecutor {
 
     /// Transfers the money between intermediate accounts. For each account with
     /// ID `N`, money are transferred to the account with ID `N + 1`.
-    async fn funds_rotation_step(&mut self) -> Result<(), failure::Error> {
+    async fn funds_rotation_step(&mut self) -> Result<(), anyhow::Error> {
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
 
         for from_id in 0..self.n_accounts {
@@ -510,7 +524,7 @@ impl ScenarioExecutor {
     }
 
     /// Transfers all the money from the intermediate accounts back to the main account.
-    async fn collect_funds(&mut self) -> Result<(), failure::Error> {
+    async fn collect_funds(&mut self) -> Result<(), anyhow::Error> {
         log::info!("Starting collecting funds back to the main account");
 
         let mut signed_transfers = Vec::with_capacity(self.n_accounts);
@@ -571,7 +585,7 @@ impl ScenarioExecutor {
     }
 
     /// Withdraws the money from the main account back to the Ethereum.
-    async fn withdraw(&mut self) -> Result<(), failure::Error> {
+    async fn withdraw(&mut self) -> Result<(), anyhow::Error> {
         let current_balance = self.main_wallet.eth_provider.balance().await?;
 
         let fee = self.withdraw_fee(&self.main_wallet).await;
@@ -610,7 +624,7 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    async fn finish(&mut self) -> Result<(), failure::Error> {
+    async fn finish(&mut self) -> Result<(), anyhow::Error> {
         Ok(())
     }
 
@@ -620,7 +634,7 @@ impl ScenarioExecutor {
         &self,
         current_balance: BigUint,
         withdraw_amount: BigUint,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         log::info!("Awaiting for ETH funds to be received");
 
         let expected_balance = current_balance + withdraw_amount;
@@ -638,7 +652,7 @@ impl ScenarioExecutor {
                 break;
             }
             if start.elapsed() > timeout {
-                failure::bail!(
+                anyhow::bail!(
                     "ETH funds were not received for {} minutes",
                     timeout_minutes
                 );
@@ -648,6 +662,24 @@ impl ScenarioExecutor {
 
         log::info!("ETH funds received");
         Ok(())
+    }
+
+    /// Obtains a fee required for the ChangePubKey operation.
+    async fn change_pubkey_fee(&self, to_acc: &TestWallet) -> BigUint {
+        let fee = self
+            .provider
+            .get_tx_fee(
+                TxFeeTypes::ChangePubKey {
+                    onchain_pubkey_auth: true,
+                },
+                to_acc.address(),
+                "ETH",
+            )
+            .await
+            .expect("Can't get tx fee")
+            .total_fee;
+
+        closest_packable_fee_amount(&fee)
     }
 
     /// Obtains a fee required for the transfer operation.

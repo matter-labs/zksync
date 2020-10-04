@@ -1,4 +1,4 @@
-use models::tx::TxHash;
+use zksync_types::tx::TxHash;
 
 #[derive(Debug)]
 pub struct SentTransactions {

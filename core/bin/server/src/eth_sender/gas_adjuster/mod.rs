@@ -57,7 +57,7 @@ impl<ETH: EthereumInterface> GasAdjuster<ETH> {
         &mut self,
         ethereum: &ETH,
         old_tx_gas_price: Option<U256>,
-    ) -> Result<U256, failure::Error> {
+    ) -> Result<U256, anyhow::Error> {
         let network_price = ethereum.gas_price().await?;
 
         let scaled_price = if let Some(old_price) = old_tx_gas_price {

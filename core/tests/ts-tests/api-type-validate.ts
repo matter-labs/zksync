@@ -302,7 +302,9 @@ async function test() {
         await deposit.awaitReceipt();
 
         if (!(await syncWallet.isSigningKeySet())) {
-            const changePubKey = await syncWallet.setSigningKey();
+            const changePubKey = await syncWallet.setSigningKey({
+                feeToken: "ETH",
+            });
             await changePubKey.awaitReceipt();
             console.log("changePubKey hash:", changePubKey.txHash);
         }

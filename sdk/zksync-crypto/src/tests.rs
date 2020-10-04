@@ -1,12 +1,12 @@
-//! Compare crypto primitives to those that we use in our `models` crate;
+//! Compare crypto primitives to those that we use in our `zksync_types` crate;
 
 use super::{private_key_to_pubkey_hash, read_signing_key, sign_musig};
 
 use crypto_lib::{public_key_from_private, Engine};
 use franklin_crypto::bellman::pairing::ff::{self, PrimeField, PrimeFieldRepr};
 use franklin_crypto::eddsa::PrivateKey;
-use models::{tx::TxSignature, PubKeyHash};
 use rand::{Rng, SeedableRng, XorShiftRng};
+use zksync_types::{tx::TxSignature, PubKeyHash};
 
 fn gen_private_key_and_its_be_bytes() -> (PrivateKey<Engine>, Vec<u8>) {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
@@ -21,10 +21,10 @@ fn gen_private_key_and_its_be_bytes() -> (PrivateKey<Engine>, Vec<u8>) {
 
 #[test]
 fn test_private_key_read() {
-    let (models_pk, serialized_pk) = gen_private_key_and_its_be_bytes();
+    let (zksync_types_pk, serialized_pk) = gen_private_key_and_its_be_bytes();
 
     let wasm_pk = read_signing_key(&serialized_pk);
-    assert_eq!(ff::to_hex(&wasm_pk.0), ff::to_hex(&models_pk.0));
+    assert_eq!(ff::to_hex(&wasm_pk.0), ff::to_hex(&zksync_types_pk.0));
 }
 
 #[test]
@@ -32,8 +32,8 @@ fn test_pubkey_hash() {
     let (pk, serialized_pk) = gen_private_key_and_its_be_bytes();
 
     let wasm_pubkey_hash = private_key_to_pubkey_hash(&serialized_pk);
-    let models_pubkey_hash = PubKeyHash::from_privkey(&pk).data.to_vec();
-    assert_eq!(wasm_pubkey_hash, models_pubkey_hash);
+    let zksync_types_pubkey_hash = PubKeyHash::from_privkey(&pk).data.to_vec();
+    assert_eq!(wasm_pubkey_hash, zksync_types_pubkey_hash);
 }
 
 #[test]

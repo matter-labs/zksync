@@ -3,8 +3,8 @@
 use num::bigint::ToBigInt;
 use zksync_basic_types::Address;
 // Workspace imports
-use models::PubKeyHash;
-use models::{Account, AccountId, TokenId};
+use zksync_types::PubKeyHash;
+use zksync_types::{Account, AccountId, TokenId};
 // Local imports
 use super::records::*;
 

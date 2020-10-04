@@ -4,8 +4,8 @@ use crate::SignerError;
 
 use jsonrpc_core::types::response::Output;
 
-use models::tx::{RawTransaction, TxEthSignature};
-use models::Address;
+use types::tx::{RawTransaction, TxEthSignature};
+use types::Address;
 
 #[derive(Clone)]
 pub struct JsonRpcSigner {
@@ -105,8 +105,8 @@ impl JsonRpcSigner {
 
 mod messages {
 
-    use models::tx::RawTransaction;
-    use models::Address;
+    use types::tx::RawTransaction;
+    use types::Address;
 
     #[derive(Debug, Serialize)]
     pub struct JsonRpcRequest {

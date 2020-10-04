@@ -10,11 +10,11 @@ use std::str::FromStr;
 use num::BigUint;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
-use models::{
+use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Operation,
 };
-use storage::{ConnectionPool, StorageProcessor};
 // Local uses
 use super::transactions::ETHStats;
 
@@ -33,7 +33,7 @@ impl Database {
 }
 
 impl Database {
-    pub async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, failure::Error> {
+    pub async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error> {
         let connection = self.db_pool.access_storage().await?;
 
         Ok(connection)
@@ -42,7 +42,7 @@ impl Database {
     pub async fn restore_state(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error> {
+    ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error> {
         let unconfirmed_ops = connection
             .ethereum_schema()
             .load_unconfirmed_operations()
@@ -62,7 +62,7 @@ impl Database {
         deadline_block: i64,
         used_gas_price: U256,
         raw_tx: Vec<u8>,
-    ) -> Result<InsertedOperationResponse, failure::Error> {
+    ) -> Result<InsertedOperationResponse, anyhow::Error> {
         let result = connection
             .ethereum_schema()
             .save_new_eth_tx(
@@ -82,7 +82,7 @@ impl Database {
         connection: &mut StorageProcessor<'_>,
         eth_op_id: i64,
         hash: &H256,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         Ok(connection
             .ethereum_schema()
             .add_hash_entry(eth_op_id, hash)
@@ -95,7 +95,7 @@ impl Database {
         eth_op_id: EthOpId,
         new_deadline_block: i64,
         new_gas_value: U256,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         Ok(connection
             .ethereum_schema()
             .update_eth_tx(
@@ -110,14 +110,14 @@ impl Database {
         &self,
         connection: &mut StorageProcessor<'_>,
         hash: &H256,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         Ok(connection.ethereum_schema().confirm_eth_tx(hash).await?)
     }
 
     pub async fn load_stats(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<ETHStats, failure::Error> {
+    ) -> Result<ETHStats, anyhow::Error> {
         let stats = connection.ethereum_schema().load_stats().await?;
         Ok(stats.into())
     }
@@ -125,7 +125,7 @@ impl Database {
     pub async fn load_gas_price_limit(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<U256, failure::Error> {
+    ) -> Result<U256, anyhow::Error> {
         let limit = connection.ethereum_schema().load_gas_price_limit().await?;
         Ok(limit)
     }
@@ -134,7 +134,7 @@ impl Database {
         &self,
         connection: &mut StorageProcessor<'_>,
         value: U256,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         connection
             .ethereum_schema()
             .update_gas_price_limit(value)

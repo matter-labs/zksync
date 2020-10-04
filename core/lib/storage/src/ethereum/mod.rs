@@ -5,7 +5,7 @@ use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use models::{
+use zksync_types::{
     ethereum::{ETHOperation, InsertedOperationResponse, OperationType},
     Operation,
 };

@@ -17,14 +17,14 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use eth_client::SignedCallResult;
-use models::{
+use zksync_config::{ConfigurationOptions, EthSenderOptions};
+use zksync_eth_client::SignedCallResult;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     config,
     ethereum::{ETHOperation, OperationType},
     Action, Operation,
 };
-use storage::ConnectionPool;
-use zksync_config::{ConfigurationOptions, EthSenderOptions};
 // Local uses
 use self::{
     database::Database,
@@ -190,7 +190,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 
         // Add all the unprocessed operations to the queue.
         for operation in unprocessed_ops {
-            info!(
+            log::info!(
                 "Adding unprocessed ZKSync operation <id {}; action: {}; block: {}> to queue",
                 operation.id.expect("ID must be set"),
                 operation.action.to_string(),
@@ -226,7 +226,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         while let Some(request) = self.rx_for_eth.next().await {
             match request {
                 ETHSenderRequest::SendOperation(operation) => {
-                    info!(
+                    log::info!(
                         "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
                         operation.id.expect("ID must be set"),
                         operation.action.to_string(),
@@ -252,7 +252,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 
         while let Some(tx) = self.tx_queue.pop_front() {
             if let Err(e) = self.initialize_operation(tx.clone()).await {
-                warn!(
+                log::warn!(
                     "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
                     file!(),
                     line!(),
@@ -260,7 +260,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                     e
                 );
                 if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-                    warn!(
+                    log::warn!(
                         "Received rate limit response, waiting for {}s",
                         RATE_LIMIT_BACKOFF_PERIOD.as_secs()
                     );
@@ -282,7 +282,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             let commitment = match self.perform_commitment_step(&mut current_op).await {
                 Ok(commitment) => commitment,
                 Err(e) => {
-                    warn!(
+                    log::warn!(
                         "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
                         file!(),
                         line!(),
@@ -290,7 +290,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                         e
                     );
                     if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-                        warn!(
+                        log::warn!(
                             "Received rate limit response, waiting for {}s",
                             RATE_LIMIT_BACKOFF_PERIOD.as_secs()
                         );
@@ -315,7 +315,9 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                         // We notify about verify only when it's confirmed on the Ethereum.
                         self.op_notify
                             .try_send(sync_op)
-                            .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
+                            .map_err(|e| {
+                                log::warn!("Failed notify about verify op confirmation: {}", e)
+                            })
                             .unwrap_or_default();
 
                         if contains_withdrawals {
@@ -341,7 +343,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
+    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), anyhow::Error> {
         let current_block = self.ethereum.block_number().await?;
         let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self
@@ -398,7 +400,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         self.ongoing_ops.push_back(new_op.clone());
 
         // After storing all the tx data in the database, we can finally send the tx.
-        info!(
+        log::info!(
             "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
             new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
         );
@@ -407,7 +409,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             // and resent. We can't do anything about this failure either, since it's most probably is not
             // related to the node logic, so we just log this error and pretend to have this operation
             // processed.
-            warn!("Error while sending the operation: {}", e);
+            log::warn!("Error while sending the operation: {}", e);
         });
 
         transaction.commit().await?;
@@ -450,7 +452,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
-    ) -> Result<OperationCommitment, failure::Error> {
+    ) -> Result<OperationCommitment, anyhow::Error> {
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
@@ -477,7 +479,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                     return Ok(OperationCommitment::Pending);
                 }
                 TxCheckOutcome::Committed => {
-                    info!(
+                    log::info!(
                         "Confirmed: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
                         op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
@@ -490,7 +492,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                     // the last entry of the list, a new tx will be sent.
                 }
                 TxCheckOutcome::Failed(receipt) => {
-                    warn!(
+                    log::warn!(
                         "ETH transaction failed: tx: {:#x}, op_type: {:?}, op: {:?}; tx_receipt: {:#?} ",
                         tx_hash,
                         op.op_type,
@@ -525,7 +527,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             .add_hash_entry(&mut transaction, op.id, &new_tx.hash)
             .await?;
 
-        info!(
+        log::info!(
             "Stuck tx processing: sending tx for op, eth_op_id: {}; ETH tx: {}",
             op.id,
             self.eth_tx_description(&new_tx),
@@ -539,7 +541,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     /// Handles a transaction execution failure by reporting the issue to the log
     /// and terminating the node.
     fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
-        error!(
+        log::error!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );
@@ -559,7 +561,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         op: &ETHOperation,
         tx_hash: &H256,
         current_block: u64,
-    ) -> Result<TxCheckOutcome, failure::Error> {
+    ) -> Result<TxCheckOutcome, anyhow::Error> {
         let status = self.ethereum.get_tx_status(tx_hash).await?;
 
         let outcome = match status {
@@ -600,7 +602,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn sign_new_tx(
         ethereum: &ETH,
         op: &ETHOperation,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -661,7 +663,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         &mut self,
         deadline_block: u64,
         stuck_tx: &mut ETHOperation,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         let tx_options = self.tx_options_from_stuck_tx(stuck_tx).await?;
 
         let raw_tx = stuck_tx.encoded_tx_data.clone();
@@ -679,7 +681,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn tx_options_from_stuck_tx(
         &mut self,
         stuck_tx: &ETHOperation,
-    ) -> Result<Options, failure::Error> {
+    ) -> Result<Options, anyhow::Error> {
         let old_tx_gas_price = stuck_tx.last_used_gas_price;
 
         let new_gas_price = self
@@ -695,7 +697,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             stuck_tx
         );
 
-        info!(
+        log::info!(
             "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, used nonce: {}, gas limit: {}",
             stuck_tx.used_tx_hashes.last().unwrap(),
             old_tx_gas_price,
@@ -718,14 +720,14 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                 let root = op.block.get_eth_encoded_root();
 
                 let public_data = op.block.get_eth_public_data();
-                debug!(
+                log::debug!(
                     "public_data for block_number {}: {}",
                     op.block.block_number,
                     hex::encode(&public_data)
                 );
 
                 let witness_data = op.block.get_eth_witness_data();
-                debug!(
+                log::debug!(
                     "witness_data for block {}: {}, {:?}",
                     op.block.block_number,
                     hex::encode(&witness_data.0),
@@ -790,7 +792,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
         );
 
-        info!("Adding withdraw operation to queue");
+        log::info!("Adding withdraw operation to queue");
 
         self.tx_queue
             .add_withdraw_operation(TxData::from_raw(OperationType::Withdraw, raw_tx));
