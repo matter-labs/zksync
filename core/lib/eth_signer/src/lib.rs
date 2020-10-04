@@ -2,7 +2,7 @@
 extern crate serde_derive;
 
 use error::SignerError;
-use models::tx::TxEthSignature;
+use models::tx::{RawTransaction, TxEthSignature};
 use models::{Address, H256};
 
 use json_rpc_signer::JsonRpcSigner;
@@ -28,14 +28,26 @@ impl EthereumSigner {
         Self::JsonRpc(rpc_signer)
     }
 
-    pub async fn sign(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
+    pub async fn sign_message(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
         match self {
-            EthereumSigner::PrivateKey(pk_signer) => pk_signer.sign(message),
-            EthereumSigner::JsonRpc(json_rpc_signer) => json_rpc_signer.sign(message).await,
+            EthereumSigner::PrivateKey(pk_signer) => pk_signer.sign_message(message),
+            EthereumSigner::JsonRpc(json_rpc_signer) => json_rpc_signer.sign_message(message).await,
         }
     }
 
-    pub async fn get_address(&self) -> Address {
+    pub async fn sign_transaction(
+        &self,
+        raw_tx: RawTransaction,
+    ) -> Result<TxEthSignature, SignerError> {
+        match self {
+            EthereumSigner::PrivateKey(pk_signer) => pk_signer.sign_transaction(raw_tx),
+            EthereumSigner::JsonRpc(json_rpc_signer) => {
+                json_rpc_signer.sign_transaction(raw_tx).await
+            }
+        }
+    }
+
+    pub fn get_address(&self) -> Address {
         match self {
             EthereumSigner::PrivateKey(pk_signer) => pk_signer.address(),
             EthereumSigner::JsonRpc(json_rpc_signer) => json_rpc_signer.address(),

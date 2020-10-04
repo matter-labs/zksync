@@ -206,7 +206,6 @@ fn test_musig_sha256_signing_verification() {
 fn test_ethereum_signature_verify_with_serialization() {
     let address: Address = "52312AD6f01657413b2eaE9287f6B9ADaD93D5FE".parse().unwrap();
     let message = "hello world";
-
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct TestSignatureSerialize {
         signature: PackedEthSignature,
@@ -229,7 +228,7 @@ fn test_ethereum_signature_verify_with_serialization() {
 
     let recovered_address = deserialized_signature
         .signature
-        .signature_recover_signer(message.as_bytes(), true)
+        .signature_recover_signer(&message.as_bytes())
         .expect("signature verification");
 
     assert_eq!(address, recovered_address, "recovered address mismatch");
@@ -253,11 +252,12 @@ fn test_ethereum_signature_verify_examples() {
         println!("addr: {}, msg: {}, sign: {}", address, msg, signature);
         let address = address[2..].parse::<Address>().unwrap();
         let msg = hex::decode(&msg[2..]).unwrap();
+      
         let signature =
             PackedEthSignature::deserialize_packed(&hex::decode(&signature[2..]).unwrap())
                 .expect("signature deserialize");
         let signer_address = signature
-            .signature_recover_signer(&msg, true)
+            .signature_recover_signer(&msg)
             .expect("signature verification");
         assert_eq!(address, signer_address, "signer address mismatch");
     }
@@ -280,12 +280,7 @@ fn test_ethereum_signature_sign() {
     for (msg, correct_signature) in examples {
         println!("message: 0x{}", hex::encode(&msg));
         let correct_signature = hex::decode(correct_signature).unwrap();
-        // todo1 make comment
-        let message_with_prefix = {
-            let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
-            [prefix.as_bytes(), &msg].concat()
-        };
-        let signature = PackedEthSignature::sign(&private_key, &message_with_prefix)
+        let signature = PackedEthSignature::sign(&private_key, &msg)
             .expect("sign verify")
             .serialize_packed()
             .to_vec();

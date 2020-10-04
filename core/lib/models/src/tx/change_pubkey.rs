@@ -68,14 +68,10 @@ impl ChangePubKey {
     pub fn verify_eth_signature(&self) -> Option<Address> {
         match &self.eth_signature {
             Some(sign) => {
-                let message_with_prefix = {
-                    let message =
-                        Self::get_eth_signed_data(self.account_id, self.nonce, &self.new_pk_hash)
-                            .ok()?;
-                    let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-                    [prefix.as_bytes(), &message].concat()
-                };
-                sign.signature_recover_signer(&message_with_prefix).ok()
+                let message =
+                    Self::get_eth_signed_data(self.account_id, self.nonce, &self.new_pk_hash)
+                        .ok()?;
+                sign.signature_recover_signer(&message).ok()
             }
             _ => None,
         }

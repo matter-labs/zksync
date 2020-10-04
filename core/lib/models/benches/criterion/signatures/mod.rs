@@ -35,13 +35,10 @@ fn bench_signature_verify_eth_packed(b: &mut Bencher<'_>) {
         .gen_iter::<u8>()
         .take(TYPICAL_ETH_SIGNATURE_LEN)
         .collect::<Vec<_>>();
-    let message_with_prefix = {
-        let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-        [prefix.as_bytes(), &message].concat()
-    };
-    let signature = PackedEthSignature::sign(&pk, &message_with_prefix).unwrap();
 
-    let setup = || (signature.clone(), message_with_prefix.clone());
+    let signature = PackedEthSignature::sign(&pk, &message).unwrap();
+
+    let setup = || (signature.clone(), message.clone());
 
     b.iter_batched(
         setup,

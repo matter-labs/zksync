@@ -114,12 +114,8 @@ pub fn get_operation_with_txs(
 pub fn get_eth_sing_data(message: String) -> EthSignData {
     let keypair = Random.generate();
     let private_key = keypair.secret();
-    // todo1 make comment
-    let message_with_prefix = {
-        let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-        [prefix.as_bytes(), &message.as_bytes()].concat()
-    };
-    let signature = PackedEthSignature::sign(private_key.deref(), &message_with_prefix).unwrap();
+
+    let signature = PackedEthSignature::sign(private_key.deref(), &message.as_bytes()).unwrap();
 
     EthSignData {
         message,

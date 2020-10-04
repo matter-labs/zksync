@@ -225,16 +225,10 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let nonce = 0;
 
     let eth_signature = {
-        // todo1 make comment
-        let sign_bytes = {
-            let message = ChangePubKey::get_eth_signed_data(0, nonce, &to_change.pub_key_hash)
-                .expect("Failed to construct ChangePubKey signed message.");
-            let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-            [prefix.as_bytes(), &message].concat()
-        };
-
-        let eth_signature =
-            PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
+        let message = ChangePubKey::get_eth_signed_data(0, nonce, &to_change.pub_key_hash)
+            .expect("Failed to construct ChangePubKey signed message.");
+        let eth_signature = PackedEthSignature::sign(eth_private_key, &message)
+            .expect("Signing failed");
         Some(eth_signature)
     };
 

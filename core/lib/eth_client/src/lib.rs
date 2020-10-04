@@ -2,18 +2,18 @@
 extern crate serde_derive;
 
 // Built-in deps
+use models::tx::PackedSignature;
+use models::tx::{RawTransaction, TxEthSignature};
 use std::fmt;
 
 // External uses
+use eth_signer::EthereumSigner;
 use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt};
 use web3::types::{H160, H256, U256, U64};
 use web3::{Error, Transport, Web3};
-
-pub mod signer;
-use eth_signer::EthereumSigner;
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
 ///
@@ -176,7 +176,7 @@ impl<T: Transport> ETHClient<T> {
         };
 
         // form and sign tx
-        let tx = signer::RawTransaction {
+        let tx = RawTransaction {
             chain_id: self.chain_id,
             nonce,
             to: Some(contract_addr),
@@ -186,16 +186,24 @@ impl<T: Transport> ETHClient<T> {
             data,
         };
 
-        let signed_tx = tx.sign(&self.eth_signer).await?;
+        // FIXME:
+        let signed_tx_bytes: Vec<u8> = {
+            let signed_tx = self.eth_signer.sign_transaction(tx).await?;
+            if let TxEthSignature::EthereumSignature(packed_signature) = signed_tx {
+                packed_signature.serialize_packed().to_vec()
+            } else {
+                panic!("FIXME:");
+            }
+        };
         let hash = self
             .web3
             .web3()
-            .sha3(Bytes(signed_tx.clone()))
+            .sha3(Bytes(signed_tx_bytes.clone()))
             .compat()
             .await?;
 
         Ok(SignedCallResult {
-            raw_tx: signed_tx,
+            raw_tx: signed_tx_bytes,
             gas_price,
             nonce,
             hash,

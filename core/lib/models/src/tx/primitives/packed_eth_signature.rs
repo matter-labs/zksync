@@ -44,17 +44,26 @@ impl PackedEthSignature {
         Ok(PackedEthSignature(ETHSignature::from(bytes_array)))
     }
 
-    // TODO
+    // FIXME:
     pub fn signature(&self) -> ETHSignature {
         self.0.clone()
     }
+
+    fn message_to_signed_bytes(msg: &[u8]) -> H256 {
+        let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+        let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
+        bytes.extend_from_slice(prefix.as_bytes());
+        bytes.extend_from_slice(msg);
+        bytes.keccak256().into()
+    }
+
 
     /// Signs message using ethereum private key, results are identical to signature created
     /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
     pub fn sign(private_key: &H256, message: &[u8]) -> Result<PackedEthSignature, failure::Error> {
         let secret_key = (*private_key).into();
-        let hash = message.keccak256().into();
-        let signature = sign(&secret_key, &hash)?; // TODO rename sign method
+        let signed_bytes = Self::message_to_signed_bytes(message);
+        let signature = sign(&secret_key, &signed_bytes)?;
         Ok(PackedEthSignature(signature))
     }
 

@@ -79,16 +79,11 @@ impl Signer {
                 .as_ref()
                 .ok_or(SignerError::MissingEthPrivateKey)?; // TODO1 Change error code
 
-            let sign_bytes = {
-                let message =
-                    ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
+            let sign_bytes = ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
                         .map_err(signing_failed_error)?;
-                let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-                [prefix.as_bytes(), &message].concat()
-            };
 
             let eth_signature = eth_signer
-                .sign(&sign_bytes)
+                .sign_message(&sign_bytes)
                 .await
                 .map_err(signing_failed_error)?;
 
@@ -138,14 +133,9 @@ impl Signer {
         .map_err(signing_failed_error)?;
 
         let eth_signature = match &self.eth_signer {
-            Some(signer) => {
-                let message_with_prefix = {
-                    let message = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
-                    let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-                    [prefix.as_bytes(), message.as_bytes()].concat()
-                };
-
-                let signature = signer.sign(&message_with_prefix).await?; // TODO rename
+            Some(signer) => { 
+                let message = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
@@ -183,13 +173,8 @@ impl Signer {
 
         let eth_signature = match &self.eth_signer {
             Some(signer) => {
-                let message_with_prefix = {
-                    let message = withdraw.get_ethereum_sign_message(&token.symbol, token.decimals);
-                    let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-                    [prefix.as_bytes(), message.as_bytes()].concat()
-                };
-
-                let signature = signer.sign(&message_with_prefix).await?; // TODO rename
+                let message = withdraw.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
 
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)

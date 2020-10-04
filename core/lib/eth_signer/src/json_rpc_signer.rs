@@ -1,9 +1,10 @@
 use crate::error::ClientError;
 use crate::json_rpc_signer::messages::JsonRpcRequest;
 use crate::SignerError;
+
 use jsonrpc_core::types::response::Output;
 
-use models::tx::TxEthSignature;
+use models::tx::{RawTransaction, TxEthSignature};
 use models::Address;
 
 #[derive(Clone)]
@@ -26,9 +27,26 @@ impl JsonRpcSigner {
         self.address
     }
 
-    /// TODO1 make comment
-    pub async fn sign(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
-        let msg = JsonRpcRequest::sign(message);
+    /// FIXME: make comment
+    pub async fn sign_message(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
+        let msg = JsonRpcRequest::sign_message(self.address, message);
+
+        let ret = self
+            .post(&msg)
+            .await
+            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+        let signature = serde_json::from_value(ret)
+            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+
+        Ok(signature)
+    }
+
+    /// FIXME: make comment
+    pub async fn sign_transaction(
+        &self,
+        raw_tx: RawTransaction,
+    ) -> Result<TxEthSignature, SignerError> {
+        let msg = JsonRpcRequest::sign_transaction(raw_tx);
 
         let ret = self
             .post(&msg)
@@ -87,6 +105,9 @@ impl JsonRpcSigner {
 
 mod messages {
 
+    use models::tx::RawTransaction;
+    use models::Address;
+
     #[derive(Debug, Serialize)]
     pub struct JsonRpcRequest {
         pub id: String,
@@ -105,10 +126,20 @@ mod messages {
             }
         }
 
-        pub fn sign(message: &[u8]) -> Self {
+        /// The sign method calculates an Ethereum specific signature with:
+        /// sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
+        pub fn sign_message(address: Address, message: &[u8]) -> Self {
             let mut params = Vec::new();
+            params.push(serde_json::to_value(address).expect("serialization fail"));
             params.push(serde_json::to_value(message).expect("serialization fail"));
-            Self::create("sign", params) // todo1 `sign`
+            Self::create("eth_sign", params)
+        }
+
+        pub fn sign_transaction(tx_data: RawTransaction) -> Self {
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(tx_data).expect("serialization fail"));
+            //params.push(serde_json::to_value(message).expect("serialization fail"));
+            Self::create("eth_signTransaction", params)
         }
     }
 }
