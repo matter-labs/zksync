@@ -1,6 +1,6 @@
 {
 	"name": "@teamnumio/zksync-crypto",
-	"version": "0.0.2",
+	"version": "0.0.5",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"publishConfig": {
@@ -21,6 +21,6 @@
 		"@polkadot/util": "^3.3.1"
 	},
 	"react-native": {
-		"./build/zksync_crypto_asm_stub.js": "./dist/zksync_crypto_asm.js"
+		"./dist/zksync_crypto_asm_stub.js": "./dist/zksync_crypto_asm.js"
 	}
 }

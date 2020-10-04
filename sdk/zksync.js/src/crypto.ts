@@ -1,6 +1,6 @@
 import { Signature } from "./types";
 
-import { private_key_to_pubkey_hash, sign_musig, waitReady } from "@teamnumio/zksync-crypto";
+import { private_key_to_pubkey_hash, sign_musig, waitReady, zksync_crypto_init } from "@teamnumio/zksync-crypto";
 import * as zks from "@teamnumio/zksync-crypto";
 import { utils } from "ethers";
 
@@ -24,12 +24,17 @@ let zksyncCryptoLoaded = false;
 
 export async function loadZkSyncCrypto(wasmFileUrl?: string) {
     // Only runs in the browser
-    if ((zks as any).default) {
-        // @ts-ignore
-        const url = wasmFileUrl ? wasmFileUrl : zks.DefaultZksyncCryptoWasmURL;
-        if (!zksyncCryptoLoaded) {
-            await (zks as any).default(url);
+    // if ((zks as any).default) {
+    //     // @ts-ignore
+    //     const url = wasmFileUrl ? wasmFileUrl : zks.DefaultZksyncCryptoWasmURL;
+    //     if (!zksyncCryptoLoaded) {
+    //         await waitReady();
+    //         await zksync_crypto_init();
+    //         await (zks as any).default(url);
             zksyncCryptoLoaded = true;
-        }
-    }
+    //     }
+    // } else {
+        await waitReady();
+        await zksync_crypto_init();
+    // }
 }

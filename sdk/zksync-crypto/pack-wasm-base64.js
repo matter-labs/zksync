@@ -4,7 +4,7 @@
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const fs = require('fs');
-const buffer = fs.readFileSync('./dist/zksync_crypto_opt.wasm');
+const buffer = fs.readFileSync('./dist/zksync_crypto_bg.wasm');
 
 fs.writeFileSync('./dist/zksync_crypto_wasm.js', `
 module.exports = Buffer.from('${buffer.toString('base64')}', 'base64');

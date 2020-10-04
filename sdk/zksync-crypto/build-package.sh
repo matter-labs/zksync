@@ -12,8 +12,8 @@ WSM=dist/zksync_crypto_bg.wasm
 OPT=dist/zksync_crypto_opt.wasm
 ASM=dist/zksync_crypto_asm.js
 
-which wasm-pack || cargo install wasm-pack
-which wasm-opt || cargo install wasm-opt
+#which wasm-pack || cargo install wasm-pack
+#which wasm-opt || cargo install wasm-opt
 
 echo "*** Building package"
 
@@ -28,7 +28,7 @@ mv ./pkg ./dist
 
 # optimise
 echo "*** Optimising WASM output"
-wasm-opt $WSM -Os -o $OPT -O --enable-mutable-globals
+./../../binaryen/bin/wasm-opt $WSM -Os -o $OPT -O
 
 # convert wasm to base64 structure
 echo "*** Packing WASM into base64"
@@ -36,7 +36,7 @@ node ./pack-wasm-base64.js
 
 # build asmjs version from the input (optimised) WASM
 echo "*** Building asm.js version"
-wasm2js --output $ASM $OPT
+./../../binaryen/bin/wasm2js --output $ASM $OPT
 
 # cleanup the generated asm, converting to cjs
 sed -i -e '/import {/d' $ASM

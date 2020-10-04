@@ -21,7 +21,7 @@ export default [
     {
         input: 'build/index.js',
         output: {
-            file: 'dist/main.js',
+            file: 'build/main.js',
             format: 'iife',
             name: 'zksync',
             globals: {
@@ -36,7 +36,7 @@ export default [
             commonjs(),
             json(),
             copy({
-                targets: [{src: 'node_modules/zksync-crypto/dist/zksync-crypto-web_bg.wasm', dest: 'dist/'}],
+                targets: [{src: 'node_modules/zksync-crypto/build/zksync-crypto-web_bg.wasm', dest: 'build/'}],
                 verbose: true
             }),
             terser(),
