@@ -373,13 +373,15 @@ export class Wallet {
         }
 
         if (changePubKey.fee == null) {
-            const feeType = {
-                ChangePubKey: {
-                    onchainPubkeyAuth: changePubKey.onchainAuth,
-                },
-            };
-            const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
-            changePubKey.fee = fullFee.totalFee;
+            changePubKey.fee = 0;
+            // TODO: uncomment to set fee from server by default
+            // const feeType = {
+            //     ChangePubKey: {
+            //         onchainPubkeyAuth: changePubKey.onchainAuth,
+            //     },
+            // };
+            // const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
+            // changePubKey.fee = fullFee.totalFee;
         }
 
         const txData = await this.signSetSigningKey(changePubKey as any);
