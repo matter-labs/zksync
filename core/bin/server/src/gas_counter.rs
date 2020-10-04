@@ -111,7 +111,7 @@ impl VerifyCost {
 /// operations in that block.
 ///
 /// These estimated costs were calculated using the `gas_price_test` from `testkit`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GasCounter {
     commit_cost: U256,
     verify_cost: U256,

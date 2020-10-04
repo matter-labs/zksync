@@ -12,16 +12,14 @@ use zksync_crypto::ff;
 use zksync_state::state::{CollectedFee, OpSuccess, ZksyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    ActionType,
-    {
-        block::{
-            Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
-            PendingBlock as SendablePendingBlock,
-        },
-        mempool::SignedTxVariant,
-        tx::{FranklinTx, TxHash},
-        Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+    block::{
+        Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
+        PendingBlock as SendablePendingBlock,
     },
+    mempool::SignedTxVariant,
+    tx::{FranklinTx, TxHash},
+    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, BlockNumber,
+    PriorityOp, SignedFranklinTx,
 };
 // Local uses
 use crate::{
@@ -29,7 +27,9 @@ use crate::{
     gas_counter::GasCounter,
     mempool::ProposedBlock,
 };
-use zksync_types::SignedFranklinTx;
+
+#[cfg(test)]
+mod tests;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),
@@ -47,7 +47,7 @@ pub enum StateKeeperRequest {
     SealBlock,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PendingBlock {
     success_operations: Vec<ExecutedOperations>,
     failed_txs: Vec<ExecutedTx>,
@@ -850,7 +850,7 @@ impl ZksyncStateKeeper {
         let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
 
         let block_commit_request = BlockCommitRequest {
-            block: Block::new_from_availabe_block_sizes(
+            block: Block::new_from_available_block_sizes(
                 self.state.block_number,
                 self.state.root_hash(),
                 self.fee_account_id,

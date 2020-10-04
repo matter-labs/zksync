@@ -124,7 +124,7 @@ impl Block {
 
     /// Constructor that determines smallest block size for the given block
     #[allow(clippy::too_many_arguments)]
-    pub fn new_from_availabe_block_sizes(
+    pub fn new_from_available_block_sizes(
         block_number: BlockNumber,
         new_root_hash: Fr,
         fee_account: AccountId,
