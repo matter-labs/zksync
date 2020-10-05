@@ -3,10 +3,10 @@
 //! Server uses this module to ensure that generated transactions
 //! won't run out of the gas and won't trespass the block gas limit.
 
-// External deps
-use zksync_basic_types::U256;
 // Workspace deps
-use zksync_types::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
+use zksync_basic_types::U256;
+// Local deps
+use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -185,7 +185,7 @@ impl GasCounter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zksync_types::{operations::ChangePubKeyOp, tx::ChangePubKey};
+    use crate::{operations::ChangePubKeyOp, tx::ChangePubKey};
 
     #[test]
     fn commit_cost() {

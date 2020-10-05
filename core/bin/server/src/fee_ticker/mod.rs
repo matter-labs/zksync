@@ -25,6 +25,7 @@ use tokio::task::JoinHandle;
 use zksync_config::TokenPriceSource;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
+    gas_counter::{CommitCost, GasCounter, VerifyCost},
     helpers::{pack_fee_amount, unpack_fee_amount},
     Address, ChangePubKeyOp, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
     WithdrawOp,
@@ -33,7 +34,6 @@ use zksync_utils::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10S
 // Local deps
 use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
 use crate::fee_ticker::ticker_api::coinmarkercap::CoinMarketCapAPI;
-use crate::gas_counter::{CommitCost, GasCounter, VerifyCost};
 use crate::{
     eth_sender::ETHSenderRequest,
     fee_ticker::{
@@ -65,7 +65,7 @@ const BASE_CHANGE_PUBKEY_OFFCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_OFF
     + VerifyCost::CHANGE_PUBKEY_COST
     + 1000 * (ChangePubKeyOp::CHUNKS as u64);
 const BASE_CHANGE_PUBKEY_ONCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_ONCHAIN
-    + crate::gas_counter::VerifyCost::CHANGE_PUBKEY_COST
+    + zksync_types::gas_counter::VerifyCost::CHANGE_PUBKEY_COST
     + 1000 * (ChangePubKeyOp::CHUNKS as u64);
 
 /// Type of the fee calculation pattern.

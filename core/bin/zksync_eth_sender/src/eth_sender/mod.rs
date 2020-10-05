@@ -34,7 +34,6 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
-use crate::utils::current_zksync_info::CurrentZksyncInfo;
 
 mod database;
 mod ethereum_interface;
@@ -139,8 +138,6 @@ struct ETHSender<ETH: EthereumInterface> {
     gas_adjuster: GasAdjuster<ETH>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
-    /// struct to communicate current verified block number to api server
-    current_zksync_info: CurrentZksyncInfo,
 }
 
 impl<ETH: EthereumInterface> ETHSender<ETH> {
@@ -150,7 +147,6 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
-        current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
         let mut connection = db
             .acquire_connection()
@@ -186,7 +182,6 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             tx_queue,
             gas_adjuster,
             options,
-            current_zksync_info,
         };
 
         // Add all the unprocessed operations to the queue.
@@ -308,8 +303,6 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 
                     if current_op.is_verify() {
                         let sync_op = current_op.op.expect("Should be verify operation");
-                        self.current_zksync_info
-                            .set_new_verified_block(sync_op.block.block_number);
 
                         let contains_withdrawals = !sync_op.block.get_withdrawals_data().is_empty();
 
@@ -806,7 +799,6 @@ pub fn start_eth_sender(
     op_notify_sender: mpsc::Sender<Operation>,
     send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
     config_options: ConfigurationOptions,
-    current_zksync_info: CurrentZksyncInfo,
 ) -> JoinHandle<()> {
     let ethereum =
         EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
@@ -822,7 +814,6 @@ pub fn start_eth_sender(
             ethereum,
             send_request_receiver,
             op_notify_sender,
-            current_zksync_info,
         )
         .await;
 

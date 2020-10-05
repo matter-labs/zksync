@@ -16,6 +16,7 @@ use zksync_types::{
         Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
         PendingBlock as SendablePendingBlock,
     },
+    gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::{FranklinTx, TxHash},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, BlockNumber,
@@ -24,7 +25,6 @@ use zksync_types::{
 // Local uses
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
-    gas_counter::GasCounter,
     mempool::ProposedBlock,
 };
 
