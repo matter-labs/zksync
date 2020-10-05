@@ -9,8 +9,8 @@ use models::{
     PriorityOp, TxFeeTypes,
 };
 use zksync::{
-    error::ClientError, utils::biguint_to_u256, web3::types::H256, EthereumProvider, Network,
-    Wallet, WalletCredentials,
+    error::ClientError, types::BlockStatus, utils::biguint_to_u256, web3::types::H256,
+    EthereumProvider, Network, Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
 // Local uses
@@ -111,6 +111,11 @@ impl TestWallet {
         Ok(closest_packable_fee_amount(&fee))
     }
 
+    /// Returns the wallet balance.
+    pub async fn balance(&self, block_status: BlockStatus) -> Result<BigUint, ClientError> {
+        self.inner.get_balance(block_status, Self::TOKEN_NAME).await
+    }
+
     /// Returns the current account ID.
     pub fn account_id(&self) -> Option<AccountId> {
         self.inner.account_id()
@@ -122,14 +127,20 @@ impl TestWallet {
     }
 
     // Creates a signed change public key transaction.
-    pub async fn sign_change_pubkey(&self, fee: BigUint) -> Result<FranklinTx, ClientError> {
-        self.inner
+    pub async fn sign_change_pubkey(
+        &self,
+        fee: BigUint,
+    ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+        let tx = self
+            .inner
             .start_change_pubkey()
             .nonce(self.pending_nonce())
             .fee_token(Self::TOKEN_NAME)?
             .fee(fee)
             .tx()
-            .await
+            .await?;
+
+        Ok((tx, None))
     }
 
     // Creates a signed withdraw transaction.

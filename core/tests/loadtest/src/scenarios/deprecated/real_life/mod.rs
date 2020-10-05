@@ -340,12 +340,11 @@ impl ScenarioExecutor {
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (
-            self.main_wallet
-                .sign_change_pubkey(change_pubkey_fee)
-                .await?,
-            None,
-        );
+        let (change_pubkey_tx, eth_sign) = self
+            .main_wallet
+            .sign_change_pubkey(change_pubkey_fee)
+            .await?;
+
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.monitor.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
@@ -440,7 +439,7 @@ impl ScenarioExecutor {
             wallet.update_account_id().await?;
 
             let change_pubkey_tx = wallet.sign_change_pubkey(BigUint::from(0u32)).await?;
-            let tx_future = self.monitor.send_tx(change_pubkey_tx, None);
+            let tx_future = self.monitor.send_tx(change_pubkey_tx.0, change_pubkey_tx.1);
 
             tx_futures.push(tx_future);
         }

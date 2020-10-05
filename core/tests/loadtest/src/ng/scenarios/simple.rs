@@ -3,6 +3,7 @@ use num::BigUint;
 use structopt::StructOpt;
 
 use models::helpers::{closest_packable_fee_amount, closest_packable_token_amount};
+use zksync::types::BlockStatus;
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 
@@ -17,9 +18,12 @@ pub struct SimpleScenario {
     /// Number of intermediate wallets to use.
     #[structopt(short = "w", default_value = "100")]
     pub wallets: u64,
-    //// Transfer amount per accounts (in gwei).
-    #[structopt(short = "t", default_value = "5")]
+    /// Transfer amount per accounts (in gwei).
+    #[structopt(short = "t", default_value = "100")]
     pub transfer_size: u64,
+    /// Number of transfer rounds.
+    #[structopt(short = "n", default_value = "1")]
+    pub transfer_rounds: u64,
 }
 
 fn gwei_to_wei(gwei: impl Into<BigUint>) -> BigUint {
@@ -33,12 +37,13 @@ impl SimpleScenario {
         main_account: AccountInfo,
         options: ConfigurationOptions,
     ) -> Result<(), anyhow::Error> {
+        tokio::spawn(monitor.run_counter());
         log::info!("Starting simple scenario");
 
         // Create main account to deposit money from and to return money back later.
         let mut main_wallet = TestWallet::from_info(monitor.clone(), &main_account, &options).await;
         // Generate random accounts to rotate funds within.
-        let wallets =
+        let mut wallets =
             wait_all((0..self.wallets).map(|_| TestWallet::new_random(monitor.clone(), &options)))
                 .await;
 
@@ -46,34 +51,41 @@ impl SimpleScenario {
 
         // Compute sufficient fee amount.
         let sufficient_fee = main_wallet.sufficient_fee().await?;
-        let transfer_size = closest_packable_token_amount(&gwei_to_wei(self.transfer_size));
+        let transfer_size = gwei_to_wei(self.transfer_size);
 
         // Make initial deposit.
-        let amount_to_deposit: BigUint =
-            (&transfer_size + &sufficient_fee) * BigUint::from(self.wallets);
-        main_wallet
-            .deposit(amount_to_deposit.clone())
-            .await
-            .unwrap();
-        monitor.wait_for_verify().await;
+        let amount_to_deposit = (&transfer_size + &sufficient_fee)
+            * BigUint::from(self.wallets * self.transfer_rounds + 2);
+        let amount_to_deposit = closest_packable_token_amount(&amount_to_deposit);
+
+        let eth_balance = main_wallet.eth_provider.balance().await?;
+        anyhow::ensure!(
+            eth_balance > amount_to_deposit,
+            "Not enough balance in the main wallet to perform this test, actual: {}, expected: {}",
+            format_ether(&eth_balance),
+            format_ether(&amount_to_deposit),
+        );
+
+        log::info!(
+            "Deposit {} for main wallet",
+            format_ether(&amount_to_deposit)
+        );
+        let priority_op = main_wallet.deposit(amount_to_deposit).await.unwrap();
+        monitor.wait_for_priority_op_commit(&priority_op).await?;
 
         // Now when deposits are done it is time to update account id.
         main_wallet.update_account_id().await?;
+
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        monitor
-            .send_tx(
-                main_wallet
-                    .sign_change_pubkey(sufficient_fee.clone())
-                    .await?,
-                None,
-            )
+        let (tx, sign) = main_wallet
+            .sign_change_pubkey(sufficient_fee.clone())
             .await?;
-        // monitor.wait_for_verify().await;
+        let tx_hash = monitor.send_tx(tx, sign).await?;
+        monitor.wait_for_tx_commit(tx_hash).await?;
 
         log::info!("Deposit phase completed");
-        tokio::spawn(monitor.run_counter());
 
         // Split the money from the main account between the intermediate wallets.
         log::info!(
@@ -82,25 +94,80 @@ impl SimpleScenario {
             self.wallets
         );
 
-        let transfer_amount = &transfer_size + &sufficient_fee;
-        let txs_queue = try_wait_all(wallets.iter().map(|to| {
-            main_wallet.sign_transfer(
-                to.address(),
-                closest_packable_fee_amount(&transfer_amount),
+        let transfer_amount =
+            &transfer_size + (&sufficient_fee * BigUint::from(self.transfer_rounds + 2));
+        let transfer_amount = closest_packable_fee_amount(&transfer_amount);
+
+        // TODO Replace copy-paste by the generic solution.
+
+        let mut tx_hashes = Vec::new();
+        for wallet in &wallets {
+            let (tx, sign) = main_wallet
+                .sign_transfer(
+                    wallet.address(),
+                    transfer_amount.clone(),
+                    Some(sufficient_fee.clone()),
+                )
+                .await?;
+            tx_hashes.push(monitor.send_tx(tx, sign).await?);
+        }
+
+        try_wait_all(
+            tx_hashes
+                .into_iter()
+                .map(|tx_hash| monitor.wait_for_tx_commit(tx_hash)),
+        )
+        .await?;
+
+        log::info!("All the initial transfers have been verified.");
+
+        let mut tx_hashes = Vec::new();
+        for wallet in &mut wallets {
+            wallet.update_account_id().await?;
+
+            let (tx, sign) = wallet.sign_change_pubkey(sufficient_fee.clone()).await?;
+            tx_hashes.push(monitor.send_tx(tx, sign).await?);
+        }
+
+        try_wait_all(
+            tx_hashes
+                .into_iter()
+                .map(|tx_hash| monitor.wait_for_tx_commit(tx_hash)),
+        )
+        .await?;
+
+        // Run transfers step.
+        let transfers_number = (self.wallets * self.transfer_rounds) as usize;
+        log::info!("All the initial transfers have been verified, creating {} transactions for the transfers step", transfers_number);
+        let txs_queue = try_wait_all((0..transfers_number).map(|i| {
+            let from = i % wallets.len();
+            let to = (i + 1) % wallets.len();
+
+            wallets[from].sign_transfer(
+                wallets[to].address(),
+                transfer_size.clone(),
                 Some(sufficient_fee.clone()),
             )
         }))
         .await?;
 
-        log::info!("All the initial transfers are created");
+        log::info!(
+            "Created {} transactions, awaiting for pending tasks verification...",
+            txs_queue.len()
+        );
+        monitor.wait_for_verify().await;
+        log::info!("Starting TPS measuring...");
+
+        // tokio::spawn(monitor.run_counter());
         try_wait_all(
             txs_queue
                 .into_iter()
                 .map(|(tx, sign)| monitor.send_tx(tx, sign)),
         )
         .await?;
+        monitor.wait_for_verify().await;
 
-        log::info!("Collected logs: {:#?}", monitor.take_logs().await);
+        log::trace!("Collected logs: {:#?}", monitor.take_logs().await);
 
         Ok(())
     }

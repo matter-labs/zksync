@@ -72,6 +72,11 @@ impl MonitorInner {
         }
     }
 
+    fn reset(&mut self) {
+        self.current_stats = Summary::default();
+        self.journal.clear();
+    }
+
     fn store_stats(&mut self) {
         let now = Instant::now();
 
@@ -82,6 +87,12 @@ impl MonitorInner {
 
             swap(&mut self.current_stats, &mut stats);
         }
+    }
+
+    fn collect_logs(&mut self) -> Vec<(Instant, Summary)> {
+        // Immediate store current status.
+        self.store_stats();
+        self.journal.drain(..).collect()
     }
 }
 
@@ -161,6 +172,9 @@ impl Monitor {
     pub(crate) fn run_counter(&self) -> impl Future<Output = ()> {
         let monitor = self.clone();
         async move {
+            // TODO Make it impossible to invoke this method twice.
+            monitor.inner().await.reset();
+
             loop {
                 tokio::time::delay_for(Self::SAMPLE_INTERVAL).await;
                 monitor.inner().await.store_stats();
@@ -179,11 +193,8 @@ impl Monitor {
     async fn monitor_tx(self, tx_hash: TxHash) -> Result<(), ClientError> {
         self.log_event(Event::TxCreated).await;
 
-        // Wait for the transaction to execute.
-        await_condition!(
-            Self::POLLING_INTERVAL,
-            self.provider.tx_info(tx_hash).await?.executed
-        );
+        // Wait for the transaction to commit.
+        self.wait_for_tx_commit(tx_hash).await?;
         self.log_event(Event::TxExecuted).await;
 
         // Wait for the transaction to verify.
@@ -199,14 +210,8 @@ impl Monitor {
     async fn monitor_priority_op(self, priority_op: PriorityOp) -> Result<(), ClientError> {
         self.log_event(Event::OpCreated).await;
 
-        // Wait until the priority operation is executed.
-        await_condition!(
-            Self::POLLING_INTERVAL,
-            self.provider
-                .ethop_info(priority_op.serial_id as u32)
-                .await?
-                .executed
-        );
+        // Wait until the priority operation is committed.
+        self.wait_for_priority_op_commit(&priority_op).await?;
         self.log_event(Event::OpExecuted).await;
 
         // Wait until the priority operation is became a part of some block and get verified.
@@ -222,7 +227,36 @@ impl Monitor {
         Ok(())
     }
 
+    // Waits for the transaction to commit.
+    pub async fn wait_for_tx_commit(&self, tx_hash: TxHash) -> Result<(), ClientError> {
+        await_condition!(Self::POLLING_INTERVAL, {
+            let info = self.provider.tx_info(tx_hash).await?;
+            info.executed && info.block.is_some()
+        });
+
+        Ok(())
+    }
+
+    // Waits for the priority operation to commit.
+    pub async fn wait_for_priority_op_commit(
+        &self,
+        priority_op: &PriorityOp,
+    ) -> Result<(), ClientError> {
+        await_condition!(Self::POLLING_INTERVAL, {
+            let info = self
+                .provider
+                .ethop_info(priority_op.serial_id as u32)
+                .await?;
+
+            info.executed && info.block.is_some()
+        });
+
+        Ok(())
+    }
+
     pub async fn wait_for_verify(&self) {
+        // TODO: It perhaps a good idea to add `wait_for execute` step
+        // to improve tests performance.
         let tasks = self
             .inner()
             .await
@@ -235,6 +269,6 @@ impl Monitor {
 
     pub async fn take_logs(&self) -> Vec<(Instant, Summary)> {
         self.wait_for_verify().await;
-        self.inner().await.journal.drain(..).collect()
+        self.inner().await.collect_logs()
     }
 }

@@ -129,12 +129,9 @@ impl SatelliteScenario {
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
         // `zkSync` account.
-        let (change_pubkey_tx, eth_sign) = (
-            wallet
-                .sign_change_pubkey(self.change_pubkey_fee.clone())
-                .await?,
-            None,
-        );
+        let (change_pubkey_tx, eth_sign) = wallet
+            .sign_change_pubkey(self.change_pubkey_fee.clone())
+            .await?;
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.monitor.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
