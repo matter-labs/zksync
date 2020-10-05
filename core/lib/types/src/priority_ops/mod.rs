@@ -1,3 +1,5 @@
+//! Definition of zkSync network priority operations: operations initiated from the L1.
+
 use super::AccountId;
 use super::TokenId;
 use anyhow::{bail, ensure, format_err};
@@ -14,15 +16,24 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::operations::{DepositOp, FullExitOp};
 
+/// Deposit priority operation transfers funds from the L1 account to the desired L2 account.
+/// If the target L2 account didn't exist at the moment of the operation execution, a new
+/// account will be created.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
+    /// Address of the transaction initiator's L1 account.
     pub from: Address,
+    /// Type of deposited token.
     pub token: TokenId,
+    /// Amount of tokens deposited.
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub amount: BigUint,
+    /// Address of L2 account to deposit funds to.
     pub to: Address,
 }
 
+/// Performs a withdrawal of funds without direct interaction with the L2 network.
+/// All the balance of the desired token will be withdrawn to the provided L1 address.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExit {
     pub account_id: AccountId,
@@ -30,6 +41,7 @@ pub struct FullExit {
     pub token: TokenId,
 }
 
+/// A set of L1 priority operations supported by the zkSync network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinPriorityOp {
@@ -38,6 +50,7 @@ pub enum FranklinPriorityOp {
 }
 
 impl FranklinPriorityOp {
+    /// Attempts to interpret `FranklinPriorityOp` as `Deposit`.
     pub fn try_get_deposit(&self) -> Option<Deposit> {
         if let Self::Deposit(deposit) = self {
             Some(deposit.clone())
@@ -46,6 +59,7 @@ impl FranklinPriorityOp {
         }
     }
 
+    /// Parses priority operation from the Ethereum logs.
     pub fn parse_from_priority_queue_logs(
         pub_data: &[u8],
         op_type_id: u8,
@@ -128,6 +142,7 @@ impl FranklinPriorityOp {
         }
     }
 
+    /// Returns the amount of chunks required to include the priority operation into the block.
     pub fn chunks(&self) -> usize {
         match self {
             Self::Deposit(_) => DepositOp::CHUNKS,
@@ -136,12 +151,18 @@ impl FranklinPriorityOp {
     }
 }
 
+/// Priority operation description with the metadata required for server to process it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriorityOp {
+    /// Unique ID of the priority operation.
     pub serial_id: u64,
+    /// Priority operation.
     pub data: FranklinPriorityOp,
+    /// Ethereum deadline block until which operation must be processed.
     pub deadline_block: u64,
+    /// Hash of the corresponding Ethereum transaction.
     pub eth_hash: Vec<u8>,
+    /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
 }
 

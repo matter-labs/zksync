@@ -1,3 +1,5 @@
+//! zkSync network L2 transactions.
+
 mod change_pubkey;
 mod close;
 mod forced_exit;

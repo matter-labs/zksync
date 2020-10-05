@@ -23,7 +23,7 @@ pub struct SignedFranklinTx {
     pub eth_sign_data: Option<EthSignData>,
 }
 
-/// A set of L2 transaction supported by zkSync network.
+/// A set of L2 transaction supported by the zkSync network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinTx {
