@@ -13,6 +13,9 @@ use zksync_crypto::primitives::rescue_hash_tx_msg;
 
 use crate::tx::{PackedPublicKey, PackedSignature};
 
+/// zkSync transaction signature.
+///
+/// Represents a MuSig Rescue signature for the message.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxSignature {
@@ -21,30 +24,14 @@ pub struct TxSignature {
 }
 
 impl TxSignature {
+    /// Signs the message via provided private key.
+    ///
+    /// Currently an alias for `TxSignature::sign_musig_rescue`.
     pub fn sign_musig(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         Self::sign_musig_rescue(pk, msg)
     }
 
-    pub fn verify_musig(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
-        self.verify_musig_rescue(msg)
-    }
-
-    pub fn verify_musig_rescue(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
-        let hashed_msg = rescue_hash_tx_msg(msg);
-        let valid = self.pub_key.0.verify_musig_rescue(
-            &hashed_msg,
-            &self.signature.0,
-            FixedGenerators::SpendingKeyGenerator,
-            &RESCUE_PARAMS,
-            &JUBJUB_PARAMS,
-        );
-        if valid {
-            Some(self.pub_key.0.clone())
-        } else {
-            None
-        }
-    }
-
+    /// Signs the message via provided private key.
     pub fn sign_musig_rescue(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self
     where
         Engine: RescueEngine,
@@ -65,7 +52,33 @@ impl TxSignature {
         }
     }
 
-    /// Deserialize signature from packed bytes representation.
+    /// Restores a public key from the signature given the initial message.
+    /// Returns `None` if an address cannot be recovered from the provided (signature, message) pair.
+    ///
+    /// Currently an alias for `TxSignature::verify_musig_rescue`.
+    pub fn verify_musig(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        self.verify_musig_rescue(msg)
+    }
+
+    /// Restores a public key from the signature given the initial message.
+    /// Returns `None` if an address cannot be recovered from the provided (signature, message) pair.
+    pub fn verify_musig_rescue(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        let hashed_msg = rescue_hash_tx_msg(msg);
+        let valid = self.pub_key.0.verify_musig_rescue(
+            &hashed_msg,
+            &self.signature.0,
+            FixedGenerators::SpendingKeyGenerator,
+            &RESCUE_PARAMS,
+            &JUBJUB_PARAMS,
+        );
+        if valid {
+            Some(self.pub_key.0.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Deserializes signature from packed bytes representation.
     /// [0..32] - packed pubkey of the signer.
     /// [32..96] - packed r,s of the signature
     pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, anyhow::Error> {
