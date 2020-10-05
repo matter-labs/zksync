@@ -3,7 +3,6 @@ use crate::json_rpc_signer::messages::JsonRpcRequest;
 use crate::SignerError;
 
 use jsonrpc_core::types::response::Output;
-
 use zksync_types::tx::{RawTransaction, TxEthSignature};
 use zksync_types::Address;
 
@@ -23,14 +22,17 @@ impl JsonRpcSigner {
         }
     }
 
+    /// Get Ethereum address.
     pub fn address(&self) -> Address {
         self.address
     }
 
-    /// FIXME: make comment
+    /// The sign method calculates an Ethereum specific signature with:
+    /// checks if the server adds a prefix if not then adds
+    /// return sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
     pub async fn sign_message(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
         let msg = JsonRpcRequest::sign_message(self.address, message);
-
+        // FIXME: add checks
         let ret = self
             .post(&msg)
             .await
@@ -41,9 +43,9 @@ impl JsonRpcSigner {
         Ok(signature)
     }
 
-    /// FIXME: make comment
+    /// Signs and returns the RLP-encoded transaction.
     pub async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
-        let msg = JsonRpcRequest::sign_transaction(raw_tx);
+        let msg = JsonRpcRequest::sign_transaction(self.address, raw_tx);
 
         let ret = self
             .post(&msg)
@@ -101,7 +103,6 @@ impl JsonRpcSigner {
 }
 
 mod messages {
-
     use zksync_types::tx::RawTransaction;
     use zksync_types::Address;
 
@@ -132,10 +133,30 @@ mod messages {
             Self::create("eth_sign", params)
         }
 
-        pub fn sign_transaction(tx_data: RawTransaction) -> Self {
+        pub fn sign_transaction(from: Address, tx_data: RawTransaction) -> Self {
             let mut params = Vec::new();
-            params.push(serde_json::to_value(tx_data).expect("serialization fail"));
-            //params.push(serde_json::to_value(message).expect("serialization fail"));
+            // FIXME:
+            let tx = if let Some(to) = tx_data.to {
+                serde_json::json!({
+                    "from": serde_json::to_value(from).expect("serialization fail"),
+                    "to": serde_json::to_value(to).expect("serialization fail"),
+                    "gas": serde_json::to_value(tx_data.gas).expect("serialization fail"),
+                    "gasPrice": serde_json::to_value(tx_data.gas_price).expect("serialization fail"),
+                    "value": serde_json::to_value(tx_data.value).expect("serialization fail"),
+                    "data": serde_json::to_value(tx_data.data).expect("serialization fail"),
+                    "nonce": serde_json::to_value(tx_data.nonce).expect("serialization fail"),
+                })
+            } else {
+                serde_json::json!({
+                    "from": serde_json::to_value(from).expect("serialization fail"),
+                    "gas": serde_json::to_value(tx_data.gas).expect("serialization fail"),
+                    "gasPrice": serde_json::to_value(tx_data.gas_price).expect("serialization fail"),
+                    "value": serde_json::to_value(tx_data.value).expect("serialization fail"),
+                    "data": serde_json::to_value(tx_data.data).expect("serialization fail"),
+                    "nonce": serde_json::to_value(tx_data.nonce).expect("serialization fail"),
+                })
+            };
+            params.push(tx);
             Self::create("eth_signTransaction", params)
         }
     }

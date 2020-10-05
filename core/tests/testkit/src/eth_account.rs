@@ -1,7 +1,6 @@
 use crate::external_commands::js_revert_reason;
 
 use anyhow::{bail, ensure, format_err};
-use eth_signer::EthereumSigner;
 use ethabi::ParamType;
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
@@ -15,6 +14,7 @@ use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_eth_client::ETHClient;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::block::Block;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 

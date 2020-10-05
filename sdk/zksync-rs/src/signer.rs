@@ -1,7 +1,7 @@
 // Built-in imports
-use eth_signer::error::SignerError;
-use eth_signer::EthereumSigner;
 use std::fmt;
+use zksync_eth_signer::error::SignerError;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::tx::TxEthSignature;
 // External uses
 use num::BigUint;

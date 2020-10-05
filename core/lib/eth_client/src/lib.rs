@@ -1,15 +1,14 @@
 // Built-in deps
 use std::fmt;
-use zksync_types::tx::PackedSignature;
-use zksync_types::tx::{RawTransaction, TxEthSignature};
+use zksync_types::tx::RawTransaction;
 
 // External uses
-use eth_signer::EthereumSigner;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt};
 use web3::types::{H160, H256, U256, U64};
 use web3::{Error, Transport, Web3};
+use zksync_eth_signer::EthereumSigner;
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
 ///

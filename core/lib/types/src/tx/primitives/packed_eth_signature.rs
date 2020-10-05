@@ -75,7 +75,7 @@ impl PackedEthSignature {
         Ok(public_to_address(&public_key))
     }
 
-    /// Get Ethereum address from private key,
+    /// Get Ethereum address from private key.
     pub fn address_from_private_key(private_key: &H256) -> Result<Address, anyhow::Error> {
         Ok(KeyPair::from_secret((*private_key).into())?.address())
     }

@@ -1,6 +1,6 @@
-use eth_signer::error::SignerError;
 pub use jsonrpc_core::types::response::Failure as RpcFailure;
 use thiserror::Error;
+use zksync_eth_signer::error::SignerError;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum ClientError {

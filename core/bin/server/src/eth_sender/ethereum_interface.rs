@@ -2,11 +2,11 @@
 // External uses
 
 use anyhow::ensure;
-use eth_signer::EthereumSigner;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::transports::Http;
 use zksync_basic_types::{TransactionReceipt, H256, U256};
+use zksync_eth_signer::EthereumSigner;
 // Workspace uses
 use super::ExecutedTxStatus;
 use std::time::Duration;

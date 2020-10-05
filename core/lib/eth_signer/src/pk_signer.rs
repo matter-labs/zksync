@@ -1,36 +1,33 @@
 use crate::SignerError;
-use parity_crypto::{publickey::sign, Keccak256};
-use rlp::RlpStream;
+use parity_crypto::publickey::sign;
 use zksync_types::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
 use zksync_types::{Address, H256};
 
 #[derive(Clone)]
 pub struct PrivateKeySigner {
     private_key: H256,
-    address: Address,
 }
 
 impl PrivateKeySigner {
     pub fn new(private_key: H256) -> Self {
-        // FIXME: remove unwrap add Result anf error code
-        let address = PackedEthSignature::address_from_private_key(&private_key).unwrap();
-        Self {
-            private_key,
-            address,
-        }
+        Self { private_key }
     }
 
-    pub fn address(&self) -> Address {
-        self.address
+    /// Get Ethereum address that matches the private key.
+    pub fn address(&self) -> Result<Address, SignerError> {
+        PackedEthSignature::address_from_private_key(&self.private_key)
+            .map_err(|_| SignerError::DefineAddress)
     }
 
-    /// FIXME:
+    /// The sign method calculates an Ethereum specific signature with:
+    /// sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
     pub fn sign_message(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
         let pack = PackedEthSignature::sign(&self.private_key, &message)
             .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
         Ok(TxEthSignature::EthereumSignature(pack))
     }
 
+    /// Signs and returns the RLP-encoded transaction.
     pub fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
         let sig = sign(&self.private_key.into(), &raw_tx.hash().into())
             .map_err(|_| SignerError::NoSigningKey)?;
