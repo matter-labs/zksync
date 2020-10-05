@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use zksync_utils::parse_env;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
-// Order of the fields are important (from more specific types to less specific types)
-/// Set of values which can be interpreted as a token descriptor.
+// Order of the fields is important (from more specific types to less specific types)
+/// Set of values that can be interpreted as a token descriptor.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum TokenLike {

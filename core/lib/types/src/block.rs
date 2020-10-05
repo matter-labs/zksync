@@ -89,7 +89,7 @@ impl ExecutedOperations {
     }
 
     /// Gets the witness required for the Ethereum smart contract.
-    /// Unlike public data, some operation may not have witness.
+    /// Unlike public data, some operations may not have a witness.
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
         self.get_executed_op()
             .map(|op| op.eth_witness().unwrap_or_else(Vec::new))
@@ -226,7 +226,7 @@ impl Block {
         (eth_witness, used_bytes)
     }
 
-    /// Returns the amount of priority operations processed in this block.
+    /// Returns the number of priority operations processed in this block.
     pub fn number_of_processed_prior_ops(&self) -> u64 {
         self.processed_priority_ops.1 - self.processed_priority_ops.0
     }

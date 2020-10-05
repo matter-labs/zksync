@@ -12,7 +12,7 @@ use zksync_crypto::{public_key_from_private, Fr, PrivateKey, PublicKey};
 /// Hash of the account's owner public key.
 ///
 /// This is an essential type used within zkSync network to authorize transaction author
-/// to perform the operation.
+/// to perform an operation.
 ///
 /// `PubKeyHash` is calculated as the Rescue hash of the public key byte sequence.
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
@@ -37,7 +37,7 @@ impl PubKeyHash {
         }
     }
 
-    /// Converts the `PubKeyHash` object to its hexadecimal representation.
+    /// Converts the `PubKeyHash` object into its hexadecimal representation.
     /// `PubKeyHash` hexadecimal form is prepended with the `sync:` prefix.
     ///
     /// # Example

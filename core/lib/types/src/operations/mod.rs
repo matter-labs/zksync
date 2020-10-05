@@ -46,7 +46,7 @@ pub enum FranklinOp {
 }
 
 impl FranklinOp {
-    /// Returns the amount of block chunks required for the operation.
+    /// Returns the number of block chunks required for the operation.
     pub fn chunks(&self) -> usize {
         match self {
             FranklinOp::Noop(_) => NoopOp::CHUNKS,
@@ -77,7 +77,7 @@ impl FranklinOp {
     }
 
     /// Gets the witness required for the Ethereum smart contract.
-    /// Unlike public data, some operation may not have witness.
+    /// Unlike public data, some operations may not have a witness.
     ///
     /// Operations that have witness data:
     ///
@@ -138,7 +138,7 @@ impl FranklinOp {
         }
     }
 
-    /// Returns the expected amount of chunks for a certain type of operation.
+    /// Returns the expected number of chunks for a certain type of operation.
     pub fn public_data_length(op_type: u8) -> Result<usize, anyhow::Error> {
         match op_type {
             NoopOp::OP_CODE => Ok(NoopOp::CHUNKS),
