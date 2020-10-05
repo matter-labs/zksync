@@ -13,8 +13,8 @@ zkSync operations are split into the following categories:
   the zkSync server and included into the block just like L2 transactions.
   Currently includes `Deposit` and `FullExit`.
   All the priority operations form an enum named `FranklinPriorityOp`.
-- **operations**: a superset of [`FranklinTx`] and [`FranklinPriorityOp`]
-  All the operations are included into an enum named [`FranklinOp`]. This enum contains
+- **operations**: a superset of `FranklinTx` and `FranklinPriorityOp`.
+  All the operations are included into an enum named `FranklinOp`. This enum contains
   all the items that can be included into the block, together with meta-information
   about each transaction.
   Main difference of operation from transaction/priority operation is that it can form

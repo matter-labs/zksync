@@ -30,6 +30,11 @@
 //! [`FranklinPriorityOp`]: ./priority_ops/enum.FranklinPriorityOp.html
 //! [`FranklinOp`]: ./operations/enum.FranklinOp.html
 //!
+//! Aside of transactions, this crate provides definitions for other zkSync network items, such as
+//! [`Block`] and [`Account`].
+//!
+//! [`Block`]: ./block/struct.Block.html
+//! [`Account`]: ./account/struct.Account.html
 
 pub mod account;
 pub mod block;

@@ -6,22 +6,22 @@ use zksync_basic_types::Address;
 
 use super::PubKeyHash;
 
+/// Atomic change in the account state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AccountUpdate {
-    Create {
-        address: Address,
-        nonce: Nonce,
-    },
-    Delete {
-        address: Address,
-        nonce: Nonce,
-    },
+    /// Create a new account.
+    Create { address: Address, nonce: Nonce },
+    /// Delete an existing account.
+    /// Note: Currently this kind of update is not used directly in the network.
+    Delete { address: Address, nonce: Nonce },
+    /// Change the account balance.
     UpdateBalance {
         old_nonce: Nonce,
         new_nonce: Nonce,
-        // (token, old, new)
+        /// Tuple of (token, old_balance, new_balance)
         balance_update: (TokenId, BigUint, BigUint),
     },
+    /// Change the account Public Key.
     ChangePubKeyHash {
         old_pub_key_hash: PubKeyHash,
         new_pub_key_hash: PubKeyHash,
@@ -31,6 +31,7 @@ pub enum AccountUpdate {
 }
 
 impl AccountUpdate {
+    /// Generates an account update to revert current update.
     pub fn reversed_update(&self) -> Self {
         match self {
             AccountUpdate::Create { address, nonce } => AccountUpdate::Delete {

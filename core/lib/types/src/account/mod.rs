@@ -18,11 +18,19 @@ pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
 mod account_update;
 mod pubkey_hash;
 
+/// zkSync network account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
+    /// Hash of the account public key used to authorize operations for this account.
+    /// Once account is created (e.g. by `Transfer` or `Deposit` operation), account owner
+    /// has to set its public key hash via `ChangePubKey` transaction, so the server will be
+    /// able to verify owner's identity when processing account transactions.
     pub pub_key_hash: PubKeyHash,
+    /// Address of the account. Directly corresponds to the L1 address.
     pub address: Address,
     balances: HashMap<TokenId, BigUintSerdeWrapper>,
+    /// Current nonce of the account. All the transactions require nonce field to be set in
+    /// order to not allow double spend, and the nonce must increment by one after each operation.
     pub nonce: Nonce,
 }
 
@@ -78,12 +86,15 @@ impl GetBits for Account {
 }
 
 impl Account {
+    /// Creates a new empty account object, and sets its address.
     pub fn default_with_address(address: &Address) -> Account {
         let mut account = Account::default();
         account.address = *address;
         account
     }
 
+    /// Creates a new account object and the list of updates that has to be applied on the state
+    /// in order to get this account created within the network.
     pub fn create_account(id: AccountId, address: Address) -> (Account, AccountUpdates) {
         let mut account = Account::default();
         account.address = address;
@@ -97,26 +108,35 @@ impl Account {
         (account, updates)
     }
 
+    /// Returns the token balance for the account.
     pub fn get_balance(&self, token: TokenId) -> BigUint {
         self.balances.get(&token).cloned().unwrap_or_default().0
     }
 
+    /// Overrides the token balance value.
     pub fn set_balance(&mut self, token: TokenId, amount: BigUint) {
         self.balances.insert(token, amount.into());
     }
 
+    /// Adds the provided amount to the token balance.
     pub fn add_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance.0 += amount;
         self.balances.insert(token, balance);
     }
 
+    /// Subtracts the provided amount from the token balance.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the amount to subtract is greater than the existing token balance.
     pub fn sub_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance.0 -= amount;
         self.balances.insert(token, balance);
     }
 
+    /// Given the list of updates to apply, changes the account state.
     pub fn apply_updates(mut account: Option<Self>, updates: &[AccountUpdate]) -> Option<Self> {
         for update in updates {
             account = Account::apply_update(account, update.clone());
@@ -124,6 +144,7 @@ impl Account {
         account
     }
 
+    /// Applies an update to the account state.
     pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {
         match account {
             Some(mut account) => match update {
@@ -170,6 +191,7 @@ impl Account {
         }
     }
 
+    /// Returns all the nonzero token balances for the account.
     pub fn get_nonzero_balances(&self) -> HashMap<TokenId, BigUintSerdeWrapper> {
         let mut balances = self.balances.clone();
         balances.retain(|_, v| v.0 != BigUint::zero());
