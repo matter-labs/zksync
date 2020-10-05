@@ -240,7 +240,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
             .get_eth_signed_data()
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
-            PackedEthSignature::sign(eth_private_key, &message).expect("Signing failed");
+            PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
         Some(eth_signature)
     };
 

@@ -66,19 +66,9 @@ impl PackedEthSignature {
         bytes.keccak256().into()
     }
 
-    /// Signs message using ethereum private key, results are identical to signature created
-    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
-    pub fn sign(private_key: &H256, message: &[u8]) -> Result<PackedEthSignature, failure::Error> {
-        let secret_key = (*private_key).into();
-        let signed_bytes = Self::message_to_signed_bytes(message);
-        let signature = sign(&secret_key, &signed_bytes)?;
-        Ok(PackedEthSignature(signature))
-    }
-
     /// Checks signature and returns ethereum address of the signer.
     /// message should be the same message that was passed to `eth.sign`(or similar) method
     /// as argument. No hashing and prefixes required.
-
     pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, anyhow::Error> {
         let signed_bytes = Self::message_to_signed_bytes(msg);
         let public_key = recover(&self.0, &signed_bytes)?;

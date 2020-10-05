@@ -68,6 +68,7 @@ impl<'a> ChangePubKeyBuilder<'a> {
             self.wallet
                 .signer
                 .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee)
+                .await
                 .map_err(ClientError::SigningError)?,
         ))
     }

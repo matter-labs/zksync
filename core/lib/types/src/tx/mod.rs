@@ -24,7 +24,7 @@ pub use self::{
 pub use self::primitives::{
     eip1271_signature::EIP1271Signature, eth_signature::TxEthSignature,
     packed_eth_signature::PackedEthSignature, packed_public_key::PackedPublicKey,
-    packed_signature::PackedSignature, raw_tx::RawTransaction, signature::TxSignature,
+    packed_signature::PackedSignature, raw_ethereum_tx::RawTransaction, signature::TxSignature,
     tx_hash::TxHash,
 };
 

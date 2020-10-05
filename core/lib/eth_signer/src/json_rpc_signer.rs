@@ -4,8 +4,8 @@ use crate::SignerError;
 
 use jsonrpc_core::types::response::Output;
 
-use types::tx::{RawTransaction, TxEthSignature};
-use types::Address;
+use zksync_types::tx::{RawTransaction, TxEthSignature};
+use zksync_types::Address;
 
 #[derive(Clone)]
 pub struct JsonRpcSigner {
@@ -42,10 +42,7 @@ impl JsonRpcSigner {
     }
 
     /// FIXME: make comment
-    pub async fn sign_transaction(
-        &self,
-        raw_tx: RawTransaction,
-    ) -> Result<TxEthSignature, SignerError> {
+    pub async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
         let msg = JsonRpcRequest::sign_transaction(raw_tx);
 
         let ret = self
@@ -105,8 +102,8 @@ impl JsonRpcSigner {
 
 mod messages {
 
-    use types::tx::RawTransaction;
-    use types::Address;
+    use zksync_types::tx::RawTransaction;
+    use zksync_types::Address;
 
     #[derive(Debug, Serialize)]
     pub struct JsonRpcRequest {

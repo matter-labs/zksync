@@ -1,7 +1,7 @@
 // Built-in deps
 use std::fmt;
-use types::tx::PackedSignature;
-use types::tx::{RawTransaction, TxEthSignature};
+use zksync_types::tx::PackedSignature;
+use zksync_types::tx::{RawTransaction, TxEthSignature};
 
 // External uses
 use eth_signer::EthereumSigner;
@@ -176,23 +176,11 @@ impl<T: Transport> ETHClient<T> {
             data,
         };
 
-        // FIXME:
-        let signed_tx_bytes: Vec<u8> = {
-            let signed_tx = self.eth_signer.sign_transaction(tx).await?;
-            if let TxEthSignature::EthereumSignature(packed_signature) = signed_tx {
-                packed_signature.serialize_packed().to_vec()
-            } else {
-                panic!("FIXME:");
-            }
-        };
-        let hash = self
-            .web3
-            .web3()
-            .sha3(Bytes(signed_tx_bytes.clone()))
-            .await?;
+        let signed_tx = self.eth_signer.sign_transaction(tx).await?;
+        let hash = self.web3.web3().sha3(Bytes(signed_tx.clone())).await?;
 
         Ok(SignedCallResult {
-            raw_tx: signed_tx_bytes,
+            raw_tx: signed_tx,
             gas_price,
             nonce,
             hash,

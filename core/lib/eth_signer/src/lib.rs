@@ -2,8 +2,8 @@
 extern crate serde_derive;
 
 use error::SignerError;
-use types::tx::{RawTransaction, TxEthSignature};
-use types::{Address, H256};
+use zksync_types::tx::{RawTransaction, TxEthSignature};
+use zksync_types::{Address, H256};
 
 use json_rpc_signer::JsonRpcSigner;
 use pk_signer::PrivateKeySigner;
@@ -35,10 +35,7 @@ impl EthereumSigner {
         }
     }
 
-    pub async fn sign_transaction(
-        &self,
-        raw_tx: RawTransaction,
-    ) -> Result<TxEthSignature, SignerError> {
+    pub async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
         match self {
             EthereumSigner::PrivateKey(pk_signer) => pk_signer.sign_transaction(raw_tx),
             EthereumSigner::JsonRpc(json_rpc_signer) => {

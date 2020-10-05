@@ -1,7 +1,6 @@
 use crate::external_commands::js_revert_reason;
 
 use anyhow::{bail, ensure, format_err};
-use eth_client::ETHClient;
 use eth_signer::EthereumSigner;
 use ethabi::ParamType;
 use num::{BigUint, ToPrimitive};

@@ -2,7 +2,7 @@
 use eth_signer::error::SignerError;
 use eth_signer::EthereumSigner;
 use std::fmt;
-use types::tx::TxEthSignature;
+use zksync_types::tx::TxEthSignature;
 // External uses
 use num::BigUint;
 // Workspace uses

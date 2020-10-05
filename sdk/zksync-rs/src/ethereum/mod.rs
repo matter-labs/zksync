@@ -1,11 +1,9 @@
 //! Utilities for the on-chain operations, such as `Deposit` and `FullExit`.
 
-use eth_client::ETHClient;
 use eth_signer::EthereumSigner;
 use num::BigUint;
 use std::{convert::TryFrom, time::Duration};
 use std::{str::FromStr, time::Instant};
-use types::{AccountId, PriorityOp, TokenLike};
 use web3::contract::tokens::Tokenize;
 use web3::contract::{Contract, Options};
 use web3::transports::Http;
