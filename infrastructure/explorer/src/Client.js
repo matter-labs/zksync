@@ -120,14 +120,18 @@ export class Client {
     async getCommitedBalances(address) {
         const account = await this.getAccount(address);
 
-        return Object.entries(account.committed.balances)
+        let balances = Object.entries(account.committed.balances)
             .map(([tokenSymbol, balance]) => {
                 return {
                     tokenSymbol,
                     balance: formatToken(balance, tokenSymbol),
                 };
             });
+
+        balances.sort((a, b) => a.tokenSymbol.localeCompare(b.tokenSymbol));
+        return balances
     }
+
     async tokenNameFromId(tokenId) {
         return (await this.tokensPromise)[tokenId].syncSymbol;
     }
