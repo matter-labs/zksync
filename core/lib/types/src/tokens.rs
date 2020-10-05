@@ -7,12 +7,16 @@ use std::path::PathBuf;
 use zksync_utils::parse_env;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
-/// Order of the fields are important (from more specific types to less specific types)
+// Order of the fields are important (from more specific types to less specific types)
+/// Set of values which can be interpreted as a token descriptor.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum TokenLike {
+    /// ID of the token in the zkSync network.
     Id(TokenId),
+    /// Address of the token in the L1.
     Address(Address),
+    /// Symbol associated with token, e.g. "ETH".
     Symbol(String),
 }
 
@@ -69,6 +73,8 @@ impl Token {
     }
 }
 
+// Hidden as it relies on the filesystem structure, which can be different for reverse dependencies.
+#[doc(hidden)]
 pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>, anyhow::Error> {
     let mut file_path = parse_env::<PathBuf>("ZKSYNC_HOME");
     file_path.push("etc");
@@ -78,6 +84,7 @@ pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>
     Ok(serde_json::from_str(&read_to_string(file_path)?)?)
 }
 
+/// Token price known to the zkSync network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenPrice {
     #[serde(with = "UnsignedRatioSerializeAsDecimal")]
@@ -85,11 +92,16 @@ pub struct TokenPrice {
     pub last_updated: DateTime<Utc>,
 }
 
+/// Type of transaction fees that exist in the zkSync network.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
+    /// Fee for the `Withdraw` or `ForcedExit` transaction.
     Withdraw,
+    /// Fee for the `Withdraw` operation that requires fast processing.
     FastWithdraw,
+    /// Fee for the `Transfer` operation.
     Transfer,
+    /// Fee for the `ChangePubKey` operation.
     ChangePubKey {
         #[serde(rename = "onchainPubkeyAuth")]
         onchain_pubkey_auth: bool,

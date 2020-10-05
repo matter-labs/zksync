@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::AccountId;
 use zksync_crypto::params::CHUNK_BYTES;
 
+/// Noop operation. For details, see the documentation of [`FranklinOp`](./operations/enum.FranklinOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoopOp {}
 
