@@ -11,9 +11,10 @@ mod primitives;
 mod tests;
 
 // Re-export transactions.
+#[doc(hidden)]
+pub use self::close::Close;
 pub use self::{
     change_pubkey::ChangePubKey,
-    close::Close,
     forced_exit::ForcedExit,
     franklin_tx::{EthSignData, FranklinTx, SignedFranklinTx},
     transfer::Transfer,

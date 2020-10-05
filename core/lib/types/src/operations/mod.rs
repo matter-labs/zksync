@@ -14,9 +14,11 @@ mod transfer_op;
 mod transfer_to_new_op;
 mod withdraw_op;
 
+#[doc(hidden)]
+pub use self::close_op::CloseOp;
 pub use self::{
-    change_pubkey_op::ChangePubKeyOp, close_op::CloseOp, deposit_op::DepositOp,
-    forced_exit::ForcedExitOp, full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
+    change_pubkey_op::ChangePubKeyOp, deposit_op::DepositOp, forced_exit::ForcedExitOp,
+    full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
     transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
 };
 use zksync_basic_types::AccountId;
@@ -28,6 +30,7 @@ pub enum FranklinOp {
     Deposit(Box<DepositOp>),
     TransferToNew(Box<TransferToNewOp>),
     Withdraw(Box<WithdrawOp>),
+    #[doc(hidden)]
     Close(Box<CloseOp>),
     Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),

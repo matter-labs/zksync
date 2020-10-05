@@ -28,6 +28,7 @@ pub struct SignedFranklinTx {
 pub enum FranklinTx {
     Transfer(Box<Transfer>),
     Withdraw(Box<Withdraw>),
+    #[doc(hidden)]
     Close(Box<Close>),
     ChangePubKey(Box<ChangePubKey>),
     ForcedExit(Box<ForcedExit>),
