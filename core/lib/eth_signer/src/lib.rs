@@ -2,15 +2,17 @@
 extern crate serde_derive;
 
 use error::SignerError;
-use zksync_types::tx::{RawTransaction, TxEthSignature};
+use zksync_types::tx::TxEthSignature;
 use zksync_types::{Address, H256};
 
 use json_rpc_signer::JsonRpcSigner;
 use pk_signer::PrivateKeySigner;
+use raw_ethereum_tx::RawTransaction;
 
 pub mod error;
 pub mod json_rpc_signer;
 pub mod pk_signer;
+pub mod raw_ethereum_tx;
 
 #[derive(Clone)]
 pub enum EthereumSigner {

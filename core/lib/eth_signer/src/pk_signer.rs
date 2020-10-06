@@ -1,8 +1,9 @@
+use crate::raw_ethereum_tx::RawTransaction;
 use crate::SignerError;
 
 use parity_crypto::publickey::sign;
 
-use zksync_types::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
+use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::{Address, H256};
 
 #[derive(Clone)]

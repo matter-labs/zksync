@@ -1,8 +1,9 @@
 use crate::error::{RpcSignerError, SignerError};
 use crate::json_rpc_signer::messages::JsonRpcRequest;
+use crate::RawTransaction;
 
 use jsonrpc_core::types::response::Output;
-use zksync_types::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
+use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::Address;
 
 #[derive(Clone)]
@@ -214,7 +215,7 @@ impl JsonRpcSigner {
 }
 
 mod messages {
-    use zksync_types::tx::RawTransaction;
+    use crate::RawTransaction;
     use zksync_types::Address;
 
     #[derive(Debug, Serialize)]
