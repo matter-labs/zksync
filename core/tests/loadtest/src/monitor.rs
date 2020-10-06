@@ -124,7 +124,7 @@ impl Monitor {
         &self,
         tx: FranklinTx,
         eth_signature: Option<PackedEthSignature>,
-    ) -> Result<TxHash, ClientError> {
+    ) -> anyhow::Result<TxHash> {
         let tx_hash = self.provider.send_tx(tx, eth_signature).await?;
 
         let monitor = self.clone();
@@ -144,7 +144,7 @@ impl Monitor {
         &self,
         eth_provider: &EthereumProvider,
         eth_tx_hash: H256,
-    ) -> Result<PriorityOp, ClientError> {
+    ) -> anyhow::Result<PriorityOp> {
         // FIXME Make this task completely async.
 
         // Wait for the corresponing priority operation ID.
@@ -190,7 +190,7 @@ impl Monitor {
         self.inner().await.log_event(event)
     }
 
-    async fn monitor_tx(self, tx_hash: TxHash) -> Result<(), ClientError> {
+    async fn monitor_tx(self, tx_hash: TxHash) -> anyhow::Result<()> {
         self.log_event(Event::TxCreated).await;
 
         // Wait for the transaction to commit.
@@ -207,7 +207,7 @@ impl Monitor {
         Ok(())
     }
 
-    async fn monitor_priority_op(self, priority_op: PriorityOp) -> Result<(), ClientError> {
+    async fn monitor_priority_op(self, priority_op: PriorityOp) -> anyhow::Result<()> {
         self.log_event(Event::OpCreated).await;
 
         // Wait until the priority operation is committed.
@@ -228,10 +228,16 @@ impl Monitor {
     }
 
     // Waits for the transaction to commit.
-    pub async fn wait_for_tx_commit(&self, tx_hash: TxHash) -> Result<(), ClientError> {
+    pub async fn wait_for_tx_commit(&self, tx_hash: TxHash) -> anyhow::Result<()> {
         await_condition!(Self::POLLING_INTERVAL, {
             let info = self.provider.tx_info(tx_hash).await?;
-            info.executed && info.block.is_some()
+            match info.success {
+                Some(true) => true,
+                None => false,
+                Some(false) => {
+                    anyhow::bail!("Transaction failed with a reason: {:?}", info.fail_reason);
+                }
+            }
         });
 
         Ok(())
@@ -241,13 +247,12 @@ impl Monitor {
     pub async fn wait_for_priority_op_commit(
         &self,
         priority_op: &PriorityOp,
-    ) -> Result<(), ClientError> {
+    ) -> anyhow::Result<()> {
         await_condition!(Self::POLLING_INTERVAL, {
             let info = self
                 .provider
                 .ethop_info(priority_op.serial_id as u32)
                 .await?;
-
             info.executed && info.block.is_some()
         });
 

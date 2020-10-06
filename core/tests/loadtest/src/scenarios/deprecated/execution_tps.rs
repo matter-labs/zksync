@@ -130,7 +130,7 @@ async fn send_transactions(
 async fn send_transactions_from_acc(
     mut test_wallet: TestWallet,
     ctx: LoadTestConfig,
-) -> Result<SentTransactions, failure::Error> {
+) -> Result<SentTransactions, anyhow::Error> {
     let mut sent_txs = SentTransactions::new();
     let addr_hex = hex::encode(test_wallet.address());
     let wei_in_gwei = BigUint::from(1_000_000_000u32);

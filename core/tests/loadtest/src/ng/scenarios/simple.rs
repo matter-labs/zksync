@@ -2,7 +2,11 @@ use futures::prelude::*;
 use num::BigUint;
 use structopt::StructOpt;
 
-use models::helpers::{closest_packable_fee_amount, closest_packable_token_amount};
+use models::{
+    helpers::{closest_packable_fee_amount, closest_packable_token_amount},
+    tx::PackedEthSignature,
+    FranklinTx,
+};
 use zksync::types::BlockStatus;
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
@@ -37,7 +41,6 @@ impl SimpleScenario {
         main_account: AccountInfo,
         options: ConfigurationOptions,
     ) -> Result<(), anyhow::Error> {
-        tokio::spawn(monitor.run_counter());
         log::info!("Starting simple scenario");
 
         // Create main account to deposit money from and to return money back later.
@@ -54,8 +57,10 @@ impl SimpleScenario {
         let transfer_size = gwei_to_wei(self.transfer_size);
 
         // Make initial deposit.
+
+        // TODO Use minimal sufficient amount.
         let amount_to_deposit = (&transfer_size + &sufficient_fee)
-            * BigUint::from(self.wallets * self.transfer_rounds + 2);
+            * BigUint::from(self.wallets * self.transfer_rounds * 2);
         let amount_to_deposit = closest_packable_token_amount(&amount_to_deposit);
 
         let eth_balance = main_wallet.eth_provider.balance().await?;
@@ -67,14 +72,19 @@ impl SimpleScenario {
         );
 
         log::info!(
-            "Deposit {} for main wallet",
-            format_ether(&amount_to_deposit)
+            "Deposit {} for main wallet, sufficient fee is {}",
+            format_ether(&amount_to_deposit),
+            format_ether(&sufficient_fee),
         );
         let priority_op = main_wallet.deposit(amount_to_deposit).await.unwrap();
         monitor.wait_for_priority_op_commit(&priority_op).await?;
 
         // Now when deposits are done it is time to update account id.
         main_wallet.update_account_id().await?;
+        assert!(
+            main_wallet.account_id().is_some(),
+            "Account ID was not set after deposit for main account"
+        );
 
         // ...and change the main account pubkey.
         // We have to change pubkey after the deposit so we'll be able to use corresponding
@@ -96,7 +106,7 @@ impl SimpleScenario {
 
         let transfer_amount =
             &transfer_size + (&sufficient_fee * BigUint::from(self.transfer_rounds + 2));
-        let transfer_amount = closest_packable_fee_amount(&transfer_amount);
+        let transfer_amount = closest_packable_token_amount(&transfer_amount);
 
         // TODO Replace copy-paste by the generic solution.
 
@@ -119,11 +129,15 @@ impl SimpleScenario {
         )
         .await?;
 
-        log::info!("All the initial transfers have been verified.");
+        log::info!("All the initial transfers have been committed.");
 
         let mut tx_hashes = Vec::new();
         for wallet in &mut wallets {
             wallet.update_account_id().await?;
+            assert!(
+                wallet.account_id().is_some(),
+                "Account ID was not set after deposit for the account"
+            );
 
             let (tx, sign) = wallet.sign_change_pubkey(sufficient_fee.clone()).await?;
             tx_hashes.push(monitor.send_tx(tx, sign).await?);
@@ -138,7 +152,11 @@ impl SimpleScenario {
 
         // Run transfers step.
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
-        log::info!("All the initial transfers have been verified, creating {} transactions for the transfers step", transfers_number);
+        log::info!(
+            "All the initial transfers have been verified, creating {} transactions \
+            for the transfers step",
+            transfers_number
+        );
         let txs_queue = try_wait_all((0..transfers_number).map(|i| {
             let from = i % wallets.len();
             let to = (i + 1) % wallets.len();
@@ -158,7 +176,7 @@ impl SimpleScenario {
         monitor.wait_for_verify().await;
         log::info!("Starting TPS measuring...");
 
-        // tokio::spawn(monitor.run_counter());
+        tokio::spawn(monitor.run_counter());
         try_wait_all(
             txs_queue
                 .into_iter()
@@ -166,8 +184,60 @@ impl SimpleScenario {
         )
         .await?;
         monitor.wait_for_verify().await;
+        let logs = monitor.take_logs().await;
 
-        log::trace!("Collected logs: {:#?}", monitor.take_logs().await);
+        // Refunding stage.
+        log::info!("Refunding the remaining tokens to the main wallet.");
+        let txs_queue = try_wait_all(wallets.into_iter().map(|wallet| {
+            let sufficient_fee = sufficient_fee.clone();
+            let main_address = main_wallet.address();
+
+            async move {
+                let balance = wallet.balance(BlockStatus::Verified).await?;
+                let withdraw_amount = closest_packable_token_amount(&(balance - &sufficient_fee));
+
+                wallet
+                    .sign_transfer(
+                        main_address,
+                        withdraw_amount.clone(),
+                        Some(sufficient_fee.clone()),
+                    )
+                    .await
+            }
+        }))
+        .await?;
+
+        let tx_hashes = try_wait_all(
+            txs_queue
+                .into_iter()
+                .map(|(tx, sign)| monitor.send_tx(tx, sign)),
+        )
+        .await?;
+
+        try_wait_all(
+            tx_hashes
+                .into_iter()
+                .map(|tx_hash| monitor.wait_for_tx_commit(tx_hash)),
+        )
+        .await?;
+
+        let main_wallet_balance = main_wallet.balance(BlockStatus::Committed).await?;
+        if main_wallet_balance > sufficient_fee {
+            log::info!(
+                "Main wallet has {} balance, making refund...",
+                format_ether(&main_wallet_balance)
+            );
+
+            let withdraw_amount =
+                closest_packable_token_amount(&(main_wallet_balance - &sufficient_fee));
+            let (tx, sign) = main_wallet
+                .sign_withdraw(withdraw_amount, Some(sufficient_fee))
+                .await?;
+            monitor.send_tx(tx, sign).await?;
+        }
+        monitor.wait_for_verify().await;
+
+        log::trace!("Collected logs: {:#?}", logs);
 
         Ok(())
     }

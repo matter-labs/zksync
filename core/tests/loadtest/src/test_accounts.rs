@@ -103,7 +103,7 @@ impl TestWallet {
         let fee = self
             .monitor
             .provider
-            .get_tx_fee(TxFeeTypes::Transfer, Address::zero(), Self::TOKEN_NAME)
+            .get_tx_fee(TxFeeTypes::Withdraw, Address::zero(), Self::TOKEN_NAME)
             .await?
             .total_fee
             * BigUint::from(Self::FEE_FACTOR);
@@ -220,7 +220,7 @@ impl TestWallet {
     }
 
     // Deposits tokens from Ethereum to the contract.
-    pub async fn deposit(&self, amount: impl Into<BigUint>) -> Result<PriorityOp, ClientError> {
+    pub async fn deposit(&self, amount: impl Into<BigUint>) -> anyhow::Result<PriorityOp> {
         let eth_tx_hash = self
             .eth_provider
             .deposit(
