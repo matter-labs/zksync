@@ -10,7 +10,7 @@ use zksync_types::{
     Operation,
 };
 // Local imports
-use self::records::{ETHBinding, ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
+use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::chain::operations::records::StoredOperation;
 use crate::{QueryResult, StorageProcessor};
 
@@ -129,7 +129,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let raw_ops = sqlx::query_as!(
             StoredOperation,
             "SELECT * FROM operations
-            WHERE confirmed = false
+            WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)
             ORDER BY id ASC",
         )
         .fetch_all(transaction.conn())
@@ -138,23 +138,13 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let mut operations: Vec<Operation> = Vec::new();
 
         for raw_op in raw_ops {
-            let maybe_binding = sqlx::query_as!(
-                ETHBinding,
-                "SELECT * FROM eth_ops_binding
-                WHERE op_id = $1",
-                raw_op.id
-            )
-            .fetch_optional(transaction.conn())
-            .await?;
-
-            // We are only interested in operations unknown to `eth_operations` table.
-            if maybe_binding.is_none() {
-                let op = raw_op
-                    .into_op(&mut transaction)
-                    .await
-                    .expect("Can't convert the operation");
-                operations.push(op);
-            }
+            // We filtered operations that don't have Ethereum binding right in the SQL query,
+            // so now we only have to convert stored operations into `Operation`.
+            let op = raw_op
+                .into_op(&mut transaction)
+                .await
+                .expect("Can't convert the operation");
+            operations.push(op);
         }
 
         transaction.commit().await?;
