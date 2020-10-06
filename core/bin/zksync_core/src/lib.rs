@@ -7,6 +7,7 @@ use crate::{
     committer::run_committer,
     eth_watch::start_eth_watch,
     mempool::run_mempool_task,
+    private_api::start_private_core_api,
     state_keeper::{start_state_keeper, ZksyncStateInitParams, ZksyncStateKeeper},
 };
 use futures::{
@@ -102,6 +103,7 @@ async fn wait_for_stop_signal(mut stop_signal_receiver: mpsc::Receiver<bool>) {
 /// - mempool, module to organize incoming transactions.
 /// - block proposer, module to create block proposals for state keeper.
 /// - committer, module to store pending and completed blocks into the database.
+/// - private Core API server.
 pub async fn run_core() -> anyhow::Result<()> {
     let connection_pool = ConnectionPool::new(None).await;
     let config_opts = ConfigurationOptions::from_env();
@@ -153,23 +155,30 @@ pub async fn run_core() -> anyhow::Result<()> {
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block);
 
+    // Start committer.
     let committer_task = run_committer(
         proposed_blocks_receiver,
         mempool_request_sender.clone(),
         connection_pool.clone(),
     );
 
+    // Start mempool.
     let mempool_task = run_mempool_task(
         connection_pool.clone(),
         mempool_request_receiver,
         eth_watch_req_sender,
         &config_opts,
     );
+
+    // Start block proposer.
     let proposer_task = run_block_proposer_task(
         &config_opts,
-        mempool_request_sender,
+        mempool_request_sender.clone(),
         state_keeper_req_sender.clone(),
     );
+
+    // Start private API.
+    start_private_core_api(config_opts, stop_signal_sender, mempool_request_sender);
 
     let task_futures = vec![
         eth_watch_task,

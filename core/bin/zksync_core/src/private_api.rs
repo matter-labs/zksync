@@ -94,7 +94,7 @@ pub fn start_private_core_api(
                         .route("/new_tx", web::post().to(new_tx))
                         .route("/new_txs_batch", web::post().to(new_txs_batch))
                 })
-                .bind(&config_options.prover_server_address)
+                .bind(&config_options.core_server_address)
                 .expect("failed to bind")
                 .run()
                 .await
