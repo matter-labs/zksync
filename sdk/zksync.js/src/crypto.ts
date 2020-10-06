@@ -23,18 +23,8 @@ export function privateKeyToPubKeyHash(privateKey: Uint8Array): string {
 let zksyncCryptoLoaded = false;
 
 export async function loadZkSyncCrypto(wasmFileUrl?: string) {
-    // Only runs in the browser
-    // if ((zks as any).default) {
-    //     // @ts-ignore
-    //     const url = wasmFileUrl ? wasmFileUrl : zks.DefaultZksyncCryptoWasmURL;
-    //     if (!zksyncCryptoLoaded) {
-    //         await waitReady();
-    //         await zksync_crypto_init();
-    //         await (zks as any).default(url);
-            zksyncCryptoLoaded = true;
-    //     }
-    // } else {
+    if (!zksyncCryptoLoaded) {
         await waitReady();
-        await zksync_crypto_init();
-    // }
+        zksyncCryptoLoaded = true;
+    }
 }
