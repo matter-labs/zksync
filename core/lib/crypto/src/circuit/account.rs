@@ -11,7 +11,9 @@ use crate::merkle_tree::hasher::Hasher;
 use crate::merkle_tree::{RescueHasher, SparseMerkleTree};
 use crate::primitives::{GetBits, GetBitsFixed};
 
+/// Account tree used in the `zksync_circuit`.
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, RescueHasher<Bn256>>;
+/// Balance tree for accounts used in the `zksync_circuit`.
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, RescueHasher<Bn256>>;
 
 pub fn empty_account_as_field_elements<E: Engine>() -> Vec<E::Fr> {
@@ -23,6 +25,7 @@ pub fn empty_account_as_field_elements<E: Engine>() -> Vec<E::Fr> {
     multipack::compute_multipacking::<E>(&bits)
 }
 
+/// Representation of the zkSync account used in the `zksync_circuit`.
 #[derive(Clone)]
 pub struct CircuitAccount<E: RescueEngine> {
     pub subtree: SparseMerkleTree<Balance<E>, E::Fr, RescueHasher<E>>,
@@ -90,6 +93,8 @@ impl std::default::Default for CircuitAccount<Bn256> {
         }
     }
 }
+
+/// Representation of one token balance used in `zksync_circuit`.
 #[derive(Clone, Debug)]
 pub struct Balance<E: Engine> {
     pub value: E::Fr,

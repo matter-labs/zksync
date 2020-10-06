@@ -23,11 +23,13 @@ pub struct SignedFranklinTx {
     pub eth_sign_data: Option<EthSignData>,
 }
 
+/// A set of L2 transaction supported by the zkSync network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinTx {
     Transfer(Box<Transfer>),
     Withdraw(Box<Withdraw>),
+    #[doc(hidden)]
     Close(Box<Close>),
     ChangePubKey(Box<ChangePubKey>),
     ForcedExit(Box<ForcedExit>),
@@ -81,6 +83,7 @@ impl std::ops::Deref for SignedFranklinTx {
 }
 
 impl FranklinTx {
+    /// Returns the hash of the transaction.
     pub fn hash(&self) -> TxHash {
         let bytes = match self {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
@@ -96,6 +99,7 @@ impl FranklinTx {
         TxHash { data: out }
     }
 
+    /// Returns the account affected by the transaction.
     pub fn account(&self) -> Address {
         match self {
             FranklinTx::Transfer(tx) => tx.from,
@@ -106,6 +110,7 @@ impl FranklinTx {
         }
     }
 
+    /// Returns the account nonce associated with transaction.
     pub fn nonce(&self) -> Nonce {
         match self {
             FranklinTx::Transfer(tx) => tx.nonce,
@@ -116,6 +121,10 @@ impl FranklinTx {
         }
     }
 
+    /// Checks whether transaction is well-formed and can be executed.
+    ///
+    /// Note that this method doesn't check whether transaction will succeed, so transaction
+    /// can fail even if this method returned `true` (i.e., if account didn't have enough balance).
     pub fn check_correctness(&mut self) -> bool {
         match self {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
@@ -126,6 +135,7 @@ impl FranklinTx {
         }
     }
 
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         match self {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
@@ -136,6 +146,9 @@ impl FranklinTx {
         }
     }
 
+    /// Returns the minimum amount of block chunks required for this operation.
+    /// Maximum amount of chunks in block is a part of  the server and provers configuration,
+    /// and this value determines the block capacity.
     pub fn min_chunks(&self) -> usize {
         match self {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
@@ -146,20 +159,27 @@ impl FranklinTx {
         }
     }
 
+    /// Returns `true` if transaction is `FranklinTx::Withdraw`.
     pub fn is_withdraw(&self) -> bool {
-        match self {
-            FranklinTx::Withdraw(_) => true,
-            _ => false,
-        }
+        matches!(self, FranklinTx::Withdraw(_))
     }
 
+    /// Returns `true` if transaction is `FranklinTx::Withdraw`.
+    #[doc(hidden)]
     pub fn is_close(&self) -> bool {
-        match self {
-            FranklinTx::Close(_) => true,
-            _ => false,
-        }
+        matches!(self, FranklinTx::Close(_))
     }
 
+    /// Returns the data required to calculate fee for the transaction.
+    ///
+    /// Response includes the following items:
+    ///
+    /// - Fee type.
+    /// - Token to pay fees in.
+    /// - Address of account affected by the transaction.
+    /// - Fee provided in the transaction.
+    ///
+    /// Returns `None` if transaction doesn't require fee.
     pub fn get_fee_info(&self) -> Option<(TxFeeTypes, TokenLike, Address, BigUint)> {
         match self {
             FranklinTx::Withdraw(withdraw) => {

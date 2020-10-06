@@ -1,7 +1,7 @@
 // External imports
 use zksync_basic_types::H256;
 // Workspace imports
-use zksync_crypto::{convert::fe_to_bytes, Fr};
+use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_crypto::{ff::PrimeField, rand::XorShiftRng};
 use zksync_types::{block::Block, helpers::apply_updates, AccountMap, AccountUpdate, BlockNumber};
 use zksync_types::{ethereum::OperationType, Action, Operation};
@@ -285,7 +285,7 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
 
         // Initialize reference sample fields.
         current_block_detail.block_number = operation.block.block_number as i64;
-        current_block_detail.new_state_root = fe_to_bytes(&operation.block.new_root_hash);
+        current_block_detail.new_state_root = operation.block.new_root_hash.to_bytes();
         current_block_detail.block_size = operation.block.block_transactions.len() as i64;
         current_block_detail.commit_tx_hash = Some(eth_tx_hash.as_ref().to_vec());
 

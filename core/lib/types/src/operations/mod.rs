@@ -1,3 +1,5 @@
+//! Set of all the operations supported by the zkSync network.
+
 use super::FranklinTx;
 use crate::FranklinPriorityOp;
 use anyhow::format_err;
@@ -14,28 +16,37 @@ mod transfer_op;
 mod transfer_to_new_op;
 mod withdraw_op;
 
+#[doc(hidden)]
+pub use self::close_op::CloseOp;
 pub use self::{
-    change_pubkey_op::ChangePubKeyOp, close_op::CloseOp, deposit_op::DepositOp,
-    forced_exit::ForcedExitOp, full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
+    change_pubkey_op::ChangePubKeyOp, deposit_op::DepositOp, forced_exit::ForcedExitOp,
+    full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
     transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
 };
 use zksync_basic_types::AccountId;
 
+/// zkSync network operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinOp {
-    Noop(NoopOp),
     Deposit(Box<DepositOp>),
+    Transfer(Box<TransferOp>),
+    /// Transfer to new operation is represented by `Transfer` transaction,
+    /// same as `Transfer` operation. The difference is that for `TransferToNew` operation
+    /// recipient account doesn't exist and has to be created.
     TransferToNew(Box<TransferToNewOp>),
     Withdraw(Box<WithdrawOp>),
+    #[doc(hidden)]
     Close(Box<CloseOp>),
-    Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),
     ChangePubKeyOffchain(Box<ChangePubKeyOp>),
     ForcedExit(Box<ForcedExitOp>),
+    /// `NoOp` operation cannot be directly created, but it's used to fill the block capacity.
+    Noop(NoopOp),
 }
 
 impl FranklinOp {
+    /// Returns the number of block chunks required for the operation.
     pub fn chunks(&self) -> usize {
         match self {
             FranklinOp::Noop(_) => NoopOp::CHUNKS,
@@ -50,6 +61,7 @@ impl FranklinOp {
         }
     }
 
+    /// Returns the public data required for the Ethereum smart contract to commit the operation.
     pub fn public_data(&self) -> Vec<u8> {
         match self {
             FranklinOp::Noop(op) => op.get_public_data(),
@@ -64,6 +76,12 @@ impl FranklinOp {
         }
     }
 
+    /// Gets the witness required for the Ethereum smart contract.
+    /// Unlike public data, some operations may not have a witness.
+    ///
+    /// Operations that have witness data:
+    ///
+    /// - `ChangePubKey`;
     pub fn eth_witness(&self) -> Option<Vec<u8>> {
         match self {
             FranklinOp::ChangePubKeyOffchain(op) => Some(op.get_eth_witness()),
@@ -71,6 +89,13 @@ impl FranklinOp {
         }
     }
 
+    /// Returns eth_witness data and data_size for operation, if any.
+    ///
+    /// Operations that have withdrawal data:
+    ///
+    /// - `Withdraw`;
+    /// - `FullExit`;
+    /// - `ForcedExit`.
     pub fn withdrawal_data(&self) -> Option<Vec<u8>> {
         match self {
             FranklinOp::Withdraw(op) => Some(op.get_withdrawal_data()),
@@ -80,6 +105,7 @@ impl FranklinOp {
         }
     }
 
+    /// Attempts to restore the operation from the public data committed on the Ethereum smart contract.
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
         let op_type: u8 = *bytes.first().ok_or_else(|| format_err!("Empty pubdata"))?;
         match op_type {
@@ -112,6 +138,7 @@ impl FranklinOp {
         }
     }
 
+    /// Returns the expected number of chunks for a certain type of operation.
     pub fn public_data_length(op_type: u8) -> Result<usize, anyhow::Error> {
         match op_type {
             NoopOp::OP_CODE => Ok(NoopOp::CHUNKS),
@@ -128,6 +155,7 @@ impl FranklinOp {
         .map(|chunks| chunks * CHUNK_BYTES)
     }
 
+    /// Attempts to interpret the operation as the L2 transaction.
     pub fn try_get_tx(&self) -> Result<FranklinTx, anyhow::Error> {
         match self {
             FranklinOp::Transfer(op) => Ok(FranklinTx::Transfer(Box::new(op.tx.clone()))),
@@ -142,6 +170,7 @@ impl FranklinOp {
         }
     }
 
+    /// Attempts to interpret the operation as the L1 priority operation.
     pub fn try_get_priority_op(&self) -> Result<FranklinPriorityOp, anyhow::Error> {
         match self {
             FranklinOp::Deposit(op) => Ok(FranklinPriorityOp::Deposit(op.priority_op.clone())),
@@ -150,6 +179,7 @@ impl FranklinOp {
         }
     }
 
+    /// Returns the list of account IDs affected by this operation.
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
         match self {
             FranklinOp::Noop(op) => op.get_updated_account_ids(),
