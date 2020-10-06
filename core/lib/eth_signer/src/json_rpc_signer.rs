@@ -1,9 +1,8 @@
-use crate::error::ClientError;
+use crate::error::{RpcSignerError, SignerError};
 use crate::json_rpc_signer::messages::JsonRpcRequest;
-use crate::SignerError;
 
 use jsonrpc_core::types::response::Output;
-use zksync_types::tx::{RawTransaction, TxEthSignature};
+use zksync_types::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
 use zksync_types::Address;
 
 #[derive(Clone)]
@@ -30,17 +29,60 @@ impl JsonRpcSigner {
     /// The sign method calculates an Ethereum specific signature with:
     /// checks if the server adds a prefix if not then adds
     /// return sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
-    pub async fn sign_message(&self, message: &[u8]) -> Result<TxEthSignature, SignerError> {
-        let msg = JsonRpcRequest::sign_message(self.address, message);
-        // FIXME: add checks
-        let ret = self
-            .post(&msg)
-            .await
-            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
-        let signature = serde_json::from_value(ret)
-            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+    pub async fn sign_message(&self, msg: &[u8]) -> Result<TxEthSignature, SignerError> {
+        // RPC can either add the prefix `\x19Ethereum Signed Message:\n` to the message and not add.
+        // Therefore, we will first check the signature for a message without a prefix, and
+        // if the wallet itself adds a prefix, we will receive a correctly signed message,
+        // otherwise we simply add the prefix manually.
 
-        Ok(signature)
+        let signature_msg_no_prefix: PackedEthSignature = {
+            let message = JsonRpcRequest::sign_message(self.address, msg);
+            let ret = self
+                .post(&message)
+                .await
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+            serde_json::from_value(ret)
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
+        };
+
+        // Checks the correctness of the message signature without a prefix
+        if signature_msg_no_prefix
+            .signature_recover_signer(msg)
+            .map_err(|_| SignerError::DefineAddress)?
+            == self.address
+        {
+            return Ok(TxEthSignature::EthereumSignature(signature_msg_no_prefix));
+        }
+
+        let message_with_prefix = {
+            let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+            let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
+            bytes.extend_from_slice(prefix.as_bytes());
+            bytes.extend_from_slice(msg);
+
+            JsonRpcRequest::sign_message(self.address, &bytes)
+        };
+
+        let signature_msg_with_prefix: PackedEthSignature = {
+            let ret = self
+                .post(&message_with_prefix)
+                .await
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+            serde_json::from_value(ret)
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
+        };
+        // Checks the correctness of the message signature with a prefix
+        if signature_msg_with_prefix
+            .signature_recover_signer(msg)
+            .map_err(|_| SignerError::DefineAddress)?
+            == self.address
+        {
+            return Ok(TxEthSignature::EthereumSignature(signature_msg_with_prefix));
+        } else {
+            Err(SignerError::SigningFailed(
+                "Failed to get the correct signature".to_string(),
+            ))
+        }
     }
 
     /// Signs and returns the RLP-encoded transaction.
@@ -62,12 +104,15 @@ impl JsonRpcSigner {
     /// `Ok` is returned only for successful calls, for any kind of error
     /// the `Err` variant is returned (including the failed RPC method
     /// execution response).
-    async fn post(&self, message: impl serde::Serialize) -> Result<serde_json::Value, ClientError> {
+    async fn post(
+        &self,
+        message: impl serde::Serialize,
+    ) -> Result<serde_json::Value, RpcSignerError> {
         let reply: Output = self.post_raw(message).await?;
 
         let ret = match reply {
             Output::Success(success) => success.result,
-            Output::Failure(failure) => return Err(ClientError::RpcError(failure)),
+            Output::Failure(failure) => return Err(RpcSignerError::RpcError(failure)),
         };
 
         Ok(ret)
@@ -78,25 +123,25 @@ impl JsonRpcSigner {
     /// `Ok` is returned only for successful calls, for any kind of error
     /// the `Err` variant is returned (including the failed RPC method
     /// execution response).
-    async fn post_raw(&self, message: impl serde::Serialize) -> Result<Output, ClientError> {
+    async fn post_raw(&self, message: impl serde::Serialize) -> Result<Output, RpcSignerError> {
         let res = self
             .client
             .post(&self.rpc_addr)
             .json(&message)
             .send()
             .await
-            .map_err(|err| ClientError::NetworkError(err.to_string()))?;
+            .map_err(|err| RpcSignerError::NetworkError(err.to_string()))?;
         if res.status() != reqwest::StatusCode::OK {
             let error = format!(
                 "Post query responded with a non-OK response: {}",
                 res.status()
             );
-            return Err(ClientError::NetworkError(error));
+            return Err(RpcSignerError::NetworkError(error));
         }
         let reply: Output = res
             .json()
             .await
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
+            .map_err(|err| RpcSignerError::MalformedResponse(err.to_string()))?;
 
         Ok(reply)
     }
@@ -135,7 +180,8 @@ mod messages {
 
         pub fn sign_transaction(from: Address, tx_data: RawTransaction) -> Self {
             let mut params = Vec::new();
-            // FIXME:
+
+            // Parameter `To` is optional, so we add it only if it is not None
             let tx = if let Some(to) = tx_data.to {
                 serde_json::json!({
                     "from": serde_json::to_value(from).expect("serialization fail"),

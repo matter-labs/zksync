@@ -91,7 +91,7 @@ impl Signer {
             let eth_signer = self
                 .eth_signer
                 .as_ref()
-                .ok_or(SignerError::MissingEthPrivateKey)?; // TODO1 Change error code
+                .ok_or(SignerError::MissingEthSigner)?;
 
             let sign_bytes = change_pubkey
                 .get_eth_signed_data()
@@ -149,7 +149,7 @@ impl Signer {
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
                 } else {
-                    return Err(SignerError::MissingEthPrivateKey);
+                    return Err(SignerError::MissingEthSigner);
                 }
             }
             _ => None,
@@ -188,7 +188,7 @@ impl Signer {
                 if let TxEthSignature::EthereumSignature(packed_signature) = signature {
                     Some(packed_signature)
                 } else {
-                    return Err(SignerError::MissingEthPrivateKey);
+                    return Err(SignerError::MissingEthSigner);
                 }
             }
             _ => None,
