@@ -17,7 +17,7 @@ serde = "1.0.90"
 ethabi = "12.0.0"
 web3 = "0.13.0"
 parity-crypto = {version = "0.6.2", features = ["publickey"] }
-rlp = "0.4.5"
+
 log = "0.4"
 anyhow = "1.0"
 

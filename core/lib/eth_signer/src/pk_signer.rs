@@ -1,5 +1,7 @@
 use crate::SignerError;
+
 use parity_crypto::publickey::sign;
+
 use zksync_types::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
 use zksync_types::{Address, H256};
 
