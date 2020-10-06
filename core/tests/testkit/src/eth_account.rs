@@ -382,15 +382,19 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    // Verifies block using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
-    pub async fn verify_block(&self, block: &Block) -> Result<ETHExecResult, anyhow::Error> {
+    // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
+    pub async fn verify_block(
+        &self,
+        block: &Block,
+        proof: Option<EncodedProofPlonk>,
+    ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "verifyBlock",
                 (
                     u64::from(block.block_number),
-                    vec![U256::default(); 10],
+                    proof.unwrap_or_default().proof,
                     block.get_withdrawals_data(),
                 ),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),

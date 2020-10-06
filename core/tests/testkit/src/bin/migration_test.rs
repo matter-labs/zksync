@@ -1,5 +1,5 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, run_upgrade_franklin};
+use crate::external_commands::{deploy_contracts, get_test_accounts, run_upgrade_franklin};
 use crate::zksync_account::ZksyncAccount;
 use std::time::Instant;
 use web3::transports::Http;
@@ -14,7 +14,7 @@ async fn migration_test() {
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,

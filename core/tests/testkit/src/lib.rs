@@ -1,7 +1,7 @@
 //use log::*;
 
 use crate::eth_account::{get_executed_tx_fee, parse_ether, ETHExecResult, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
+use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use anyhow::bail;
 use futures::{
@@ -35,6 +35,7 @@ use itertools::Itertools;
 use web3::types::{TransactionReceipt, U64};
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::rand::Rng;
+use zksync_types::block::Block;
 
 /// Constant for testkit
 /// Real value is in `dev.env`
@@ -443,7 +444,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Deposit to other account test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 
     // test two deposits
@@ -471,7 +472,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Deposit test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 
     // test transfers
@@ -559,7 +560,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Transfer test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 
     test_setup.start_block();
@@ -572,7 +573,7 @@ pub async fn perform_basic_operations(
             .await
             .expect("Block execution failed");
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 }
 
@@ -600,7 +601,7 @@ pub async fn perform_basic_tests() {
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -1273,7 +1274,7 @@ impl TestSetup {
     }
 
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
-    pub async fn execute_commit_block(&mut self) -> ETHExecResult {
+    pub async fn execute_commit_block(&mut self) -> (ETHExecResult, Block) {
         self.state_keeper_request_sender
             .clone()
             .send(StateKeeperRequest::SealBlock)
@@ -1282,10 +1283,24 @@ impl TestSetup {
 
         let new_block = self.await_for_block_commit_request().await;
 
+        (
+            self.commit_account
+                .commit_block(&new_block.block)
+                .await
+                .expect("block commit fail"),
+            new_block.block,
+        )
+    }
+
+    pub async fn execute_verify_block(
+        &mut self,
+        block: &Block,
+        proof: EncodedProofPlonk,
+    ) -> ETHExecResult {
         self.commit_account
-            .commit_block(&new_block.block)
+            .verify_block(block, Some(proof))
             .await
-            .expect("block commit fail")
+            .expect("block verify fail")
     }
 
     pub async fn execute_commit_and_verify_block(
@@ -1307,7 +1322,7 @@ impl TestSetup {
             .expect_success();
         let verify_result = self
             .commit_account
-            .verify_block(&new_block.block)
+            .verify_block(&new_block.block, None)
             .await
             .expect("block verify send tx")
             .expect_success();
