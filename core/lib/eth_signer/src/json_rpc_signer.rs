@@ -6,19 +6,39 @@ use zksync_types::tx::{PackedEthSignature, RawTransaction, TxEthSignature};
 use zksync_types::Address;
 
 #[derive(Clone)]
+pub enum SignerType {
+    NotPrefixed,
+    Prefixed,
+}
+
+#[derive(Clone)]
 pub struct JsonRpcSigner {
     rpc_addr: String,
     client: reqwest::Client,
     address: Address,
+    signer_type: Option<SignerType>,
 }
 
 impl JsonRpcSigner {
-    pub fn new(rpc_addr: impl Into<String>, address: Address) -> Self {
-        Self {
+    pub async fn new(
+        rpc_addr: impl Into<String>,
+        address: Address,
+        signer_type: Option<SignerType>,
+    ) -> Result<Self, SignerError> {
+        let mut signer = Self {
             rpc_addr: rpc_addr.into(),
             client: reqwest::Client::new(),
             address,
-        }
+            signer_type,
+        };
+
+        // If it is not known whether it is necessary
+        // to add a prefix to messages, then we define this.
+        if signer.signer_type.is_none() {
+            signer.detect_signer_type().await?;
+        };
+
+        Ok(signer)
     }
 
     /// Get Ethereum address.
@@ -26,17 +46,89 @@ impl JsonRpcSigner {
         self.address
     }
 
+    /// Server can either add the prefix `\x19Ethereum Signed Message:\n` to the message and not add.
+    /// Checks if a prefix should be added to the message
+    pub async fn detect_signer_type(&mut self) -> Result<(), SignerError> {
+        // If the `sig_type` is set, then we do not need to detect it from the server
+        if self.signer_type.is_some() {
+            return Ok(());
+        }
+        let msg = "JsonRpcSigner type was not specified. Sign this message to detect the signer type. It only has to be done once per session".as_bytes();
+
+        let signature_msg_no_prefix: PackedEthSignature = {
+            let message = JsonRpcRequest::sign_message(self.address, msg);
+
+            let ret = self
+                .post(&message)
+                .await
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+            serde_json::from_value(ret)
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
+        };
+
+        let signature_msg_with_prefix: PackedEthSignature = {
+            let message_with_prefix = {
+                let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+                let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
+                bytes.extend_from_slice(prefix.as_bytes());
+                bytes.extend_from_slice(msg);
+
+                JsonRpcRequest::sign_message(self.address, &bytes)
+            };
+
+            let ret = self
+                .post(&message_with_prefix)
+                .await
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+            serde_json::from_value(ret)
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
+        };
+
+        if signature_msg_no_prefix
+            .signature_recover_signer(msg)
+            .map_err(|_| SignerError::DefineAddress)?
+            == self.address
+        {
+            self.signer_type = Some(SignerType::NotPrefixed);
+        }
+
+        if signature_msg_with_prefix
+            .signature_recover_signer(msg)
+            .map_err(|_| SignerError::DefineAddress)?
+            == self.address
+        {
+            self.signer_type = Some(SignerType::Prefixed);
+        }
+
+        match self.signer_type.is_some() {
+            true => Ok(()),
+            false => Err(SignerError::SigningFailed(
+                "Failed to get the correct signature".to_string(),
+            )),
+        }
+    }
+
     /// The sign method calculates an Ethereum specific signature with:
     /// checks if the server adds a prefix if not then adds
     /// return sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
     pub async fn sign_message(&self, msg: &[u8]) -> Result<TxEthSignature, SignerError> {
-        // RPC can either add the prefix `\x19Ethereum Signed Message:\n` to the message and not add.
-        // Therefore, we will first check the signature for a message without a prefix, and
-        // if the wallet itself adds a prefix, we will receive a correctly signed message,
-        // otherwise we simply add the prefix manually.
+        let signature: PackedEthSignature = {
+            let msg = match &self.signer_type {
+                Some(SignerType::NotPrefixed) => msg.to_vec(),
+                Some(SignerType::Prefixed) => {
+                    let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+                    let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
+                    bytes.extend_from_slice(prefix.as_bytes());
+                    bytes.extend_from_slice(msg);
 
-        let signature_msg_no_prefix: PackedEthSignature = {
-            let message = JsonRpcRequest::sign_message(self.address, msg);
+                    bytes
+                }
+                None => {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            };
+
+            let message = JsonRpcRequest::sign_message(self.address, &msg);
             let ret = self
                 .post(&message)
                 .await
@@ -46,41 +138,15 @@ impl JsonRpcSigner {
         };
 
         // Checks the correctness of the message signature without a prefix
-        if signature_msg_no_prefix
+        if signature
             .signature_recover_signer(msg)
             .map_err(|_| SignerError::DefineAddress)?
             == self.address
         {
-            return Ok(TxEthSignature::EthereumSignature(signature_msg_no_prefix));
-        }
-
-        let message_with_prefix = {
-            let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
-            let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
-            bytes.extend_from_slice(prefix.as_bytes());
-            bytes.extend_from_slice(msg);
-
-            JsonRpcRequest::sign_message(self.address, &bytes)
-        };
-
-        let signature_msg_with_prefix: PackedEthSignature = {
-            let ret = self
-                .post(&message_with_prefix)
-                .await
-                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
-            serde_json::from_value(ret)
-                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
-        };
-        // Checks the correctness of the message signature with a prefix
-        if signature_msg_with_prefix
-            .signature_recover_signer(msg)
-            .map_err(|_| SignerError::DefineAddress)?
-            == self.address
-        {
-            Ok(TxEthSignature::EthereumSignature(signature_msg_with_prefix))
+            Ok(TxEthSignature::EthereumSignature(signature))
         } else {
             Err(SignerError::SigningFailed(
-                "Failed to get the correct signature".to_string(),
+                "Invalid signature from JsonRpcSigner".to_string(),
             ))
         }
     }
