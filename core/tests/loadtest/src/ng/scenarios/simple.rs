@@ -60,7 +60,7 @@ impl SimpleScenario {
 
         // TODO Use minimal sufficient amount.
         let amount_to_deposit = (&transfer_size + &sufficient_fee)
-            * BigUint::from(self.wallets * self.transfer_rounds * 2);
+            * BigUint::from(self.wallets * self.transfer_rounds * 5);
         let amount_to_deposit = closest_packable_token_amount(&amount_to_deposit);
 
         let eth_balance = main_wallet.eth_provider.balance().await?;
@@ -163,7 +163,7 @@ impl SimpleScenario {
 
             wallets[from].sign_transfer(
                 wallets[to].address(),
-                transfer_size.clone(),
+                closest_packable_token_amount(&transfer_size),
                 Some(sufficient_fee.clone()),
             )
         }))
