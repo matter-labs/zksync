@@ -15,8 +15,8 @@ use zksync_types::{tx::TxEthSignature, FranklinTx, SignedFranklinTx};
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 use crate::mempool::TxAddError;
-use crate::panic_notify::ThreadPanicNotify;
 use zksync_types::tx::EthSignData;
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// Wrapper on a `FranklinTx` which guarantees that
 /// transaction was checked and signatures associated with

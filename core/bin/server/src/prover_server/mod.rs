@@ -12,8 +12,8 @@ use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOn
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
 // Local deps
-use crate::panic_notify::ThreadPanicNotify;
 use crate::prover_server::scaler::ScalerOracle;
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 mod scaler;
 mod witness_generator;

@@ -19,7 +19,6 @@ use zksync_types::{
     Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
 };
 // Local uses
-use crate::panic_notify::ThreadPanicNotify;
 use crate::{
     eth_watch::{EthBlockId, EthWatchRequest},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
@@ -33,6 +32,7 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 use zksync_types::tx::EthSignData;
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 pub mod error;
 mod rpc_impl;

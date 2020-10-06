@@ -8,7 +8,6 @@ pub mod fee_ticker;
 pub mod leader_election;
 pub mod mempool;
 pub mod observer_mode;
-pub mod panic_notify;
 pub mod prometheus_exporter;
 pub mod prover_server;
 pub mod signature_checker;

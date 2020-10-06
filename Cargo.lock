@@ -5901,6 +5901,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
+ "futures 0.3.5",
  "num",
  "serde",
 ]

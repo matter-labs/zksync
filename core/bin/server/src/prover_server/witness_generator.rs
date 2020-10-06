@@ -4,7 +4,6 @@ use std::{thread, time};
 use anyhow::format_err;
 use futures::channel::mpsc;
 // Workspace deps
-use crate::panic_notify::ThreadPanicNotify;
 use std::time::Instant;
 use zksync_circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
@@ -19,6 +18,7 @@ use zksync_state::state::CollectedFee;
 use zksync_storage::StorageProcessor;
 use zksync_types::block::Block;
 use zksync_types::{BlockNumber, FranklinOp};
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.

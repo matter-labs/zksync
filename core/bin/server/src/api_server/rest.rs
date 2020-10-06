@@ -31,8 +31,8 @@ use zksync_types::{
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::{EthBlockId, EthWatchRequest};
-use crate::panic_notify::ThreadPanicNotify;
 use zksync_storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkStatus {

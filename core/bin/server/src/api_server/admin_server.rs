@@ -16,8 +16,8 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 // Local uses
-use crate::panic_notify::ThreadPanicNotify;
 use zksync_types::{tokens, Address, TokenId};
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {

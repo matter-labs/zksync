@@ -1,6 +1,7 @@
 mod convert;
 mod env_tools;
 mod format;
+pub mod panic_notify;
 mod serde_wrappers;
 
 pub use convert::*;

@@ -16,7 +16,6 @@ use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Operation};
 // Local uses
 use crate::fee_ticker::TickerRequest;
-use crate::panic_notify::ThreadPanicNotify;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
@@ -26,6 +25,7 @@ use crate::{
     state_keeper::StateKeeperRequest,
     utils::current_zksync_info::CurrentZksyncInfo,
 };
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[rpc]
 pub trait RpcPubSub {
