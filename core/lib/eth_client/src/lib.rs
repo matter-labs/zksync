@@ -59,7 +59,7 @@ impl<T: Transport> ETHClient<T> {
     ) -> Self {
         Self {
             sender_account: operator_eth_addr,
-            eth_signer: eth_signer,
+            eth_signer,
             contract_addr: contract_eth_addr,
             chain_id,
             contract,

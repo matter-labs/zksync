@@ -100,7 +100,7 @@ impl WalletCredentials {
         private_key: PrivateKey,
         eth_private_key: Option<H256>,
     ) -> Self {
-        let eth_signer = eth_private_key.map(|eth_pk| EthereumSigner::from_key(eth_pk));
+        let eth_signer = eth_private_key.map(EthereumSigner::from_key);
 
         Self {
             eth_address,

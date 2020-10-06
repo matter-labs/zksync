@@ -17,7 +17,7 @@ impl JsonRpcSigner {
         Self {
             rpc_addr: rpc_addr.into(),
             client: reqwest::Client::new(),
-            address: address,
+            address,
         }
     }
 
@@ -77,7 +77,7 @@ impl JsonRpcSigner {
             .map_err(|_| SignerError::DefineAddress)?
             == self.address
         {
-            return Ok(TxEthSignature::EthereumSignature(signature_msg_with_prefix));
+            Ok(TxEthSignature::EthereumSignature(signature_msg_with_prefix))
         } else {
             Err(SignerError::SigningFailed(
                 "Failed to get the correct signature".to_string(),
