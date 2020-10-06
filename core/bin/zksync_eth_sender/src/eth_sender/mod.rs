@@ -7,10 +7,7 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 // External uses
-use futures::{
-    channel::{mpsc, oneshot},
-    StreamExt,
-};
+use futures::channel::{mpsc, oneshot};
 use tokio::{task::JoinHandle, time};
 use web3::{
     contract::Options,
@@ -128,8 +125,6 @@ struct ETHSender<ETH: EthereumInterface> {
     db: Database,
     /// Ethereum intermediator.
     ethereum: ETH,
-    /// Channel for receiving operations to commit.
-    rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
     /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
     /// Queue for ordered transaction processing.
@@ -145,7 +140,6 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         options: EthSenderOptions,
         db: Database,
         ethereum: ETH,
-        rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
         let mut connection = db
@@ -177,7 +171,6 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             ethereum,
             ongoing_ops,
             db,
-            rx_for_eth,
             op_notify,
             tx_queue,
             gas_adjuster,
@@ -219,21 +212,32 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     /// Gets the incoming operations from the channel and adds them to the
     /// transactions queue.
     async fn process_requests(&mut self) {
-        while let Some(request) = self.rx_for_eth.next().await {
-            match request {
-                ETHSenderRequest::SendOperation(operation) => {
-                    log::info!(
-                        "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
-                        operation.id.expect("ID must be set"),
-                        operation.action.to_string(),
-                        operation.block.block_number
-                    );
-                    self.add_operation_to_queue(operation);
-                }
-                ETHSenderRequest::GetAverageUsedGasPrice(response_sender) => response_sender
-                    .send(self.gas_adjuster.get_average_gas_price())
-                    .unwrap_or_default(),
+        let mut connection = match self.db.acquire_connection().await {
+            Ok(connection) => connection,
+            Err(err) => {
+                log::warn!("Unable to connect to the database: {}", err);
+                return;
             }
+        };
+
+        let new_operations = self
+            .db
+            .load_new_operations(&mut connection)
+            .await
+            .unwrap_or_else(|err| {
+                log::warn!("Unable to load new operations from the database: {}", err);
+                Vec::new()
+            });
+        drop(connection);
+
+        for operation in new_operations {
+            log::info!(
+                "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
+                operation.id.expect("ID must be set"),
+                operation.action.to_string(),
+                operation.block.block_number
+            );
+            self.add_operation_to_queue(operation);
         }
     }
 
@@ -797,7 +801,6 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 pub fn start_eth_sender(
     pool: ConnectionPool,
     op_notify_sender: mpsc::Sender<Operation>,
-    send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
     config_options: ConfigurationOptions,
 ) -> JoinHandle<()> {
     let ethereum =
@@ -808,14 +811,7 @@ pub fn start_eth_sender(
     let eth_sender_options = EthSenderOptions::from_env();
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(
-            eth_sender_options,
-            db,
-            ethereum,
-            send_request_receiver,
-            op_notify_sender,
-        )
-        .await;
+        let eth_sender = ETHSender::new(eth_sender_options, db, ethereum, op_notify_sender).await;
 
         eth_sender.run().await
     })

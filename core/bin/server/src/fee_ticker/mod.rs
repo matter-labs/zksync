@@ -35,7 +35,6 @@ use zksync_utils::{ratio_to_big_decimal, round_precision, BigUintSerdeAsRadix10S
 use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
 use crate::fee_ticker::ticker_api::coinmarkercap::CoinMarketCapAPI;
 use crate::{
-    eth_sender::ETHSenderRequest,
     fee_ticker::{
         ticker_api::{FeeTickerAPI, TickerApi, CONNECTION_TIMEOUT},
         ticker_info::{FeeTickerInfo, TickerInfo},
@@ -170,7 +169,6 @@ pub fn run_ticker_task(
     token_price_source: TokenPriceSource,
     fast_processing_coeff: f64,
     db_pool: ConnectionPool,
-    eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     tricker_requests: Receiver<TickerRequest>,
 ) -> JoinHandle<()> {
@@ -215,7 +213,7 @@ pub fn run_ticker_task(
         TokenPriceSource::CoinMarketCap { base_url } => {
             let token_price_api = CoinMarketCapAPI::new(client, base_url);
 
-            let ticker_api = TickerApi::new(db_pool, eth_sender_request_sender, token_price_api);
+            let ticker_api = TickerApi::new(db_pool, token_price_api);
             let ticker_info = TickerInfo::new(state_keeper_request_sender);
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);
@@ -226,7 +224,7 @@ pub fn run_ticker_task(
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url).expect("failed to init CoinGecko client");
 
-            let ticker_api = TickerApi::new(db_pool, eth_sender_request_sender, token_price_api);
+            let ticker_api = TickerApi::new(db_pool, token_price_api);
             let ticker_info = TickerInfo::new(state_keeper_request_sender);
             let fee_ticker =
                 FeeTicker::new(ticker_api, ticker_info, tricker_requests, ticker_config);

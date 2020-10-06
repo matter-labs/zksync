@@ -118,7 +118,11 @@ impl<ETH: EthereumInterface> GasAdjuster<ETH> {
                 }
             };
             let result = db
-                .update_gas_price_limit(&mut connection, self.statistics.get_limit())
+                .update_gas_price_params(
+                    &mut connection,
+                    self.statistics.get_limit(),
+                    self.get_average_gas_price(),
+                )
                 .await;
 
             if let Err(err) = result {

@@ -1,12 +1,7 @@
-use crate::eth_sender::ETHSenderRequest;
 use crate::utils::token_db_cache::TokenDBCache;
 use anyhow::format_err;
 use async_trait::async_trait;
 use chrono::Utc;
-use futures::{
-    channel::{mpsc, oneshot},
-    SinkExt,
-};
 use num::rational::Ratio;
 use num::BigUint;
 use std::collections::HashMap;
@@ -79,7 +74,6 @@ impl TokenCacheEntry {
 #[derive(Debug)]
 pub(super) struct TickerApi<T: TokenPriceAPI> {
     db_pool: ConnectionPool,
-    eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
 
     token_db_cache: TokenDBCache,
     price_cache: Mutex<HashMap<TokenId, TokenCacheEntry>>,
@@ -89,15 +83,10 @@ pub(super) struct TickerApi<T: TokenPriceAPI> {
 }
 
 impl<T: TokenPriceAPI> TickerApi<T> {
-    pub fn new(
-        db_pool: ConnectionPool,
-        eth_sender_request_sender: mpsc::Sender<ETHSenderRequest>,
-        token_price_api: T,
-    ) -> Self {
+    pub fn new(db_pool: ConnectionPool, token_price_api: T) -> Self {
         let token_db_cache = TokenDBCache::new(db_pool.clone());
         Self {
             db_pool,
-            eth_sender_request_sender,
             token_db_cache,
             price_cache: Mutex::new(HashMap::new()),
             gas_price_cache: Mutex::new(None),
@@ -240,17 +229,22 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             }
         }
 
-        let eth_sender_req = oneshot::channel();
-        self.eth_sender_request_sender
-            .clone()
-            .send(ETHSenderRequest::GetAverageUsedGasPrice(eth_sender_req.0))
+        let mut storage = self
+            .db_pool
+            .access_storage_fragile()
             .await
-            .expect("Eth sender receiver dropped");
-        let eth_sender_resp = BigUint::from(eth_sender_req.1.await?.as_u128());
+            .map_err(|e| format_err!("Can't access storage: {}", e))?;
+        let average_gas_price = storage
+            .ethereum_schema()
+            .load_average_gas_price()
+            .await?
+            .unwrap_or_default()
+            .as_u64();
+        let average_gas_price = BigUint::from(average_gas_price);
 
-        *cached_value = Some((eth_sender_resp.clone(), Instant::now()));
+        *cached_value = Some((average_gas_price.clone(), Instant::now()));
 
-        Ok(eth_sender_resp)
+        Ok(average_gas_price)
     }
 
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {

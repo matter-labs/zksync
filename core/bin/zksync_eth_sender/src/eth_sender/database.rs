@@ -54,6 +54,17 @@ impl Database {
         Ok((unconfirmed_ops, unprocessed_ops))
     }
 
+    pub async fn load_new_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+    ) -> Result<Vec<Operation>, anyhow::Error> {
+        let unprocessed_ops = connection
+            .ethereum_schema()
+            .load_unprocessed_operations()
+            .await?;
+        Ok(unprocessed_ops)
+    }
+
     pub async fn save_new_eth_tx(
         &self,
         connection: &mut StorageProcessor<'_>,
@@ -130,14 +141,15 @@ impl Database {
         Ok(limit)
     }
 
-    pub async fn update_gas_price_limit(
+    pub async fn update_gas_price_params(
         &self,
         connection: &mut StorageProcessor<'_>,
-        value: U256,
+        gas_price_limit: U256,
+        average_gas_price: U256,
     ) -> Result<(), anyhow::Error> {
         connection
             .ethereum_schema()
-            .update_gas_price_limit(value)
+            .update_gas_price(gas_price_limit, average_gas_price)
             .await?;
         Ok(())
     }

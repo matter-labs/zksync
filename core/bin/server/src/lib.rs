@@ -3,7 +3,6 @@
 pub mod api_server;
 pub mod block_proposer;
 pub mod committer;
-pub mod eth_sender;
 pub mod eth_watch;
 pub mod fee_ticker;
 pub mod leader_election;

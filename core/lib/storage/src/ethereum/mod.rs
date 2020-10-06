@@ -317,21 +317,28 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Updates the stored gas price limit used by GasAdjuster.
+    /// Updates the stored gas price limit and average gas price used by GasAdjuster.
     ///
     /// This method expects the database to be initially prepared with inserting the actual
     /// gas limit value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    pub async fn update_gas_price_limit(&mut self, gas_price_limit: U256) -> QueryResult<()> {
+    pub async fn update_gas_price(
+        &mut self,
+        gas_price_limit: U256,
+        average_gas_price: U256,
+    ) -> QueryResult<()> {
         let gas_price_limit: i64 =
             i64::try_from(gas_price_limit).expect("Can't convert U256 to i64");
+        let average_gas_price: i64 =
+            i64::try_from(average_gas_price).expect("Can't convert U256 to i64");
 
         // Update the stored gas price limit.
         sqlx::query!(
             "UPDATE eth_parameters
-            SET gas_price_limit = $1
+            SET gas_price_limit = $1, average_gas_price = $2
             WHERE id = true",
-            gas_price_limit
+            gas_price_limit,
+            average_gas_price
         )
         .execute(self.0.conn())
         .await?;
@@ -346,6 +353,16 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             U256::try_from(params.gas_price_limit).expect("Negative gas limit value stored in DB");
 
         Ok(gas_price_limit)
+    }
+
+    pub async fn load_average_gas_price(&mut self) -> QueryResult<Option<U256>> {
+        let params = self.load_eth_params().await?;
+
+        let average_gas_price = params
+            .average_gas_price
+            .map(|price| U256::try_from(price).expect("Negative average gas price stored in DB"));
+
+        Ok(average_gas_price)
     }
 
     /// Loads the stored Ethereum operations stats.

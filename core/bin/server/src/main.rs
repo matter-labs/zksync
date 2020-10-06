@@ -26,7 +26,6 @@ use zksync_server::{
     api_server::start_api_server,
     block_proposer::run_block_proposer_task,
     committer::run_committer,
-    eth_sender,
     eth_watch::{start_eth_watch, EthWatchRequest},
     fee_ticker::run_ticker_task,
     leader_election,
@@ -230,19 +229,9 @@ fn main() {
         );
         let state_keeper_task = start_state_keeper(state_keeper, pending_block);
 
-        let (eth_send_request_sender, eth_send_request_receiver) = mpsc::channel(256);
         let (zksync_commit_notify_sender, zksync_commit_notify_receiver) = mpsc::channel(256);
-        let eth_sender_task = eth_sender::start_eth_sender(
-            connection_pool.clone(),
-            zksync_commit_notify_sender.clone(), // eth sender sends only verify blocks notifications
-            eth_send_request_receiver,
-            config_opts.clone(),
-            current_zksync_info.clone(),
-        );
-
         let committer_task = run_committer(
             proposed_blocks_receiver,
-            eth_send_request_sender.clone(),
             zksync_commit_notify_sender, // commiter sends only commit block notifications
             mempool_request_sender.clone(),
             executed_tx_notify_sender,
@@ -287,7 +276,6 @@ fn main() {
             config_opts.token_price_source.clone(),
             config_opts.ticker_fast_processing_coeff,
             connection_pool.clone(),
-            eth_send_request_sender,
             state_keeper_req_sender,
             ticker_request_receiver,
         );
@@ -297,7 +285,6 @@ fn main() {
         let task_futures = vec![
             eth_watch_task,
             state_keeper_task,
-            eth_sender_task,
             committer_task,
             mempool_task,
             proposer_task,

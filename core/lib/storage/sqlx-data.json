@@ -578,38 +578,6 @@
       "nullable": []
     }
   },
-  "225bc05ebadd79ce58ca3282a3dd977fffb0ed64bf1248017a0c31418b2eb2a3": {
-    "query": "SELECT * FROM eth_ops_binding\n                WHERE op_id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "op_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "eth_op_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "23610c64c6b48f1527f90d4ea0426a8c37ca436d0c811d890759cfb6330f70a9": {
     "query": "\n                        INSERT INTO account_balance_updates ( account_id, block_number, coin_id, old_balance, new_balance, old_nonce, new_nonce, update_order_id )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8 )\n                        ",
     "describe": {
@@ -2610,6 +2578,11 @@
           "ordinal": 5,
           "name": "withdraw_ops",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "average_gas_price",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -2621,7 +2594,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -2996,48 +2970,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "d875fdc50d7d8d7953bcc56209eec32d9788d75843f30da6bbc95e3970d569e1": {
-    "query": "SELECT * FROM operations\n            WHERE confirmed = false\n            ORDER BY id ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "d8d94a30a654bf70f4465b9c33cf06cd14833ba35644db0f8d15182b64b04550": {
@@ -3575,6 +3507,48 @@
       },
       "nullable": [
         false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "f5be7cf851842a40bdb41b2ef914dd9120f868be7cdf995953eb5c365d2fea7f": {
+    "query": "SELECT * FROM operations\n            WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)\n            ORDER BY id ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
         false,
         false,
         false,
