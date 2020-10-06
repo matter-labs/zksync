@@ -1,0 +1,31 @@
+{
+  "name": "ts-tests",
+  "version": "1.0.0",
+  "license": "MIT",
+  "prettier": {
+    "tabWidth": 4,
+    "printWidth": 120,
+    "parser": "typescript",
+    "singleQuote": true,
+    "trailingComma": "none"
+  },
+  "scripts": {
+    "test": "f mocha --no-timeout -r ts-node/register test/*.test.ts",
+    "fmt": "prettier --write {src,test}/*.ts"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.13",
+    "@types/chai-as-promised": "^7.1.3",
+    "@types/mocha": "^8.0.3",
+    "@types/node": "^14.11.5",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "ethers": "^5.0.15",
+    "mocha": "^8.1.3",
+    "prettier": "^2.1.2",
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.3",
+    "zcli": "link:../../../infrastructure/zcli",
+    "zksync": "link:../../../sdk/zksync.js"
+  }
+}
