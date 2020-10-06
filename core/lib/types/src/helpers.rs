@@ -24,7 +24,8 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
 }
 
 /// Transforms the token amount into packed form.
-/// If the provided token amount is not packable, it will be rounded, as some precision will be lost.
+/// If the provided token amount is not packable, it is rounded down to the
+/// closest amount that fits in packed form. As a result, some precision will be lost.
 pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {
     pack_as_float(
         amount,
@@ -37,7 +38,8 @@ pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {
 /// As the packed form for fee is smaller than one for the token,
 /// the same value must be packable as a token amount, but not packable
 /// as a fee amount.
-/// If the provided fee amount is not packable, it will be rounded, as some precision will be lost.
+/// If the provided fee amount is not packable, it is rounded down to the
+/// closest amount that fits in packed form. As a result, some precision will be lost.
 pub fn pack_fee_amount(amount: &BigUint) -> Vec<u8> {
     pack_as_float(
         amount,
