@@ -15,27 +15,45 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{TxSignature, VerifiedSignatureCache};
 
+/// `ForcedExit` transaction is used to withdraw funds from an unowned
+/// account to its corresponding L1 address.
+///
+/// Caller of this function will pay fee for the operation, and has no
+/// control over the address on which funds will be withdrawn. Account
+/// to which `ForcedExit` is applied must have no public key hash set.
+///
+/// This operation is expected to be used in cases when account in L1
+/// cannot prove its identity in L2 (e.g. it's an existing smart contract),
+/// so the funds won't get "locked" in L2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ForcedExit {
-    /// Account ID of the transaction initiator.
+    /// zkSync network account ID of the transaction initiator.
     pub initiator_account_id: AccountId,
     /// Address of the account to withdraw funds from.
+    /// Also this field represents the address in L1 to which funds will be withdrawn.
     pub target: Address,
+    /// Type of token for withdrawal. Also represents the token in which fee will be paid.
     pub token: TokenId,
+    /// Fee for the transaction.
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
+    /// Current initiator account nonce.
     pub nonce: Nonce,
+    /// Transaction zkSync signature.
     pub signature: TxSignature,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
 }
 
 impl ForcedExit {
-    const TX_TYPE: u8 = 8;
+    /// Unique identifier of the transaction type in zkSync network.
+    pub const TX_TYPE: u8 = 8;
 
-    /// Creates transaction from parts
-    /// signature is optional, because sometimes we don't know it (i.e. data_restore)
+    /// Creates transaction from all the required fields.
+    ///
+    /// While `signature` field is mandatory for new transactions, it may be `None`
+    /// in some cases (e.g. when restoring the network state from the L1 contract data).
     pub fn new(
         initiator_account_id: AccountId,
         target: Address,
@@ -59,7 +77,8 @@ impl ForcedExit {
         tx
     }
 
-    /// Creates signed transaction using private key, checks for correcteness
+    /// Creates a signed transaction using private key and
+    /// checks for the transaction correcteness.
     pub fn new_signed(
         initiator_account_id: AccountId,
         target: Address,
@@ -76,6 +95,7 @@ impl ForcedExit {
         Ok(tx)
     }
 
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -87,6 +107,12 @@ impl ForcedExit {
         out
     }
 
+    /// Verifies the transaction correctness:
+    ///
+    /// - `initiator_account_id` field must be within supported range.
+    /// - `token` field must be within supported range.
+    /// - `fee` field must represent a packable value.
+    /// - zkSync signature must correspond to the PubKeyHash of the account.
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = is_fee_amount_packable(&self.fee)
             && self.initiator_account_id <= max_account_id()
@@ -100,6 +126,7 @@ impl ForcedExit {
         valid
     }
 
+    /// Restores the `PubKeyHash` from the transaction signature.
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             cached_signer.clone()

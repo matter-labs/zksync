@@ -18,30 +18,41 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{TxSignature, VerifiedSignatureCache};
 
-/// Signed by user.
+/// `Transfer` transaction performs a move of funds from one zkSync account to another.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transfer {
+    /// zkSync network account ID of the transaction initiator.
     pub account_id: AccountId,
+    /// Address of account to transfer funds from.
     pub from: Address,
+    /// Address of account to transfer funds to.
     pub to: Address,
+    /// Type of token for transfer. Also represents the token in which fee will be paid.
     pub token: TokenId,
+    /// Amount of funds to transfer.
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub amount: BigUint,
+    /// Fee for the transaction.
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
+    /// Current account nonce.
     pub nonce: Nonce,
+    /// Transaction zkSync signature.
     pub signature: TxSignature,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
 }
 
 impl Transfer {
+    /// Unique identifier of the transaction type in zkSync network.
     pub const TX_TYPE: u8 = 5;
 
+    /// Creates transaction from all the required fields.
+    ///
+    /// While `signature` field is mandatory for new transactions, it may be `None`
+    /// in some cases (e.g. when restoring the network state from the L1 contract data).
     #[allow(clippy::too_many_arguments)]
-    /// Creates transaction from parts
-    /// signature is optional, because sometimes we don't know it (i.e. data_restore)
     pub fn new(
         account_id: AccountId,
         from: Address,
@@ -69,8 +80,9 @@ impl Transfer {
         tx
     }
 
+    /// Creates a signed transaction using private key and
+    /// checks for the transaction correcteness.
     #[allow(clippy::too_many_arguments)]
-    /// Creates signed transaction using private key, checks for correcteness
     pub fn new_signed(
         account_id: AccountId,
         from: Address,
@@ -89,6 +101,7 @@ impl Transfer {
         Ok(tx)
     }
 
+    /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -102,6 +115,14 @@ impl Transfer {
         out
     }
 
+    /// Verifies the transaction correctness:
+    ///
+    /// - `account_id` field must be within supported range.
+    /// - `token` field must be within supported range.
+    /// - `amount` field must represent a packable value.
+    /// - `fee` field must represent a packable value.
+    /// - transfer recipient must not be `Adddress::zero()`.
+    /// - zkSync signature must correspond to the PubKeyHash of the account.
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.amount <= BigUint::from(u128::max_value())
             && self.fee <= BigUint::from(u128::max_value())
@@ -118,6 +139,7 @@ impl Transfer {
         valid
     }
 
+    /// Restores the `PubKeyHash` from the transaction signature.
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             cached_signer.clone()
@@ -128,7 +150,7 @@ impl Transfer {
         }
     }
 
-    /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
+    /// Gets message that should be signed by Ethereum keys of the account for 2-Factor authentication.
     pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
         format!(
             "Transfer {amount} {token}\n\
