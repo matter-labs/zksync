@@ -5538,6 +5538,7 @@ dependencies = [
 name = "zksync_eth_signer"
 version = "1.0.0"
 dependencies = [
+ "hex",
  "jsonrpc-core",
  "parity-crypto",
  "reqwest",

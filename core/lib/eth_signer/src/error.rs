@@ -19,6 +19,10 @@ pub enum SignerError {
     MissingEthSigner,
     #[error("Signing failed: {0}")]
     SigningFailed(String),
+    #[error("Unlocking failed: {0}")]
+    UnlockingFailed(String),
+    #[error("Decode raw transaction failed: {0}")]
+    DecodeRawTxFailed(String),
     #[error("Signing key is not set in account")]
     NoSigningKey,
     #[error("Address determination error")]

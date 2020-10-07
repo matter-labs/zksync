@@ -6,6 +6,8 @@ use jsonrpc_core::types::response::Output;
 use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::Address;
 
+use serde_json::Value;
+
 #[derive(Clone)]
 pub enum AddressOrIndex {
     Address(Address),
@@ -31,18 +33,13 @@ impl JsonRpcSigner {
         rpc_addr: impl Into<String>,
         address_or_index: Option<AddressOrIndex>,
         signer_type: Option<SignerType>,
+        password_to_unlock: Option<String>,
     ) -> Result<Self, SignerError> {
         let mut signer = Self {
             rpc_addr: rpc_addr.into(),
             client: reqwest::Client::new(),
             address: None,
             signer_type,
-        };
-
-        // If it is not known whether it is necessary
-        // to add a prefix to messages, then we define this.
-        if signer.signer_type.is_none() {
-            signer.detect_signer_type().await?;
         };
 
         // If the user has not specified either the index or the address,
@@ -57,12 +54,17 @@ impl JsonRpcSigner {
         // of receiving from the server or by the address itself.
         signer.detect_address(address_or_index).await?;
 
-        Ok(signer)
-    }
+        if let Some(password) = password_to_unlock {
+            signer.unlock(&password).await?;
+        }
 
-    /// Get Ethereum address.
-    pub fn address(&self) -> Result<Address, SignerError> {
-        self.address.ok_or(SignerError::DefineAddress)
+        // If it is not known whether it is necessary
+        // to add a prefix to messages, then we define this.
+        if signer.signer_type.is_none() {
+            signer.detect_signer_type().await?;
+        };
+
+        Ok(signer)
     }
 
     /// Specifies the Ethreum address which sets the address for which all other requests will be processed.
@@ -150,6 +152,31 @@ impl JsonRpcSigner {
         }
     }
 
+    /// Get Ethereum address.
+    pub fn address(&self) -> Result<Address, SignerError> {
+        self.address.ok_or(SignerError::DefineAddress)
+    }
+
+    /// Unlocks the current account, after that the server can sign messages and transactions.
+    pub async fn unlock(&self, password: &str) -> Result<(), SignerError> {
+        let message = JsonRpcRequest::unlock_account(self.address()?, password);
+        let ret = self
+            .post(&message)
+            .await
+            .map_err(|err| SignerError::UnlockingFailed(err.to_string()))?;
+
+        let res: bool = serde_json::from_value(ret)
+            .map_err(|err| SignerError::UnlockingFailed(err.to_string()))?;
+
+        if res {
+            Ok(())
+        } else {
+            Err(SignerError::UnlockingFailed(
+                "Server response: false".to_string(),
+            ))
+        }
+    }
+
     /// The sign method calculates an Ethereum specific signature with:
     /// checks if the server adds a prefix if not then adds
     /// return sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
@@ -201,10 +228,21 @@ impl JsonRpcSigner {
             .post(&msg)
             .await
             .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
-        let signature = serde_json::from_value(ret)
+
+        // get Json object and parse it to get raw Transaction
+        let json: Value = serde_json::from_value(ret)
             .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
 
-        Ok(signature)
+        let raw_tx: Option<&str> = json
+            .get("raw")
+            .and_then(|value| value.as_str())
+            .map(|value| &value["0x".len()..]);
+
+        if let Some(raw_tx) = raw_tx {
+            hex::decode(raw_tx).map_err(|err| SignerError::DecodeRawTxFailed(err.to_string()))
+        } else {
+            Err(SignerError::DefineAddress)
+        }
     }
 
     /// Performs a POST query to the JSON RPC endpoint,
@@ -257,6 +295,7 @@ impl JsonRpcSigner {
 
 mod messages {
     use crate::RawTransaction;
+    use hex::encode;
     use zksync_types::Address;
 
     #[derive(Debug, Serialize)]
@@ -283,16 +322,28 @@ mod messages {
             Self::create("eth_accounts", params)
         }
 
+        // Unlocks the address, after that the server can sign messages and transactions.
+        pub fn unlock_account(address: Address, password: &str) -> Self {
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(address).expect("serialization fail"));
+            params.push(serde_json::to_value(password).expect("serialization fail"));
+            Self::create("personal_unlockAccount", params)
+        }
+
         /// The sign method calculates an Ethereum specific signature with:
         /// sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
+        /// The address to sign with must be unlocked.
         pub fn sign_message(address: Address, message: &[u8]) -> Self {
             let mut params = Vec::new();
             params.push(serde_json::to_value(address).expect("serialization fail"));
-            params.push(serde_json::to_value(message).expect("serialization fail"));
+            params.push(
+                serde_json::to_value(format!("0x{}", encode(message))).expect("serialization fail"),
+            );
             Self::create("eth_sign", params)
         }
 
         /// Signs a transaction that can be submitted to the network.
+        /// The address to sign with must be unlocked.
         pub fn sign_transaction(from: Address, tx_data: RawTransaction) -> Self {
             let mut params = Vec::new();
 
@@ -304,7 +355,7 @@ mod messages {
                     "gas": serde_json::to_value(tx_data.gas).expect("serialization fail"),
                     "gasPrice": serde_json::to_value(tx_data.gas_price).expect("serialization fail"),
                     "value": serde_json::to_value(tx_data.value).expect("serialization fail"),
-                    "data": serde_json::to_value(tx_data.data).expect("serialization fail"),
+                    "data": serde_json::to_value(format!("0x{}", encode(tx_data.data))).expect("serialization fail"),
                     "nonce": serde_json::to_value(tx_data.nonce).expect("serialization fail"),
                 })
             } else {
@@ -313,7 +364,7 @@ mod messages {
                     "gas": serde_json::to_value(tx_data.gas).expect("serialization fail"),
                     "gasPrice": serde_json::to_value(tx_data.gas_price).expect("serialization fail"),
                     "value": serde_json::to_value(tx_data.value).expect("serialization fail"),
-                    "data": serde_json::to_value(tx_data.data).expect("serialization fail"),
+                    "data": serde_json::to_value(format!("0x{}", encode(tx_data.data))).expect("serialization fail"),
                     "nonce": serde_json::to_value(tx_data.nonce).expect("serialization fail"),
                 })
             };
