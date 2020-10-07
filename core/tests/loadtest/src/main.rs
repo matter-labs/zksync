@@ -55,7 +55,7 @@ fn main() -> Result<(), anyhow::Error> {
     let scenario = ng::scenarios::SimpleScenario {
         transfer_size: 1,
         wallets: 100,
-        transfer_rounds: 10,
+        transfer_rounds: 100,
     };
     tokio_runtime.block_on(scenario.run(monitor, main_account, env_config.clone()))?;
 

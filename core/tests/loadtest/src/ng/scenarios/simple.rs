@@ -1,20 +1,15 @@
-use futures::prelude::*;
+// Built-in uses
+// External uses
+use models::helpers::closest_packable_token_amount;
 use num::BigUint;
 use structopt::StructOpt;
-
-use models::{
-    helpers::{closest_packable_fee_amount, closest_packable_token_amount},
-    tx::PackedEthSignature,
-    FranklinTx,
-};
-use zksync::types::BlockStatus;
+// Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
-
+use zksync::types::BlockStatus;
+// Local uses
 use crate::{
-    monitor::Monitor,
-    scenarios::{configs::AccountInfo, utils::DynamicChunks},
-    test_accounts::TestWallet,
+    monitor::Monitor, ng::utils::{try_wait_all, wait_all}, scenarios::configs::AccountInfo, test_accounts::TestWallet,
 };
 
 #[derive(Debug, StructOpt)]
@@ -241,31 +236,4 @@ impl SimpleScenario {
 
         Ok(())
     }
-}
-
-async fn wait_all<I>(i: I) -> Vec<<I::Item as Future>::Output>
-where
-    I: IntoIterator,
-    I::Item: Future,
-{
-    let mut output = Vec::new();
-    for chunk in DynamicChunks::new(i, &[64]) {
-        let values = futures::future::join_all(chunk).await;
-        output.extend(values);
-    }
-    output
-}
-
-async fn try_wait_all<I>(
-    i: I,
-) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
-where
-    I: IntoIterator,
-    I::Item: TryFuture,
-{
-    let mut output = Vec::new();
-    for chunk in DynamicChunks::new(i, &[64]) {
-        output.extend(futures::future::try_join_all(chunk).await?);
-    }
-    Ok(output)
 }
