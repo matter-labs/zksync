@@ -195,7 +195,7 @@ impl CloseAccountWitness<Bn256> {
 //    use zksync_types::merkle_tree::PedersenHasher;
 //    use zksync_types::primitives::bytes_into_be_bits;
 //
-//    use crate::circuit::FranklinCircuit;
+//    use crate::circuit::ZkSyncCircuit;
 //    use bellman::Circuit;
 //    use zksync_crypto::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 //    use zksync_crypto::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
@@ -299,7 +299,7 @@ impl CloseAccountWitness<Bn256> {
 //        {
 //            let mut cs = TestConstraintSystem::<Bn256>::new();
 //
-//            let instance = FranklinCircuit {
+//            let instance = ZkSyncCircuit {
 //                params,
 //                old_root: close_account_witness.before_root,
 //                operations,

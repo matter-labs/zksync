@@ -6,7 +6,7 @@ use zksync_crypto::convert::FeConvert;
 use zksync_types::{block::PendingBlock, Action, ActionType, Operation};
 use zksync_types::{
     block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, FranklinOp,
+    AccountId, BlockNumber, ZkSyncOp,
 };
 // Local imports
 use self::records::{
@@ -156,12 +156,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         )))
     }
 
-    /// Same as `get_block_executed_ops`, but returns a vector of `FranklinOp` instead
+    /// Same as `get_block_executed_ops`, but returns a vector of `ZkSyncOp` instead
     /// of `ExecutedOperations`.
-    pub async fn get_block_operations(
-        &mut self,
-        block: BlockNumber,
-    ) -> QueryResult<Vec<FranklinOp>> {
+    pub async fn get_block_operations(&mut self, block: BlockNumber) -> QueryResult<Vec<ZkSyncOp>> {
         let executed_ops = self.get_block_executed_ops(block).await?;
         Ok(executed_ops
             .into_iter()

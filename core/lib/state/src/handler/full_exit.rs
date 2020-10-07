@@ -1,14 +1,14 @@
 use num::BigUint;
 use zksync_crypto::params;
-use zksync_types::{AccountUpdate, AccountUpdates, FranklinOp, FullExit, FullExitOp};
+use zksync_types::{AccountUpdate, AccountUpdates, FullExit, FullExitOp, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, ZksyncState},
+    state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
-impl TxHandler<FullExit> for ZksyncState {
+impl TxHandler<FullExit> for ZkSyncState {
     type Op = FullExitOp;
 
     fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, anyhow::Error> {
@@ -40,7 +40,7 @@ impl TxHandler<FullExit> for ZksyncState {
         let result = OpSuccess {
             fee,
             updates,
-            executed_op: FranklinOp::FullExit(Box::new(op)),
+            executed_op: ZkSyncOp::FullExit(Box::new(op)),
         };
 
         Ok(result)

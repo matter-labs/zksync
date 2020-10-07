@@ -18,15 +18,15 @@ pub struct EthSignData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SignedFranklinTx {
-    pub tx: FranklinTx,
+pub struct SignedZkSyncTx {
+    pub tx: ZkSyncTx,
     pub eth_sign_data: Option<EthSignData>,
 }
 
 /// A set of L2 transaction supported by the zkSync network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum FranklinTx {
+pub enum ZkSyncTx {
     Transfer(Box<Transfer>),
     Withdraw(Box<Withdraw>),
     #[doc(hidden)]
@@ -35,38 +35,38 @@ pub enum FranklinTx {
     ForcedExit(Box<ForcedExit>),
 }
 
-impl From<Transfer> for FranklinTx {
+impl From<Transfer> for ZkSyncTx {
     fn from(transfer: Transfer) -> Self {
         Self::Transfer(Box::new(transfer))
     }
 }
 
-impl From<Withdraw> for FranklinTx {
+impl From<Withdraw> for ZkSyncTx {
     fn from(withdraw: Withdraw) -> Self {
         Self::Withdraw(Box::new(withdraw))
     }
 }
 
-impl From<Close> for FranklinTx {
+impl From<Close> for ZkSyncTx {
     fn from(close: Close) -> Self {
         Self::Close(Box::new(close))
     }
 }
 
-impl From<ChangePubKey> for FranklinTx {
+impl From<ChangePubKey> for ZkSyncTx {
     fn from(change_pub_key: ChangePubKey) -> Self {
         Self::ChangePubKey(Box::new(change_pub_key))
     }
 }
 
-impl From<ForcedExit> for FranklinTx {
+impl From<ForcedExit> for ZkSyncTx {
     fn from(tx: ForcedExit) -> Self {
         Self::ForcedExit(Box::new(tx))
     }
 }
 
-impl From<FranklinTx> for SignedFranklinTx {
-    fn from(tx: FranklinTx) -> Self {
+impl From<ZkSyncTx> for SignedZkSyncTx {
+    fn from(tx: ZkSyncTx) -> Self {
         Self {
             tx,
             eth_sign_data: None,
@@ -74,23 +74,23 @@ impl From<FranklinTx> for SignedFranklinTx {
     }
 }
 
-impl std::ops::Deref for SignedFranklinTx {
-    type Target = FranklinTx;
+impl std::ops::Deref for SignedZkSyncTx {
+    type Target = ZkSyncTx;
 
     fn deref(&self) -> &Self::Target {
         &self.tx
     }
 }
 
-impl FranklinTx {
+impl ZkSyncTx {
     /// Returns the hash of the transaction.
     pub fn hash(&self) -> TxHash {
         let bytes = match self {
-            FranklinTx::Transfer(tx) => tx.get_bytes(),
-            FranklinTx::Withdraw(tx) => tx.get_bytes(),
-            FranklinTx::Close(tx) => tx.get_bytes(),
-            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
-            FranklinTx::ForcedExit(tx) => tx.get_bytes(),
+            ZkSyncTx::Transfer(tx) => tx.get_bytes(),
+            ZkSyncTx::Withdraw(tx) => tx.get_bytes(),
+            ZkSyncTx::Close(tx) => tx.get_bytes(),
+            ZkSyncTx::ChangePubKey(tx) => tx.get_bytes(),
+            ZkSyncTx::ForcedExit(tx) => tx.get_bytes(),
         };
 
         let hash = sha256(&bytes);
@@ -102,22 +102,22 @@ impl FranklinTx {
     /// Returns the account affected by the transaction.
     pub fn account(&self) -> Address {
         match self {
-            FranklinTx::Transfer(tx) => tx.from,
-            FranklinTx::Withdraw(tx) => tx.from,
-            FranklinTx::Close(tx) => tx.account,
-            FranklinTx::ChangePubKey(tx) => tx.account,
-            FranklinTx::ForcedExit(tx) => tx.target,
+            ZkSyncTx::Transfer(tx) => tx.from,
+            ZkSyncTx::Withdraw(tx) => tx.from,
+            ZkSyncTx::Close(tx) => tx.account,
+            ZkSyncTx::ChangePubKey(tx) => tx.account,
+            ZkSyncTx::ForcedExit(tx) => tx.target,
         }
     }
 
     /// Returns the account nonce associated with transaction.
     pub fn nonce(&self) -> Nonce {
         match self {
-            FranklinTx::Transfer(tx) => tx.nonce,
-            FranklinTx::Withdraw(tx) => tx.nonce,
-            FranklinTx::Close(tx) => tx.nonce,
-            FranklinTx::ChangePubKey(tx) => tx.nonce,
-            FranklinTx::ForcedExit(tx) => tx.nonce,
+            ZkSyncTx::Transfer(tx) => tx.nonce,
+            ZkSyncTx::Withdraw(tx) => tx.nonce,
+            ZkSyncTx::Close(tx) => tx.nonce,
+            ZkSyncTx::ChangePubKey(tx) => tx.nonce,
+            ZkSyncTx::ForcedExit(tx) => tx.nonce,
         }
     }
 
@@ -127,22 +127,22 @@ impl FranklinTx {
     /// can fail even if this method returned `true` (i.e., if account didn't have enough balance).
     pub fn check_correctness(&mut self) -> bool {
         match self {
-            FranklinTx::Transfer(tx) => tx.check_correctness(),
-            FranklinTx::Withdraw(tx) => tx.check_correctness(),
-            FranklinTx::Close(tx) => tx.check_correctness(),
-            FranklinTx::ChangePubKey(tx) => tx.check_correctness(),
-            FranklinTx::ForcedExit(tx) => tx.check_correctness(),
+            ZkSyncTx::Transfer(tx) => tx.check_correctness(),
+            ZkSyncTx::Withdraw(tx) => tx.check_correctness(),
+            ZkSyncTx::Close(tx) => tx.check_correctness(),
+            ZkSyncTx::ChangePubKey(tx) => tx.check_correctness(),
+            ZkSyncTx::ForcedExit(tx) => tx.check_correctness(),
         }
     }
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
         match self {
-            FranklinTx::Transfer(tx) => tx.get_bytes(),
-            FranklinTx::Withdraw(tx) => tx.get_bytes(),
-            FranklinTx::Close(tx) => tx.get_bytes(),
-            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
-            FranklinTx::ForcedExit(tx) => tx.get_bytes(),
+            ZkSyncTx::Transfer(tx) => tx.get_bytes(),
+            ZkSyncTx::Withdraw(tx) => tx.get_bytes(),
+            ZkSyncTx::Close(tx) => tx.get_bytes(),
+            ZkSyncTx::ChangePubKey(tx) => tx.get_bytes(),
+            ZkSyncTx::ForcedExit(tx) => tx.get_bytes(),
         }
     }
 
@@ -151,23 +151,23 @@ impl FranklinTx {
     /// and this value determines the block capacity.
     pub fn min_chunks(&self) -> usize {
         match self {
-            FranklinTx::Transfer(_) => TransferOp::CHUNKS,
-            FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
-            FranklinTx::Close(_) => CloseOp::CHUNKS,
-            FranklinTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
-            FranklinTx::ForcedExit(_) => ForcedExitOp::CHUNKS,
+            ZkSyncTx::Transfer(_) => TransferOp::CHUNKS,
+            ZkSyncTx::Withdraw(_) => WithdrawOp::CHUNKS,
+            ZkSyncTx::Close(_) => CloseOp::CHUNKS,
+            ZkSyncTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
+            ZkSyncTx::ForcedExit(_) => ForcedExitOp::CHUNKS,
         }
     }
 
-    /// Returns `true` if transaction is `FranklinTx::Withdraw`.
+    /// Returns `true` if transaction is `ZkSyncTx::Withdraw`.
     pub fn is_withdraw(&self) -> bool {
-        matches!(self, FranklinTx::Withdraw(_))
+        matches!(self, ZkSyncTx::Withdraw(_))
     }
 
-    /// Returns `true` if transaction is `FranklinTx::Withdraw`.
+    /// Returns `true` if transaction is `ZkSyncTx::Withdraw`.
     #[doc(hidden)]
     pub fn is_close(&self) -> bool {
-        matches!(self, FranklinTx::Close(_))
+        matches!(self, ZkSyncTx::Close(_))
     }
 
     /// Returns the data required to calculate fee for the transaction.
@@ -182,7 +182,7 @@ impl FranklinTx {
     /// Returns `None` if transaction doesn't require fee.
     pub fn get_fee_info(&self) -> Option<(TxFeeTypes, TokenLike, Address, BigUint)> {
         match self {
-            FranklinTx::Withdraw(withdraw) => {
+            ZkSyncTx::Withdraw(withdraw) => {
                 let fee_type = if withdraw.fast {
                     TxFeeTypes::FastWithdraw
                 } else {
@@ -196,13 +196,13 @@ impl FranklinTx {
                     withdraw.fee.clone(),
                 ))
             }
-            FranklinTx::ForcedExit(forced_exit) => Some((
+            ZkSyncTx::ForcedExit(forced_exit) => Some((
                 TxFeeTypes::Withdraw,
                 TokenLike::Id(forced_exit.token),
                 forced_exit.target,
                 forced_exit.fee.clone(),
             )),
-            FranklinTx::Transfer(transfer) => Some((
+            ZkSyncTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
                 transfer.to,

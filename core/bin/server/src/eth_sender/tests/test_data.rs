@@ -6,8 +6,8 @@ use chrono::DateTime;
 use lazy_static::lazy_static;
 // Workspace uses
 use zksync_types::{
-    block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FranklinOp,
-    FranklinPriorityOp, FullExit, FullExitOp, PriorityOp,
+    block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FullExit, FullExitOp,
+    PriorityOp, ZkSyncOp, ZkSyncPriorityOp,
 };
 use zksync_types::{Action, Operation};
 
@@ -23,12 +23,12 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
         ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
             priority_op: PriorityOp {
                 serial_id: 0,
-                data: FranklinPriorityOp::FullExit(priority_op.clone()),
+                data: ZkSyncPriorityOp::FullExit(priority_op.clone()),
                 deadline_block: 0,
                 eth_hash: Vec::new(),
                 eth_block: 0,
             },
-            op: FranklinOp::FullExit(Box::new(FullExitOp {
+            op: ZkSyncOp::FullExit(Box::new(FullExitOp {
                 priority_op,
                 withdraw_amount: None,
             })),

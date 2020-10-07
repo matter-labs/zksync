@@ -10,19 +10,19 @@
 //! and `SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS` that are read from env in config files.
 //! Before generating parameters universal setup keys should be downloaded using `zksync plonk-setup` command.
 
-mod franklin_key;
 mod verifier_contract_generator;
+mod zksync_key;
 
 use clap::{App, SubCommand};
 
-use crate::franklin_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
 use crate::verifier_contract_generator::create_verifier_contract;
+use crate::zksync_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
 use zksync_config::AvailableBlockSizesConfig;
 
 fn main() {
     env_logger::init();
 
-    let cli = App::new("Zksync keys generator")
+    let cli = App::new("ZkSync keys generator")
         .author("Matter Labs")
         .subcommand(
             SubCommand::with_name("keys").about("Generate zkSync main circuit(for various block sizes), and exodus circuit verification keys"),

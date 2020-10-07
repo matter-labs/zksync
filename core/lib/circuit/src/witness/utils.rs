@@ -34,7 +34,7 @@ use zksync_types::{
 // Local deps
 use crate::{
     account::AccountWitness,
-    circuit::FranklinCircuit,
+    circuit::ZkSyncCircuit,
     operation::{Operation, SignatureData},
     utils::sign_rescue,
 };
@@ -160,8 +160,8 @@ impl<'a> WitnessBuilder<'a> {
     }
 
     /// Finaly, creates circuit instance for given operations.
-    pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
-        FranklinCircuit {
+    pub fn into_circuit_instance(self) -> ZkSyncCircuit<'static, Engine> {
+        ZkSyncCircuit {
             rescue_params: &zksync_crypto::params::RESCUE_PARAMS,
             jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS,
             old_root: Some(self.initial_root_hash),

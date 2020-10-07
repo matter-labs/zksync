@@ -52,7 +52,7 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Provides Ethereum Governance contract unterface
     pub governance_contract: (ethabi::Contract, Contract<T>),
     /// Provides Ethereum Rollup contract unterface
-    pub franklin_contract: (ethabi::Contract, Contract<T>),
+    pub zksync_contract: (ethabi::Contract, Contract<T>),
     /// Rollup contract events state
     pub events_state: EventsState,
     /// Rollup accounts state
@@ -80,7 +80,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `connection_pool` - Database connection pool
     /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
-    /// * `franklin_contract_eth_addr` - Rollup contract address
+    /// * `zksync_contract_eth_addr` - Rollup contract address
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
@@ -89,7 +89,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         connection_pool: ConnectionPool,
         web3_transport: T,
         governance_contract_eth_addr: H160,
-        franklin_contract_eth_addr: H160,
+        zksync_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         available_block_chunk_sizes: Vec<usize>,
@@ -106,11 +106,11 @@ impl<T: Transport> DataRestoreDriver<T> {
             )
         };
 
-        let franklin_contract = {
+        let zksync_contract = {
             let abi = zksync_contract();
             (
                 abi.clone(),
-                Contract::new(web3.eth(), franklin_contract_eth_addr, abi),
+                Contract::new(web3.eth(), zksync_contract_eth_addr, abi),
             )
         };
 
@@ -122,7 +122,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             connection_pool,
             web3,
             governance_contract,
-            franklin_contract,
+            zksync_contract,
             events_state,
             tree_state,
             eth_blocks_step,
@@ -140,12 +140,11 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// # Arguments
     ///
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
-    /// * `franklin_contract_genesis_tx_hash` - Rollup contract creation tx hash
     ///
     pub async fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
         let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
             .await
-            .expect("Cant get franklin genesis transaction");
+            .expect("Cant get zkSync genesis transaction");
 
         // Setting genesis block number for events state
         let genesis_eth_block_number = self
@@ -230,7 +229,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             }
             StorageUpdateState::None => {}
         }
-        let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract).await;
+        let total_verified_blocks = get_total_verified_blocks(&self.zksync_contract).await;
         let last_verified_block = self.tree_state.state.block_number;
         log::info!(
             "State has been loaded\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
@@ -257,7 +256,7 @@ impl<T: Transport> DataRestoreDriver<T> {
                     self.update_tree_state(new_ops_blocks).await;
 
                     let total_verified_blocks =
-                        get_total_verified_blocks(&self.franklin_contract).await;
+                        get_total_verified_blocks(&self.zksync_contract).await;
                     let last_verified_block = self.tree_state.state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
@@ -314,7 +313,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             .events_state
             .update_events_state(
                 &self.web3,
-                &self.franklin_contract,
+                &self.zksync_contract,
                 &self.governance_contract,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,

@@ -8,7 +8,7 @@ use jsonrpc_core::types::response::Output;
 
 // Workspace uses
 use zksync_types::{
-    tx::{FranklinTx, PackedEthSignature, TxHash},
+    tx::{PackedEthSignature, TxHash, ZkSyncTx},
     Address, TokenLike, TxFeeTypes,
 };
 
@@ -76,7 +76,7 @@ impl Provider {
     /// Returns the hash of the created transaction.
     pub async fn send_tx(
         &self,
-        tx: FranklinTx,
+        tx: ZkSyncTx,
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<TxHash, ClientError> {
         let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
@@ -91,7 +91,7 @@ impl Provider {
     /// Returns the hashes of the created transactions.
     pub async fn send_txs_batch(
         &self,
-        txs_signed: Vec<(FranklinTx, Option<PackedEthSignature>)>,
+        txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
     ) -> Result<Vec<TxHash>, ClientError> {
         let msg = JsonRpcRequest::submit_tx_batch(txs_signed);
 
@@ -212,7 +212,7 @@ impl Provider {
 mod messages {
     use serde_derive::Serialize;
     use zksync_types::{
-        tx::{FranklinTx, PackedEthSignature, TxEthSignature, TxHash},
+        tx::{PackedEthSignature, TxEthSignature, TxHash, ZkSyncTx},
         Address, TokenLike, TxFeeTypes,
     };
 
@@ -240,7 +240,7 @@ mod messages {
             Self::create("account_info", params)
         }
 
-        pub fn submit_tx(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
+        pub fn submit_tx(tx: ZkSyncTx, eth_signature: Option<PackedEthSignature>) -> Self {
             let mut params = Vec::with_capacity(2);
             params.push(serde_json::to_value(tx).expect("serialization fail"));
             params.push(
@@ -250,7 +250,7 @@ mod messages {
             Self::create("tx_submit", params)
         }
 
-        pub fn submit_tx_batch(txs_signed: Vec<(FranklinTx, Option<PackedEthSignature>)>) -> Self {
+        pub fn submit_tx_batch(txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>) -> Self {
             let mut params = Vec::with_capacity(1);
 
             let txs_signed = txs_signed.into_iter().map(|(tx, eth_signature)| {

@@ -15,7 +15,7 @@ use crate::fee_ticker::TickerRequest;
 use crate::{
     committer::ExecutedOpsNotify, eth_watch::EthWatchRequest, mempool::MempoolRequest,
     signature_checker, state_keeper::StateKeeperRequest,
-    utils::current_zksync_info::CurrentZksyncInfo,
+    utils::current_zksync_info::CurrentZkSyncInfo,
 };
 
 mod admin_server;
@@ -37,7 +37,7 @@ pub fn start_api_server(
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
     admin_server_opts: AdminServerOptions,
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
 

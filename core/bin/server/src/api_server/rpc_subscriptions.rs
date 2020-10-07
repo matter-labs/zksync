@@ -24,7 +24,7 @@ use crate::{
     mempool::MempoolRequest,
     signature_checker::VerifyTxSignatureRequest,
     state_keeper::StateKeeperRequest,
-    utils::current_zksync_info::CurrentZksyncInfo,
+    utils::current_zksync_info::CurrentZkSyncInfo,
 };
 
 #[rpc]
@@ -192,7 +192,7 @@ pub fn start_ws_server(
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
     each_cache_size: usize,
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 ) {
     let config_options = config_options.clone();
     let addr = config_options.json_rpc_ws_server_address;

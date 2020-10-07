@@ -133,7 +133,7 @@ type ForcedExit = {
     tx: {
         initiatorAccountId: number;
         target: string;
-        token: string;
+        token: number;
         fee: string;
         nonce: number;
         signature: {
