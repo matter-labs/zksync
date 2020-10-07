@@ -10,14 +10,9 @@
 
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
-use crate::zksync_account::ZksyncAccount;
-use models::{
-    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
-};
+use crate::zksync_account::ZkSyncAccount;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::str::FromStr;
-use testkit::*;
 use web3::transports::Http;
 use web3::types::U256;
 use zksync_crypto::params::{
@@ -25,6 +20,11 @@ use zksync_crypto::params::{
     FEE_MANTISSA_BIT_WIDTH,
 };
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+use zksync_testkit::*;
+use zksync_types::{
+    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
+    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 /// Constant for gas_price_test
@@ -186,13 +186,13 @@ fn gen_unpacked_amount(rng: &mut impl Rng) -> BigUint {
 async fn gas_price_test() {
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
     let contracts = deploy_test_contracts();
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
         commit_account_info.private_key,
@@ -220,8 +220,8 @@ async fn gas_price_test() {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,

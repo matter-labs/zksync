@@ -2,9 +2,9 @@
 // External
 use serde::{Deserialize, Serialize};
 // Workspace
-use circuit::account::AccountWitness;
-use circuit::circuit::FranklinCircuit;
-use circuit::operation::{
+use zksync_circuit::account::AccountWitness;
+use zksync_circuit::circuit::ZkSyncCircuit;
+use zksync_circuit::operation::{
     OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
 use zksync_crypto::ff::PrimeField;
@@ -32,14 +32,14 @@ pub struct ProverData {
     #[serde(with = "VecOptionalFrSerde")]
     pub validator_audit_path: Vec<Option<Fr>>,
     #[serde(with = "VecOperationsSerde")]
-    pub operations: Vec<circuit::operation::Operation<Engine>>,
+    pub operations: Vec<zksync_circuit::operation::Operation<Engine>>,
     #[serde(with = "AccountWitnessDef")]
-    pub validator_account: circuit::account::AccountWitness<Engine>,
+    pub validator_account: zksync_circuit::account::AccountWitness<Engine>,
 }
 
 impl ProverData {
-    pub fn into_circuit(self, block: i64) -> FranklinCircuit<'static, Engine> {
-        FranklinCircuit {
+    pub fn into_circuit(self, block: i64) -> ZkSyncCircuit<'static, Engine> {
+        ZkSyncCircuit {
             rescue_params: &zksync_crypto::params::RESCUE_PARAMS as &Bn256RescueParams,
             jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS as &AltJubjubBn256,
             old_root: Some(self.old_root),
@@ -56,7 +56,7 @@ impl ProverData {
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "circuit::account::AccountWitness::<Engine>")]
+#[serde(remote = "zksync_circuit::account::AccountWitness::<Engine>")]
 struct AccountWitnessDef {
     #[serde(with = "OptionalFrSerde")]
     pub nonce: Option<Fr>,
@@ -67,7 +67,7 @@ struct AccountWitnessDef {
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "circuit::operation::Operation::<Engine>")]
+#[serde(remote = "zksync_circuit::operation::Operation::<Engine>")]
 pub struct OperationDef {
     #[serde(with = "OptionalFrSerde")]
     pub new_root: Option<Fr>,
@@ -95,7 +95,7 @@ pub struct OperationDef {
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "circuit::operation::OperationArguments::<Engine>")]
+#[serde(remote = "zksync_circuit::operation::OperationArguments::<Engine>")]
 pub struct OperationArgumentsDef {
     #[serde(with = "OptionalFrSerde")]
     pub a: Option<Fr>,
@@ -116,7 +116,7 @@ pub struct OperationArgumentsDef {
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "circuit::operation::OperationBranch::<Engine>")]
+#[serde(remote = "zksync_circuit::operation::OperationBranch::<Engine>")]
 pub struct OperationBranchDef {
     #[serde(with = "OptionalFrSerde")]
     pub address: Option<Fr>,
@@ -127,7 +127,7 @@ pub struct OperationBranchDef {
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "circuit::operation::OperationBranchWitness::<Engine>")]
+#[serde(remote = "zksync_circuit::operation::OperationBranchWitness::<Engine>")]
 pub struct OperationBranchWitnessDef {
     #[serde(with = "AccountWitnessDef")]
     pub account_witness: AccountWitness<Engine>,

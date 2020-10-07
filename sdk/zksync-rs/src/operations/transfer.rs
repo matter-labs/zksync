@@ -1,12 +1,12 @@
-use models::{
+use num::BigUint;
+use zksync_types::{
     helpers::{
         closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
         is_token_amount_packable,
     },
     tx::PackedEthSignature,
-    Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
+    Address, Nonce, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
-use num::BigUint;
 
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
 
@@ -34,7 +34,7 @@ impl<'a> TransferBuilder<'a> {
     }
 
     /// Directly returns the signed transfer transaction for the subsequent usage.
-    pub async fn tx(self) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+    pub async fn tx(self) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let token = self
             .token
             .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
@@ -72,7 +72,7 @@ impl<'a> TransferBuilder<'a> {
         self.wallet
             .signer
             .sign_transfer(token, amount, fee, to, nonce)
-            .map(|(tx, signature)| (FranklinTx::Transfer(Box::new(tx)), signature))
+            .map(|(tx, signature)| (ZkSyncTx::Transfer(Box::new(tx)), signature))
             .map_err(ClientError::SigningError)
     }
 

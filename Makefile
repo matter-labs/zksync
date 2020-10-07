@@ -119,10 +119,7 @@ push-image-fee-seller: image-fee-seller
 # Rust: main stuff
 
 server:
-	@cargo run --bin server --release
-
-sandbox:
-	@cargo run --bin sandbox
+	@cargo run --bin zksync_server --release
 
 image-server: build-contracts build-dev-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
@@ -182,7 +179,7 @@ price:
 	@node contracts/scripts/check-price.js
 
 prover-tests:
-	f cargo test -p prover --release -- --ignored
+	f cargo test -p zksync_prover --release -- --ignored
 
 js-tests:
 	@cd sdk/zksync.js && yarn tests

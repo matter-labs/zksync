@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 // Local uses
 use crate::panic_notify::ThreadPanicNotify;
-use models::{tokens, Address, TokenId};
+use zksync_types::{tokens, Address, TokenId};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {
@@ -28,11 +28,11 @@ struct PayloadAuthToken {
 #[derive(Debug, Clone)]
 struct AppState {
     secret_auth: String,
-    connection_pool: storage::ConnectionPool,
+    connection_pool: zksync_storage::ConnectionPool,
 }
 
 impl AppState {
-    async fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor<'_>> {
+    async fn access_storage(&self) -> actix_web::Result<zksync_storage::StorageProcessor<'_>> {
         self.connection_pool
             .access_storage_fragile()
             .await
@@ -150,7 +150,7 @@ async fn run_server(app_state: AppState, bind_to: SocketAddr) {
 pub fn start_admin_server(
     bind_to: SocketAddr,
     secret_auth: String,
-    connection_pool: storage::ConnectionPool,
+    connection_pool: zksync_storage::ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
 ) {
     thread::Builder::new()

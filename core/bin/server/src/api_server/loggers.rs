@@ -50,7 +50,7 @@ pub mod http_rpc {
     use log::Level;
 
     pub fn request_middleware(request: Request<Body>) -> RequestMiddlewareAction {
-        if log_enabled!(Level::Info) {
+        if log::log_enabled!(Level::Info) {
             let get_header = |header| {
                 request
                     .headers()
@@ -81,7 +81,7 @@ pub mod ws_rpc {
     use std::{collections::HashMap, ops::Deref};
 
     pub fn request_middleware(request: &Request) -> Option<Response> {
-        if log_enabled!(Level::Info) {
+        if log::log_enabled!(Level::Info) {
             let mut headers = HashMap::with_capacity(request.headers().len());
 
             for (k, v) in request.headers() {

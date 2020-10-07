@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate log;
-
 pub mod contract_functions;
 pub mod data_restore_driver;
 pub mod eth_tx_helpers;
@@ -12,14 +9,14 @@ pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
-use models::{
+use web3::transports::Http;
+use zksync_config::ConfigurationOptions;
+use zksync_crypto::convert::FeConvert;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     tokens::{get_genesis_token_list, Token},
     TokenId,
 };
-use storage::ConnectionPool;
-use web3::transports::Http;
-use zksync_config::ConfigurationOptions;
-use zksync_crypto::convert::fe_from_hex;
 
 const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
@@ -54,7 +51,7 @@ async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
 
 #[tokio::main]
 async fn main() {
-    info!("Restoring zkSync state from the contract");
+    log::info!("Restoring zkSync state from the contract");
     env_logger::init();
     let connection_pool = ConnectionPool::new(Some(1)).await;
     let config_opts = ConfigurationOptions::from_env();
@@ -84,8 +81,7 @@ async fn main() {
         )
         .get_matches();
 
-    let (_event_loop, transport) =
-        Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
+    let transport = Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
     let governance_addr = config_opts.governance_eth_addr;
     let genesis_tx_hash = config_opts.genesis_tx_hash;
     let contract_addr = config_opts.contract_eth_addr;
@@ -94,7 +90,7 @@ async fn main() {
     let finite_mode = cli.is_present("finite");
     let final_hash = if finite_mode {
         cli.value_of("final_hash")
-            .map(|value| fe_from_hex(value).expect("Can't parse the final hash"))
+            .map(|value| FeConvert::from_hex(value).expect("Can't parse the final hash"))
     } else {
         None
     };

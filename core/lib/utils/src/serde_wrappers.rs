@@ -27,7 +27,7 @@ impl UnsignedRatioSerializeAsDecimal {
         big_decimal_to_ratio(&big_decimal_string).map_err(de::Error::custom)
     }
 
-    pub fn deserialize_from_str_with_dot(input: &str) -> Result<Ratio<BigUint>, failure::Error> {
+    pub fn deserialize_from_str_with_dot(input: &str) -> Result<Ratio<BigUint>, anyhow::Error> {
         big_decimal_to_ratio(&BigDecimal::from_str(input)?)
     }
 

@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 // Workspace deps
-use models::PriorityOp;
+use zksync_types::PriorityOp;
 
 pub const SECS_IN_HOUR: u64 = 3600;
 

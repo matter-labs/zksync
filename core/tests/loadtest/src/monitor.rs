@@ -11,8 +11,11 @@ use tokio::{
     task::JoinHandle,
 };
 // Workspace uses
-use models::{tx::PackedEthSignature, tx::TxHash, FranklinTx, PriorityOp, H256};
 use zksync::{error::ClientError, ethereum::PriorityOpHolder, EthereumProvider, Provider};
+use zksync_types::{
+    tx::{PackedEthSignature, TxHash},
+    PriorityOp, ZkSyncTx, H256,
+};
 // Local uses
 
 #[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -122,7 +125,7 @@ impl Monitor {
 
     pub async fn send_tx(
         &self,
-        tx: FranklinTx,
+        tx: ZkSyncTx,
         eth_signature: Option<PackedEthSignature>,
     ) -> anyhow::Result<TxHash> {
         let tx_hash = self.provider.send_tx(tx, eth_signature).await?;
@@ -260,8 +263,6 @@ impl Monitor {
     }
 
     pub async fn wait_for_verify(&self) {
-        // TODO: It perhaps a good idea to add `wait_for execute` step
-        // to improve tests performance.
         let tasks = self
             .inner()
             .await

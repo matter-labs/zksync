@@ -8,7 +8,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::operations::TransferOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -21,6 +20,7 @@ use zksync_crypto::{
     },
     primitives::convert_to_float,
 };
+use zksync_types::operations::TransferOp;
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
@@ -201,7 +201,7 @@ impl TransferWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, transfer: &TransferData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        debug!("Initial root = {}", before_root);
+        log::debug!("Initial root = {}", before_root);
         let (audit_path_from_before, audit_balance_path_from_before) =
             get_audits(tree, transfer.from_account_address, transfer.token);
 
@@ -258,7 +258,7 @@ impl TransferWitness<Bn256> {
         );
 
         let intermediate_root = tree.root_hash();
-        debug!("Intermediate root = {}", intermediate_root);
+        log::debug!("Intermediate root = {}", intermediate_root);
 
         let (audit_path_from_intermediate, audit_balance_path_from_intermediate) =
             get_audits(tree, transfer.from_account_address, transfer.token);

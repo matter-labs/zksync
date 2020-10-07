@@ -1,5 +1,5 @@
 use super::hasher::Hasher;
-use crate::merkle_tree::{parallel_smt, sequential_smt, PedersenHasher};
+use crate::merkle_tree::{parallel_smt, sequential_smt, RescueHasher};
 use crate::primitives::GetBits;
 use crate::rand::{Rng, SeedableRng, XorShiftRng};
 use crate::{Engine, Fr};
@@ -9,7 +9,7 @@ use crate::{Engine, Fr};
 fn verify_proof<T>(
     element_index: u64,
     element: T,
-    hasher: PedersenHasher<Engine>,
+    hasher: RescueHasher<Engine>,
     merkle_proof: Vec<(Fr, bool)>,
     expected_root: Fr,
 ) where
@@ -51,10 +51,9 @@ fn cross_trees_merkle_path_comparison() {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
     let elements = rng.gen_iter::<u64>().take(1 << depth).collect::<Vec<_>>();
 
-    let mut par_tree =
-        parallel_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
+    let mut par_tree = parallel_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
     let mut seq_tree =
-        sequential_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
+        sequential_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
 
     for (idx, item) in elements.into_iter().enumerate() {
         // Insert the same element in both trees and verify that the root hash is the same.
@@ -105,10 +104,9 @@ fn cross_trees_merkle_path_comparison() {
 fn simulate_transfer_to_new_par_tree_seq_tree() {
     let depth = 3;
 
-    let mut par_tree =
-        parallel_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
+    let mut par_tree = parallel_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
     let mut seq_tree =
-        sequential_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
+        sequential_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
 
     let from_account_id = 1;
     let from_account_before_bal = 5;

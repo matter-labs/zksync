@@ -22,7 +22,7 @@ use zksync_crypto::{
 
 // Local deps
 use crate::{
-    circuit::FranklinCircuit,
+    circuit::ZkSyncCircuit,
     witness::{
         noop::noop_operation,
         tests::test_utils::{check_circuit, check_circuit_non_panicking},
@@ -138,8 +138,8 @@ fn test_noop() {
 /// The following checks are performed:
 /// - Incorrect old root hash in `pub_data_commitment`,
 /// - Incorrect new root hash in `pub_data_commitment`,
-/// - Incorrect old root hash in `FranklinCircuit`,
-/// - Incorrect old root hash in both `pub_data_commitment` and `FranklinCircuit` (same value),
+/// - Incorrect old root hash in `ZkSyncCircuit`,
+/// - Incorrect old root hash in both `pub_data_commitment` and `ZkSyncCircuit` (same value),
 /// - Incorrect validator address in pubdata,
 /// - Incorrect block number in pubdata.
 ///
@@ -223,7 +223,7 @@ fn incorrect_circuit_pubdata() {
             Some(block_number),
         );
 
-        let circuit_instance = FranklinCircuit {
+        let circuit_instance = ZkSyncCircuit {
             rescue_params,
             jubjub_params,
             old_root: Some(circuit_old_hash),
@@ -260,7 +260,7 @@ fn incorrect_circuit_pubdata() {
         Some(block_number),
     );
 
-    let circuit_instance = FranklinCircuit {
+    let circuit_instance = ZkSyncCircuit {
         rescue_params,
         jubjub_params,
         old_root: Some(tree.root_hash()),
@@ -302,7 +302,7 @@ fn incorrect_circuit_pubdata() {
         Some(incorrect_block_number),
     );
 
-    let circuit_instance = FranklinCircuit {
+    let circuit_instance = ZkSyncCircuit {
         rescue_params,
         jubjub_params,
         old_root: Some(tree.root_hash()),

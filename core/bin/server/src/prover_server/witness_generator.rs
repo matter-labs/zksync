@@ -1,25 +1,24 @@
 // Built-in
 use std::{thread, time};
 // External
-use failure::format_err;
+use anyhow::format_err;
 use futures::channel::mpsc;
-use log::info;
 // Workspace deps
 use crate::panic_notify::ThreadPanicNotify;
-use circuit::witness::{
+use std::time::Instant;
+use zksync_circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
     FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
-use models::block::Block;
-use models::{BlockNumber, FranklinOp};
-use plasma::state::CollectedFee;
-use std::time::Instant;
-use storage::StorageProcessor;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 use zksync_crypto::params::{account_tree_depth, CHUNK_BIT_WIDTH};
 use zksync_crypto::{circuit::CircuitAccountTree, Fr};
 use zksync_prover_utils::prover_data::ProverData;
+use zksync_state::state::CollectedFee;
+use zksync_storage::StorageProcessor;
+use zksync_types::block::Block;
+use zksync_types::{BlockNumber, ZkSyncOp};
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
@@ -28,7 +27,7 @@ use zksync_prover_utils::prover_data::ProverData;
 /// start_block, start_block + block_step, start_block + 2*block_step, ...
 pub struct WitnessGenerator {
     /// Connection to the database.
-    conn_pool: storage::ConnectionPool,
+    conn_pool: zksync_storage::ConnectionPool,
     /// Routine refresh interval.
     rounds_interval: time::Duration,
 
@@ -45,7 +44,7 @@ enum BlockInfo {
 impl WitnessGenerator {
     /// Creates a new `WitnessGenerator` object.
     pub fn new(
-        conn_pool: storage::ConnectionPool,
+        conn_pool: zksync_storage::ConnectionPool,
         rounds_interval: time::Duration,
         start_block: BlockNumber,
         block_step: BlockNumber,
@@ -81,7 +80,7 @@ impl WitnessGenerator {
     async fn should_work_on_block(
         &self,
         block_number: BlockNumber,
-    ) -> Result<BlockInfo, failure::Error> {
+    ) -> Result<BlockInfo, anyhow::Error> {
         let mut storage = self.conn_pool.access_storage_fragile().await?;
         let mut transaction = storage.start_transaction().await?;
         let block = transaction
@@ -110,7 +109,7 @@ impl WitnessGenerator {
         &self,
         block: BlockNumber,
         storage: &mut StorageProcessor<'_>,
-    ) -> Result<CircuitAccountTree, failure::Error> {
+    ) -> Result<CircuitAccountTree, anyhow::Error> {
         let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
 
         if let Some((cached_block, account_tree_cache)) = storage
@@ -193,7 +192,7 @@ impl WitnessGenerator {
         Ok(circuit_account_tree)
     }
 
-    async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), failure::Error> {
+    async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), anyhow::Error> {
         let timer = Instant::now();
         let mut storage = self.conn_pool.access_storage_fragile().await?;
         let mut transaction = storage.start_transaction().await?;
@@ -201,7 +200,7 @@ impl WitnessGenerator {
         let mut circuit_account_tree = self
             .load_account_tree(block.block_number - 1, &mut transaction)
             .await?;
-        trace!(
+        log::trace!(
             "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
@@ -209,7 +208,7 @@ impl WitnessGenerator {
         let timer = Instant::now();
         let witness =
             build_prover_block_data(&mut circuit_account_tree, &mut transaction, &block).await?;
-        trace!(
+        log::trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
@@ -242,9 +241,10 @@ impl WitnessGenerator {
     /// Updates witness data in database in an infinite loop,
     /// awaiting `rounds_interval` time between updates.
     async fn maintain(self) {
-        info!(
+        log::info!(
             "preparing prover data routine started with start_block({}), block_step({})",
-            self.start_block, self.block_step
+            self.start_block,
+            self.block_step
         );
         let mut current_block = self.start_block;
         loop {
@@ -275,13 +275,13 @@ impl WitnessGenerator {
 
 async fn build_prover_block_data(
     account_tree: &mut CircuitAccountTree,
-    transaction: &mut storage::StorageProcessor<'_>,
+    transaction: &mut zksync_storage::StorageProcessor<'_>,
     block: &Block,
-) -> Result<ProverData, failure::Error> {
+) -> Result<ProverData, anyhow::Error> {
     let block_number = block.block_number;
     let block_size = block.block_chunks_size;
 
-    info!("building prover data for block {}", &block_number);
+    log::info!("building prover data for block {}", &block_number);
 
     let mut witness_accum = WitnessBuilder::new(account_tree, block.fee_account, block_number);
 
@@ -290,14 +290,14 @@ async fn build_prover_block_data(
         .block_schema()
         .get_block_operations(block_number)
         .await
-        .map_err(|e| failure::format_err!("failed to get block operations {}", e))?;
+        .map_err(|e| anyhow::format_err!("failed to get block operations {}", e))?;
 
     let mut operations = vec![];
     let mut pub_data = vec![];
     let mut fees = vec![];
     for op in ops {
         match op {
-            FranklinOp::Deposit(deposit) => {
+            ZkSyncOp::Deposit(deposit) => {
                 let deposit_witness =
                     DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit);
 
@@ -305,7 +305,7 @@ async fn build_prover_block_data(
                 operations.extend(deposit_operations);
                 pub_data.extend(deposit_witness.get_pubdata());
             }
-            FranklinOp::Transfer(transfer) => {
+            ZkSyncOp::Transfer(transfer) => {
                 let transfer_witness =
                     TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer);
 
@@ -320,7 +320,7 @@ async fn build_prover_block_data(
                 });
                 pub_data.extend(transfer_witness.get_pubdata());
             }
-            FranklinOp::TransferToNew(transfer_to_new) => {
+            ZkSyncOp::TransferToNew(transfer_to_new) => {
                 let transfer_to_new_witness = TransferToNewWitness::apply_tx(
                     &mut witness_accum.account_tree,
                     &transfer_to_new,
@@ -338,7 +338,7 @@ async fn build_prover_block_data(
                 });
                 pub_data.extend(transfer_to_new_witness.get_pubdata());
             }
-            FranklinOp::Withdraw(withdraw) => {
+            ZkSyncOp::Withdraw(withdraw) => {
                 let withdraw_witness =
                     WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);
 
@@ -353,7 +353,7 @@ async fn build_prover_block_data(
                 });
                 pub_data.extend(withdraw_witness.get_pubdata());
             }
-            FranklinOp::Close(close) => {
+            ZkSyncOp::Close(close) => {
                 let close_account_witness =
                     CloseAccountWitness::apply_tx(&mut witness_accum.account_tree, &close);
 
@@ -364,7 +364,7 @@ async fn build_prover_block_data(
                 operations.extend(close_account_operations);
                 pub_data.extend(close_account_witness.get_pubdata());
             }
-            FranklinOp::FullExit(full_exit_op) => {
+            ZkSyncOp::FullExit(full_exit_op) => {
                 let success = full_exit_op.withdraw_amount.is_some();
 
                 let full_exit_witness = FullExitWitness::apply_tx(
@@ -377,7 +377,7 @@ async fn build_prover_block_data(
                 operations.extend(full_exit_operations);
                 pub_data.extend(full_exit_witness.get_pubdata());
             }
-            FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
+            ZkSyncOp::ChangePubKeyOffchain(change_pkhash_op) => {
                 let change_pkhash_witness = ChangePubkeyOffChainWitness::apply_tx(
                     &mut witness_accum.account_tree,
                     &change_pkhash_op,
@@ -394,7 +394,7 @@ async fn build_prover_block_data(
                 });
                 pub_data.extend(change_pkhash_witness.get_pubdata());
             }
-            FranklinOp::ForcedExit(forced_exit) => {
+            ZkSyncOp::ForcedExit(forced_exit) => {
                 let forced_exit_witness =
                     ForcedExitWitness::apply_tx(&mut witness_accum.account_tree, &forced_exit);
 
@@ -409,7 +409,7 @@ async fn build_prover_block_data(
                 });
                 pub_data.extend(forced_exit_witness.get_pubdata());
             }
-            FranklinOp::Noop(_) => {} // Noops are handled below
+            ZkSyncOp::Noop(_) => {} // Noops are handled below
         }
     }
 

@@ -14,5 +14,5 @@ pub use crate::{
     types::network::Network, wallet::Wallet,
 };
 
-pub use models as zksync_models;
 pub use web3;
+pub use zksync_types;

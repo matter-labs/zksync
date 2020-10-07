@@ -3,12 +3,12 @@ use std::str::FromStr;
 // External imports
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use models::{
+use zksync_crypto::Fr;
+use zksync_types::{
     ethereum::{ETHOperation, OperationType},
     Action, Operation,
     {block::Block, BlockNumber},
 };
-use zksync_crypto::Fr;
 // Local imports
 use crate::tests::db_test;
 use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, QueryResult, StorageProcessor};

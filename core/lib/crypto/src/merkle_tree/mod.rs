@@ -1,13 +1,13 @@
 pub mod hasher;
 pub mod parallel_smt;
-pub mod pedersen_hasher;
 pub mod rescue_hasher;
 pub mod sequential_smt;
 #[cfg(test)]
 mod tests;
 
+/// Sparse merkle tree used to calculate root hashes for the state in zkSync network.
 pub type SparseMerkleTree<T, H, HH> = parallel_smt::SparseMerkleTree<T, H, HH>;
-pub type PedersenHasher<T> = pedersen_hasher::PedersenHasher<T>;
+/// Default hasher used in the zkSync network for state hash calculations.
 pub type RescueHasher<T> = rescue_hasher::RescueHasher<T>;
 
 // TODO: return the code below and uncomment asserts

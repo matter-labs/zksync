@@ -1,15 +1,17 @@
 // Built-in uses
 // External uses
-use models::helpers::closest_packable_token_amount;
 use num::BigUint;
 use structopt::StructOpt;
 // Workspace uses
+use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
-use zksync::types::BlockStatus;
 // Local uses
 use crate::{
-    monitor::Monitor, ng::utils::{try_wait_all, wait_all}, scenarios::configs::AccountInfo, test_accounts::TestWallet,
+    monitor::Monitor,
+    ng::utils::{try_wait_all, wait_all},
+    scenarios::configs::AccountInfo,
+    test_accounts::TestWallet,
 };
 
 #[derive(Debug, StructOpt)]

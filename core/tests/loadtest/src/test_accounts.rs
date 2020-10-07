@@ -4,15 +4,15 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use num::BigUint;
 use rand::Rng;
 // Workspace uses
-use models::{
-    helpers::closest_packable_fee_amount, tx::PackedEthSignature, AccountId, Address, FranklinTx,
-    PriorityOp, TxFeeTypes,
-};
 use zksync::{
-    error::ClientError, types::BlockStatus, utils::biguint_to_u256, web3::types::H256,
+    error::ClientError,
+    types::BlockStatus,
+    utils::{biguint_to_u256, closest_packable_fee_amount},
+    web3::types::H256,
     EthereumProvider, Network, Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
+use zksync_types::{tx::PackedEthSignature, AccountId, Address, PriorityOp, TxFeeTypes, ZkSyncTx};
 // Local uses
 use crate::{monitor::Monitor, scenarios::configs::AccountInfo};
 
@@ -130,7 +130,7 @@ impl TestWallet {
     pub async fn sign_change_pubkey(
         &self,
         fee: BigUint,
-    ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let tx = self
             .inner
             .start_change_pubkey()
@@ -147,7 +147,7 @@ impl TestWallet {
     pub async fn sign_withdraw_single(
         &self,
         amount: BigUint,
-    ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         self.inner
             .start_withdraw()
             .nonce(self.pending_nonce())
@@ -163,7 +163,7 @@ impl TestWallet {
         &self,
         amount: BigUint,
         fee: Option<BigUint>,
-    ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let mut builder = self
             .inner
             .start_withdraw()
@@ -184,7 +184,7 @@ impl TestWallet {
         to: impl Into<Address>,
         amount: impl Into<BigUint>,
         fee: Option<BigUint>,
-    ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let mut builder = self
             .inner
             .start_transfer()
@@ -204,7 +204,7 @@ impl TestWallet {
         &self,
         test_accounts: &[AccountInfo],
         amount: BigUint,
-    ) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let to = {
             let mut rng = rand::thread_rng();
             let count = test_accounts.len() - 1;

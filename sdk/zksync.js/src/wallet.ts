@@ -184,6 +184,19 @@ export class Wallet {
         return submitSignedTransaction(signedForcedExitTransaction, this.provider);
     }
 
+    // Note that in syncMultiTransfer, unlike in syncTransfer,
+    // users need to specify the fee for each transaction.
+    // The main reason is that multitransfer enables paying fees
+    // in multiple tokens, (as long as the total sum
+    // of fees is enough to cover up the fees for all of the transactions).
+    // That might bring an inattentive user in a trouble like the following:
+    //
+    // A user wants to submit transactions in multiple tokens and
+    // wants to pay the fees with only some of them. If the user forgets
+    // to set the fees' value to 0 for transactions with tokens
+    // he won't pay the fee with, then this user will overpay a lot.
+    //
+    // That's why we want the users to be explicit about fees in multitransfers.
     async syncMultiTransfer(
         transfers: {
             to: Address;
@@ -209,11 +222,6 @@ export class Wallet {
             const transfer = transfers[i];
             const nonce = nextNonce;
             nextNonce += 1;
-
-            if (transfer.fee == null) {
-                const fullFee = await this.provider.getTransactionFee("Transfer", transfer.to, transfer.token);
-                transfer.fee = fullFee.totalFee;
-            }
 
             const { tx, ethereumSignature } = await this.signSyncTransfer({
                 to: transfer.to,
@@ -373,13 +381,15 @@ export class Wallet {
         }
 
         if (changePubKey.fee == null) {
-            const feeType = {
-                ChangePubKey: {
-                    onchainPubkeyAuth: changePubKey.onchainAuth,
-                },
-            };
-            const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
-            changePubKey.fee = fullFee.totalFee;
+            changePubKey.fee = 0;
+            // TODO: uncomment to set fee from server by default
+            // const feeType = {
+            //     ChangePubKey: {
+            //         onchainPubkeyAuth: changePubKey.onchainAuth,
+            //     },
+            // };
+            // const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
+            // changePubKey.fee = fullFee.totalFee;
         }
 
         const txData = await this.signSetSigningKey(changePubKey as any);

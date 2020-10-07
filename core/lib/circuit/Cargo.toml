@@ -1,31 +1,28 @@
 [package]
-name = "circuit"
-version = "0.1.1"
+name = "zksync_circuit"
+version = "1.0.0"
 edition = "2018"
-
-authors = [
-    "Alex Gluchowski <alex@gluchowski.net>",
-    "Alex Vlasov <alex.m.vlasov@gmail.com>"
-]
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
 
 [features]
 default = []
 playground = []
 
 [dependencies]
-plasma = { path = "../plasma", version = "0.1.1" }
-models = { path = "../models", version = "0.0.1" }
-zksync_crypto = { path = "../crypto", version = "0.1.0" }
+zksync_state ={ path = "../state", version = "1.0" }
+zksync_types ={ path = "../types", version = "1.0" }
+zksync_crypto = { path = "../crypto", version = "1.0" }
 rust-crypto = "0.2"
-hex = "0.4"
 num = { version = "0.2", features = ["serde"] }
 log = "0.4"
 serde = "1.0.90"
-serde_derive = "1.0.90"
-serde_json = "1.0.0"
-web3 = "0.10.0"
 
 [dev-dependencies]
-zksync_test_account = { path = "../../tests/test_account", version = "0.1.0"}
+zksync_test_account = { path = "../../tests/test_account", version = "1.0" }
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 rayon = "1.3.0"

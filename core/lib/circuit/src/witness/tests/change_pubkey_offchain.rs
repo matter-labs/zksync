@@ -1,13 +1,11 @@
 // External deps
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::{
-    operations::ChangePubKeyOp,
+use zksync_state::state::CollectedFee;
+use zksync_state::{handler::TxHandler, state::ZkSyncState};
+use zksync_types::{
     tx::{ChangePubKey, TxSignature},
-};
-use plasma::{
-    handler::TxHandler,
-    state::{CollectedFee, PlasmaState},
+    ChangePubKeyOp,
 };
 // Local deps
 use crate::witness::{
@@ -45,7 +43,7 @@ fn test_change_pubkey_offchain_success() {
         change_pkhash_op,
         input,
         |plasma_state, op| {
-            let fee = <PlasmaState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
+            let fee = <ZkSyncState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
                 .expect("Operation failed")
                 .0
                 .unwrap();
@@ -78,7 +76,7 @@ fn test_change_pubkey_offchain_nonzero_fee() {
         change_pkhash_op,
         input,
         |plasma_state, op| {
-            let fee = <PlasmaState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
+            let fee = <ZkSyncState as TxHandler<ChangePubKey>>::apply_op(plasma_state, op)
                 .expect("Operation failed")
                 .0
                 .unwrap();

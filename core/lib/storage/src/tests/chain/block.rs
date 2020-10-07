@@ -1,10 +1,10 @@
 // External imports
 use zksync_basic_types::H256;
 // Workspace imports
-use models::{block::Block, helpers::apply_updates, AccountMap, AccountUpdate, BlockNumber};
-use models::{ethereum::OperationType, Action, Operation};
-use zksync_crypto::{convert::fe_to_bytes, Fr};
+use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_crypto::{ff::PrimeField, rand::XorShiftRng};
+use zksync_types::{block::Block, helpers::apply_updates, AccountMap, AccountUpdate, BlockNumber};
+use zksync_types::{ethereum::OperationType, Action, Operation};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
 use crate::tests::{create_rng, db_test};
@@ -285,7 +285,7 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
 
         // Initialize reference sample fields.
         current_block_detail.block_number = operation.block.block_number as i64;
-        current_block_detail.new_state_root = fe_to_bytes(&operation.block.new_root_hash);
+        current_block_detail.new_state_root = operation.block.new_root_hash.to_bytes();
         current_block_detail.block_size = operation.block.block_transactions.len() as i64;
         current_block_detail.commit_tx_hash = Some(eth_tx_hash.as_ref().to_vec());
 
@@ -481,28 +481,28 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 #[db_test]
 async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     use crate::chain::operations_ext::OperationsExtSchema;
-    use models::{
+    use zksync_test_account::ZkSyncAccount;
+    use zksync_types::{
         block::PendingBlock,
         operations::{ChangePubKeyOp, TransferToNewOp},
-        ExecutedOperations, ExecutedTx, FranklinOp, FranklinTx,
+        ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
-    use zksync_test_account::ZksyncAccount;
 
     let _ = env_logger::try_init();
 
     let from_account_id = 0xbabe;
-    let from_zksync_account = ZksyncAccount::rand();
+    let from_zksync_account = ZkSyncAccount::rand();
     from_zksync_account.set_account_id(Some(from_account_id));
 
     let to_account_id = 0xdcba;
-    let to_zksync_account = ZksyncAccount::rand();
+    let to_zksync_account = ZkSyncAccount::rand();
     to_zksync_account.set_account_id(Some(to_account_id));
 
     let (tx_1, executed_tx_1) = {
         let tx =
             from_zksync_account.sign_change_pubkey_tx(None, false, 0, Default::default(), false);
 
-        let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
+        let change_pubkey_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
             tx: tx.clone(),
             account_id: from_account_id,
         }));
@@ -518,7 +518,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         };
 
         (
-            FranklinTx::ChangePubKey(Box::new(tx)),
+            ZkSyncTx::ChangePubKey(Box::new(tx)),
             ExecutedOperations::Tx(Box::new(executed_change_pubkey_op)),
         )
     };
@@ -535,7 +535,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             )
             .0;
 
-        let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+        let transfer_to_new_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
             tx: tx.clone(),
             from: from_account_id,
             to: to_account_id,
@@ -552,7 +552,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         };
 
         (
-            FranklinTx::Transfer(Box::new(tx)),
+            ZkSyncTx::Transfer(Box::new(tx)),
             ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op)),
         )
     };

@@ -23,16 +23,13 @@
 //!   ```
 
 // Built-in import
-use structopt::StructOpt;
 // External uses
 use tokio::runtime::Builder;
 // Workspace uses
 use zksync::{Network, Provider};
 use zksync_config::ConfigurationOptions;
 // Local uses
-use self::{
-    cli::CliOptions, monitor::Monitor, scenarios::configs::AccountInfo, scenarios::ScenarioContext,
-};
+use self::{monitor::Monitor, scenarios::configs::AccountInfo};
 
 mod cli;
 mod monitor;
@@ -57,19 +54,7 @@ fn main() -> Result<(), anyhow::Error> {
         wallets: 100,
         transfer_rounds: 100,
     };
-    tokio_runtime.block_on(scenario.run(monitor, main_account, env_config.clone()))?;
+    tokio_runtime.block_on(scenario.run(monitor, main_account, env_config))?;
 
-    return Ok(());
-
-    let CliOptions {
-        test_spec_path,
-        scenario_type,
-    } = CliOptions::from_args();
-
-    let provider = Provider::new(Network::Localhost);
-    let context = ScenarioContext::new(provider, env_config, test_spec_path, tokio_runtime);
-
-    let scenario = scenario_type.into_scenario();
-
-    scenario(context);
+    Ok(())
 }

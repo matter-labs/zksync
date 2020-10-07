@@ -10,14 +10,14 @@
 
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
-use crate::zksync_account::ZksyncAccount;
+use crate::zksync_account::ZkSyncAccount;
 use log::*;
-use models::{AccountId, AccountMap};
 use num::BigUint;
 use std::time::Instant;
-use testkit::*;
 use web3::transports::Http;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_testkit::*;
+use zksync_types::{AccountId, AccountMap};
 
 const PRIORITY_EXPIRATION: u64 = 101;
 
@@ -346,7 +346,7 @@ async fn exit_test() {
     env_logger::init();
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
@@ -359,7 +359,7 @@ async fn exit_test() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
 
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let test_accounts_info = test_accounts_info[0..2].to_vec();
@@ -388,8 +388,8 @@ async fn exit_test() {
     let (zksync_accounts, fee_account_id) = {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,

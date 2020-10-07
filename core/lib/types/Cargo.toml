@@ -1,0 +1,43 @@
+[package]
+name = "zksync_types"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+readme = "README.md"
+
+[dependencies]
+zksync_crypto = { path = "../crypto", version = "1.0" }
+zksync_utils = { path = "../utils", version = "1.0" }
+zksync_basic_types = { path = "../basic_types", version = "1.0" }
+
+num = { version = "0.2", features = ["serde"] }
+hex = "0.4"
+anyhow = "1.0"
+log = "0.4"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+
+serde = "1.0.90"
+serde_json = "1.0.0"
+
+# Crypto stuff
+parity-crypto = {version = "0.6.2", features = ["publickey"] }
+ethabi = "12.0.0"
+
+[dev-dependencies]
+criterion = "0.3.0"
+secp256k1 = {version = "0.17.2", features = ["std", "recovery"] }
+
+[[bench]]
+name = "criterion"
+harness = false
+path = "benches/criterion/lib.rs"
+
+[features]
+default=[]
+run_benches=[]
+

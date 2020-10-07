@@ -5,10 +5,10 @@ use web3::{
     Transport, Web3,
 };
 // Workspace deps
-use models::{AccountMap, AccountUpdate};
-use storage::ConnectionPool;
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;
+use zksync_storage::ConnectionPool;
+use zksync_types::{AccountMap, AccountUpdate};
 // Local deps
 use crate::{
     contract_functions::{get_genesis_account, get_total_verified_blocks},
@@ -52,7 +52,7 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Provides Ethereum Governance contract unterface
     pub governance_contract: (ethabi::Contract, Contract<T>),
     /// Provides Ethereum Rollup contract unterface
-    pub franklin_contract: (ethabi::Contract, Contract<T>),
+    pub zksync_contract: (ethabi::Contract, Contract<T>),
     /// Rollup contract events state
     pub events_state: EventsState,
     /// Rollup accounts state
@@ -80,7 +80,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `connection_pool` - Database connection pool
     /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
-    /// * `franklin_contract_eth_addr` - Rollup contract address
+    /// * `zksync_contract_eth_addr` - Rollup contract address
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
@@ -89,7 +89,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         connection_pool: ConnectionPool,
         web3_transport: T,
         governance_contract_eth_addr: H160,
-        franklin_contract_eth_addr: H160,
+        zksync_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         available_block_chunk_sizes: Vec<usize>,
@@ -106,11 +106,11 @@ impl<T: Transport> DataRestoreDriver<T> {
             )
         };
 
-        let franklin_contract = {
+        let zksync_contract = {
             let abi = zksync_contract();
             (
                 abi.clone(),
-                Contract::new(web3.eth(), franklin_contract_eth_addr, abi),
+                Contract::new(web3.eth(), zksync_contract_eth_addr, abi),
             )
         };
 
@@ -122,7 +122,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             connection_pool,
             web3,
             governance_contract,
-            franklin_contract,
+            zksync_contract,
             events_state,
             tree_state,
             eth_blocks_step,
@@ -140,18 +140,18 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// # Arguments
     ///
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
-    /// * `franklin_contract_genesis_tx_hash` - Rollup contract creation tx hash
     ///
     pub async fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
         let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
-            .expect("Cant get franklin genesis transaction");
+            .await
+            .expect("Cant get zkSync genesis transaction");
 
         // Setting genesis block number for events state
         let genesis_eth_block_number = self
             .events_state
             .set_genesis_block_number(&genesis_transaction)
             .expect("Cant set genesis block number for events state");
-        info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
+        log::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
         storage_interactor::save_events_state(
             &self.connection_pool,
@@ -164,7 +164,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let genesis_fee_account =
             get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
 
-        info!(
+        log::info!(
             "genesis fee account address: 0x{}",
             hex::encode(genesis_fee_account.address.as_ref())
         );
@@ -189,19 +189,19 @@ impl<T: Transport> DataRestoreDriver<T> {
             self.available_block_chunk_sizes.clone(),
         );
 
-        info!("Genesis tree root hash: {:?}", tree_state.root_hash());
-        debug!("Genesis accounts: {:?}", tree_state.get_accounts());
+        log::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
+        log::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
         storage_interactor::save_genesis_tree_state(&self.connection_pool, account_update).await;
 
-        info!("Saved genesis tree state\n");
+        log::info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
     }
 
     /// Stops states from storage
     pub async fn load_state_from_storage(&mut self) {
-        info!("Loading state from storage");
+        log::info!("Loading state from storage");
         let state = storage_interactor::get_storage_state(&self.connection_pool).await;
         self.events_state =
             storage_interactor::get_block_events_state_from_storage(&self.connection_pool).await;
@@ -229,9 +229,9 @@ impl<T: Transport> DataRestoreDriver<T> {
             }
             StorageUpdateState::None => {}
         }
-        let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract);
+        let total_verified_blocks = get_total_verified_blocks(&self.zksync_contract).await;
         let last_verified_block = self.tree_state.state.block_number;
-        info!(
+        log::info!(
             "State has been loaded\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
             last_verified_block,
             total_verified_blocks,
@@ -244,7 +244,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
-            debug!("Last watched ethereum block: {:?}", last_wached_block);
+            log::debug!("Last watched ethereum block: {:?}", last_wached_block);
 
             // Update events
             if self.update_events_state().await {
@@ -255,14 +255,15 @@ impl<T: Transport> DataRestoreDriver<T> {
                     // Update tree
                     self.update_tree_state(new_ops_blocks).await;
 
-                    let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract);
+                    let total_verified_blocks =
+                        get_total_verified_blocks(&self.zksync_contract).await;
                     let last_verified_block = self.tree_state.state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
                     // to keep the `state_keeper` consistent with the `eth_sender`.
                     storage_interactor::update_eth_stats(&self.connection_pool).await;
 
-                    info!(
+                    log::info!(
                         "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
                         last_verified_block,
                         total_verified_blocks,
@@ -277,9 +278,10 @@ impl<T: Transport> DataRestoreDriver<T> {
                         if root_hash == self.tree_state.root_hash() {
                             final_hash_was_found = true;
 
-                            info!(
+                            log::info!(
                                 "Correct expected root hash was met on the block {} out of {}",
-                                last_verified_block, total_verified_blocks
+                                last_verified_block,
+                                total_verified_blocks
                             );
                         }
                     }
@@ -311,7 +313,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             .events_state
             .update_events_state(
                 &self.web3,
-                &self.franklin_contract,
+                &self.zksync_contract,
                 &self.governance_contract,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
@@ -327,7 +329,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         )
         .await;
 
-        debug!("Updated events storage");
+        log::debug!("Updated events storage");
 
         !block_events.is_empty()
     }
@@ -360,30 +362,36 @@ impl<T: Transport> DataRestoreDriver<T> {
             .await;
         }
 
-        debug!("Updated state");
+        log::debug!("Updated state");
     }
 
     /// Gets new operations blocks from events, updates rollup operations stored state.
     /// Returns new rollup operations blocks
     async fn update_operations_state(&mut self) -> Vec<RollupOpsBlock> {
-        let new_blocks = self.get_new_operation_blocks_from_events();
+        let new_blocks = self.get_new_operation_blocks_from_events().await;
 
         storage_interactor::save_rollup_ops(&self.connection_pool, &new_blocks).await;
 
-        debug!("Updated operations storage");
+        log::debug!("Updated operations storage");
 
         new_blocks
     }
 
     /// Returns verified comitted operations blocks from verified op blocks events
-    pub fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
-        self.events_state
+    pub async fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
+        let mut blocks = Vec::new();
+
+        for event in self
+            .events_state
             .get_only_verified_committed_events()
             .iter()
-            .map(|event| {
-                RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
-                    .expect("Cant get new operation blocks from events")
-            })
-            .collect()
+        {
+            let block = RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
+                .await
+                .expect("Cant get new operation blocks from events");
+            blocks.push(block);
+        }
+
+        blocks
     }
 }

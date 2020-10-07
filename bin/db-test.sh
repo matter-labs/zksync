@@ -10,4 +10,4 @@ if [ "$1" == "reset" ]; then
     diesel migration run
 fi
 
-cargo test --release -p storage --features "db_test" $2 -- --nocapture
+cargo test --release -p zksync_storage --features "db_test" $2 -- --nocapture

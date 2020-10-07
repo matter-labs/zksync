@@ -116,4 +116,28 @@ type Withdraw = {
     created_at: string;
 };
 
-export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit)[];
+type ForcedExit = {
+    tx_id: string;
+    hash: string;
+    eth_block: null;
+    pq_id: null;
+    tx: {
+        initiatorAccountId: number;
+        target: string;
+        token: string;
+        fee: string;
+        nonce: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        type: "ForcedExit";
+    };
+    success: boolean;
+    fail_reason?: string;
+    commited: boolean;
+    verified: boolean;
+    created_at: string;
+};
+
+export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit | ForcedExit)[];

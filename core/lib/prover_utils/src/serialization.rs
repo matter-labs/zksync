@@ -4,7 +4,7 @@
 // External deps
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // Workspace deps
-use circuit::operation::Operation;
+use zksync_circuit::operation::Operation;
 use zksync_crypto::Engine;
 // Local
 use crate::prover_data::OperationDef;

@@ -1,6 +1,6 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
+use anyhow::format_err;
 use backoff::Operation;
-use failure::format_err;
 use std::time::Duration;
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use zksync_crypto::Engine;
@@ -8,8 +8,8 @@ use zksync_crypto::Engine;
 /// Downloads universal setup in the monomial form of the given power of two (range: SETUP_MIN_POW2..=SETUP_MAX_POW2)
 pub fn get_universal_setup_monomial_form(
     power_of_two: u32,
-) -> Result<Crs<Engine, CrsForMonomialForm>, failure::Error> {
-    failure::ensure!(
+) -> Result<Crs<Engine, CrsForMonomialForm>, anyhow::Error> {
+    anyhow::ensure!(
         (SETUP_MIN_POW2..=SETUP_MAX_POW2).contains(&power_of_two),
         "setup power of two is not in the correct range"
     );
@@ -36,7 +36,7 @@ pub fn get_universal_setup_monomial_form(
 
 fn try_to_download_setup(
     power_of_two: u32,
-) -> Result<Crs<Engine, CrsForMonomialForm>, backoff::Error<failure::Error>> {
+) -> Result<Crs<Engine, CrsForMonomialForm>, backoff::Error<anyhow::Error>> {
     let setup_network_dir = std::env::var("PROVER_SETUP_NETWORK_DIR")
         .map_err(|e| backoff::Error::Permanent(e.into()))?;
 

@@ -1,6 +1,6 @@
 // External imports
 use chrono::prelude::*;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 // Workspace imports
 // Local imports

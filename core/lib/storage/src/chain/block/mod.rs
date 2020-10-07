@@ -2,12 +2,12 @@
 // External imports
 use zksync_basic_types::U256;
 // Workspace imports
-use models::{block::PendingBlock, Action, ActionType, Operation};
-use models::{
+use zksync_crypto::convert::FeConvert;
+use zksync_types::{block::PendingBlock, Action, ActionType, Operation};
+use zksync_types::{
     block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, FranklinOp,
+    AccountId, BlockNumber, ZkSyncOp,
 };
-use zksync_crypto::convert::{fe_from_bytes, fe_to_bytes};
 // Local imports
 use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
@@ -137,7 +137,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let block_transactions = self.get_block_executed_ops(block).await?;
 
         // Encode the root hash as `0xFF..FF`.
-        let new_root_hash = fe_from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
+        let new_root_hash =
+            FeConvert::from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
         // Return the obtained block in the expected format.
         Ok(Some(Block::new(
@@ -155,12 +156,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         )))
     }
 
-    /// Same as `get_block_executed_ops`, but returns a vector of `FranklinOp` instead
+    /// Same as `get_block_executed_ops`, but returns a vector of `ZkSyncOp` instead
     /// of `ExecutedOperations`.
-    pub async fn get_block_operations(
-        &mut self,
-        block: BlockNumber,
-    ) -> QueryResult<Vec<FranklinOp>> {
+    pub async fn get_block_operations(&mut self, block: BlockNumber) -> QueryResult<Vec<ZkSyncOp>> {
         let executed_ops = self.get_block_executed_ops(block).await?;
         Ok(executed_ops
             .into_iter()
@@ -582,7 +580,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let number = i64::from(block.block_number);
-        let root_hash = fe_to_bytes(&block.new_root_hash);
+        let root_hash = block.new_root_hash.to_bytes();
         let fee_account_id = i64::from(block.fee_account);
         let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
         let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;

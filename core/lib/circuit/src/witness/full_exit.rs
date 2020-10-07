@@ -7,7 +7,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::FullExitOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -18,6 +17,7 @@ use zksync_crypto::{
         ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
 };
+use zksync_types::FullExitOp;
 // Local deps
 use crate::{
     operation::{
@@ -157,7 +157,7 @@ impl FullExitWitness<Bn256> {
     ) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        debug!("Initial root = {}", before_root);
+        log::debug!("Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) =
             get_audits(tree, full_exit.account_address, full_exit.token);
 
@@ -189,7 +189,7 @@ impl FullExitWitness<Bn256> {
         };
 
         let after_root = tree.root_hash();
-        debug!("After root = {}", after_root);
+        log::debug!("After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, full_exit.account_address, full_exit.token);
 

@@ -1,9 +1,7 @@
 //! Common functions shared by different scenarios.
 
 // Built-in uses
-use std::{
-    iter::Iterator,
-};
+use std::iter::Iterator;
 // External uses
 use futures::{Future, TryFuture};
 // Workspace uses

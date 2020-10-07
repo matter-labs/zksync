@@ -15,7 +15,6 @@ use super::tps_counter::TPSCounter;
 use crate::monitor::Monitor;
 
 pub(crate) mod configs;
-mod deprecated;
 pub(crate) mod utils;
 
 pub type Scenario = Box<dyn Fn(ScenarioContext)>;
@@ -34,16 +33,12 @@ pub enum ScenarioType {
 impl ScenarioType {
     /// Returns the scenario function given its type.
     pub fn into_scenario(self) -> Scenario {
-        match self {
-            Self::OutgoingTps => Box::new(deprecated::outgoing_tps::run_scenario),
-            Self::ExecutionTps => Box::new(deprecated::execution_tps::run_scenario),
-            Self::RealLife => Box::new(deprecated::real_life::run_scenario),
-        }
+        unreachable!()
     }
 }
 
 impl FromStr for ScenarioType {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let scenario = match s {
@@ -51,7 +46,7 @@ impl FromStr for ScenarioType {
             "execution" | "execution_tps" => Self::ExecutionTps,
             "reallife" | "real-life" | "real_life" => Self::RealLife,
             other => {
-                failure::bail!(
+                anyhow::bail!(
                     "Unknown scenario type '{}'. \
                      Available options are: \
                      'outgoing_tps', 'execution_tps', 'real_life', \

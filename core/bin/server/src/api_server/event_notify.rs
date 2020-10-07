@@ -4,7 +4,7 @@ use super::rpc_server::types::{
 use crate::committer::ExecutedOpsNotify;
 use crate::state_keeper::{ExecutedOpId, StateKeeperRequest};
 use crate::utils::token_db_cache::TokenDBCache;
-use failure::{bail, format_err};
+use anyhow::{bail, format_err};
 use futures::{
     channel::{mpsc, oneshot},
     compat::Future01CompatExt,
@@ -17,15 +17,15 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use lru_cache::LruCache;
-use models::tx::TxHash;
-use models::BlockNumber;
-use models::{block::ExecutedOperations, AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
-use storage::chain::operations::records::StoredExecutedPriorityOperation;
-use storage::chain::operations_ext::records::TxReceiptResponse;
-use storage::ConnectionPool;
 use zksync_basic_types::Address;
+use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
+use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
+use zksync_storage::ConnectionPool;
+use zksync_types::tx::TxHash;
+use zksync_types::BlockNumber;
+use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation};
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
 const TX_SUB_PREFIX: &str = "txsub";
@@ -81,7 +81,7 @@ impl OperationNotifier {
     async fn check_op_executed_current_block(
         &self,
         op_id: ExecutedOpId,
-    ) -> Result<Option<(BlockNumber, bool, Option<String>)>, failure::Error> {
+    ) -> Result<Option<(BlockNumber, bool, Option<String>)>, anyhow::Error> {
         let response = oneshot::channel();
         self.state_keeper_requests
             .clone()
@@ -93,7 +93,7 @@ impl OperationNotifier {
         Ok(state_keeper_resp?)
     }
 
-    fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), failure::Error> {
+    fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), anyhow::Error> {
         let str_sub_id = if let SubscriptionId::String(str_sub_id) = sub_id.clone() {
             str_sub_id
         } else {
@@ -142,7 +142,7 @@ impl OperationNotifier {
     async fn handle_notify_req(
         &mut self,
         new_sub: EventNotifierRequest,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         match new_sub {
             EventNotifierRequest::Sub(event_sub) => match event_sub {
                 EventSubscribeRequest::Transaction {
@@ -177,7 +177,7 @@ impl OperationNotifier {
     async fn get_executed_priority_operation(
         &mut self,
         serial_id: u32,
-    ) -> Result<Option<StoredExecutedPriorityOperation>, failure::Error> {
+    ) -> Result<Option<StoredExecutedPriorityOperation>, anyhow::Error> {
         let res = if let Some(executed_op) = self
             .cache_of_executed_priority_operations
             .get_mut(&serial_id)
@@ -201,7 +201,7 @@ impl OperationNotifier {
         Ok(res)
     }
 
-    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, failure::Error> {
+    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, anyhow::Error> {
         let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
             block_info.clone()
         } else {
@@ -253,7 +253,7 @@ impl OperationNotifier {
         serial_id: u64,
         action: ActionType,
         sub: Subscriber<ETHOpInfoResp>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let sub_id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
             ETHOP_SUB_PREFIX,
@@ -341,7 +341,7 @@ impl OperationNotifier {
     async fn get_tx_receipt(
         &mut self,
         hash: &TxHash,
-    ) -> Result<Option<TxReceiptResponse>, failure::Error> {
+    ) -> Result<Option<TxReceiptResponse>, anyhow::Error> {
         let res = if let Some(tx_receipt) = self
             .cache_of_transaction_receipts
             .get_mut(&hash.as_ref().to_vec())
@@ -372,7 +372,7 @@ impl OperationNotifier {
         hash: TxHash,
         action: ActionType,
         sub: Subscriber<TransactionInfoResp>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
             TX_SUB_PREFIX,
@@ -440,7 +440,7 @@ impl OperationNotifier {
                 .assign_id(id.clone())
                 .map_err(|_| format_err!("SubIdAssign"))?;
             subs.push(SubscriptionSender { id, sink });
-            trace!("tx sub added: {}", hash.to_string());
+            log::trace!("tx sub added: {}", hash.to_string());
         }
         self.tx_subs.insert((hash, action), subs);
         Ok(())
@@ -451,7 +451,7 @@ impl OperationNotifier {
         address: Address,
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let mut storage = self.db_pool.access_storage_fragile().await?;
         let account_state = storage
             .chain()
@@ -506,7 +506,7 @@ impl OperationNotifier {
         ops: Vec<ExecutedOperations>,
         action: ActionType,
         block_number: BlockNumber,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         for tx in ops {
             match tx {
                 ExecutedOperations::Tx(tx) => {
@@ -551,7 +551,7 @@ impl OperationNotifier {
     fn handle_new_executed_batch(
         &mut self,
         exec_batch: ExecutedOpsNotify,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         self.handle_executed_operations(
             exec_batch.operations,
             ActionType::COMMIT,
@@ -559,7 +559,7 @@ impl OperationNotifier {
         )
     }
 
-    async fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
+    async fn handle_new_block(&mut self, op: Operation) -> Result<(), anyhow::Error> {
         let action = op.action.get_type();
 
         self.handle_executed_operations(
@@ -603,16 +603,18 @@ impl OperationNotifier {
                     {
                         result
                     } else {
-                        warn!(
+                        log::warn!(
                             "Failed to restore resp account state: id: {}, block: {}",
-                            id, op.block.block_number
+                            id,
+                            op.block.block_number
                         );
                         continue;
                     }
                 } else {
-                    warn!(
+                    log::warn!(
                         "Account is updated but not stored in DB, id: {}, block: {}",
-                        id, op.block.block_number
+                        id,
+                        op.block.block_number
                     );
                     continue;
                 };
@@ -656,14 +658,14 @@ pub fn start_sub_notifier(
                     if let Some(new_block) = new_block {
                         notifier.handle_new_block(new_block)
                             .await
-                            .map_err(|e| warn!("Failed to handle new block: {}",e))
+                            .map_err(|e| log::warn!("Failed to handle new block: {}",e))
                             .unwrap_or_default();
                     }
                 },
                 new_exec_batch = executed_tx_stream.next() => {
                     if let Some(new_exec_batch) = new_exec_batch {
                         notifier.handle_new_executed_batch(new_exec_batch)
-                            .map_err(|e| warn!("Failed to handle new exec batch: {}",e))
+                            .map_err(|e| log::warn!("Failed to handle new exec batch: {}",e))
                             .unwrap_or_default();
                     }
                 },
@@ -671,7 +673,7 @@ pub fn start_sub_notifier(
                     if let Some(new_sub) = new_sub {
                         notifier.handle_notify_req(new_sub)
                             .await
-                            .map_err(|e| warn!("Failed to handle notify request: {}",e))
+                            .map_err(|e| log::warn!("Failed to handle notify request: {}",e))
                             .unwrap_or_default();
                     }
                 },

@@ -8,7 +8,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::operations::ForcedExitOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -22,6 +21,7 @@ use zksync_crypto::{
     },
     primitives::convert_to_float,
 };
+use zksync_types::operations::ForcedExitOp;
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
@@ -234,7 +234,7 @@ impl ForcedExitWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        debug!("Initial root = {}", before_root);
+        log::debug!("Initial root = {}", before_root);
         let (audit_path_initiator_before, audit_balance_path_initiator_before) = get_audits(
             tree,
             forced_exit.initiator_account_address,
@@ -292,7 +292,7 @@ impl ForcedExitWitness<Bn256> {
         );
 
         let intermediate_root = tree.root_hash();
-        debug!("Intermediate root = {}", intermediate_root);
+        log::debug!("Intermediate root = {}", intermediate_root);
 
         let (audit_path_initiator_intermediate, audit_balance_path_initiator_intermediate) =
             get_audits(

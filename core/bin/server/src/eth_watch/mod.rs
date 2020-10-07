@@ -12,29 +12,27 @@ use std::{
     time::{Duration, Instant},
 };
 // External uses
-use failure::format_err;
+use anyhow::format_err;
 use futures::{
     channel::{mpsc, oneshot},
-    compat::Future01CompatExt,
     SinkExt, StreamExt,
 };
 use tokio::{task::JoinHandle, time};
 use web3::{
     contract::{Contract, Options},
-    transports::EventLoopHandle,
     types::{Address, BlockNumber, Filter, FilterBuilder, H160},
     Transport, Web3,
 };
 // Workspace deps
-use models::{
-    ethereum::CompleteWithdrawalsTx,
-    tx::EIP1271Signature,
-    {FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
-};
-use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
 use zksync_contracts::{eip1271_contract, zksync_contract};
 use zksync_crypto::params::PRIORITY_EXPIRATION;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
+    ethereum::CompleteWithdrawalsTx,
+    tx::EIP1271Signature,
+    {Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp},
+};
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
 
@@ -92,10 +90,10 @@ pub enum EthWatchRequest {
         address: Address,
         message: Vec<u8>,
         signature: EIP1271Signature,
-        resp: oneshot::Sender<Result<bool, failure::Error>>,
+        resp: oneshot::Sender<Result<bool, anyhow::Error>>,
     },
     GetPendingWithdrawalsQueueIndex {
-        resp: oneshot::Sender<Result<u32, failure::Error>>,
+        resp: oneshot::Sender<Result<u32, anyhow::Error>>,
     },
 }
 
@@ -103,7 +101,6 @@ pub struct EthWatch<T: Transport> {
     zksync_contract: (ethabi::Contract, Contract<T>),
     eth_state: ETHState,
     web3: Web3<T>,
-    _web3_event_loop_handle: EventLoopHandle,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
 
@@ -117,7 +114,6 @@ pub struct EthWatch<T: Transport> {
 impl<T: Transport> EthWatch<T> {
     pub fn new(
         web3: Web3<T>,
-        web3_event_loop_handle: EventLoopHandle,
         zksync_contract_addr: H160,
         number_of_confirmations_for_event: u64,
         eth_watch_req: mpsc::Receiver<EthWatchRequest>,
@@ -134,7 +130,6 @@ impl<T: Transport> EthWatch<T> {
             zksync_contract,
             eth_state: ETHState::default(),
             web3,
-            _web3_event_loop_handle: web3_event_loop_handle,
             eth_watch_req,
 
             mode: WatcherMode::Working,
@@ -196,18 +191,19 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<(EthBlockId, PriorityOp)>, failure::Error> {
+    ) -> Result<Vec<(EthBlockId, PriorityOp)>, anyhow::Error> {
         let filter = self.get_priority_op_event_filter(from, to);
         self.web3
             .eth()
             .logs(filter)
-            .compat()
             .await?
             .into_iter()
             .map(|event| {
                 let block_number: u64 = event
                     .block_number
-                    .ok_or_else(|| failure::err_msg("No block number set in the queue event log"))?
+                    .ok_or_else(|| {
+                        anyhow::format_err!("No block number set in the queue event log")
+                    })?
                     .as_u64();
 
                 let priority_op = PriorityOp::try_from(event).map_err(|e| {
@@ -223,12 +219,11 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<PriorityOp>, failure::Error> {
+    ) -> Result<Vec<PriorityOp>, anyhow::Error> {
         let filter = self.get_priority_op_event_filter(from, to);
         self.web3
             .eth()
             .logs(filter)
-            .compat()
             .await?
             .into_iter()
             .map(|event| {
@@ -243,12 +238,11 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<CompleteWithdrawalsTx>, failure::Error> {
+    ) -> Result<Vec<CompleteWithdrawalsTx>, anyhow::Error> {
         let filter = self.get_complete_withdrawals_event_filter(from, to);
         self.web3
             .eth()
             .logs(filter)
-            .compat()
             .await?
             .into_iter()
             .map(CompleteWithdrawalsTx::try_from)
@@ -258,7 +252,7 @@ impl<T: Transport> EthWatch<T> {
     async fn get_unconfirmed_ops(
         &mut self,
         current_ethereum_block: u64,
-    ) -> Result<Vec<(EthBlockId, PriorityOp)>, failure::Error> {
+    ) -> Result<Vec<(EthBlockId, PriorityOp)>, anyhow::Error> {
         // We want to scan the interval of blocks from the latest one up to the oldest one which may
         // have unconfirmed priority ops.
         // `+ 1` is added because if we subtract number of confirmations, we'll obtain the last block
@@ -286,7 +280,7 @@ impl<T: Transport> EthWatch<T> {
     async fn store_complete_withdrawals(
         &mut self,
         complete_withdrawals_txs: Vec<CompleteWithdrawalsTx>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let mut storage = self
             .db_pool
             .access_storage_fragile()
@@ -308,7 +302,7 @@ impl<T: Transport> EthWatch<T> {
     async fn restore_state_from_eth(
         &mut self,
         last_ethereum_block: u64,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let current_ethereum_block =
             last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
 
@@ -346,12 +340,12 @@ impl<T: Transport> EthWatch<T> {
 
         self.set_new_state(new_state);
 
-        trace!("ETH state: {:#?}", self.eth_state);
+        log::trace!("ETH state: {:#?}", self.eth_state);
 
         Ok(())
     }
 
-    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> Result<(), failure::Error> {
+    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> Result<(), anyhow::Error> {
         debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
         let previous_block_with_accepted_events = (self.eth_state.last_ethereum_block() + 1)
@@ -380,7 +374,7 @@ impl<T: Transport> EthWatch<T> {
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
         for priority_op in priority_op_events.into_iter() {
-            debug!("New priority op: {:?}", priority_op);
+            log::debug!("New priority op: {:?}", priority_op);
             priority_queue.insert(priority_op.serial_id, priority_op.into());
         }
 
@@ -421,7 +415,7 @@ impl<T: Transport> EthWatch<T> {
         address: Address,
         message: Vec<u8>,
         signature: EIP1271Signature,
-    ) -> Result<bool, failure::Error> {
+    ) -> Result<bool, anyhow::Error> {
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
@@ -431,7 +425,6 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| format_err!("Failed to query contract isValidSignature: {}", e))?;
 
@@ -443,7 +436,7 @@ impl<T: Transport> EthWatch<T> {
         address: Address,
         nonce: Nonce,
         pub_key_hash: &PubKeyHash,
-    ) -> Result<bool, failure::Error> {
+    ) -> Result<bool, anyhow::Error> {
         let auth_fact: Vec<u8> = self
             .zksync_contract
             .1
@@ -454,13 +447,12 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?;
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
-    async fn pending_withdrawals_queue_index(&self) -> Result<u32, failure::Error> {
+    async fn pending_withdrawals_queue_index(&self) -> Result<u32, anyhow::Error> {
         let first_pending_withdrawal_index: u32 = self
             .zksync_contract
             .1
@@ -471,7 +463,6 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| {
                 format_err!(
@@ -489,7 +480,6 @@ impl<T: Transport> EthWatch<T> {
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(|e| {
                 format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e)
@@ -510,7 +500,7 @@ impl<T: Transport> EthWatch<T> {
             .unconfirmed_queue()
             .iter()
             .filter(|(_block, op)| match &op.data {
-                FranklinPriorityOp::Deposit(deposit) => {
+                ZkSyncPriorityOp::Deposit(deposit) => {
                     // Address may be set to either sender or recipient.
                     deposit.from == address || deposit.to == address
                 }
@@ -520,8 +510,8 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
-    async fn poll_eth_node(&mut self) -> Result<(), failure::Error> {
-        let last_block_number = self.web3.eth().block_number().compat().await?.as_u64();
+    async fn poll_eth_node(&mut self) -> Result<(), anyhow::Error> {
+        let last_block_number = self.web3.eth().block_number().await?.as_u64();
 
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
@@ -530,7 +520,7 @@ impl<T: Transport> EthWatch<T> {
         Ok(())
     }
 
-    fn is_backoff_requested(&self, error: &failure::Error) -> bool {
+    fn is_backoff_requested(&self, error: &anyhow::Error) -> bool {
         error.to_string().contains("429 Too Many Requests")
     }
 
@@ -560,7 +550,7 @@ impl<T: Transport> EthWatch<T> {
         // block number.
         // Normally, however, this loop is not expected to last more than one iteration.
         let block = loop {
-            let block = self.web3.eth().block_number().compat().await;
+            let block = self.web3.eth().block_number().await;
 
             match block {
                 Ok(block) => {
@@ -669,13 +659,11 @@ pub fn start_eth_watch(
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
-    let (web3_event_loop_handle, transport) =
-        web3::transports::Http::new(&config_options.web3_url).unwrap();
+    let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
 
     let eth_watch = EthWatch::new(
         web3,
-        web3_event_loop_handle,
         config_options.contract_eth_addr,
         config_options.confirmations_for_eth_event,
         eth_req_receiver,

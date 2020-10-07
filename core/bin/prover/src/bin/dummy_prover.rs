@@ -1,8 +1,8 @@
-use prover::cli_utils::main_for_prover_impl;
-use prover::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
 use std::sync::mpsc;
 use std::time::Duration;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_prover::cli_utils::main_for_prover_impl;
+use zksync_prover::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
 use zksync_utils::get_env;
 
 #[derive(Debug)]
@@ -101,5 +101,5 @@ impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
 }
 
 fn main() {
-    main_for_prover_impl::<DummyProver<prover::client::ApiClient>>();
+    main_for_prover_impl::<DummyProver<zksync_prover::client::ApiClient>>();
 }

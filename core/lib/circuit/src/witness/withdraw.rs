@@ -8,7 +8,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::operations::WithdrawOp;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -22,6 +21,7 @@ use zksync_crypto::{
     },
     primitives::convert_to_float,
 };
+use zksync_types::operations::WithdrawOp;
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
@@ -188,7 +188,7 @@ impl WithdrawWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, withdraw: &WithdrawData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        debug!("Initial root = {}", before_root);
+        log::debug!("Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) =
             get_audits(tree, withdraw.account_address, withdraw.token);
 
@@ -239,7 +239,7 @@ impl WithdrawWitness<Bn256> {
             );
 
         let after_root = tree.root_hash();
-        debug!("After root = {}", after_root);
+        log::debug!("After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, withdraw.account_address, withdraw.token);
 
