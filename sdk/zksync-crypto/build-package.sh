@@ -36,7 +36,7 @@ node ./pack-wasm-base64.js
 
 # build asmjs version from the input (optimised) WASM
 echo "*** Building asm.js version"
-./../../binaryen/bin/wasm2js --output $ASM $OPT
+./../../binaryen/bin/wasm2js -Oz --output $ASM $OPT
 
 # cleanup the generated asm, converting to cjs
 sed -i -e '/import {/d' $ASM

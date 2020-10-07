@@ -1,7 +1,5 @@
 import { Signature } from "./types";
-
 import { private_key_to_pubkey_hash, sign_musig, waitReady, zksync_crypto_init } from "@teamnumio/zksync-crypto";
-import * as zks from "@teamnumio/zksync-crypto";
 import { utils } from "ethers";
 
 export { privateKeyFromSeed } from "@teamnumio/zksync-crypto";

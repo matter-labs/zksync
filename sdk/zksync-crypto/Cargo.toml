@@ -42,4 +42,4 @@ panic = "abort"
 opt-level = "s"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = false
+#wasm-opt = false
