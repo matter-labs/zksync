@@ -6,6 +6,7 @@ type Network = 'localhost' | 'rinkeby' | 'ropsten';
 
 export class Tester {
     public contract: ethers.Contract;
+    public runningFee: ethers.BigNumber;
     constructor(
         public network: Network,
         public ethProvider: ethers.providers.Provider,
@@ -14,6 +15,7 @@ export class Tester {
         public syncWallet: zksync.Wallet
     ) {
         this.contract = new ethers.Contract(syncProvider.contractAddress.mainContract, franklin_abi, ethWallet);
+        this.runningFee = ethers.BigNumber.from(0);
     }
 
     // prettier-ignore
@@ -48,5 +50,13 @@ export class Tester {
     async emptyWallet() {
         let ethWallet = ethers.Wallet.createRandom().connect(this.ethProvider);
         return await zksync.Wallet.fromEthSigner(ethWallet, this.syncProvider);
+    }
+
+    async operatorBalance(token: zksync.types.TokenLike) {
+        const operatorAddress = process.env.OPERATOR_FEE_ETH_ADDRESS as string;
+        const accountState = await this.syncProvider.getState(operatorAddress);
+        const tokenSymbol = this.syncProvider.tokenSet.resolveTokenSymbol(token);
+        const balance = accountState.committed.balances[tokenSymbol] || '0';
+        return ethers.BigNumber.from(balance);
     }
 }

@@ -7,8 +7,8 @@ type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<BigNumber>;
-        testMultiTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<BigNumber>;
+        testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testMultiTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testFailedMultiTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
@@ -44,7 +44,7 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
         expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer checks failed').to.be.true;
     }
 
-    return fee;
+    this.runningFee = this.runningFee.add(fee);
 };
 
 Tester.prototype.testMultiTransfer = async function (
@@ -97,7 +97,7 @@ Tester.prototype.testMultiTransfer = async function (
         expect(receiverAfter.eq(receiverBefore), 'Batched transfer checks failed').to.be.true;
     }
 
-    return fee;
+    this.runningFee = this.runningFee.add(fee);
 };
 
 Tester.prototype.testFailedMultiTransfer = async function (

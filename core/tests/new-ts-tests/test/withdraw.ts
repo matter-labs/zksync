@@ -8,7 +8,7 @@ const VERIFY_TIMEOUT = 120_000;
 
 declare module './tester' {
     interface Tester {
-        testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<BigNumber>;
+        testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
     }
 }
 
@@ -25,7 +25,7 @@ Tester.prototype.testWithdraw = async function (
     amount: BigNumber,
     fastProcessing?: boolean
 ) {
-    const type = fastProcessing ? "FastWithdraw" : 'Withdraw';
+    const type = fastProcessing ? 'FastWithdraw' : 'Withdraw';
     const { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), token);
     const balanceBefore = await wallet.getBalance(token);
     const onchainBalanceBefore = await wallet.getEthereumBalance(token);
@@ -59,5 +59,5 @@ Tester.prototype.testWithdraw = async function (
         'Wrong amount onchain after withdraw'
     ).to.be.true;
 
-    return fee;
+    this.runningFee = this.runningFee.add(fee);
 };

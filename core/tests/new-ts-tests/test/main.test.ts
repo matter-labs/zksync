@@ -1,6 +1,6 @@
 import { expect, use } from 'chai';
 import promised from 'chai-as-promised';
-import { utils } from 'ethers';
+import { BigNumber, utils } from 'ethers';
 import { Wallet } from 'zksync';
 
 import { Tester } from './tester';
@@ -19,6 +19,7 @@ describe('ZkSync integration tests', () => {
     // let bob: Wallet;
     let carl: Wallet;
     // let donna: Wallet;
+    let operatorBalance: BigNumber;
 
     before('create tester', async () => {
         tester = await Tester.init('localhost', 'HTTP');
@@ -26,6 +27,7 @@ describe('ZkSync integration tests', () => {
         // bob = await tester.emptyWallet();
         carl = await tester.emptyWallet();
         // donna = await tester.emptyWallet();
+        operatorBalance = await tester.operatorBalance('ETH');
     });
 
     after('disconnect tester', async () => {
@@ -85,5 +87,10 @@ describe('ZkSync integration tests', () => {
 
     step('should execute a fast withdrawal', async () => {
         await expect(tester.testWithdraw(carl, 'ETH', one.div(10), true)).to.be.fulfilled;
+    });
+
+    step('check collected fees', async () => {
+        const collectedFee = (await tester.operatorBalance('ETH')).sub(operatorBalance);
+        expect(collectedFee.eq(tester.runningFee), 'Fee collection failed').to.be.true;
     });
 });
