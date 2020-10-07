@@ -8,7 +8,7 @@ const VERIFY_TIMEOUT = 120_000;
 
 declare module './tester' {
     interface Tester {
-        testWithdraw(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<BigNumber>;
+        testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<BigNumber>;
     }
 }
 
@@ -20,18 +20,18 @@ function timeout<T>(promise: Promise<T>, millis: number) {
 }
 
 Tester.prototype.testWithdraw = async function (
-    from: Wallet,
-    to: Wallet,
+    wallet: Wallet,
     token: TokenLike,
     amount: BigNumber,
     fastProcessing?: boolean
 ) {
-    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Withdraw', to.address(), token);
-    const balanceBefore = await from.getBalance(token);
-    const onchainBalanceBefore = await to.getEthereumBalance(token);
+    const type = fastProcessing ? "FastWithdraw" : 'Withdraw';
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), token);
+    const balanceBefore = await wallet.getBalance(token);
+    const onchainBalanceBefore = await wallet.getEthereumBalance(token);
 
-    const handle = await from.withdrawFromSyncToEthereum({
-        ethAddress: to.address(),
+    const handle = await wallet.withdrawFromSyncToEthereum({
+        ethAddress: wallet.address(),
         token,
         amount,
         fee,
@@ -39,20 +39,20 @@ Tester.prototype.testWithdraw = async function (
     });
 
     // Checking that there are no complete withdrawals tx hash for this withdrawal
-    expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.be.empty;
+    expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.not.exist;
 
     // Await for verification with a timeout set.
     await timeout(handle.awaitVerifyReceipt(), VERIFY_TIMEOUT);
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     // we should wait some time for `completeWithdrawals` transaction to be processed
-    await utils.sleep(10000);
-    expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.not.be.empty;
+    await utils.sleep(10_000);
+    expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.exist;
 
-    const balanceAfter = await from.getBalance(token);
-    const onchainBalanceAfter = await to.getEthereumBalance(token);
-    const tokenId = to.provider.tokenSet.resolveTokenId(token);
-    const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(to.address(), tokenId);
+    const balanceAfter = await wallet.getBalance(token);
+    const onchainBalanceAfter = await wallet.getEthereumBalance(token);
+    const tokenId = wallet.provider.tokenSet.resolveTokenId(token);
+    const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
     expect(balanceBefore.sub(balanceAfter).eq(amount.add(fee)), 'Wrong amount on wallet after withdraw').to.be.true;
     expect(
         onchainBalanceAfter.add(pendingToBeOnchain).sub(onchainBalanceBefore).eq(amount),

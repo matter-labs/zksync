@@ -7,6 +7,7 @@ import { Tester } from './tester';
 import './deposit';
 import './change-pub-key';
 import './transfer';
+import './withdraw';
 
 use(promised);
 
@@ -69,11 +70,20 @@ describe('ZkSync integration tests', () => {
 
     step('should change pubkey offchain', async () => {
         await expect(tester.testChangePubKey(alice, 'ETH', false)).to.be.fulfilled;
+        await expect(tester.testChangePubKey(carl, 'ETH', false)).to.be.fulfilled;
         // await expect(tester.testChangePubKey(bob, 'DAI', false)).to.be.fulfilled;
     });
 
     step('should test multi-transfers', async () => {
         await expect(tester.testMultiTransfer(alice, carl, 'ETH', one.div(100))).to.be.fulfilled;
         await expect(tester.testFailedMultiTransfer(alice, carl, 'ETH', one.div(100))).to.be.fulfilled;
+    });
+
+    step('should execute a withdrawal', async () => {
+        await expect(tester.testWithdraw(alice, 'ETH', one.div(10))).to.be.fulfilled;
+    });
+
+    step('should execute a fast withdrawal', async () => {
+        await expect(tester.testWithdraw(carl, 'ETH', one.div(10), true)).to.be.fulfilled;
     });
 });
