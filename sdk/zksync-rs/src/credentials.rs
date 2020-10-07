@@ -3,7 +3,7 @@ use crate::{error::ClientError, types::network::Network, utils::private_key_from
 use web3::types::{Address, H256};
 use zksync_crypto::PrivateKey;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::tx::PackedEthSignature;
+use zksync_types::tx::TxEthSignature;
 
 pub struct WalletCredentials {
     pub(crate) eth_signer: Option<EthereumSigner>,
@@ -25,11 +25,11 @@ impl WalletCredentials {
     /// ## Arguments
     ///
     /// - `eth_address`: Address of the corresponding Ethereum wallet.
-    /// - `eth_private_key`: Private key of a corresponding Ethereum account.
+    /// - `eth_signer`: Abstract signer that signs messages and transactions.
     /// - `network`: Network this wallet is used on.
-    pub fn from_eth_pk(
+    pub async fn from_eth_signer(
         eth_address: Address,
-        eth_private_key: H256,
+        eth_signer: EthereumSigner,
         network: Network,
     ) -> Result<Self, ClientError> {
         // Pre-defined message to generate seed from.
@@ -45,9 +45,21 @@ impl WalletCredentials {
         }
         .into_bytes();
 
-        // Check that private key is correct and corresponds to the provided address.
-        let address_from_pk = PackedEthSignature::address_from_private_key(&eth_private_key);
-        if !address_from_pk
+        let signature = eth_signer
+            .sign_message(&eth_sign_message)
+            .await
+            .map_err(|_| ClientError::IncorrectCredentials)?;
+
+        let packed_signature =
+            if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                packed_signature
+            } else {
+                return Err(ClientError::IncorrectCredentials);
+            };
+
+        // Check that signature is correct and corresponds to the provided address.
+        let address_from_sig = packed_signature.signature_recover_signer(&eth_sign_message);
+        if !address_from_sig
             .map(|address_from_pk| eth_address == address_from_pk)
             .unwrap_or(false)
         {
@@ -55,12 +67,8 @@ impl WalletCredentials {
         }
 
         // Generate seed, and then zkSync private key.
-        let signature = PackedEthSignature::sign(&eth_private_key, &eth_sign_message)
-            .map_err(|_| ClientError::IncorrectCredentials)?;
-
-        let signature_bytes = signature.serialize_packed();
+        let signature_bytes = packed_signature.serialize_packed();
         let zksync_pk = private_key_from_seed(&signature_bytes)?;
-        let eth_signer = EthereumSigner::from_key(eth_private_key);
 
         Ok(Self {
             eth_signer: Some(eth_signer),

@@ -2506,6 +2506,7 @@ dependencies = [
  "web3 0.13.0",
  "zksync",
  "zksync_config",
+ "zksync_eth_signer",
  "zksync_server",
  "zksync_types",
  "zksync_utils",

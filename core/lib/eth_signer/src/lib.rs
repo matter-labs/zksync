@@ -5,9 +5,9 @@ use error::SignerError;
 use zksync_types::tx::TxEthSignature;
 use zksync_types::{Address, H256};
 
-use json_rpc_signer::JsonRpcSigner;
-use pk_signer::PrivateKeySigner;
-use raw_ethereum_tx::RawTransaction;
+pub use json_rpc_signer::JsonRpcSigner;
+pub use pk_signer::PrivateKeySigner;
+pub use raw_ethereum_tx::RawTransaction;
 
 pub mod error;
 pub mod json_rpc_signer;
