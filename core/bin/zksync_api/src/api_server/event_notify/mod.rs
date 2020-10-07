@@ -18,7 +18,6 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use lru_cache::LruCache;
-use std::collections::BTreeMap;
 use std::str::FromStr;
 use zksync_basic_types::Address;
 use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
@@ -28,7 +27,7 @@ use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
 use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation};
 
-use self::operation_notifier::OperationNotifier;
+use self::{operation_notifier::OperationNotifier, sub_store::SubStorage};
 
 mod event_notify_fetcher;
 mod operation_notifier;
@@ -87,9 +86,9 @@ pub fn start_sub_notifier(
         cache_of_blocks_info: LruCache::new(api_requests_caches_size),
         tokens_cache,
         db_pool,
-        tx_subs: BTreeMap::new(),
-        prior_op_subs: BTreeMap::new(),
-        account_subs: BTreeMap::new(),
+        tx_subs: SubStorage::new(),
+        prior_op_subs: SubStorage::new(),
+        account_subs: SubStorage::new(),
     };
 
     tokio::spawn(async move {
