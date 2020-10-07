@@ -1,7 +1,7 @@
 mod collect_fee;
 mod operations;
 
-use crate::state::ZksyncState;
+use crate::state::ZkSyncState;
 use num::BigUint;
 use web3::types::H256;
 use zksync_crypto::{
@@ -11,7 +11,7 @@ use zksync_crypto::{
 };
 use zksync_types::tx::PackedEthSignature;
 use zksync_types::{
-    Account, AccountId, AccountUpdate, FranklinPriorityOp, FranklinTx, PubKeyHash, TokenId,
+    Account, AccountId, AccountUpdate, PubKeyHash, TokenId, ZkSyncPriorityOp, ZkSyncTx,
 };
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];
@@ -23,7 +23,7 @@ pub enum AccountState {
 
 pub struct PlasmaTestBuilder {
     rng: XorShiftRng,
-    state: ZksyncState,
+    state: ZkSyncState,
 }
 
 impl Default for PlasmaTestBuilder {
@@ -36,7 +36,7 @@ impl PlasmaTestBuilder {
     pub fn new() -> Self {
         Self {
             rng: XorShiftRng::from_seed([1, 2, 3, 4]),
-            state: ZksyncState::empty(),
+            state: ZkSyncState::empty(),
         }
     }
 
@@ -76,7 +76,7 @@ impl PlasmaTestBuilder {
         self.state.insert_account(account_id, account);
     }
 
-    pub fn test_tx_success(&mut self, tx: FranklinTx, expected_updates: &BoundAccountUpdates) {
+    pub fn test_tx_success(&mut self, tx: ZkSyncTx, expected_updates: &BoundAccountUpdates) {
         let mut state_clone = self.state.clone();
         let op_success = self.state.execute_tx(tx).expect("transaction failed");
         self.compare_updates(
@@ -86,7 +86,7 @@ impl PlasmaTestBuilder {
         );
     }
 
-    pub fn test_tx_fail(&mut self, tx: FranklinTx, expected_error_message: &str) {
+    pub fn test_tx_fail(&mut self, tx: ZkSyncTx, expected_error_message: &str) {
         let error = self
             .state
             .execute_tx(tx)
@@ -101,7 +101,7 @@ impl PlasmaTestBuilder {
 
     pub fn test_priority_op_success(
         &mut self,
-        op: FranklinPriorityOp,
+        op: ZkSyncPriorityOp,
         expected_updates: &BoundAccountUpdates,
     ) {
         let mut state_clone = self.state.clone();
@@ -117,7 +117,7 @@ impl PlasmaTestBuilder {
         &self,
         expected_updates: &BoundAccountUpdates,
         actual_updates: &BoundAccountUpdates,
-        state_clone: &mut ZksyncState,
+        state_clone: &mut ZkSyncState,
     ) {
         assert_eq!(expected_updates, actual_updates, "unexpected updates");
 

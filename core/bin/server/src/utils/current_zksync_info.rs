@@ -9,11 +9,11 @@ use zksync_types::BlockNumber;
 /// It's like storage, but in memory.
 /// In the future, more fields might be added.
 #[derive(Debug, Clone)]
-pub struct CurrentZksyncInfo {
+pub struct CurrentZkSyncInfo {
     last_verified_block: Arc<AtomicU32>,
 }
 
-impl CurrentZksyncInfo {
+impl CurrentZkSyncInfo {
     pub async fn new(connection_pool: &ConnectionPool) -> Self {
         let mut storage = connection_pool.access_storage().await.expect("db failed");
 

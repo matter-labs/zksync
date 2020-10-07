@@ -5,10 +5,10 @@ use zksync_types::{AccountUpdate, AccountUpdates, Close, CloseOp, TokenId};
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, ZksyncState},
+    state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
-impl TxHandler<Close> for ZksyncState {
+impl TxHandler<Close> for ZkSyncState {
     type Op = CloseOp;
 
     fn create_op(&self, _tx: Close) -> Result<Self::Op, anyhow::Error> {

@@ -20,7 +20,7 @@ use super::ETHSender;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
 use crate::eth_sender::transactions::{ETHStats, ExecutedTxStatus};
 use crate::eth_sender::ETHSenderRequest;
-use crate::utils::current_zksync_info::CurrentZksyncInfo;
+use crate::utils::current_zksync_info::CurrentZkSyncInfo;
 
 const CHANNEL_CAPACITY: usize = 16;
 
@@ -403,7 +403,7 @@ fn build_eth_sender(
         is_enabled: true,
     };
 
-    let current_zksync_info = CurrentZksyncInfo::with_block_number(0);
+    let current_zksync_info = CurrentZkSyncInfo::with_block_number(0);
     let eth_sender = ETHSender::new(
         options,
         db,

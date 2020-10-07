@@ -32,8 +32,8 @@ use zksync_server::{
     mempool::run_mempool_task,
     observer_mode,
     prover_server::start_prover_server,
-    state_keeper::{start_state_keeper, ZksyncStateKeeper},
-    utils::current_zksync_info::CurrentZksyncInfo,
+    state_keeper::{start_state_keeper, ZkSyncStateKeeper},
+    utils::current_zksync_info::CurrentZkSyncInfo,
 };
 
 fn main() {
@@ -62,7 +62,7 @@ fn main() {
             let pool = ConnectionPool::new(Some(1)).await;
 
             log::info!("Generating genesis block.");
-            ZksyncStateKeeper::create_genesis_block(
+            ZkSyncStateKeeper::create_genesis_block(
                 pool.clone(),
                 &config_opts.operator_fee_eth_addr,
             )
@@ -143,7 +143,7 @@ fn main() {
             );
         }
 
-        let current_zksync_info = CurrentZksyncInfo::new(&connection_pool).await;
+        let current_zksync_info = CurrentZkSyncInfo::new(&connection_pool).await;
 
         log::info!("starting actors");
 
@@ -217,7 +217,7 @@ fn main() {
             .state_keeper_init
             .get_pending_block(&mut storage)
             .await;
-        let state_keeper = ZksyncStateKeeper::new(
+        let state_keeper = ZkSyncStateKeeper::new(
             observer_mode_final_state.state_keeper_init,
             config_opts.operator_fee_eth_addr,
             state_keeper_req_receiver,

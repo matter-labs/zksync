@@ -12,7 +12,7 @@ use zksync_crypto::params::{
 };
 use zksync_crypto::primitives::{bytes_slice_to_uint16, bytes_slice_to_uint32};
 
-/// TransferToNew operation. For details, see the documentation of [`FranklinOp`](./operations/enum.FranklinOp.html).
+/// TransferToNew operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferToNewOp {
     pub tx: Transfer,

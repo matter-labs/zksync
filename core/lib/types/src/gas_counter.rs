@@ -6,7 +6,7 @@
 // Workspace deps
 use zksync_basic_types::U256;
 // Local deps
-use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, FranklinOp};
+use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, ZkSyncOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -37,23 +37,23 @@ impl CommitCost {
         U256::from(Self::BASE_COST)
     }
 
-    pub fn op_cost(op: &FranklinOp) -> U256 {
+    pub fn op_cost(op: &ZkSyncOp) -> U256 {
         let cost = match op {
-            FranklinOp::Noop(_) => 0,
-            FranklinOp::Deposit(_) => Self::DEPOSIT_COST,
-            FranklinOp::ChangePubKeyOffchain(change_pubkey) => {
+            ZkSyncOp::Noop(_) => 0,
+            ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
+            ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
                 if change_pubkey.tx.eth_signature.is_some() {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
                     Self::CHANGE_PUBKEY_COST_ONCHAIN
                 }
             }
-            FranklinOp::Transfer(_) => Self::TRANSFER_COST,
-            FranklinOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
-            FranklinOp::FullExit(_) => Self::FULL_EXIT_COST,
-            FranklinOp::Withdraw(_) => Self::WITHDRAW_COST,
-            FranklinOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
-            FranklinOp::Close(_) => unreachable!("Close operations are disabled"),
+            ZkSyncOp::Transfer(_) => Self::TRANSFER_COST,
+            ZkSyncOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
+            ZkSyncOp::FullExit(_) => Self::FULL_EXIT_COST,
+            ZkSyncOp::Withdraw(_) => Self::WITHDRAW_COST,
+            ZkSyncOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
+            ZkSyncOp::Close(_) => unreachable!("Close operations are disabled"),
         };
 
         U256::from(cost)
@@ -83,17 +83,17 @@ impl VerifyCost {
         U256::from(Self::BASE_COST)
     }
 
-    pub fn op_cost(op: &FranklinOp) -> U256 {
+    pub fn op_cost(op: &ZkSyncOp) -> U256 {
         let cost = match op {
-            FranklinOp::Noop(_) => 0,
-            FranklinOp::Deposit(_) => Self::DEPOSIT_COST,
-            FranklinOp::ChangePubKeyOffchain(_) => Self::CHANGE_PUBKEY_COST,
-            FranklinOp::Transfer(_) => Self::TRANSFER_COST,
-            FranklinOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
-            FranklinOp::FullExit(_) => Self::FULL_EXIT_COST,
-            FranklinOp::Withdraw(_) => Self::WITHDRAW_COST,
-            FranklinOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
-            FranklinOp::Close(_) => unreachable!("Close operations are disabled"),
+            ZkSyncOp::Noop(_) => 0,
+            ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
+            ZkSyncOp::ChangePubKeyOffchain(_) => Self::CHANGE_PUBKEY_COST,
+            ZkSyncOp::Transfer(_) => Self::TRANSFER_COST,
+            ZkSyncOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
+            ZkSyncOp::FullExit(_) => Self::FULL_EXIT_COST,
+            ZkSyncOp::Withdraw(_) => Self::WITHDRAW_COST,
+            ZkSyncOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
+            ZkSyncOp::Close(_) => unreachable!("Close operations are disabled"),
         };
 
         U256::from(cost)
@@ -140,7 +140,7 @@ impl GasCounter {
     ///
     /// Returns `Ok(())` if transaction fits, and returns `Err(())` if
     /// the block must be sealed without this transaction.
-    pub fn add_op(&mut self, op: &FranklinOp) -> Result<(), ()> {
+    pub fn add_op(&mut self, op: &ZkSyncOp) -> Result<(), ()> {
         let new_commit_cost = self.commit_cost + CommitCost::op_cost(op);
         if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
             return Err(());
@@ -206,7 +206,7 @@ mod tests {
         // TODO add other operations to this test.
 
         let test_vector = vec![(
-            FranklinOp::from(change_pubkey_op),
+            ZkSyncOp::from(change_pubkey_op),
             CommitCost::CHANGE_PUBKEY_COST_ONCHAIN,
         )];
 
@@ -234,7 +234,7 @@ mod tests {
         // TODO add other operations to this test.
 
         let test_vector = vec![(
-            FranklinOp::from(change_pubkey_op),
+            ZkSyncOp::from(change_pubkey_op),
             VerifyCost::CHANGE_PUBKEY_COST,
         )];
 
@@ -258,7 +258,7 @@ mod tests {
             ),
             account_id: 1,
         };
-        let franklin_op = FranklinOp::from(change_pubkey_op);
+        let zksync_op = ZkSyncOp::from(change_pubkey_op);
 
         let mut gas_counter = GasCounter::new();
 
@@ -272,7 +272,7 @@ mod tests {
 
         for _ in 0..amount_ops_in_block.as_u64() {
             gas_counter
-                .add_op(&franklin_op)
+                .add_op(&zksync_op)
                 .expect("Gas limit was not reached, but op adding failed");
         }
 
@@ -290,7 +290,7 @@ mod tests {
 
         // Attempt to add one more operation (it should fail).
         gas_counter
-            .add_op(&franklin_op)
+            .add_op(&zksync_op)
             .expect_err("Able to add operation beyond the gas limit");
 
         // Check again that limit has not changed.

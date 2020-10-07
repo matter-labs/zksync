@@ -10,7 +10,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     Action, Operation,
-    {block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
+    {block::Block, AccountMap, AccountUpdate, AccountUpdates, ZkSyncOp},
 };
 // Local deps
 use crate::{
@@ -169,7 +169,7 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
 ///
 pub async fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBlock]) {
     let mut storage = connection_pool.access_storage().await.expect("db failed");
-    let mut ops: Vec<(u32, &FranklinOp, u32)> = vec![];
+    let mut ops: Vec<(u32, &ZkSyncOp, u32)> = vec![];
 
     for block in blocks {
         for op in &block.ops {
@@ -206,7 +206,7 @@ pub async fn get_ops_blocks_from_storage(connection_pool: &ConnectionPool) -> Ve
 ///
 /// # Arguments
 ///
-/// * `op_block` - Stored Franklin operations block description
+/// * `op_block` - Stored ZkSync operations block description
 ///
 pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> RollupOpsBlock {
     RollupOpsBlock {
@@ -306,7 +306,7 @@ pub async fn get_block_events_state_from_storage(connection_pool: &ConnectionPoo
 ///
 /// # Arguments
 ///
-/// * `block` - Stored representation of Franklin Contract event
+/// * `block` - Stored representation of ZkSync Contract event
 ///
 pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEvent {
     BlockEvent {

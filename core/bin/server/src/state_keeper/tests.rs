@@ -1,4 +1,4 @@
-use super::{CommitRequest, ExecutedOpId, ZksyncStateInitParams, ZksyncStateKeeper};
+use super::{CommitRequest, ExecutedOpId, ZkSyncStateInitParams, ZkSyncStateKeeper};
 use crate::mempool::ProposedBlock;
 use futures::{channel::mpsc, stream::StreamExt};
 use num::BigUint;
@@ -11,7 +11,7 @@ use zksync_crypto::{
 use zksync_types::{mempool::SignedTxVariant, tx::PackedEthSignature, *};
 
 struct StateKeeperTester {
-    state_keeper: ZksyncStateKeeper,
+    state_keeper: ZkSyncStateKeeper,
     response_rx: mpsc::Receiver<CommitRequest>,
     fee_collector: AccountId,
 }
@@ -30,10 +30,10 @@ impl StateKeeperTester {
         let mut fee_collector = Account::default();
         fee_collector.address = H160::random();
 
-        let mut init_params = ZksyncStateInitParams::default();
+        let mut init_params = ZkSyncStateInitParams::default();
         init_params.insert_account(0, fee_collector.clone());
 
-        let state_keeper = ZksyncStateKeeper::new(
+        let state_keeper = ZkSyncStateKeeper::new(
             init_params,
             fee_collector.address,
             request_rx,
@@ -91,7 +91,7 @@ fn create_account_and_withdrawal<B: Into<BigUint>>(
     account_id: AccountId,
     balance: B,
     withdraw_amount: B,
-) -> SignedFranklinTx {
+) -> SignedZkSyncTx {
     let (account, sk) = tester.add_account(account_id);
     tester.set_balance(account_id, token_id, balance);
 
@@ -107,8 +107,8 @@ fn create_account_and_withdrawal<B: Into<BigUint>>(
     )
     .unwrap();
 
-    SignedFranklinTx {
-        tx: FranklinTx::Withdraw(Box::new(withdraw)),
+    SignedZkSyncTx {
+        tx: ZkSyncTx::Withdraw(Box::new(withdraw)),
         eth_sign_data: None,
     }
 }
@@ -122,7 +122,7 @@ pub fn create_deposit(token: TokenId, amount: impl Into<BigUint>) -> PriorityOp 
         token,
     };
     PriorityOp {
-        data: FranklinPriorityOp::Deposit(deposit),
+        data: ZkSyncPriorityOp::Deposit(deposit),
         serial_id: 0,
         deadline_block: 0,
         eth_hash: vec![],

@@ -5,8 +5,8 @@ use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_types::{
-    tx::TxEthSignature, Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce,
-    PriorityOp, PubKeyHash,
+    tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash,
+    ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 // Local uses
@@ -15,7 +15,7 @@ use crate::utils::token_db_cache::TokenDBCache;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxWithSignature {
-    pub tx: FranklinTx,
+    pub tx: ZkSyncTx,
     pub signature: Option<TxEthSignature>,
 }
 
@@ -167,7 +167,7 @@ pub struct OngoingDeposit {
 impl OngoingDeposit {
     pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
         let (token_id, amount) = match priority_op.data {
-            FranklinPriorityOp::Deposit(deposit) => (
+            ZkSyncPriorityOp::Deposit(deposit) => (
                 deposit.token,
                 deposit
                     .amount

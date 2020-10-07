@@ -2,7 +2,7 @@ use num::BigUint;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
     tokens::TxFeeTypes,
-    FranklinTx, Nonce, Token, TokenLike,
+    Nonce, Token, TokenLike, ZkSyncTx,
 };
 
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
@@ -29,7 +29,7 @@ impl<'a> ChangePubKeyBuilder<'a> {
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn tx(self) -> Result<FranklinTx, ClientError> {
+    pub async fn tx(self) -> Result<ZkSyncTx, ClientError> {
         let fee_token = self
             .fee_token
             .ok_or_else(|| ClientError::MissingRequiredField("fee_token".into()))?;
@@ -64,7 +64,7 @@ impl<'a> ChangePubKeyBuilder<'a> {
             }
         };
 
-        Ok(FranklinTx::from(
+        Ok(ZkSyncTx::from(
             self.wallet
                 .signer
                 .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee)

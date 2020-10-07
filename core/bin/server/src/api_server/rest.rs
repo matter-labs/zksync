@@ -25,8 +25,8 @@ use zksync_storage::chain::operations_ext::{
 };
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
-    Account, AccountId, Address, BlockNumber, ExecutedOperations, FranklinPriorityOp, PriorityOp,
-    Token, TokenId,
+    Account, AccountId, Address, BlockNumber, ExecutedOperations, PriorityOp, Token, TokenId,
+    ZkSyncPriorityOp,
 };
 
 use super::rpc_server::get_ongoing_priority_ops;
@@ -469,7 +469,7 @@ fn deposit_op_to_tx_by_hash(
     eth_block: EthBlockId,
 ) -> Option<TxByHashResponse> {
     match &op.data {
-        FranklinPriorityOp::Deposit(deposit) => {
+        ZkSyncPriorityOp::Deposit(deposit) => {
             // As the time of creation is indefinite, we always will provide the current time.
             let current_time = chrono::Utc::now();
             let naive_current_time =

@@ -9,7 +9,7 @@ use tokio::task::JoinHandle;
 use zksync_basic_types::Address;
 // Workspace uses
 use zksync_crypto::ff;
-use zksync_state::state::{CollectedFee, OpSuccess, ZksyncState};
+use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{
@@ -18,9 +18,9 @@ use zksync_types::{
     },
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
-    tx::{FranklinTx, TxHash},
+    tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, BlockNumber,
-    PriorityOp, SignedFranklinTx,
+    PriorityOp, SignedZkSyncTx,
 };
 // Local uses
 use crate::{
@@ -86,9 +86,9 @@ impl PendingBlock {
 }
 
 /// Responsible for tx processing and block forming.
-pub struct ZksyncStateKeeper {
+pub struct ZkSyncStateKeeper {
     /// Current plasma state
-    state: ZksyncState,
+    state: ZkSyncState,
 
     fee_account_id: AccountId,
     current_unprocessed_priority_op: u64,
@@ -104,20 +104,20 @@ pub struct ZksyncStateKeeper {
     max_number_of_withdrawals_per_block: usize,
 }
 
-pub struct ZksyncStateInitParams {
+pub struct ZkSyncStateInitParams {
     pub tree: AccountTree,
     pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
 }
 
-impl Default for ZksyncStateInitParams {
+impl Default for ZkSyncStateInitParams {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ZksyncStateInitParams {
+impl ZkSyncStateInitParams {
     pub fn new() -> Self {
         Self {
             tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
@@ -331,10 +331,10 @@ impl ZksyncStateInitParams {
     }
 }
 
-impl ZksyncStateKeeper {
+impl ZkSyncStateKeeper {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        initial_state: ZksyncStateInitParams,
+        initial_state: ZkSyncStateInitParams,
         fee_account_address: Address,
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
@@ -352,7 +352,7 @@ impl ZksyncStateKeeper {
         };
         assert!(is_sorted);
 
-        let state = ZksyncState::new(
+        let state = ZkSyncState::new(
             initial_state.tree,
             initial_state.acc_id_by_addr,
             initial_state.last_block_number + 1,
@@ -363,7 +363,7 @@ impl ZksyncStateKeeper {
             .expect("Fee account should be present in the account tree");
         // Keeper starts with the NEXT block
         let max_block_size = *available_block_chunk_sizes.iter().max().unwrap();
-        let keeper = ZksyncStateKeeper {
+        let keeper = ZkSyncStateKeeper {
             state,
             fee_account_id,
             current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
@@ -467,7 +467,7 @@ impl ZksyncStateKeeper {
             .commit()
             .await
             .expect("Unable to commit transaction in statekeeper");
-        let state = ZksyncState::from_acc_map(accounts, last_committed + 1);
+        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         log::info!("Genesis block created, state: {}", state.root_hash());
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
@@ -587,7 +587,7 @@ impl ZksyncStateKeeper {
         // too expensive.
         let non_executed_op = self
             .state
-            .priority_op_to_franklin_op(priority_op.data.clone());
+            .priority_op_to_zksync_op(priority_op.data.clone());
         if self
             .pending_block
             .gas_counter
@@ -628,7 +628,7 @@ impl ZksyncStateKeeper {
 
     fn apply_batch(
         &mut self,
-        txs: &[SignedFranklinTx],
+        txs: &[SignedZkSyncTx],
         batch_id: i64,
     ) -> Result<Vec<ExecutedOperations>, ()> {
         let chunks_needed = self.state.chunks_for_batch(txs);
@@ -642,7 +642,7 @@ impl ZksyncStateKeeper {
         for tx in txs {
             // Check if adding this transaction to the block won't make the contract operations
             // too expensive.
-            let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.tx.clone());
+            let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone());
             if let Ok(non_executed_op) = non_executed_op {
                 // We only care about successful conversions, since if conversion failed,
                 // then transaction will fail as well (as it shares the same code base).
@@ -658,7 +658,7 @@ impl ZksyncStateKeeper {
                 }
             }
 
-            if matches!(&tx.tx, &FranklinTx::Withdraw(_)) {
+            if matches!(&tx.tx, &ZkSyncTx::Withdraw(_)) {
                 // Increase amount of the withdraw operations in this block.
                 self.pending_block.withdrawals_amount += 1;
             }
@@ -725,7 +725,7 @@ impl ZksyncStateKeeper {
         Ok(executed_operations)
     }
 
-    fn apply_tx(&mut self, tx: &SignedFranklinTx) -> Result<ExecutedOperations, ()> {
+    fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> Result<ExecutedOperations, ()> {
         let chunks_needed = self.state.chunks_for_tx(&tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -736,7 +736,7 @@ impl ZksyncStateKeeper {
 
         // Check if adding this transaction to the block won't make the contract operations
         // too expensive.
-        let non_executed_op = self.state.franklin_tx_to_franklin_op(tx.tx.clone());
+        let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone());
         if let Ok(non_executed_op) = non_executed_op {
             // We only care about successful conversions, since if conversion failed,
             // then transaction will fail as well (as it shares the same code base).
@@ -752,7 +752,7 @@ impl ZksyncStateKeeper {
             }
         }
 
-        if let FranklinTx::Withdraw(tx) = &tx.tx {
+        if let ZkSyncTx::Withdraw(tx) = &tx.tx {
             // Increase amount of the withdraw operations in this block.
             self.pending_block.withdrawals_amount += 1;
 
@@ -968,7 +968,7 @@ impl ZksyncStateKeeper {
 
 #[must_use]
 pub fn start_state_keeper(
-    sk: ZksyncStateKeeper,
+    sk: ZkSyncStateKeeper,
     pending_block: Option<SendablePendingBlock>,
 ) -> JoinHandle<()> {
     tokio::spawn(sk.run(pending_block))

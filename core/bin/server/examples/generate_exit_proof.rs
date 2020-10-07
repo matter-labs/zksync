@@ -22,7 +22,7 @@ struct ExitProofData {
 async fn main() {
     env_logger::init();
 
-    let cli = App::new("Franklin operator node")
+    let cli = App::new("ZkSync operator node")
         .author("Matter Labs")
         .arg(
             Arg::with_name("Account id")
