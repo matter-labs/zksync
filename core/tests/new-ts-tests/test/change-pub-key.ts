@@ -11,29 +11,26 @@ declare module './tester' {
     }
 }
 
-Tester.prototype.testChangePubKey = async function(
-    wallet: Wallet,
-    feeToken: TokenLike,
-    onchain: boolean
-) {
-    if (await wallet.isSigningKeySet()) 
+Tester.prototype.testChangePubKey = async function (wallet: Wallet, feeToken: TokenLike, onchain: boolean) {
+    if (await wallet.isSigningKeySet()) {
         return BigNumber.from(0);
+    }
 
     const feeType = { ChangePubKey: { onchainPubkeyAuth: onchain } };
     let { totalFee: fee } = await this.syncProvider.getTransactionFee(feeType, wallet.address(), feeToken);
 
     if (onchain) {
-        await (await wallet.onchainAuthSigningKey()).wait();
+        const handle = await wallet.onchainAuthSigningKey();
+        await handle.wait();
     }
 
     const changePubkeyHandle = await wallet.setSigningKey({
         feeToken,
         fee,
-        onchainAuth: onchain,
+        onchainAuth: onchain
     });
 
     await changePubkeyHandle.awaitReceipt();
-    expect(await wallet.isSigningKeySet(), "ChangePubKey failed").to.be.true;
+    expect(await wallet.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
     return fee;
-}
-
+};

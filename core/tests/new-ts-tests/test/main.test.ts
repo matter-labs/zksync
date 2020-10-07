@@ -31,50 +31,49 @@ describe('ZkSync integration tests', () => {
         await tester.disconnect();
     });
 
-    describe('Deposit', () => {
-        step('should execute an auto-approved deposit', async () => {
-            await expect(tester.testDeposit(alice, 'ETH', one, true)).to.be.fulfilled;
-            // await expect(tester.testDeposit(bob, 'DAI', hundred, true)).to.be.fulfilled;
-        });
-
-        step('should execute a normal deposit', async () => {
-            await expect(tester.testDeposit(alice, 'ETH', one)).to.be.fulfilled;
-
-            // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should not be approved").to.be.false;
-            // const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits('DAI');
-            // await approveERC20.wait();
-            // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should be approved").to.be.true;
-            // await expect(tester.testDeposit(bob, 'DAI', hundred)).to.be.fulfilled;
-            // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should still be approved").to.be.true;
-        });
+    step('should execute an auto-approved deposit', async () => {
+        await expect(tester.testDeposit(alice, 'ETH', one, true)).to.be.fulfilled;
+        // await expect(tester.testDeposit(bob, 'DAI', hundred, true)).to.be.fulfilled;
     });
 
-    describe('ChangePubKey and Transfer', () => {
+    step('should execute a normal deposit', async () => {
+        await expect(tester.testDeposit(alice, 'ETH', one)).to.be.fulfilled;
 
-        step('should change pubkey onchain', async () => {
-            await expect(tester.testChangePubKey(alice, 'ETH', true)).to.be.fulfilled;
-            // await expect(tester.testChangePubKey(bob, 'DAI', true)).to.be.fulfilled;
-        });
+        // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should not be approved").to.be.false;
+        // const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits('DAI');
+        // await approveERC20.wait();
+        // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should be approved").to.be.true;
+        // await expect(tester.testDeposit(bob, 'DAI', hundred)).to.be.fulfilled;
+        // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should still be approved").to.be.true;
+    });
 
-        step('should execute a transfer to new account', async () => {
-            await expect(tester.testTransfer(alice, carl, 'ETH', one.div(10))).to.be.fulfilled;
-            // await expect(tester.testTransfer(bob, donna, 'DAI', hundred.div(10))).to.be.fulfilled;
-        });
+    step('should change pubkey onchain', async () => {
+        await expect(tester.testChangePubKey(alice, 'ETH', true)).to.be.fulfilled;
+        // await expect(tester.testChangePubKey(bob, 'DAI', true)).to.be.fulfilled;
+    });
 
-        step('should execute a transfer to existing account', async () => {
-            await expect(tester.testTransfer(alice, carl, 'ETH', one.div(10))).to.be.fulfilled;
-            // await expect(tester.testTransfer(bob, donna, 'DAI', hundred.div(10))).to.be.fulfilled;
-        });
+    step('should execute a transfer to new account', async () => {
+        await expect(tester.testTransfer(alice, carl, 'ETH', one.div(10))).to.be.fulfilled;
+        // await expect(tester.testTransfer(bob, donna, 'DAI', hundred.div(10))).to.be.fulfilled;
+    });
 
-        step('should execute a transfer to self', async () => {
-            await expect(tester.testTransfer(alice, alice, 'ETH', one.div(10))).to.be.fulfilled;
-            // await expect(tester.testTransfer(bob, bob, 'DAI', hundred.div(10))).to.be.fulfilled;
-        });
+    step('should execute a transfer to existing account', async () => {
+        await expect(tester.testTransfer(alice, carl, 'ETH', one.div(10))).to.be.fulfilled;
+        // await expect(tester.testTransfer(bob, donna, 'DAI', hundred.div(10))).to.be.fulfilled;
+    });
 
-        step('should change pubkey offchain', async () => {
-            await expect(tester.testChangePubKey(alice, 'ETH', false)).to.be.fulfilled;
-            // await expect(tester.testChangePubKey(bob, 'DAI', false)).to.be.fulfilled;
-        });
+    step('should execute a transfer to self', async () => {
+        await expect(tester.testTransfer(alice, alice, 'ETH', one.div(10))).to.be.fulfilled;
+        // await expect(tester.testTransfer(bob, bob, 'DAI', hundred.div(10))).to.be.fulfilled;
+    });
+
+    step('should change pubkey offchain', async () => {
+        await expect(tester.testChangePubKey(alice, 'ETH', false)).to.be.fulfilled;
+        // await expect(tester.testChangePubKey(bob, 'DAI', false)).to.be.fulfilled;
+    });
+
+    step('should test multi-transfers', async () => {
+        await expect(tester.testMultiTransfer(alice, carl, 'ETH', one.div(100))).to.be.fulfilled;
+        await expect(tester.testFailedMultiTransfer(alice, carl, 'ETH', one.div(100))).to.be.fulfilled;
     });
 });
-

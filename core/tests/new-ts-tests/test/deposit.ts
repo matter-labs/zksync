@@ -11,23 +11,17 @@ declare module './tester' {
     }
 }
 
-Tester.prototype.testDeposit = async function(
-    wallet: Wallet,
-    token: TokenLike,
-    amount: BigNumber,
-    approve?: boolean
-) {
+Tester.prototype.testDeposit = async function (wallet: Wallet, token: TokenLike, amount: BigNumber, approve?: boolean) {
     const balanceBefore = await wallet.getBalance(token);
 
     const depositHandle = await this.syncWallet.depositToSyncFromEthereum({
         depositTo: wallet.address(),
         token: token,
         amount,
-        approveDepositAmountForERC20: approve,
+        approveDepositAmountForERC20: approve
     });
 
     await depositHandle.awaitReceipt();
     const balanceAfter = await wallet.getBalance(token);
-    expect(balanceAfter.sub(balanceBefore).eq(amount), "Deposit checks failed").to.be.true;
-}
-
+    expect(balanceAfter.sub(balanceBefore).eq(amount), 'Deposit checks failed').to.be.true;
+};

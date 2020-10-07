@@ -11,7 +11,7 @@
   },
   "scripts": {
     "test": "f mocha --no-timeout -r ts-node/register -r mocha-steps test/*.test.ts",
-    "fmt": "prettier --write {src,test}/*.ts"
+    "fmt": "prettier --write test/*.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.13",
@@ -27,7 +27,6 @@
     "prettier": "^2.1.2",
     "ts-node": "^9.0.0",
     "typescript": "^4.0.3",
-    "zcli": "link:../../../infrastructure/zcli",
     "zksync": "link:../../../sdk/zksync.js"
   }
 }
