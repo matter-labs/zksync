@@ -1,5 +1,5 @@
 use crate::playground::get_path_in_file_dump_dir;
-use crate::witness::tests::test_utils::{WitnessTestAccount, ZksyncStateGenerator};
+use crate::witness::tests::test_utils::{WitnessTestAccount, ZkSyncStateGenerator};
 use crate::witness::utils::WitnessBuilder;
 use crate::witness::{deposit::DepositWitness, Witness};
 use num::BigUint;
@@ -18,7 +18,7 @@ fn test_transpile_deposit_franklin_existing_account() {
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
     let (mut plasma_state, mut circuit_account_tree) =
-        ZksyncStateGenerator::generate(&vec![account]);
+        ZkSyncStateGenerator::generate(&vec![account]);
 
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
@@ -101,7 +101,7 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
 
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
-    let (mut plasma_state, mut circuit_tree) = ZksyncStateGenerator::generate(&vec![account]);
+    let (mut plasma_state, mut circuit_tree) = ZkSyncStateGenerator::generate(&vec![account]);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
     let deposit_op = DepositOp {
@@ -209,7 +209,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
     let (mut plasma_state, mut circuit_account_tree) =
-        ZksyncStateGenerator::generate(&vec![account]);
+        ZkSyncStateGenerator::generate(&vec![account]);
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
@@ -385,7 +385,7 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
 
     let deposit_to_account_id = account.id;
     let deposit_to_account_address = account.account.address;
-    let (mut plasma_state, mut circuit_tree) = ZksyncStateGenerator::generate(&vec![account]);
+    let (mut plasma_state, mut circuit_tree) = ZkSyncStateGenerator::generate(&vec![account]);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
     let deposit_op = DepositOp {
@@ -478,7 +478,7 @@ fn print_available_setup_powers() {
 
     let calculate_setup_power = |chunks: usize| -> (usize, u32) {
         let circuit = {
-            let (_, mut circuit_account_tree) = ZksyncStateGenerator::generate(&[]);
+            let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&[]);
             let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, 0, 1);
             witness_accum.extend_pubdata_with_noops(chunks);
             witness_accum.collect_fees(&[]);

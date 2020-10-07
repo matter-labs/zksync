@@ -30,7 +30,7 @@ use zksync::{
         transports::Http,
         types::{Address, H160, H256, U256},
     },
-    zksync_types::{tx::PackedEthSignature, FranklinTx, Token, TokenLike, TxFeeTypes},
+    zksync_types::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes, ZkSyncTx},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
 use zksync_contracts::{erc20_contract, zksync_contract};
@@ -674,7 +674,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
             .sign_transfer(token.clone(), 1_000_000u64.into(), fee, recipient, nonce)
             .expect("Transfer signing error");
 
-        signed_transfers.push((FranklinTx::Transfer(Box::new(transfer)), signature));
+        signed_transfers.push((ZkSyncTx::Transfer(Box::new(transfer)), signature));
 
         nonce += 1;
     }

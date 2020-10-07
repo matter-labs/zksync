@@ -7,6 +7,7 @@ use crate::franklin_crypto::rescue::{rescue_hash, RescueEngine};
 use super::hasher::Hasher;
 use core::fmt;
 
+/// Default hasher for the zkSync state hash calculation.
 pub struct RescueHasher<E: RescueEngine> {
     params: &'static E::Params,
 }

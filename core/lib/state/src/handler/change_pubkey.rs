@@ -1,17 +1,17 @@
 use anyhow::{ensure, format_err};
 use zksync_crypto::params;
 use zksync_types::{
-    operations::{ChangePubKeyOp, FranklinOp},
+    operations::{ChangePubKeyOp, ZkSyncOp},
     tx::ChangePubKey,
     AccountUpdate, AccountUpdates,
 };
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, ZksyncState},
+    state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
-impl TxHandler<ChangePubKey> for ZksyncState {
+impl TxHandler<ChangePubKey> for ZkSyncState {
     type Op = ChangePubKeyOp;
 
     fn create_op(&self, tx: ChangePubKey) -> Result<Self::Op, anyhow::Error> {
@@ -46,7 +46,7 @@ impl TxHandler<ChangePubKey> for ZksyncState {
         Ok(OpSuccess {
             fee,
             updates,
-            executed_op: FranklinOp::ChangePubKeyOffchain(Box::new(op)),
+            executed_op: ZkSyncOp::ChangePubKeyOffchain(Box::new(op)),
         })
     }
 

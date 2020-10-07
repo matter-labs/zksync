@@ -1,16 +1,14 @@
 use anyhow::{ensure, format_err};
 use zksync_crypto::params;
-use zksync_types::{
-    AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, FranklinOp, PubKeyHash,
-};
+use zksync_types::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, PubKeyHash, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, ZksyncState},
+    state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
-impl TxHandler<ForcedExit> for ZksyncState {
+impl TxHandler<ForcedExit> for ZkSyncState {
     type Op = ForcedExitOp;
 
     fn create_op(&self, tx: ForcedExit) -> Result<Self::Op, anyhow::Error> {
@@ -61,7 +59,7 @@ impl TxHandler<ForcedExit> for ZksyncState {
         Ok(OpSuccess {
             fee,
             updates,
-            executed_op: FranklinOp::ForcedExit(Box::new(op)),
+            executed_op: ZkSyncOp::ForcedExit(Box::new(op)),
         })
     }
 
