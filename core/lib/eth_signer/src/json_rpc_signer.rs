@@ -7,6 +7,12 @@ use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::Address;
 
 #[derive(Clone)]
+pub enum AddressOrIndex {
+    Address(Address),
+    Index(usize),
+}
+
+#[derive(Clone)]
 pub enum SignerType {
     NotPrefixed,
     Prefixed,
@@ -16,20 +22,20 @@ pub enum SignerType {
 pub struct JsonRpcSigner {
     rpc_addr: String,
     client: reqwest::Client,
-    address: Address,
+    address: Option<Address>,
     signer_type: Option<SignerType>,
 }
 
 impl JsonRpcSigner {
     pub async fn new(
         rpc_addr: impl Into<String>,
-        address: Address,
+        address_or_index: Option<AddressOrIndex>,
         signer_type: Option<SignerType>,
     ) -> Result<Self, SignerError> {
         let mut signer = Self {
             rpc_addr: rpc_addr.into(),
             client: reqwest::Client::new(),
-            address,
+            address: None,
             signer_type,
         };
 
@@ -39,25 +45,60 @@ impl JsonRpcSigner {
             signer.detect_signer_type().await?;
         };
 
+        // If the user has not specified either the index or the address,
+        // then we will assume that by default the address will be the first one that the server will send
+        let address_or_index = match address_or_index {
+            Some(address_or_index) => address_or_index,
+            None => AddressOrIndex::Index(0),
+        };
+
+        // EthereumSigner can support many different addresses,
+        // we define only the one we need by the index
+        // of receiving from the server or by the address itself.
+        signer.detect_address(address_or_index).await?;
+
         Ok(signer)
     }
 
     /// Get Ethereum address.
-    pub fn address(&self) -> Address {
-        self.address
+    pub fn address(&self) -> Result<Address, SignerError> {
+        self.address.ok_or(SignerError::DefineAddress)
+    }
+
+    /// Specifies the Ethreum address which sets the address for which all other requests will be processed.
+    /// If the address has already been set, then it will all the same change to a new one.
+    pub async fn detect_address(
+        &mut self,
+        address_or_index: AddressOrIndex,
+    ) -> Result<Address, SignerError> {
+        self.address = match address_or_index {
+            AddressOrIndex::Address(address) => Some(address),
+            AddressOrIndex::Index(index) => {
+                let message = JsonRpcRequest::accounts();
+                let ret = self
+                    .post(&message)
+                    .await
+                    .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+                let accounts: Vec<Address> = serde_json::from_value(ret)
+                    .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+                accounts.get(index).copied()
+            }
+        };
+
+        self.address.ok_or(SignerError::DefineAddress)
     }
 
     /// Server can either add the prefix `\x19Ethereum Signed Message:\n` to the message and not add.
-    /// Checks if a prefix should be added to the message
+    /// Checks if a prefix should be added to the message.
     pub async fn detect_signer_type(&mut self) -> Result<(), SignerError> {
-        // If the `sig_type` is set, then we do not need to detect it from the server
+        // If the `sig_type` is set, then we do not need to detect it from the server.
         if self.signer_type.is_some() {
             return Ok(());
         }
         let msg = "JsonRpcSigner type was not specified. Sign this message to detect the signer type. It only has to be done once per session".as_bytes();
 
         let signature_msg_no_prefix: PackedEthSignature = {
-            let message = JsonRpcRequest::sign_message(self.address, msg);
+            let message = JsonRpcRequest::sign_message(self.address()?, msg);
 
             let ret = self
                 .post(&message)
@@ -74,7 +115,7 @@ impl JsonRpcSigner {
                 bytes.extend_from_slice(prefix.as_bytes());
                 bytes.extend_from_slice(msg);
 
-                JsonRpcRequest::sign_message(self.address, &bytes)
+                JsonRpcRequest::sign_message(self.address()?, &bytes)
             };
 
             let ret = self
@@ -88,7 +129,7 @@ impl JsonRpcSigner {
         if signature_msg_no_prefix
             .signature_recover_signer(msg)
             .map_err(|_| SignerError::DefineAddress)?
-            == self.address
+            == self.address()?
         {
             self.signer_type = Some(SignerType::NotPrefixed);
         }
@@ -96,7 +137,7 @@ impl JsonRpcSigner {
         if signature_msg_with_prefix
             .signature_recover_signer(msg)
             .map_err(|_| SignerError::DefineAddress)?
-            == self.address
+            == self.address()?
         {
             self.signer_type = Some(SignerType::Prefixed);
         }
@@ -129,7 +170,7 @@ impl JsonRpcSigner {
                 }
             };
 
-            let message = JsonRpcRequest::sign_message(self.address, &msg);
+            let message = JsonRpcRequest::sign_message(self.address()?, &msg);
             let ret = self
                 .post(&message)
                 .await
@@ -142,7 +183,7 @@ impl JsonRpcSigner {
         if signature
             .signature_recover_signer(msg)
             .map_err(|_| SignerError::DefineAddress)?
-            == self.address
+            == self.address()?
         {
             Ok(TxEthSignature::EthereumSignature(signature))
         } else {
@@ -154,7 +195,7 @@ impl JsonRpcSigner {
 
     /// Signs and returns the RLP-encoded transaction.
     pub async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
-        let msg = JsonRpcRequest::sign_transaction(self.address, raw_tx);
+        let msg = JsonRpcRequest::sign_transaction(self.address()?, raw_tx);
 
         let ret = self
             .post(&msg)
@@ -236,6 +277,12 @@ mod messages {
             }
         }
 
+        /// Returns a list of addresses owned by client.
+        pub fn accounts() -> Self {
+            let params = Vec::new();
+            Self::create("eth_accounts", params)
+        }
+
         /// The sign method calculates an Ethereum specific signature with:
         /// sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
         pub fn sign_message(address: Address, message: &[u8]) -> Self {
@@ -245,6 +292,7 @@ mod messages {
             Self::create("eth_sign", params)
         }
 
+        /// Signs a transaction that can be submitted to the network.
         pub fn sign_transaction(from: Address, tx_data: RawTransaction) -> Self {
             let mut params = Vec::new();
 

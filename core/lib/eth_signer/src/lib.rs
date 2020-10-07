@@ -57,7 +57,7 @@ impl EthereumSigner {
     pub fn get_address(&self) -> Result<Address, SignerError> {
         match self {
             EthereumSigner::PrivateKey(pk_signer) => pk_signer.address(),
-            EthereumSigner::JsonRpc(json_rpc_signer) => Ok(json_rpc_signer.address()),
+            EthereumSigner::JsonRpc(json_rpc_signer) => Ok(json_rpc_signer.address()?),
         }
     }
 }
