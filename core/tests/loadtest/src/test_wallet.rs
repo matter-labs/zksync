@@ -2,7 +2,6 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 // External uses
 use num::BigUint;
-use rand::Rng;
 // Workspace uses
 use zksync::{
     error::ClientError,
@@ -14,12 +13,12 @@ use zksync::{
 use zksync_config::ConfigurationOptions;
 use zksync_types::{tx::PackedEthSignature, AccountId, Address, PriorityOp, TxFeeTypes, ZkSyncTx};
 // Local uses
-use crate::{monitor::Monitor, scenarios::configs::AccountInfo};
+use crate::{config::AccountInfo, monitor::Monitor};
 
 #[derive(Debug)]
 pub struct TestWallet {
-    pub monitor: Monitor,
-    pub eth_provider: EthereumProvider,
+    monitor: Monitor,
+    eth_provider: EthereumProvider,
     inner: Wallet,
     nonce: AtomicU32,
 }
@@ -41,21 +40,6 @@ impl TestWallet {
             .await
             .unwrap();
         Self::from_wallet(monitor, inner, &options.web3_url).await
-    }
-
-    // Parses and builds a new wallets list.
-    pub async fn from_info_list(
-        monitor: Monitor,
-        input: &[AccountInfo],
-        options: &ConfigurationOptions,
-    ) -> Vec<Self> {
-        let mut wallets = Vec::new();
-
-        for info in input {
-            let wallet = Self::from_info(monitor.clone(), info, options).await;
-            wallets.push(wallet)
-        }
-        wallets
     }
 
     // Creates a random wallet.
@@ -103,7 +87,7 @@ impl TestWallet {
         let fee = self
             .monitor
             .provider
-            .get_tx_fee(TxFeeTypes::Withdraw, Address::zero(), Self::TOKEN_NAME)
+            .get_tx_fee(TxFeeTypes::FastWithdraw, Address::zero(), Self::TOKEN_NAME)
             .await?
             .total_fee
             * BigUint::from(Self::FEE_FACTOR);
@@ -111,9 +95,14 @@ impl TestWallet {
         Ok(closest_packable_fee_amount(&fee))
     }
 
-    /// Returns the wallet balance.
+    /// Returns the wallet balance in zkSync network.
     pub async fn balance(&self, block_status: BlockStatus) -> Result<BigUint, ClientError> {
         self.inner.get_balance(block_status, Self::TOKEN_NAME).await
+    }
+
+    /// Returns the wallet balance in Ehtereum network.
+    pub async fn eth_balance(&self) -> Result<BigUint, ClientError> {
+        self.eth_provider.balance().await
     }
 
     /// Returns the current account ID.
@@ -129,7 +118,7 @@ impl TestWallet {
     // Creates a signed change public key transaction.
     pub async fn sign_change_pubkey(
         &self,
-        fee: BigUint,
+        fee: impl Into<BigUint>,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let tx = self
             .inner
@@ -143,39 +132,21 @@ impl TestWallet {
         Ok((tx, None))
     }
 
-    // Creates a signed withdraw transaction.
-    pub async fn sign_withdraw_single(
+    // Creates a signed withdraw transaction with a fee provided.
+    pub async fn sign_withdraw(
         &self,
-        amount: BigUint,
+        amount: impl Into<BigUint>,
+        fee: impl Into<BigUint>,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         self.inner
             .start_withdraw()
             .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
+            .fee(fee)
             .to(self.inner.address())
             .tx()
             .await
-    }
-
-    // Creates a signed withdraw transaction with a fee provided.
-    pub async fn sign_withdraw(
-        &self,
-        amount: BigUint,
-        fee: Option<BigUint>,
-    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
-        let mut builder = self
-            .inner
-            .start_withdraw()
-            .nonce(self.pending_nonce())
-            .token(Self::TOKEN_NAME)?
-            .amount(amount)
-            .to(self.inner.address());
-        if let Some(fee) = fee {
-            builder = builder.fee(fee);
-        }
-
-        builder.tx().await
     }
 
     // Creates a signed transfer tx to a given receiver.
@@ -183,40 +154,17 @@ impl TestWallet {
         &self,
         to: impl Into<Address>,
         amount: impl Into<BigUint>,
-        fee: Option<BigUint>,
+        fee: BigUint,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
-        let mut builder = self
-            .inner
+        self.inner
             .start_transfer()
             .nonce(self.pending_nonce())
             .token(Self::TOKEN_NAME)?
             .amount(amount)
-            .to(to.into());
-        if let Some(fee) = fee {
-            builder = builder.fee(fee);
-        }
-
-        builder.tx().await
-    }
-
-    // Creates a signed transfer tx to a random receiver.
-    pub async fn sign_transfer_to_random(
-        &self,
-        test_accounts: &[AccountInfo],
-        amount: BigUint,
-    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
-        let to = {
-            let mut rng = rand::thread_rng();
-            let count = test_accounts.len() - 1;
-
-            let mut to_idx = rng.gen_range(0, count);
-            while test_accounts[to_idx].address == self.inner.address() {
-                to_idx = rng.gen_range(0, count);
-            }
-            test_accounts[to_idx].address
-        };
-
-        self.sign_transfer(to, amount, None).await
+            .fee(fee)
+            .to(to.into())
+            .tx()
+            .await
     }
 
     // Deposits tokens from Ethereum to the contract.

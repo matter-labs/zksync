@@ -7,7 +7,7 @@ use zksync::utils::closest_packable_token_amount;
 use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
 // Local uses
 use super::{Scenario, ScenarioResources};
-use crate::{monitor::Monitor, ng::utils::try_wait_all, test_accounts::TestWallet};
+use crate::{monitor::Monitor, ng::utils::try_wait_all, test_wallet::TestWallet};
 
 /// Schematically, scenario will look like this:
 ///
@@ -76,7 +76,7 @@ impl Scenario for SimpleScenario {
             wallets[from].sign_transfer(
                 wallets[to].address(),
                 closest_packable_token_amount(&self.transfer_size),
-                Some(sufficient_fee.clone()),
+                sufficient_fee.clone(),
             )
         }))
         .await?;

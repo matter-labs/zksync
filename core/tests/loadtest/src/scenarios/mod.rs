@@ -11,7 +11,6 @@ use tokio::runtime::Runtime;
 use zksync::Provider;
 use zksync_config::ConfigurationOptions;
 // Local uses
-use super::tps_counter::TPSCounter;
 use crate::monitor::Monitor;
 
 pub(crate) mod configs;

@@ -29,16 +29,13 @@ use tokio::runtime::Builder;
 use zksync::{Network, Provider};
 use zksync_config::ConfigurationOptions;
 // Local uses
-use self::{monitor::Monitor, ng::scenarios::ScenarioExecutor, scenarios::configs::AccountInfo};
+use self::{config::AccountInfo, monitor::Monitor, ng::scenarios::ScenarioExecutor};
 
-mod cli;
+mod config;
 mod journal;
 mod monitor;
 mod ng;
-mod scenarios;
-mod sent_transactions;
-mod test_accounts;
-mod tps_counter;
+mod test_wallet;
 
 fn main() -> Result<(), anyhow::Error> {
     env_logger::init();

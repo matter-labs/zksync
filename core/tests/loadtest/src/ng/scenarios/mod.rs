@@ -9,11 +9,11 @@ use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local uses
 use crate::{
+    config::AccountInfo,
     journal::Journal,
     monitor::Monitor,
     ng::utils::{try_wait_all, wait_all},
-    scenarios::configs::AccountInfo,
-    test_accounts::TestWallet,
+    test_wallet::TestWallet,
 };
 
 mod simple;
@@ -130,7 +130,7 @@ impl ScenarioExecutor {
 
         let amount_to_deposit = closest_packable_token_amount(&amount_to_deposit);
 
-        let eth_balance = self.main_wallet.eth_provider.balance().await?;
+        let eth_balance = self.main_wallet.eth_balance().await?;
         anyhow::ensure!(
             eth_balance > amount_to_deposit,
             "Not enough balance in the main wallet to perform this test, actual: {}, expected: {}",
@@ -185,7 +185,7 @@ impl ScenarioExecutor {
                     .sign_transfer(
                         wallet.address(),
                         scenario_amount.clone(),
-                        Some(self.sufficient_fee.clone()),
+                        self.sufficient_fee.clone(),
                     )
                     .await?;
                 tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
@@ -277,7 +277,7 @@ impl ScenarioExecutor {
                         .sign_transfer(
                             main_address,
                             withdraw_amount.clone(),
-                            Some(sufficient_fee.clone()),
+                            sufficient_fee.clone(),
                         )
                         .await
                 }
@@ -310,7 +310,7 @@ impl ScenarioExecutor {
                 closest_packable_token_amount(&(main_wallet_balance - &self.sufficient_fee));
             let (tx, sign) = self
                 .main_wallet
-                .sign_withdraw(withdraw_amount, Some(self.sufficient_fee.clone()))
+                .sign_withdraw(withdraw_amount, self.sufficient_fee.clone())
                 .await?;
             self.monitor.send_tx(tx, sign).await?;
         }

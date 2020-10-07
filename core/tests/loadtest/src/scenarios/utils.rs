@@ -12,7 +12,7 @@ use tokio::time;
 // Workspace uses
 use zksync::{ethereum::PriorityOpHolder, utils::biguint_to_u256, Provider};
 // Local uses
-use crate::{monitor::Monitor, sent_transactions::SentTransactions, test_accounts::TestWallet};
+use crate::{monitor::Monitor, test_accounts::TestWallet};
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 
