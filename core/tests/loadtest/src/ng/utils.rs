@@ -4,10 +4,15 @@
 use std::iter::Iterator;
 // External uses
 use futures::{Future, TryFuture};
+use num::BigUint;
 // Workspace uses
 // Local uses
 
 const CHUNK_SIZES: &[usize] = &[100];
+
+pub fn gwei_to_wei(gwei: impl Into<BigUint>) -> BigUint {
+    gwei.into() * BigUint::from(10u64.pow(9))
+}
 
 pub async fn wait_all<I>(i: I) -> Vec<<I::Item as Future>::Output>
 where

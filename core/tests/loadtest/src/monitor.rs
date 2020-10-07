@@ -17,20 +17,7 @@ use zksync_types::{
     PriorityOp, ZkSyncTx, H256,
 };
 // Local uses
-
-#[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Stats {
-    pub created: u64,
-    pub executed: u64,
-    pub verified: u64,
-    pub errored: u64,
-}
-
-#[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Summary {
-    pub txs: Stats,
-    pub ops: Stats,
-}
+use crate::journal::{Journal, Summary};
 
 #[derive(Debug)]
 enum Event {
@@ -50,7 +37,7 @@ enum Event {
 #[derive(Debug, Default)]
 struct MonitorInner {
     current_stats: Summary,
-    journal: Vec<(Instant, Summary)>,
+    journal: Journal,
     pending_tasks: Vec<JoinHandle<()>>,
 }
 
@@ -83,19 +70,22 @@ impl MonitorInner {
     fn store_stats(&mut self) {
         let now = Instant::now();
 
+        log::info!("Got stats: {:?} {:?}", now, self.current_stats);
+
         let mut stats = Summary::default();
         if self.current_stats != stats {
-            log::info!("Got stats: {:?} {:?}", now, self.current_stats);
-            self.journal.push((now, self.current_stats));
+            self.journal.record_stats(now, self.current_stats);
 
             swap(&mut self.current_stats, &mut stats);
         }
     }
 
-    fn collect_logs(&mut self) -> Vec<(Instant, Summary)> {
+    fn collect_logs(&mut self) -> Journal {
         // Immediate store current status.
         self.store_stats();
-        self.journal.drain(..).collect()
+        let journal = self.journal.clone();
+        self.journal.clear();
+        journal
     }
 }
 
@@ -273,7 +263,7 @@ impl Monitor {
         futures::future::join_all(tasks).await;
     }
 
-    pub async fn take_logs(&self) -> Vec<(Instant, Summary)> {
+    pub async fn take_logs(&self) -> Journal {
         self.wait_for_verify().await;
         self.inner().await.collect_logs()
     }

@@ -32,6 +32,7 @@ use zksync_config::ConfigurationOptions;
 use self::{monitor::Monitor, ng::scenarios::ScenarioExecutor, scenarios::configs::AccountInfo};
 
 mod cli;
+mod journal;
 mod monitor;
 mod ng;
 mod scenarios;
