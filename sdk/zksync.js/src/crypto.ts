@@ -22,9 +22,10 @@ export function privateKeyToPubKeyHash(privateKey: Uint8Array): string {
 
 let zksyncCryptoLoaded = false;
 
-export async function loadZkSyncCrypto(wasmFileUrl?: string) {
+export async function loadZkSyncCrypto() {
     if (!zksyncCryptoLoaded) {
         await waitReady();
+        await zksync_crypto_init();
         zksyncCryptoLoaded = true;
     }
 }
