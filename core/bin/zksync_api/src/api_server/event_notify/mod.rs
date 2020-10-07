@@ -80,16 +80,7 @@ pub fn start_sub_notifier(
 ) -> tokio::task::JoinHandle<()> {
     let tokens_cache = TokenDBCache::new(db_pool.clone());
 
-    let mut notifier = OperationNotifier {
-        cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
-        cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
-        cache_of_blocks_info: LruCache::new(api_requests_caches_size),
-        tokens_cache,
-        db_pool,
-        tx_subs: SubStorage::new(),
-        prior_op_subs: SubStorage::new(),
-        account_subs: SubStorage::new(),
-    };
+    let mut notifier = OperationNotifier::new(api_requests_caches_size, db_pool);
 
     tokio::spawn(async move {
         loop {

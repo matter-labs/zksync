@@ -25,8 +25,8 @@ use zksync_types::BlockNumber;
 use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation, PriorityOpId};
 
 use super::{
-    sub_store::SubStorage, EventNotifierRequest, EventSubscribeRequest, ExecutedOpId,
-    ExecutedOpsNotify, SubscriptionSender,
+    state::NotifierState, sub_store::SubStorage, EventNotifierRequest, EventSubscribeRequest,
+    ExecutedOpId, ExecutedOpsNotify, SubscriptionSender,
 };
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
@@ -35,96 +35,22 @@ const ETHOP_SUB_PREFIX: &str = "eosub";
 const ACCOUNT_SUB_PREFIX: &str = "acsub";
 
 pub struct OperationNotifier {
-    pub(super) cache_of_executed_priority_operations:
-        LruCache<u32, StoredExecutedPriorityOperation>,
-    pub(super) cache_of_transaction_receipts: LruCache<Vec<u8>, TxReceiptResponse>,
-    pub(super) cache_of_blocks_info: LruCache<BlockNumber, BlockInfo>,
-    pub(super) tokens_cache: TokenDBCache,
+    state: NotifierState,
 
-    pub(super) db_pool: ConnectionPool,
-    pub(super) tx_subs: SubStorage<TxHash, TransactionInfoResp>,
-    pub(super) prior_op_subs: SubStorage<u64, ETHOpInfoResp>,
-    pub(super) account_subs: SubStorage<AccountId, ResponseAccountState>,
+    tx_subs: SubStorage<TxHash, TransactionInfoResp>,
+    prior_op_subs: SubStorage<u64, ETHOpInfoResp>,
+    account_subs: SubStorage<AccountId, ResponseAccountState>,
 }
 
 impl OperationNotifier {
-    async fn get_tx_receipt(
-        &mut self,
-        hash: &TxHash,
-    ) -> Result<Option<TxReceiptResponse>, anyhow::Error> {
-        let res = if let Some(tx_receipt) = self
-            .cache_of_transaction_receipts
-            .get_mut(&hash.as_ref().to_vec())
-        {
-            Some(tx_receipt.clone())
-        } else {
-            let mut storage = self.db_pool.access_storage_fragile().await?;
-            let tx_receipt = storage
-                .chain()
-                .operations_ext_schema()
-                .tx_receipt(hash.as_ref())
-                .await?;
-
-            if let Some(tx_receipt) = tx_receipt.clone() {
-                if tx_receipt.verified {
-                    self.cache_of_transaction_receipts
-                        .insert(hash.as_ref().to_vec(), tx_receipt);
-                }
-            }
-
-            tx_receipt
-        };
-        Ok(res)
+    pub fn new(cache_capacity: usize, db_pool: ConnectionPool) -> Self {
+        Self {
+            state: NotifierState::new(cache_capacity, db_pool),
+            tx_subs: SubStorage::new(),
+            prior_op_subs: SubStorage::new(),
+            account_subs: SubStorage::new(),
+        }
     }
-
-    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, anyhow::Error> {
-        let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
-            block_info.clone()
-        } else {
-            let mut storage = self.db_pool.access_storage_fragile().await?;
-            let mut transaction = storage.start_transaction().await?;
-            let block_info = if let Some(block_with_op) = transaction
-                .chain()
-                .block_schema()
-                .get_block(block_number)
-                .await?
-            {
-                let verified = if let Some(block_verify) = transaction
-                    .chain()
-                    .operations_schema()
-                    .get_operation(block_number, ActionType::VERIFY)
-                    .await
-                {
-                    block_verify.confirmed
-                } else {
-                    false
-                };
-
-                BlockInfo {
-                    block_number: i64::from(block_with_op.block_number),
-                    committed: true,
-                    verified,
-                }
-            } else {
-                anyhow::bail!("Transaction is executed but block is not committed. (bug)");
-            };
-
-            transaction.commit().await?;
-
-            // Unverified blocks can still change, so we can't cache them.
-            // Since request for non-existing block will return the last committed block,
-            // we must also check that block number matches the requested one.
-            if block_info.verified && block_info.block_number == block_number as i64 {
-                self.cache_of_blocks_info
-                    .insert(block_info.block_number as u32, block_info.clone());
-            }
-
-            block_info
-        };
-        Ok(res)
-    }
-
-    /// ============================================================
 
     fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), anyhow::Error> {
         self.prior_op_subs.remove(sub_id.clone())?;
@@ -168,33 +94,6 @@ impl OperationNotifier {
         }
     }
 
-    async fn get_executed_priority_operation(
-        &mut self,
-        serial_id: u32,
-    ) -> Result<Option<StoredExecutedPriorityOperation>, anyhow::Error> {
-        let res = if let Some(executed_op) = self
-            .cache_of_executed_priority_operations
-            .get_mut(&serial_id)
-        {
-            Some(executed_op.clone())
-        } else {
-            let mut storage = self.db_pool.access_storage_fragile().await?;
-            let executed_op = storage
-                .chain()
-                .operations_schema()
-                .get_executed_priority_operation(serial_id)
-                .await?;
-
-            if let Some(executed_op) = executed_op.clone() {
-                self.cache_of_executed_priority_operations
-                    .insert(serial_id, executed_op);
-            }
-
-            executed_op
-        };
-        Ok(res)
-    }
-
     async fn handle_priority_op_sub(
         &mut self,
         serial_id: u64,
@@ -204,10 +103,14 @@ impl OperationNotifier {
         let sub_id = self.prior_op_subs.generate_sub_id(serial_id, action);
 
         let executed_op = self
+            .state
             .get_executed_priority_operation(serial_id as u32)
             .await?;
         if let Some(executed_op) = executed_op {
-            let block_info = self.get_block_info(executed_op.block_number as u32).await?;
+            let block_info = self
+                .state
+                .get_block_info(executed_op.block_number as u32)
+                .await?;
 
             match action {
                 ActionType::COMMIT => {
@@ -244,7 +147,7 @@ impl OperationNotifier {
     ) -> Result<(), anyhow::Error> {
         let sub_id = self.tx_subs.generate_sub_id(hash.clone(), action);
 
-        let tx_receipt = self.get_tx_receipt(&hash).await?;
+        let tx_receipt = self.state.get_tx_receipt(&hash).await?;
 
         if let Some(receipt) = tx_receipt {
             let tx_info_resp = TransactionInfoResp {
@@ -281,31 +184,9 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), anyhow::Error> {
-        let mut storage = self.db_pool.access_storage_fragile().await?;
-        let account_state = storage
-            .chain()
-            .account_schema()
-            .account_state_by_address(&address)
-            .await?;
-
-        let account_id = if let Some(id) = account_state.committed.as_ref().map(|(id, _)| id) {
-            *id
-        } else {
-            anyhow::bail!("AccountId is unknown");
-        };
+        let (account_id, account_state) = self.state.get_account_info(address, action).await?;
 
         let sub_id = self.account_subs.generate_sub_id(account_id, action);
-
-        let account_state = if let Some(account) = match action {
-            ActionType::COMMIT => account_state.committed,
-            ActionType::VERIFY => account_state.verified,
-        }
-        .map(|(_, a)| a)
-        {
-            ResponseAccountState::try_restore(account, &self.tokens_cache).await?
-        } else {
-            ResponseAccountState::default()
-        };
 
         self.account_subs
             .insert_new(sub_id, sub, account_id, action)?;
@@ -371,8 +252,6 @@ impl OperationNotifier {
             op.block.block_number,
         )?;
 
-        let mut storage = self.db_pool.access_storage_fragile().await?;
-
         let updated_accounts: Vec<AccountId> = op
             .block
             .block_transactions
@@ -383,46 +262,19 @@ impl OperationNotifier {
 
         for id in updated_accounts {
             if self.account_subs.subscriber_exists(id, action) {
-                let stored_account = match action {
-                    ActionType::COMMIT => {
-                        storage
-                            .chain()
-                            .account_schema()
-                            .last_committed_state_for_account(id)
-                            .await?
-                    }
-                    ActionType::VERIFY => {
-                        storage
-                            .chain()
-                            .account_schema()
-                            .last_verified_state_for_account(id)
-                            .await?
-                    }
-                };
-
-                let account = if let Some(account) = stored_account {
-                    if let Ok(result) =
-                        ResponseAccountState::try_restore(account, &self.tokens_cache).await
-                    {
-                        result
-                    } else {
+                let account_state = match self.state.get_account_state(id, action).await? {
+                    Some(account_state) => account_state,
+                    None => {
                         log::warn!(
-                            "Failed to restore resp account state: id: {}, block: {}",
+                            "Account is updated but not stored in DB, id: {}, block: {:#?}",
                             id,
-                            op.block.block_number
+                            op.block
                         );
                         continue;
                     }
-                } else {
-                    log::warn!(
-                        "Account is updated but not stored in DB, id: {}, block: {}",
-                        id,
-                        op.block.block_number
-                    );
-                    continue;
                 };
 
-                self.account_subs.notify(id, action, account);
+                self.account_subs.notify(id, action, account_state);
             }
         }
 
