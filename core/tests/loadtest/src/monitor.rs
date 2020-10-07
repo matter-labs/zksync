@@ -70,7 +70,12 @@ impl MonitorInner {
     fn store_stats(&mut self) {
         let now = Instant::now();
 
-        log::info!("Got stats: {:?} {:?}", now, self.current_stats);
+        log::info!(
+            "Transactions stats: created: {}, executed: {}, verified: {}",
+            self.current_stats.txs.created,
+            self.current_stats.txs.executed,
+            self.current_stats.txs.verified
+        );
 
         let mut stats = Summary::default();
         if self.current_stats != stats {

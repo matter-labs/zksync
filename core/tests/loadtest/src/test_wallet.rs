@@ -11,7 +11,9 @@ use zksync::{
     EthereumProvider, Network, Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
-use zksync_types::{tx::PackedEthSignature, AccountId, Address, PriorityOp, TxFeeTypes, ZkSyncTx};
+use zksync_types::{
+    tx::PackedEthSignature, AccountId, Address, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
+};
 // Local uses
 use crate::{config::AccountInfo, monitor::Monitor};
 
@@ -20,6 +22,8 @@ pub struct TestWallet {
     monitor: Monitor,
     eth_provider: EthereumProvider,
     inner: Wallet,
+    token_name: TokenLike,
+
     nonce: AtomicU32,
 }
 
@@ -74,6 +78,7 @@ impl TestWallet {
             inner,
             eth_provider,
             nonce: AtomicU32::new(zk_nonce),
+            token_name: Self::TOKEN_NAME.into(),
         }
     }
 
@@ -87,7 +92,11 @@ impl TestWallet {
         let fee = self
             .monitor
             .provider
-            .get_tx_fee(TxFeeTypes::FastWithdraw, Address::zero(), Self::TOKEN_NAME)
+            .get_tx_fee(
+                TxFeeTypes::FastWithdraw,
+                Address::zero(),
+                self.token_name.clone(),
+            )
             .await?
             .total_fee
             * BigUint::from(Self::FEE_FACTOR);
@@ -97,7 +106,9 @@ impl TestWallet {
 
     /// Returns the wallet balance in zkSync network.
     pub async fn balance(&self, block_status: BlockStatus) -> Result<BigUint, ClientError> {
-        self.inner.get_balance(block_status, Self::TOKEN_NAME).await
+        self.inner
+            .get_balance(block_status, self.token_name.clone())
+            .await
     }
 
     /// Returns the wallet balance in Ehtereum network.
@@ -124,7 +135,7 @@ impl TestWallet {
             .inner
             .start_change_pubkey()
             .nonce(self.pending_nonce())
-            .fee_token(Self::TOKEN_NAME)?
+            .fee_token(self.token_name.clone())?
             .fee(fee)
             .tx()
             .await?;
@@ -141,7 +152,7 @@ impl TestWallet {
         self.inner
             .start_withdraw()
             .nonce(self.pending_nonce())
-            .token(Self::TOKEN_NAME)?
+            .token(self.token_name.clone())?
             .amount(amount)
             .fee(fee)
             .to(self.inner.address())
@@ -159,7 +170,7 @@ impl TestWallet {
         self.inner
             .start_transfer()
             .nonce(self.pending_nonce())
-            .token(Self::TOKEN_NAME)?
+            .token(self.token_name.clone())?
             .amount(amount)
             .fee(fee)
             .to(to.into())
@@ -172,7 +183,7 @@ impl TestWallet {
         let eth_tx_hash = self
             .eth_provider
             .deposit(
-                Self::TOKEN_NAME,
+                self.token_name.clone(),
                 biguint_to_u256(amount.into()),
                 self.address(),
             )

@@ -7,7 +7,7 @@ use zksync::utils::closest_packable_token_amount;
 use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
 // Local uses
 use super::{Scenario, ScenarioResources};
-use crate::{monitor::Monitor, ng::utils::try_wait_all, test_wallet::TestWallet};
+use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all};
 
 /// Schematically, scenario will look like this:
 ///
