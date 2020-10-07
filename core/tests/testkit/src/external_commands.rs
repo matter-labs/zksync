@@ -7,7 +7,7 @@ use std::str::FromStr;
 use web3::types::{Address, H256};
 
 use serde::{Deserialize, Serialize};
-use zksync_crypto::convert::fe_to_hex;
+use zksync_crypto::convert::FeConvert;
 use zksync_crypto::Fr;
 
 #[derive(Debug, Clone)]
@@ -84,7 +84,7 @@ pub fn js_revert_reason(tx_hash: &H256) -> String {
 pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts {
     let mut args = Vec::new();
     args.push("--genesisRoot");
-    let genesis_root = format!("0x{}", fe_to_hex(&genesis_root));
+    let genesis_root = format!("0x{}", genesis_root.to_hex());
     args.push(genesis_root.as_str());
     // args.push(genesis_root)
     if use_prod_contracts {
