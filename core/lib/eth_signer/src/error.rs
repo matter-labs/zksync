@@ -27,4 +27,6 @@ pub enum SignerError {
     NoSigningKey,
     #[error("Address determination error")]
     DefineAddress,
+    #[error("Recover address from signature failed: {0}")]
+    RecoverAddress(String),
 }

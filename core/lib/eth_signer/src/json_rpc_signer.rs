@@ -6,7 +6,16 @@ use jsonrpc_core::types::response::Output;
 use zksync_types::tx::{PackedEthSignature, TxEthSignature};
 use zksync_types::Address;
 
+use parity_crypto::publickey::{public_to_address, recover, Signature};
+use parity_crypto::Keccak256;
 use serde_json::Value;
+
+pub fn recover_eth_signer(signature: &Signature, msg: &[u8]) -> Result<Address, SignerError> {
+    let signed_bytes = msg.keccak256().into();
+    let public_key = recover(&signature, &signed_bytes)
+        .map_err(|err| SignerError::RecoverAddress(err.to_string()))?;
+    Ok(public_to_address(&public_key))
+}
 
 #[derive(Clone)]
 pub enum AddressOrIndex {
@@ -14,10 +23,12 @@ pub enum AddressOrIndex {
     Index(usize),
 }
 
+/// Describes whether to add a prefix `\x19Ethereum Signed Message:\n`
+/// when requesting a message signature.
 #[derive(Clone)]
 pub enum SignerType {
-    NotPrefixed,
-    Prefixed,
+    NotNeedPrefix,
+    NeedPrefix,
 }
 
 #[derive(Clone)]
@@ -97,10 +108,12 @@ impl JsonRpcSigner {
         if self.signer_type.is_some() {
             return Ok(());
         }
-        let msg = "JsonRpcSigner type was not specified. Sign this message to detect the signer type. It only has to be done once per session".as_bytes();
 
-        let signature_msg_no_prefix: PackedEthSignature = {
-            let message = JsonRpcRequest::sign_message(self.address()?, msg);
+        let msg = "JsonRpcSigner type was not specified. Sign this message to detect the signer type. It only has to be done once per session";
+        let msg_with_prefix = format!("\x19Ethereum Signed Message:\n{}{}", msg.len(), msg);
+
+        let signature: PackedEthSignature = {
+            let message = JsonRpcRequest::sign_message(self.address()?, msg.as_bytes());
 
             let ret = self
                 .post(&message)
@@ -110,38 +123,18 @@ impl JsonRpcSigner {
                 .map_err(|err| SignerError::SigningFailed(err.to_string()))?
         };
 
-        let signature_msg_with_prefix: PackedEthSignature = {
-            let message_with_prefix = {
-                let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
-                let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
-                bytes.extend_from_slice(prefix.as_bytes());
-                bytes.extend_from_slice(msg);
-
-                JsonRpcRequest::sign_message(self.address()?, &bytes)
-            };
-
-            let ret = self
-                .post(&message_with_prefix)
-                .await
-                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
-            serde_json::from_value(ret)
-                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
-        };
-
-        if signature_msg_no_prefix
-            .signature_recover_signer(msg)
-            .map_err(|_| SignerError::DefineAddress)?
+        if recover_eth_signer(&signature.serialize_packed().into(), &msg.as_bytes())?
             == self.address()?
         {
-            self.signer_type = Some(SignerType::NotPrefixed);
+            self.signer_type = Some(SignerType::NotNeedPrefix);
         }
 
-        if signature_msg_with_prefix
-            .signature_recover_signer(msg)
-            .map_err(|_| SignerError::DefineAddress)?
-            == self.address()?
+        if recover_eth_signer(
+            &signature.serialize_packed().into(),
+            &msg_with_prefix.as_bytes(),
+        )? == self.address()?
         {
-            self.signer_type = Some(SignerType::Prefixed);
+            self.signer_type = Some(SignerType::NeedPrefix);
         }
 
         match self.signer_type.is_some() {
@@ -183,8 +176,8 @@ impl JsonRpcSigner {
     pub async fn sign_message(&self, msg: &[u8]) -> Result<TxEthSignature, SignerError> {
         let signature: PackedEthSignature = {
             let msg = match &self.signer_type {
-                Some(SignerType::NotPrefixed) => msg.to_vec(),
-                Some(SignerType::Prefixed) => {
+                Some(SignerType::NotNeedPrefix) => msg.to_vec(),
+                Some(SignerType::NeedPrefix) => {
                     let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
                     let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
                     bytes.extend_from_slice(prefix.as_bytes());
