@@ -1,5 +1,5 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
+use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
 use web3::transports::Http;
 use zksync_testkit::*;
@@ -97,7 +97,7 @@ async fn execute_blocks_with_new_state_keeper(
 
 async fn revert_blocks_test() {
     println!("deploying contracts");
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
     println!("contracts deployed");
 
     execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify).await;

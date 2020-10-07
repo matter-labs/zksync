@@ -167,7 +167,7 @@ ci-check:
 	@ci-check.sh
 	
 integration-testkit:
-	@bin/integration-testkit.sh
+	@bin/integration-testkit.sh $(filter-out $@,$(MAKECMDGOALS))
 
 integration-simple:
 	@cd core/tests/ts-tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))

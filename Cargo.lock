@@ -5448,6 +5448,7 @@ dependencies = [
 name = "zksync_circuit"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "bigdecimal",
  "log 0.4.11",
  "num",
@@ -5716,12 +5717,14 @@ dependencies = [
  "serde_json",
  "tokio 0.2.22",
  "web3 0.13.0",
+ "zksync_circuit",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_prover",
+ "zksync_prover_utils",
  "zksync_server",
  "zksync_test_account",
  "zksync_types",
