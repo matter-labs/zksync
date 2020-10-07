@@ -5739,7 +5739,6 @@ dependencies = [
  "log 0.4.11",
  "num",
  "parity-crypto",
- "rlp",
  "secp256k1",
  "serde",
  "serde_json",
