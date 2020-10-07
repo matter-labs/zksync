@@ -11,6 +11,7 @@ use zksync_crypto::primitives::{
 };
 use zksync_utils::BigUintSerdeWrapper;
 
+/// FullExit operation. For details, see the documentation of [`FranklinOp`](./operations/enum.FranklinOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExitOp {
     pub priority_op: FullExit,

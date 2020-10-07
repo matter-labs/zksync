@@ -15,6 +15,7 @@ use zksync_crypto::primitives::{
     bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
 };
 
+/// Withdraw operation. For details, see the documentation of [`FranklinOp`](./operations/enum.FranklinOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WithdrawOp {
     pub tx: Withdraw,

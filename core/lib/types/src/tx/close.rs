@@ -6,6 +6,8 @@ use zksync_basic_types::Address;
 
 use super::TxSignature;
 
+/// `Close` transaction was used to remove the account from the network.
+/// Currently unused and left for the backward compatibility reasons.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Close {

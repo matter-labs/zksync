@@ -8,6 +8,7 @@ repository = "https://github.com/matter-labs/zksync"
 license = "Apache-2.0"
 keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
+readme = "README.md"
 
 [dependencies]
 zksync_crypto = { path = "../crypto", version = "1.0" }

@@ -11,6 +11,7 @@ use zksync_crypto::params::{
 };
 use zksync_crypto::primitives::{bytes_slice_to_uint16, bytes_slice_to_uint32};
 
+/// ChangePubKey operation. For details, see the documentation of [`FranklinOp`](./operations/enum.FranklinOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangePubKeyOp {
     pub tx: ChangePubKey,

@@ -1,3 +1,5 @@
+//! zkSync network block definition.
+
 use super::FranklinOp;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
@@ -10,16 +12,29 @@ use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFiel
 use zksync_crypto::params::CHUNK_BIT_WIDTH;
 use zksync_crypto::serialization::FrSerde;
 
+/// An intermediate state of the block in the zkSync network.
+/// Contains the information about (so far) executed transactions and
+/// meta-information related to the block creating process.
 #[derive(Clone, Debug)]
 pub struct PendingBlock {
-    pub number: u32,
+    /// Block ID.
+    pub number: BlockNumber,
+    /// Amount of chunks left in the block.
     pub chunks_left: usize,
+    /// ID of the first unprocessed priority operation at the moment
+    /// of the block initialization.
     pub unprocessed_priority_op_before: u64,
+    /// Amount of processing iterations applied to the pending block.
+    /// If this amount exceeds the limit configured in the server, block will be
+    /// sealed even if it's not full.
     pub pending_block_iteration: usize,
+    /// List of successfully executed operations.
     pub success_operations: Vec<ExecutedOperations>,
+    /// Lit of failed operations.
     pub failed_txs: Vec<ExecutedTx>,
 }
 
+/// Executed L2 transaction.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
     pub signed_tx: SignedFranklinTx,
@@ -31,6 +46,8 @@ pub struct ExecutedTx {
     pub batch_id: Option<i64>,
 }
 
+/// Executed L1 priority operation.
+/// Unlike L2 transactions, L1 priority operations cannot fail in L2.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedPriorityOp {
     pub priority_op: PriorityOp,
@@ -39,6 +56,7 @@ pub struct ExecutedPriorityOp {
     pub created_at: DateTime<Utc>,
 }
 
+/// Representation of executed operation, which can be either L1 or L2.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ExecutedOperations {
@@ -47,6 +65,7 @@ pub enum ExecutedOperations {
 }
 
 impl ExecutedOperations {
+    /// Returns the `FranklinOp` object associated with the operation, if any.
     pub fn get_executed_op(&self) -> Option<&FranklinOp> {
         match self {
             ExecutedOperations::Tx(exec_tx) => exec_tx.op.as_ref(),
@@ -54,6 +73,7 @@ impl ExecutedOperations {
         }
     }
 
+    /// Attempts to get the executed L1 transaction.
     pub fn get_executed_tx(&self) -> Option<&ExecutedTx> {
         match self {
             ExecutedOperations::Tx(exec_tx) => Some(exec_tx),
@@ -61,17 +81,21 @@ impl ExecutedOperations {
         }
     }
 
+    /// Returns the public data required for the Ethereum smart contract to commit the operation.
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         self.get_executed_op()
             .map(FranklinOp::public_data)
             .unwrap_or_default()
     }
 
+    /// Gets the witness required for the Ethereum smart contract.
+    /// Unlike public data, some operations may not have a witness.
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
         self.get_executed_op()
             .map(|op| op.eth_witness().unwrap_or_else(Vec::new))
     }
 
+    /// Returns the list of accounts affected by the operation.
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
         self.get_executed_op()
             .map(|op| op.get_updated_account_ids())
@@ -79,16 +103,23 @@ impl ExecutedOperations {
     }
 }
 
+/// zkSync network block.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
+    /// Block ID.
     pub block_number: BlockNumber,
+    /// Chain root hash obtained after executing this block.
     #[serde(with = "FrSerde")]
     pub new_root_hash: Fr,
+    /// ID of the zkSync account to which fees are collected.
     pub fee_account: AccountId,
+    /// List of operations executed in the block. Includes both L1 and L2 operations.
     pub block_transactions: Vec<ExecutedOperations>,
-    /// (unprocessed prior op id before block, unprocessed prior op id after block)
+    /// A tuple of ID of the first unprocessed priority operation before and after this block.
     pub processed_priority_ops: (u64, u64),
-    // actual block chunks sizes that will be used on contract, `block_chunks_sizes >= block.chunks_used()`
+    /// Actual block chunks amount that will be used on contract, such that `block_chunks_sizes >= block.chunks_used()`.
+    /// Server and provers may support blocks of several different sizes, and this value must be equal to one of the
+    /// supported size values.
     pub block_chunks_size: usize,
 
     /// Gas limit to be set for the Commit Ethereum transaction.
@@ -98,7 +129,7 @@ pub struct Block {
 }
 
 impl Block {
-    // Constructor
+    /// Creates a new `Block` object.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_number: BlockNumber,
@@ -122,7 +153,12 @@ impl Block {
         }
     }
 
-    /// Constructor that determines smallest block size for the given block
+    /// Creates a new block, choosing the smallest supported block size which will fit
+    /// all the executed transactions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no supported block size to fit all the transactions.
     #[allow(clippy::too_many_arguments)]
     pub fn new_from_available_block_sizes(
         block_number: BlockNumber,
@@ -148,6 +184,7 @@ impl Block {
         block
     }
 
+    /// Returns the new state root hash encoded for the Ethereum smart contract.
     pub fn get_eth_encoded_root(&self) -> H256 {
         let mut be_bytes = [0u8; 32];
         self.new_root_hash
@@ -157,6 +194,7 @@ impl Block {
         H256::from(be_bytes)
     }
 
+    /// Returns the public data for the Ethereum Commit operation.
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         let mut executed_tx_pub_data = self
             .block_transactions
@@ -171,7 +209,7 @@ impl Block {
         executed_tx_pub_data
     }
 
-    /// Returns eth_witness data and bytes used by each operation which needed them
+    /// Returns eth_witness data and data_size for each operation that has it.
     pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
         let mut eth_witness = Vec::new();
         let mut used_bytes = Vec::new();
@@ -188,6 +226,7 @@ impl Block {
         (eth_witness, used_bytes)
     }
 
+    /// Returns the number of priority operations processed in this block.
     pub fn number_of_processed_prior_ops(&self) -> u64 {
         self.processed_priority_ops.1 - self.processed_priority_ops.0
     }
@@ -205,6 +244,7 @@ impl Block {
         smallest_block_size_for_chunks(chunks_used, available_block_sizes)
     }
 
+    /// Returns the data about withdrawals required for the Ethereum smart contract.
     pub fn get_withdrawals_data(&self) -> Vec<u8> {
         let mut withdrawals_data = Vec::new();
 
