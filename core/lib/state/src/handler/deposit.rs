@@ -1,12 +1,12 @@
 use zksync_crypto::params;
-use zksync_types::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, FranklinOp};
+use zksync_types::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, ZkSyncOp};
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, ZksyncState},
+    state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
-impl TxHandler<Deposit> for ZksyncState {
+impl TxHandler<Deposit> for ZkSyncState {
     type Op = DepositOp;
 
     fn create_op(&self, priority_op: Deposit) -> Result<Self::Op, anyhow::Error> {
@@ -35,7 +35,7 @@ impl TxHandler<Deposit> for ZksyncState {
         let result = OpSuccess {
             fee,
             updates,
-            executed_op: FranklinOp::Deposit(Box::new(op)),
+            executed_op: ZkSyncOp::Deposit(Box::new(op)),
         };
 
         Ok(result)

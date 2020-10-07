@@ -4,7 +4,7 @@ use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use zksync_state::{
     handler::TxHandler,
-    state::{CollectedFee, TransferOutcome, ZksyncState},
+    state::{CollectedFee, TransferOutcome, ZkSyncState},
 };
 use zksync_types::{operations::TransferOp, tx::Transfer};
 // Local deps
@@ -65,7 +65,7 @@ fn test_transfer_success() {
             input,
             |plasma_state, op| {
                 let raw_op = TransferOutcome::Transfer(op.clone());
-                let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
+                let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
                     .expect("Operation failed")
                     .0
                     .unwrap();
@@ -109,7 +109,7 @@ fn test_transfer_to_self() {
         input,
         |plasma_state, op| {
             let raw_op = TransferOutcome::Transfer(op.clone());
-            let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
+            let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
                 .expect("Operation failed")
                 .0
                 .unwrap();
@@ -160,7 +160,7 @@ fn corrupted_ops_input() {
             EXPECTED_PANIC_MSG,
             |plasma_state, op| {
                 let raw_op = TransferOutcome::Transfer(op.clone());
-                let fee = <ZksyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
+                let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
                     .expect("Operation failed")
                     .0
                     .unwrap();

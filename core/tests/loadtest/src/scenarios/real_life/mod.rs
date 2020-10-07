@@ -65,7 +65,7 @@ use zksync_config::ConfigurationOptions;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, closest_packable_token_amount},
     tx::PackedEthSignature,
-    FranklinTx, TxFeeTypes,
+    TxFeeTypes, ZkSyncTx,
 };
 use zksync_utils::format_ether;
 // Local deps
@@ -715,7 +715,7 @@ impl ScenarioExecutor {
         to: &TestWallet,
         amount: impl Into<BigUint>,
         fee: Option<BigUint>,
-    ) -> (FranklinTx, Option<PackedEthSignature>) {
+    ) -> (ZkSyncTx, Option<PackedEthSignature>) {
         from.sign_transfer(to.address(), amount, fee).await.unwrap()
     }
 

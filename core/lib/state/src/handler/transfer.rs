@@ -7,10 +7,10 @@ use zksync_types::{
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, TransferOutcome, ZksyncState},
+    state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
 };
 
-impl TxHandler<Transfer> for ZksyncState {
+impl TxHandler<Transfer> for ZkSyncState {
     type Op = TransferOutcome;
 
     fn create_op(&self, tx: Transfer) -> Result<Self::Op, anyhow::Error> {
@@ -73,7 +73,7 @@ impl TxHandler<Transfer> for ZksyncState {
     }
 }
 
-impl ZksyncState {
+impl ZkSyncState {
     fn apply_transfer_op(
         &mut self,
         op: &TransferOp,

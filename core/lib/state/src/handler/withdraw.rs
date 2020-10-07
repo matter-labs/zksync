@@ -1,13 +1,13 @@
 use anyhow::{ensure, format_err};
 use zksync_crypto::params::{self, max_account_id};
-use zksync_types::{AccountUpdate, AccountUpdates, FranklinOp, PubKeyHash, Withdraw, WithdrawOp};
+use zksync_types::{AccountUpdate, AccountUpdates, PubKeyHash, Withdraw, WithdrawOp, ZkSyncOp};
 
 use crate::{
     handler::TxHandler,
-    state::{CollectedFee, OpSuccess, ZksyncState},
+    state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
-impl TxHandler<Withdraw> for ZksyncState {
+impl TxHandler<Withdraw> for ZkSyncState {
     type Op = WithdrawOp;
 
     fn create_op(&self, tx: Withdraw) -> Result<Self::Op, anyhow::Error> {
@@ -42,7 +42,7 @@ impl TxHandler<Withdraw> for ZksyncState {
         Ok(OpSuccess {
             fee,
             updates,
-            executed_op: FranklinOp::Withdraw(Box::new(op)),
+            executed_op: ZkSyncOp::Withdraw(Box::new(op)),
         })
     }
 

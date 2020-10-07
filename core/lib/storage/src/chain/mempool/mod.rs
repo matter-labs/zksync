@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use zksync_types::{mempool::SignedTxVariant, tx::TxHash, SignedFranklinTx};
+use zksync_types::{mempool::SignedTxVariant, tx::TxHash, SignedZkSyncTx};
 // Local imports
 use self::records::MempoolTx;
 use crate::{QueryResult, StorageProcessor};
@@ -53,20 +53,20 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         let mut txs = Vec::new();
 
         for (batch_id, group) in grouped_txs.into_iter() {
-            let deserialized_txs: Vec<SignedFranklinTx> = group
-                .map(|tx_object| -> QueryResult<SignedFranklinTx> {
+            let deserialized_txs: Vec<SignedZkSyncTx> = group
+                .map(|tx_object| -> QueryResult<SignedZkSyncTx> {
                     let tx = serde_json::from_value(tx_object.tx)?;
                     let sign_data = match tx_object.eth_sign_data {
                         None => None,
                         Some(sign_data_value) => serde_json::from_value(sign_data_value)?,
                     };
 
-                    Ok(SignedFranklinTx {
+                    Ok(SignedZkSyncTx {
                         tx,
                         eth_sign_data: sign_data,
                     })
                 })
-                .collect::<Result<Vec<SignedFranklinTx>, anyhow::Error>>()?;
+                .collect::<Result<Vec<SignedZkSyncTx>, anyhow::Error>>()?;
 
             match batch_id {
                 Some(batch_id) => {
@@ -102,7 +102,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
     /// Adds a new transactions batch to the mempool schema.
     /// Returns id of the inserted batch
-    pub async fn insert_batch(&mut self, txs: &[SignedFranklinTx]) -> QueryResult<i64> {
+    pub async fn insert_batch(&mut self, txs: &[SignedZkSyncTx]) -> QueryResult<i64> {
         if txs.is_empty() {
             anyhow::bail!("Cannot insert an empty batch");
         }
@@ -171,7 +171,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     }
 
     /// Adds a new transaction to the mempool schema.
-    pub async fn insert_tx(&mut self, tx_data: &SignedFranklinTx) -> QueryResult<()> {
+    pub async fn insert_tx(&mut self, tx_data: &SignedZkSyncTx) -> QueryResult<()> {
         let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
         let tx = serde_json::to_value(&tx_data.tx)?;
         let batch_id = 0; // Special case: batch_id == 0 <==> transaction is not a part of some batch

@@ -1,22 +1,24 @@
+//! zkSync network L2 transactions.
+
 mod change_pubkey;
 mod close;
 mod forced_exit;
-mod franklin_tx;
-mod primitives;
 mod transfer;
 mod withdraw;
+mod zksync_tx;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export transactions.
+#[doc(hidden)]
+pub use self::close::Close;
 pub use self::{
     change_pubkey::ChangePubKey,
-    close::Close,
     forced_exit::ForcedExit,
-    franklin_tx::{EthSignData, FranklinTx, SignedFranklinTx},
     transfer::Transfer,
     withdraw::Withdraw,
+    zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},
 };
 
 // Re-export primitives associated with transactions.

@@ -3,8 +3,8 @@ use std::fs::{remove_file, File};
 use std::path::Path;
 // Workspace deps
 use zksync_circuit::account::AccountWitness;
-use zksync_circuit::circuit::FranklinCircuit;
-use zksync_circuit::exit_circuit::ZksyncExitCircuit;
+use zksync_circuit::circuit::ZkSyncCircuit;
+use zksync_circuit::exit_circuit::ZkSyncExitCircuit;
 use zksync_circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
@@ -50,7 +50,7 @@ pub(crate) fn make_plonk_blocks_verify_keys(config: AvailableBlockSizesConfig) {
 
 /// Creates instance of the exodus mode zkSync circuit.
 fn exit_circuit() -> impl Circuit<Engine> + Clone {
-    ZksyncExitCircuit::<'_, Engine> {
+    ZkSyncExitCircuit::<'_, Engine> {
         params: &params::RESCUE_PARAMS,
         pub_data_commitment: None,
         root_hash: None,
@@ -123,7 +123,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         },
     };
 
-    FranklinCircuit::<'_, Engine> {
+    ZkSyncCircuit::<'_, Engine> {
         rescue_params: &params::RESCUE_PARAMS,
         jubjub_params: &params::JUBJUB_PARAMS,
         old_root: None,
