@@ -1071,6 +1071,19 @@
       ]
     }
   },
+  "3970cf9992bebde3cab6c3f5cd8dc4ee3d9b7f49093327f00075dd96f5ef3623": {
+    "query": "UPDATE eth_parameters\n            SET gas_price_limit = $1, average_gas_price = $2\n            WHERE id = true",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "39f351e0d79171f20e82f0df7ea9fd34069c69915f96d4496242d35d6bd22a1b": {
     "query": "\n                        INSERT INTO balances ( account_id, coin_id, balance )\n                        VALUES ( $1, $2, $3 )\n                        ON CONFLICT (account_id, coin_id)\n                        DO UPDATE\n                          SET balance = $3\n                        ",
     "describe": {
@@ -2355,18 +2368,6 @@
         "Left": [
           "Int8",
           "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "b3f12f698873c6032f13d2022fb97341b93ddad2f11caf06587bbc7e6d577f2c": {
-    "query": "UPDATE eth_parameters\n            SET gas_price_limit = $1\n            WHERE id = true",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": []
