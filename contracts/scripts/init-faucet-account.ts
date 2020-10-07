@@ -57,7 +57,7 @@ async function main() {
     console.log("Deposit successful");
 
     if (! await faucetWallet.isSigningKeySet()) {
-        const setSigningKey = await faucetWallet.setSigningKey();
+        const setSigningKey = await faucetWallet.setSigningKey({ feeToken: "MLTT" });
         await setSigningKey.awaitReceipt();
         console.log("Signing key is set");
     }
