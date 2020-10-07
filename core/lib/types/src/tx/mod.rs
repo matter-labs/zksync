@@ -3,6 +3,7 @@
 mod change_pubkey;
 mod close;
 mod forced_exit;
+mod primitives;
 mod transfer;
 mod withdraw;
 mod zksync_tx;
