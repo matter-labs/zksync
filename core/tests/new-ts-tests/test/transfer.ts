@@ -1,7 +1,7 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
-import { BigNumber } from 'ethers';
+import { BigNumber, utils } from 'ethers';
 
 type TokenLike = types.TokenLike;
 
@@ -10,6 +10,7 @@ declare module './tester' {
         testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testMultiTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testFailedMultiTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testWrongSignature(from: Wallet, to: Wallet): Promise<void>;
     }
 }
 
@@ -121,5 +122,45 @@ Tester.prototype.testFailedMultiTransfer = async function (
         expect.fail('This batch should have failed!');
     } catch (e) {
         expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+    }
+};
+
+Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet) {
+    const signedTransfer = await from.signSyncTransfer({
+        to: to.address(),
+        token: 'ETH',
+        amount: utils.parseEther('0.002'),
+        fee: utils.parseEther('0.001'),
+        nonce: await from.getNonce()
+    });
+
+    const ETH_SIGNATURE_LENGTH_PREFIXED = 132;
+    const fakeEthSignature: types.TxEthSignature = {
+        signature: '0x'.padEnd(ETH_SIGNATURE_LENGTH_PREFIXED, '0'),
+        type: 'EthereumSignature'
+    };
+
+    try {
+        await from.provider.submitTx(signedTransfer.tx, fakeEthSignature);
+        expect.fail('Sending tx with incorrect ETH signature must throw');
+    } catch (e) {
+        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
+    }
+
+    const { totalFee } = await this.syncProvider.getTransactionFee('Withdraw', from.address(), 'ETH');
+
+    const signedWithdraw = await from.signWithdrawFromSyncToEthereum({
+        ethAddress: from.address(),
+        token: 'ETH',
+        amount: utils.parseEther('0.001'),
+        fee: totalFee,
+        nonce: await from.getNonce()
+    });
+
+    try {
+        await from.provider.submitTx(signedWithdraw.tx, fakeEthSignature);
+        expect.fail('Sending tx with incorrect ETH signature must throw');
+    } catch (e) {
+        expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
     }
 };

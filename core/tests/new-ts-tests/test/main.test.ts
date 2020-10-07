@@ -81,6 +81,10 @@ describe('ZkSync integration tests', () => {
         await expect(tester.testFailedMultiTransfer(alice, carl, 'ETH', one.div(100))).to.be.fulfilled;
     });
 
+    step('should fail trying to send tx with wrong signature', async () => {
+        await expect(tester.testWrongSignature(alice, carl)).to.be.fulfilled;
+    });
+
     step('should execute a withdrawal', async () => {
         await expect(tester.testWithdraw(alice, 'ETH', one.div(10))).to.be.fulfilled;
     });
