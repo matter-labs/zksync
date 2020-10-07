@@ -29,7 +29,7 @@ use tokio::runtime::Builder;
 use zksync::{Network, Provider};
 use zksync_config::ConfigurationOptions;
 // Local uses
-use self::{monitor::Monitor, scenarios::configs::AccountInfo};
+use self::{monitor::Monitor, ng::scenarios::ScenarioExecutor, scenarios::configs::AccountInfo};
 
 mod cli;
 mod monitor;
@@ -49,12 +49,11 @@ fn main() -> Result<(), anyhow::Error> {
         address: "36615Cf349d7F6344891B1e7CA7C72883F5dc049".parse()?,
         private_key: "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110".parse()?,
     };
-    let scenario = ng::scenarios::SimpleScenario {
-        transfer_size: 1,
-        wallets: 100,
-        transfer_rounds: 100,
-    };
-    tokio_runtime.block_on(scenario.run(monitor, main_account, env_config))?;
+
+    tokio_runtime.block_on(async {
+        let scenario = ScenarioExecutor::new(monitor, main_account, env_config).await?;
+        scenario.run().await
+    })?;
 
     Ok(())
 }
