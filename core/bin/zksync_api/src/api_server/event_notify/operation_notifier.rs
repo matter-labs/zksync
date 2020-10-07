@@ -52,13 +52,7 @@ impl OperationNotifier {
         }
     }
 
-    fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), anyhow::Error> {
-        self.prior_op_subs.remove(sub_id.clone())?;
-        self.tx_subs.remove(sub_id.clone())?;
-        self.account_subs.remove(sub_id)?;
-        Ok(())
-    }
-
+    /// Handles incoming subscription/unsubscription request.
     pub async fn handle_notify_req(
         &mut self,
         new_sub: EventNotifierRequest,
@@ -69,13 +63,13 @@ impl OperationNotifier {
                     hash,
                     action,
                     subscriber,
-                } => self.handle_transaction_sub(hash, action, subscriber).await,
+                } => self.add_transaction_sub(hash, action, subscriber).await,
                 EventSubscribeRequest::PriorityOp {
                     serial_id,
                     action,
                     subscriber,
                 } => {
-                    self.handle_priority_op_sub(serial_id, action, subscriber)
+                    self.add_priority_op_sub(serial_id, action, subscriber)
                         .await
                 }
                 EventSubscribeRequest::Account {
@@ -83,7 +77,7 @@ impl OperationNotifier {
                     action,
                     subscriber,
                 } => {
-                    self.handle_account_update_sub(address, action, subscriber)
+                    self.add_account_update_sub(address, action, subscriber)
                         .await
                 }
             }
@@ -94,7 +88,107 @@ impl OperationNotifier {
         }
     }
 
-    async fn handle_priority_op_sub(
+    /// Processes new block action (commit or verify), notifying the subscribers.
+    pub async fn handle_new_block(&mut self, op: Operation) -> Result<(), anyhow::Error> {
+        let action = op.action.get_type();
+
+        self.handle_executed_operations(
+            op.block.block_transactions.clone(),
+            action,
+            op.block.block_number,
+        )?;
+
+        let updated_accounts: Vec<AccountId> = op
+            .block
+            .block_transactions
+            .iter()
+            .map(|exec_op| exec_op.get_updated_account_ids())
+            .flatten()
+            .collect();
+
+        for id in updated_accounts {
+            if self.account_subs.subscriber_exists(id, action) {
+                let account_state = match self.state.get_account_state(id, action).await? {
+                    Some(account_state) => account_state,
+                    None => {
+                        log::warn!(
+                            "Account is updated but not stored in DB, id: {}, block: {:#?}",
+                            id,
+                            op.block
+                        );
+                        continue;
+                    }
+                };
+
+                self.account_subs.notify(id, action, account_state);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Processes new executed operations, notifying the corresponding subscribers.
+    fn handle_executed_operations(
+        &mut self,
+        ops: Vec<ExecutedOperations>,
+        action: ActionType,
+        block_number: BlockNumber,
+    ) -> Result<(), anyhow::Error> {
+        for tx in ops {
+            match tx {
+                ExecutedOperations::Tx(tx) => {
+                    let hash = tx.signed_tx.hash();
+                    let resp = TransactionInfoResp {
+                        executed: true,
+                        success: Some(tx.success),
+                        fail_reason: tx.fail_reason,
+                        block: Some(BlockInfo {
+                            block_number: i64::from(block_number),
+                            committed: true,
+                            verified: action == ActionType::VERIFY,
+                        }),
+                    };
+                    self.tx_subs.notify(hash, action, resp);
+                }
+                ExecutedOperations::PriorityOp(prior_op) => {
+                    let id = prior_op.priority_op.serial_id;
+                    let resp = ETHOpInfoResp {
+                        executed: true,
+                        block: Some(BlockInfo {
+                            block_number: i64::from(block_number),
+                            committed: true,
+                            verified: action == ActionType::VERIFY,
+                        }),
+                    };
+                    self.prior_op_subs.notify(id, action, resp);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// More convenient alias for `handle_executed_operations`.
+    fn handle_new_executed_batch(
+        &mut self,
+        exec_batch: ExecutedOpsNotify,
+    ) -> Result<(), anyhow::Error> {
+        self.handle_executed_operations(
+            exec_batch.operations,
+            ActionType::COMMIT,
+            exec_batch.block_number,
+        )
+    }
+
+    /// Removes provided subscription from the list.
+    fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), anyhow::Error> {
+        self.prior_op_subs.remove(sub_id.clone())?;
+        self.tx_subs.remove(sub_id.clone())?;
+        self.account_subs.remove(sub_id)?;
+        Ok(())
+    }
+
+    /// Add priority operation subscription.
+    async fn add_priority_op_sub(
         &mut self,
         serial_id: u64,
         action: ActionType,
@@ -139,7 +233,8 @@ impl OperationNotifier {
         Ok(())
     }
 
-    async fn handle_transaction_sub(
+    /// Add transactions subscription.
+    async fn add_transaction_sub(
         &mut self,
         hash: TxHash,
         action: ActionType,
@@ -178,7 +273,8 @@ impl OperationNotifier {
         Ok(())
     }
 
-    async fn handle_account_update_sub(
+    /// Add account info subscription.
+    async fn add_account_update_sub(
         &mut self,
         address: Address,
         action: ActionType,
@@ -190,94 +286,6 @@ impl OperationNotifier {
 
         self.account_subs
             .insert_new(sub_id, sub, account_id, action)?;
-        Ok(())
-    }
-
-    fn handle_executed_operations(
-        &mut self,
-        ops: Vec<ExecutedOperations>,
-        action: ActionType,
-        block_number: BlockNumber,
-    ) -> Result<(), anyhow::Error> {
-        for tx in ops {
-            match tx {
-                ExecutedOperations::Tx(tx) => {
-                    let hash = tx.signed_tx.hash();
-                    let resp = TransactionInfoResp {
-                        executed: true,
-                        success: Some(tx.success),
-                        fail_reason: tx.fail_reason,
-                        block: Some(BlockInfo {
-                            block_number: i64::from(block_number),
-                            committed: true,
-                            verified: action == ActionType::VERIFY,
-                        }),
-                    };
-                    self.tx_subs.notify(hash, action, resp);
-                }
-                ExecutedOperations::PriorityOp(prior_op) => {
-                    let id = prior_op.priority_op.serial_id;
-                    let resp = ETHOpInfoResp {
-                        executed: true,
-                        block: Some(BlockInfo {
-                            block_number: i64::from(block_number),
-                            committed: true,
-                            verified: action == ActionType::VERIFY,
-                        }),
-                    };
-                    self.prior_op_subs.notify(id, action, resp);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_new_executed_batch(
-        &mut self,
-        exec_batch: ExecutedOpsNotify,
-    ) -> Result<(), anyhow::Error> {
-        self.handle_executed_operations(
-            exec_batch.operations,
-            ActionType::COMMIT,
-            exec_batch.block_number,
-        )
-    }
-
-    async fn handle_new_block(&mut self, op: Operation) -> Result<(), anyhow::Error> {
-        let action = op.action.get_type();
-
-        self.handle_executed_operations(
-            op.block.block_transactions.clone(),
-            action,
-            op.block.block_number,
-        )?;
-
-        let updated_accounts: Vec<AccountId> = op
-            .block
-            .block_transactions
-            .iter()
-            .map(|exec_op| exec_op.get_updated_account_ids())
-            .flatten()
-            .collect();
-
-        for id in updated_accounts {
-            if self.account_subs.subscriber_exists(id, action) {
-                let account_state = match self.state.get_account_state(id, action).await? {
-                    Some(account_state) => account_state,
-                    None => {
-                        log::warn!(
-                            "Account is updated but not stored in DB, id: {}, block: {:#?}",
-                            id,
-                            op.block
-                        );
-                        continue;
-                    }
-                };
-
-                self.account_subs.notify(id, action, account_state);
-            }
-        }
-
         Ok(())
     }
 }
