@@ -1,28 +1,13 @@
-use crate::api_server::rpc_server::types::{
-    BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
-};
+use crate::api_server::rpc_server::types::{BlockInfo, ResponseAccountState};
 use crate::utils::token_db_cache::TokenDBCache;
-use futures::{
-    channel::{mpsc, oneshot},
-    compat::Future01CompatExt,
-    select,
-    stream::StreamExt,
-    FutureExt, SinkExt,
-};
-use jsonrpc_pubsub::{
-    typed::{Sink, Subscriber},
-    SubscriptionId,
-};
 use lru_cache::LruCache;
-use std::collections::BTreeMap;
-use std::str::FromStr;
 use zksync_basic_types::Address;
 use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
 use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation, PriorityOpId};
+use zksync_types::{AccountId, ActionType};
 
 pub struct NotifierState {
     pub(super) cache_of_executed_priority_operations:

@@ -1,8 +1,10 @@
+use super::ExecutedOps;
+use futures::channel::mpsc;
 use std::time::Duration;
-use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
-use zksync_types::{block::PendingBlock, BlockNumber};
+use zksync_types::{block::PendingBlock, BlockNumber, Operation};
 
+#[derive(Debug)]
 pub struct EventFetcher {
     miniblock_interval: Duration,
     db_pool: ConnectionPool,
@@ -10,22 +12,28 @@ pub struct EventFetcher {
     last_block: BlockNumber,
     success_operations_len: usize,
     failed_txs_len: usize,
+
+    operations_sender: mpsc::Sender<Operation>,
+    txs_sender: mpsc::Sender<ExecutedOps>,
 }
 
 impl EventFetcher {
     pub async fn new(
         db_pool: ConnectionPool,
-        config_options: ConfigurationOptions,
+        miniblock_interval: Duration,
+        operations_sender: mpsc::Sender<Operation>,
+        txs_sender: mpsc::Sender<ExecutedOps>,
     ) -> anyhow::Result<Self> {
         let mut fetcher = EventFetcher {
-            miniblock_interval: config_options
-                .miniblock_timings
-                .miniblock_iteration_interval,
+            miniblock_interval,
             db_pool,
 
             last_block: 0,
             success_operations_len: 0,
             failed_txs_len: 0,
+
+            operations_sender,
+            txs_sender,
         };
 
         let pending_block = fetcher.load_pending_block().await?;
@@ -54,13 +62,15 @@ impl EventFetcher {
         loop {
             interval.tick().await;
 
-            let pending_block = match self.load_pending_block().await {
+            let _pending_block = match self.load_pending_block().await {
                 Ok(block) => block,
                 Err(err) => {
                     log::warn!("Unable to connect to the database: {}", err);
                     continue;
                 }
             };
+
+            // match
         }
     }
 

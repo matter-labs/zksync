@@ -1,38 +1,17 @@
 use crate::api_server::rpc_server::types::{
     BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
 };
-use crate::utils::token_db_cache::TokenDBCache;
-use futures::{
-    channel::{mpsc, oneshot},
-    compat::Future01CompatExt,
-    select,
-    stream::StreamExt,
-    FutureExt, SinkExt,
-};
-use jsonrpc_pubsub::{
-    typed::{Sink, Subscriber},
-    SubscriptionId,
-};
-use lru_cache::LruCache;
-use std::collections::BTreeMap;
-use std::str::FromStr;
+use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId};
 use zksync_basic_types::Address;
-use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
-use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation, PriorityOpId};
+use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation};
 
 use super::{
     state::NotifierState, sub_store::SubStorage, EventNotifierRequest, EventSubscribeRequest,
-    ExecutedOpId, ExecutedOpsNotify, SubscriptionSender,
+    ExecutedOps,
 };
-
-const MAX_LISTENERS_PER_ENTITY: usize = 2048;
-const TX_SUB_PREFIX: &str = "txsub";
-const ETHOP_SUB_PREFIX: &str = "eosub";
-const ACCOUNT_SUB_PREFIX: &str = "acsub";
 
 pub struct OperationNotifier {
     state: NotifierState,
@@ -168,9 +147,9 @@ impl OperationNotifier {
     }
 
     /// More convenient alias for `handle_executed_operations`.
-    fn handle_new_executed_batch(
+    pub fn handle_new_executed_batch(
         &mut self,
-        exec_batch: ExecutedOpsNotify,
+        exec_batch: ExecutedOps,
     ) -> Result<(), anyhow::Error> {
         self.handle_executed_operations(
             exec_batch.operations,
@@ -280,7 +259,7 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), anyhow::Error> {
-        let (account_id, account_state) = self.state.get_account_info(address, action).await?;
+        let (account_id, _account_state) = self.state.get_account_info(address, action).await?;
 
         let sub_id = self.account_subs.generate_sub_id(account_id, action);
 

@@ -1,13 +1,7 @@
 //! Storage for subscription objects.
 use super::SubscriptionSender;
-use futures::{
-    channel::{mpsc, oneshot},
-    compat::Future01CompatExt,
-    select,
-    stream::StreamExt,
-    FutureExt, SinkExt,
-};
-use std::{cmp::Ord, collections::BTreeMap, fmt::Display, str::FromStr};
+use futures::{compat::Future01CompatExt, FutureExt};
+use std::{cmp::Ord, collections::BTreeMap, str::FromStr};
 use zksync_types::{tx::TxHash, AccountId, ActionType, PriorityOpId};
 
 use jsonrpc_pubsub::{

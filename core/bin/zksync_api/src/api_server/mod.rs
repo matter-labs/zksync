@@ -9,7 +9,6 @@ use futures::channel::mpsc;
 // Workspace uses
 use zksync_config::{AdminServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
-use zksync_types::Operation;
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{signature_checker, utils::current_zksync_info::CurrentZksyncInfo};
@@ -23,7 +22,6 @@ mod rpc_subscriptions;
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_api_server(
-    op_notify_receiver: mpsc::Receiver<Operation>,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
@@ -48,12 +46,10 @@ pub fn start_api_server(
     );
     rpc_subscriptions::start_ws_server(
         &config_options,
-        op_notify_receiver,
         connection_pool.clone(),
         sign_check_sender.clone(),
         ticker_request_sender.clone(),
         panic_notify.clone(),
-        config_options.api_requests_caches_size,
         current_zksync_info.clone(),
     );
 

@@ -1,47 +1,27 @@
-// TODO: Temporary, to not have all the code completely yellow.
-#![allow(dead_code, unused_imports, unused_variables, unused_mut)]
-
-use super::rpc_server::types::{
-    BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
-};
-use crate::utils::token_db_cache::TokenDBCache;
-use anyhow::{bail, format_err};
-use futures::{
-    channel::{mpsc, oneshot},
-    compat::Future01CompatExt,
-    select,
-    stream::StreamExt,
-    FutureExt, SinkExt,
-};
+use super::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
+use futures::{channel::mpsc, select, stream::StreamExt};
 use jsonrpc_pubsub::{
     typed::{Sink, Subscriber},
     SubscriptionId,
 };
-use lru_cache::LruCache;
-use std::str::FromStr;
+use std::time::Duration;
 use zksync_basic_types::Address;
-use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
-use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation};
+use zksync_types::{block::ExecutedOperations, ActionType};
 
-use self::{operation_notifier::OperationNotifier, sub_store::SubStorage};
+use self::{event_fetcher::EventFetcher, operation_notifier::OperationNotifier};
 
-mod event_notify_fetcher;
+mod event_fetcher;
 mod operation_notifier;
 mod state;
 mod sub_store;
 
-pub struct ExecutedOpsNotify {
+#[derive(Debug)]
+pub struct ExecutedOps {
     pub operations: Vec<ExecutedOperations>,
     pub block_number: BlockNumber,
-}
-
-pub enum ExecutedOpId {
-    Transaction(TxHash),
-    PriorityOp(u64),
 }
 
 pub enum EventSubscribeRequest {
@@ -74,32 +54,44 @@ struct SubscriptionSender<T> {
 
 pub fn start_sub_notifier(
     db_pool: ConnectionPool,
-    mut new_block_stream: mpsc::Receiver<Operation>,
     mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
     api_requests_caches_size: usize,
+    miniblock_interval: Duration,
 ) -> tokio::task::JoinHandle<()> {
-    let tokens_cache = TokenDBCache::new(db_pool.clone());
+    let (new_block_sender, mut new_block_receiver) = mpsc::channel(32_728);
+    let (new_txs_sender, mut new_txs_receiver) = mpsc::channel(32_728);
 
-    let mut notifier = OperationNotifier::new(api_requests_caches_size, db_pool);
+    let mut notifier = OperationNotifier::new(api_requests_caches_size, db_pool.clone());
 
     tokio::spawn(async move {
+        let fetcher = EventFetcher::new(
+            db_pool,
+            miniblock_interval,
+            new_block_sender,
+            new_txs_sender,
+        )
+        .await
+        .expect("Unable to create event fetcher");
+
+        tokio::spawn(fetcher.run());
+
         loop {
             select! {
-                // new_block = new_block_stream.next() => {
-                //     if let Some(new_block) = new_block {
-                //         notifier.handle_new_block(new_block)
-                //             .await
-                //             .map_err(|e| log::warn!("Failed to handle new block: {}",e))
-                //             .unwrap_or_default();
-                //     }
-                // },
-                // new_exec_batch = executed_tx_stream.next() => {
-                //     if let Some(new_exec_batch) = new_exec_batch {
-                //         notifier.handle_new_executed_batch(new_exec_batch)
-                //             .map_err(|e| log::warn!("Failed to handle new exec batch: {}",e))
-                //             .unwrap_or_default();
-                //     }
-                // },
+                new_block = new_block_receiver.next() => {
+                    if let Some(new_block) = new_block {
+                        notifier.handle_new_block(new_block)
+                            .await
+                            .map_err(|e| log::warn!("Failed to handle new block: {}",e))
+                            .unwrap_or_default();
+                    }
+                },
+                new_exec_batch = new_txs_receiver.next() => {
+                    if let Some(new_exec_batch) = new_exec_batch {
+                        notifier.handle_new_executed_batch(new_exec_batch)
+                            .map_err(|e| log::warn!("Failed to handle new exec batch: {}",e))
+                            .unwrap_or_default();
+                    }
+                },
                 new_sub = subscription_stream.next() => {
                     if let Some(new_sub) = new_sub {
                         notifier.handle_notify_req(new_sub)

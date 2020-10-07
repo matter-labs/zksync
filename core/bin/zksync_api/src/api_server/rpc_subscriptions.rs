@@ -12,7 +12,7 @@ use zksync_basic_types::Address;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
-use zksync_types::{tx::TxHash, ActionType, Operation};
+use zksync_types::{tx::TxHash, ActionType};
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{
@@ -178,24 +178,26 @@ struct RpcSubApp {
 #[allow(clippy::too_many_arguments)]
 pub fn start_ws_server(
     config_options: &ConfigurationOptions,
-    op_recv: mpsc::Receiver<Operation>,
     db_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    each_cache_size: usize,
     current_zksync_info: CurrentZksyncInfo,
 ) {
     let config_options = config_options.clone();
+    let api_caches_size = config_options.api_requests_caches_size;
+
     let addr = config_options.json_rpc_ws_server_address;
 
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
     start_sub_notifier(
         db_pool.clone(),
-        op_recv,
         event_sub_receiver,
-        each_cache_size,
+        api_caches_size,
+        config_options
+            .miniblock_timings
+            .miniblock_iteration_interval,
     );
 
     let req_rpc_app = super::rpc_server::RpcApp::new(
