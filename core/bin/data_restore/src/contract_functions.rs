@@ -73,12 +73,12 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
 /// # Arguments
 ///
 /// * `web3` - Web3 provider url
-/// * `franklin_contract` - Rollup contract
+/// * `zksync_contract` - Rollup contract
 ///
 pub async fn get_total_verified_blocks<T: Transport>(
-    franklin_contract: &(ethabi::Contract, Contract<T>),
+    zksync_contract: &(ethabi::Contract, Contract<T>),
 ) -> u32 {
-    franklin_contract
+    zksync_contract
         .1
         .query::<U256, Option<Address>, Option<BlockId>, ()>(
             "totalBlocksVerified",

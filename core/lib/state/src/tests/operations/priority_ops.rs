@@ -2,7 +2,7 @@ use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use num::{BigUint, Zero};
 use web3::types::H160;
 use zksync_types::priority_ops::{Deposit, FullExit};
-use zksync_types::{account::AccountUpdate, FranklinPriorityOp};
+use zksync_types::{account::AccountUpdate, ZkSyncPriorityOp};
 
 /// Check Deposit to existing account
 #[test]
@@ -20,7 +20,7 @@ fn deposit_to_existing() {
     };
 
     tb.test_priority_op_success(
-        FranklinPriorityOp::Deposit(deposit),
+        ZkSyncPriorityOp::Deposit(deposit),
         &[(
             account_id,
             AccountUpdate::UpdateBalance {
@@ -49,7 +49,7 @@ fn deposit_to_new() {
     };
 
     tb.test_priority_op_success(
-        FranklinPriorityOp::Deposit(deposit),
+        ZkSyncPriorityOp::Deposit(deposit),
         &[
             (account_id, AccountUpdate::Create { address, nonce: 0 }),
             (
@@ -77,7 +77,7 @@ fn full_exit_non_existent() {
         account_id: 145,
     };
 
-    tb.test_priority_op_success(FranklinPriorityOp::FullExit(full_exit), &[])
+    tb.test_priority_op_success(ZkSyncPriorityOp::FullExit(full_exit), &[])
 }
 
 /// Check successfull FullExit
@@ -96,7 +96,7 @@ fn full_exit_success() {
     };
 
     tb.test_priority_op_success(
-        FranklinPriorityOp::FullExit(full_exit),
+        ZkSyncPriorityOp::FullExit(full_exit),
         &[(
             account_id,
             AccountUpdate::UpdateBalance {

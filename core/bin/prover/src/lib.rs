@@ -88,7 +88,7 @@ pub trait ApiClient: Debug {
     fn prover_data(
         &self,
         block: i64,
-    ) -> Result<zksync_circuit::circuit::FranklinCircuit<'_, Engine>, anyhow::Error>;
+    ) -> Result<zksync_circuit::circuit::ZkSyncCircuit<'_, Engine>, anyhow::Error>;
     fn publish(&self, block: i64, p: EncodedProofPlonk) -> Result<(), anyhow::Error>;
     fn prover_stopped(&self, prover_run_id: i32) -> Result<(), anyhow::Error>;
 }

@@ -187,7 +187,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
-    let mut state = zksync_state::state::ZksyncState::from_acc_map(accounts, 1);
+    let mut state = zksync_state::state::ZkSyncState::from_acc_map(accounts, 1);
     println!(
         "acc_number 0, acc {:?}",
         zksync_crypto::circuit::account::CircuitAccount::from(validator_account.clone())
@@ -200,7 +200,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let initial_root = circuit_tree.root_hash();
     let initial_root2 = circuit_tree.root_hash();
     let initial_used_subtree_root = get_used_subtree_root_hash(&circuit_tree);
-    let deposit_priority_op = zksync_types::FranklinPriorityOp::Deposit(zksync_types::Deposit {
+    let deposit_priority_op = zksync_types::ZkSyncPriorityOp::Deposit(zksync_types::Deposit {
         from: validator_account.address,
         token: 0,
         amount: BigUint::from(10u32),
@@ -272,7 +272,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let mut pub_data = vec![];
     let mut operations = vec![];
 
-    if let zksync_types::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
+    if let zksync_types::ZkSyncPriorityOp::Deposit(deposit_op) = deposit_priority_op {
         let deposit_witness = DepositWitness::apply_tx(
             &mut circuit_tree,
             &zksync_types::operations::DepositOp {

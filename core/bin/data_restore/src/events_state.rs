@@ -76,7 +76,7 @@ impl EventsState {
     /// # Arguments
     ///
     /// * `web3` - Web3 provider url
-    /// * `franklin_contract` - Rollup contract
+    /// * `zksync_contract` - Rollup contract
     /// * `governance_contract` - Governance contract
     /// * `eth_blocks_step` - Blocks step for watching
     /// * `end_eth_blocks_offset` - Delta between last eth block and last watched block
@@ -84,7 +84,7 @@ impl EventsState {
     pub async fn update_events_state<T: Transport>(
         &mut self,
         web3: &Web3<T>,
-        franklin_contract: &(ethabi::Contract, Contract<T>),
+        zksync_contract: &(ethabi::Contract, Contract<T>),
         governance_contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
@@ -94,7 +94,7 @@ impl EventsState {
         let (block_events, token_events, to_block_number): (Vec<Log>, Vec<NewTokenEvent>, u64) =
             EventsState::get_new_events_and_last_watched_block(
                 web3,
-                franklin_contract,
+                zksync_contract,
                 governance_contract,
                 self.last_watched_eth_block_number,
                 eth_blocks_step,
@@ -104,7 +104,7 @@ impl EventsState {
 
         self.last_watched_eth_block_number = to_block_number;
 
-        if !self.update_blocks_state(franklin_contract, &block_events) {
+        if !self.update_blocks_state(zksync_contract, &block_events) {
             return Ok((vec![], token_events, self.last_watched_eth_block_number));
         }
 
@@ -133,7 +133,7 @@ impl EventsState {
     /// # Arguments
     ///
     /// * `web3` - Web3 provider url
-    /// * `franklin_contract` - Rollup contract
+    /// * `zksync_contract` - Rollup contract
     /// * `governance_contract` - Governance contract
     /// * `last_watched_block_number` - the current last watched eth block
     /// * `eth_blocks_step` - Ethereum blocks delta step
@@ -141,7 +141,7 @@ impl EventsState {
     ///
     async fn get_new_events_and_last_watched_block<T: Transport>(
         web3: &Web3<T>,
-        franklin_contract: &(ethabi::Contract, Contract<T>),
+        zksync_contract: &(ethabi::Contract, Contract<T>),
         governance_contract: &(ethabi::Contract, Contract<T>),
         last_watched_block_number: u64,
         eth_blocks_step: u64,
@@ -168,13 +168,9 @@ impl EventsState {
 
         let from_block_number = BlockNumber::Number(from_block_number_u64.into());
 
-        let block_logs = EventsState::get_block_logs(
-            web3,
-            franklin_contract,
-            from_block_number,
-            to_block_number,
-        )
-        .await?;
+        let block_logs =
+            EventsState::get_block_logs(web3, zksync_contract, from_block_number, to_block_number)
+                .await?;
 
         let token_logs = EventsState::get_token_added_logs(
             web3,

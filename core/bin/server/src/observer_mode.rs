@@ -1,7 +1,7 @@
 //! Observer mode continuously checks the database and keeps updated state of the accounts in memory.
 //! The state is then fed to other actors when server transitions to the leader mode.
 
-use crate::state_keeper::ZksyncStateInitParams;
+use crate::state_keeper::ZkSyncStateInitParams;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -11,12 +11,12 @@ use zksync_circuit::witness::{
 };
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
-use zksync_types::{BlockNumber, FranklinOp};
+use zksync_types::{BlockNumber, ZkSyncOp};
 
 /// The state being observed during observer mode. Meant to be used later to initialize server actors.
 pub struct ObservedState {
-    /// Used to initialize `ZksyncStateKeeper`
-    pub state_keeper_init: ZksyncStateInitParams,
+    /// Used to initialize `ZkSyncStateKeeper`
+    pub state_keeper_init: ZkSyncStateInitParams,
     /// Used to initialize pool of prover_server.
     pub circuit_acc_tree: CircuitAccountTree,
     /// Block number corresponding to the state in `circuit_acc_tree`.
@@ -28,7 +28,7 @@ pub struct ObservedState {
 impl ObservedState {
     fn new(connection_pool: zksync_storage::ConnectionPool) -> Self {
         Self {
-            state_keeper_init: ZksyncStateInitParams::new(),
+            state_keeper_init: ZkSyncStateInitParams::new(),
             circuit_acc_tree: CircuitAccountTree::new(zksync_crypto::params::account_tree_depth()),
             circuit_tree_block: 0,
             connection_pool,
@@ -40,7 +40,7 @@ impl ObservedState {
         self.init_circuit_tree().await?;
         log::info!("updated circuit tree to block: {}", self.circuit_tree_block);
         let mut storage = self.connection_pool.access_storage().await?;
-        self.state_keeper_init = ZksyncStateInitParams::restore_from_db(&mut storage).await?;
+        self.state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage).await?;
         log::info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
@@ -113,38 +113,38 @@ impl ObservedState {
         Ok(())
     }
 
-    fn apply(&mut self, ops: Vec<FranklinOp>) {
+    fn apply(&mut self, ops: Vec<ZkSyncOp>) {
         for op in ops {
             match op {
-                FranklinOp::Deposit(deposit) => {
+                ZkSyncOp::Deposit(deposit) => {
                     DepositWitness::apply_tx(&mut self.circuit_acc_tree, &deposit);
                 }
-                FranklinOp::Transfer(transfer) => {
+                ZkSyncOp::Transfer(transfer) => {
                     TransferWitness::apply_tx(&mut self.circuit_acc_tree, &transfer);
                 }
-                FranklinOp::TransferToNew(transfer_to_new) => {
+                ZkSyncOp::TransferToNew(transfer_to_new) => {
                     TransferToNewWitness::apply_tx(&mut self.circuit_acc_tree, &transfer_to_new);
                 }
-                FranklinOp::Withdraw(withdraw) => {
+                ZkSyncOp::Withdraw(withdraw) => {
                     WithdrawWitness::apply_tx(&mut self.circuit_acc_tree, &withdraw);
                 }
-                FranklinOp::Close(close) => {
+                ZkSyncOp::Close(close) => {
                     CloseAccountWitness::apply_tx(&mut self.circuit_acc_tree, &close);
                 }
-                FranklinOp::FullExit(full_exit) => {
+                ZkSyncOp::FullExit(full_exit) => {
                     let success = full_exit.withdraw_amount.is_some();
                     FullExitWitness::apply_tx(&mut self.circuit_acc_tree, &(*full_exit, success));
                 }
-                FranklinOp::ChangePubKeyOffchain(change_pubkey) => {
+                ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
                     ChangePubkeyOffChainWitness::apply_tx(
                         &mut self.circuit_acc_tree,
                         &change_pubkey,
                     );
                 }
-                FranklinOp::ForcedExit(forced_exit) => {
+                ZkSyncOp::ForcedExit(forced_exit) => {
                     ForcedExitWitness::apply_tx(&mut self.circuit_acc_tree, &forced_exit);
                 }
-                FranklinOp::Noop(_) => {}
+                ZkSyncOp::Noop(_) => {}
             }
         }
     }

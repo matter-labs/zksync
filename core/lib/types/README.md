@@ -7,14 +7,14 @@ zkSync operations are split into the following categories:
 
 - **transactions**: operations of zkSync network existing purely in the L2.
   Currently includes `Transfer`, `Withdraw`, `ChangePubKey` and `ForcedExit`.
-  All the transactions form an enum named `FranklinTx`.
+  All the transactions form an enum named `ZkSyncTx`.
 - **priority operations**: operations of zkSync network which are triggered by
   invoking the zkSync smart contract method in L1. These operations are disovered by
   the zkSync server and included into the block just like L2 transactions.
   Currently includes `Deposit` and `FullExit`.
-  All the priority operations form an enum named `FranklinPriorityOp`.
-- **operations**: a superset of `FranklinTx` and `FranklinPriorityOp`.
-  All the operations are included into an enum named `FranklinOp`. This enum contains
+  All the priority operations form an enum named `ZkSyncPriorityOp`.
+- **operations**: a superset of `ZkSyncTx` and `ZkSyncPriorityOp`.
+  All the operations are included into an enum named `ZkSyncOp`. This enum contains
   all the items that can be included into the block, together with meta-information
   about each transaction.
   Main difference of operation from transaction/priority operation is that it can form

@@ -11,7 +11,7 @@ use zksync_crypto::primitives::{
     bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
 };
 
-/// Deposit operation. For details, see the documentation of [`FranklinOp`](./operations/enum.FranklinOp.html).
+/// Deposit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
     pub priority_op: Deposit,

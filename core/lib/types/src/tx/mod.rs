@@ -3,9 +3,9 @@
 mod change_pubkey;
 mod close;
 mod forced_exit;
-mod franklin_tx;
 mod transfer;
 mod withdraw;
+mod zksync_tx;
 
 mod primitives;
 
@@ -18,9 +18,9 @@ pub use self::close::Close;
 pub use self::{
     change_pubkey::ChangePubKey,
     forced_exit::ForcedExit,
-    franklin_tx::{EthSignData, FranklinTx, SignedFranklinTx},
     transfer::Transfer,
     withdraw::Withdraw,
+    zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},
 };
 
 // Re-export primitives associated with transactions.

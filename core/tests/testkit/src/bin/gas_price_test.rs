@@ -10,7 +10,7 @@
 
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
-use crate::zksync_account::ZksyncAccount;
+use crate::zksync_account::ZkSyncAccount;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::str::FromStr;
 use web3::transports::Http;
@@ -186,7 +186,7 @@ fn gen_unpacked_amount(rng: &mut impl Rng) -> BigUint {
 async fn gas_price_test() {
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
@@ -220,8 +220,8 @@ async fn gas_price_test() {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,

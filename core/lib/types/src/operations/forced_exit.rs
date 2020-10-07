@@ -16,7 +16,7 @@ use zksync_crypto::primitives::{
 };
 use zksync_utils::BigUintSerdeWrapper;
 
-/// ForcedExit operation. For details, see the documentation of [`FranklinOp`](./operations/enum.FranklinOp.html).
+/// ForcedExit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForcedExitOp {
     pub tx: ForcedExit,
