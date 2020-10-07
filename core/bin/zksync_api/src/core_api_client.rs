@@ -1,5 +1,5 @@
 use crate::tx_error::TxAddError;
-use zksync_types::{Address, PriorityOp, SignedFranklinTx, H256};
+use zksync_types::{Address, PriorityOp, SignedZkSyncTx, H256};
 
 #[derive(Debug, Clone)]
 pub struct CoreApiClient {
@@ -17,14 +17,14 @@ impl CoreApiClient {
         }
     }
 
-    pub async fn send_tx(&self, _tx: SignedFranklinTx) -> anyhow::Result<Result<(), TxAddError>> {
+    pub async fn send_tx(&self, _tx: SignedZkSyncTx) -> anyhow::Result<Result<(), TxAddError>> {
         // TODO
         Ok(Ok(()))
     }
 
     pub async fn send_txs_batch(
         &self,
-        _txs: Vec<SignedFranklinTx>,
+        _txs: Vec<SignedZkSyncTx>,
     ) -> anyhow::Result<Result<(), TxAddError>> {
         // TODO
         Ok(Ok(()))

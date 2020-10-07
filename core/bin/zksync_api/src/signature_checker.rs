@@ -11,21 +11,21 @@ use futures::{
 };
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
-use zksync_types::{tx::TxEthSignature, FranklinTx, SignedFranklinTx};
+use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
 use zksync_config::ConfigurationOptions;
 use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
-/// Wrapper on a `FranklinTx` which guarantees that
+/// Wrapper on a `ZkSyncTx` which guarantees that
 /// transaction was checked and signatures associated with
 /// this transactions are correct.
 ///
-/// Underlying `FranklinTx` is a private field, thus no such
+/// Underlying `ZkSyncTx` is a private field, thus no such
 /// object can be created without verification.
 #[derive(Debug, Clone)]
-pub struct VerifiedTx(SignedFranklinTx);
+pub struct VerifiedTx(SignedZkSyncTx);
 
 impl VerifiedTx {
     /// Checks the transaction correctness by verifying its
@@ -38,20 +38,20 @@ impl VerifiedTx {
             .await
             .and_then(|_| verify_tx_correctness(request.tx.clone()))
             .map(|tx| {
-                Self(SignedFranklinTx {
+                Self(SignedZkSyncTx {
                     tx,
                     eth_sign_data: request.eth_sign_data.clone(),
                 })
             })
     }
 
-    /// Takes the `FranklinTx` out of the wrapper.
-    pub fn into_inner(self) -> SignedFranklinTx {
+    /// Takes the `ZkSyncTx` out of the wrapper.
+    pub fn into_inner(self) -> SignedZkSyncTx {
         self.0
     }
 
-    /// Takes reference to the inner `FranklinTx`.
-    pub fn inner(&self) -> &SignedFranklinTx {
+    /// Takes reference to the inner `ZkSyncTx`.
+    pub fn inner(&self) -> &SignedZkSyncTx {
         &self.0
     }
 }
@@ -62,7 +62,7 @@ async fn verify_eth_signature(
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
     // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
-    if let FranklinTx::ChangePubKey(change_pk) = &request.tx {
+    if let ZkSyncTx::ChangePubKey(change_pk) = &request.tx {
         if change_pk.eth_signature.is_none() {
             // Check that user is allowed to perform this operation.
             let is_authorized = eth_checker
@@ -120,7 +120,7 @@ async fn verify_eth_signature(
 
 /// Verifies the correctness of the ZKSync transaction (including the
 /// signature check).
-fn verify_tx_correctness(mut tx: FranklinTx) -> Result<FranklinTx, TxAddError> {
+fn verify_tx_correctness(mut tx: ZkSyncTx) -> Result<ZkSyncTx, TxAddError> {
     if !tx.check_correctness() {
         return Err(TxAddError::IncorrectTx);
     }
@@ -131,7 +131,7 @@ fn verify_tx_correctness(mut tx: FranklinTx) -> Result<FranklinTx, TxAddError> {
 /// Request for the signature check.
 #[derive(Debug)]
 pub struct VerifyTxSignatureRequest {
-    pub tx: FranklinTx,
+    pub tx: ZkSyncTx,
     /// `eth_sign_data` is a tuple of the Ethereum signature and the message
     /// which user should have signed with their private key.
     /// Can be `None` if the Ethereum signature is not required.

@@ -5,7 +5,7 @@ use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
 use zksync_types::{
     tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, Token, TokenLike, TxFeeTypes,
+    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -93,7 +93,7 @@ impl RpcApp {
 
     pub async fn _impl_tx_submit(
         self,
-        mut tx: Box<FranklinTx>,
+        mut tx: Box<ZkSyncTx>,
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> Result<TxHash> {
@@ -105,7 +105,7 @@ impl RpcApp {
             });
         }
 
-        if let FranklinTx::ForcedExit(forced_exit) = &*tx {
+        if let ZkSyncTx::ForcedExit(forced_exit) = &*tx {
             self.check_forced_exit(&forced_exit).await?;
         }
 
@@ -120,7 +120,7 @@ impl RpcApp {
             });
         }
 
-        if let FranklinTx::Withdraw(withdraw) = tx.as_mut() {
+        if let ZkSyncTx::Withdraw(withdraw) = tx.as_mut() {
             if withdraw.fast {
                 // We set `fast` field ourselves, so we have to check that user did not set it themselves.
                 return Err(Error {
@@ -224,7 +224,7 @@ impl RpcApp {
             let tx_fee_info = match &tx.tx {
                 // Cause `ChangePubKey` will have fee we must add this check
                 // TODO: should be removed after merging with a branch that contains a fee on ChangePubKey
-                FranklinTx::ChangePubKey(_) => {
+                ZkSyncTx::ChangePubKey(_) => {
                     // Now `ChangePubKey` operations are not allowed in batches
                     return Err(Error {
                         code: RpcErrorCodes::from(TxAddError::Other).into(),

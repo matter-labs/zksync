@@ -16,7 +16,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
+    Address, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
 use crate::{
@@ -143,15 +143,15 @@ impl RpcApp {
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
-    async fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
+    async fn get_tx_info_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<String>> {
         match tx {
-            FranklinTx::Transfer(tx) => {
+            ZkSyncTx::Transfer(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
                     tx.get_ethereum_sign_message(&token.symbol, token.decimals),
                 ))
             }
-            FranklinTx::Withdraw(tx) => {
+            ZkSyncTx::Withdraw(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
                     tx.get_ethereum_sign_message(&token.symbol, token.decimals),
@@ -495,7 +495,7 @@ pub fn start_rpc_server(
 }
 
 async fn verify_tx_info_message_signature(
-    tx: &FranklinTx,
+    tx: &ZkSyncTx,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<String>,
     mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,

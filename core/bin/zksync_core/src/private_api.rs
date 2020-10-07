@@ -15,7 +15,7 @@ use futures::{
 };
 use std::thread;
 use zksync_config::ConfigurationOptions;
-use zksync_types::SignedFranklinTx;
+use zksync_types::SignedZkSyncTx;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
@@ -28,7 +28,7 @@ struct AppState {
 /// Expects transaction to be checked on the API side.
 async fn new_tx(
     data: web::Data<AppState>,
-    web::Json(tx): web::Json<SignedFranklinTx>,
+    web::Json(tx): web::Json<SignedZkSyncTx>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     let item = MempoolRequest::NewTx(Box::new(tx), sender);
@@ -50,7 +50,7 @@ async fn new_tx(
 /// Expects transaction to be checked on the API side.
 async fn new_txs_batch(
     data: web::Data<AppState>,
-    web::Json(txs): web::Json<Vec<SignedFranklinTx>>,
+    web::Json(txs): web::Json<Vec<SignedZkSyncTx>>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     let item = MempoolRequest::NewTxsBatch(txs, sender);

@@ -28,8 +28,8 @@ use tokio::task::JoinHandle;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
-    SignedFranklinTx, TransferOp, TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
+    TransferOp, TransferToNewOp, ZkSyncTx,
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
@@ -100,18 +100,12 @@ pub enum MempoolRequest {
     /// Add new transaction to mempool, transaction should be previously checked
     /// for correctness (including its Ethereum and ZKSync signatures).
     /// oneshot is used to receive tx add result.
-    NewTx(
-        Box<SignedFranklinTx>,
-        oneshot::Sender<Result<(), TxAddError>>,
-    ),
+    NewTx(Box<SignedZkSyncTx>, oneshot::Sender<Result<(), TxAddError>>),
     /// Add a new batch of transactions to the mempool. All transactions in batch must
     /// be either executed successfully, or otherwise fail all together.
     /// Invariants for each individual transaction in the batch are the same as in
     /// `NewTx` variant of this enum.
-    NewTxsBatch(
-        Vec<SignedFranklinTx>,
-        oneshot::Sender<Result<(), TxAddError>>,
-    ),
+    NewTxsBatch(Vec<SignedZkSyncTx>, oneshot::Sender<Result<(), TxAddError>>),
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -126,9 +120,9 @@ struct MempoolState {
 }
 
 impl MempoolState {
-    fn chunks_for_tx(&self, tx: &FranklinTx) -> usize {
+    fn chunks_for_tx(&self, tx: &ZkSyncTx) -> usize {
         match tx {
-            FranklinTx::Transfer(tx) => {
+            ZkSyncTx::Transfer(tx) => {
                 if self.account_nonces.contains_key(&tx.to) {
                     TransferOp::CHUNKS
                 } else {
@@ -211,7 +205,7 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
-    fn add_tx(&mut self, tx: SignedFranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
         // Correctness should be checked by `signature_checker`, thus
         // `tx.check_correctness()` is not invoked here.
 
@@ -248,7 +242,7 @@ struct Mempool {
 }
 
 impl Mempool {
-    async fn add_tx(&mut self, tx: SignedFranklinTx) -> Result<(), TxAddError> {
+    async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -276,7 +270,7 @@ impl Mempool {
         self.mempool_state.add_tx(tx)
     }
 
-    async fn add_batch(&mut self, txs: Vec<SignedFranklinTx>) -> Result<(), TxAddError> {
+    async fn add_batch(&mut self, txs: Vec<SignedZkSyncTx>) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError

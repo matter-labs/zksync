@@ -8,7 +8,7 @@ use crate::{
     eth_watch::start_eth_watch,
     mempool::run_mempool_task,
     private_api::start_private_core_api,
-    state_keeper::{start_state_keeper, ZksyncStateInitParams, ZksyncStateKeeper},
+    state_keeper::{start_state_keeper, ZkSyncStateInitParams, ZkSyncStateKeeper},
 };
 use futures::{
     channel::{mpsc, oneshot},
@@ -139,11 +139,11 @@ pub async fn run_core() -> anyhow::Result<()> {
     insert_pending_withdrawals(&mut storage_processor, eth_watch_req_sender.clone()).await;
 
     // Start State Keeper.
-    let state_keeper_init = ZksyncStateInitParams::restore_from_db(&mut storage_processor).await?;
+    let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await?;
     let pending_block = state_keeper_init
         .get_pending_block(&mut storage_processor)
         .await;
-    let state_keeper = ZksyncStateKeeper::new(
+    let state_keeper = ZkSyncStateKeeper::new(
         state_keeper_init,
         config_opts.operator_fee_eth_addr,
         state_keeper_req_receiver,
