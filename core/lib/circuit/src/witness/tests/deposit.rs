@@ -2,7 +2,7 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use zksync_state::{handler::TxHandler, state::ZksyncState};
+use zksync_state::{handler::TxHandler, state::ZkSyncState};
 use zksync_types::{operations::DepositOp, Deposit};
 // Local deps
 use crate::witness::{
@@ -11,13 +11,13 @@ use crate::witness::{
 };
 
 /// Checks that deposit can be applied to a new account.
-/// Here we generate an empty ZksyncState (with no accounts), and make a deposit to a new account.
+/// Here we generate an empty ZkSyncState (with no accounts), and make a deposit to a new account.
 #[test]
 #[ignore]
 fn test_deposit_in_empty_leaf() {
     // Input data.
     let accounts = &[];
-    let account = WitnessTestAccount::new_empty(1); // Will not be included into ZksyncState
+    let account = WitnessTestAccount::new_empty(1); // Will not be included into ZkSyncState
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: account.account.address,
@@ -33,7 +33,7 @@ fn test_deposit_in_empty_leaf() {
         deposit_op,
         (),
         |plasma_state, op| {
-            <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+            <ZkSyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
                 .expect("Deposit failed");
             vec![]
         },
@@ -41,7 +41,7 @@ fn test_deposit_in_empty_leaf() {
 }
 
 /// Checks that deposit can be applied to an existing account.
-/// Here we generate a ZksyncState with one account, and make a deposit to this account.
+/// Here we generate a ZkSyncState with one account, and make a deposit to this account.
 #[test]
 #[ignore]
 fn test_deposit_existing_account() {
@@ -72,7 +72,7 @@ fn test_deposit_existing_account() {
             deposit_op,
             (),
             |plasma_state, op| {
-                <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+                <ZkSyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
                     .expect("Deposit failed");
                 vec![]
             },
@@ -109,7 +109,7 @@ fn test_incorrect_deposit_address() {
         deposit_op,
         (),
         |plasma_state, op| {
-            <ZksyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
+            <ZkSyncState as TxHandler<Deposit>>::apply_op(plasma_state, op)
                 .expect("Deposit failed");
             vec![]
         },

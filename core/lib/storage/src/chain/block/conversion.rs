@@ -10,7 +10,7 @@ use zksync_types::{
     Action, ActionType, Operation,
     {
         block::{ExecutedPriorityOp, ExecutedTx},
-        BlockNumber, FranklinOp, FranklinTx, PriorityOp,
+        BlockNumber, PriorityOp, ZkSyncOp, ZkSyncTx,
     },
 };
 // Local imports
@@ -25,7 +25,7 @@ use crate::{
     prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
-use zksync_types::SignedFranklinTx;
+use zksync_types::SignedZkSyncTx;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
@@ -54,14 +54,14 @@ impl StoredOperation {
 
 impl StoredExecutedTransaction {
     pub fn into_executed_tx(self) -> Result<ExecutedTx, anyhow::Error> {
-        let tx: FranklinTx = serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
-        let franklin_op: Option<FranklinOp> =
-            serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");
+        let tx: ZkSyncTx = serde_json::from_value(self.tx).expect("Unparsable ZkSyncTx in db");
+        let franklin_op: Option<ZkSyncOp> =
+            serde_json::from_value(self.operation).expect("Unparsable ZkSyncOp in db");
         let eth_sign_data = self
             .eth_sign_data
             .map(|value| serde_json::from_value(value).expect("Unparsable EthSignData"));
         Ok(ExecutedTx {
-            signed_tx: SignedFranklinTx { tx, eth_sign_data },
+            signed_tx: SignedZkSyncTx { tx, eth_sign_data },
             success: self.success,
             op: franklin_op,
             fail_reason: self.fail_reason,
@@ -76,14 +76,14 @@ impl StoredExecutedTransaction {
 
 impl StoredExecutedPriorityOperation {
     pub fn into_executed(self) -> ExecutedPriorityOp {
-        let franklin_op: FranklinOp =
+        let franklin_op: ZkSyncOp =
             serde_json::from_value(self.operation).expect("Unparsable priority op in db");
         ExecutedPriorityOp {
             priority_op: PriorityOp {
                 serial_id: self.priority_op_serialid as u64,
                 data: franklin_op
                     .try_get_priority_op()
-                    .expect("FranklinOp should have priority op"),
+                    .expect("ZkSyncOp should have priority op"),
                 deadline_block: self.deadline_block as u64,
                 eth_hash: self.eth_hash,
                 eth_block: self.eth_block as u64,
@@ -103,8 +103,8 @@ impl NewExecutedPriorityOperation {
         let operation = serde_json::to_value(&exec_prior_op.op).unwrap();
 
         let (from_account, to_account) = match exec_prior_op.op {
-            FranklinOp::Deposit(deposit) => (deposit.priority_op.from, deposit.priority_op.to),
-            FranklinOp::FullExit(full_exit) => {
+            ZkSyncOp::Deposit(deposit) => (deposit.priority_op.from, deposit.priority_op.to),
+            ZkSyncOp::FullExit(full_exit) => {
                 let eth_address = full_exit.priority_op.eth_address;
                 (eth_address, eth_address)
             }
@@ -146,19 +146,19 @@ impl NewExecutedTransaction {
 
         let (from_account_hex, to_account_hex): (String, Option<String>) =
             match exec_tx.signed_tx.tx {
-                FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
+                ZkSyncTx::Withdraw(_) | ZkSyncTx::Transfer(_) => (
                     serde_json::from_value(tx["from"].clone()).unwrap(),
                     serde_json::from_value(tx["to"].clone()).unwrap(),
                 ),
-                FranklinTx::ChangePubKey(_) => (
+                ZkSyncTx::ChangePubKey(_) => (
                     serde_json::from_value(tx["account"].clone()).unwrap(),
                     serde_json::from_value(tx["newPkHash"].clone()).unwrap(),
                 ),
-                FranklinTx::Close(_) => (
+                ZkSyncTx::Close(_) => (
                     serde_json::from_value(tx["account"].clone()).unwrap(),
                     serde_json::from_value(tx["account"].clone()).unwrap(),
                 ),
-                FranklinTx::ForcedExit(_) => (
+                ZkSyncTx::ForcedExit(_) => (
                     serde_json::from_value(tx["target"].clone()).unwrap(),
                     serde_json::from_value(tx["target"].clone()).unwrap(),
                 ),

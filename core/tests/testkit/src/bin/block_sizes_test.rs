@@ -10,7 +10,7 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
 use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
-use zksync_testkit::zksync_account::ZksyncAccount;
+use zksync_testkit::zksync_account::ZkSyncAccount;
 use zksync_testkit::{
     genesis_state, get_testkit_config_from_env, spawn_state_keeper, AccountSet, ETHAccountId,
     TestSetup, Token, ZKSyncAccountId,
@@ -23,7 +23,7 @@ async fn main() {
 
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
@@ -59,8 +59,8 @@ async fn main() {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,

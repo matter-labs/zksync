@@ -30,7 +30,7 @@ use zksync_types::{
     block::Block,
     operations::{ChangePubKeyOp, CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp},
     tx::PackedPublicKey,
-    AccountId, BlockNumber, FranklinOp,
+    AccountId, BlockNumber, ZkSyncOp,
 };
 // Local deps
 use crate::witness::{
@@ -39,7 +39,7 @@ use crate::witness::{
 };
 use crate::{
     account::AccountWitness,
-    circuit::FranklinCircuit,
+    circuit::ZkSyncCircuit,
     operation::{Operation, SignatureData},
     utils::sign_rescue,
 };
@@ -165,8 +165,8 @@ impl<'a> WitnessBuilder<'a> {
     }
 
     /// Finaly, creates circuit instance for given operations.
-    pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
-        FranklinCircuit {
+    pub fn into_circuit_instance(self) -> ZkSyncCircuit<'static, Engine> {
+        ZkSyncCircuit {
             rescue_params: &zksync_crypto::params::RESCUE_PARAMS,
             jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS,
             old_root: Some(self.initial_root_hash),
@@ -625,7 +625,7 @@ pub fn build_block_witness<'a>(
     let mut fees = vec![];
     for op in ops {
         match op {
-            FranklinOp::Deposit(deposit) => {
+            ZkSyncOp::Deposit(deposit) => {
                 let deposit_witness =
                     DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit);
 
@@ -633,7 +633,7 @@ pub fn build_block_witness<'a>(
                 operations.extend(deposit_operations);
                 pub_data.extend(deposit_witness.get_pubdata());
             }
-            FranklinOp::Transfer(transfer) => {
+            ZkSyncOp::Transfer(transfer) => {
                 let transfer_witness =
                     TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer);
 
@@ -647,7 +647,7 @@ pub fn build_block_witness<'a>(
                 });
                 pub_data.extend(transfer_witness.get_pubdata());
             }
-            FranklinOp::TransferToNew(transfer_to_new) => {
+            ZkSyncOp::TransferToNew(transfer_to_new) => {
                 let transfer_to_new_witness = TransferToNewWitness::apply_tx(
                     &mut witness_accum.account_tree,
                     &transfer_to_new,
@@ -664,7 +664,7 @@ pub fn build_block_witness<'a>(
                 });
                 pub_data.extend(transfer_to_new_witness.get_pubdata());
             }
-            FranklinOp::Withdraw(withdraw) => {
+            ZkSyncOp::Withdraw(withdraw) => {
                 let withdraw_witness =
                     WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);
 
@@ -678,7 +678,7 @@ pub fn build_block_witness<'a>(
                 });
                 pub_data.extend(withdraw_witness.get_pubdata());
             }
-            FranklinOp::Close(close) => {
+            ZkSyncOp::Close(close) => {
                 let close_account_witness =
                     CloseAccountWitness::apply_tx(&mut witness_accum.account_tree, &close);
 
@@ -688,7 +688,7 @@ pub fn build_block_witness<'a>(
                 operations.extend(close_account_operations);
                 pub_data.extend(close_account_witness.get_pubdata());
             }
-            FranklinOp::FullExit(full_exit_op) => {
+            ZkSyncOp::FullExit(full_exit_op) => {
                 let success = full_exit_op.withdraw_amount.is_some();
 
                 let full_exit_witness = FullExitWitness::apply_tx(
@@ -701,7 +701,7 @@ pub fn build_block_witness<'a>(
                 operations.extend(full_exit_operations);
                 pub_data.extend(full_exit_witness.get_pubdata());
             }
-            FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
+            ZkSyncOp::ChangePubKeyOffchain(change_pkhash_op) => {
                 let change_pkhash_witness = ChangePubkeyOffChainWitness::apply_tx(
                     &mut witness_accum.account_tree,
                     &change_pkhash_op,
@@ -717,7 +717,7 @@ pub fn build_block_witness<'a>(
                 });
                 pub_data.extend(change_pkhash_witness.get_pubdata());
             }
-            FranklinOp::ForcedExit(forced_exit) => {
+            ZkSyncOp::ForcedExit(forced_exit) => {
                 let forced_exit_witness =
                     ForcedExitWitness::apply_tx(&mut witness_accum.account_tree, &forced_exit);
 
@@ -731,7 +731,7 @@ pub fn build_block_witness<'a>(
                 });
                 pub_data.extend(forced_exit_witness.get_pubdata());
             }
-            FranklinOp::Noop(_) => {} // Noops are handled below
+            ZkSyncOp::Noop(_) => {} // Noops are handled below
         }
     }
 

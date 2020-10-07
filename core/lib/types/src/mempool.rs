@@ -1,11 +1,11 @@
-use super::{tx::TxHash, SignedFranklinTx};
+use super::{tx::TxHash, SignedZkSyncTx};
 
 /// A collection of transactions that must be executed together.
 /// All the transactions in the batch must be included into the same block,
 /// and either succeed or fail all together.
 #[derive(Debug, Clone)]
 pub struct SignedTxsBatch {
-    pub txs: Vec<SignedFranklinTx>,
+    pub txs: Vec<SignedZkSyncTx>,
     pub batch_id: i64,
 }
 
@@ -13,18 +13,18 @@ pub struct SignedTxsBatch {
 /// a single transaction, or the transactions batch.
 #[derive(Debug, Clone)]
 pub enum SignedTxVariant {
-    Tx(SignedFranklinTx),
+    Tx(SignedZkSyncTx),
     Batch(SignedTxsBatch),
 }
 
-impl From<SignedFranklinTx> for SignedTxVariant {
-    fn from(tx: SignedFranklinTx) -> Self {
+impl From<SignedZkSyncTx> for SignedTxVariant {
+    fn from(tx: SignedZkSyncTx) -> Self {
         Self::Tx(tx)
     }
 }
 
 impl SignedTxVariant {
-    pub fn batch(txs: Vec<SignedFranklinTx>, batch_id: i64) -> Self {
+    pub fn batch(txs: Vec<SignedZkSyncTx>, batch_id: i64) -> Self {
         Self::Batch(SignedTxsBatch { txs, batch_id })
     }
 

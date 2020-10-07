@@ -1,9 +1,9 @@
 //! zkSync network block definition.
 
-use super::FranklinOp;
 use super::PriorityOp;
+use super::ZkSyncOp;
 use super::{AccountId, BlockNumber, Fr};
-use crate::SignedFranklinTx;
+use crate::SignedZkSyncTx;
 use chrono::DateTime;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -37,9 +37,9 @@ pub struct PendingBlock {
 /// Executed L2 transaction.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
-    pub signed_tx: SignedFranklinTx,
+    pub signed_tx: SignedZkSyncTx,
     pub success: bool,
-    pub op: Option<FranklinOp>,
+    pub op: Option<ZkSyncOp>,
     pub fail_reason: Option<String>,
     pub block_index: Option<u32>,
     pub created_at: DateTime<Utc>,
@@ -51,7 +51,7 @@ pub struct ExecutedTx {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedPriorityOp {
     pub priority_op: PriorityOp,
-    pub op: FranklinOp,
+    pub op: ZkSyncOp,
     pub block_index: u32,
     pub created_at: DateTime<Utc>,
 }
@@ -65,8 +65,8 @@ pub enum ExecutedOperations {
 }
 
 impl ExecutedOperations {
-    /// Returns the `FranklinOp` object associated with the operation, if any.
-    pub fn get_executed_op(&self) -> Option<&FranklinOp> {
+    /// Returns the `ZkSyncOp` object associated with the operation, if any.
+    pub fn get_executed_op(&self) -> Option<&ZkSyncOp> {
         match self {
             ExecutedOperations::Tx(exec_tx) => exec_tx.op.as_ref(),
             ExecutedOperations::PriorityOp(exec_op) => Some(&exec_op.op),
@@ -84,7 +84,7 @@ impl ExecutedOperations {
     /// Returns the public data required for the Ethereum smart contract to commit the operation.
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         self.get_executed_op()
-            .map(FranklinOp::public_data)
+            .map(ZkSyncOp::public_data)
             .unwrap_or_default()
     }
 
@@ -200,7 +200,7 @@ impl Block {
             .block_transactions
             .iter()
             .filter_map(ExecutedOperations::get_executed_op)
-            .flat_map(FranklinOp::public_data)
+            .flat_map(ZkSyncOp::public_data)
             .collect::<Vec<_>>();
 
         // Pad block with noops.
@@ -235,7 +235,7 @@ impl Block {
         self.block_transactions
             .iter()
             .filter_map(ExecutedOperations::get_executed_op)
-            .map(FranklinOp::chunks)
+            .map(ZkSyncOp::chunks)
             .sum()
     }
 

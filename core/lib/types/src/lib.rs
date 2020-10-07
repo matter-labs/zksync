@@ -7,14 +7,14 @@
 //!
 //! - **transactions**: operations of zkSync network existing purely in the L2.
 //!   Currently includes [`Transfer`], [`Withdraw`], [`ChangePubKey`] and [`ForcedExit`].
-//!   All the transactions form an enum named [`FranklinTx`].
+//!   All the transactions form an enum named [`ZkSyncTx`].
 //! - **priority operations**: operations of zkSync network which are triggered by
 //!   invoking the zkSync smart contract method in L1. These operations are disovered by
 //!   the zkSync server and included into the block just like L2 transactions.
 //!   Currently includes [`Deposit`] and [`FullExit`].
-//!   All the priority operations form an enum named [`FranklinPriorityOp`].
-//! - **operations**: a superset of [`FranklinTx`] and [`FranklinPriorityOp`]
-//!   All the operations are included into an enum named [`FranklinOp`]. This enum contains
+//!   All the priority operations form an enum named [`ZkSyncPriorityOp`].
+//! - **operations**: a superset of [`ZkSyncTx`] and [`ZkSyncPriorityOp`]
+//!   All the operations are included into an enum named [`ZkSyncOp`]. This enum contains
 //!   all the items that can be included into the block, together with meta-information
 //!   about each transaction.
 //!   Main difference of operation from transaction/priority operation is that it can form
@@ -24,11 +24,11 @@
 //! [`Withdraw`]: ./tx/struct.Withdraw.html
 //! [`ChangePubKey`]: ./tx/struct.ChangePubKey.html
 //! [`ForcedExit`]: ./tx/struct.ForcedExit.html
-//! [`FranklinTx`]: ./tx/enum.FranklinTx.html
+//! [`ZkSyncTx`]: ./tx/enum.ZkSyncTx.html
 //! [`Deposit`]: ./priority_ops/struct.Deposit.html
 //! [`FullExit`]: ./priority_ops/struct.FullExit.html
-//! [`FranklinPriorityOp`]: ./priority_ops/enum.FranklinPriorityOp.html
-//! [`FranklinOp`]: ./operations/enum.FranklinOp.html
+//! [`ZkSyncPriorityOp`]: ./priority_ops/enum.ZkSyncPriorityOp.html
+//! [`ZkSyncOp`]: ./operations/enum.ZkSyncOp.html
 //!
 //! Aside from transactions, this crate provides definitions for other zkSync network items, such as
 //! [`Block`] and [`Account`].
@@ -50,12 +50,12 @@ pub mod tx;
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{
-    ChangePubKeyOp, DepositOp, ForcedExitOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    ZkSyncOp,
 };
-pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
+pub use self::priority_ops::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
-pub use self::tx::{ForcedExit, FranklinTx, SignedFranklinTx, Transfer, Withdraw};
+pub use self::tx::{ForcedExit, SignedZkSyncTx, Transfer, Withdraw, ZkSyncTx};
 
 #[doc(hidden)]
 pub use self::{operations::CloseOp, tx::Close};

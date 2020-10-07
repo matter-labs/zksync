@@ -33,7 +33,7 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
-use crate::{gas_counter::GasCounter, utils::current_zksync_info::CurrentZksyncInfo};
+use crate::{gas_counter::GasCounter, utils::current_zksync_info::CurrentZkSyncInfo};
 
 mod database;
 mod ethereum_interface;
@@ -139,7 +139,7 @@ struct ETHSender<ETH: EthereumInterface> {
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
     /// struct to communicate current verified block number to api server
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 }
 
 impl<ETH: EthereumInterface> ETHSender<ETH> {
@@ -149,7 +149,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
-        current_zksync_info: CurrentZksyncInfo,
+        current_zksync_info: CurrentZkSyncInfo,
     ) -> Self {
         let mut connection = db
             .acquire_connection()
@@ -805,7 +805,7 @@ pub fn start_eth_sender(
     op_notify_sender: mpsc::Sender<Operation>,
     send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
     config_options: ConfigurationOptions,
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 ) -> JoinHandle<()> {
     let ethereum =
         EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");

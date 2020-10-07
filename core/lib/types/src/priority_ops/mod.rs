@@ -44,13 +44,13 @@ pub struct FullExit {
 /// A set of L1 priority operations supported by the zkSync network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum FranklinPriorityOp {
+pub enum ZkSyncPriorityOp {
     Deposit(Deposit),
     FullExit(FullExit),
 }
 
-impl FranklinPriorityOp {
-    /// Attempts to interpret `FranklinPriorityOp` as `Deposit`.
+impl ZkSyncPriorityOp {
+    /// Attempts to interpret `ZkSyncPriorityOp` as `Deposit`.
     pub fn try_get_deposit(&self) -> Option<Deposit> {
         if let Self::Deposit(deposit) = self {
             Some(deposit.clone())
@@ -157,7 +157,7 @@ pub struct PriorityOp {
     /// Unique ID of the priority operation.
     pub serial_id: u64,
     /// Priority operation.
-    pub data: FranklinPriorityOp,
+    pub data: ZkSyncPriorityOp,
     /// Ethereum deadline block until which operation must be processed.
     pub deadline_block: u64,
     /// Hash of the corresponding Ethereum transaction.
@@ -198,7 +198,7 @@ impl TryFrom<Log> for PriorityOp {
                     .map(|ui| U256::as_u32(ui) as u8)
                     .unwrap();
                 let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
-                FranklinPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender)
+                ZkSyncPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender)
                     .expect("Failed to parse priority op data")
             },
             deadline_block: dec_ev

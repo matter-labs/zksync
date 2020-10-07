@@ -7,7 +7,7 @@ use num::BigUint;
 use zksync_crypto::pairing::ff::PrimeField;
 // Workspace deps
 use zksync_circuit::{
-    circuit::FranklinCircuit,
+    circuit::ZkSyncCircuit,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
 use zksync_config::ConfigurationOptions;
@@ -197,7 +197,7 @@ impl<F: Fn() -> Option<ProverData>> zksync_prover::ApiClient for MockApiClient<F
         Ok(())
     }
 
-    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, anyhow::Error> {
+    fn prover_data(&self, block: i64) -> Result<ZkSyncCircuit<'_, Engine>, anyhow::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();

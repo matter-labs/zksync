@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use zksync_crypto::{params, Fr};
 use zksync_types::{
     helpers::reverse_updates,
-    operations::{FranklinOp, TransferOp, TransferToNewOp},
+    operations::{TransferOp, TransferToNewOp, ZkSyncOp},
     Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address,
-    BlockNumber, FranklinPriorityOp, FranklinTx, SignedFranklinTx, TokenId,
+    BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
 };
 
 use crate::handler::TxHandler;
@@ -15,11 +15,11 @@ use crate::handler::TxHandler;
 pub struct OpSuccess {
     pub fee: Option<CollectedFee>,
     pub updates: AccountUpdates,
-    pub executed_op: FranklinOp,
+    pub executed_op: ZkSyncOp,
 }
 
 #[derive(Debug, Clone)]
-pub struct ZksyncState {
+pub struct ZkSyncState {
     /// Accounts stored in a sparse Merkle tree
     balance_tree: AccountTree,
 
@@ -43,7 +43,7 @@ pub enum TransferOutcome {
 }
 
 impl TransferOutcome {
-    pub fn into_franklin_op(self) -> FranklinOp {
+    pub fn into_franklin_op(self) -> ZkSyncOp {
         match self {
             Self::Transfer(transfer) => transfer.into(),
             Self::TransferToNew(transfer) => transfer.into(),
@@ -51,7 +51,7 @@ impl TransferOutcome {
     }
 }
 
-impl ZksyncState {
+impl ZkSyncState {
     pub fn empty() -> Self {
         let tree_depth = params::account_tree_depth();
         let balance_tree = AccountTree::new(tree_depth);
@@ -109,13 +109,13 @@ impl ZksyncState {
         account
     }
 
-    pub fn chunks_for_batch(&self, txs: &[SignedFranklinTx]) -> usize {
+    pub fn chunks_for_batch(&self, txs: &[SignedZkSyncTx]) -> usize {
         txs.iter().map(|tx| self.chunks_for_tx(tx)).sum()
     }
 
-    pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
+    pub fn chunks_for_tx(&self, franklin_tx: &ZkSyncTx) -> usize {
         match franklin_tx {
-            FranklinTx::Transfer(tx) => {
+            ZkSyncTx::Transfer(tx) => {
                 if self.get_account_by_address(&tx.to).is_some() {
                     TransferOp::CHUNKS
                 } else {
@@ -127,12 +127,12 @@ impl ZksyncState {
     }
 
     /// Priority op execution should not fail.
-    pub fn execute_priority_op(&mut self, op: FranklinPriorityOp) -> OpSuccess {
+    pub fn execute_priority_op(&mut self, op: ZkSyncPriorityOp) -> OpSuccess {
         match op {
-            FranklinPriorityOp::Deposit(op) => self
+            ZkSyncPriorityOp::Deposit(op) => self
                 .apply_tx(op)
                 .expect("Priority operation execution failed"),
-            FranklinPriorityOp::FullExit(op) => self
+            ZkSyncPriorityOp::FullExit(op) => self
                 .apply_tx(op)
                 .expect("Priority operation execution failed"),
         }
@@ -195,7 +195,7 @@ impl ZksyncState {
         }
     }
 
-    pub fn execute_txs_batch(&mut self, txs: &[SignedFranklinTx]) -> Vec<Result<OpSuccess, Error>> {
+    pub fn execute_txs_batch(&mut self, txs: &[SignedZkSyncTx]) -> Vec<Result<OpSuccess, Error>> {
         let mut successes = Vec::new();
 
         for (id, tx) in txs.iter().enumerate() {
@@ -235,13 +235,13 @@ impl ZksyncState {
         successes
     }
 
-    pub fn execute_tx(&mut self, tx: FranklinTx) -> Result<OpSuccess, Error> {
+    pub fn execute_tx(&mut self, tx: ZkSyncTx) -> Result<OpSuccess, Error> {
         match tx {
-            FranklinTx::Transfer(tx) => self.apply_tx(*tx),
-            FranklinTx::Withdraw(tx) => self.apply_tx(*tx),
-            FranklinTx::Close(tx) => self.apply_tx(*tx),
-            FranklinTx::ChangePubKey(tx) => self.apply_tx(*tx),
-            FranklinTx::ForcedExit(tx) => self.apply_tx(*tx),
+            ZkSyncTx::Transfer(tx) => self.apply_tx(*tx),
+            ZkSyncTx::Withdraw(tx) => self.apply_tx(*tx),
+            ZkSyncTx::Close(tx) => self.apply_tx(*tx),
+            ZkSyncTx::ChangePubKey(tx) => self.apply_tx(*tx),
+            ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx),
         }
     }
 
@@ -308,22 +308,22 @@ impl ZksyncState {
         }
     }
 
-    /// Converts the `FranklinTx` object to a `FranklinOp`, without applying it.
-    pub fn franklin_tx_to_franklin_op(&self, tx: FranklinTx) -> Result<FranklinOp, anyhow::Error> {
+    /// Converts the `ZkSyncTx` object to a `ZkSyncOp`, without applying it.
+    pub fn zksync_tx_to_zksync_op(&self, tx: ZkSyncTx) -> Result<ZkSyncOp, anyhow::Error> {
         match tx {
-            FranklinTx::Transfer(tx) => self.create_op(*tx).map(TransferOutcome::into_franklin_op),
-            FranklinTx::Withdraw(tx) => self.create_op(*tx).map(Into::into),
-            FranklinTx::ChangePubKey(tx) => self.create_op(*tx).map(Into::into),
-            FranklinTx::Close(_) => anyhow::bail!("Close op is disabled"),
-            FranklinTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
+            ZkSyncTx::Transfer(tx) => self.create_op(*tx).map(TransferOutcome::into_franklin_op),
+            ZkSyncTx::Withdraw(tx) => self.create_op(*tx).map(Into::into),
+            ZkSyncTx::ChangePubKey(tx) => self.create_op(*tx).map(Into::into),
+            ZkSyncTx::Close(_) => anyhow::bail!("Close op is disabled"),
+            ZkSyncTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
         }
     }
 
-    /// Converts the `PriorityOp` object to a `FranklinOp`, without applying it.
-    pub fn priority_op_to_franklin_op(&self, op: FranklinPriorityOp) -> FranklinOp {
+    /// Converts the `PriorityOp` object to a `ZkSyncOp`, without applying it.
+    pub fn priority_op_to_zksync_op(&self, op: ZkSyncPriorityOp) -> ZkSyncOp {
         match op {
-            FranklinPriorityOp::Deposit(op) => self.create_op(op).unwrap().into(),
-            FranklinPriorityOp::FullExit(op) => self.create_op(op).unwrap().into(),
+            ZkSyncPriorityOp::Deposit(op) => self.create_op(op).unwrap().into(),
+            ZkSyncPriorityOp::FullExit(op) => self.create_op(op).unwrap().into(),
         }
     }
 
@@ -412,7 +412,7 @@ mod tests {
         // Delete 0, update balance of 1, create account 2
         // Reverse updates
 
-        let initial_plasma_state = ZksyncState::from_acc_map(AccountMap::default(), 0);
+        let initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), 0);
 
         let updates = {
             let mut updates = AccountUpdates::new();

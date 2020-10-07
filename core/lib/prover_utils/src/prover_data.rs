@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 // Workspace
 use zksync_circuit::account::AccountWitness;
-use zksync_circuit::circuit::FranklinCircuit;
+use zksync_circuit::circuit::ZkSyncCircuit;
 use zksync_circuit::operation::{
     OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
@@ -56,8 +56,8 @@ impl From<WitnessBuilder<'_>> for ProverData {
 }
 
 impl ProverData {
-    pub fn into_circuit(self, block: i64) -> FranklinCircuit<'static, Engine> {
-        FranklinCircuit {
+    pub fn into_circuit(self, block: i64) -> ZkSyncCircuit<'static, Engine> {
+        ZkSyncCircuit {
             rescue_params: &zksync_crypto::params::RESCUE_PARAMS as &Bn256RescueParams,
             jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS as &AltJubjubBn256,
             old_root: Some(self.old_root),

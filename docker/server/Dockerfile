@@ -17,4 +17,4 @@ EXPOSE 3030
 COPY --from=builder /usr/src/zksync/target/release/zksync_server /usr/bin
 COPY contracts/build/ /contracts/build/
 COPY bin/kube-is-leader.sh /bin/
-ENTRYPOINT ["server"]
+ENTRYPOINT ["zksync_server"]

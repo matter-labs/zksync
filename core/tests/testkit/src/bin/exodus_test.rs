@@ -10,7 +10,7 @@
 
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts};
-use crate::zksync_account::ZksyncAccount;
+use crate::zksync_account::ZkSyncAccount;
 use log::*;
 use num::BigUint;
 use std::time::Instant;
@@ -346,7 +346,7 @@ async fn exit_test() {
     env_logger::init();
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
@@ -388,8 +388,8 @@ async fn exit_test() {
     let (zksync_accounts, fee_account_id) = {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,

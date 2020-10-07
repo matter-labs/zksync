@@ -28,8 +28,8 @@ use tokio::task::JoinHandle;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
-    SignedFranklinTx, TransferOp, TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
+    TransferOp, TransferToNewOp, ZkSyncTx,
 };
 // Local uses
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
@@ -118,9 +118,9 @@ struct MempoolState {
 }
 
 impl MempoolState {
-    fn chunks_for_tx(&self, tx: &FranklinTx) -> usize {
+    fn chunks_for_tx(&self, tx: &ZkSyncTx) -> usize {
         match tx {
-            FranklinTx::Transfer(tx) => {
+            ZkSyncTx::Transfer(tx) => {
                 if self.account_nonces.contains_key(&tx.to) {
                     TransferOp::CHUNKS
                 } else {
@@ -203,7 +203,7 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
-    fn add_tx(&mut self, tx: SignedFranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
         // Correctness should be checked by `signature_checker`, thus
         // `tx.check_correctness()` is not invoked here.
 
