@@ -9,7 +9,7 @@
 //! We don't take fees for deposit and full exit, but we must process them, so it is possible to spam us and force us to spend money.
 
 use crate::eth_account::EthereumAccount;
-use crate::external_commands::{deploy_test_contracts, get_test_accounts};
+use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::zksync_account::ZkSyncAccount;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::str::FromStr;
@@ -190,7 +190,7 @@ async fn gas_price_test() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
 
     let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();

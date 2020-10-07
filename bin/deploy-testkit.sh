@@ -6,4 +6,4 @@ then
 fi
 
 cd contracts;
-yarn deploy-testkit
+yarn deploy-testkit $@
