@@ -52,7 +52,10 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
         if ("result" in response) {
             return response.result;
         } else if ("error" in response) {
-            throw new JRPCError(`JRPC response error: ${response.error}`, response.error);
+            throw new JRPCError(
+                `zkSync API response error: code ${response.error.code}; message: ${response.error.message}`,
+                response.error
+            );
         } else {
             throw new Error("Unknown JRPC Error");
         }
