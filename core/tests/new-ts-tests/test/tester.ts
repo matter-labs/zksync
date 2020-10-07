@@ -9,7 +9,8 @@ export class Tester {
         public network: Network,
         public ethProvider: ethers.providers.Provider,
         public syncProvider: zksync.Provider,
-        public richWallet: zksync.Wallet
+        public ethWallet: ethers.Wallet,
+        public syncWallet: zksync.Wallet
     ) {}
 
     static async init(network: Network, transport: 'WS' | 'HTTP') {
@@ -23,21 +24,19 @@ export class Tester {
             "m/44'/60'/0'/0/0"
         ).connect(ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
-        return new Tester(network, ethProvider, syncProvider, syncWallet);
+        return new Tester(network, ethProvider, syncProvider, ethWallet, syncWallet);
     }
 
     async disconnect() { await this.syncProvider.disconnect(); }
 
-    async fundedWallet(token: zksync.types.TokenLike, amount: string) {
-        const ethWallet = ethers.Wallet.createRandom().connect(this.ethProvider);
-        const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, this.syncProvider);
-        const depositHandle = await this.richWallet.depositToSyncFromEthereum({
-            depositTo: syncWallet.address(),
-            token,
-            amount: this.syncProvider.tokenSet.parseToken(token, amount),
-            approveDepositAmountForERC20: !zksync.utils.isTokenETH(token)
+    async fundedWallet(amount: string) {
+        const newWallet = ethers.Wallet.createRandom().connect(this.ethProvider);
+        const syncWallet = await zksync.Wallet.fromEthSigner(newWallet, this.syncProvider);
+        const handle = await this.ethWallet.sendTransaction({
+            to: newWallet.address, 
+            value: ethers.utils.parseEther(amount)
         });
-        await depositHandle.awaitReceipt();
+        await handle.wait();
         return syncWallet;
     }
 
