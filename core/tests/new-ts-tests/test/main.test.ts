@@ -8,6 +8,7 @@ import './deposit';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
+import './misc';
 
 use(promised);
 
@@ -97,4 +98,8 @@ describe('ZkSync integration tests', () => {
         const collectedFee = (await tester.operatorBalance('ETH')).sub(operatorBalance);
         expect(collectedFee.eq(tester.runningFee), 'Fee collection failed').to.be.true;
     });
+
+    // step('...', async () => {
+    //     await expect(tester.testTransactionResending(alice, carl)).to.be.fulfilled;
+    // })
 });
