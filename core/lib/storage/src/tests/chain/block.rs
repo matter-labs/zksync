@@ -422,6 +422,9 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         EthereumSchema(&mut storage)
             .add_hash_entry(response.id, &eth_tx_hash)
             .await?;
+        EthereumSchema(&mut storage)
+            .confirm_eth_tx(&eth_tx_hash)
+            .await?;
 
         // Add verification for the block if required.
         if block_number <= n_verified {
