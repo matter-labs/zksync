@@ -10,9 +10,9 @@
     "trailingComma": "none"
   },
   "scripts": {
-    "test": "f mocha --no-timeout -r ts-node/register -r mocha-steps --exit --slow 0 test/*.test.ts",
+    "test": "f mocha --no-timeout -r ts-node/register -r mocha-steps --exit --slow 0 tests/*.test.ts",
     "print-accounts": "f ts-node print-accounts.ts",
-    "fmt": "prettier --write {.,test}/*.ts"
+    "fmt": "prettier --write {.,tests}/*.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.13",
