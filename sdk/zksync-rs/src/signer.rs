@@ -1,14 +1,14 @@
 // Built-in imports
 use std::fmt;
+use zksync_eth_signer::error::SignerError;
+use zksync_eth_signer::EthereumSigner;
+use zksync_types::tx::TxEthSignature;
 // External uses
 use num::BigUint;
-use web3::types::H256;
 // Workspace uses
 use zksync_crypto::PrivateKey;
 use zksync_types::tx::{ChangePubKey, PackedEthSignature};
 use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token, Transfer, Withdraw};
-
-use crate::error::SignerError;
 
 fn signing_failed_error(err: impl ToString) -> SignerError {
     SignerError::SigningFailed(err.to_string())
@@ -18,7 +18,7 @@ pub struct Signer {
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
     pub(crate) private_key: PrivateKey,
-    pub(crate) eth_private_key: Option<H256>,
+    pub(crate) eth_signer: Option<EthereumSigner>,
     pub(crate) account_id: Option<AccountId>,
 }
 
@@ -36,13 +36,18 @@ impl fmt::Debug for Signer {
 }
 
 impl Signer {
-    pub fn new(private_key: PrivateKey, address: Address, eth_private_key: Option<H256>) -> Self {
+    pub fn new(
+        private_key: PrivateKey,
+        address: Address,
+        eth_signer: Option<EthereumSigner>,
+    ) -> Self {
         let pubkey_hash = PubKeyHash::from_privkey(&private_key);
+
         Self {
             private_key,
             pubkey_hash,
             address,
-            eth_private_key,
+            eth_signer,
             account_id: None,
         }
     }
@@ -59,7 +64,7 @@ impl Signer {
         self.account_id
     }
 
-    pub fn sign_change_pubkey_tx(
+    pub async fn sign_change_pubkey_tx(
         &self,
         nonce: Nonce,
         auth_onchain: bool,
@@ -83,16 +88,23 @@ impl Signer {
         let eth_signature = if auth_onchain {
             None
         } else {
-            let eth_private_key = self
-                .eth_private_key
-                .ok_or(SignerError::MissingEthPrivateKey)?;
+            let eth_signer = self
+                .eth_signer
+                .as_ref()
+                .ok_or(SignerError::MissingEthSigner)?;
 
             let sign_bytes = change_pubkey
                 .get_eth_signed_data()
                 .map_err(signing_failed_error)?;
-            let eth_signature = PackedEthSignature::sign(&eth_private_key, &sign_bytes)
+            let eth_signature = eth_signer
+                .sign_message(&sign_bytes)
+                .await
                 .map_err(signing_failed_error)?;
-            Some(eth_signature)
+
+            match eth_signature {
+                TxEthSignature::EthereumSignature(packed_signature) => Some(packed_signature),
+                _ => None,
+            }
         };
 
         change_pubkey.eth_signature = eth_signature;
@@ -107,7 +119,7 @@ impl Signer {
         Ok(change_pubkey)
     }
 
-    pub fn sign_transfer(
+    pub async fn sign_transfer(
         &self,
         token: Token,
         amount: BigUint,
@@ -129,19 +141,24 @@ impl Signer {
         )
         .map_err(signing_failed_error)?;
 
-        let eth_signature = self
-            .eth_private_key
-            .map(|pk| {
-                let msg = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
-                PackedEthSignature::sign(&pk, msg.as_bytes())
-            })
-            .transpose()
-            .map_err(signing_failed_error)?;
+        let eth_signature = match &self.eth_signer {
+            Some(signer) => {
+                let message = transfer.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            }
+            _ => None,
+        };
 
         Ok((transfer, eth_signature))
     }
 
-    pub fn sign_withdraw(
+    pub async fn sign_withdraw(
         &self,
         token: Token,
         amount: BigUint,
@@ -163,14 +180,19 @@ impl Signer {
         )
         .map_err(signing_failed_error)?;
 
-        let eth_signature = self
-            .eth_private_key
-            .map(|pk| {
-                let msg = withdraw.get_ethereum_sign_message(&token.symbol, token.decimals);
-                PackedEthSignature::sign(&pk, msg.as_bytes())
-            })
-            .transpose()
-            .map_err(signing_failed_error)?;
+        let eth_signature = match &self.eth_signer {
+            Some(signer) => {
+                let message = withdraw.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            }
+            _ => None,
+        };
 
         Ok((withdraw, eth_signature))
     }

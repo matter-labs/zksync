@@ -27,7 +27,7 @@ impl Wallet {
         let mut signer = Signer::new(
             credentials.zksync_private_key,
             credentials.eth_address,
-            credentials.eth_private_key,
+            credentials.eth_signer,
         );
 
         let account_info = provider.account_info(credentials.eth_address).await?;
@@ -137,12 +137,12 @@ impl Wallet {
         &self,
         web3_addr: impl AsRef<str>,
     ) -> Result<EthereumProvider, ClientError> {
-        if let Some(eth_private_key) = self.signer.eth_private_key {
+        if let Some(eth_signer) = &self.signer.eth_signer {
             let ethereum_provider = EthereumProvider::new(
                 &self.provider,
                 self.tokens.clone(),
                 web3_addr,
-                eth_private_key,
+                eth_signer.clone(),
                 self.signer.address,
             )
             .await?;

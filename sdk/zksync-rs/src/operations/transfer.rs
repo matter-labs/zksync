@@ -72,6 +72,7 @@ impl<'a> TransferBuilder<'a> {
         self.wallet
             .signer
             .sign_transfer(token, amount, fee, to, nonce)
+            .await
             .map(|(tx, signature)| (ZkSyncTx::Transfer(Box::new(tx)), signature))
             .map_err(ClientError::SigningError)
     }

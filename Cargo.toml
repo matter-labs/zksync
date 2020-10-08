@@ -11,6 +11,7 @@ members = [
     # Libraries
     "core/lib/circuit",
     "core/lib/eth_client",
+    "core/lib/eth_signer",
     "core/lib/types",
     "core/lib/state",
     "core/lib/storage",
