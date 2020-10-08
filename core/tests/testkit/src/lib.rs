@@ -1,8 +1,8 @@
 //use log::*;
 
 use crate::eth_account::{get_executed_tx_fee, parse_ether, ETHExecResult, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
-use crate::zksync_account::ZksyncAccount;
+use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
+use crate::zksync_account::ZkSyncAccount;
 use anyhow::bail;
 use futures::{
     channel::{mpsc, oneshot},
@@ -19,12 +19,12 @@ use zksync_config::ConfigurationOptions;
 use zksync_server::committer::{BlockCommitRequest, CommitRequest};
 use zksync_server::mempool::ProposedBlock;
 use zksync_server::state_keeper::{
-    start_state_keeper, StateKeeperRequest, ZksyncStateInitParams, ZksyncStateKeeper,
+    start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams, ZkSyncStateKeeper,
 };
 use zksync_types::{
-    mempool::SignedTxVariant, tx::SignedFranklinTx, Account, AccountId, AccountMap, Address,
-    DepositOp, FranklinTx, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address,
+    DepositOp, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    ZkSyncTx,
 };
 
 pub use zksync_test_account as zksync_account;
@@ -35,6 +35,7 @@ use itertools::Itertools;
 use web3::types::{TransactionReceipt, U64};
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::rand::Rng;
+use zksync_types::block::Block;
 
 /// Constant for testkit
 /// Real value is in `dev.env`
@@ -75,7 +76,7 @@ impl BlockExecutionResult {
 /// in a convenient way
 pub struct AccountSet<T: Transport> {
     pub eth_accounts: Vec<EthereumAccount<T>>,
-    pub zksync_accounts: Vec<ZksyncAccount>,
+    pub zksync_accounts: Vec<ZkSyncAccount>,
     pub fee_account_id: ZKSyncAccountId,
 }
 impl<T: Transport> AccountSet<T> {
@@ -135,11 +136,11 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> FranklinTx {
+    ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
 
-        FranklinTx::Transfer(Box::new(
+        ZkSyncTx::Transfer(Box::new(
             from.sign_transfer(
                 token_id.0,
                 "",
@@ -166,12 +167,12 @@ impl<T: Transport> AccountSet<T> {
         nonce: Option<Nonce>,
         increment_nonce: bool,
         rng: &mut impl Rng,
-    ) -> FranklinTx {
+    ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
 
         let to_address = Address::from_slice(&rng.gen::<[u8; 20]>());
 
-        FranklinTx::Transfer(Box::new(
+        ZkSyncTx::Transfer(Box::new(
             from.sign_transfer(
                 token_id.0,
                 "",
@@ -198,11 +199,11 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> FranklinTx {
+    ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
 
-        FranklinTx::Withdraw(Box::new(
+        ZkSyncTx::Withdraw(Box::new(
             from.sign_withdraw(
                 token_id.0,
                 "",
@@ -228,10 +229,10 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> FranklinTx {
+    ) -> ZkSyncTx {
         let from = &self.zksync_accounts[initiator.0];
         let target = &self.zksync_accounts[target.0];
-        FranklinTx::ForcedExit(Box::new(from.sign_forced_exit(
+        ZkSyncTx::ForcedExit(Box::new(from.sign_forced_exit(
             token_id.0,
             fee,
             &target.address,
@@ -253,11 +254,11 @@ impl<T: Transport> AccountSet<T> {
         nonce: Option<Nonce>,
         increment_nonce: bool,
         rng: &mut impl Rng,
-    ) -> FranklinTx {
+    ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
         let to_address = Address::from_slice(&rng.gen::<[u8; 20]>());
 
-        FranklinTx::Withdraw(Box::new(
+        ZkSyncTx::Withdraw(Box::new(
             from.sign_withdraw(
                 token_id.0,
                 "",
@@ -295,7 +296,7 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> FranklinTx {
+    ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
         let auth_nonce = nonce.unwrap_or_else(|| zksync_account.nonce());
 
@@ -305,7 +306,7 @@ impl<T: Transport> AccountSet<T> {
             .await
             .expect("Auth pubkey fail");
         assert_eq!(tx_receipt.status, Some(U64::from(1)), "Auth pubkey fail");
-        FranklinTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
+        ZkSyncTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
             nonce,
             increment_nonce,
             fee_token,
@@ -321,9 +322,9 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> FranklinTx {
+    ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        FranklinTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
+        ZkSyncTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
             nonce,
             increment_nonce,
             fee_token,
@@ -334,9 +335,9 @@ impl<T: Transport> AccountSet<T> {
 }
 
 /// Initialize plasma state with one account - fee account.
-pub fn genesis_state(fee_account_address: &Address) -> ZksyncStateInitParams {
+pub fn genesis_state(fee_account_address: &Address) -> ZkSyncStateInitParams {
     let operator_account = Account::default_with_address(fee_account_address);
-    let mut params = ZksyncStateInitParams::new();
+    let mut params = ZkSyncStateInitParams::new();
     params.insert_account(0, operator_account);
     params
 }
@@ -381,7 +382,7 @@ pub fn spawn_state_keeper(
     block_chunks_sizes.dedup();
 
     let max_miniblock_iterations = *block_chunks_sizes.iter().max().unwrap();
-    let state_keeper = ZksyncStateKeeper::new(
+    let state_keeper = ZkSyncStateKeeper::new(
         genesis_state(fee_account),
         *fee_account,
         state_keeper_req_receiver,
@@ -443,7 +444,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Deposit to other account test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 
     // test two deposits
@@ -471,7 +472,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Deposit test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 
     // test transfers
@@ -559,7 +560,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Transfer test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 
     test_setup.start_block();
@@ -572,7 +573,7 @@ pub async fn perform_basic_operations(
             .await
             .expect("Block execution failed");
     } else {
-        test_setup.execute_commit_block().await.expect_success();
+        test_setup.execute_commit_block().await.0.expect_success();
     }
 }
 
@@ -594,13 +595,13 @@ pub fn get_testkit_config_from_env() -> TestkitConfig {
 pub async fn perform_basic_tests() {
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -635,8 +636,8 @@ pub async fn perform_basic_tests() {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,
@@ -756,7 +757,7 @@ impl TestSetup {
         self.expected_changes_for_current_block = ExpectedAccountState::default();
     }
 
-    pub async fn execute_incorrect_tx(&mut self, tx: FranklinTx) {
+    pub async fn execute_incorrect_tx(&mut self, tx: ZkSyncTx) {
         self.execute_tx(tx).await;
     }
 
@@ -814,10 +815,10 @@ impl TestSetup {
         receipts
     }
 
-    async fn execute_tx(&mut self, tx: FranklinTx) {
+    async fn execute_tx(&mut self, tx: ZkSyncTx) {
         let block = ProposedBlock {
             priority_ops: Vec::new(),
-            txs: vec![SignedTxVariant::from(SignedFranklinTx::from(tx))],
+            txs: vec![SignedTxVariant::from(SignedZkSyncTx::from(tx))],
         };
 
         // Request miniblock execution.
@@ -1273,7 +1274,7 @@ impl TestSetup {
     }
 
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
-    pub async fn execute_commit_block(&mut self) -> ETHExecResult {
+    pub async fn execute_commit_block(&mut self) -> (ETHExecResult, Block) {
         self.state_keeper_request_sender
             .clone()
             .send(StateKeeperRequest::SealBlock)
@@ -1282,10 +1283,24 @@ impl TestSetup {
 
         let new_block = self.await_for_block_commit_request().await;
 
+        (
+            self.commit_account
+                .commit_block(&new_block.block)
+                .await
+                .expect("block commit fail"),
+            new_block.block,
+        )
+    }
+
+    pub async fn execute_verify_block(
+        &mut self,
+        block: &Block,
+        proof: EncodedProofPlonk,
+    ) -> ETHExecResult {
         self.commit_account
-            .commit_block(&new_block.block)
+            .verify_block(block, Some(proof))
             .await
-            .expect("block commit fail")
+            .expect("block verify fail")
     }
 
     pub async fn execute_commit_and_verify_block(
@@ -1307,7 +1322,7 @@ impl TestSetup {
             .expect_success();
         let verify_result = self
             .commit_account
-            .verify_block(&new_block.block)
+            .verify_block(&new_block.block, None)
             .await
             .expect("block verify send tx")
             .expect_success();

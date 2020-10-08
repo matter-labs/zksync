@@ -42,7 +42,7 @@ use crate::{
 };
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
-pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
+pub struct ZkSyncCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
     /// The old root of the tree
@@ -60,7 +60,7 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_account: AccountWitness<E>,
 }
 
-impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'a, E> {
+impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for ZkSyncCircuit<'a, E> {
     fn clone(&self) -> Self {
         Self {
             rescue_params: self.rescue_params,
@@ -84,7 +84,7 @@ struct PreviousData<E: RescueEngine> {
 }
 
 // Implementation of our circuit:
-impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
+impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let zero = AllocatedNum::alloc(cs.namespace(|| "allocate element equal to zero"), || {
             Ok(E::Fr::zero())
@@ -482,7 +482,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         Ok(())
     }
 }
-impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
+impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
     fn verify_correct_chunking<CS: ConstraintSystem<E>>(
         &self,
         op: &Operation<E>,

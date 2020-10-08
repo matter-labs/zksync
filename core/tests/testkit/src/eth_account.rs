@@ -1,4 +1,5 @@
 use crate::external_commands::js_revert_reason;
+
 use anyhow::{bail, ensure, format_err};
 use ethabi::ParamType;
 use num::{BigUint, ToPrimitive};
@@ -13,6 +14,7 @@ use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_eth_client::ETHClient;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::block::Block;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 
@@ -69,11 +71,12 @@ impl<T: Transport> EthereumAccount<T> {
         chain_id: u8,
         gas_price_factor: f64,
     ) -> Self {
+        let eth_signer = EthereumSigner::from_key(private_key);
         let main_contract_eth_client = ETHClient::new(
             transport,
             zksync_contract(),
             address,
-            private_key,
+            eth_signer,
             contract_address,
             chain_id,
             gas_price_factor,
@@ -301,11 +304,12 @@ impl<T: Transport> EthereumAccount<T> {
         token_contract: Address,
         amount: BigUint,
     ) -> Result<TransactionReceipt, anyhow::Error> {
+        let eth_signer = EthereumSigner::from_key(self.private_key);
         let erc20_client = ETHClient::new(
             self.main_contract_eth_client.web3.transport().clone(),
             erc20_contract(),
             self.address,
-            self.private_key,
+            eth_signer,
             token_contract,
             self.main_contract_eth_client.chain_id,
             self.main_contract_eth_client.gas_price_factor,
@@ -382,15 +386,19 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    // Verifies block using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
-    pub async fn verify_block(&self, block: &Block) -> Result<ETHExecResult, anyhow::Error> {
+    // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
+    pub async fn verify_block(
+        &self,
+        block: &Block,
+        proof: Option<EncodedProofPlonk>,
+    ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "verifyBlock",
                 (
                     u64::from(block.block_number),
-                    vec![U256::default(); 10],
+                    proof.unwrap_or_default().proof,
                     block.get_withdrawals_data(),
                 ),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),

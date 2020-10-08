@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 // Workspace
 use zksync_circuit::account::AccountWitness;
-use zksync_circuit::circuit::FranklinCircuit;
+use zksync_circuit::circuit::ZkSyncCircuit;
 use zksync_circuit::operation::{
     OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
@@ -13,6 +13,7 @@ use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use zksync_crypto::{Engine, Fr};
 // Local
 use crate::serialization::*;
+use zksync_circuit::witness::WitnessBuilder;
 
 /// ProverData is data prover needs to calculate proof of the given block.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -37,9 +38,26 @@ pub struct ProverData {
     pub validator_account: zksync_circuit::account::AccountWitness<Engine>,
 }
 
+impl From<WitnessBuilder<'_>> for ProverData {
+    fn from(witness_builder: WitnessBuilder) -> ProverData {
+        ProverData {
+            public_data_commitment: witness_builder.pubdata_commitment.unwrap(),
+            old_root: witness_builder.initial_root_hash,
+            initial_used_subtree_root: witness_builder.initial_used_subtree_root_hash,
+            new_root: witness_builder.root_after_fees.unwrap(),
+            validator_address: Fr::from_str(&witness_builder.fee_account_id.to_string())
+                .expect("failed to parse"),
+            operations: witness_builder.operations,
+            validator_balances: witness_builder.fee_account_balances.unwrap(),
+            validator_audit_path: witness_builder.fee_account_audit_path.unwrap(),
+            validator_account: witness_builder.fee_account_witness.unwrap(),
+        }
+    }
+}
+
 impl ProverData {
-    pub fn into_circuit(self, block: i64) -> FranklinCircuit<'static, Engine> {
-        FranklinCircuit {
+    pub fn into_circuit(self, block: i64) -> ZkSyncCircuit<'static, Engine> {
+        ZkSyncCircuit {
             rescue_params: &zksync_crypto::params::RESCUE_PARAMS as &Bn256RescueParams,
             jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS as &AltJubjubBn256,
             old_root: Some(self.old_root),

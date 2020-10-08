@@ -5,7 +5,7 @@ use zksync_types::{
         is_token_amount_packable,
     },
     tx::PackedEthSignature,
-    Address, FranklinTx, Nonce, Token, TokenLike, TxFeeTypes,
+    Address, Nonce, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
@@ -34,7 +34,7 @@ impl<'a> WithdrawBuilder<'a> {
     }
 
     /// Directly returns the signed withdraw transaction for the subsequent usage.
-    pub async fn tx(self) -> Result<(FranklinTx, Option<PackedEthSignature>), ClientError> {
+    pub async fn tx(self) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let token = self
             .token
             .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
@@ -72,7 +72,8 @@ impl<'a> WithdrawBuilder<'a> {
         self.wallet
             .signer
             .sign_withdraw(token, amount, fee, to, nonce)
-            .map(|(tx, sign)| (FranklinTx::Withdraw(Box::new(tx)), sign))
+            .await
+            .map(|(tx, sign)| (ZkSyncTx::Withdraw(Box::new(tx)), sign))
             .map_err(ClientError::SigningError)
     }
 

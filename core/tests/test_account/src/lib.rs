@@ -12,7 +12,7 @@ use zksync_types::{
 };
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
-pub struct ZksyncAccount {
+pub struct ZkSyncAccount {
     pub private_key: PrivateKey,
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
@@ -21,7 +21,7 @@ pub struct ZksyncAccount {
     nonce: Mutex<Nonce>,
 }
 
-impl fmt::Debug for ZksyncAccount {
+impl fmt::Debug for ZkSyncAccount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // It is OK to disclose the private key contents for a testkit account.
         let mut pk_contents = Vec::new();
@@ -29,7 +29,7 @@ impl fmt::Debug for ZksyncAccount {
             .write(&mut pk_contents)
             .expect("Failed writing the private key contents");
 
-        f.debug_struct("ZksyncAccount")
+        f.debug_struct("ZkSyncAccount")
             .field("private_key", &pk_contents)
             .field("pubkey_hash", &self.pubkey_hash)
             .field("address", &self.address)
@@ -39,7 +39,7 @@ impl fmt::Debug for ZksyncAccount {
     }
 }
 
-impl ZksyncAccount {
+impl ZkSyncAccount {
     /// Note: probably not secure, use for testing.
     pub fn rand() -> Self {
         let rng = &mut thread_rng();
@@ -130,13 +130,9 @@ impl ZksyncAccount {
             *stored_nonce += 1;
         }
 
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            transfer
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-        )
-        .expect("Signing the transfer unexpectedly failed");
+        let message = transfer.get_ethereum_sign_message(token_symbol, 18);
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
+            .expect("Signing the transfer unexpectedly failed");
         (transfer, eth_signature)
     }
 
@@ -200,13 +196,9 @@ impl ZksyncAccount {
             *stored_nonce += 1;
         }
 
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            withdraw
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-        )
-        .expect("Signing the withdraw unexpectedly failed");
+        let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
+            .expect("Signing the withdraw unexpectedly failed");
         (withdraw, eth_signature)
     }
 

@@ -2,7 +2,7 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use zksync_state::{handler::TxHandler, state::ZksyncState};
+use zksync_state::{handler::TxHandler, state::ZkSyncState};
 use zksync_types::{operations::FullExitOp, FullExit};
 // Local deps
 use crate::witness::{
@@ -11,7 +11,7 @@ use crate::witness::{
 };
 
 /// Checks that `FullExit` can be applied to an existing account.
-/// Here we generate a ZksyncState with one account (which has some funds), and
+/// Here we generate a ZkSyncState with one account (which has some funds), and
 /// apply a `FullExit` to this account.
 #[test]
 #[ignore]
@@ -34,7 +34,7 @@ fn test_full_exit_success() {
         (full_exit_op, success),
         (),
         |plasma_state, op| {
-            <ZksyncState as TxHandler<FullExit>>::apply_op(plasma_state, &op.0)
+            <ZkSyncState as TxHandler<FullExit>>::apply_op(plasma_state, &op.0)
                 .expect("FullExit failed");
             vec![]
         },
@@ -46,7 +46,7 @@ fn test_full_exit_success() {
 fn test_full_exit_failure_no_account_in_tree() {
     // Input data.
     let accounts = &[];
-    let account = WitnessTestAccount::new_empty(1); // Will not be included into ZksyncState
+    let account = WitnessTestAccount::new_empty(1); // Will not be included into ZkSyncState
     let full_exit_op = FullExitOp {
         priority_op: FullExit {
             account_id: account.id,
@@ -62,7 +62,7 @@ fn test_full_exit_failure_no_account_in_tree() {
         (full_exit_op, success),
         (),
         |plasma_state, op| {
-            <ZksyncState as TxHandler<FullExit>>::apply_op(plasma_state, &op.0)
+            <ZkSyncState as TxHandler<FullExit>>::apply_op(plasma_state, &op.0)
                 .expect("FullExit failed");
             vec![]
         },

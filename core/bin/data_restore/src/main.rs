@@ -11,7 +11,7 @@ use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
 use web3::transports::Http;
 use zksync_config::ConfigurationOptions;
-use zksync_crypto::convert::fe_from_hex;
+use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::{get_genesis_token_list, Token},
@@ -90,7 +90,7 @@ async fn main() {
     let finite_mode = cli.is_present("finite");
     let final_hash = if finite_mode {
         cli.value_of("final_hash")
-            .map(|value| fe_from_hex(value).expect("Can't parse the final hash"))
+            .map(|value| FeConvert::from_hex(value).expect("Can't parse the final hash"))
     } else {
         None
     };

@@ -31,7 +31,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::{
     ethereum::CompleteWithdrawalsTx,
     tx::EIP1271Signature,
-    {FranklinPriorityOp, Nonce, PriorityOp, PubKeyHash},
+    {Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp},
 };
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
@@ -500,7 +500,7 @@ impl<T: Transport> EthWatch<T> {
             .unconfirmed_queue()
             .iter()
             .filter(|(_block, op)| match &op.data {
-                FranklinPriorityOp::Deposit(deposit) => {
+                ZkSyncPriorityOp::Deposit(deposit) => {
                     // Address may be set to either sender or recipient.
                     deposit.from == address || deposit.to == address
                 }

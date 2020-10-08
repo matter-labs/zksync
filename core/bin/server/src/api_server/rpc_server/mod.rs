@@ -16,7 +16,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
+    Address, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
 use crate::panic_notify::ThreadPanicNotify;
@@ -27,7 +27,7 @@ use crate::{
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
     utils::{
-        current_zksync_info::CurrentZksyncInfo, shared_lru_cache::SharedLruCache,
+        current_zksync_info::CurrentZkSyncInfo, shared_lru_cache::SharedLruCache,
         token_db_cache::TokenDBCache,
     },
 };
@@ -94,7 +94,7 @@ pub struct RpcApp {
 
     pub confirmations_for_eth_event: u64,
     pub token_cache: TokenDBCache,
-    pub current_zksync_info: CurrentZksyncInfo,
+    pub current_zksync_info: CurrentZkSyncInfo,
 
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     forced_exit_minimum_account_age: chrono::Duration,
@@ -110,7 +110,7 @@ impl RpcApp {
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        current_zksync_info: CurrentZksyncInfo,
+        current_zksync_info: CurrentZkSyncInfo,
     ) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
@@ -171,15 +171,15 @@ impl RpcApp {
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
-    async fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
+    async fn get_tx_info_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<String>> {
         match tx {
-            FranklinTx::Transfer(tx) => {
+            ZkSyncTx::Transfer(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
                     tx.get_ethereum_sign_message(&token.symbol, token.decimals),
                 ))
             }
-            FranklinTx::Withdraw(tx) => {
+            ZkSyncTx::Withdraw(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
                     tx.get_ethereum_sign_message(&token.symbol, token.decimals),
@@ -501,7 +501,7 @@ pub fn start_rpc_server(
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 ) {
     let addr = config_options.json_rpc_http_server_address;
 
@@ -530,7 +530,7 @@ pub fn start_rpc_server(
 }
 
 async fn verify_tx_info_message_signature(
-    tx: &FranklinTx,
+    tx: &ZkSyncTx,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<String>,
     mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,

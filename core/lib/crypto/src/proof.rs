@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::U256;
 
+/// Encoded representation of the block proof.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EncodedProofPlonk {
     pub inputs: Vec<U256>,

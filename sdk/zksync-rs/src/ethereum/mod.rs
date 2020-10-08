@@ -10,6 +10,7 @@ use web3::types::{TransactionReceipt, H160, H256, U256};
 use web3::Web3;
 use zksync_contracts as abi;
 use zksync_eth_client::ETHClient;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, PriorityOp, TokenLike};
 
 use crate::{
@@ -48,7 +49,7 @@ impl EthereumProvider {
         provider: &Provider,
         tokens_cache: TokensCache,
         eth_web3_url: impl AsRef<str>,
-        eth_private_key: H256,
+        eth_signer: EthereumSigner,
         eth_addr: H160,
     ) -> Result<Self, ClientError> {
         let transport = Http::new(eth_web3_url.as_ref())
@@ -67,7 +68,7 @@ impl EthereumProvider {
             transport,
             abi::zksync_contract(),
             eth_addr,
-            eth_private_key,
+            eth_signer,
             contract_address
                 .parse()
                 .map_err(|err| ClientError::MalformedResponse(format!("{}", err)))?,

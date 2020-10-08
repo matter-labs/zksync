@@ -1,6 +1,6 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
-use crate::zksync_account::ZksyncAccount;
+use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
+use crate::zksync_account::ZkSyncAccount;
 use web3::transports::Http;
 use zksync_testkit::*;
 
@@ -12,7 +12,7 @@ async fn execute_blocks_with_new_state_keeper(
 ) {
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
@@ -44,8 +44,8 @@ async fn execute_blocks_with_new_state_keeper(
         let mut zksync_accounts = Vec::new();
         zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,
@@ -97,7 +97,7 @@ async fn execute_blocks_with_new_state_keeper(
 
 async fn revert_blocks_test() {
     println!("deploying contracts");
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
     println!("contracts deployed");
 
     execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify).await;
