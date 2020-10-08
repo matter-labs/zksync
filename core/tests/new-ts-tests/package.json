@@ -11,7 +11,8 @@
   },
   "scripts": {
     "test": "f mocha --no-timeout -r ts-node/register -r mocha-steps --exit --slow 0 test/*.test.ts",
-    "fmt": "prettier --write test/*.ts"
+    "print-accounts": "f ts-node print-accounts.ts",
+    "fmt": "prettier --write {.,test}/*.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.13",
