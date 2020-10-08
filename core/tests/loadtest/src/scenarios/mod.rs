@@ -1,5 +1,5 @@
 // Built-in uses
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 // External uses
 use async_trait::async_trait;
 use num::BigUint;
@@ -16,7 +16,7 @@ use crate::{
     utils::{try_wait_all, wait_all},
 };
 
-mod simple;
+mod transfers;
 
 /// Resources that are needed from the scenario executor to perform the scenario.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -28,9 +28,7 @@ pub struct ScenarioResources {
 }
 
 #[async_trait]
-pub trait Scenario: Debug {
-    /// Returns scenario name.
-    fn name(&self) -> &str;
+pub trait Scenario: Debug + Display {
     /// Returns resources that should be provided by the scenario executor.
     fn requested_resources(&self, sufficient_fee: &BigUint) -> ScenarioResources;
 
@@ -75,7 +73,7 @@ impl ScenarioExecutor {
     ) -> anyhow::Result<Self> {
         log::info!("Creating scenarious...");
 
-        let scenario = Box::new(simple::SimpleScenario::default());
+        let scenario = Box::new(transfers::TransferScenario::default());
 
         // Create main account to deposit money from and to return money back later.
         let main_wallet = TestWallet::from_info(monitor.clone(), &main_account, &options).await;
@@ -133,13 +131,13 @@ impl ScenarioExecutor {
         let eth_balance = self.main_wallet.eth_balance().await?;
         anyhow::ensure!(
             eth_balance > amount_to_deposit,
-            "Not enough balance in the main wallet to perform this test, actual: {}, expected: {}",
+            "Not enough balance in the main wallet to perform this test, actual: {} ETH, expected: {} ETH",
             format_ether(&eth_balance),
             format_ether(&amount_to_deposit),
         );
 
         log::info!(
-            "Deposit {} for main wallet",
+            "Deposit {} ETH for main wallet",
             format_ether(&amount_to_deposit),
         );
 
@@ -172,8 +170,9 @@ impl ScenarioExecutor {
             wallets.into_iter().enumerate()
         {
             log::info!(
-                "Preparing transactions for the initial transfer for. {} \
-                ETH will be send to each of {} new wallets",
+                "Preparing transactions for the initial transfer for `{}` scenario: \
+                {} ETH to will be send to each of {} new wallets",
+                self.scenarios[scenario_index].0,
                 format_ether(&scenario_amount),
                 scenario_wallets.len()
             );
@@ -236,10 +235,9 @@ impl ScenarioExecutor {
 
     async fn process(&mut self) -> anyhow::Result<Journal> {
         log::info!("Starting TPS measuring...");
-
-        tokio::spawn(self.monitor.run_counter());
-
         let monitor = self.monitor.clone();
+        monitor.start().await;
+
         let sufficient_fee = self.sufficient_fee.clone();
         try_wait_all(
             self.scenarios
@@ -248,10 +246,9 @@ impl ScenarioExecutor {
         )
         .await?;
         self.monitor.wait_for_verify().await;
-        let logs = self.monitor.take_logs().await;
 
+        let logs = self.monitor.finish().await;
         log::info!("TPS measuring finished...");
-
         Ok(logs)
     }
 
@@ -302,7 +299,7 @@ impl ScenarioExecutor {
         let main_wallet_balance = self.main_wallet.balance(BlockStatus::Committed).await?;
         if main_wallet_balance > self.sufficient_fee {
             log::info!(
-                "Main wallet has {} balance, making refund...",
+                "Main wallet has {} ETH balance, making refund...",
                 format_ether(&main_wallet_balance)
             );
 

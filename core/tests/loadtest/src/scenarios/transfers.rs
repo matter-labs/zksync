@@ -1,4 +1,5 @@
 // Built-in uses
+use std::fmt;
 // External uses
 use async_trait::async_trait;
 use num::BigUint;
@@ -14,38 +15,40 @@ use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all};
 /// ```text
 /// Deposit  | Transfer to new  | Transfer | Collect back | Withdraw to ETH
 ///          |                  |          |              |
-///          |                  |  ┗━━━━┓  |              |
-///          |           ┏━━━>Acc1━━━━━┓┗>Acc1━━━┓        |
-///          |         ┏━┻━━━>Acc2━━━━┓┗━>Acc2━━━┻┓       |
+///          |                  |          |              |
+///          |           ┏━━━>Acc1━━━━━┓┗>Acc1━━━┓     |
+///          |         ┏━┻━━━>Acc2━━━━┓┗━>Acc2━━━┻┓    |
 /// ETH━━━━>InitialAcc━╋━━━━━>Acc3━━━┓┗━━>Acc3━━━━╋━>InitialAcc━>ETH
-///          |         ┗━┳━━━>Acc4━━┓┗━━━>Acc4━━━┳┛       |
-///          |           ┗━━━>Acc5━┓┗━━━━>Acc5━━━┛        |
+///          |         ┗━┳━━━>Acc4━━┓┗━━━>Acc4━━━┳┛    |
+///          |           ┗━━━>Acc5━┓┗━━━━>Acc5━━━┛     |
 /// ```
 #[derive(Debug)]
-pub struct SimpleScenario {
+pub struct TransferScenario {
     transfer_size: BigUint,
     transfer_rounds: u64,
     wallets: u64,
     txs: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
 }
 
-impl Default for SimpleScenario {
+impl Default for TransferScenario {
     fn default() -> Self {
         Self {
-            transfer_size: BigUint::from(1_000_000_u64),
-            transfer_rounds: 10,
+            transfer_size: BigUint::from(1_000_u64),
+            transfer_rounds: 100,
             wallets: 100,
             txs: Vec::new(),
         }
     }
 }
 
-#[async_trait]
-impl Scenario for SimpleScenario {
-    fn name(&self) -> &str {
-        "simple"
+impl fmt::Display for TransferScenario {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Transfers")
     }
+}
 
+#[async_trait]
+impl Scenario for TransferScenario {
     fn requested_resources(&self, fee: &BigUint) -> ScenarioResources {
         let balance_per_wallet = &self.transfer_size + (fee * BigUint::from(self.transfer_rounds));
 
@@ -64,7 +67,7 @@ impl Scenario for SimpleScenario {
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
 
         log::info!(
-            "Simple scenario: All the initial transfers have been verified, creating {} transactions \
+            "All the initial transfers have been verified, creating {} transactions \
             for the transfers step",
             transfers_number
         );
@@ -81,10 +84,7 @@ impl Scenario for SimpleScenario {
         }))
         .await?;
 
-        log::info!(
-            "Simple scenario: created {} transactions...",
-            self.txs.len()
-        );
+        log::info!("Created {} transactions...", self.txs.len());
 
         Ok(())
     }

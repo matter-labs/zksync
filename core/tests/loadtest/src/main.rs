@@ -43,15 +43,17 @@ fn main() -> Result<(), anyhow::Error> {
     let mut tokio_runtime = Builder::new().threaded_scheduler().enable_all().build()?;
 
     let env_config = ConfigurationOptions::from_env();
-    let monitor = Monitor::new(Provider::new(Network::Localhost));
     let main_account = AccountInfo {
         address: "36615Cf349d7F6344891B1e7CA7C72883F5dc049".parse()?,
         private_key: "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110".parse()?,
     };
 
     tokio_runtime.block_on(async {
-        let scenario = ScenarioExecutor::new(monitor, main_account, env_config).await?;
-        scenario.run().await
+        let monitor = Monitor::new(Provider::new(Network::Localhost)).await;
+        ScenarioExecutor::new(monitor, main_account, env_config)
+            .await?
+            .run()
+            .await
     })?;
 
     Ok(())
