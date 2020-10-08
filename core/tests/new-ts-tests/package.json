@@ -10,7 +10,7 @@
     "trailingComma": "none"
   },
   "scripts": {
-    "test": "f mocha --no-timeout -r ts-node/register -r mocha-steps test/*.test.ts --exit",
+    "test": "f mocha --no-timeout -r ts-node/register -r mocha-steps --exit --slow 0 test/*.test.ts",
     "fmt": "prettier --write test/*.ts"
   },
   "devDependencies": {

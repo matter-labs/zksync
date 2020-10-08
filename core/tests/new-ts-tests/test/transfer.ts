@@ -112,15 +112,16 @@ Tester.prototype.testFailedMultiTransfer = async function (
         amount,
         fee: BigNumber.from('0')
     };
+    let success = true;
     try {
         const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }]);
         for (const handle of handles) {
             await handle.awaitVerifyReceipt();
         }
         // this line should be unreachable
-        expect.fail('This batch should have failed!');
+        success = false;
     } catch (e) {
         expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
     }
+    expect(success, 'Batch did not fail').to.be.true;
 };
-
