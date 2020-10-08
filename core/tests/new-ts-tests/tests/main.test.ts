@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { BigNumber, utils } from 'ethers';
-import { Wallet } from 'zksync';
+import { Wallet, types } from 'zksync';
 
 import { Tester } from './tester';
 import './priority-ops';
@@ -9,18 +9,20 @@ import './transfer';
 import './withdraw';
 import './misc';
 
-describe('ZkSync integration tests', () => {
+// prettier-ignore
+const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS') =>
+describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, () => {
     let tester: Tester;
-    const one = utils.parseEther('1.0');
+    const hundred = utils.parseEther('100.0');
     let alice: Wallet;
     let bob: Wallet;
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
-        tester = await Tester.init('localhost', 'HTTP');
-        alice = await tester.fundedWallet('1.45');
+        tester = await Tester.init('localhost', transport);
+        alice = await tester.fundedWallet('145.0');
         bob = await tester.emptyWallet();
-        operatorBalance = await tester.operatorBalance('ETH');
+        operatorBalance = await tester.operatorBalance(token);
     });
 
     after('disconnect tester', async () => {
@@ -28,45 +30,47 @@ describe('ZkSync integration tests', () => {
     });
 
     step('should execute an auto-approved deposit', async () => {
-        await tester.testDeposit(alice, 'ETH', one, true);
+        await tester.testDeposit(alice, token, hundred, true);
     });
 
     step('should execute a normal deposit', async () => {
-        await tester.testDeposit(alice, 'ETH', one);
-
-        // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should not be approved").to.be.false;
-        // const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits('DAI');
-        // await approveERC20.wait();
-        // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should be approved").to.be.true;
-        // await expect(tester.testDeposit(bob, 'DAI', hundred)).to.be.fulfilled;
-        // expect(await tester.syncWallet.isERC20DepositsApproved('DAI'), "Token should still be approved").to.be.true;
+        if (token == 'ETH') {
+            await tester.testDeposit(alice, token, hundred);
+        } else {
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should not be approved').to.be.false;
+            const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits(token);
+            await approveERC20.wait();
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should be approved').to.be.true;
+            await tester.testDeposit(bob, token, hundred);
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should still be approved').to.be.true;
+        }
     });
 
     step('should change pubkey onchain', async () => {
-        await tester.testChangePubKey(alice, 'ETH', true);
+        await tester.testChangePubKey(alice, token, true);
     });
 
     step('should execute a transfer to new account', async () => {
-        await tester.testTransfer(alice, bob, 'ETH', one.div(10));
+        await tester.testTransfer(alice, bob, token, hundred.div(10));
     });
 
     step('should execute a transfer to existing account', async () => {
-        await tester.testTransfer(alice, bob, 'ETH', one.div(10));
+        await tester.testTransfer(alice, bob, token, hundred.div(10));
     });
 
     it('should execute a transfer to self', async () => {
-        await tester.testTransfer(alice, alice, 'ETH', one.div(10));
+        await tester.testTransfer(alice, alice, token, hundred.div(10));
     });
 
     step('should change pubkey offchain', async () => {
-        await tester.testChangePubKey(alice, 'ETH', false);
-        await tester.testChangePubKey(bob, 'ETH', false);
+        await tester.testChangePubKey(alice, token, false);
+        await tester.testChangePubKey(bob, token, false);
     });
 
     step('should test multi-transfers', async () => {
-        await tester.testBatch(alice, bob, 'ETH', one.div(100));
-        await tester.testIgnoredBatch(alice, bob, 'ETH', one.div(100));
-        await tester.testFailedBatch(alice, bob, 'ETH', one.div(100));
+        await tester.testBatch(alice, bob, token, hundred.div(100));
+        await tester.testIgnoredBatch(alice, bob, token, hundred.div(100));
+        await tester.testFailedBatch(alice, bob, token, hundred.div(100));
     });
 
     it('should fail trying to send tx with wrong signature', async () => {
@@ -74,15 +78,15 @@ describe('ZkSync integration tests', () => {
     });
 
     step('should execute a withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, 'ETH', one.div(10));
+        await tester.testVerifiedWithdraw(alice, token, hundred.div(10));
     });
 
     step('should execute a fast withdrawal', async () => {
-        await tester.testVerifiedWithdraw(bob, 'ETH', one.div(10), true);
+        await tester.testVerifiedWithdraw(bob, token, hundred.div(10), true);
     });
 
     it('should check collected fees', async () => {
-        const collectedFee = (await tester.operatorBalance('ETH')).sub(operatorBalance);
+        const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
         expect(collectedFee.eq(tester.runningFee), 'Fee collection failed').to.be.true;
     });
 
@@ -94,29 +98,29 @@ describe('ZkSync integration tests', () => {
         });
 
         step('should execute full-exit on random wallet', async () => {
-            await tester.testFullExit(carl, 'ETH', 145);
+            await tester.testFullExit(carl, token, 145);
         });
 
         step('should fail full-exit with wrong eth-signer', async () => {
             // make a deposit so that wallet is assigned an accountId
-            await tester.testDeposit(carl, 'ETH', one);
+            await tester.testDeposit(carl, token, hundred);
 
             let oldSigner = carl.ethSigner;
             carl.ethSigner = tester.ethWallet;
-            let [before, after] = await tester.testFullExit(carl, 'ETH');
+            let [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0)).to.be.false;
             expect(before.eq(after)).to.be.true;
             carl.ethSigner = oldSigner;
         });
 
         step('should execute a normal full-exit', async () => {
-            let [before, after] = await tester.testFullExit(carl, 'ETH');
+            let [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0)).to.be.false;
             expect(after.eq(0)).to.be.true;
         });
 
         step('should execute full-exit on an empty wallet', async () => {
-            let [before, after] = await tester.testFullExit(carl, 'ETH');
+            let [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0)).to.be.true;
             expect(after.eq(0)).to.be.true;
         });
@@ -126,3 +130,10 @@ describe('ZkSync integration tests', () => {
     //     await expect(tester.testTransactionResending(alice, carl)).to.be.fulfilled;
     // })
 });
+
+for (const transport of ['HTTP', 'WS']) {
+    for (const token of ['ETH', 'DAI']) {
+        // @ts-ignore
+        TestSuite(token, transport);
+    }
+}
