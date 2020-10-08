@@ -130,13 +130,9 @@ impl ZkSyncAccount {
             *stored_nonce += 1;
         }
 
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            transfer
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-        )
-        .expect("Signing the transfer unexpectedly failed");
+        let message = transfer.get_ethereum_sign_message(token_symbol, 18);
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
+            .expect("Signing the transfer unexpectedly failed");
         (transfer, eth_signature)
     }
 
@@ -200,13 +196,9 @@ impl ZkSyncAccount {
             *stored_nonce += 1;
         }
 
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            withdraw
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-        )
-        .expect("Signing the withdraw unexpectedly failed");
+        let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
+            .expect("Signing the withdraw unexpectedly failed");
         (withdraw, eth_signature)
     }
 
