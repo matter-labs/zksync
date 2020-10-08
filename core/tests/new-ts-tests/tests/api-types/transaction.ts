@@ -1,5 +1,5 @@
 type ChangePubKey = {
-    tx_type: "ChangePubKey";
+    tx_type: 'ChangePubKey';
     from: string;
     to: string;
     token: number;
@@ -8,19 +8,19 @@ type ChangePubKey = {
     block_number: number;
     nonce: number;
     created_at: string;
-    fail_reason?: string;
+    fail_reason: string | null;
     tx: {
         account: string;
         accountId: number;
         ethSignature?: string;
         newPkHash: string;
         nonce: number;
-        type: "ChangePubKey";
+        type: 'ChangePubKey';
     };
 };
 
 type Transfer = {
-    tx_type: "Transfer";
+    tx_type: 'Transfer';
     from: string;
     to: string;
     token: number;
@@ -29,7 +29,7 @@ type Transfer = {
     block_number: number;
     nonce: number;
     created_at: string;
-    fail_reason?: string;
+    fail_reason: string | null;
     tx: {
         amount: string;
         fee: string;
@@ -42,12 +42,12 @@ type Transfer = {
         };
         to: string;
         token: number;
-        type: "Transfer";
+        type: 'Transfer';
     };
 };
 
 type Withdraw = {
-    tx_type: "Withdraw";
+    tx_type: 'Withdraw';
     from: string;
     to: string;
     token: number;
@@ -56,7 +56,7 @@ type Withdraw = {
     block_number: number;
     nonce: number;
     created_at: string;
-    fail_reason?: string;
+    fail_reason: string | null;
     tx: {
         amount: string;
         fee: string;
@@ -69,18 +69,18 @@ type Withdraw = {
         };
         to: string;
         token: number;
-        type: "Withdraw";
-        fast?: boolean;
+        type: 'Withdraw';
+        fast: boolean;
     };
 };
 
 type Deposit = {
-    tx_type: "Deposit";
+    tx_type: 'Deposit';
     from: string;
     to: string;
     token: number;
     amount: string;
-    fee: string;
+    fee: null;
     block_number: number;
     nonce: number;
     created_at: string;
@@ -93,17 +93,17 @@ type Deposit = {
             to: string;
             token: number;
         };
-        type: "Deposit";
+        type: 'Deposit';
     };
 };
 
 type FullExit = {
-    tx_type: "FullExit";
+    tx_type: 'FullExit';
     from: string;
     to: string;
     token: number;
     amount: string;
-    fee: string;
+    fee: null;
     block_number: number;
     nonce: number;
     created_at: string;
@@ -114,13 +114,13 @@ type FullExit = {
             eth_address: string;
             token: number;
         };
-        type: "FullExit";
+        type: 'FullExit';
         withdraw_amount: string;
     };
 };
 
 type ForcedExit = {
-    tx_type: "ForcedExit";
+    tx_type: 'ForcedExit';
     from: string;
     to: string;
     token: number;
@@ -129,7 +129,7 @@ type ForcedExit = {
     block_number: number;
     nonce: number;
     created_at: string;
-    fail_reason?: string;
+    fail_reason: string | null;
     tx: {
         initiatorAccountId: number;
         target: string;
@@ -140,7 +140,7 @@ type ForcedExit = {
             pubKey: string;
             signature: string;
         };
-        type: "ForcedExit";
+        type: 'ForcedExit';
     };
 };
 

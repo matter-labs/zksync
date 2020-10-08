@@ -8,7 +8,8 @@ const VERIFY_TIMEOUT = 120_000;
 
 declare module './tester' {
     interface Tester {
-        testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
+        testVerifiedWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
+        testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<any>;
     }
 }
 
@@ -19,24 +20,14 @@ function timeout<T>(promise: Promise<T>, millis: number) {
     return Promise.race([promise, timeout]);
 }
 
-Tester.prototype.testWithdraw = async function (
+Tester.prototype.testVerifiedWithdraw = async function (
     wallet: Wallet,
     token: TokenLike,
     amount: BigNumber,
     fastProcessing?: boolean
 ) {
-    const type = fastProcessing ? 'FastWithdraw' : 'Withdraw';
-    const { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), token);
-    const balanceBefore = await wallet.getBalance(token);
     const onchainBalanceBefore = await wallet.getEthereumBalance(token);
-
-    const handle = await wallet.withdrawFromSyncToEthereum({
-        ethAddress: wallet.address(),
-        token,
-        amount,
-        fee,
-        fastProcessing
-    });
+    const handle = await this.testWithdraw(wallet, token, amount, fastProcessing);
 
     // Checking that there are no complete withdrawals tx hash for this withdrawal
     expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.not.exist;
@@ -49,15 +40,36 @@ Tester.prototype.testWithdraw = async function (
     await utils.sleep(10_000);
     expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.exist;
 
-    const balanceAfter = await wallet.getBalance(token);
     const onchainBalanceAfter = await wallet.getEthereumBalance(token);
     const tokenId = wallet.provider.tokenSet.resolveTokenId(token);
     const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
-    expect(balanceBefore.sub(balanceAfter).eq(amount.add(fee)), 'Wrong amount on wallet after withdraw').to.be.true;
     expect(
         onchainBalanceAfter.add(pendingToBeOnchain).sub(onchainBalanceBefore).eq(amount),
         'Wrong amount onchain after withdraw'
     ).to.be.true;
+};
 
+Tester.prototype.testWithdraw = async function (
+    wallet: Wallet,
+    token: TokenLike,
+    amount: BigNumber,
+    fastProcessing?: boolean
+) {
+    const type = fastProcessing ? 'FastWithdraw' : 'Withdraw';
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), token);
+    const balanceBefore = await wallet.getBalance(token);
+
+    const handle = await wallet.withdrawFromSyncToEthereum({
+        ethAddress: wallet.address(),
+        token,
+        amount,
+        fee,
+        fastProcessing
+    });
+
+    await handle.awaitReceipt();
+    const balanceAfter = await wallet.getBalance(token);
+    expect(balanceBefore.sub(balanceAfter).eq(amount.add(fee)), 'Wrong amount on wallet after withdraw').to.be.true;
     this.runningFee = this.runningFee.add(fee);
+    return handle;
 };

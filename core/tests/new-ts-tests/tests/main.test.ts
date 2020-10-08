@@ -1,17 +1,16 @@
 import { expect, use } from 'chai';
-import promised from 'chai-as-promised';
+// import promised from 'chai-as-promised';
 import { BigNumber, utils } from 'ethers';
 import { Wallet } from 'zksync';
 
 import { Tester } from './tester';
-import './deposit';
+import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
-import './full-exit';
 import './misc';
 
-use(promised);
+// use(promised);
 
 describe('ZkSync integration tests', () => {
     let tester: Tester;
@@ -77,11 +76,11 @@ describe('ZkSync integration tests', () => {
     });
 
     step('should execute a withdrawal', async () => {
-        await tester.testWithdraw(alice, 'ETH', one.div(10));
+        await tester.testVerifiedWithdraw(alice, 'ETH', one.div(10));
     });
 
     step('should execute a fast withdrawal', async () => {
-        await tester.testWithdraw(bob, 'ETH', one.div(10), true);
+        await tester.testVerifiedWithdraw(bob, 'ETH', one.div(10), true);
     });
 
     it('should check collected fees', async () => {
@@ -101,7 +100,7 @@ describe('ZkSync integration tests', () => {
         });
 
         step('should fail full-exit with wrong eth-signer', async () => {
-            // make a deposit so it is assigned an accountId
+            // make a deposit so that wallet is assigned an accountId
             await tester.testDeposit(carl, 'ETH', one);
 
             let oldSigner = carl.ethSigner;

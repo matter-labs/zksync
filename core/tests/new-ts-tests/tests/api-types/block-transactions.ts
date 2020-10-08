@@ -13,7 +13,7 @@ type Transfer = {
         };
         to: string;
         token: number;
-        type: "Transfer";
+        type: 'Transfer';
     };
     created_at: string;
 };
@@ -29,7 +29,7 @@ type Deposit = {
             to: string;
             token: number;
         };
-        type: "Deposit";
+        type: 'Deposit';
     };
     created_at: string;
 };
@@ -49,7 +49,7 @@ type ChangePubKey = {
             pubKey: string;
             signature: string;
         };
-        type: "ChangePubKey";
+        type: 'ChangePubKey';
     };
     created_at: string;
 };
@@ -69,7 +69,7 @@ type Withdraw = {
         };
         to: string;
         token: number;
-        type: "Withdraw";
+        type: 'Withdraw';
         fast: boolean;
     };
     created_at: string;
@@ -84,7 +84,7 @@ type FullExit = {
             eth_address: string;
             token: number;
         };
-        type: "FullExit";
+        type: 'FullExit';
         withdraw_amount: string;
     };
     created_at: string;
@@ -94,7 +94,7 @@ type ForcedExit = {
     tx_hash: string;
     block_number: number;
     op: {
-        type: "ForcedExit";
+        type: 'ForcedExit';
         initiatorAccountId: number;
         target: string;
         token: number;
