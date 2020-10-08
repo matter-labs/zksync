@@ -479,7 +479,7 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
 /// Checks the correctness of the processing of committed unconfirmed transactions.
 #[db_test]
-async fn replace_tx_hash(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Below lies the initialization of the data for the test.
 
     let mut rng = create_rng();
