@@ -4,20 +4,12 @@ import { Wallet, types, utils } from 'zksync';
 import { BigNumber } from 'ethers';
 
 type TokenLike = types.TokenLike;
-const VERIFY_TIMEOUT = 120_000;
 
 declare module './tester' {
     interface Tester {
         testVerifiedWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
         testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<any>;
     }
-}
-
-function timeout<T>(promise: Promise<T>, millis: number) {
-    const timeout = new Promise((_, reject) => {
-        setTimeout(() => reject(`Timed out in ${millis}ms.`), millis);
-    });
-    return Promise.race([promise, timeout]);
 }
 
 Tester.prototype.testVerifiedWithdraw = async function (
@@ -32,8 +24,8 @@ Tester.prototype.testVerifiedWithdraw = async function (
     // Checking that there are no complete withdrawals tx hash for this withdrawal
     expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.not.exist;
 
-    // Await for verification with a timeout set.
-    await timeout(handle.awaitVerifyReceipt(), VERIFY_TIMEOUT);
+    // Await for verification with a timeout set (through mocha's --timeout)
+    await handle.awaitVerifyReceipt();
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     // we should wait some time for `completeWithdrawals` transaction to be processed

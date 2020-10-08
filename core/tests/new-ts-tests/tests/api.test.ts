@@ -1,5 +1,3 @@
-// import { expect, use } from 'chai';
-// import { BigNumber } from 'ethers';
 import { Wallet } from 'zksync';
 
 import { Tester } from './tester';

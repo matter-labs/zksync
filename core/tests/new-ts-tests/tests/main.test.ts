@@ -1,5 +1,4 @@
-import { expect, use } from 'chai';
-// import promised from 'chai-as-promised';
+import { expect } from 'chai';
 import { BigNumber, utils } from 'ethers';
 import { Wallet } from 'zksync';
 
@@ -9,8 +8,6 @@ import './change-pub-key';
 import './transfer';
 import './withdraw';
 import './misc';
-
-// use(promised);
 
 describe('ZkSync integration tests', () => {
     let tester: Tester;
