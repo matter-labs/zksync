@@ -25,15 +25,16 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet) 
         type: 'EthereumSignature'
     };
 
+    let thrown = true;
     try {
         await from.provider.submitTx(signedTransfer.tx, fakeEthSignature);
-        expect.fail('Sending tx with incorrect ETH signature must throw');
+        thrown = false; // this line should be unreachable
     } catch (e) {
         expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
     }
+    expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 
     const { totalFee } = await this.syncProvider.getTransactionFee('Withdraw', from.address(), 'ETH');
-
     const signedWithdraw = await from.signWithdrawFromSyncToEthereum({
         ethAddress: from.address(),
         token: 'ETH',
@@ -42,12 +43,14 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet) 
         nonce: await from.getNonce()
     });
 
+    thrown = true;
     try {
         await from.provider.submitTx(signedWithdraw.tx, fakeEthSignature);
-        expect.fail('Sending tx with incorrect ETH signature must throw');
+        thrown = false; // this line should be unreachable
     } catch (e) {
         expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
     }
+    expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 };
 
 // Tester.prototype.testTransactionResending = async function (

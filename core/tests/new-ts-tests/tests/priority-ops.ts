@@ -24,7 +24,7 @@ Tester.prototype.testDeposit = async function (wallet: Wallet, token: TokenLike,
 
     await depositHandle.awaitReceipt();
     const balanceAfter = await wallet.getBalance(token);
-    expect(balanceAfter.sub(balanceBefore).eq(amount), 'Deposit checks failed').to.be.true;
+    expect(balanceAfter.sub(balanceBefore).eq(amount), 'Deposit failed').to.be.true;
 };
 
 Tester.prototype.testFullExit = async function (wallet: Wallet, token: TokenLike, accountId?: number) {

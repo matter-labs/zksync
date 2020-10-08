@@ -64,8 +64,9 @@ describe('ZkSync integration tests', () => {
     });
 
     step('should test multi-transfers', async () => {
-        await tester.testMultiTransfer(alice, bob, 'ETH', one.div(100));
-        await tester.testFailedMultiTransfer(alice, bob, 'ETH', one.div(100));
+        await tester.testBatch(alice, bob, 'ETH', one.div(100));
+        await tester.testIgnoredBatch(alice, bob, 'ETH', one.div(100));
+        await tester.testFailedBatch(alice, bob, 'ETH', one.div(100));
     });
 
     it('should fail trying to send tx with wrong signature', async () => {

@@ -8,8 +8,9 @@ type TokenLike = types.TokenLike;
 declare module './tester' {
     interface Tester {
         testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testMultiTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testFailedMultiTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testFailedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -38,16 +39,41 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
     const receiverAfter = await receiver.getBalance(token);
 
     if (sender.address() === receiver.address()) {
-        expect(senderBefore.sub(fee).eq(senderAfter), 'Transfer to self checks failed').to.be.true;
+        expect(senderBefore.sub(fee).eq(senderAfter), 'Transfer to self failed').to.be.true;
     } else {
-        expect(senderBefore.sub(senderAfter).eq(amount.add(fee)), 'Transfer checks failed').to.be.true;
-        expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer checks failed').to.be.true;
+        expect(senderBefore.sub(senderAfter).eq(amount.add(fee)), 'Transfer failed').to.be.true;
+        expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed').to.be.true;
     }
 
     this.runningFee = this.runningFee.add(fee);
 };
 
-Tester.prototype.testMultiTransfer = async function (
+Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, token: TokenLike, amount: BigNumber) {
+    const fee = await this.syncProvider.getTransactionsBatchFee(
+        ['Transfer', 'Transfer'],
+        [receiver.address(), receiver.address()],
+        token
+    );
+
+    const tx = {
+        to: receiver.address(),
+        token,
+        amount,
+        fee: fee.div(2)
+    };
+
+    const senderBefore = await sender.getBalance(token);
+    const receiverBefore = await receiver.getBalance(token);
+    const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }]);
+    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    const senderAfter = await sender.getBalance(token);
+    const receiverAfter = await receiver.getBalance(token);
+    expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(fee)), 'Batched transfer failed').to.be.true;
+    expect(receiverAfter.sub(receiverBefore).eq(amount.mul(2)), 'Batched transfer failed').to.be.true;
+    this.runningFee = this.runningFee.add(fee);
+};
+
+Tester.prototype.testIgnoredBatch = async function (
     sender: Wallet,
     receiver: Wallet,
     token: TokenLike,
@@ -66,41 +92,25 @@ Tester.prototype.testMultiTransfer = async function (
         fee: fee.div(2)
     };
 
-    // First, execute batched transfers successfully.
-    {
-        const senderBefore = await sender.getBalance(token);
-        const receiverBefore = await receiver.getBalance(token);
-        const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }]);
-        await Promise.all(handles.map((handle) => handle.awaitReceipt()));
-        const senderAfter = await sender.getBalance(token);
-        const receiverAfter = await receiver.getBalance(token);
-        expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(fee)), 'Batched transfer checks failed').to.be.true;
-        expect(receiverAfter.sub(receiverBefore).eq(amount.mul(2)), 'Batched transfer checks failed').to.be.true;
+    const senderBefore = await sender.getBalance(token);
+    const receiverBefore = await receiver.getBalance(token);
+    const handles = await sender.syncMultiTransfer([
+        { ...tx },
+        // set amount too big
+        { ...tx, amount: amount.mul(10 ** 6) }
+    ]);
+
+    for (const handle of handles) {
+        await suppress(handle.awaitReceipt());
     }
 
-    // Then, send another batch in which the second transaction will fail.
-    // The first transaction should not be executed.
-    {
-        const senderBefore = await sender.getBalance(token);
-        const receiverBefore = await receiver.getBalance(token);
-        const handles = await sender.syncMultiTransfer([
-            { ...tx },
-            // set amount too big
-            { ...tx, amount: amount.mul(10 ** 6) }
-        ]);
-        for (const handle of handles) {
-            await suppress(handle.awaitReceipt());
-        }
-        const senderAfter = await sender.getBalance(token);
-        const receiverAfter = await receiver.getBalance(token);
-        expect(senderBefore.eq(senderAfter), 'Batched transfer checks failed').to.be.true;
-        expect(receiverAfter.eq(receiverBefore), 'Batched transfer checks failed').to.be.true;
-    }
-
-    this.runningFee = this.runningFee.add(fee);
+    const senderAfter = await sender.getBalance(token);
+    const receiverAfter = await receiver.getBalance(token);
+    expect(senderBefore.eq(senderAfter), 'Wrong batch was not ignored').to.be.true;
+    expect(receiverAfter.eq(receiverBefore), 'Wrong batch wa not ignored').to.be.true;
 };
 
-Tester.prototype.testFailedMultiTransfer = async function (
+Tester.prototype.testFailedBatch = async function (
     sender: Wallet,
     receiver: Wallet,
     token: types.TokenLike,
@@ -118,10 +128,9 @@ Tester.prototype.testFailedMultiTransfer = async function (
         for (const handle of handles) {
             await handle.awaitVerifyReceipt();
         }
-        // this line should be unreachable
-        success = false;
+        success = false; // this line should be unreachable
     } catch (e) {
         expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
     }
-    expect(success, 'Batch did not fail').to.be.true;
+    expect(success, 'Batch should have failed').to.be.true;
 };

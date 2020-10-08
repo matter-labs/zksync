@@ -76,7 +76,7 @@ export async function checkTxHistoryResponseType(address: string): Promise<TxHis
     const data: TxHistoryInterface = await validateResponseFromUrl(typeFilePath, url);
 
     for (const tx of data) {
-        expect(tx.created_at).to.match(DATE_REGEX);
+        expect(tx.created_at, 'Wrong date format').to.match(DATE_REGEX);
     }
 
     return data;
@@ -86,7 +86,7 @@ export async function checkBlockResponseType(blockNumber: number): Promise<Block
     const url = `${process.env.REST_API_ADDR}/api/v0.1/blocks/${blockNumber}`;
     const typeFilePath = `${apiTypesFolder}/block.ts`;
     const data: BlockInterface = await validateResponseFromUrl(typeFilePath, url);
-    expect(data.committed_at).to.match(DATE_REGEX);
+    expect(data.committed_at, 'Wrong date format').to.match(DATE_REGEX);
     return data;
 }
 
@@ -103,7 +103,7 @@ export async function checkBlockTransactionsResponseType(blockNumber: number): P
     const data: BlockTransactionsInterface = await validateResponseFromUrl(typeFilePath, url);
 
     for (const tx of data) {
-        expect(tx.created_at).to.match(DATE_REGEX);
+        expect(tx.created_at, 'Wrong date format').to.match(DATE_REGEX);
     }
 
     return data;
@@ -113,7 +113,7 @@ export async function checkTestnetConfigResponseType(): Promise<TestnetConfigInt
     const url = `${process.env.REST_API_ADDR}/api/v0.1/testnet_config`;
     const typeFilePath = `${apiTypesFolder}/config.ts`;
     const data: TestnetConfigInterface = await validateResponseFromUrl(typeFilePath, url);
-    expect(data.contractAddress).to.match(ADDRESS_REGEX);
+    expect(data.contractAddress, 'Wrong address format').to.match(ADDRESS_REGEX);
     return data;
 }
 
@@ -121,7 +121,7 @@ export async function checkTransactionsResponseType(txHash: string): Promise<Tra
     const url = `${process.env.REST_API_ADDR}/api/v0.1/transactions_all/${txHash}`;
     const typeFilePath = `${apiTypesFolder}/transaction.ts`;
     const data: TransactionInterface = await validateResponseFromUrl(typeFilePath, url);
-    expect(data.created_at).to.match(DATE_REGEX);
+    expect(data.created_at, 'Wrong date format').to.match(DATE_REGEX);
     return data;
 }
 
