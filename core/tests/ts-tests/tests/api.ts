@@ -44,13 +44,7 @@ async function validateResponseFromUrl(typeFilePath: string, url: string): Promi
     });
     const data = await response.json();
     const serverJson = JSON.stringify(data, null, 4);
-
-    try {
-        await validateTypeJSON(typeFilePath, serverJson);
-    } catch (e) {
-        expect.fail(`Error in response type of ${url}`);
-    }
-
+    await validateTypeJSON(typeFilePath, serverJson);
     return data;
 }
 

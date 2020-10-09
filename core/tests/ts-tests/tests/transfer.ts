@@ -1,13 +1,13 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
+import { Wallet, types, utils } from 'zksync';
 import { BigNumber } from 'ethers';
 
 type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber, timeout?: number): Promise<void>;
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testFailedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
@@ -20,7 +20,13 @@ async function suppress<T>(promise: Promise<T>) {
     } catch (_) {}
 }
 
-Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet, token: TokenLike, amount: BigNumber) {
+Tester.prototype.testTransfer = async function (
+    sender: Wallet,
+    receiver: Wallet,
+    token: TokenLike,
+    amount: BigNumber,
+    timeout: number = 0
+) {
     const fullFee = await this.syncProvider.getTransactionFee('Transfer', receiver.address(), token);
     const fee = fullFee.totalFee;
     const senderBefore = await sender.getBalance(token);
@@ -33,7 +39,7 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
         fee
     });
 
-    // await sleep(timeoutBeforeReceipt);
+    await utils.sleep(timeout);
     await handle.awaitReceipt();
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
@@ -107,7 +113,7 @@ Tester.prototype.testIgnoredBatch = async function (
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
     expect(senderBefore.eq(senderAfter), 'Wrong batch was not ignored').to.be.true;
-    expect(receiverAfter.eq(receiverBefore), 'Wrong batch wa not ignored').to.be.true;
+    expect(receiverAfter.eq(receiverBefore), 'Wrong batch was not ignored').to.be.true;
 };
 
 Tester.prototype.testFailedBatch = async function (

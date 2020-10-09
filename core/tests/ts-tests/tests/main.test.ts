@@ -73,10 +73,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testFailedBatch(alice, bob, token, hundred.div(100));
     });
 
-    it('should fail trying to send tx with wrong signature', async () => {
-        await tester.testWrongSignature(alice, bob);
-    });
-
     step('should execute a withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, hundred.div(10));
     });
@@ -89,6 +85,16 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
         expect(collectedFee.eq(tester.runningFee), 'Fee collection failed').to.be.true;
     });
+
+    it('should fail trying to send tx with wrong signature', async () => {
+        await tester.testWrongSignature(alice, bob, token, hundred.div(10));
+    });
+
+    it('should succeed resending a previously failed tx', async () => {
+        let nick = await tester.fundedWallet('1.0');
+        let mike = await tester.emptyWallet();
+        await tester.testTransactionResending(nick, mike, token, hundred);
+    })
 
     describe('Full Exit tests', () => {
         let carl: Wallet;
@@ -126,9 +132,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
     });
 
-    // step('...', async () => {
-    //     await expect(tester.testTransactionResending(alice, carl)).to.be.fulfilled;
-    // })
 });
 
 for (const transport of ['HTTP', 'WS']) {

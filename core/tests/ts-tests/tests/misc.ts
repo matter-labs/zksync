@@ -1,21 +1,23 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
-import { utils } from 'ethers';
+import { Wallet, types, utils } from 'zksync';
+import { BigNumber } from 'ethers';
+
+type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testWrongSignature(from: Wallet, to: Wallet): Promise<void>;
-        testTransactionResending(from: Wallet, to: Wallet): Promise<void>;
+        testWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testTransactionResending(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
-Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet) {
+Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber) {
     const signedTransfer = await from.signSyncTransfer({
         to: to.address(),
-        token: 'ETH',
-        amount: utils.parseEther('0.002'),
-        fee: utils.parseEther('0.001'),
+        token: token,
+        amount,
+        fee: amount.div(2),
         nonce: await from.getNonce()
     });
 
@@ -34,11 +36,11 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet) 
     }
     expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 
-    const { totalFee } = await this.syncProvider.getTransactionFee('Withdraw', from.address(), 'ETH');
+    const { totalFee } = await this.syncProvider.getTransactionFee('Withdraw', from.address(), token);
     const signedWithdraw = await from.signWithdrawFromSyncToEthereum({
         ethAddress: from.address(),
-        token: 'ETH',
-        amount: utils.parseEther('0.001'),
+        token: token,
+        amount: amount.div(2),
         fee: totalFee,
         nonce: await from.getNonce()
     });
@@ -53,39 +55,38 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet) 
     expect(thrown, 'Sending tx with incorrect ETH signature must throw').to.be.true;
 };
 
-// Tester.prototype.testTransactionResending = async function (
-//     from: Wallet,
-//     to: Wallet
-// ) {
-//     const amount = utils.parseEther("0.2");
-//     const transferFullFee = await this.syncProvider.getTransactionFee("Transfer", to.address(), "ETH");
-//     const transferFee = transferFullFee.totalFee;
-//
-//     const feeType = { ChangePubKey: { onchainPubkeyAuth: false } };
-//     const changePubKeyFullFee = await this.syncProvider.getTransactionFee(feeType, from.address(), "ETH");
-//     const changePubKeyFee = changePubKeyFullFee.totalFee;
-//
-//     await this.testDeposit(
-//         from,
-//         "ETH",
-//         amount.div(2).add(transferFee).add(changePubKeyFee),
-//         true
-//     );
-//     await this.testChangePubKey(from, "ETH", true);
-//     try {
-//         await this.testTransfer(from, to, "ETH", amount);
-//         expect.fail();
-//     } catch (e) {
-//         console.log(JSON.stringify(e, null, 4));
-//         expect(e.value.failReason).to.equal('Not enough balance');
-//     }
-//
-//     await this.testDeposit(from, "ETH", amount.div(2));
-//     // We should wait some `timeoutBeforeReceipt` to give server enough time
-//     // to move our transaction with success flag from mempool to statekeeper
-//     //
-//     // If we won't wait enough, then we'll get the receipt for the previous, failed tx,
-//     // which has the same hash. The new (successful) receipt will be available only
-//     // when tx will be executed again in state keeper, so we must wait for it.
-//     // await this.testTransfer(from, to, "ETH", amount, 3000);
-// }
+Tester.prototype.testTransactionResending = async function (
+    from: Wallet,
+    to: Wallet,
+    token: TokenLike,
+    amount: BigNumber
+) {
+    const transferFullFee = await this.syncProvider.getTransactionFee('Transfer', to.address(), token);
+    const transferFee = transferFullFee.totalFee;
+
+    const feeType = { ChangePubKey: { onchainPubkeyAuth: false } };
+    const changePubKeyFullFee = await this.syncProvider.getTransactionFee(feeType, from.address(), token);
+    const changePubKeyFee = changePubKeyFullFee.totalFee;
+
+    await this.testDeposit(from, token, amount.div(2).add(transferFee).add(changePubKeyFee), true);
+    await this.testChangePubKey(from, token, true);
+
+    let thrown = true;
+    try {
+        await this.testTransfer(from, to, token, amount);
+        thrown = false; // this line should be unreachable
+    } catch (e) {
+        expect(e.value.failReason).to.equal('Not enough balance');
+    }
+    expect(thrown).to.be.true;
+
+    await this.testDeposit(from, token, amount.div(2));
+
+    // We should wait some `timeoutBeforeReceipt` to give server enough time
+    // to move our transaction with success flag from mempool to statekeeper
+    //
+    // If we won't wait enough, then we'll get the receipt for the previous, failed tx,
+    // which has the same hash. The new (successful) receipt will be available only
+    // when tx will be executed again in state keeper, so we must wait for it.
+    await this.testTransfer(from, to, token, amount, 3000);
+};
