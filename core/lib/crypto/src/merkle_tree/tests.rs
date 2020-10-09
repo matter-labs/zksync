@@ -49,13 +49,13 @@ fn cross_trees_merkle_path_comparison() {
     let depth = 8;
 
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
-    let elements = rng.gen_iter::<u64>().take(1 << depth).collect::<Vec<_>>();
+    let elements = rng.gen_iter::<u64>().take(1 << depth);
 
     let mut par_tree = parallel_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
     let mut seq_tree =
         sequential_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
 
-    for (idx, item) in elements.into_iter().enumerate() {
+    for (idx, item) in elements.enumerate() {
         // Insert the same element in both trees and verify that the root hash is the same.
         let idx = idx as u32;
         par_tree.insert(idx, item);
