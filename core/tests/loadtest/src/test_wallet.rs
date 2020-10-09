@@ -17,6 +17,7 @@ use zksync_types::{
 // Local uses
 use crate::{config::AccountInfo, monitor::Monitor};
 
+/// A wrapper over `zksync::Wallet` to make testing more convenient.
 #[derive(Debug)]
 pub struct TestWallet {
     monitor: Monitor,
@@ -28,9 +29,9 @@ pub struct TestWallet {
 }
 
 impl TestWallet {
-    pub const TOKEN_NAME: &'static str = "ETH";
     const FEE_FACTOR: u64 = 3;
 
+    /// Creates a new wallet from the given account information and Ethereum configuration options.
     pub async fn from_info(
         monitor: Monitor,
         info: &AccountInfo,
@@ -43,11 +44,15 @@ impl TestWallet {
         let inner = Wallet::new(monitor.provider.clone(), credentials)
             .await
             .unwrap();
-        Self::from_wallet(monitor, inner, &options.web3_url).await
+        Self::from_wallet(info.token_name.clone(), monitor, inner, &options.web3_url).await
     }
 
-    // Creates a random wallet.
-    pub async fn new_random(monitor: Monitor, options: &ConfigurationOptions) -> Self {
+    /// Creates a random wallet.
+    pub async fn new_random(
+        token_name: TokenLike,
+        monitor: Monitor,
+        options: &ConfigurationOptions,
+    ) -> Self {
         let eth_private_key = gen_random_eth_private_key();
         let address_from_pk =
             PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
@@ -60,10 +65,15 @@ impl TestWallet {
         .await
         .unwrap();
 
-        Self::from_wallet(monitor, inner, &options.web3_url).await
+        Self::from_wallet(token_name, monitor, inner, &options.web3_url).await
     }
 
-    async fn from_wallet(monitor: Monitor, inner: Wallet, web3_url: impl AsRef<str>) -> Self {
+    async fn from_wallet(
+        token_name: TokenLike,
+        monitor: Monitor,
+        inner: Wallet,
+        web3_url: impl AsRef<str>,
+    ) -> Self {
         let eth_provider = inner.ethereum(web3_url).await.unwrap();
         let zk_nonce = inner
             .provider
@@ -78,7 +88,7 @@ impl TestWallet {
             inner,
             eth_provider,
             nonce: AtomicU32::new(zk_nonce),
-            token_name: Self::TOKEN_NAME.into(),
+            token_name,
         }
     }
 
@@ -114,6 +124,11 @@ impl TestWallet {
     /// Returns the wallet balance in Ehtereum network.
     pub async fn eth_balance(&self) -> Result<BigUint, ClientError> {
         self.eth_provider.balance().await
+    }
+
+    /// Returns the token name of this wallet.
+    pub fn token_name(&self) -> &TokenLike {
+        &self.token_name
     }
 
     /// Returns the current account ID.

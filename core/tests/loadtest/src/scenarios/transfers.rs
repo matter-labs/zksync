@@ -3,12 +3,47 @@ use std::fmt;
 // External uses
 use async_trait::async_trait;
 use num::BigUint;
+use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::utils::closest_packable_token_amount;
 use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
 // Local uses
 use super::{Scenario, ScenarioResources};
-use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all};
+use crate::{
+    monitor::Monitor,
+    test_wallet::TestWallet,
+    utils::{gwei_to_wei, try_wait_all},
+};
+
+/// Configuration options for the transfers scenario.
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct TransferScenarioConfig {
+    /// Amount of money to be used in the transfer, in gwei.
+    pub transfer_size: u64,
+    /// Amount of iterations to rotate funds, "length" of the test.
+    pub transfer_rounds: u64,
+    /// Amount of intermediate wallets to use.
+    ///
+    /// Due to scenario implementation details, amount of intermediate wallets
+    /// should be greater than the expected block size.
+    pub wallets_amount: u64,
+}
+
+impl Default for TransferScenarioConfig {
+    fn default() -> Self {
+        Self {
+            transfer_size: 1,
+            transfer_rounds: 10,
+            wallets_amount: 100,
+        }
+    }
+}
+
+impl From<TransferScenarioConfig> for TransferScenario {
+    fn from(cfg: TransferScenarioConfig) -> Self {
+        Self::new(cfg)
+    }
+}
 
 /// Schematically, scenario will look like this:
 ///
@@ -30,12 +65,12 @@ pub struct TransferScenario {
     txs: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
 }
 
-impl Default for TransferScenario {
-    fn default() -> Self {
+impl TransferScenario {
+    pub fn new(config: TransferScenarioConfig) -> Self {
         Self {
-            transfer_size: BigUint::from(1_000_u64),
-            transfer_rounds: 100,
-            wallets: 100,
+            transfer_size: gwei_to_wei(config.transfer_size),
+            transfer_rounds: config.transfer_rounds,
+            wallets: config.wallets_amount,
             txs: Vec::new(),
         }
     }
@@ -43,7 +78,7 @@ impl Default for TransferScenario {
 
 impl fmt::Display for TransferScenario {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("Transfers")
+        f.write_str("transfers")
     }
 }
 
