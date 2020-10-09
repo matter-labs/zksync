@@ -256,13 +256,13 @@ pub fn public_data_commitment<E: JubjubEngine>(
     let block_number_bits: Vec<bool> =
         BitIterator::new(block_number.unwrap().into_repr()).collect();
 
-    public_data_initial_bits.extend(vec![false; 256]);
+    public_data_initial_bits.extend(vec![false; 256 - block_number_bits.len()]);
     public_data_initial_bits.extend(block_number_bits.into_iter());
 
     let validator_id_bits: Vec<bool> =
         BitIterator::new(validator_address.unwrap().into_repr()).collect();
 
-    public_data_initial_bits.extend(vec![false; 256]);
+    public_data_initial_bits.extend(vec![false; 256 - validator_id_bits.len()]);
     public_data_initial_bits.extend(validator_id_bits.into_iter());
 
     assert_eq!(public_data_initial_bits.len(), 512);
@@ -277,7 +277,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     h.result(&mut hash_result[..]);
 
     let old_root_bits: Vec<bool> = BitIterator::new(initial_root.unwrap().into_repr()).collect();
-    let mut packed_old_root_bits = vec![false; 256];
+    let mut packed_old_root_bits = vec![false; 256 - old_root_bits.len()];
     packed_old_root_bits.extend(old_root_bits);
 
     let packed_old_root_bytes = be_bit_vector_into_bytes(&packed_old_root_bits);
@@ -292,7 +292,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     h.result(&mut hash_result[..]);
 
     let new_root_bits: Vec<bool> = BitIterator::new(new_root.unwrap().into_repr()).collect();
-    let mut packed_new_root_bits = vec![false; 256];
+    let mut packed_new_root_bits = vec![false; 256 - new_root_bits.len()];
     packed_new_root_bits.extend(new_root_bits);
 
     let packed_new_root_bytes = be_bit_vector_into_bytes(&packed_new_root_bits);
