@@ -1,7 +1,7 @@
-use parity_crypto::{publickey::sign, Keccak256};
+use parity_crypto::{publickey::Signature, Keccak256};
 use rlp::RlpStream;
 use serde::{Deserialize, Serialize};
-use web3::types::{H160, H256, U256};
+use zksync_types::{H160, U256};
 
 /// Description of a Transaction, pending or in the chain.
 #[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
@@ -37,25 +37,23 @@ fn find_first_nonzero(vector: &[u8]) -> usize {
 }
 
 impl RawTransaction {
-    /// Signs and returns the RLP-encoded transaction
-    pub fn sign(&self, private_key: &H256) -> Vec<u8> {
-        let hash = self.hash();
-        let sig = ecdsa_sign(hash, &private_key, self.chain_id);
+    pub fn rlp_encode_tx(&self, sig: Signature) -> Vec<u8> {
+        let signature = to_ecdsa(sig, self.chain_id);
         let mut tx = RlpStream::new();
         tx.begin_unbounded_list();
         self.encode(&mut tx);
-        tx.append(&sig.v);
-        let r_start = find_first_nonzero(&sig.r);
-        let r = &sig.r[r_start..];
+        tx.append(&signature.v);
+        let r_start = find_first_nonzero(&signature.r);
+        let r = &signature.r[r_start..];
         tx.append(&r);
-        let s_start = find_first_nonzero(&sig.s);
-        let s = &sig.s[s_start..];
+        let s_start = find_first_nonzero(&signature.s);
+        let s = &signature.s[s_start..];
         tx.append(&s);
         tx.finalize_unbounded_list();
         tx.out()
     }
 
-    fn hash(&self) -> [u8; 32] {
+    pub fn hash(&self) -> [u8; 32] {
         let mut hash = RlpStream::new();
         hash.begin_unbounded_list();
         self.encode(&mut hash);
@@ -66,7 +64,7 @@ impl RawTransaction {
         hash.out().keccak256()
     }
 
-    fn encode(&self, s: &mut RlpStream) {
+    pub fn encode(&self, s: &mut RlpStream) {
         s.append(&self.nonce);
         s.append(&self.gas_price);
         s.append(&self.gas);
@@ -80,11 +78,7 @@ impl RawTransaction {
     }
 }
 
-fn ecdsa_sign(hash: [u8; 32], private_key: &H256, chain_id: u8) -> EcdsaSig {
-    let sig = sign(&(*private_key).into(), &hash.into()).expect("failed to sign eth message");
-
-    //debug!("V m8 {:?}", v);
-
+fn to_ecdsa(sig: Signature, chain_id: u8) -> EcdsaSig {
     EcdsaSig {
         v: vec![sig.v() as u8 + chain_id * 2 + 35],
         r: sig.r().to_vec(),

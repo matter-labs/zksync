@@ -23,7 +23,7 @@
 use std::time::{Duration, Instant};
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
-    error::{ClientError, SignerError::NoSigningKey},
+    error::ClientError,
     types::BlockStatus,
     web3::{
         contract::{Contract, Options},
@@ -34,6 +34,7 @@ use zksync::{
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
 use zksync_contracts::{erc20_contract, zksync_contract};
+use zksync_eth_signer::EthereumSigner;
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
@@ -111,8 +112,10 @@ async fn transfer_to(
     let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
 
     let provider = Provider::new(Network::Localhost);
+    let eth_signer = EthereumSigner::from_key(main_eth_private_key);
     let credentials =
-        WalletCredentials::from_eth_pk(main_eth_address, main_eth_private_key, Network::Localhost)
+        WalletCredentials::from_eth_signer(main_eth_address, eth_signer, Network::Localhost)
+            .await
             .unwrap();
 
     let wallet = Wallet::new(provider, credentials).await?;
@@ -132,11 +135,10 @@ async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Er
     let provider = Provider::new(Network::Localhost);
 
     let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-    let random_credentials = WalletCredentials::from_eth_pk(
-        random_eth_address,
-        random_eth_private_key,
-        Network::Localhost,
-    )?;
+    let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+    let random_credentials =
+        WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
+            .await?;
     let sync_wallet = Wallet::new(provider, random_credentials).await?;
 
     let handle = sync_wallet
@@ -149,7 +151,7 @@ async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Er
 
     assert!(matches!(
         handle,
-        Err(ClientError::SigningError(NoSigningKey))
+        Err(ClientError::SigningError(_no_signing_key))
     ));
 
     Ok(())
@@ -456,8 +458,12 @@ async fn init_account_with_one_ether() -> Result<Wallet, anyhow::Error> {
     transfer_to("ETH", one_ether(), eth_address).await?;
 
     let provider = Provider::new(Network::Localhost);
+
+    let eth_signer = EthereumSigner::from_key(eth_private_key);
     let credentials =
-        WalletCredentials::from_eth_pk(eth_address, eth_private_key, Network::Localhost).unwrap();
+        WalletCredentials::from_eth_signer(eth_address, eth_signer, Network::Localhost)
+            .await
+            .unwrap();
 
     let mut wallet = Wallet::new(provider, credentials).await?;
     let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
@@ -494,61 +500,55 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let main_wallet = {
         let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
-        let main_credentials = WalletCredentials::from_eth_pk(
-            main_eth_address,
-            main_eth_private_key,
-            Network::Localhost,
-        )?;
+        let eth_signer = EthereumSigner::from_key(main_eth_private_key);
+        let main_credentials =
+            WalletCredentials::from_eth_signer(main_eth_address, eth_signer, Network::Localhost)
+                .await?;
         Wallet::new(provider.clone(), main_credentials).await?
     };
 
     let sync_depositor_wallet = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let random_credentials = WalletCredentials::from_eth_pk(
-            random_eth_address,
-            random_eth_private_key,
-            Network::Localhost,
-        )?;
+        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let random_credentials =
+            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
+                .await?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let mut alice_wallet1 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let random_credentials = WalletCredentials::from_eth_pk(
-            random_eth_address,
-            random_eth_private_key,
-            Network::Localhost,
-        )?;
+        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let random_credentials =
+            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
+                .await?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let mut alice_wallet2 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let random_credentials = WalletCredentials::from_eth_pk(
-            random_eth_address,
-            random_eth_private_key,
-            Network::Localhost,
-        )?;
+        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let random_credentials =
+            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
+                .await?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let bob_wallet1 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let random_credentials = WalletCredentials::from_eth_pk(
-            random_eth_address,
-            random_eth_private_key,
-            Network::Localhost,
-        )?;
+        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let random_credentials =
+            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
+                .await?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
     let bob_wallet2 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let random_credentials = WalletCredentials::from_eth_pk(
-            random_eth_address,
-            random_eth_private_key,
-            Network::Localhost,
-        )?;
+        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let random_credentials =
+            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
+                .await?;
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
@@ -672,6 +672,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
         let (transfer, signature) = wallet
             .signer
             .sign_transfer(token.clone(), 1_000_000u64.into(), fee, recipient, nonce)
+            .await
             .expect("Transfer signing error");
 
         signed_transfers.push((ZkSyncTx::Transfer(Box::new(transfer)), signature));

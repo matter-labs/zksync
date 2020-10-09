@@ -2506,6 +2506,7 @@ dependencies = [
  "web3 0.13.0",
  "zksync",
  "zksync_config",
+ "zksync_eth_signer",
  "zksync_server",
  "zksync_types",
  "zksync_utils",
@@ -5431,6 +5432,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
+ "zksync_eth_signer",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5446,6 +5448,7 @@ dependencies = [
 name = "zksync_circuit"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "bigdecimal",
  "log 0.4.11",
  "num",
@@ -5526,9 +5529,26 @@ dependencies = [
  "ethabi 12.0.0",
  "log 0.4.11",
  "parity-crypto",
- "rlp",
  "serde",
  "web3 0.13.0",
+ "zksync_eth_signer",
+ "zksync_types",
+]
+
+[[package]]
+name = "zksync_eth_signer"
+version = "1.0.0"
+dependencies = [
+ "hex",
+ "jsonrpc-core",
+ "parity-crypto",
+ "reqwest",
+ "rlp",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "thiserror",
+ "zksync_types",
 ]
 
 [[package]]
@@ -5622,6 +5642,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
+ "zksync_eth_signer",
  "zksync_prover",
  "zksync_prover_utils",
  "zksync_state",
@@ -5696,11 +5717,14 @@ dependencies = [
  "serde_json",
  "tokio 0.2.22",
  "web3 0.13.0",
+ "zksync_circuit",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
+ "zksync_eth_signer",
  "zksync_prover",
+ "zksync_prover_utils",
  "zksync_server",
  "zksync_test_account",
  "zksync_types",

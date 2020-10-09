@@ -72,6 +72,7 @@ impl<'a> WithdrawBuilder<'a> {
         self.wallet
             .signer
             .sign_withdraw(token, amount, fee, to, nonce)
+            .await
             .map(|(tx, sign)| (ZkSyncTx::Withdraw(Box::new(tx)), sign))
             .map_err(ClientError::SigningError)
     }
