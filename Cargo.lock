@@ -5648,22 +5648,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zksync_eth_signer"
-version = "1.0.0"
-dependencies = [
- "hex",
- "jsonrpc-core",
- "parity-crypto",
- "reqwest",
- "rlp",
- "serde",
- "serde_derive",
- "serde_json",
- "thiserror",
- "zksync_types",
-]
-
-[[package]]
 name = "zksync_eth_sender"
 version = "1.0.0"
 dependencies = [
@@ -5711,12 +5695,29 @@ dependencies = [
  "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
+ "zksync_eth_signer",
  "zksync_prover",
  "zksync_prover_utils",
  "zksync_state",
  "zksync_storage",
  "zksync_types",
  "zksync_utils",
+]
+
+[[package]]
+name = "zksync_eth_signer"
+version = "1.0.0"
+dependencies = [
+ "hex",
+ "jsonrpc-core",
+ "parity-crypto",
+ "reqwest",
+ "rlp",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "thiserror",
+ "zksync_types",
 ]
 
 [[package]]

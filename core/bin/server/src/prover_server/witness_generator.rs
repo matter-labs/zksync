@@ -11,6 +11,7 @@ use zksync_prover_utils::prover_data::ProverData;
 use zksync_storage::StorageProcessor;
 use zksync_types::block::Block;
 use zksync_types::BlockNumber;
+use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.

@@ -11,6 +11,7 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
 [dependencies]
+zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
 zksync_eth_client ={ path = "../../lib/eth_client", version = "1.0" }
 zksync_state ={ path = "../../lib/state", version = "1.0" }
 zksync_types ={ path = "../../lib/types", version = "1.0" }
