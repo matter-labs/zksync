@@ -7,6 +7,8 @@ use std::str::FromStr;
 use web3::types::{Address, H256};
 
 use serde::{Deserialize, Serialize};
+use zksync_crypto::convert::FeConvert;
+use zksync_crypto::Fr;
 
 #[derive(Debug, Clone)]
 pub struct Contracts {
@@ -79,8 +81,16 @@ pub fn js_revert_reason(tx_hash: &H256) -> String {
     )
 }
 
-pub fn deploy_test_contracts() -> Contracts {
-    let stdout = run_external_command("deploy-testkit.sh", &[]);
+pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts {
+    let mut args = Vec::new();
+    args.push("--genesisRoot");
+    let genesis_root = format!("0x{}", genesis_root.to_hex());
+    args.push(genesis_root.as_str());
+    // args.push(genesis_root)
+    if use_prod_contracts {
+        args.push("--prodContracts");
+    }
+    let stdout = run_external_command("deploy-testkit.sh", &args);
 
     let mut contracts = HashMap::new();
     for std_out_line in stdout.split_whitespace().collect::<Vec<_>>() {

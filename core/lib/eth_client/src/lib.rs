@@ -8,7 +8,8 @@ use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt};
 use web3::types::{H160, H256, U256, U64};
 use web3::{Error, Transport, Web3};
 
-pub mod signer;
+// Workspace uses
+use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
 
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
@@ -18,7 +19,7 @@ const FALLBACK_GAS_LIMIT: u64 = 3_000_000;
 
 #[derive(Clone)]
 pub struct ETHClient<T: Transport> {
-    private_key: H256,
+    eth_signer: EthereumSigner,
     pub sender_account: Address,
     pub contract_addr: H160,
     pub contract: ethabi::Contract,
@@ -53,14 +54,14 @@ impl<T: Transport> ETHClient<T> {
         transport: T,
         contract: ethabi::Contract,
         operator_eth_addr: H160,
-        operator_pk: H256,
+        eth_signer: EthereumSigner,
         contract_eth_addr: H160,
         chain_id: u8,
         gas_price_factor: f64,
     ) -> Self {
         Self {
             sender_account: operator_eth_addr,
-            private_key: operator_pk,
+            eth_signer,
             contract_addr: contract_eth_addr,
             chain_id,
             contract,
@@ -166,7 +167,7 @@ impl<T: Transport> ETHClient<T> {
         };
 
         // form and sign tx
-        let tx = signer::RawTransaction {
+        let tx = RawTransaction {
             chain_id: self.chain_id,
             nonce,
             to: Some(contract_addr),
@@ -176,7 +177,7 @@ impl<T: Transport> ETHClient<T> {
             data,
         };
 
-        let signed_tx = tx.sign(&self.private_key);
+        let signed_tx = self.eth_signer.sign_transaction(tx).await?;
         let hash = self.web3.web3().sha3(Bytes(signed_tx.clone())).await?;
 
         Ok(SignedCallResult {

@@ -9,7 +9,7 @@
 //! + Check exit with correct proof for other account, correct proof for this account but other token, correct proof but wrong amount.
 
 use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts};
+use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::zksync_account::ZkSyncAccount;
 use log::*;
 use num::BigUint;
@@ -59,7 +59,7 @@ async fn commit_deposit_to_expire(
     test_setup
         .deposit(from, to, token, deposit_amount.clone())
         .await;
-    test_setup.execute_commit_block().await.expect_success();
+    test_setup.execute_commit_block().await.0.expect_success();
 
     info!("Done commit deposit to expire");
     test_setup.eth_block_number().await
@@ -352,7 +352,7 @@ async fn exit_test() {
 
     let deploy_timer = Instant::now();
     info!("deploying contracts");
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
     info!(
         "contracts deployed {:#?}, {} secs",
         contracts,

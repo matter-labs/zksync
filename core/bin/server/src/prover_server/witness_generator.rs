@@ -1,24 +1,16 @@
 // Built-in
 use std::{thread, time};
 // External
-use anyhow::format_err;
 use futures::channel::mpsc;
 // Workspace deps
 use std::time::Instant;
-use zksync_circuit::witness::{
-    utils::{SigDataInput, WitnessBuilder},
-    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
-    FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
-};
-use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
-use zksync_crypto::params::{account_tree_depth, CHUNK_BIT_WIDTH};
-use zksync_crypto::{circuit::CircuitAccountTree, Fr};
+use zksync_circuit::witness::utils::build_block_witness;
+use zksync_crypto::circuit::CircuitAccountTree;
+use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::prover_data::ProverData;
-use zksync_state::state::CollectedFee;
 use zksync_storage::StorageProcessor;
 use zksync_types::block::Block;
-use zksync_types::{BlockNumber, ZkSyncOp};
-use zksync_utils::panic_notify::ThreadPanicNotify;
+use zksync_types::BlockNumber;
 
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
@@ -195,10 +187,9 @@ impl WitnessGenerator {
     async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), anyhow::Error> {
         let timer = Instant::now();
         let mut storage = self.conn_pool.access_storage_fragile().await?;
-        let mut transaction = storage.start_transaction().await?;
 
         let mut circuit_account_tree = self
-            .load_account_tree(block.block_number - 1, &mut transaction)
+            .load_account_tree(block.block_number - 1, &mut storage)
             .await?;
         log::trace!(
             "Witness generator loading circuit account tree {}s",
@@ -206,22 +197,19 @@ impl WitnessGenerator {
         );
 
         let timer = Instant::now();
-        let witness =
-            build_prover_block_data(&mut circuit_account_tree, &mut transaction, &block).await?;
+        let witness: ProverData = build_block_witness(&mut circuit_account_tree, &block)?.into();
         log::trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
 
-        transaction
+        storage
             .prover_schema()
             .store_witness(
                 block.block_number,
                 serde_json::to_value(witness).expect("Witness serialize to json"),
             )
             .await?;
-
-        transaction.commit().await?;
 
         Ok(())
     }
@@ -271,173 +259,6 @@ impl WitnessGenerator {
             current_block = next_block;
         }
     }
-}
-
-async fn build_prover_block_data(
-    account_tree: &mut CircuitAccountTree,
-    transaction: &mut zksync_storage::StorageProcessor<'_>,
-    block: &Block,
-) -> Result<ProverData, anyhow::Error> {
-    let block_number = block.block_number;
-    let block_size = block.block_chunks_size;
-
-    log::info!("building prover data for block {}", &block_number);
-
-    let mut witness_accum = WitnessBuilder::new(account_tree, block.fee_account, block_number);
-
-    let ops = transaction
-        .chain()
-        .block_schema()
-        .get_block_operations(block_number)
-        .await
-        .map_err(|e| anyhow::format_err!("failed to get block operations {}", e))?;
-
-    let mut operations = vec![];
-    let mut pub_data = vec![];
-    let mut fees = vec![];
-    for op in ops {
-        match op {
-            ZkSyncOp::Deposit(deposit) => {
-                let deposit_witness =
-                    DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit);
-
-                let deposit_operations = deposit_witness.calculate_operations(());
-                operations.extend(deposit_operations);
-                pub_data.extend(deposit_witness.get_pubdata());
-            }
-            ZkSyncOp::Transfer(transfer) => {
-                let transfer_witness =
-                    TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer);
-
-                let input =
-                    SigDataInput::from_transfer_op(&transfer).map_err(|e| format_err!("{}", e))?;
-                let transfer_operations = transfer_witness.calculate_operations(input);
-
-                operations.extend(transfer_operations);
-                fees.push(CollectedFee {
-                    token: transfer.tx.token,
-                    amount: transfer.tx.fee,
-                });
-                pub_data.extend(transfer_witness.get_pubdata());
-            }
-            ZkSyncOp::TransferToNew(transfer_to_new) => {
-                let transfer_to_new_witness = TransferToNewWitness::apply_tx(
-                    &mut witness_accum.account_tree,
-                    &transfer_to_new,
-                );
-
-                let input = SigDataInput::from_transfer_to_new_op(&transfer_to_new)
-                    .map_err(|e| format_err!("{}", e))?;
-                let transfer_to_new_operations =
-                    transfer_to_new_witness.calculate_operations(input);
-
-                operations.extend(transfer_to_new_operations);
-                fees.push(CollectedFee {
-                    token: transfer_to_new.tx.token,
-                    amount: transfer_to_new.tx.fee,
-                });
-                pub_data.extend(transfer_to_new_witness.get_pubdata());
-            }
-            ZkSyncOp::Withdraw(withdraw) => {
-                let withdraw_witness =
-                    WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);
-
-                let input =
-                    SigDataInput::from_withdraw_op(&withdraw).map_err(|e| format_err!("{}", e))?;
-                let withdraw_operations = withdraw_witness.calculate_operations(input);
-
-                operations.extend(withdraw_operations);
-                fees.push(CollectedFee {
-                    token: withdraw.tx.token,
-                    amount: withdraw.tx.fee,
-                });
-                pub_data.extend(withdraw_witness.get_pubdata());
-            }
-            ZkSyncOp::Close(close) => {
-                let close_account_witness =
-                    CloseAccountWitness::apply_tx(&mut witness_accum.account_tree, &close);
-
-                let input =
-                    SigDataInput::from_close_op(&close).map_err(|e| format_err!("{}", e))?;
-                let close_account_operations = close_account_witness.calculate_operations(input);
-
-                operations.extend(close_account_operations);
-                pub_data.extend(close_account_witness.get_pubdata());
-            }
-            ZkSyncOp::FullExit(full_exit_op) => {
-                let success = full_exit_op.withdraw_amount.is_some();
-
-                let full_exit_witness = FullExitWitness::apply_tx(
-                    &mut witness_accum.account_tree,
-                    &(*full_exit_op, success),
-                );
-
-                let full_exit_operations = full_exit_witness.calculate_operations(());
-
-                operations.extend(full_exit_operations);
-                pub_data.extend(full_exit_witness.get_pubdata());
-            }
-            ZkSyncOp::ChangePubKeyOffchain(change_pkhash_op) => {
-                let change_pkhash_witness = ChangePubkeyOffChainWitness::apply_tx(
-                    &mut witness_accum.account_tree,
-                    &change_pkhash_op,
-                );
-
-                let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
-                    .map_err(|e| format_err!("{}", e))?;
-                let change_pkhash_operations = change_pkhash_witness.calculate_operations(input);
-
-                operations.extend(change_pkhash_operations);
-                fees.push(CollectedFee {
-                    token: change_pkhash_op.tx.fee_token,
-                    amount: change_pkhash_op.tx.fee,
-                });
-                pub_data.extend(change_pkhash_witness.get_pubdata());
-            }
-            ZkSyncOp::ForcedExit(forced_exit) => {
-                let forced_exit_witness =
-                    ForcedExitWitness::apply_tx(&mut witness_accum.account_tree, &forced_exit);
-
-                let input = SigDataInput::from_forced_exit_op(&forced_exit)
-                    .map_err(|e| format_err!("{}", e))?;
-                let forced_exit_operations = forced_exit_witness.calculate_operations(input);
-
-                operations.extend(forced_exit_operations);
-                fees.push(CollectedFee {
-                    token: forced_exit.tx.token,
-                    amount: forced_exit.tx.fee,
-                });
-                pub_data.extend(forced_exit_witness.get_pubdata());
-            }
-            ZkSyncOp::Noop(_) => {} // Noops are handled below
-        }
-    }
-
-    witness_accum.add_operation_with_pubdata(operations, pub_data);
-    witness_accum.extend_pubdata_with_noops(block_size);
-    assert_eq!(witness_accum.pubdata.len(), CHUNK_BIT_WIDTH * block_size);
-    assert_eq!(witness_accum.operations.len(), block_size);
-
-    witness_accum.collect_fees(&fees);
-    assert_eq!(
-        witness_accum
-            .root_after_fees
-            .expect("root_after_fees not present"),
-        block.new_root_hash
-    );
-    witness_accum.calculate_pubdata_commitment();
-
-    Ok(ProverData {
-        public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
-        old_root: witness_accum.initial_root_hash,
-        initial_used_subtree_root: witness_accum.initial_used_subtree_root_hash,
-        new_root: block.new_root_hash,
-        validator_address: Fr::from_str(&block.fee_account.to_string()).expect("failed to parse"),
-        operations: witness_accum.operations,
-        validator_balances: witness_accum.fee_account_balances.unwrap(),
-        validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
-        validator_account: witness_accum.fee_account_witness.unwrap(),
-    })
 }
 
 #[cfg(test)]

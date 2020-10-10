@@ -9,7 +9,9 @@ use zksync::{
     WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{tx::PackedEthSignature, AccountId, Address, ZkSyncTx};
+
 // Local uses
 use crate::scenarios::configs::AccountInfo;
 
@@ -28,9 +30,13 @@ impl TestWallet {
         provider: Provider,
         config: &ConfigurationOptions,
     ) -> Self {
-        let credentials =
-            WalletCredentials::from_eth_pk(info.address, info.private_key, Network::Localhost)
-                .unwrap();
+        let credentials = WalletCredentials::from_eth_signer(
+            info.address,
+            EthereumSigner::from_key(info.private_key),
+            Network::Localhost,
+        )
+        .await
+        .unwrap();
 
         let inner = Wallet::new(provider, credentials).await.unwrap();
         Self::from_wallet(inner, &config.web3_url).await
@@ -59,8 +65,13 @@ impl TestWallet {
 
         let inner = Wallet::new(
             provider,
-            WalletCredentials::from_eth_pk(address_from_pk, eth_private_key, Network::Localhost)
-                .unwrap(),
+            WalletCredentials::from_eth_signer(
+                address_from_pk,
+                EthereumSigner::from_key(eth_private_key),
+                Network::Localhost,
+            )
+            .await
+            .unwrap(),
         )
         .await
         .unwrap();

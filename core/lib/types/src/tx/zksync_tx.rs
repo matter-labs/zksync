@@ -208,6 +208,14 @@ impl ZkSyncTx {
                 transfer.to,
                 transfer.fee.clone(),
             )),
+            ZkSyncTx::ChangePubKey(change_pubkey) => Some((
+                TxFeeTypes::ChangePubKey {
+                    onchain_pubkey_auth: change_pubkey.eth_signature.is_none(),
+                },
+                TokenLike::Id(change_pubkey.fee_token),
+                change_pubkey.account,
+                change_pubkey.fee.clone(),
+            )),
             _ => None,
         }
     }
