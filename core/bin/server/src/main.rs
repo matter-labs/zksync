@@ -33,6 +33,7 @@ fn read_cli() -> ServerCommand {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
     let server_mode = read_cli();
 
     if let ServerCommand::Genesis = server_mode {
@@ -42,6 +43,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // It's a `ServerCommand::Launch`, perform the usual routine.
+    log::info!("Running the zkSync server");
 
     let connection_pool = ConnectionPool::new(None).await;
     let config_options = ConfigurationOptions::from_env();
@@ -59,17 +61,21 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Run core actors.
+    log::info!("Starting the Core actors");
     let core_task_handles = run_core(connection_pool.clone(), stop_signal_sender.clone())
         .await
         .expect("Unable to start Core actors");
 
     // Run API actors.
+    log::info!("Starting the API server actors");
     let api_task_handle = run_api(connection_pool.clone(), stop_signal_sender.clone());
 
     // Run Ethereum sender actors.
+    log::info!("Starting the Ethereum sender actors");
     let eth_sender_task_handle = run_eth_sender(connection_pool.clone(), config_options.clone());
 
     // Run prover server & witness generator.
+    log::info!("Starting the Prover server actors");
     run_prover_server(
         connection_pool,
         stop_signal_sender,
