@@ -1,13 +1,13 @@
 // Built-in
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::time::{self, Duration};
+use std::time::Duration;
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 // Workspace deps
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
@@ -252,12 +252,10 @@ async fn required_replicas(
     Ok(HttpResponse::Ok().json(response))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn start_prover_server(
     connection_pool: zksync_storage::ConnectionPool,
-    prover_timeout: time::Duration,
-    rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
+    prover_options: ProverOptions,
     config_options: ConfigurationOptions,
 ) {
     thread::Builder::new()
@@ -293,7 +291,7 @@ pub fn start_prover_server(
                     );
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         connection_pool.clone(),
-                        rounds_interval,
+                        prover_options.prepare_data_interval,
                         start_block,
                         block_step,
                     );
@@ -303,8 +301,11 @@ pub fn start_prover_server(
                 // Start HTTP server.
                 let idle_provers = config_options.idle_provers;
                 HttpServer::new(move || {
-                    let app_state =
-                        AppState::new(connection_pool.clone(), prover_timeout, idle_provers);
+                    let app_state = AppState::new(
+                        connection_pool.clone(),
+                        prover_options.gone_timeout,
+                        idle_provers,
+                    );
 
                     // By calling `register_data` instead of `data` we're avoiding double
                     // `Arc` wrapping of the object.
