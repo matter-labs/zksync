@@ -5,9 +5,9 @@ use crate::{
         helpers::*,
         v01::{caches::Caches, network_status::SharedNetworkStatus},
     },
-    core_api_client::CoreApiClient,
+    core_api_client::{CoreApiClient, EthBlockId},
 };
-use actix_web::{HttpResponse, Result as ActixResult};
+use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
 use zksync_config::ConfigurationOptions;
 use zksync_storage::{
@@ -17,8 +17,9 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::block::ExecutedOperations;
+use zksync_types::{block::ExecutedOperations, PriorityOp, H256};
 
+#[derive(Debug, Clone)]
 pub struct ApiV01 {
     pub(crate) caches: Caches,
     pub(crate) connection_pool: ConnectionPool,
@@ -29,6 +30,53 @@ pub struct ApiV01 {
 }
 
 impl ApiV01 {
+    pub fn into_scope(self) -> actix_web::Scope {
+        web::scope("/api/v0.1")
+            .data(self)
+            .route("/testnet_config", web::get().to(Self::testnet_config))
+            .route("/status", web::get().to(Self::status))
+            .route("/tokens", web::get().to(Self::tokens))
+            .route(
+                "/account/{address}/history/{offset}/{limit}",
+                web::get().to(Self::tx_history),
+            )
+            .route(
+                "/account/{address}/history/older_than",
+                web::get().to(Self::tx_history_older_than),
+            )
+            .route(
+                "/account/{address}/history/newer_than",
+                web::get().to(Self::tx_history_newer_than),
+            )
+            .route(
+                "/transactions/{tx_hash}",
+                web::get().to(Self::executed_tx_by_hash),
+            )
+            .route(
+                "/transactions_all/{tx_hash}",
+                web::get().to(Self::tx_by_hash),
+            )
+            .route(
+                "/priority_operations/{pq_id}/",
+                web::get().to(Self::priority_op),
+            )
+            .route(
+                "/blocks/{block_id}/transactions/{tx_id}",
+                web::get().to(Self::block_tx),
+            )
+            .route(
+                "/blocks/{block_id}/transactions",
+                web::get().to(Self::block_transactions),
+            )
+            .route("/blocks/{block_id}", web::get().to(Self::block_by_id))
+            .route("/blocks", web::get().to(Self::blocks))
+            .route("/search", web::get().to(Self::explorer_search))
+            .route(
+                "/withdrawal_processing_time",
+                web::get().to(Self::withdrawal_processing_time),
+            )
+    }
+
     pub(crate) async fn access_storage(&self) -> ActixResult<StorageProcessor<'_>> {
         self.connection_pool
             .access_storage_fragile()
@@ -198,5 +246,14 @@ impl ApiV01 {
         }
 
         Ok(block)
+    }
+
+    /// Sends an EthWatchRequest asking for an unconfirmed priority op
+    /// with given hash. If no such priority op exists, returns Ok(None).
+    pub(crate) async fn get_unconfirmed_op_by_hash(
+        &self,
+        eth_tx_hash: H256,
+    ) -> Result<Option<(EthBlockId, PriorityOp)>, anyhow::Error> {
+        self.api_client.get_unconfirmed_op(eth_tx_hash).await
     }
 }

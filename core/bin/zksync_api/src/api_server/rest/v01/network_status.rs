@@ -16,7 +16,7 @@ pub struct NetworkStatus {
     pub outstanding_txs: u32,
 }
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
 impl SharedNetworkStatus {
