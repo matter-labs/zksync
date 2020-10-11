@@ -21,14 +21,18 @@ use zksync_storage::chain::operations_ext::{
 };
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
-    Account, AccountId, Address, BlockNumber, ExecutedOperations, PriorityOp, Token, TokenId,
-    ZkSyncPriorityOp,
+    Address, BlockNumber, ExecutedOperations, PriorityOp, Token, TokenId, ZkSyncPriorityOp,
 };
 
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::core_api_client::{CoreApiClient, EthBlockId};
 use zksync_storage::chain::operations_ext::records::{TransactionsHistoryItem, TxByHashResponse};
 use zksync_utils::panic_notify::ThreadPanicNotify;
+
+use self::{helpers::*, v01::types::*};
+
+mod helpers;
+mod v01;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkStatus {
@@ -46,38 +50,6 @@ impl SharedNetworkStatus {
     fn read(&self) -> NetworkStatus {
         (*self.0.as_ref().read().unwrap()).clone()
     }
-}
-
-fn remove_prefix(query: &str) -> &str {
-    if query.starts_with("0x") {
-        &query[2..]
-    } else if query.starts_with("sync-bl:") || query.starts_with("sync-tx:") {
-        &query[8..]
-    } else {
-        &query
-    }
-}
-
-fn try_parse_hash(query: &str) -> Option<H256> {
-    const HASH_SIZE: usize = 32; // 32 bytes
-
-    let query = remove_prefix(query);
-    let bytes = hex::decode(query).ok()?;
-
-    if bytes.len() == HASH_SIZE {
-        Some(H256::from_slice(&bytes))
-    } else {
-        None
-    }
-}
-
-/// Checks if block is finalized, meaning that
-/// both Verify operation is performed for it, and this
-/// operation is anchored on the Ethereum blockchain.
-fn block_verified(block: &BlockDetails) -> bool {
-    // We assume that it's not possible to have block that is
-    // verified and not committed.
-    block.verified_at.is_some() && block.verify_tx_hash.is_some()
 }
 
 /// Caches used by REST API server.
@@ -102,7 +74,7 @@ impl Caches {
     }
 }
 
-/// AppState is a collection of records cloned by each thread to shara data between them
+/// AppState is a collection of records cloned by each thread to share data between them
 #[derive(Clone)]
 struct AppState {
     caches: Caches,
@@ -358,12 +330,6 @@ impl AppState {
     }
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TestnetConfigResponse {
-    contract_address: String,
-}
-
 async fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let contract_address = data.contract_address.clone();
     Ok(HttpResponse::Ok().json(TestnetConfigResponse { contract_address }))
@@ -372,12 +338,6 @@ async fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<Htt
 async fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let network_status = data.network_status.read();
     Ok(HttpResponse::Ok().json(network_status))
-}
-
-#[derive(Debug, Serialize)]
-struct WithdrawalProcessingTimeResponse {
-    normal: u64,
-    fast: u64,
 }
 
 async fn handle_get_withdrawal_processing_time(
@@ -394,14 +354,6 @@ async fn handle_get_withdrawal_processing_time(
     };
 
     Ok(HttpResponse::Ok().json(processing_time))
-}
-
-#[derive(Debug, Serialize)]
-struct AccountStateResponse {
-    // None if account is not created yet.
-    id: Option<AccountId>,
-    commited: Account,
-    verified: Account,
 }
 
 async fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
@@ -630,12 +582,6 @@ async fn handle_get_account_transactions_history(
     transactions_history.append(&mut ongoing_transactions_history);
 
     Ok(HttpResponse::Ok().json(transactions_history))
-}
-
-#[derive(Debug, Deserialize)]
-struct TxHistoryQuery {
-    tx_id: Option<String>,
-    limit: Option<u64>,
 }
 
 async fn parse_tx_id(data: &str, storage: &mut StorageProcessor<'_>) -> ActixResult<(u64, u64)> {
@@ -916,12 +862,6 @@ async fn handle_get_transaction_by_id(
     }
 }
 
-#[derive(Deserialize)]
-struct HandleBlocksQuery {
-    max_block: Option<u32>,
-    limit: Option<u32>,
-}
-
 async fn handle_get_blocks(
     data: web::Data<AppState>,
     query: web::Query<HandleBlocksQuery>,
@@ -982,11 +922,6 @@ async fn handle_get_block_transactions(
         })?;
 
     Ok(HttpResponse::Ok().json(txs))
-}
-
-#[derive(Deserialize)]
-struct BlockExplorerSearchQuery {
-    query: String,
 }
 
 async fn handle_block_explorer_search(
