@@ -166,7 +166,7 @@ pub async fn run_core() -> anyhow::Result<()> {
     let mempool_task = run_mempool_task(
         connection_pool.clone(),
         mempool_request_receiver,
-        eth_watch_req_sender,
+        eth_watch_req_sender.clone(),
         &config_opts,
     );
 
@@ -178,7 +178,12 @@ pub async fn run_core() -> anyhow::Result<()> {
     );
 
     // Start private API.
-    start_private_core_api(config_opts, stop_signal_sender, mempool_request_sender);
+    start_private_core_api(
+        config_opts,
+        stop_signal_sender,
+        mempool_request_sender,
+        eth_watch_req_sender,
+    );
 
     let task_futures = vec![
         eth_watch_task,
