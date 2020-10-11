@@ -12,9 +12,8 @@ use crate::{
 };
 use futures::{
     channel::{mpsc, oneshot},
-    future, SinkExt, StreamExt,
+    future, SinkExt,
 };
-use std::cell::RefCell;
 use tokio::task::JoinHandle;
 use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
@@ -74,7 +73,7 @@ pub async fn insert_pending_withdrawals(
 /// Since the main tokio tasks are used as actors which should live as long
 /// as application runs, any possible outcome (either `Ok` or `Err`) is considered
 /// as a reason to stop the server completely.
-async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
+pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
     match future::select_all(task_futures).await {
         (Ok(_), _, _) => {
             panic!("One of the actors finished its run, while it wasn't expected to do it");
@@ -89,13 +88,6 @@ async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
     }
 }
 
-/// Waits for a message on a `stop_signal_receiver`. This receiver exists
-/// for threads that aren't using the tokio Runtime to run on, and thus
-/// cannot be handled the same way as the tokio tasks.
-async fn wait_for_stop_signal(mut stop_signal_receiver: mpsc::Receiver<bool>) {
-    stop_signal_receiver.next().await;
-}
-
 /// Starts the core application, which has the following sub-modules:
 ///
 /// - Ethereum Watcher, module to monitor on-chain operations.
@@ -104,8 +96,10 @@ async fn wait_for_stop_signal(mut stop_signal_receiver: mpsc::Receiver<bool>) {
 /// - block proposer, module to create block proposals for state keeper.
 /// - committer, module to store pending and completed blocks into the database.
 /// - private Core API server.
-pub async fn run_core() -> anyhow::Result<()> {
-    let connection_pool = ConnectionPool::new(None).await;
+pub async fn run_core(
+    connection_pool: ConnectionPool,
+    panic_notify: mpsc::Sender<bool>,
+) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let config_opts = ConfigurationOptions::from_env();
 
     let channel_size = 32768;
@@ -114,17 +108,6 @@ pub async fn run_core() -> anyhow::Result<()> {
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(channel_size);
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(channel_size);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(channel_size);
-
-    // Handle ctrl+c
-    let (stop_signal_sender, stop_signal_receiver) = mpsc::channel(256);
-    {
-        let stop_signal_sender = RefCell::new(stop_signal_sender.clone());
-        ctrlc::set_handler(move || {
-            let mut sender = stop_signal_sender.borrow_mut();
-            futures::executor::block_on(sender.send(true)).expect("crtlc signal send");
-        })
-        .expect("Error setting Ctrl-C handler");
-    }
 
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
@@ -143,6 +126,7 @@ pub async fn run_core() -> anyhow::Result<()> {
     let pending_block = state_keeper_init
         .get_pending_block(&mut storage_processor)
         .await;
+
     let state_keeper = ZkSyncStateKeeper::new(
         state_keeper_init,
         config_opts.operator_fee_eth_addr,
@@ -180,7 +164,7 @@ pub async fn run_core() -> anyhow::Result<()> {
     // Start private API.
     start_private_core_api(
         config_opts,
-        stop_signal_sender,
+        panic_notify.clone(),
         mempool_request_sender,
         eth_watch_req_sender,
     );
@@ -193,19 +177,5 @@ pub async fn run_core() -> anyhow::Result<()> {
         proposer_task,
     ];
 
-    let task_future = wait_for_tasks(task_futures);
-    let signal_future = wait_for_stop_signal(stop_signal_receiver);
-
-    // Select either of futures: completion of the any will mean that
-    // server has to be stopped.
-    tokio::select! {
-        _ = task_future => {
-            // Do nothing, task future always panic upon finishing.
-        },
-        _ = signal_future => {
-            log::warn!("Stop signal received, shutting down");
-        },
-    }
-
-    Ok(())
+    Ok(task_futures)
 }
