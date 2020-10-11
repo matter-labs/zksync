@@ -1,6 +1,6 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
-use zksync_api::run_app;
+use zksync_api::run_api;
 use zksync_storage::ConnectionPool;
 
 #[tokio::main]
@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     }
     let connection_pool = ConnectionPool::new(None).await;
 
-    let task_handle = run_app(connection_pool, stop_signal_sender);
+    let task_handle = run_api(connection_pool, stop_signal_sender);
 
     tokio::select! {
         _ = async { task_handle.await } => {

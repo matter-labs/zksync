@@ -14,7 +14,7 @@ pub mod tx_error;
 pub mod utils;
 
 /// Runs the application actors.
-pub fn run_app(
+pub fn run_api(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
 ) -> tokio::task::JoinHandle<()> {

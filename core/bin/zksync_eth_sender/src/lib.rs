@@ -774,7 +774,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 }
 
 #[must_use]
-pub fn start_eth_sender(
+pub fn run_eth_sender(
     pool: ConnectionPool,
     config_options: ConfigurationOptions,
 ) -> JoinHandle<()> {

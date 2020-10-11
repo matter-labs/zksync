@@ -252,7 +252,7 @@ async fn required_replicas(
     Ok(HttpResponse::Ok().json(response))
 }
 
-pub fn start_prover_server(
+pub fn run_prover_server(
     connection_pool: zksync_storage::ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     prover_options: ProverOptions,
