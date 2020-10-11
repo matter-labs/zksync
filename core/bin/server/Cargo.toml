@@ -11,11 +11,11 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
 [dependencies]
-zksync_api ={ path = "../zksync_api", version = "1.0" }
-zksync_core ={ path = "../zksync_core", version = "1.0" }
-zksync_witness_generator ={ path = "../zksync_witness_generator", version = "1.0" }
-zksync_eth_sender ={ path = "../zksync_eth_sender", version = "1.0" }
-zksync_prometheus_exporter ={ path = "../zksync_prometheus_exporter", version = "1.0" }
+zksync_api = { path = "../zksync_api", version = "1.0" }
+zksync_core = { path = "../zksync_core", version = "1.0" }
+zksync_witness_generator = { path = "../zksync_witness_generator", version = "1.0" }
+zksync_eth_sender = { path = "../zksync_eth_sender", version = "1.0" }
+zksync_prometheus_exporter = { path = "../zksync_prometheus_exporter", version = "1.0" }
 
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
@@ -30,7 +30,7 @@ tokio = { version = "0.2", features = ["full"] }
 
 [dev-dependencies]
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
-zksync_types ={ path = "../../lib/types", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_prover = { path = "../prover", version = "1.0" }
 
 num = { version = "0.2", features = ["serde"] }
