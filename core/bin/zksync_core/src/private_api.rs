@@ -126,10 +126,10 @@ pub fn start_private_core_api(
     eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
 ) {
     thread::Builder::new()
-        .name("prover_server".to_string())
+        .name("core-private-api".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            let mut actix_runtime = actix_rt::System::new("prover-server");
+            let mut actix_runtime = actix_rt::System::new("core-private-api-server");
 
             actix_runtime.block_on(async move {
                 // Start HTTP server.

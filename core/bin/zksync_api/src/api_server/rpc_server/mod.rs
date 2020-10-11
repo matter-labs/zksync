@@ -84,7 +84,7 @@ impl RpcApp {
 
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
-        let api_client = CoreApiClient::new(config_options.core_server_address.to_string());
+        let api_client = CoreApiClient::new(config_options.core_server_url.clone());
 
         let api_requests_caches_size = config_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;

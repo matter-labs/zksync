@@ -39,7 +39,7 @@ impl CoreApiClient {
         address: Address,
     ) -> anyhow::Result<Vec<(EthBlockId, PriorityOp)>> {
         let endpoint = format!(
-            "{}/unconfirmed_deposits/{}",
+            "{}/unconfirmed_deposits/0x{}",
             self.addr,
             hex::encode(address)
         );
@@ -51,7 +51,11 @@ impl CoreApiClient {
         &self,
         eth_tx_hash: H256,
     ) -> anyhow::Result<Option<(EthBlockId, PriorityOp)>> {
-        let endpoint = format!("{}/unconfirmed_op/{}", self.addr, hex::encode(eth_tx_hash));
+        let endpoint = format!(
+            "{}/unconfirmed_op/0x{}",
+            self.addr,
+            hex::encode(eth_tx_hash)
+        );
         self.get(&endpoint).await
     }
 

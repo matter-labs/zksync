@@ -40,7 +40,7 @@ impl ApiV01 {
         contract_address: H160,
         config_options: ConfigurationOptions,
     ) -> Self {
-        let api_client = CoreApiClient::new(config_options.core_server_address.to_string());
+        let api_client = CoreApiClient::new(config_options.core_server_url.clone());
         Self {
             caches: Caches::new(config_options.api_requests_caches_size),
             connection_pool,
