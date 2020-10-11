@@ -24,10 +24,7 @@ use crate::{
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     tx_error::TxAddError,
-    utils::{
-        current_zksync_info::CurrentZksyncInfo, shared_lru_cache::SharedLruCache,
-        token_db_cache::TokenDBCache,
-    },
+    utils::{shared_lru_cache::SharedLruCache, token_db_cache::TokenDBCache},
 };
 use bigdecimal::BigDecimal;
 use zksync_types::tx::EthSignData;
@@ -69,7 +66,6 @@ pub struct RpcApp {
 
     pub confirmations_for_eth_event: u64,
     pub token_cache: TokenDBCache,
-    pub current_zksync_info: CurrentZksyncInfo,
 
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     forced_exit_minimum_account_age: chrono::Duration,
@@ -82,7 +78,6 @@ impl RpcApp {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
@@ -114,7 +109,6 @@ impl RpcApp {
 
             confirmations_for_eth_event,
             token_cache,
-            current_zksync_info,
 
             forced_exit_minimum_account_age,
         }
@@ -469,7 +463,6 @@ pub fn start_rpc_server(
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    current_zksync_info: CurrentZksyncInfo,
 ) {
     let addr = config_options.json_rpc_http_server_address;
 
@@ -478,7 +471,6 @@ pub fn start_rpc_server(
         connection_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        current_zksync_info,
     );
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);

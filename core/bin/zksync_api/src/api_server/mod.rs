@@ -11,7 +11,7 @@ use zksync_config::{AdminServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
 // Local uses
 use crate::fee_ticker::TickerRequest;
-use crate::{signature_checker, utils::current_zksync_info::CurrentZksyncInfo};
+use crate::signature_checker;
 
 mod admin_server;
 mod event_notify;
@@ -27,7 +27,6 @@ pub fn start_api_server(
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
     admin_server_opts: AdminServerOptions,
-    current_zksync_info: CurrentZksyncInfo,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
 
@@ -50,7 +49,6 @@ pub fn start_api_server(
         sign_check_sender.clone(),
         ticker_request_sender.clone(),
         panic_notify.clone(),
-        current_zksync_info.clone(),
     );
 
     admin_server::start_admin_server(
@@ -66,6 +64,5 @@ pub fn start_api_server(
         sign_check_sender,
         ticker_request_sender,
         panic_notify,
-        current_zksync_info,
     );
 }

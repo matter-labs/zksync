@@ -19,7 +19,6 @@ use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
     signature_checker::VerifyTxSignatureRequest,
-    utils::current_zksync_info::CurrentZksyncInfo,
 };
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -182,7 +181,6 @@ pub fn start_ws_server(
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    current_zksync_info: CurrentZksyncInfo,
 ) {
     let config_options = config_options.clone();
     let api_caches_size = config_options.api_requests_caches_size;
@@ -205,7 +203,6 @@ pub fn start_ws_server(
         db_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        current_zksync_info,
     );
 
     std::thread::spawn(move || {
