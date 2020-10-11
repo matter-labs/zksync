@@ -1,6 +1,6 @@
 use crate::eth_watch::EthWatchRequest;
 use zksync_storage::StorageProcessor;
-use zksync_types::tx::TxHash;
+use zksync_types::{tokens::get_genesis_token_list, tx::TxHash, Token, TokenId};
 
 use crate::{
     block_proposer::run_block_proposer_task,
@@ -85,6 +85,42 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
                 std::panic::resume_unwind(error.into_panic());
             }
         }
+    }
+}
+
+/// Inserts the initial information about zkSync tokens into the database.
+pub async fn genesis_init() {
+    let pool = ConnectionPool::new(Some(1)).await;
+    let config_options = ConfigurationOptions::from_env();
+
+    log::info!("Generating genesis block.");
+    ZkSyncStateKeeper::create_genesis_block(pool.clone(), &config_options.operator_fee_eth_addr)
+        .await;
+    log::info!("Adding initial tokens to db");
+    let genesis_tokens =
+        get_genesis_token_list(&config_options.eth_network).expect("Initial token list not found");
+    for (id, token) in (1..).zip(genesis_tokens) {
+        log::info!(
+            "Adding token: {}, id:{}, address: {}, decimals: {}",
+            token.symbol,
+            id,
+            token.address,
+            token.decimals
+        );
+        pool.access_storage()
+            .await
+            .expect("failed to access db")
+            .tokens_schema()
+            .store_token(Token {
+                id: id as TokenId,
+                symbol: token.symbol,
+                address: token.address[2..]
+                    .parse()
+                    .expect("failed to parse token address"),
+                decimals: token.decimals,
+            })
+            .await
+            .expect("failed to store token");
     }
 }
 

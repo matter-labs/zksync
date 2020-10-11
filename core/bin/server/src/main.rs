@@ -2,14 +2,44 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use zksync_api::run_api;
 use zksync_config::{ConfigurationOptions, ProverOptions};
-use zksync_core::{run_core, wait_for_tasks};
+use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_sender::run_eth_sender;
 use zksync_witness_generator::run_prover_server;
 
 use zksync_storage::ConnectionPool;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ServerCommand {
+    Genesis,
+    Launch,
+}
+
+fn read_cli() -> ServerCommand {
+    let cli = clap::App::new("zkSync operator node")
+        .author("Matter Labs")
+        .arg(
+            clap::Arg::with_name("genesis")
+                .long("genesis")
+                .help("Generate genesis block for the first contract deployment"),
+        )
+        .get_matches();
+
+    if cli.is_present("genesis") {
+        ServerCommand::Genesis
+    } else {
+        ServerCommand::Launch
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let server_mode = read_cli();
+
+    if let ServerCommand::Launch = server_mode {
+        genesis_init().await;
+        return Ok(());
+    }
+
     let connection_pool = ConnectionPool::new(None).await;
     let config_options = ConfigurationOptions::from_env();
     let prover_options = ProverOptions::from_env();
