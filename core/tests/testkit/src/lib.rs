@@ -16,9 +16,9 @@ use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
 use zksync_config::ConfigurationOptions;
-use zksync_server::committer::{BlockCommitRequest, CommitRequest};
-use zksync_server::mempool::ProposedBlock;
-use zksync_server::state_keeper::{
+use zksync_core::committer::{BlockCommitRequest, CommitRequest};
+use zksync_core::mempool::ProposedBlock;
+use zksync_core::state_keeper::{
     start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams, ZkSyncStateKeeper,
 };
 use zksync_types::{
