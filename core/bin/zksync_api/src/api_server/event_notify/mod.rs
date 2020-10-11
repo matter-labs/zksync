@@ -5,11 +5,10 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use std::time::Duration;
-use zksync_basic_types::Address;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{block::ExecutedOperations, ActionType};
+use zksync_types::{block::ExecutedOperations, ActionType, Address};
 
 use self::{event_fetcher::EventFetcher, operation_notifier::OperationNotifier};
 

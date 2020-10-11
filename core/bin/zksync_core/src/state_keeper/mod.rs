@@ -6,7 +6,6 @@ use futures::{
     SinkExt,
 };
 use tokio::task::JoinHandle;
-use zksync_basic_types::Address;
 // Workspace uses
 use zksync_crypto::ff;
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
@@ -19,8 +18,8 @@ use zksync_types::{
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
-    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, BlockNumber,
-    PriorityOp, SignedZkSyncTx,
+    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, Address,
+    BlockNumber, PriorityOp, SignedZkSyncTx,
 };
 // Local uses
 use crate::{

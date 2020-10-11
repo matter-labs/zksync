@@ -1,13 +1,12 @@
 use crate::api_server::rpc_server::types::{BlockInfo, ResponseAccountState};
 use crate::utils::token_db_cache::TokenDBCache;
 use lru_cache::LruCache;
-use zksync_basic_types::Address;
 use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
 use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{AccountId, ActionType};
+use zksync_types::{AccountId, ActionType, Address};
 
 pub struct NotifierState {
     pub(super) cache_of_executed_priority_operations:

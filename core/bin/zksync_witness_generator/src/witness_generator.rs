@@ -265,8 +265,8 @@ impl WitnessGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zksync_basic_types::U256;
     use zksync_crypto::Fr;
+    use zksync_types::U256;
 
     #[test]
     fn test_next_witness_block() {

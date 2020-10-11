@@ -2,11 +2,10 @@ use crate::api_server::rpc_server::types::{
     BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
 };
 use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId};
-use zksync_basic_types::Address;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Operation};
+use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Address, Operation};
 
 use super::{
     state::NotifierState, sub_store::SubStorage, EventNotifierRequest, EventSubscribeRequest,

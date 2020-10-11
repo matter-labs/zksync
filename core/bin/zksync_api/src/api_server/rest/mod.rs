@@ -6,9 +6,9 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use std::net::SocketAddr;
-use zksync_basic_types::H160;
 use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
+use zksync_types::H160;
 
 use zksync_utils::panic_notify::ThreadPanicNotify;
 

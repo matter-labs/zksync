@@ -2,13 +2,12 @@ use super::{CommitRequest, ExecutedOpId, ZkSyncStateInitParams, ZkSyncStateKeepe
 use crate::mempool::ProposedBlock;
 use futures::{channel::mpsc, stream::StreamExt};
 use num::BigUint;
-use zksync_basic_types::{AccountId, H160};
 use zksync_crypto::{
     priv_key_from_fs,
     rand::{Rng, SeedableRng, XorShiftRng},
     PrivateKey,
 };
-use zksync_types::{mempool::SignedTxVariant, tx::PackedEthSignature, *};
+use zksync_types::{mempool::SignedTxVariant, tx::PackedEthSignature, AccountId, H160, *};
 
 struct StateKeeperTester {
     state_keeper: ZkSyncStateKeeper,

@@ -8,11 +8,10 @@ use jsonrpc_core::{MetaIoHandler, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
-use zksync_basic_types::Address;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
-use zksync_types::{tx::TxHash, ActionType};
+use zksync_types::{tx::TxHash, ActionType, Address};
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{
