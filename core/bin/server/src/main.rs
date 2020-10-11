@@ -35,10 +35,13 @@ fn read_cli() -> ServerCommand {
 async fn main() -> anyhow::Result<()> {
     let server_mode = read_cli();
 
-    if let ServerCommand::Launch = server_mode {
+    if let ServerCommand::Genesis = server_mode {
+        log::info!("Performing the server genesis initialization");
         genesis_init().await;
         return Ok(());
     }
+
+    // It's a `ServerCommand::Launch`, perform the usual routine.
 
     let connection_pool = ConnectionPool::new(None).await;
     let config_options = ConfigurationOptions::from_env();
