@@ -13,7 +13,7 @@ bellman = { package = "bellman_ce", path = "../../../bellman", version = "0.3.2"
 
 
 sha2 = "0.8"
-web3 = "0.10.0"
+web3 = "0.13.0"
 ethabi = "9.0.0"
 tokio = { version = "0.2", features = ["time"] }
 futures = { version = "0.3", features = ["compat"] }

@@ -17,7 +17,7 @@ log = "0.4"
 env_logger = "0.6"
 num = { version = "0.2", features = ["serde"] }
 ethabi = "9.0.0"
-web3 = "0.10.0"
+web3 = "0.13.0"
 failure = "0.1"
 serde = "1.0.90"
 serde_derive = "1.0.90"
