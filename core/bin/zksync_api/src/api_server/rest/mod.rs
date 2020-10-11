@@ -17,14 +17,14 @@ use self::v01::api_decl::ApiV01;
 mod helpers;
 mod v01;
 
-async fn start_server(state: ApiV01, bind_to: SocketAddr) {
+async fn start_server(api_v01: ApiV01, bind_to: SocketAddr) {
     let logger_format = crate::api_server::loggers::rest::get_logger_format();
     HttpServer::new(move || {
-        let state = state.clone();
+        let api_v01 = api_v01.clone();
         App::new()
             .wrap(middleware::Logger::new(&logger_format))
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
-            .service(state.into_scope())
+            .service(api_v01.into_scope())
             // Endpoint needed for js isReachable
             .route(
                 "/favicon.ico",
@@ -53,10 +53,10 @@ pub(super) fn start_server_thread_detached(
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
             actix_rt::System::new("api-server").block_on(async move {
-                let state = ApiV01::new(connection_pool, contract_address, config_options);
-                state.spawn_network_status_updater(panic_notify);
+                let api_v01 = ApiV01::new(connection_pool, contract_address, config_options);
+                api_v01.spawn_network_status_updater(panic_notify);
 
-                start_server(state, listen_addr).await;
+                start_server(api_v01, listen_addr).await;
             });
         })
         .expect("Api server thread");
