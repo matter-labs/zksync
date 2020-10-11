@@ -1186,6 +1186,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ct-logs"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d3686f5fa27dbc1d76c751300376e167c5a43387f44bb451fd1c24776e49113"
+dependencies = [
+ "sct",
+]
+
+[[package]]
 name = "ctr"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2091,6 +2100,24 @@ dependencies = [
  "tower-service",
  "tracing",
  "want 0.3.0",
+]
+
+[[package]]
+name = "hyper-rustls"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac965ea399ec3a25ac7d13b8affd4b8f39325cca00858ddf5eb29b79e6b14b08"
+dependencies = [
+ "bytes 0.5.6",
+ "ct-logs",
+ "futures-util",
+ "hyper 0.13.8",
+ "log 0.4.11",
+ "rustls",
+ "rustls-native-certs",
+ "tokio 0.2.22",
+ "tokio-rustls",
+ "webpki",
 ]
 
 [[package]]
@@ -3282,6 +3309,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "prometheus_exporter_base"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d4cf32926a711d1109383887fa93b22f087aea854696c637d2826c7ff84d0be"
+dependencies = [
+ "clap",
+ "env_logger 0.7.1",
+ "failure",
+ "http 0.2.1",
+ "hyper 0.13.8",
+ "hyper-rustls",
+ "log 0.4.11",
+ "num",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3689,6 +3734,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0d4a31f5d68413404705d6982529b0e11a9aacd4839d1d6222ee3b8cb4015e1"
+dependencies = [
+ "base64 0.11.0",
+ "log 0.4.11",
+ "ring",
+ "sct",
+ "webpki",
+]
+
+[[package]]
+name = "rustls-native-certs"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a75ffeb84a6bd9d014713119542ce415db3a3e4748f0bfce1e1416cd224a23a5"
+dependencies = [
+ "openssl-probe",
+ "rustls",
+ "schannel",
+ "security-framework",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3742,6 +3812,16 @@ dependencies = [
  "hmac 0.7.1",
  "pbkdf2",
  "sha2 0.8.2",
+]
+
+[[package]]
+name = "sct"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3042af939fca8c3453b7af0f1c66e533a15a86169e39de2657310ade8f98d3c"
+dependencies = [
+ "ring",
+ "untrusted",
 ]
 
 [[package]]
@@ -4594,6 +4674,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-rustls"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15cb62a0d2770787abc96e99c1cd98fcf17f94959f3af63ca85bdfb203f051b4"
+dependencies = [
+ "futures-core",
+ "rustls",
+ "tokio 0.2.22",
+ "webpki",
+]
+
+[[package]]
 name = "tokio-sync"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5172,6 +5264,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "webpki"
+version = "0.21.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1f50e1972865d6b1adb54167d1c8ed48606004c2c9d0ea5f1eeb34d95e863ef"
+dependencies = [
+ "ring",
+ "untrusted",
+]
+
+[[package]]
 name = "websocket"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5553,6 +5655,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "zksync_prometheus_exporter"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "futures 0.3.5",
+ "log 0.4.11",
+ "prometheus_exporter_base",
+ "tokio 0.2.22",
+ "zksync_config",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "zksync_prover"
 version = "1.0.0"
 dependencies = [
@@ -5614,6 +5733,7 @@ dependencies = [
  "zksync_core",
  "zksync_crypto",
  "zksync_eth_sender",
+ "zksync_prometheus_exporter",
  "zksync_prover",
  "zksync_storage",
  "zksync_types",

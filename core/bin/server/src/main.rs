@@ -4,6 +4,7 @@ use zksync_api::run_api;
 use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_sender::run_eth_sender;
+use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
 
 use zksync_storage::ConnectionPool;
@@ -74,6 +75,9 @@ async fn main() -> anyhow::Result<()> {
     log::info!("Starting the Ethereum sender actors");
     let eth_sender_task_handle = run_eth_sender(connection_pool.clone(), config_options.clone());
 
+    // Run prometheus data exporter.
+    let prometheus_task_handle = run_prometheus_exporter(connection_pool.clone(), &config_options);
+
     // Run prover server & witness generator.
     log::info!("Starting the Prover server actors");
     run_prover_server(
@@ -92,6 +96,9 @@ async fn main() -> anyhow::Result<()> {
         },
         _ = async { eth_sender_task_handle.await } => {
             panic!("Ethereum Sender actors aren't supposed to finish their execution")
+        },
+        _ = async { prometheus_task_handle.await } => {
+            panic!("Prometheus actors aren't supposed to finish their execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             log::warn!("Stop signal received, shutting down");
