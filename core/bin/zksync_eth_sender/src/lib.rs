@@ -179,7 +179,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            time::timeout(self.options.tx_poll_period, self.process_requests())
+            time::timeout(self.options.tx_poll_period, self.load_new_operations())
                 .await
                 .unwrap_or_default();
 
@@ -194,9 +194,9 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         }
     }
 
-    /// Gets the incoming operations from the channel and adds them to the
+    /// Gets the incoming operations from the database and adds them to the
     /// transactions queue.
-    async fn process_requests(&mut self) {
+    async fn load_new_operations(&mut self) {
         let mut connection = match self.db.acquire_connection().await {
             Ok(connection) => connection,
             Err(err) => {
