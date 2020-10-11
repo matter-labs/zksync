@@ -6,13 +6,13 @@ use zksync_crypto::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use num::BigUint;
 use zksync_circuit::witness::{deposit::DepositWitness, Witness};
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 use zksync_prover::{client, ApiClient};
 use zksync_types::{block::Block, Address};
 // Local deps
 use zksync_circuit::witness::utils::get_used_subtree_root_hash;
-use zksync_server::prover_server;
+use zksync_witness_generator::run_prover_server;
 
 async fn connect_to_db() -> zksync_storage::ConnectionPool {
     zksync_storage::ConnectionPool::new(Some(1)).await
@@ -24,17 +24,15 @@ async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Dur
     let mut config_opt = ConfigurationOptions::from_env();
     config_opt.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();
 
+    let mut prover_options = ProverOptions::from_env();
+    prover_options.prepare_data_interval = rounds_interval;
+    prover_options.gone_timeout = prover_timeout;
+
     let conn_pool = connect_to_db().await;
     let (tx, _rx) = mpsc::channel(1);
 
     thread::spawn(move || {
-        prover_server::start_prover_server(
-            conn_pool,
-            prover_timeout,
-            rounds_interval,
-            tx,
-            config_opt,
-        );
+        run_prover_server(conn_pool, tx, prover_options, config_opt);
     });
     bind_to.to_string()
 }
