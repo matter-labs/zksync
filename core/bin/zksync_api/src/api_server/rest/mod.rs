@@ -10,10 +10,9 @@ use zksync_basic_types::H160;
 use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
 
-use crate::core_api_client::CoreApiClient;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
-use self::v01::{api_decl::ApiV01, caches::Caches, network_status::SharedNetworkStatus};
+use self::v01::api_decl::ApiV01;
 
 mod helpers;
 mod v01;
@@ -53,17 +52,8 @@ pub(super) fn start_server_thread_detached(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
-            let api_client = CoreApiClient::new(config_options.core_server_address.to_string());
-
             actix_rt::System::new("api-server").block_on(async move {
-                let state = ApiV01 {
-                    caches: Caches::new(config_options.api_requests_caches_size),
-                    connection_pool,
-                    api_client,
-                    network_status: SharedNetworkStatus::default(),
-                    contract_address: format!("{:?}", contract_address),
-                    config_options,
-                };
+                let state = ApiV01::new(connection_pool, contract_address, config_options);
                 state.spawn_network_status_updater(panic_notify);
 
                 start_server(state, listen_addr).await;

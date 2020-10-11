@@ -1,3 +1,9 @@
+//! Implementation of REST API v0.1 endpoints.
+//!
+//! Since all the methods declared in this file are valid `actix-web` handlers,
+//! they take no `self` argument, but instead expect it to be set as `data` in the
+//! scope configuration. This is done by the `ApiV01::into_scope` method.
+
 use crate::api_server::{
     rest::{
         helpers::*,

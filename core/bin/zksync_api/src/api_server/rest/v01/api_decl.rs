@@ -1,4 +1,4 @@
-//! Declaration of the API interface.
+//! Declaration of the API structure.
 
 use crate::{
     api_server::rest::{
@@ -17,8 +17,13 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{block::ExecutedOperations, PriorityOp, H256};
+use zksync_types::{block::ExecutedOperations, PriorityOp, H160, H256};
 
+/// `ApiV01` structure contains the implementation of `/api/v0.1` endpoints set.
+/// It is considered (somewhat) stable and will be supported for a while.
+///
+/// Once a new API is designed, it will be created as `ApiV1` structure, so that
+/// each API version is encapsulated inside one type.
 #[derive(Debug, Clone)]
 pub struct ApiV01 {
     pub(crate) caches: Caches,
@@ -30,6 +35,23 @@ pub struct ApiV01 {
 }
 
 impl ApiV01 {
+    pub fn new(
+        connection_pool: ConnectionPool,
+        contract_address: H160,
+        config_options: ConfigurationOptions,
+    ) -> Self {
+        let api_client = CoreApiClient::new(config_options.core_server_address.to_string());
+        Self {
+            caches: Caches::new(config_options.api_requests_caches_size),
+            connection_pool,
+            api_client,
+            network_status: SharedNetworkStatus::default(),
+            contract_address: format!("{:?}", contract_address),
+            config_options,
+        }
+    }
+
+    /// Creates an actix-web `Scope`, which can be mounted to the Http server.
     pub fn into_scope(self) -> actix_web::Scope {
         web::scope("/api/v0.1")
             .data(self)
