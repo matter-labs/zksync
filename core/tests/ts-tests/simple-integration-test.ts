@@ -201,7 +201,7 @@ async function testForcedExit(
     await promiseTimeout(VERIFY_TIMEOUT, forcedExitHandle.awaitVerifyReceipt());
     console.log(`ForcedExit verified: ${new Date().getTime() - startTime} ms`);
 
-    await sleep(5000); // Sleep 3 seconds so the transaction will be executed on L1.
+    await sleep(10000); // We should wait some time for `completeWithdrawals` transaction to be processed
 
     const initiatorAfterWithdraw = await syncWallet.getBalance(token);
     const targetAfterWithdraw = await targetWallet.getBalance(token);
@@ -748,6 +748,8 @@ async function checkFailedTransactionResending(
     // which has the same hash. The new (successful) receipt will be available only
     // when tx will be executed again in state keeper, so we must wait for it.
     await testTransfer(syncWallet1, syncWallet2, "ETH", amount, feeInfo, 3000);
+
+    console.log("Invalid transaction resending OK");
 }
 
 (async () => {
