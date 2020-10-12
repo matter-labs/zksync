@@ -29,6 +29,6 @@ sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runti
 [dev-dependencies]
 env_logger = "0.6"
 testkit = { path = "../../tests/testkit" }
-parity-crypto = {version = "0.6.2", features = ["publickey"] }
+parity-crypto = {version = "0.5.0", features = ["publickey"] }
 db_test_macro = { path = "./db_test_macro" }
 tokio = { version = "0.2", features = ["full"] }
