@@ -9,18 +9,21 @@ import './transfer';
 import './withdraw';
 import './misc';
 
+const TX_AMOUNT = utils.parseEther('10.0');
+// should be enough for ~100 test transactions (excluding fees), increase if needed
+const DEPOSIT_AMOUNT = TX_AMOUNT.mul(100);
+
 // prettier-ignore
 const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS') =>
 describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, () => {
     let tester: Tester;
-    const hundred = utils.parseEther('100.0');
     let alice: Wallet;
     let bob: Wallet;
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport);
-        alice = await tester.fundedWallet('145.0');
+        alice = await tester.fundedWallet('1.0');
         bob = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
@@ -30,18 +33,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute an auto-approved deposit', async () => {
-        await tester.testDeposit(alice, token, hundred, true);
+        await tester.testDeposit(alice, token, DEPOSIT_AMOUNT, true);
     });
 
     step('should execute a normal deposit', async () => {
         if (token == 'ETH') {
-            await tester.testDeposit(alice, token, hundred);
+            await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
         } else {
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should not be approved').to.be.false;
             const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits(token);
             await approveERC20.wait();
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should be approved').to.be.true;
-            await tester.testDeposit(bob, token, hundred);
+            await tester.testDeposit(bob, token, DEPOSIT_AMOUNT);
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should still be approved').to.be.true;
         }
     });
@@ -51,15 +54,15 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a transfer to new account', async () => {
-        await tester.testTransfer(alice, bob, token, hundred.div(10));
+        await tester.testTransfer(alice, bob, token, TX_AMOUNT);
     });
 
     step('should execute a transfer to existing account', async () => {
-        await tester.testTransfer(alice, bob, token, hundred.div(10));
+        await tester.testTransfer(alice, bob, token, TX_AMOUNT);
     });
 
     it('should execute a transfer to self', async () => {
-        await tester.testTransfer(alice, alice, token, hundred.div(10));
+        await tester.testTransfer(alice, alice, token, TX_AMOUNT);
     });
 
     step('should change pubkey offchain', async () => {
@@ -68,17 +71,17 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should test multi-transfers', async () => {
-        await tester.testBatch(alice, bob, token, hundred.div(100));
-        await tester.testIgnoredBatch(alice, bob, token, hundred.div(100));
-        await tester.testFailedBatch(alice, bob, token, hundred.div(100));
+        await tester.testBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testFailedBatch(alice, bob, token, TX_AMOUNT);
     });
 
     step('should execute a withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, token, hundred.div(10));
+        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
     step('should execute a fast withdrawal', async () => {
-        await tester.testVerifiedWithdraw(bob, token, hundred.div(10), true);
+        await tester.testVerifiedWithdraw(bob, token, TX_AMOUNT, true);
     });
 
     it('should check collected fees', async () => {
@@ -87,20 +90,20 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     it('should fail trying to send tx with wrong signature', async () => {
-        await tester.testWrongSignature(alice, bob, token, hundred.div(10));
+        await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
     });
 
     it('should succeed resending a previously failed tx', async () => {
         let nick = await tester.fundedWallet('1.0');
         let mike = await tester.emptyWallet();
-        await tester.testTransactionResending(nick, mike, token, hundred);
+        await tester.testTransactionResending(nick, mike, token, TX_AMOUNT);
     })
 
     describe('Full Exit tests', () => {
         let carl: Wallet;
 
         before('create a test wallet', async () => {
-            carl = await tester.fundedWallet('0.5');
+            carl = await tester.fundedWallet('1.0');
         });
 
         step('should execute full-exit on random wallet', async () => {
@@ -109,7 +112,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
         step('should fail full-exit with wrong eth-signer', async () => {
             // make a deposit so that wallet is assigned an accountId
-            await tester.testDeposit(carl, token, hundred, true);
+            await tester.testDeposit(carl, token, DEPOSIT_AMOUNT, true);
 
             const oldSigner = carl.ethSigner;
             carl.ethSigner = tester.ethWallet;
