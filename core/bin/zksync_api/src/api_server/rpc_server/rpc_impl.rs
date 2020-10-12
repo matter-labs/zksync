@@ -145,13 +145,16 @@ impl RpcApp {
         let ticker_request_sender = self.ticker_request_sender.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+            let should_enforce_fee =
+                !matches!(tx_type, TxFeeTypes::ChangePubKey{..}) || self.enforce_pubkey_change_fee;
+
             let required_fee =
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
             // We allow fee to be 5% off the required fee
             let scaled_provided_fee =
                 provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
-            if required_fee.total_fee >= scaled_provided_fee {
+            if required_fee.total_fee >= scaled_provided_fee && should_enforce_fee {
                 vlog::warn!(
                     "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
                     required_fee, provided_fee, scaled_provided_fee, token

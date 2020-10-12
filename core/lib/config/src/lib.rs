@@ -7,7 +7,7 @@ use std::time::Duration;
 use url::Url;
 // Workspace uses
 use zksync_basic_types::{H160, H256};
-use zksync_utils::{get_env, parse_env, parse_env_with};
+use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
 
 /// Configuration options for `eth_sender`.
@@ -165,6 +165,7 @@ pub struct ConfigurationOptions {
     /// Fee increase coefficient for fast processing of withdrawal.
     pub ticker_fast_processing_coeff: f64,
     pub forced_exit_minimum_account_age: Duration,
+    pub enforce_pubkey_change_fee: bool,
 }
 
 impl ConfigurationOptions {
@@ -198,11 +199,7 @@ impl ConfigurationOptions {
             governance_eth_addr: parse_env_with("GOVERNANCE_ADDR", |s| &s[2..]),
             operator_commit_eth_addr: parse_env_with("OPERATOR_COMMIT_ETH_ADDRESS", |s| &s[2..]),
             operator_fee_eth_addr: parse_env_with("OPERATOR_FEE_ETH_ADDRESS", |s| &s[2..]),
-            operator_private_key: if env::var("OPERATOR_PRIVATE_KEY").is_ok() {
-                Some(parse_env("OPERATOR_PRIVATE_KEY"))
-            } else {
-                None
-            },
+            operator_private_key: parse_env_if_exists("OPERATOR_PRIVATE_KEY"),
             chain_id: parse_env("CHAIN_ID"),
             gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
@@ -221,6 +218,8 @@ impl ConfigurationOptions {
             witness_generators: parse_env("WITNESS_GENERATORS"),
             ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
             forced_exit_minimum_account_age,
+            enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
+                .unwrap_or(true),
         }
     }
 }
