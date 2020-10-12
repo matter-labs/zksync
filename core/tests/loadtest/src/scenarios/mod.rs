@@ -3,7 +3,9 @@
 //! A simplest scenario will be: "get a bunch of accounts and just spawn a lot of transfer
 //! operations between them".
 
-pub use self::{executor::ScenarioExecutor, transfers::TransferScenarioConfig};
+pub use self::{
+    executor::ScenarioExecutor, transfers::TransferScenarioConfig, withdraw::WithdrawScenarioConfig,
+};
 
 // Built-in uses
 use std::fmt::{Debug, Display};
@@ -13,11 +15,12 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 // Local uses
+use self::{transfers::TransferScenario, withdraw::WithdrawScenario};
 use crate::{monitor::Monitor, test_wallet::TestWallet};
-use transfers::TransferScenario;
 
 mod executor;
 mod transfers;
+mod withdraw;
 
 /// Resources that are needed from the scenario executor to perform the scenario.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -59,12 +62,14 @@ pub trait Scenario: Debug + Display {
 #[serde(tag = "name", rename_all = "snake_case")]
 pub enum ScenarioConfig {
     Transfer(TransferScenarioConfig),
+    Withdraw(WithdrawScenarioConfig),
 }
 
 impl ScenarioConfig {
     pub fn into_scenario(self) -> Box<dyn Scenario> {
         match self {
-            Self::Transfer(cfg) => Box::new(TransferScenario::new(cfg)),
+            Self::Transfer(cfg) => Box::new(TransferScenario::from(cfg)),
+            Self::Withdraw(cfg) => Box::new(WithdrawScenario::from(cfg)),
         }
     }
 }

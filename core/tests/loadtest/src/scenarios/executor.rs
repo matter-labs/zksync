@@ -44,6 +44,8 @@ impl ScenarioExecutor {
             TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options).await;
         let sufficient_fee = main_wallet.sufficient_fee().await?;
 
+        log::info!("Fee is {}", format_ether(&sufficient_fee));
+
         Ok(Self {
             monitor,
             eth_options,
@@ -99,19 +101,19 @@ impl ScenarioExecutor {
         let eth_balance = self.main_wallet.eth_balance().await?;
         anyhow::ensure!(
             eth_balance > amount_to_deposit,
-            "Not enough balance in the main wallet to perform this test, actual: {} ETH, expected: {} ETH",
+            "Not enough balance in the main wallet to perform this test, actual: {}, expected: {}",
             format_ether(&eth_balance),
             format_ether(&amount_to_deposit),
         );
 
         log::info!(
-            "Deposit {} ETH for main wallet",
+            "Deposit {} for main wallet",
             format_ether(&amount_to_deposit),
         );
 
         let priority_op = self.main_wallet.deposit(amount_to_deposit).await.unwrap();
         self.monitor
-            .wait_for_priority_op_commit(&priority_op)
+            .wait_for_priority_op(BlockStatus::Committed, &priority_op)
             .await?;
 
         // Now when deposits are done it is time to update account id.
@@ -129,7 +131,9 @@ impl ScenarioExecutor {
             .sign_change_pubkey(self.sufficient_fee.clone())
             .await?;
         let tx_hash = self.monitor.send_tx(tx, sign).await?;
-        self.monitor.wait_for_tx_commit(tx_hash).await?;
+        self.monitor
+            .wait_for_tx(BlockStatus::Committed, tx_hash)
+            .await?;
 
         log::info!("Deposit phase completed");
 
@@ -139,7 +143,7 @@ impl ScenarioExecutor {
         {
             log::info!(
                 "Preparing transactions for the initial transfer for `{}` scenario: \
-                {} ETH to will be send to each of {} new wallets",
+                {} to will be send to each of {} new wallets",
                 self.scenarios[scenario_index].0,
                 format_ether(&scenario_amount),
                 scenario_wallets.len()
@@ -161,7 +165,7 @@ impl ScenarioExecutor {
             try_wait_all(
                 tx_hashes
                     .into_iter()
-                    .map(|tx_hash| self.monitor.wait_for_tx_commit(tx_hash)),
+                    .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
             )
             .await?;
 
@@ -184,7 +188,7 @@ impl ScenarioExecutor {
             try_wait_all(
                 tx_hashes
                     .into_iter()
-                    .map(|tx_hash| self.monitor.wait_for_tx_commit(tx_hash)),
+                    .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
             )
             .await?;
 
@@ -259,7 +263,7 @@ impl ScenarioExecutor {
             try_wait_all(
                 tx_hashes
                     .into_iter()
-                    .map(|tx_hash| monitor.wait_for_tx_commit(tx_hash)),
+                    .map(|tx_hash| monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
             )
             .await?;
         }
@@ -267,7 +271,7 @@ impl ScenarioExecutor {
         let main_wallet_balance = self.main_wallet.balance(BlockStatus::Committed).await?;
         if main_wallet_balance > self.sufficient_fee {
             log::info!(
-                "Main wallet has {} ETH balance, making refund...",
+                "Main wallet has {} balance, making refund...",
                 format_ether(&main_wallet_balance)
             );
 

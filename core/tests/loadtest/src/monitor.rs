@@ -11,7 +11,9 @@ use tokio::{
     task::JoinHandle,
 };
 // Workspace uses
-use zksync::{error::ClientError, ethereum::PriorityOpHolder, EthereumProvider, Provider};
+use zksync::{
+    error::ClientError, ethereum::PriorityOpHolder, types::BlockStatus, EthereumProvider, Provider,
+};
 use zksync_types::{
     tx::{PackedEthSignature, TxHash},
     PriorityOp, ZkSyncTx, H256,
@@ -69,15 +71,15 @@ impl MonitorInner {
         if self.enabled {
             let now = Instant::now();
 
-            log::info!(
-                "Transactions stats: created: {}, executed: {}, verified: {}",
-                self.current_stats.txs.created,
-                self.current_stats.txs.executed,
-                self.current_stats.txs.verified
-            );
-
             let mut stats = Summary::default();
             if self.current_stats != stats {
+                log::info!(
+                    "Transactions stats: created: {}, executed: {}, verified: {}",
+                    self.current_stats.txs.created,
+                    self.current_stats.txs.executed,
+                    self.current_stats.txs.verified
+                );
+
                 self.journal.record_stats(now, self.current_stats);
 
                 swap(&mut self.current_stats, &mut stats);
@@ -94,6 +96,7 @@ impl MonitorInner {
     }
 }
 
+#[macro_export]
 macro_rules! await_condition {
     ($d:expr, $e:expr) => {
         loop {
@@ -154,24 +157,34 @@ impl Monitor {
     }
 
     // Waits for the transaction to commit.
-    pub async fn wait_for_tx_commit(&self, tx_hash: TxHash) -> anyhow::Result<()> {
+    pub async fn wait_for_tx(
+        &self,
+        block_status: BlockStatus,
+        tx_hash: TxHash,
+    ) -> anyhow::Result<()> {
         await_condition!(Self::POLLING_INTERVAL, {
             let info = self.provider.tx_info(tx_hash).await?;
-            match info.success {
-                Some(true) => true,
-                None => false,
-                Some(false) => {
-                    anyhow::bail!("Transaction failed with a reason: {:?}", info.fail_reason);
-                }
+
+            match block_status {
+                BlockStatus::Committed => match info.success {
+                    Some(true) => true,
+                    None => false,
+                    Some(false) => {
+                        anyhow::bail!("Transaction failed with a reason: {:?}", info.fail_reason);
+                    }
+                },
+
+                BlockStatus::Verified => info.is_verified(),
             }
         });
 
         Ok(())
     }
 
-    // Waits for the priority operation to commit.
-    pub async fn wait_for_priority_op_commit(
+    // Waits for the priority operation.
+    pub async fn wait_for_priority_op(
         &self,
+        block_status: BlockStatus,
         priority_op: &PriorityOp,
     ) -> anyhow::Result<()> {
         await_condition!(Self::POLLING_INTERVAL, {
@@ -179,7 +192,11 @@ impl Monitor {
                 .provider
                 .ethop_info(priority_op.serial_id as u32)
                 .await?;
-            info.executed && info.block.is_some()
+
+            match block_status {
+                BlockStatus::Committed => info.executed && info.block.is_some(),
+                BlockStatus::Verified => info.is_verified(),
+            }
         });
 
         Ok(())
@@ -254,14 +271,11 @@ impl Monitor {
         self.log_event(Event::TxCreated).await;
 
         // Wait for the transaction to commit.
-        self.wait_for_tx_commit(tx_hash).await?;
+        self.wait_for_tx(BlockStatus::Committed, tx_hash).await?;
         self.log_event(Event::TxExecuted).await;
 
         // Wait for the transaction to verify.
-        await_condition!(
-            Self::POLLING_INTERVAL,
-            self.provider.tx_info(tx_hash).await?.is_verified()
-        );
+        self.wait_for_tx(BlockStatus::Verified, tx_hash).await?;
         self.log_event(Event::TxVerified).await;
 
         Ok(())
@@ -271,17 +285,13 @@ impl Monitor {
         self.log_event(Event::OpCreated).await;
 
         // Wait until the priority operation is committed.
-        self.wait_for_priority_op_commit(&priority_op).await?;
+        self.wait_for_priority_op(BlockStatus::Committed, &priority_op)
+            .await?;
         self.log_event(Event::OpExecuted).await;
 
         // Wait until the priority operation is became a part of some block and get verified.
-        await_condition!(
-            Self::POLLING_INTERVAL,
-            self.provider
-                .ethop_info(priority_op.serial_id as u32)
-                .await?
-                .is_verified()
-        );
+        self.wait_for_priority_op(BlockStatus::Verified, &priority_op)
+            .await?;
         self.log_event(Event::OpVerified).await;
 
         Ok(())

@@ -11,3 +11,8 @@ name = 'transfer'
 transfer_size = 1
 transfer_rounds = 100
 wallets_amount = 100
+
+[[scenarios]]
+name = "withdraw"
+wallets_amount = 10
+withdraw_rounds = 10

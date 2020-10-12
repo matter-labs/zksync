@@ -32,6 +32,7 @@ use self::{config::Config, scenarios::ScenarioExecutor};
 
 mod config;
 mod journal;
+#[macro_use]
 mod monitor;
 mod scenarios;
 mod test_wallet;

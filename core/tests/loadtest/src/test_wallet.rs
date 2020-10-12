@@ -11,6 +11,7 @@ use zksync::{
     EthereumProvider, Network, Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     tx::PackedEthSignature, AccountId, Address, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
 };
@@ -29,7 +30,7 @@ pub struct TestWallet {
 }
 
 impl TestWallet {
-    const FEE_FACTOR: u64 = 3;
+    const FEE_FACTOR: u64 = 2;
 
     /// Creates a new wallet from the given account information and Ethereum configuration options.
     pub async fn from_info(
@@ -37,9 +38,13 @@ impl TestWallet {
         info: &AccountInfo,
         options: &ConfigurationOptions,
     ) -> Self {
-        let credentials =
-            WalletCredentials::from_eth_pk(info.address, info.private_key, Network::Localhost)
-                .unwrap();
+        let credentials = WalletCredentials::from_eth_signer(
+            info.address,
+            EthereumSigner::from_key(info.private_key),
+            Network::Localhost,
+        )
+        .await
+        .unwrap();
 
         let inner = Wallet::new(monitor.provider.clone(), credentials)
             .await
@@ -59,8 +64,13 @@ impl TestWallet {
 
         let inner = Wallet::new(
             monitor.provider.clone(),
-            WalletCredentials::from_eth_pk(address_from_pk, eth_private_key, Network::Localhost)
-                .unwrap(),
+            WalletCredentials::from_eth_signer(
+                address_from_pk,
+                EthereumSigner::from_key(eth_private_key),
+                Network::Localhost,
+            )
+            .await
+            .unwrap(),
         )
         .await
         .unwrap();
