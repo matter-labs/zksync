@@ -20,7 +20,7 @@ const DEFAULT_THRESHOLD: f64 = 5.0f64;
 /// Example:
 ///
 /// ```rust
-/// use zksync_server::utils::metrics_counter::MetricsCounter;
+/// use zksync_api::utils::metrics_counter::MetricsCounter;
 /// use std::time::Duration;
 ///
 /// struct SomeProcessor {
