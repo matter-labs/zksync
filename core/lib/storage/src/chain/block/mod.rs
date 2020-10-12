@@ -311,10 +311,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 committed.created_at AS "committed_at!",
                 verified.created_at AS "verified_at?"
             FROM blocks
-            INNER JOIN eth_ops COMMITTED ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT'
+            INNER JOIN eth_ops committed ON
+                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY' and verified.confirmed = true
+                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
             WHERE
                 blocks.number <= $1
             ORDER BY blocks.number DESC
@@ -412,9 +412,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 verified.created_at AS "verified_at?"
             FROM blocks
             INNER JOIN eth_ops committed ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT'
+                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY' and verified.confirmed = true
+                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
             WHERE false
                 OR committed.tx_hash = $1
                 OR verified.tx_hash = $1

@@ -299,9 +299,7 @@ pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
-    for _ in 0..4 - size {
-        vec.push(0);
-    }
+    vec.extend(vec![0; 4 - size]);
     vec.reverse();
     let new_bytes = vec.as_slice();
     Some(u32::from_be_bytes(new_bytes.try_into().ok()?))
@@ -311,9 +309,7 @@ pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
-    for _ in 0..2 - size {
-        vec.push(0);
-    }
+    vec.extend(vec![0; 2 - size]);
     vec.reverse();
     let new_bytes = vec.as_slice();
     Some(u16::from_be_bytes(new_bytes.try_into().ok()?))
@@ -323,9 +319,7 @@ pub fn bytes_slice_to_uint128(bytes: &[u8]) -> Option<u128> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
-    for _ in 0..16 - size {
-        vec.push(0);
-    }
+    vec.extend(vec![0; 16 - size]);
     vec.reverse();
     let new_bytes = vec.as_slice();
     Some(u128::from_be_bytes(new_bytes.try_into().ok()?))

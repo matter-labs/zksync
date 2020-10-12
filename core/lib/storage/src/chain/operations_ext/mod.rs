@@ -564,7 +564,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at as "created_at!"
             from transactions
             left join eth_ops committed on
-                committed.block_number = transactions.block_number and committed.action_type = 'COMMIT'
+                committed.block_number = transactions.block_number and committed.action_type = 'COMMIT' and committed.confirmed = true
             left join eth_ops verified on
                 verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
             order by transactions.block_number desc, created_at desc
