@@ -10,7 +10,7 @@ use std::{collections::HashMap, fmt};
 #[derive(Debug)]
 pub struct SparseQueue<T: fmt::Debug> {
     next_expected_idx: usize,
-    elements: HashMap<usize, T>,
+    pub(super) elements: HashMap<usize, T>,
 }
 
 impl<T: fmt::Debug> Default for SparseQueue<T> {

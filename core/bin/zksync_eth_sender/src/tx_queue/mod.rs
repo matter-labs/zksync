@@ -1,5 +1,5 @@
 // Workspace imports
-use zksync_types::{ethereum::OperationType, Operation};
+use zksync_types::{ethereum::OperationType, BlockNumber, Operation};
 // Local imports
 use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
 
@@ -44,6 +44,15 @@ impl TxData {
             raw,
             operation: None,
         }
+    }
+
+    /// Obtains the corresponding block number from the transaction data.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `TxData` object has no `operation` field set.
+    pub fn block(&self) -> BlockNumber {
+        self.operation.as_ref().unwrap().block.block_number
     }
 }
 
@@ -146,6 +155,21 @@ pub struct TxQueue {
 }
 
 impl TxQueue {
+    /// Checks whether `commit` operation for a certain block is already in the queue.
+    pub fn commit_operation_exists(&self, block_idx: BlockNumber) -> bool {
+        self.commit_operations
+            .elements
+            .iter()
+            .any(|item| item.block() == block_idx)
+    }
+
+    /// Checks whether `verify` operation for a certain block is already in the queue.
+    pub fn verify_operation_exists(&self, block_idx: BlockNumber) -> bool {
+        self.verify_operations
+            .elements
+            .contains_key(&(block_idx as usize))
+    }
+
     /// Adds the `commit` operation to the queue.
     pub fn add_commit_operation(&mut self, commit_operation: TxData) {
         self.commit_operations.push_back(commit_operation);

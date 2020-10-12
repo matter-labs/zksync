@@ -5,7 +5,7 @@ use std::{collections::VecDeque, fmt};
 /// tracks the amount of the processed elements.
 #[derive(Debug)]
 pub struct CounterQueue<T: fmt::Debug> {
-    elements: VecDeque<T>,
+    pub(super) elements: VecDeque<T>,
     counter: usize,
 }
 

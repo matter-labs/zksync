@@ -738,9 +738,15 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     /// Encodes the zkSync operation to the tx payload and adds it to the queue.
     fn add_operation_to_queue(&mut self, op: Operation) {
         let raw_tx = self.operation_to_raw_tx(&op);
+        let block_number = op.block.block_number;
 
         match &op.action {
             Action::Commit => {
+                if self.tx_queue.commit_operation_exists(block_number) {
+                    // Already added, do nothing.
+                    return;
+                }
+
                 self.tx_queue.add_commit_operation(TxData::from_operation(
                     OperationType::Commit,
                     op,
@@ -748,7 +754,10 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                 ));
             }
             Action::Verify { .. } => {
-                let block_number = op.block.block_number;
+                if self.tx_queue.verify_operation_exists(block_number) {
+                    // Already added, do nothing.
+                    return;
+                }
 
                 self.tx_queue.add_verify_operation(
                     block_number as usize,
