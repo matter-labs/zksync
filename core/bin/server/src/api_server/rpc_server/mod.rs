@@ -98,6 +98,7 @@ pub struct RpcApp {
 
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     forced_exit_minimum_account_age: chrono::Duration,
+    enforce_pubkey_change_fee: bool,
 }
 
 impl RpcApp {
@@ -119,6 +120,7 @@ impl RpcApp {
 
         let api_requests_caches_size = config_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
+        let enforce_pubkey_change_fee = config_options.enforce_pubkey_change_fee;
 
         let forced_exit_minimum_account_age =
             chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
@@ -145,6 +147,7 @@ impl RpcApp {
             current_zksync_info,
 
             forced_exit_minimum_account_age,
+            enforce_pubkey_change_fee,
         }
     }
 

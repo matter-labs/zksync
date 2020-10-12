@@ -31,3 +31,19 @@ where
         .parse()
         .unwrap_or_else(|e| panic!("Failed to parse environment variable {}: {:?}", name, e))
 }
+
+/// Obtains the environment variable value and on success parses it using the `FromStr` type implementation.
+/// Panics if value cannot be parsed.
+pub fn parse_env_if_exists<F>(name: &str) -> Option<F>
+where
+    F: FromStr,
+    F::Err: std::fmt::Debug,
+{
+    env::var(name)
+        .map(|var| {
+            var.parse().unwrap_or_else(|e| {
+                panic!("Failed to parse environment variable {}: {:?}", name, e)
+            })
+        })
+        .ok()
+}
