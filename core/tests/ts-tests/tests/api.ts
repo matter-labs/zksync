@@ -2,13 +2,13 @@ import fs from 'fs';
 import fetch from 'node-fetch';
 import { expect } from 'chai';
 
-import { Interface as StatusInterface } from './api-types/status';
-import { Interface as BlockInterface } from './api-types/block';
-import { Interface as BlocksInterface } from './api-types/blocks';
-import { Interface as TxHistoryInterface } from './api-types/tx-history';
-import { Interface as TestnetConfigInterface } from './api-types/config';
-import { Interface as BlockTransactionsInterface } from './api-types/block-transactions';
-import { Interface as TransactionInterface } from './api-types/transaction';
+import { Interface as StatusInterface } from '../api-types/status';
+import { Interface as BlockInterface } from '../api-types/block';
+import { Interface as BlocksInterface } from '../api-types/blocks';
+import { Interface as TxHistoryInterface } from '../api-types/tx-history';
+import { Interface as TestnetConfigInterface } from '../api-types/config';
+import { Interface as BlockTransactionsInterface } from '../api-types/block-transactions';
+import { Interface as TransactionInterface } from '../api-types/transaction';
 
 const apiTypesFolder = './api-types';
 const ADDRESS_REGEX = /^0x([0-9a-fA-F]){40}$/;
@@ -28,7 +28,7 @@ async function validateTypeJSON(typeFilePath: string, json: string) {
     fs.writeFileSync(tmpFilePath, `${typeContent}\n\nexport const val: Interface = ${json};\n`);
 
     try {
-        require(tmpFilePath);
+        require('../' + tmpFilePath);
         fs.unlinkSync(tmpFilePath);
     } catch (e) {
         expect.fail(`Rest api response format error in type ${typeFilePath}`);

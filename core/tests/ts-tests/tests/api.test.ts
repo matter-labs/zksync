@@ -1,5 +1,4 @@
 import { Wallet } from 'zksync';
-
 import { Tester } from './tester';
 import './priority-ops';
 import './change-pub-key';

@@ -134,8 +134,12 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
 });
 
-for (const transport of ['HTTP', 'WS']) {
-    for (const token of ['ETH', 'DAI']) {
+
+const transports = process.env.TEST_TRANSPORT ? [process.env.TEST_TRANSPORT] : ['HTTP', 'WS'];
+const tokens = process.env.TEST_TOKEN ? [process.env.TEST_TOKEN] : ['ETH', 'DAI'];
+
+for (const transport of transports) {
+    for (const token of tokens) {
         // @ts-ignore
         TestSuite(token, transport);
     }
