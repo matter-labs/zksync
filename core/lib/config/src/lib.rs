@@ -177,7 +177,7 @@ impl ConfigurationOptions {
             .map(|s| usize::from_str(s).unwrap())
             .collect::<Vec<_>>();
 
-        available_block_chunk_sizes.sort();
+        available_block_chunk_sizes.sort_unstable();
 
         let forced_exit_minimum_account_age =
             Duration::from_secs(parse_env::<u64>("FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS"));

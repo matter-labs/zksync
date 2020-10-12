@@ -224,7 +224,7 @@ impl ZkSyncStateInitParams {
                     .into_iter()
                     .map(|(id, _)| id)
                     .collect::<Vec<_>>();
-                updated_accounts.sort();
+                updated_accounts.sort_unstable();
                 updated_accounts.dedup();
                 for idx in updated_accounts {
                     if let Some(acc) = accounts.get(&idx).cloned() {
@@ -346,7 +346,7 @@ impl ZkSyncStateKeeper {
 
         let is_sorted = {
             let mut sorted = available_block_chunk_sizes.clone();
-            sorted.sort();
+            sorted.sort_unstable();
             sorted == available_block_chunk_sizes
         };
         assert!(is_sorted);

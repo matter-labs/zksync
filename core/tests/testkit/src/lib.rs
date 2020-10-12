@@ -378,7 +378,7 @@ pub fn spawn_state_keeper(
         .cartesian_product(ops_chunks)
         .map(|(x, y)| x * y)
         .collect::<Vec<_>>();
-    block_chunks_sizes.sort();
+    block_chunks_sizes.sort_unstable();
     block_chunks_sizes.dedup();
 
     let max_miniblock_iterations = *block_chunks_sizes.iter().max().unwrap();
