@@ -223,7 +223,7 @@ export default {
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.priority_op.withdraw_amount || 0, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.withdraw_amount, token)} ${token}`;
                         created_at         = tx.created_at;
                         fee                = '';
                         break;

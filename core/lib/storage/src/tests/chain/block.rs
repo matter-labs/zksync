@@ -422,6 +422,9 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         EthereumSchema(&mut storage)
             .add_hash_entry(response.id, &eth_tx_hash)
             .await?;
+        EthereumSchema(&mut storage)
+            .confirm_eth_tx(&eth_tx_hash)
+            .await?;
 
         // Add verification for the block if required.
         if block_number <= n_verified {
@@ -470,6 +473,110 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     for (max_block, limit) in test_vector {
         check_block_range(&mut storage, max_block, limit).await?;
     }
+
+    Ok(())
+}
+
+/// Checks the correctness of the processing of committed unconfirmed transactions.
+#[db_test]
+async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Below lies the initialization of the data for the test.
+
+    let mut rng = create_rng();
+
+    // Required since we use `EthereumSchema` in this test.
+    EthereumSchema(&mut storage).initialize_eth_data().await?;
+
+    let mut accounts_map = AccountMap::default();
+
+    let n_committed = 5;
+    let n_commited_confirmed = 3;
+    let n_verified = 2;
+
+    // Create and apply several blocks to work with.
+    for block_number in 1..=n_committed {
+        let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
+        accounts_map = new_accounts_map;
+
+        // Store the operation in the block schema.
+        let operation = BlockSchema(&mut storage)
+            .execute_operation(get_unique_operation(block_number, Action::Commit))
+            .await?;
+        StateSchema(&mut storage)
+            .commit_state_update(block_number, &updates, 0)
+            .await?;
+
+        // Store & confirm the operation in the ethereum schema, as it's used for obtaining
+        // commit/verify hashes.
+        let ethereum_op_id = operation.id.unwrap() as i64;
+        let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+        let response = EthereumSchema(&mut storage)
+            .save_new_eth_tx(
+                OperationType::Commit,
+                Some(ethereum_op_id),
+                100,
+                100u32.into(),
+                Default::default(),
+            )
+            .await?;
+        EthereumSchema(&mut storage)
+            .add_hash_entry(response.id, &eth_tx_hash)
+            .await?;
+
+        if block_number <= n_commited_confirmed {
+            EthereumSchema(&mut storage)
+                .confirm_eth_tx(&eth_tx_hash)
+                .await?;
+        }
+
+        // Add verification for the block if required.
+        if block_number <= n_verified {
+            ProverSchema(&mut storage)
+                .store_proof(block_number, &Default::default())
+                .await?;
+            let operation = BlockSchema(&mut storage)
+                .execute_operation(get_unique_operation(
+                    block_number,
+                    Action::Verify {
+                        proof: Default::default(),
+                    },
+                ))
+                .await?;
+            let ethereum_op_id = operation.id.unwrap() as i64;
+            let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+            let response = EthereumSchema(&mut storage)
+                .save_new_eth_tx(
+                    OperationType::Verify,
+                    Some(ethereum_op_id),
+                    100,
+                    100u32.into(),
+                    Default::default(),
+                )
+                .await?;
+            EthereumSchema(&mut storage)
+                .add_hash_entry(response.id, &eth_tx_hash)
+                .await?;
+            EthereumSchema(&mut storage)
+                .confirm_eth_tx(&eth_tx_hash)
+                .await?;
+        }
+    }
+
+    assert!(BlockSchema(&mut storage)
+        .find_block_by_height_or_hash(n_commited_confirmed.to_string())
+        .await
+        .is_some());
+
+    assert!(BlockSchema(&mut storage)
+        .find_block_by_height_or_hash((n_commited_confirmed + 1).to_string())
+        .await
+        .is_none());
+
+    let block_range = BlockSchema(&mut storage)
+        .load_block_range(n_committed, 100)
+        .await?;
+
+    assert_eq!(block_range.len(), n_commited_confirmed as usize);
 
     Ok(())
 }
