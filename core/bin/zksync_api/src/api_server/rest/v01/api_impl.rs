@@ -284,14 +284,12 @@ impl ApiV01 {
 
     pub async fn tx_by_hash(
         self_: web::Data<Self>,
-        hash_hex_with_prefix: String,
+        web::Path(hash_hex_with_prefix): web::Path<String>,
     ) -> ActixResult<HttpResponse> {
         let hash = try_parse_hash(&hash_hex_with_prefix)
             .ok_or_else(|| HttpResponse::BadRequest().finish())?;
 
-        let mut res;
-
-        res = self_
+        let mut res = self_
             .access_storage()
             .await?
             .chain()
