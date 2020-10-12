@@ -80,7 +80,7 @@ Tester.prototype.testTransactionResending = async function (
     }
     expect(thrown).to.be.true;
 
-    await this.testDeposit(from, token, amount.div(2));
+    await this.testDeposit(from, token, amount.div(2), true);
 
     // We should wait some `timeoutBeforeReceipt` to give server enough time
     // to move our transaction with success flag from mempool to statekeeper

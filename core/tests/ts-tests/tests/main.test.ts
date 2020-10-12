@@ -109,34 +109,33 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
         step('should fail full-exit with wrong eth-signer', async () => {
             // make a deposit so that wallet is assigned an accountId
-            await tester.testDeposit(carl, token, hundred);
+            await tester.testDeposit(carl, token, hundred, true);
 
-            let oldSigner = carl.ethSigner;
+            const oldSigner = carl.ethSigner;
             carl.ethSigner = tester.ethWallet;
-            let [before, after] = await tester.testFullExit(carl, token);
+            const [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0)).to.be.false;
             expect(before.eq(after)).to.be.true;
             carl.ethSigner = oldSigner;
         });
 
         step('should execute a normal full-exit', async () => {
-            let [before, after] = await tester.testFullExit(carl, token);
+            const [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0)).to.be.false;
             expect(after.eq(0)).to.be.true;
         });
 
         step('should execute full-exit on an empty wallet', async () => {
-            let [before, after] = await tester.testFullExit(carl, token);
+            const [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0)).to.be.true;
             expect(after.eq(0)).to.be.true;
         });
     });
-
 });
 
 
-const transports = process.env.TEST_TRANSPORT ? [process.env.TEST_TRANSPORT] : ['HTTP', 'WS'];
-const tokens = process.env.TEST_TOKEN ? [process.env.TEST_TOKEN] : ['ETH', 'DAI'];
+const transports = process.env.TEST_TRANSPORT ? [process.env.TEST_TRANSPORT.toUpperCase()] : ['HTTP', 'WS'];
+const tokens = process.env.TEST_TOKEN ? [process.env.TEST_TOKEN.toUpperCase()] : ['ETH', 'DAI'];
 
 for (const transport of transports) {
     for (const token of tokens) {

@@ -31,7 +31,7 @@ async function validateTypeJSON(typeFilePath: string, json: string) {
         require('../' + tmpFilePath);
         fs.unlinkSync(tmpFilePath);
     } catch (e) {
-        expect.fail(`Rest api response format error in type ${typeFilePath}`);
+        expect.fail(`Rest api response format error in type ${typeFilePath}:\n${json}`);
     }
 }
 
