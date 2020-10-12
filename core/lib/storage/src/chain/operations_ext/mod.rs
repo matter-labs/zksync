@@ -374,7 +374,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         eth_block,
-                        null as success,
+                        true as success,
                         null as fail_reason,
                         block_number,
                         created_at
@@ -531,7 +531,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         eth_block,
-                        null as success,
+                        true as success,
                         null as fail_reason,
                         block_number,
                         created_at
