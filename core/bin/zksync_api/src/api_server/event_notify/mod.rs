@@ -46,6 +46,7 @@ pub enum EventNotifierRequest {
     Unsub(SubscriptionId),
 }
 
+#[derive(Debug)]
 struct SubscriptionSender<T> {
     id: SubscriptionId,
     sink: Sink<T>,

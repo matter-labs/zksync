@@ -82,16 +82,24 @@ impl EventFetcher {
             // 1. Update last verified block.
             let last_verified_block = await_db!(self.last_verified_block(), continue);
             if last_verified_block > self.last_verified_block {
-                self.send_operations(last_verified_block, ActionType::VERIFY)
-                    .await;
+                self.send_operations(
+                    self.last_verified_block,
+                    last_verified_block,
+                    ActionType::VERIFY,
+                )
+                .await;
                 self.last_verified_block = last_verified_block;
             }
 
             // 2. Update last committed block.
             let last_committed_block = await_db!(self.last_committed_block(), continue);
             if last_committed_block > self.last_committed_block {
-                self.send_operations(last_committed_block, ActionType::COMMIT)
-                    .await;
+                self.send_operations(
+                    self.last_committed_block,
+                    last_committed_block,
+                    ActionType::COMMIT,
+                )
+                .await;
                 self.last_committed_block = last_committed_block;
             }
 
@@ -107,7 +115,7 @@ impl EventFetcher {
     }
 
     fn update_pending_block(&mut self, new: PendingBlock) -> Option<ExecutedOps> {
-        if new.number <= self.last_committed_block + 1 {
+        if new.number <= self.last_committed_block {
             // Outdated block, we're not interested in it.
             return None;
         }
@@ -136,23 +144,32 @@ impl EventFetcher {
             operations: Vec::new(),
         };
 
-        for tx in &new.success_operations[last_success_len..] {
-            executed_ops.operations.push(tx.clone());
+        if new.success_operations.len() > last_success_len {
+            for tx in &new.success_operations[last_success_len..] {
+                executed_ops.operations.push(tx.clone());
+            }
         }
 
-        for tx in &new.failed_txs[last_errors_len..] {
-            executed_ops
-                .operations
-                .push(ExecutedOperations::Tx(Box::new(tx.clone())));
+        if new.failed_txs.len() > last_errors_len {
+            for tx in &new.failed_txs[last_errors_len..] {
+                executed_ops
+                    .operations
+                    .push(ExecutedOperations::Tx(Box::new(tx.clone())));
+            }
         }
 
         self.pending_block = Some(new);
         Some(executed_ops)
     }
 
-    async fn send_operations(&mut self, new_last_operation: BlockNumber, action: ActionType) {
+    async fn send_operations(
+        &mut self,
+        current_last_block: BlockNumber,
+        new_last_operation: BlockNumber,
+        action: ActionType,
+    ) {
         // There may be more than one block in the gap.
-        for block_idx in (self.last_verified_block + 1)..=new_last_operation {
+        for block_idx in (current_last_block + 1)..=new_last_operation {
             let operation = await_db!(self.load_operation(block_idx, action), continue);
             self.operations_sender
                 .send(operation)

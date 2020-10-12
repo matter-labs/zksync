@@ -201,6 +201,8 @@ async function testForcedExit(
     await promiseTimeout(VERIFY_TIMEOUT, forcedExitHandle.awaitVerifyReceipt());
     console.log(`ForcedExit verified: ${new Date().getTime() - startTime} ms`);
 
+    await sleep(5000); // Sleep 3 seconds so the transaction will be executed on L1.
+
     const initiatorAfterWithdraw = await syncWallet.getBalance(token);
     const targetAfterWithdraw = await targetWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await targetWallet.getEthereumBalance(token);
@@ -400,7 +402,7 @@ async function testWithdraw(
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
-    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+    assert(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash));
 
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
@@ -465,7 +467,7 @@ async function testFastWithdraw(
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
-    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+    assert(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash));
 
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);

@@ -36,14 +36,15 @@ impl ActionId for AccountId {
     }
 }
 
+#[derive(Debug)]
 pub struct SubStorage<ID, RESP> {
     storage: BTreeMap<(ID, ActionType), Vec<SubscriptionSender<RESP>>>,
 }
 
 impl<ID, RESP> SubStorage<ID, RESP>
 where
-    ID: Ord + Clone + ToString + FromStr + ActionId,
-    RESP: serde::Serialize + Clone,
+    ID: Ord + Clone + ToString + FromStr + ActionId + std::fmt::Debug,
+    RESP: serde::Serialize + Clone + std::fmt::Debug,
 {
     pub fn new() -> Self {
         Self {

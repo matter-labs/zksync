@@ -111,7 +111,7 @@ pub struct Operation {
     pub block: Block,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum ActionType {
     COMMIT,
     VERIFY,
