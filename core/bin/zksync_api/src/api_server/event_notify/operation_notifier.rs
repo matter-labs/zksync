@@ -179,28 +179,30 @@ impl OperationNotifier {
             .get_executed_priority_operation(serial_id as u32)
             .await?;
         if let Some(executed_op) = executed_op {
-            let block_info = self
+            // There may be no block, if transaction was executed in the pending block only.
+            if let Some(block_info) = self
                 .state
                 .get_block_info(executed_op.block_number as u32)
-                .await?;
-
-            match action {
-                ActionType::COMMIT => {
-                    let resp = ETHOpInfoResp {
-                        executed: true,
-                        block: Some(block_info),
-                    };
-                    self.prior_op_subs.respond_once(sub_id, sub, resp)?;
-                    return Ok(());
-                }
-                ActionType::VERIFY => {
-                    if block_info.verified {
+                .await?
+            {
+                match action {
+                    ActionType::COMMIT => {
                         let resp = ETHOpInfoResp {
                             executed: true,
                             block: Some(block_info),
                         };
                         self.prior_op_subs.respond_once(sub_id, sub, resp)?;
                         return Ok(());
+                    }
+                    ActionType::VERIFY => {
+                        if block_info.verified {
+                            let resp = ETHOpInfoResp {
+                                executed: true,
+                                block: Some(block_info),
+                            };
+                            self.prior_op_subs.respond_once(sub_id, sub, resp)?;
+                            return Ok(());
+                        }
                     }
                 }
             }
