@@ -40,7 +40,7 @@ type ChangePubKey = {
     op: {
         account: string;
         accountId: number;
-        ethSignature?: string;
+        ethSignature: string | null;
         newPkHash: string;
         feeToken: number;
         fee: string;

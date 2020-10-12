@@ -75,7 +75,7 @@ type ChangePubKey = {
     tx: {
         account: string;
         accountId: number;
-        ethSignature?: string;
+        ethSignature: string | null;
         newPkHash: string;
         nonce: number;
         type: string;
