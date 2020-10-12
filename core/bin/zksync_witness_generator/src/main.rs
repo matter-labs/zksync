@@ -35,7 +35,5 @@ async fn main() -> anyhow::Result<()> {
 
     stop_signal_receiver.next().await;
 
-    log::info!("Stop signal received, stopping execution");
-
     Ok(())
 }

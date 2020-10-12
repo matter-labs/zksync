@@ -2512,7 +2512,6 @@ dependencies = [
  "zksync",
  "zksync_config",
  "zksync_eth_signer",
- "zksync_server",
  "zksync_types",
  "zksync_utils",
 ]

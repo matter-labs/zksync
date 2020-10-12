@@ -29,14 +29,12 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::select! {
         _ = async { task_handle.await } => {
-            panic!("API server actors aren't supposed to finish their execution")
+            panic!("Prometheus exporter actors aren't supposed to finish their execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             log::warn!("Stop signal received, shutting down");
         }
     };
-
-    log::info!("Stop signal received, stopping execution");
 
     Ok(())
 }
