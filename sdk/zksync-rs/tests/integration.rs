@@ -662,7 +662,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
     // Sign a transfer for each recipient created above
     let mut signed_transfers = Vec::with_capacity(recipients.len());
 
-    for recipient in recipients.into_iter() {
+    for recipient in recipients {
         let fee = wallet
             .provider
             .get_tx_fee(TxFeeTypes::Transfer, recipient, token_like.clone())
@@ -686,10 +686,9 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
         .send_txs_batch(signed_transfers)
         .await?
         .into_iter()
-        .map(|tx_hash| SyncTransactionHandle::new(tx_hash, wallet.provider.clone()))
-        .collect::<Vec<SyncTransactionHandle>>();
+        .map(|tx_hash| SyncTransactionHandle::new(tx_hash, wallet.provider.clone()));
 
-    for handle in handles.into_iter() {
+    for handle in handles {
         handle
             .verify_timeout(Duration::from_secs(180))
             .wait_for_verify()

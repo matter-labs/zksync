@@ -136,7 +136,7 @@ impl WitnessGenerator {
                         .into_iter()
                         .map(|(id, _)| id)
                         .collect::<Vec<_>>();
-                    updated_accounts.sort();
+                    updated_accounts.sort_unstable();
                     updated_accounts.dedup();
                     for idx in updated_accounts {
                         circuit_account_tree
