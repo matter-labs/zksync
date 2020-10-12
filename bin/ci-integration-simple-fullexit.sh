@@ -40,6 +40,10 @@ function cat_logs() {
 }
 
 zksync dummy-prover status | grep -q 'disabled' && zksync dummy-prover enable
+
+# We have to compile server, because otherwise the time to compile it may exceed 15 seconds,
+# and the test will start without an actually running server.
+f cargo build --bin zksync_server --release
 zksync server &> integration-server.log &
 SERVER_PID=$!
 zksync dummy-prover &> integration-prover.log &
