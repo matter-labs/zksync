@@ -169,7 +169,10 @@ impl ScenarioExecutor {
             )
             .await?;
 
-            log::info!("All the initial transfers have been committed.");
+            log::info!(
+                "All the initial transfers for `{}` scenario have been committed.",
+                self.scenarios[scenario_index].0,
+            );
 
             let mut tx_hashes = Vec::new();
             for wallet in &mut scenario_wallets {

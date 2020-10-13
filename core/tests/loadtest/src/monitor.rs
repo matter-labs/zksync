@@ -21,19 +21,21 @@ use zksync_types::{
 // Local uses
 use crate::journal::{Journal, Summary};
 
+type SerialId = u64;
+
 #[derive(Debug)]
 enum Event {
     // Transactions block.
-    TxCreated,
-    TxExecuted,
-    TxVerified,
-    TxErrored,
+    TxCreated(TxHash),
+    TxExecuted(TxHash),
+    TxVerified(TxHash),
+    TxErrored(TxHash),
 
     // Priority ops block.
-    OpCreated,
-    OpExecuted,
-    OpVerified,
-    OpErrored,
+    OpCreated(SerialId),
+    OpExecuted(SerialId),
+    OpVerified(SerialId),
+    OpErrored(SerialId),
 }
 
 #[derive(Debug, Default)]
@@ -54,15 +56,15 @@ impl MonitorInner {
     fn log_event(&mut self, event: Event) {
         if self.enabled {
             match event {
-                Event::TxCreated => self.current_stats.txs.created += 1,
-                Event::TxExecuted => self.current_stats.txs.executed += 1,
-                Event::TxVerified => self.current_stats.txs.verified += 1,
-                Event::TxErrored => self.current_stats.txs.errored += 1,
+                Event::TxCreated(_) => self.current_stats.txs.created += 1,
+                Event::TxExecuted(_) => self.current_stats.txs.executed += 1,
+                Event::TxVerified(_) => self.current_stats.txs.verified += 1,
+                Event::TxErrored(_) => self.current_stats.txs.errored += 1,
 
-                Event::OpCreated => self.current_stats.ops.created += 1,
-                Event::OpExecuted => self.current_stats.ops.executed += 1,
-                Event::OpVerified => self.current_stats.ops.verified += 1,
-                Event::OpErrored => self.current_stats.ops.errored += 1,
+                Event::OpCreated(_) => self.current_stats.ops.created += 1,
+                Event::OpExecuted(_) => self.current_stats.ops.executed += 1,
+                Event::OpVerified(_) => self.current_stats.ops.verified += 1,
+                Event::OpErrored(_) => self.current_stats.ops.errored += 1,
             }
         }
     }
@@ -151,7 +153,7 @@ impl Monitor {
         let handle = tokio::spawn(async move {
             if let Err(e) = monitor.clone().monitor_tx(tx_hash).await {
                 log::warn!("Monitored transaction execution failed. {}", e);
-                monitor.log_event(Event::TxErrored).await;
+                monitor.log_event(Event::TxErrored(tx_hash)).await;
             }
         });
         self.inner().await.pending_tasks.push(handle);
@@ -252,9 +254,15 @@ impl Monitor {
         let monitor = self.clone();
         let priority_op2 = priority_op.clone();
         let handle = tokio::spawn(async move {
-            if let Err(e) = monitor.clone().monitor_priority_op(priority_op2).await {
+            if let Err(e) = monitor
+                .clone()
+                .monitor_priority_op(priority_op2.clone())
+                .await
+            {
                 log::warn!("Monitored priority op execution failed. {}", e);
-                monitor.log_event(Event::OpErrored).await;
+                monitor
+                    .log_event(Event::OpErrored(priority_op2.serial_id))
+                    .await;
             }
         });
         self.inner().await.pending_tasks.push(handle);
@@ -271,31 +279,34 @@ impl Monitor {
     }
 
     async fn monitor_tx(self, tx_hash: TxHash) -> anyhow::Result<()> {
-        self.log_event(Event::TxCreated).await;
+        self.log_event(Event::TxCreated(tx_hash)).await;
 
         // Wait for the transaction to commit.
         self.wait_for_tx(BlockStatus::Committed, tx_hash).await?;
-        self.log_event(Event::TxExecuted).await;
+        self.log_event(Event::TxExecuted(tx_hash)).await;
 
         // Wait for the transaction to verify.
         self.wait_for_tx(BlockStatus::Verified, tx_hash).await?;
-        self.log_event(Event::TxVerified).await;
+        self.log_event(Event::TxVerified(tx_hash)).await;
 
         Ok(())
     }
 
     async fn monitor_priority_op(self, priority_op: PriorityOp) -> anyhow::Result<()> {
-        self.log_event(Event::OpCreated).await;
+        self.log_event(Event::OpCreated(priority_op.serial_id))
+            .await;
 
         // Wait until the priority operation is committed.
         self.wait_for_priority_op(BlockStatus::Committed, &priority_op)
             .await?;
-        self.log_event(Event::OpExecuted).await;
+        self.log_event(Event::OpExecuted(priority_op.serial_id))
+            .await;
 
         // Wait until the priority operation is became a part of some block and get verified.
         self.wait_for_priority_op(BlockStatus::Verified, &priority_op)
             .await?;
-        self.log_event(Event::OpVerified).await;
+        self.log_event(Event::OpVerified(priority_op.serial_id))
+            .await;
 
         Ok(())
     }
