@@ -19,7 +19,7 @@ use zksync_types::{
     PriorityOp, ZkSyncTx, H256,
 };
 // Local uses
-use crate::journal::{Journal, Summary};
+use crate::journal::{Journal, Summary, TxLifecycle};
 
 type SerialId = u64;
 
@@ -69,11 +69,14 @@ impl MonitorInner {
         }
     }
 
+    fn record_tx(&mut self, tx_hash: TxHash, tx_result: anyhow::Result<TxLifecycle>) {
+        self.journal.record_tx(tx_hash, tx_result);
+    }
+
     fn store_stats(&mut self) {
         if self.enabled {
-            let now = Instant::now();
-
             let mut stats = Summary::default();
+
             if self.current_stats != stats {
                 log::info!(
                     "Transactions stats: created: {}, executed: {}, verified: {}; operations: created: {}, executed: {}, verified: {}",
@@ -84,8 +87,6 @@ impl MonitorInner {
                     self.current_stats.ops.executed,
                     self.current_stats.ops.verified,
                 );
-
-                self.journal.record_stats(now, self.current_stats);
 
                 swap(&mut self.current_stats, &mut stats);
             }
@@ -147,14 +148,23 @@ impl Monitor {
         tx: ZkSyncTx,
         eth_signature: Option<PackedEthSignature>,
     ) -> anyhow::Result<TxHash> {
+        let created_at = Instant::now();
         let tx_hash = self.provider.send_tx(tx, eth_signature).await?;
+        let sent_at = Instant::now();
 
         let monitor = self.clone();
         let handle = tokio::spawn(async move {
-            if let Err(e) = monitor.clone().monitor_tx(tx_hash).await {
+            let tx_result = monitor
+                .clone()
+                .monitor_tx(created_at, sent_at, tx_hash)
+                .await;
+
+            if let Err(e) = tx_result.as_ref() {
                 log::warn!("Monitored transaction execution failed. {}", e);
                 monitor.log_event(Event::TxErrored(tx_hash)).await;
             }
+
+            monitor.record_tx(tx_hash, tx_result).await;
         });
         self.inner().await.pending_tasks.push(handle);
 
@@ -278,18 +288,34 @@ impl Monitor {
         self.inner().await.log_event(event)
     }
 
-    async fn monitor_tx(self, tx_hash: TxHash) -> anyhow::Result<()> {
+    async fn record_tx(&self, tx_hash: TxHash, tx_result: anyhow::Result<TxLifecycle>) {
+        self.inner().await.record_tx(tx_hash, tx_result)
+    }
+
+    async fn monitor_tx(
+        self,
+        created_at: Instant,
+        sent_at: Instant,
+        tx_hash: TxHash,
+    ) -> anyhow::Result<TxLifecycle> {
         self.log_event(Event::TxCreated(tx_hash)).await;
 
         // Wait for the transaction to commit.
         self.wait_for_tx(BlockStatus::Committed, tx_hash).await?;
+        let committed_at = Instant::now();
         self.log_event(Event::TxExecuted(tx_hash)).await;
 
         // Wait for the transaction to verify.
         self.wait_for_tx(BlockStatus::Verified, tx_hash).await?;
+        let verified_at = Instant::now();
         self.log_event(Event::TxVerified(tx_hash)).await;
 
-        Ok(())
+        Ok(TxLifecycle {
+            created_at,
+            sent_at,
+            committed_at,
+            verified_at,
+        })
     }
 
     async fn monitor_priority_op(self, priority_op: PriorityOp) -> anyhow::Result<()> {

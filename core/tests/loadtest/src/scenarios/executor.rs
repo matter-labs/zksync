@@ -60,6 +60,8 @@ impl ScenarioExecutor {
         let logs = self.process().await?;
         self.refund().await?;
 
+        logs.print_summary();
+
         Ok(logs)
     }
 
