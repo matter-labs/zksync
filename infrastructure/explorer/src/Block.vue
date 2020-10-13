@@ -192,9 +192,10 @@ export default {
                         to_explorer_link   = ``;
                         from_onchain_icon  = '';
                         to_onchain_icon    = '';
-                        token              = '';
+                        token              = tx.op.feeToken;
+                        token              = tokens[token].syncSymbol;
                         amount             = '';
-                        fee                = '';
+                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
                         created_at         = tx.created_at;
                         break;
                     case "Withdraw":
@@ -212,6 +213,21 @@ export default {
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
                         created_at         = tx.created_at;
                         break;
+                    case "ForcedExit":
+                        fromAddr           = tx.op.target;
+                        toAddr             = tx.op.target;
+                        from               = shortenHash(tx.op.target, 'unknown account');
+                        to                 = shortenHash(tx.op.target, 'unknown ethAddress');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.op.target}`;
+                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.op.target}`;
+                        from_onchain_icon  = '';
+                        to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
+                        token              = tx.op.token;
+                        token              = tokens[token].syncSymbol;
+                        amount             = '';
+                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        created_at         = tx.created_at;
+                        break;
                     case "FullExit":
                         fromAddr           = tx.op.priority_op.eth_address;
                         toAddr             = tx.op.priority_op.eth_address;
@@ -223,7 +239,7 @@ export default {
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.withdraw_amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.withdraw_amount || 0, token)} ${token}`;
                         created_at         = tx.created_at;
                         fee                = '';
                         break;

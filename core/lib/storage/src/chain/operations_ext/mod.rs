@@ -134,9 +134,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
             let tx_token = operation["token"].as_i64().unwrap_or(-1);
             let tx_type = operation["type"].as_str().unwrap_or("unknown tx_type");
-            let tx_amount = operation["amount"].as_str().unwrap_or("unknown amount");
             let nonce = operation["nonce"].as_i64().unwrap_or(-1);
-            let (tx_from, tx_to, tx_fee) = match tx_type {
+            let (tx_from, tx_to, tx_fee, tx_amount) = match tx_type {
                 "Withdraw" | "Transfer" | "TransferToNew" => (
                     operation["from"]
                         .as_str()
@@ -144,6 +143,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .to_string(),
                     operation["to"].as_str().unwrap_or("unknown to").to_string(),
                     operation["fee"].as_str().map(|v| v.to_string()),
+                    operation["amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount")
+                        .to_string(),
                 ),
                 "ChangePubKey" | "ChangePubKeyOffchain" => (
                     operation["account"]
@@ -155,11 +158,31 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .unwrap_or("unknown to")
                         .to_string(),
                     None,
+                    operation["amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount")
+                        .to_string(),
+                ),
+                "ForcedExit" => (
+                    operation["target"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["target"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    tx.operation["withdraw_amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount")
+                        .to_string(),
                 ),
                 &_ => (
                     "unknown from".to_string(),
                     "unknown to".to_string(),
                     Some("unknown fee".to_string()),
+                    "unknown amount".to_string(),
                 ),
             };
 
@@ -174,7 +197,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 from: tx_from,
                 to: tx_to,
                 token: tx_token as i32,
-                amount: tx_amount.to_string(),
+                amount: tx_amount,
                 fee: tx_fee,
                 block_number,
                 nonce,

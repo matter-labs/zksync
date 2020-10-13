@@ -216,12 +216,13 @@ export default {
                     { name: "Type",                     value: `${this.txData.tx_type}`   },
                     { name: "Status",                   value: `${this.txData.status}` },
                     { name: "Account",                  value: `<a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
+                    { name: "fee",                      value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee, this.txData.tokenName)}` },
                     { name: "New signer key hash",      value: `${this.txData.to.replace('sync:', '')}`},
                     { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ]
                 : this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit"
                 ? [
-                    { name: 'ETH Tx hash',        value: tx_hash},
+                    { name: 'ETH Tx hash',    value: tx_hash},
                     { name: "Type",           value: `${this.txData.tx_type}`   },
                     { name: "Status",         value: `${this.txData.status}` },
                     { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
