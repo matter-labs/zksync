@@ -181,6 +181,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         '0x' || encode(tx_hash, 'hex') as tx_hash,
                         tx as op,
                         block_number,
+                        success,
+                        fail_reason,
                         created_at
                     FROM executed_transactions
                     WHERE block_number = $1
@@ -189,6 +191,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         '0x' || encode(eth_hash, 'hex') as tx_hash,
                         operation as op,
                         block_number,
+                        true as success,
+                        Null as fail_reason,
                         created_at
                     FROM executed_priority_operations
                     WHERE block_number = $1
@@ -201,6 +205,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     tx_hash as "tx_hash!",
                     block_number as "block_number!",
                     op as "op!",
+                    success as "success?",
+                    fail_reason as "fail_reason?",
                     created_at as "created_at!"
                 FROM everything
                 ORDER BY created_at DESC

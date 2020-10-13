@@ -58,7 +58,7 @@ export default {
         const { contractAddress } = await client.testnetConfig();
         this.store.contractAddress = contractAddress;
     }
-}
+};
 </script>
 
 <style scoped>

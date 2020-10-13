@@ -14,7 +14,7 @@
         <template v-slot:cell(tx_hash)="data">
             <a :href="`/transactions/${data.item['tx_hash']}`">
                 {{ shortenHash(data.item['tx_hash']) }}
-            </a>    
+            </a>
         </template>
         <template v-slot:cell(type)="data"><span v-html="data.item['type']" /></template>
         <template v-slot:cell(from)="data"><span v-html="data.item['from']" /></template>
@@ -54,7 +54,7 @@ export default {
     computed: {
         fields() {
             return this.transactions.length == 0 ? []
-                 : Object.keys(this.transactions[0]).filter(k => ! ['fromAddr', 'toAddr'].includes(k));
+                 : Object.keys(this.transactions[0]).filter(k => ! ['fromAddr', 'toAddr', 'success'].includes(k));
         },
     },
     components,

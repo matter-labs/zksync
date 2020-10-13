@@ -117,12 +117,12 @@ export default {
             const block = await client.getBlock(this.blockNumber).catch(() => null);
             console.log({block});
             if (!block) {
-                this.loadingStatus = 'not committed'
+                this.loadingStatus = 'not committed';
                 return;
             }
 
             if (block.block_number != this.blockNumber) {
-                this.loadingStatus = 'not committed'
+                this.loadingStatus = 'not committed';
                 return;
             }
 
@@ -150,6 +150,7 @@ export default {
                 let to_explorer_link = "";
                 let from_onchain_icon = "";
                 let to_onchain_icon = "";
+                let success = false;
                 let created_at = "";
 
                 switch (type) {
@@ -165,6 +166,7 @@ export default {
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.op.priority_op.amount, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         fee                = '';
                         break;
@@ -181,6 +183,7 @@ export default {
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.op.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         break;
                     case "ChangePubKey":
@@ -195,6 +198,7 @@ export default {
                         token              = '';
                         amount             = '';
                         fee                = '';
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         break;
                     case "Withdraw":
@@ -210,6 +214,7 @@ export default {
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.op.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         break;
                     case "FullExit":
@@ -224,6 +229,7 @@ export default {
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.op.withdraw_amount, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         fee                = '';
                         break;
@@ -250,9 +256,10 @@ export default {
                     toAddr,
                     amount,
                     fee,
+                    success,
                     created_at: formatDate(created_at),
                 };
-            });
+            }).filter(tx => tx.success);
 
             this.loadingStatus = 'ready';
         },
