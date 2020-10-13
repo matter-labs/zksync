@@ -41,11 +41,14 @@ function cat_logs() {
 
 zksync dummy-prover status | grep -q 'disabled' && zksync dummy-prover enable
 
-# We have to compile server, because otherwise the time to compile it may exceed 15 seconds,
+# We have to compile binaries, because otherwise the time to compile it may exceed 15 seconds,
 # and the test will start without an actually running server.
 f cargo build --bin zksync_server --release
+f cargo build --bin dummy_prover --release
 zksync server &> integration-server.log &
 SERVER_PID=$!
+# Wait a bit, so server and prover won't have conflicts about the workspace lockfile.
+sleep 1 
 zksync dummy-prover &> integration-prover.log &
 PROVER_PID=$!
 

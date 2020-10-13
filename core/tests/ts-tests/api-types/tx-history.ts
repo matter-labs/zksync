@@ -13,8 +13,8 @@ type Deposit = {
         };
         type: "Deposit";
     };
-    success: null;
-    fail_reason: null;
+    success: boolean;
+    fail_reason?: string;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -34,8 +34,8 @@ type FullExit = {
         withdraw_amount: string;
         type: "FullExit";
     };
-    success: null;
-    fail_reason: null;
+    success: boolean;
+    fail_reason?: string;
     commited: boolean;
     verified: boolean;
     created_at: string;

@@ -97,7 +97,7 @@ export default {
     methods: {
         readyStateFromString(s) {
             return {
-                "Failed": -1,
+                "Rejected": -1,
                 "Initiated": 0,
                 "Pending": 1,
                 "Complete": 2,
@@ -249,8 +249,8 @@ export default {
             }
 
             if (this.txData.fail_reason) {
-                rows.push({ name: "Fail reason:", value: `${this.txData.fail_reason}` });
-                rows.find(r => r.name == 'Status').value = 'Failed'
+                rows.push({ name: "Rejection reason:", value: `${this.txData.fail_reason}` });
+                rows.find(r => r.name == 'Status').value = 'Rejected';
             }
 
             return rows;

@@ -33,7 +33,7 @@ export default {
             event.stopPropagation();
         },
         mouseEntered() {
-            this.hover_title = "Click to copy"
+            this.hover_title = "Click to copy";
         },
     },
 };
