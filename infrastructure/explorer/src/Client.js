@@ -200,6 +200,18 @@ export class Client {
                         amount,
                     };
                 }
+                case type == 'ForcedExit': {
+                    const token = this.tokenNameFromSymbol(tx.tx.token);
+                    let amount = (await this.searchTx(hash)).amount;
+                    amount = formatToken(amount, token);
+                    return {
+                        ...data,
+                        from: tx.tx.target,
+                        to: tx.tx.target,
+                        token,
+                        amount,
+                    };
+                }
                 case type == 'Close' || type == 'ChangePubKey': {
                     return {
                         ...data,
