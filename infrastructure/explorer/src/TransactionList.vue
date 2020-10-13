@@ -12,7 +12,6 @@
         class="nowrap"
     >
         <template v-slot:cell(tx_hash)="data">
-            <i v-if="!data.item['success']" class="fas fa-times red"></i>
             <a :href="`/transactions/${data.item['tx_hash']}`">
                 {{ shortenHash(data.item['tx_hash']) }}
             </a>
@@ -63,7 +62,4 @@ export default {
 </script>
 
 <style>
-.red {
-    color: red;
-}
 </style>

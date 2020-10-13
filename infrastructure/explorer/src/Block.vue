@@ -117,12 +117,12 @@ export default {
             const block = await client.getBlock(this.blockNumber).catch(() => null);
             console.log({block});
             if (!block) {
-                this.loadingStatus = 'not committed'
+                this.loadingStatus = 'not committed';
                 return;
             }
 
             if (block.block_number != this.blockNumber) {
-                this.loadingStatus = 'not committed'
+                this.loadingStatus = 'not committed';
                 return;
             }
 
@@ -259,7 +259,7 @@ export default {
                     success,
                     created_at: formatDate(created_at),
                 };
-            });
+            }).filter(tx => tx.success);
 
             this.loadingStatus = 'ready';
         },
