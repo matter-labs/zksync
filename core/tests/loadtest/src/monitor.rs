@@ -74,10 +74,13 @@ impl MonitorInner {
             let mut stats = Summary::default();
             if self.current_stats != stats {
                 log::info!(
-                    "Transactions stats: created: {}, executed: {}, verified: {}",
+                    "Transactions stats: created: {}, executed: {}, verified: {}; operations: created: {}, executed: {}, verified: {}",
                     self.current_stats.txs.created,
                     self.current_stats.txs.executed,
-                    self.current_stats.txs.verified
+                    self.current_stats.txs.verified,
+                    self.current_stats.ops.created,
+                    self.current_stats.ops.executed,
+                    self.current_stats.ops.verified,
                 );
 
                 self.journal.record_stats(now, self.current_stats);

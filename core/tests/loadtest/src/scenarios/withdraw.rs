@@ -10,7 +10,7 @@ use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
 use super::{Scenario, ScenarioResources};
 use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all};
 
-/// Configuration options for the transfers scenario.
+/// Configuration options for the withdraw scenario.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct WithdrawScenarioConfig {
     /// Amount of intermediate wallets to use.
@@ -123,13 +123,14 @@ impl WithdrawScenario {
             .wait_for_tx(BlockStatus::Verified, monitor.send_tx(tx, sign).await?)
             .await?;
 
-        await_condition!(std::time::Duration::from_millis(1_000), {
+        await_condition!(
+            std::time::Duration::from_millis(1_00),
             wallet.eth_balance().await? >= amount
-        });
+        );
 
         let amount = closest_packable_token_amount(&(wallet.eth_balance().await? - sufficient_fee));
         monitor
-            .wait_for_priority_op(BlockStatus::Committed, &wallet.deposit(amount).await?)
+            .wait_for_priority_op(BlockStatus::Verified, &wallet.deposit(amount).await?)
             .await?;
 
         Ok(())

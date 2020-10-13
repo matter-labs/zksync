@@ -219,6 +219,22 @@ impl TestWallet {
             .await
     }
 
+    // Performs a full exit operation.
+    pub async fn full_exit(&self) -> anyhow::Result<PriorityOp> {
+        let eth_tx_hash = self
+            .eth_provider
+            .full_exit(
+                self.token_name.clone(),
+                self.account_id()
+                    .expect("An attempt to perform full exit on a wallet without account_id."),
+            )
+            .await?;
+
+        self.monitor
+            .get_priority_op(&self.eth_provider, eth_tx_hash)
+            .await
+    }
+
     /// Returns appropriate nonce for the new transaction and increments the nonce.
     fn pending_nonce(&self) -> u32 {
         self.nonce.fetch_add(1, Ordering::SeqCst)

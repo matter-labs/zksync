@@ -16,3 +16,7 @@ wallets_amount = 100
 name = "withdraw"
 wallets_amount = 10
 withdraw_rounds = 10
+
+[[scenarios]]
+name = "full_exit"
+wallets_amount = 10

@@ -4,7 +4,8 @@
 //! operations between them".
 
 pub use self::{
-    executor::ScenarioExecutor, transfers::TransferScenarioConfig, withdraw::WithdrawScenarioConfig,
+    executor::ScenarioExecutor, full_exit::FullExitScenarioConfig,
+    transfers::TransferScenarioConfig, withdraw::WithdrawScenarioConfig,
 };
 
 // Built-in uses
@@ -15,10 +16,11 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 // Local uses
-use self::{transfers::TransferScenario, withdraw::WithdrawScenario};
+use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::WithdrawScenario};
 use crate::{monitor::Monitor, test_wallet::TestWallet};
 
 mod executor;
+mod full_exit;
 mod transfers;
 mod withdraw;
 
@@ -63,6 +65,7 @@ pub trait Scenario: Debug + Display {
 pub enum ScenarioConfig {
     Transfer(TransferScenarioConfig),
     Withdraw(WithdrawScenarioConfig),
+    FullExit(FullExitScenarioConfig),
 }
 
 impl ScenarioConfig {
@@ -70,6 +73,7 @@ impl ScenarioConfig {
         match self {
             Self::Transfer(cfg) => Box::new(TransferScenario::from(cfg)),
             Self::Withdraw(cfg) => Box::new(WithdrawScenario::from(cfg)),
+            Self::FullExit(cfg) => Box::new(FullExitScenario::from(cfg)),
         }
     }
 }
