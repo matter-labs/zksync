@@ -137,7 +137,10 @@ export default {
             const txs = await client.getBlockTransactions(this.blockNumber);
             const tokens = await client.tokensPromise;
 
-            this.transactions = txs.map(tx => {
+            // TODO: Remove the hack to get the amount field in ForceExit operations
+            // API needs to be updated
+            
+            this.transactions = await Promise.all(txs.map(async (tx) => {
                 const type = tx.op.type;
                 let fromAddr = "";
                 let toAddr = "";
@@ -229,7 +232,8 @@ export default {
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = '';
+                        amount             = (await client.searchTx(tx.tx_hash)).amount;
+                        amount             = `${formatToken(amount, token)} ${token}`;
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
                         success            = tx.success;
                         created_at         = tx.created_at;
@@ -276,8 +280,8 @@ export default {
                     success,
                     created_at: formatDate(created_at),
                 };
-            }).filter(tx => tx.success);
-
+            }));
+            console.log(this.transactions);
             this.loadingStatus = 'ready';
         },
     },
