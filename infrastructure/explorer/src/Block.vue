@@ -281,7 +281,6 @@ export default {
                     created_at: formatDate(created_at),
                 };
             }));
-            console.log(this.transactions);
             this.loadingStatus = 'ready';
         },
     },
