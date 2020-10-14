@@ -14,7 +14,7 @@ type Deposit = {
         type: 'Deposit';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -35,7 +35,7 @@ type FullExit = {
         type: 'FullExit';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;

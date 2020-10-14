@@ -16,7 +16,7 @@ type Transfer = {
         type: 'Transfer';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -34,7 +34,7 @@ type Deposit = {
         type: 'Deposit';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -56,7 +56,7 @@ type ChangePubKey = {
         type: 'ChangePubKey';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -79,7 +79,7 @@ type Withdraw = {
         fast: boolean;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -96,7 +96,7 @@ type FullExit = {
         withdraw_amount: string | null;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -116,7 +116,7 @@ type ForcedExit = {
         };
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
