@@ -1,7 +1,7 @@
 // Built-in import
 use std::{
     cmp::{max, min},
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     time::{Duration, Instant},
 };
 // External uses
@@ -40,6 +40,10 @@ impl TxLifecycle {
     pub fn commit_duration(&self) -> Duration {
         self.committed_at.duration_since(self.sent_at)
     }
+
+    pub fn verify_duration(&self) -> Duration {
+        self.verified_at.duration_since(self.committed_at)
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -57,9 +61,10 @@ impl Journal {
         self.txs.clear()
     }
 
-    pub fn five_stats_summary(&self) -> anyhow::Result<HashMap<String, FiveSummaryStats>> {
+    pub fn five_stats_summary(&self) -> anyhow::Result<BTreeMap<String, FiveSummaryStats>> {
         let mut sending = Vec::new();
         let mut committing = Vec::new();
+        let mut verifying = Vec::new();
 
         for (tx_hash, tx_result) in &self.txs {
             let tx_lifecycle = tx_result.as_ref().map_err(|err| {
@@ -72,15 +77,17 @@ impl Journal {
 
             sending.push(tx_lifecycle.send_duration().as_millis());
             committing.push(tx_lifecycle.commit_duration().as_millis());
+            verifying.push(tx_lifecycle.verify_duration().as_millis());
         }
 
-        let mut output = HashMap::new();
-        output.insert("sending".to_owned(), FiveSummaryStats::from_data(&sending));
-        output.insert(
-            "committing".to_owned(),
-            FiveSummaryStats::from_data(&committing),
-        );
-        Ok(output)
+        Ok([
+            ("sending", sending),
+            ("committing", committing),
+            ("verifying", verifying),
+        ]
+        .iter()
+        .map(|(category, data)| (category.to_string(), FiveSummaryStats::from_data(data)))
+        .collect())
     }
 }
 
