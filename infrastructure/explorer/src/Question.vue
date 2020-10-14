@@ -6,5 +6,5 @@
 export default {
     name: 'Question',
     props: ['text'],
-}
+};
 </script>

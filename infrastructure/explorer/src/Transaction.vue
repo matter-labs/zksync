@@ -97,7 +97,7 @@ export default {
     methods: {
         readyStateFromString(s) {
             return {
-                "Failed": -1,
+                "Rejected": -1,
                 "Initiated": 0,
                 "Pending": 1,
                 "Complete": 2,
@@ -216,12 +216,13 @@ export default {
                     { name: "Type",                     value: `${this.txData.tx_type}`   },
                     { name: "Status",                   value: `${this.txData.status}` },
                     { name: "Account",                  value: `<a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
+                    { name: "fee",                      value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee, this.txData.tokenName)}` },
                     { name: "New signer key hash",      value: `${this.txData.to.replace('sync:', '')}`},
                     { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ]
                 : this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit"
                 ? [
-                    { name: 'ETH Tx hash',        value: tx_hash},
+                    { name: 'ETH Tx hash',    value: tx_hash},
                     { name: "Type",           value: `${this.txData.tx_type}`   },
                     { name: "Status",         value: `${this.txData.status}` },
                     { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
@@ -248,8 +249,8 @@ export default {
             }
 
             if (this.txData.fail_reason) {
-                rows.push({ name: "Fail reason:", value: `${this.txData.fail_reason}` });
-                rows.find(r => r.name == 'Status').value = 'Failed'
+                rows.push({ name: "Rejection reason:", value: `${this.txData.fail_reason}` });
+                rows.find(r => r.name == 'Status').value = 'Rejected';
             }
 
             return rows;
