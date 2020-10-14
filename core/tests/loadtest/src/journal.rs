@@ -5,8 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 // External uses
-use num::Num;
-use statrs::statistics::{Max, Median, Min, Statistics};
+use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_types::tx::TxHash;
 // Local uses
@@ -20,7 +19,7 @@ pub struct Stats {
 }
 
 #[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Summary {
+pub struct Sample {
     pub txs: Stats,
     pub ops: Stats,
 }
@@ -34,11 +33,11 @@ pub struct TxLifecycle {
 }
 
 impl TxLifecycle {
-    pub fn sending_duration(&self) -> Duration {
+    pub fn send_duration(&self) -> Duration {
         self.sent_at.duration_since(self.created_at)
     }
 
-    pub fn committing_duration(&self) -> Duration {
+    pub fn commit_duration(&self) -> Duration {
         self.committed_at.duration_since(self.sent_at)
     }
 }
@@ -58,82 +57,46 @@ impl Journal {
         self.txs.clear()
     }
 
-    pub fn print_summary(&self) {
-        let result = self
-            .txs
-            .iter()
-            .map(|(tx_hash, result)| match result {
-                Ok(tx_lifecycle) => Ok((
-                    tx_lifecycle.sending_duration().as_millis(),
-                    tx_lifecycle.committing_duration().as_millis(),
-                )),
-                Err(err) => Err((*tx_hash, err.to_owned())),
-            })
-            .collect::<Result<Vec<(_, _)>, (TxHash, String)>>();
+    pub fn five_stats_summary(&self) -> anyhow::Result<HashMap<String, FiveSummaryStats>> {
+        let mut sending = Vec::new();
+        let mut committing = Vec::new();
 
-        match result {
-            Ok(txs) => {
-                let (sending, committing): (Vec<_>, Vec<_>) = txs.into_iter().unzip();
+        for (tx_hash, tx_result) in &self.txs {
+            let tx_lifecycle = tx_result.as_ref().map_err(|err| {
+                anyhow::anyhow!(
+                    "An error occured while processing a transaction {}: {}",
+                    tx_hash.to_string(),
+                    err
+                )
+            })?;
 
-                Self::print_stats("sending", &sending);
-                Self::print_stats("committing", &committing)
-            }
-
-            Err((tx_hash, err)) => log::error!(
-                "An error occured while processing a transaction {}: {}",
-                tx_hash.to_string(),
-                err
-            ),
+            sending.push(tx_lifecycle.send_duration().as_millis());
+            committing.push(tx_lifecycle.commit_duration().as_millis());
         }
-    }
 
-    fn print_stats(category: &str, data: &[u128]) {
-        debug_assert!(data.len() >= 4);
-
-        let data2 = data.iter().map(|&x| x as f64).collect::<Vec<_>>();
-
-        let min: f64 = Min::min(data2.as_slice());
-        let max: f64 = Max::max(data2.as_slice());
-        let median = data2.median();
-        let std_dev = data2.std_dev();
-
-        log::info!(
-            "Statistics for `{}`: min: {}ms, median: {}ms, max: {}ms, std_dev: {}ms",
-            category,
-            min,
-            median,
-            max,
-            std_dev
+        let mut output = HashMap::new();
+        output.insert("sending".to_owned(), FiveSummaryStats::from_data(&sending));
+        output.insert(
+            "committing".to_owned(),
+            FiveSummaryStats::from_data(&committing),
         );
-
-        let five_stats_summary = FiveSummaryStats::from_data(data.iter().copied());
-
-        log::info!(
-            "Statistics2 for `{}`: min: {}ms, median: {}ms, max: {}ms, lower_quartile: {}ms, \
-            upper_quartile: {}ms, std_dev: {}ms",
-            category,
-            five_stats_summary.min,
-            five_stats_summary.median,
-            five_stats_summary.max,
-            five_stats_summary.lower_quartile,
-            five_stats_summary.upper_quartile,
-            five_stats_summary.std_dev
-        );
+        Ok(output)
     }
 }
 
-struct FiveSummaryStats {
-    min: u128,
-    lower_quartile: u128,
-    median: u128,
-    upper_quartile: u128,
-    max: u128,
-    std_dev: f64,
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct FiveSummaryStats {
+    pub min: u128,
+    pub lower_quartile: u128,
+    pub median: u128,
+    pub upper_quartile: u128,
+    pub max: u128,
+    pub std_dev: f64,
 }
 
 impl FiveSummaryStats {
-    fn from_data(data: impl IntoIterator<Item = u128>) -> Self {
-        let mut data = data.into_iter().collect::<Vec<_>>();
+    fn from_data(data: &[u128]) -> Self {
+        let mut data = data.iter().copied().collect::<Vec<_>>();
         data.sort_unstable();
 
         assert!(data.len() >= 4);

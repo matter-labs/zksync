@@ -59,9 +59,6 @@ impl ScenarioExecutor {
         self.prepare().await?;
         let logs = self.process().await?;
         self.refund().await?;
-
-        logs.print_summary();
-
         Ok(logs)
     }
 

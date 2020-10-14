@@ -8,6 +8,7 @@
 //!   server in real-life conditions.
 
 // Built-in imports
+use std::{fs, path::Path};
 // External uses
 use serde::{Deserialize, Serialize};
 use web3::types::H256;
@@ -44,5 +45,13 @@ impl Default for Config {
             "/config/localhost.toml"
         ));
         toml::from_str(config_str).unwrap()
+    }
+}
+
+impl Config {
+    /// Reads config from the given TOML file.
+    pub fn from_toml(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let content = fs::read_to_string(path)?;
+        toml::from_str(&content).map_err(From::from)
     }
 }

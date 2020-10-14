@@ -23,30 +23,48 @@
 //!   ```
 
 // Built-in import
+use std::path::PathBuf;
 // External uses
-use tokio::runtime::Builder;
+use structopt::StructOpt;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 // Local uses
-use self::{config::Config, scenarios::ScenarioExecutor};
+use loadtest::{Config, ScenarioExecutor};
 
-mod config;
-mod journal;
-#[macro_use]
-mod monitor;
-mod scenarios;
-mod test_wallet;
-mod utils;
+/// An utility for simulating a load similar to a real one.
+#[derive(Debug, StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+struct LoadtestOpts {
+    /// Path to a load test configuration file.
+    #[structopt(short = "p", long)]
+    config_path: Option<PathBuf>,
+    /// Print the results as json file.
+    #[structopt(long)]
+    json_output: bool,
+}
 
-fn main() -> Result<(), anyhow::Error> {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
-    let mut tokio_runtime = Builder::new().threaded_scheduler().enable_all().build()?;
-
     let env_config = ConfigurationOptions::from_env();
-    let config = Config::default();
 
-    tokio_runtime
-        .block_on(async { ScenarioExecutor::new(config, env_config).await?.run().await })?;
+    let opts = LoadtestOpts::from_args();
+
+    let config = opts
+        .config_path
+        .map(Config::from_toml)
+        .transpose()?
+        .unwrap_or_default();
+
+    let executor = ScenarioExecutor::new(config, env_config).await?;
+    let journal = executor.run().await?;
+
+    let summary = journal.five_stats_summary()?;
+    if opts.json_output {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        todo!()
+    }
 
     Ok(())
 }

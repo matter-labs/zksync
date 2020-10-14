@@ -19,7 +19,7 @@ use zksync_types::{
     PriorityOp, ZkSyncTx, H256,
 };
 // Local uses
-use crate::journal::{Journal, Summary, TxLifecycle};
+use crate::journal::{Journal, Sample, TxLifecycle};
 
 type SerialId = u64;
 
@@ -41,7 +41,7 @@ enum Event {
 #[derive(Debug, Default)]
 struct MonitorInner {
     enabled: bool,
-    current_stats: Summary,
+    current_sample: Sample,
     journal: Journal,
     pending_tasks: Vec<JoinHandle<()>>,
 }
@@ -56,15 +56,15 @@ impl MonitorInner {
     fn log_event(&mut self, event: Event) {
         if self.enabled {
             match event {
-                Event::TxCreated(_) => self.current_stats.txs.created += 1,
-                Event::TxExecuted(_) => self.current_stats.txs.executed += 1,
-                Event::TxVerified(_) => self.current_stats.txs.verified += 1,
-                Event::TxErrored(_) => self.current_stats.txs.errored += 1,
+                Event::TxCreated(_) => self.current_sample.txs.created += 1,
+                Event::TxExecuted(_) => self.current_sample.txs.executed += 1,
+                Event::TxVerified(_) => self.current_sample.txs.verified += 1,
+                Event::TxErrored(_) => self.current_sample.txs.errored += 1,
 
-                Event::OpCreated(_) => self.current_stats.ops.created += 1,
-                Event::OpExecuted(_) => self.current_stats.ops.executed += 1,
-                Event::OpVerified(_) => self.current_stats.ops.verified += 1,
-                Event::OpErrored(_) => self.current_stats.ops.errored += 1,
+                Event::OpCreated(_) => self.current_sample.ops.created += 1,
+                Event::OpExecuted(_) => self.current_sample.ops.executed += 1,
+                Event::OpVerified(_) => self.current_sample.ops.verified += 1,
+                Event::OpErrored(_) => self.current_sample.ops.errored += 1,
             }
         }
     }
@@ -75,20 +75,20 @@ impl MonitorInner {
 
     fn store_stats(&mut self) {
         if self.enabled {
-            let mut stats = Summary::default();
+            let mut sample = Sample::default();
 
-            if self.current_stats != stats {
+            if self.current_sample != sample {
                 log::info!(
                     "Transactions stats: created: {}, executed: {}, verified: {}; operations: created: {}, executed: {}, verified: {}",
-                    self.current_stats.txs.created,
-                    self.current_stats.txs.executed,
-                    self.current_stats.txs.verified,
-                    self.current_stats.ops.created,
-                    self.current_stats.ops.executed,
-                    self.current_stats.ops.verified,
+                    self.current_sample.txs.created,
+                    self.current_sample.txs.executed,
+                    self.current_sample.txs.verified,
+                    self.current_sample.ops.created,
+                    self.current_sample.ops.executed,
+                    self.current_sample.ops.verified,
                 );
 
-                swap(&mut self.current_stats, &mut stats);
+                swap(&mut self.current_sample, &mut sample);
             }
         }
     }

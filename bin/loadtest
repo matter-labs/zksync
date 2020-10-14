@@ -1,39 +1,4 @@
 #!/bin/bash
 
-USAGE='Usage: zksync loadtest [-h|--help] [SCENARIO] [PATH_TO_CONFIG]
-where:
-    -h | --help     show this message
-    SCENARIO        {outgoing,execution,real-life,api-test} (outgoing by default)
-    PATH_TO_CONFIG  path to loadtest config (default is 'core/tests/loadtest/src/loadtest.json'
-                    for outgoing/execution and 'core/tests/loadtest/src/configs/reallife.json'
-                    for real-life scenario)'
-
-if [ -z $ZKSYNC_ENV ];
-then 
-    echo "$USAGE"
-    exit 1
-fi
-
-SCENARIO=${1:-outgoing}
-
-case $SCENARIO in
-  outgoing | execution)
-      CONFIG=${2:-"$ZKSYNC_HOME/core/tests/loadtest/src/configs/loadtest.json"}
-      ;;
-  real-life|reallife|real_life)
-      CONFIG=${2:-"$ZKSYNC_HOME/core/tests/loadtest/src/configs/reallife.json"}
-      ;;
-  -h | --help)
-      echo "$USAGE"
-      exit 0
-    ;;
-  *)
-      echo Unknown loadtest scenario
-      echo "$USAGE"
-      exit 1
-    ;;
-esac
-
-echo "Executing $SCENARIO loadtest scenario (config path $CONFIG)"
 cd $ZKSYNC_HOME
-cargo run --release --bin loadtest -- --scenario $SCENARIO $CONFIG
+cargo run --release --bin loadtest -- "${@}"
