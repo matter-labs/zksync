@@ -25,11 +25,12 @@
 // Built-in import
 use std::path::PathBuf;
 // External uses
+use colored::*;
 use structopt::StructOpt;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 // Local uses
-use loadtest::{Config, ScenarioExecutor};
+use loadtest::{Config, FiveSummaryStats, ScenarioExecutor};
 
 /// An utility for simulating a load similar to a real one.
 #[derive(Debug, StructOpt)]
@@ -41,6 +42,25 @@ struct LoadtestOpts {
     /// Print the results as json file.
     #[structopt(long)]
     json_output: bool,
+}
+
+macro_rules! pretty_fmt {
+    ($ms:expr) => {
+        format!("{:.3}s", $ms as f64 / 1000_f64)
+    };
+}
+
+fn print_stats_summary(name: impl AsRef<str>, summary: &FiveSummaryStats) {
+    println!(
+        "    Statistics for {}: [ {} {} {} {} {} ] (std_dev = {})",
+        name.as_ref().green(),
+        pretty_fmt!(summary.min).dimmed(),
+        pretty_fmt!(summary.lower_quartile),
+        pretty_fmt!(summary.median).bold(),
+        pretty_fmt!(summary.upper_quartile),
+        pretty_fmt!(summary.max).dimmed(),
+        pretty_fmt!(summary.std_dev).yellow()
+    );
 }
 
 #[tokio::main]
@@ -63,7 +83,10 @@ async fn main() -> Result<(), anyhow::Error> {
     if opts.json_output {
         println!("{}", serde_json::to_string_pretty(&summary)?);
     } else {
-        todo!()
+        println!("Loadtest finished.");
+        for (category, stats) in &summary {
+            print_stats_summary(category, stats);
+        }
     }
 
     Ok(())

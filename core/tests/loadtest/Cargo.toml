@@ -29,6 +29,7 @@ tokio = { version = "0.2", features = ["full"] }
 
 anyhow = "1.0"
 chrono = "0.4"
+colored = "2.0.0"
 env_logger = "0.6"
 hex = "0.4"
 log = "0.4"
