@@ -28,7 +28,7 @@ function readableEther(wei) {
 
 export function shortenHash(str, fallback) {
     try {
-        return `${str.slice(0, 14)}...`;
+        return `${str.slice(0, 12)}...`;
     } catch (e) {
         return fallback || 'unknown';
     }

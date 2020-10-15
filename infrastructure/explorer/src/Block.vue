@@ -117,12 +117,12 @@ export default {
             const block = await client.getBlock(this.blockNumber).catch(() => null);
             console.log({block});
             if (!block) {
-                this.loadingStatus = 'not committed'
+                this.loadingStatus = 'not committed';
                 return;
             }
 
             if (block.block_number != this.blockNumber) {
-                this.loadingStatus = 'not committed'
+                this.loadingStatus = 'not committed';
                 return;
             }
 
@@ -137,7 +137,10 @@ export default {
             const txs = await client.getBlockTransactions(this.blockNumber);
             const tokens = await client.tokensPromise;
 
-            this.transactions = txs.map(tx => {
+            // TODO: Remove the hack to get the amount field in ForceExit operations
+            // API needs to be updated
+            
+            const transactions = await Promise.all(txs.map(async (tx) => {
                 const type = tx.op.type;
                 let fromAddr = "";
                 let toAddr = "";
@@ -150,6 +153,7 @@ export default {
                 let to_explorer_link = "";
                 let from_onchain_icon = "";
                 let to_onchain_icon = "";
+                let success = false;
                 let created_at = "";
 
                 switch (type) {
@@ -164,7 +168,8 @@ export default {
                         to_onchain_icon    = '';
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.priority_op.amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.priority_op.amount || 0, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         fee                = '';
                         break;
@@ -181,6 +186,7 @@ export default {
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.op.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         break;
                     case "ChangePubKey":
@@ -192,9 +198,11 @@ export default {
                         to_explorer_link   = ``;
                         from_onchain_icon  = '';
                         to_onchain_icon    = '';
-                        token              = '';
+                        token              = tx.op.feeToken;
+                        token              = token == null ? '' : tokens[token].syncSymbol;
                         amount             = '';
-                        fee                = '';
+                        fee                = tx.op.fee == null ? '' :`${formatToken(tx.op.fee, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         break;
                     case "Withdraw":
@@ -208,8 +216,27 @@ export default {
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.amount || 0, token)} ${token}`;
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        success            = tx.success;
+                        created_at         = tx.created_at;
+                        break;
+                    case "ForcedExit":
+                        fromAddr           = tx.op.target;
+                        toAddr             = tx.op.target;
+                        from               = shortenHash(tx.op.target, 'unknown account');
+                        to                 = shortenHash(tx.op.target, 'unknown ethAddress');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.op.target}`;
+                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.op.target}`;
+                        from_onchain_icon  = '';
+                        to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
+                        token              = tx.op.token;
+                        token              = tokens[token].syncSymbol;
+                        amount             = (await client.searchTx(tx.tx_hash)).amount;
+                        amount             = amount == "unknown amount" ? 0 : amount;
+                        amount             = `${formatToken(amount || 0, token)} ${token}`;
+                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         break;
                     case "FullExit":
@@ -223,7 +250,8 @@ export default {
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.withdraw_amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.withdraw_amount || 0, token)} ${token}`;
+                        success            = tx.success;
                         created_at         = tx.created_at;
                         fee                = '';
                         break;
@@ -250,10 +278,12 @@ export default {
                     toAddr,
                     amount,
                     fee,
+                    success,
                     created_at: formatDate(created_at),
                 };
-            });
+            }));
 
+            this.transactions = transactions.filter(tx => tx.success);
             this.loadingStatus = 'ready';
         },
     },
