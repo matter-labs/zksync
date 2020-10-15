@@ -178,7 +178,10 @@ impl OperationNotifier {
         Ok(res)
     }
 
-    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, anyhow::Error> {
+    async fn get_block_info(
+        &mut self,
+        block_number: u32,
+    ) -> Result<Option<BlockInfo>, anyhow::Error> {
         let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
             block_info.clone()
         } else {
@@ -207,7 +210,8 @@ impl OperationNotifier {
                     verified,
                 }
             } else {
-                bail!("Transaction is executed but block is not committed. (bug)");
+                // It's OK: transaction is pending, block was not finalized yet.
+                return Ok(None);
             };
 
             transaction.commit().await?;
@@ -222,7 +226,7 @@ impl OperationNotifier {
 
             block_info
         };
-        Ok(res)
+        Ok(Some(res))
     }
 
     async fn handle_priority_op_sub(
@@ -254,24 +258,26 @@ impl OperationNotifier {
                         &sink,
                         ETHOpInfoResp {
                             executed: true,
-                            block: Some(block_info),
+                            block: block_info,
                         },
                     );
                     return Ok(());
                 }
                 ActionType::VERIFY => {
-                    if block_info.verified {
-                        let sink = sub
-                            .assign_id(sub_id)
-                            .map_err(|_| format_err!("SubIdAssign"))?;
-                        self.send_once(
-                            &sink,
-                            ETHOpInfoResp {
-                                executed: true,
-                                block: Some(block_info),
-                            },
-                        );
-                        return Ok(());
+                    if let Some(block_info) = block_info {
+                        if block_info.verified {
+                            let sink = sub
+                                .assign_id(sub_id)
+                                .map_err(|_| format_err!("SubIdAssign"))?;
+                            self.send_once(
+                                &sink,
+                                ETHOpInfoResp {
+                                    executed: true,
+                                    block: Some(block_info),
+                                },
+                            );
+                            return Ok(());
+                        }
                     }
                 }
             }
