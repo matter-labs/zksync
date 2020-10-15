@@ -216,12 +216,6 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         drop(connection);
 
         for operation in new_operations {
-            log::info!(
-                "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
-                operation.id.expect("ID must be set"),
-                operation.action.to_string(),
-                operation.block.block_number
-            );
             self.add_operation_to_queue(operation);
         }
     }
@@ -749,7 +743,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 
                 self.tx_queue.add_commit_operation(TxData::from_operation(
                     OperationType::Commit,
-                    op,
+                    op.clone(),
                     raw_tx,
                 ));
             }
@@ -761,10 +755,17 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 
                 self.tx_queue.add_verify_operation(
                     block_number as usize,
-                    TxData::from_operation(OperationType::Verify, op, raw_tx),
+                    TxData::from_operation(OperationType::Verify, op.clone(), raw_tx),
                 );
             }
         }
+
+        log::info!(
+            "Added ZKSync operation <id {}; action: {}; block: {}> to queue",
+            op.id.expect("ID must be set"),
+            op.action.to_string(),
+            op.block.block_number
+        );
     }
 
     /// The same as `add_operation_to_queue`, but for the withdraw operation.
