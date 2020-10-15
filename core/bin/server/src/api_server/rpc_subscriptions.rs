@@ -23,7 +23,6 @@ use crate::{
     committer::ExecutedOpsNotify,
     mempool::MempoolRequest,
     signature_checker::VerifyTxSignatureRequest,
-    state_keeper::StateKeeperRequest,
     utils::current_zksync_info::CurrentZkSyncInfo,
 };
 
@@ -186,7 +185,6 @@ pub fn start_ws_server(
     db_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
-    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
@@ -204,7 +202,6 @@ pub fn start_ws_server(
         op_recv,
         event_sub_receiver,
         executed_tx_receiver,
-        state_keeper_request_sender.clone(),
         each_cache_size,
     );
 
@@ -212,7 +209,6 @@ pub fn start_ws_server(
         &config_options,
         db_pool,
         mempool_request_sender,
-        state_keeper_request_sender,
         sign_verify_request_sender,
         eth_watcher_request_sender,
         ticker_request_sender,

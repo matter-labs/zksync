@@ -254,7 +254,6 @@ fn main() {
             stop_signal_sender.clone(),
             mempool_request_sender.clone(),
             executed_tx_notify_receiver,
-            state_keeper_req_sender.clone(),
             eth_watch_req_sender.clone(),
             ticker_request_sender,
             config_opts.clone(),
