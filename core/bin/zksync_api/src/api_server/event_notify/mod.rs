@@ -17,6 +17,8 @@ mod operation_notifier;
 mod state;
 mod sub_store;
 
+const NOTIFIER_CHANNEL_CAPACITY: usize = 32_768;
+
 #[derive(Debug)]
 pub struct ExecutedOps {
     pub operations: Vec<ExecutedOperations>,
@@ -58,8 +60,8 @@ pub fn start_sub_notifier(
     api_requests_caches_size: usize,
     miniblock_interval: Duration,
 ) -> tokio::task::JoinHandle<()> {
-    let (new_block_sender, mut new_block_receiver) = mpsc::channel(32_728);
-    let (new_txs_sender, mut new_txs_receiver) = mpsc::channel(32_728);
+    let (new_block_sender, mut new_block_receiver) = mpsc::channel(NOTIFIER_CHANNEL_CAPACITY);
+    let (new_txs_sender, mut new_txs_receiver) = mpsc::channel(NOTIFIER_CHANNEL_CAPACITY);
 
     let mut notifier = OperationNotifier::new(api_requests_caches_size, db_pool.clone());
 

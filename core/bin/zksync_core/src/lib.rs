@@ -18,6 +18,8 @@ use tokio::task::JoinHandle;
 use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
 
+const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
+
 pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
@@ -138,12 +140,13 @@ pub async fn run_core(
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let config_opts = ConfigurationOptions::from_env();
 
-    let channel_size = 32768;
-
-    let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(channel_size);
-    let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(channel_size);
-    let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(channel_size);
-    let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(channel_size);
+    let (proposed_blocks_sender, proposed_blocks_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+    let (state_keeper_req_sender, state_keeper_req_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+    let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+    let (mempool_request_sender, mempool_request_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
 
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
