@@ -19,9 +19,23 @@ use zksync_types::{
     PriorityOp, ZkSyncTx, H256,
 };
 // Local uses
-use crate::journal::{Journal, Sample, TxLifecycle};
+use crate::journal::{Journal, TxLifecycle};
 
 type SerialId = u64;
+
+#[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+struct Stats {
+    created: u64,
+    executed: u64,
+    verified: u64,
+    errored: u64,
+}
+
+#[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+struct Sample {
+    txs: Stats,
+    ops: Stats,
+}
 
 #[derive(Debug)]
 enum Event {

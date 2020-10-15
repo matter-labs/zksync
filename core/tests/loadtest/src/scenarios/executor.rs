@@ -1,7 +1,9 @@
 // Built-in uses
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 // External uses
+use futures::{future::BoxFuture, FutureExt};
 use num::BigUint;
+use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::{types::BlockStatus, utils::closest_packable_token_amount, Provider};
 use zksync_config::ConfigurationOptions;
@@ -14,9 +16,17 @@ use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
     utils::{try_wait_all, wait_all},
+    FiveSummaryStats,
 };
 
-#[derive(Debug)]
+type ApiTestsFuture = BoxFuture<'static, anyhow::Result<BTreeMap<String, FiveSummaryStats>>>;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Report {
+    pub scenarios: BTreeMap<String, FiveSummaryStats>,
+    pub api: BTreeMap<String, FiveSummaryStats>,
+}
+
 pub struct ScenarioExecutor {
     /// Main account to deposit ETH from / return ETH back to.
     main_wallet: TestWallet,
@@ -25,6 +35,7 @@ pub struct ScenarioExecutor {
     /// Estimated fee amount for any zkSync operation.
     sufficient_fee: BigUint,
     scenarios: Vec<(Box<dyn Scenario>, Vec<TestWallet>)>,
+    api_tests: Option<ApiTestsFuture>,
 }
 
 impl ScenarioExecutor {
@@ -46,20 +57,33 @@ impl ScenarioExecutor {
 
         log::info!("Fee is {}", format_ether(&sufficient_fee));
 
+        let api_tests = crate::api::run(
+            monitor.clone(),
+            TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options).await,
+        )
+        .boxed();
+
         Ok(Self {
             monitor,
             eth_options,
             main_wallet,
             scenarios,
             sufficient_fee,
+            api_tests: Some(api_tests),
         })
     }
 
-    pub async fn run(mut self) -> anyhow::Result<Journal> {
+    pub async fn run(mut self) -> anyhow::Result<Report> {
         self.prepare().await?;
-        let logs = self.process().await?;
+        // Spawn an additional load routine with a lot of API requests.
+        let api_handle = tokio::spawn(self.api_tests.take().unwrap());
+        let journal = self.process().await?;
         self.refund().await?;
-        Ok(logs)
+
+        Ok(Report {
+            scenarios: journal.five_stats_summary()?,
+            api: api_handle.await??,
+        })
     }
 
     /// Makes initial deposit to the main wallet.

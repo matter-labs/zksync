@@ -10,20 +10,6 @@ use serde::{Deserialize, Serialize};
 use zksync_types::tx::TxHash;
 // Local uses
 
-#[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Stats {
-    pub created: u64,
-    pub executed: u64,
-    pub verified: u64,
-    pub errored: u64,
-}
-
-#[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Sample {
-    pub txs: Stats,
-    pub ops: Stats,
-}
-
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct TxLifecycle {
     pub created_at: Instant,
@@ -75,9 +61,9 @@ impl Journal {
                 )
             })?;
 
-            sending.push(tx_lifecycle.send_duration().as_millis());
-            committing.push(tx_lifecycle.commit_duration().as_millis());
-            verifying.push(tx_lifecycle.verify_duration().as_millis());
+            sending.push(tx_lifecycle.send_duration().as_micros());
+            committing.push(tx_lifecycle.commit_duration().as_micros());
+            verifying.push(tx_lifecycle.verify_duration().as_micros());
         }
 
         Ok([
@@ -88,6 +74,18 @@ impl Journal {
         .iter()
         .map(|(category, data)| (category.to_string(), FiveSummaryStats::from_data(data)))
         .collect())
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Sample {
+    pub started_at: Instant,
+    pub finished_at: Instant,
+}
+
+impl Sample {
+    pub fn duration(&self) -> Duration {
+        self.finished_at.duration_since(self.started_at)
     }
 }
 
@@ -102,8 +100,11 @@ pub struct FiveSummaryStats {
 }
 
 impl FiveSummaryStats {
-    fn from_data(data: &[u128]) -> Self {
-        let mut data = data.iter().copied().collect::<Vec<_>>();
+    pub fn from_data<'a, I>(data: I) -> Self
+    where
+        I: IntoIterator<Item = &'a u128>,
+    {
+        let mut data = data.into_iter().copied().collect::<Vec<_>>();
         data.sort_unstable();
 
         assert!(data.len() >= 4);
@@ -128,5 +129,17 @@ impl FiveSummaryStats {
             max: data[idx],
             std_dev,
         }
+    }
+
+    pub fn from_samples<'a, I>(samples: I) -> Self
+    where
+        I: IntoIterator<Item = &'a Sample>,
+    {
+        let data = samples
+            .into_iter()
+            .map(|s| s.duration().as_micros())
+            .collect::<Vec<_>>();
+
+        Self::from_data(&data)
     }
 }

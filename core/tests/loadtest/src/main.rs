@@ -46,13 +46,17 @@ struct LoadtestOpts {
 
 macro_rules! pretty_fmt {
     ($ms:expr) => {
-        format!("{:.3}s", $ms as f64 / 1000_f64)
+        if ($ms as f64) < 1_000f64 {
+            format!("{:.3}µs", $ms)
+        } else {
+            format!("{:.3}s", $ms as f64 / 1_000_000_f64)
+        }
     };
 }
 
 fn print_stats_summary(name: impl AsRef<str>, summary: &FiveSummaryStats) {
     println!(
-        "    Statistics for {}: [ {} {} {} {} {} ] (std_dev = {})",
+        "    {}: [ {} {} {} {} {} ] (std_dev = {})",
         name.as_ref().green(),
         pretty_fmt!(summary.min).dimmed(),
         pretty_fmt!(summary.lower_quartile),
@@ -77,14 +81,20 @@ async fn main() -> Result<(), anyhow::Error> {
         .unwrap_or_default();
 
     let executor = ScenarioExecutor::new(config, env_config).await?;
-    let journal = executor.run().await?;
+    let report = executor.run().await?;
 
-    let summary = journal.five_stats_summary()?;
     if opts.json_output {
-        println!("{}", serde_json::to_string_pretty(&summary)?);
+        println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("Loadtest finished.");
-        for (category, stats) in &summary {
+
+        println!("Statistics for scenarios:");
+        for (category, stats) in &report.scenarios {
+            print_stats_summary(category, stats);
+        }
+
+        println!("Statistics for API tests:");
+        for (category, stats) in &report.api {
             print_stats_summary(category, stats);
         }
     }
