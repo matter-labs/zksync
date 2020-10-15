@@ -41,6 +41,11 @@ function cat_logs() {
 
 zksync dummy-prover status | grep -q 'disabled' && zksync dummy-prover enable
 
+# We have to compile binaries, because otherwise the time to compile it may exceed 15 seconds,
+# and the test will start without an actually running server.
+f cargo build --bin zksync_server --release
+f cargo build --bin dummy_prover --release
+
 zksync server &> rust-sdk-server.log &
 SERVER_PID=$!
 zksync dummy-prover &> rust-sdk-prover.log &
