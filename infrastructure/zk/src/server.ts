@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import fs from 'fs';
 import * as utils from './utils';
+import fs from 'fs';
 
 export async function server() {
     await utils.spawn('cargo run --bin zksync_server --release');
@@ -26,8 +26,7 @@ export async function genesis() {
     fs.writeFileSync(envFile, env.replace(/GENESIS_ROOT=.*/g, genesisRoot));
 }
 
-export const command = 
-    new Command('server')
+export const command = new Command('server')
     .description('start zksync server')
     .option('--genesis', 'generate genesis data via server')
     .action(async (cmd: Command) => {
@@ -38,4 +37,3 @@ export const command =
             await server();
         }
     });
-

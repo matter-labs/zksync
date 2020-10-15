@@ -23,8 +23,7 @@ export function spawn(command: string) {
 // loads environment variables
 export function loadEnv() {
     const current = 'etc/env/current';
-    const ZKSYNC_ENV = process.env.ZKSYNC_ENV 
-        || (fs.existsSync(current) ? fs.readFileSync(current).toString() : 'dev');
+    const ZKSYNC_ENV = process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString() : 'dev');
     const ENV_FILE = `etc/env/${ZKSYNC_ENV}.env`;
     if (ZKSYNC_ENV == 'dev' && !fs.existsSync('etc/env/dev.env')) {
         fs.copyFileSync('etc/env/dev.env.example', 'etc/env/dev.env');
