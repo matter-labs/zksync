@@ -47,8 +47,11 @@
                     class="nowrap"
                     :items="transactionProps" 
                     :fields="transactionFields">
+                    <template v-slot:cell(TxHash) ="data">
+                        <i v-if="!data.item['success']" class="fas fa-times brown" />
+                        <span v-html="data.item['TxHash']" />
+                    </template>
                     <template v-slot:cell(Type)   ="data"><span v-html="data.item['Type']"   /></template>
-                    <template v-slot:cell(TxHash) ="data"><span v-html="data.item['TxHash']" /></template>
                     <template v-slot:cell(Block)  ="data"><span v-html="data.item['Block']"  /></template>
                     <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"  /></template>
                     <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']" /></template>
@@ -137,14 +140,14 @@ export default {
             // maybe load the requested page
             if (this.pagesOfTransactions[this.currentPage] == undefined)
                 this.pagesOfTransactions[this.currentPage] 
-                    = await this.client.transactionsAsRenderableList(this.address, offset, limit);
+                    = await this.client.transactionsList(this.address, offset, limit);
 
             let nextPageLoaded = false;
             let numNextPageTransactions;
             
             // maybe load the next page
             if (this.pagesOfTransactions[this.currentPage + 1] == undefined) {
-                let txs = await this.client.transactionsAsRenderableList(this.address, offset + limit, limit);
+                let txs = await this.client.transactionsList(this.address, offset + limit, limit);
                 numNextPageTransactions = txs.length;
                 nextPageLoaded = true;
 
@@ -200,66 +203,65 @@ export default {
         transactionProps() {
             return this.transactions
                 .map(tx => {
-                    if (tx.data.hash.startsWith('sync-tx:')) {
-                        tx.data.hash = tx.data.hash.slice('sync-tx:'.length);
+                    if (tx.hash.startsWith('sync-tx:')) {
+                        tx.hash = tx.hash.slice('sync-tx:'.length);
                     }
 
-                    if (tx.data.type == 'Withdraw') {
-                        tx.data.type = 'Withdrawal';
+                    if (tx.type == 'Withdraw') {
+                        tx.type = 'Withdrawal';
                     }
 
                     let TxHash = `
-                        <a href="${this.routerBase}transactions/${tx.data.hash}">
-                            ${shortenHash(tx.data.hash, 'unknown! hash')}
+                        <a href="${this.routerBase}transactions/${tx.hash}">
+                            ${shortenHash(tx.hash, 'unknown! hash')}
                         </a>`;
 
-                    const link_from = tx.data.type == 'Deposit' 
-                        ? `${this.blockchainExplorerAddress}/${tx.data.from}`
-                        : `${this.routerBase}accounts/${tx.data.from}`;
+                    const link_from = tx.type == 'Deposit' 
+                        ? `${this.blockchainExplorerAddress}/${tx.from}`
+                        : `${this.routerBase}accounts/${tx.from}`;
 
-                    const link_to = tx.data.type == 'Withdrawal' 
-                        ? `${this.blockchainExplorerAddress}/${tx.data.to}`
-                        : `${this.routerBase}accounts/${tx.data.to}`;
+                    const link_to = tx.type == 'Withdrawal' 
+                        ? `${this.blockchainExplorerAddress}/${tx.to}`
+                        : `${this.routerBase}accounts/${tx.to}`;
 
-                    const target_from = tx.data.type == 'Deposit' 
+                    const target_from = tx.type == 'Deposit' 
                         ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    const target_to = tx.data.type == 'Withdrawal' 
+                    const target_to = tx.type == 'Withdrawal' 
                         ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    const onchain_from = tx.data.type == 'Deposit' 
+                    const onchain_from = tx.type == 'Deposit' 
                         ? '<i class="fas fa-external-link-alt"></i> '
                         : '';
 
-                    const onchain_to = tx.data.type == 'Withdrawal' 
+                    const onchain_to = tx.type == 'Withdrawal' 
                         ? '<i class="fas fa-external-link-alt"></i> '
                         : '';
 
                     const From = `
                         <a href="${link_from}" ${target_from}>
-                            ${shortenHash(tx.data.from, 'unknown! from')}
+                            ${shortenHash(tx.from, 'unknown! from')}
                             ${onchain_from}
                         </a>`;
 
                     const To = `
                         <a href="${link_to}" ${target_to}>
                             ${
-                                tx.data.type == "ChangePubKey" 
+                                tx.type == "ChangePubKey" 
                                     ? ''
-                                    : shortenHash(tx.data.to, 'unknown! to')
+                                    : shortenHash(tx.to, 'unknown! to')
                             }
 
-                            ${ tx.data.type == "ChangePubKey" ? '' : onchain_to }
+                            ${ tx.type == "ChangePubKey" ? '' : onchain_to }
                         </a>`;
 
-                    const Type = `${tx.data.type}`;
+                    const Type = `${tx.type}`;
                     const Amount 
-                        = tx.data.type == "ChangePubKey" ? ''
-                        : `${tx.data.token} <span>${tx.data.amount}</span>`;
-
-                    const CreatedAt = formatDate(tx.data.created_at);
+                        = tx.type == "ChangePubKey" ? ''
+                        : `${tx.token} <span>${tx.amount}</span>`;
+                    const CreatedAt = formatDate(tx.created_at);
 
                     return {
                         TxHash,
@@ -268,17 +270,17 @@ export default {
                         From, 
                         To,
                         CreatedAt,
-
-                        fromAddr: tx.data.from,
-                        toAddr: tx.data.to,
-                        hash: tx.data.hash,
+                        success: tx.success,
+                        fromAddr: tx.from,
+                        toAddr: tx.to,
+                        hash: tx.hash,
                     };
                 });
         },
         transactionFields() {
             return this.transactionProps && this.transactionProps.length
                  ? Object.keys(this.transactionProps[0])
-                    .filter(k => ! ['hash', 'fromAddr', 'toAddr'].includes(k))
+                    .filter(k => ! ['hash', 'fromAddr', 'toAddr', 'success'].includes(k))
                  : [];
         }
     },
@@ -300,5 +302,8 @@ export default {
 }
 .bigger-text {
     font-size: 1.05em;
+}
+.brown {
+    color: #AA935D;
 }
 </style>
