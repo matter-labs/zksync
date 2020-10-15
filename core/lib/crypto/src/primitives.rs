@@ -3,19 +3,14 @@ use std::convert::TryInto;
 // External deps
 use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
-use crate::franklin_crypto::bellman::pairing::ff::{
-    BitIterator, Field, PrimeField, PrimeFieldRepr,
-};
+use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
-use crate::franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
-use failure::bail;
-use num::{BigUint, FromPrimitive, ToPrimitive};
+use anyhow::bail;
+use num::{BigUint, ToPrimitive};
 use zksync_basic_types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
-use crate::merkle_tree::{
-    hasher::Hasher, pedersen_hasher::BabyPedersenHasher, rescue_hasher::BabyRescueHasher,
-};
+use crate::merkle_tree::{hasher::Hasher, rescue_hasher::BabyRescueHasher};
 use crate::params;
 
 // TODO: replace Vec with Iterator?
@@ -44,26 +39,6 @@ pub trait GetBitsFixed {
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool>;
 }
 
-pub fn get_bits_le_fixed_u128(num: u128, n: usize) -> Vec<bool> {
-    let mut r: Vec<bool> = Vec::with_capacity(n);
-    let it_end = if n > 128 { 128 } else { n };
-    let mut tmp = num;
-    for _ in 0..it_end {
-        let bit = tmp & 1u128 > 0;
-        r.push(bit);
-        tmp >>= 1;
-    }
-    r.resize(n, false);
-
-    r
-}
-
-pub fn get_bits_le_fixed_big_decimal(num: BigUint, n: usize) -> Vec<bool> {
-    let as_u128 = num.to_u128().unwrap();
-
-    get_bits_le_fixed_u128(as_u128, n)
-}
-
 impl<Fr: PrimeField> GetBitsFixed for Fr {
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool> {
         let mut r: Vec<bool> = Vec::with_capacity(n);
@@ -72,38 +47,6 @@ impl<Fr: PrimeField> GetBitsFixed for Fr {
         r.extend((len..n).map(|_| false));
         r
     }
-}
-
-pub fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
-    let mut iterator: Vec<bool> = BitIterator::new(fr.into_repr()).collect();
-    iterator.reverse();
-    iterator.truncate(32);
-    let mut res = 0u32;
-    let mut base = 1u32;
-    for bit in iterator {
-        if bit {
-            res += base;
-        }
-        base <<= 1;
-    }
-
-    res
-}
-
-pub fn field_element_to_u128<P: PrimeField>(fr: P) -> u128 {
-    let mut iterator: Vec<bool> = BitIterator::new(fr.into_repr()).collect();
-    iterator.reverse();
-    iterator.truncate(128);
-    let mut res = 0u128;
-    let mut base = 1u128;
-    for bit in iterator {
-        if bit {
-            res += base;
-        }
-        base <<= 1;
-    }
-
-    res
 }
 
 pub fn serialize_g1_for_ethereum(point: &<Bn256 as Engine>::G1Affine) -> (U256, U256) {
@@ -147,57 +90,6 @@ pub fn serialize_fe_for_ethereum(field_element: &<Bn256 as ScalarEngine>::Fr) ->
         .expect("get new root BE bytes");
     U256::from_big_endian(&be_bytes[..])
 }
-
-pub fn unpack_edwards_point<E: JubjubEngine>(
-    serialized: [u8; 32],
-    params: &E::Params,
-) -> Result<edwards::Point<E, Unknown>, String> {
-    // TxSignature has S and R in compressed form serialized as BE
-    let x_sign = serialized[0] & 0x80 > 0;
-    let mut tmp = serialized;
-    tmp[0] &= 0x7f; // strip the top bit
-
-    // read from byte array
-    let mut y_repr = E::Fr::zero().into_repr();
-    y_repr.read_be(&tmp[..]).expect("read R_y as field element");
-
-    let y = E::Fr::from_repr(y_repr).expect("make y from representation");
-
-    // here we convert it to field elements for all further uses
-    let r = edwards::Point::get_for_y(y, x_sign, params);
-    if r.is_none() {
-        return Err("Invalid R point".to_string());
-    }
-
-    Ok(r.unwrap())
-}
-
-pub fn pack_edwards_point<E: JubjubEngine>(
-    point: edwards::Point<E, Unknown>,
-) -> Result<[u8; 32], String> {
-    let mut tmp = [0u8; 32];
-    let (y, sign) = point.compress_into_y();
-    y.into_repr().write_be(&mut tmp[..]).expect("write y");
-    if sign {
-        tmp[0] |= 0x80
-    }
-
-    Ok(tmp)
-}
-
-#[test]
-fn test_get_bits() {
-    use crate::franklin_crypto::bellman::pairing::bn256::Fr;
-
-    // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
-    let bits = Fr::from_str("12").unwrap().get_bits_le_fixed(3);
-    assert_eq!(bits, vec![false, false, true]);
-
-    let bits = Fr::from_str("0").unwrap().get_bits_le_fixed(512);
-    assert_eq!(bits, vec![false; 512]);
-}
-
-//
 
 // Resulting iterator is little endian: lowest bit first
 
@@ -306,21 +198,12 @@ pub fn pack_as_float(number: &BigUint, exponent_len: usize, mantissa_len: usize)
     pack_bits_into_bytes_in_order(vec)
 }
 
-pub fn unpack_as_big_decimal(
-    bytes: &[u8],
-    exponent_len: usize,
-    mantissa_len: usize,
-) -> Option<BigUint> {
-    let amount = unpack_float(bytes, exponent_len, mantissa_len)?;
-    BigUint::from_u128(amount)
-}
-
 pub fn convert_to_float(
     integer: u128,
     exponent_length: usize,
     mantissa_length: usize,
     exponent_base: u32,
-) -> Result<Vec<bool>, failure::Error> {
+) -> Result<Vec<bool>, anyhow::Error> {
     let exponent_base = u128::from(exponent_base);
 
     let mut max_exponent = 1u128;
@@ -402,16 +285,6 @@ pub fn bytes_into_be_bits(bytes: &[u8]) -> Vec<bool> {
     bits
 }
 
-pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
-    let mut msg_bits = bytes_into_be_bits(msg);
-    msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
-    let hasher = &params::PEDERSEN_HASHER as &BabyPedersenHasher;
-    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
-    let mut hash_bits = Vec::new();
-    append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
-    pack_bits_into_bytes(hash_bits)
-}
-
 pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let mut msg_bits = bytes_into_be_bits(msg);
     msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
@@ -426,9 +299,7 @@ pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
-    for _ in 0..4 - size {
-        vec.push(0);
-    }
+    vec.extend(vec![0; 4 - size]);
     vec.reverse();
     let new_bytes = vec.as_slice();
     Some(u32::from_be_bytes(new_bytes.try_into().ok()?))
@@ -438,9 +309,7 @@ pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
-    for _ in 0..2 - size {
-        vec.push(0);
-    }
+    vec.extend(vec![0; 2 - size]);
     vec.reverse();
     let new_bytes = vec.as_slice();
     Some(u16::from_be_bytes(new_bytes.try_into().ok()?))
@@ -450,9 +319,7 @@ pub fn bytes_slice_to_uint128(bytes: &[u8]) -> Option<u128> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
-    for _ in 0..16 - size {
-        vec.push(0);
-    }
+    vec.extend(vec![0; 16 - size]);
     vec.reverse();
     let new_bytes = vec.as_slice();
     Some(u128::from_be_bytes(new_bytes.try_into().ok()?))
@@ -471,6 +338,19 @@ pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::franklin_crypto::bellman::pairing::ff::BitIterator;
+
+    #[test]
+    fn test_get_bits() {
+        use crate::franklin_crypto::bellman::pairing::bn256::Fr;
+
+        // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
+        let bits = Fr::from_str("12").unwrap().get_bits_le_fixed(3);
+        assert_eq!(bits, vec![false, false, true]);
+
+        let bits = Fr::from_str("0").unwrap().get_bits_le_fixed(512);
+        assert_eq!(bits, vec![false; 512]);
+    }
 
     #[test]
     fn test_bit_iterator_e() {

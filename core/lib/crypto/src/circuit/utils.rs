@@ -40,7 +40,7 @@ pub fn pub_key_hash_bytes<E: JubjubEngine, H: Hasher<E::Fr>>(
     le_bit_vector_into_bytes(&pk_hash_bits)
 }
 
-pub fn le_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
+fn le_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
     let mut bytes: Vec<u8> = vec![];
 
     let byte_chunks = bits.chunks(8);
@@ -93,7 +93,7 @@ pub fn be_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
-pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
+pub(crate) fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
     let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
     token_bits.reverse();
     // token_bits.truncate(width);
@@ -107,20 +107,6 @@ pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
     token_bits.resize(width, false);
     token_bits.reverse();
     content.extend(token_bits);
-}
-
-pub fn encode_fs_into_fr<E: JubjubEngine>(input: E::Fs) -> E::Fr {
-    let mut fs_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
-    fs_le_bits.reverse();
-
-    le_bit_vector_into_field_element::<E::Fr>(&fs_le_bits)
-}
-
-pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
-    let mut fr_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
-    fr_le_bits.reverse();
-
-    le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits)
 }
 
 pub fn eth_address_to_fr(address: &Address) -> Fr {

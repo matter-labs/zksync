@@ -4,16 +4,15 @@ use futures::{channel::oneshot, SinkExt};
 use jsonrpc_core::{Error, Result};
 use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
-use models::{
+use zksync_types::{
     tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, Token, TokenLike, TxFeeTypes,
+    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
 use crate::{
     fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
-    state_keeper::StateKeeperRequest,
 };
 use bigdecimal::BigDecimal;
 
@@ -24,33 +23,8 @@ impl RpcApp {
         use std::time::Instant;
 
         let started = Instant::now();
-        let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
 
-        let state_keeper_response = oneshot::channel();
-        let state_keeper_future = state_keeper_request_sender.send(StateKeeperRequest::GetAccount(
-            address,
-            state_keeper_response.0,
-        ));
-
-        state_keeper_future.await.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
-            Error::internal_error()
-        })?;
-
-        let committed_account_state = state_keeper_response.1.await.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {}", err, address,);
-            Error::internal_error()
-        })?;
-
-        let (id, committed) = if let Some((id, account)) = committed_account_state {
-            let restored_state =
-                ResponseAccountState::try_restore(account, &self.token_cache).await?;
-            (Some(id), restored_state)
-        } else {
-            (None, Default::default())
-        };
-
-        let verified = self.get_verified_account_state(&address).await?;
+        let account_state = self.get_account_state(&address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
         let depositing =
@@ -64,9 +38,9 @@ impl RpcApp {
 
         Ok(AccountInfoResp {
             address,
-            id,
-            committed,
-            verified,
+            id: account_state.account_id,
+            committed: account_state.committed,
+            verified: account_state.verified,
             depositing,
         })
     }
@@ -120,7 +94,7 @@ impl RpcApp {
 
     pub async fn _impl_tx_submit(
         self,
-        mut tx: Box<FranklinTx>,
+        mut tx: Box<ZkSyncTx>,
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> Result<TxHash> {
@@ -130,6 +104,10 @@ impl RpcApp {
                 message: "Account close tx is disabled.".to_string(),
                 data: None,
             });
+        }
+
+        if let ZkSyncTx::ForcedExit(forced_exit) = &*tx {
+            self.check_forced_exit(&forced_exit).await?;
         }
 
         let fast_processing = fast_processing.unwrap_or_default(); // `None` => false
@@ -143,7 +121,7 @@ impl RpcApp {
             });
         }
 
-        if let FranklinTx::Withdraw(withdraw) = tx.as_mut() {
+        if let ZkSyncTx::Withdraw(withdraw) = tx.as_mut() {
             if withdraw.fast {
                 // We set `fast` field ourselves, so we have to check that user did not set it themselves.
                 return Err(Error {
@@ -167,16 +145,18 @@ impl RpcApp {
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
         let ticker_request_sender = self.ticker_request_sender.clone();
-        let ops_counter = self.ops_counter.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+            let should_enforce_fee =
+                !matches!(tx_type, TxFeeTypes::ChangePubKey{..}) || self.enforce_pubkey_change_fee;
+
             let required_fee =
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
             // We allow fee to be 5% off the required fee
             let scaled_provided_fee =
                 provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
-            if required_fee.total_fee >= scaled_provided_fee {
+            if required_fee.total_fee >= scaled_provided_fee && should_enforce_fee {
                 vlog::warn!(
                     "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
                     required_fee, provided_fee, scaled_provided_fee, token
@@ -196,21 +176,6 @@ impl RpcApp {
             sign_verify_channel,
         )
         .await?;
-
-        // Check whether operations limit for this account was reached.
-        // We must do it after we've checked that transaction is correct to avoid the situation
-        // when somebody sends incorrect transactions to deny changing the pubkey for some account ID.
-        if let FranklinTx::ChangePubKey(tx) = tx.as_ref() {
-            let mut ops_counter_lock = ops_counter.write().expect("Write lock");
-
-            if let Err(error) = ops_counter_lock.check_allowanse(&tx) {
-                return Err(Error {
-                    code: RpcErrorCodes::OperationsLimitReached.into(),
-                    message: error.to_string(),
-                    data: None,
-                });
-            }
-        }
 
         let hash = tx.hash();
         let mempool_resp = oneshot::channel();
@@ -265,7 +230,7 @@ impl RpcApp {
             let tx_fee_info = match &tx.tx {
                 // Cause `ChangePubKey` will have fee we must add this check
                 // TODO: should be removed after merging with a branch that contains a fee on ChangePubKey
-                FranklinTx::ChangePubKey(_) => {
+                ZkSyncTx::ChangePubKey(_) => {
                     // Now `ChangePubKey` operations are not allowed in batches
                     return Err(Error {
                         code: RpcErrorCodes::from(TxAddError::Other).into(),

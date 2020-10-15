@@ -2,13 +2,12 @@
 //! correct verified state should be present in the db (could be restored using `data-restore` module)
 
 use clap::{App, Arg};
-use log::info;
-use models::{AccountId, Address, TokenId, TokenLike};
 use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;
-use storage::ConnectionPool;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_storage::ConnectionPool;
+use zksync_types::{AccountId, Address, TokenId, TokenLike};
 
 #[derive(Serialize, Debug)]
 struct ExitProofData {
@@ -23,7 +22,7 @@ struct ExitProofData {
 async fn main() {
     env_logger::init();
 
-    let cli = App::new("Franklin operator node")
+    let cli = App::new("ZkSync operator node")
         .author("Matter Labs")
         .arg(
             Arg::with_name("Account id")
@@ -53,7 +52,7 @@ async fn main() {
     };
 
     let timer = Instant::now();
-    info!("Restoring state from db");
+    log::info!("Restoring state from db");
     let connection_pool = ConnectionPool::new(Some(1)).await;
     let mut storage = connection_pool
         .access_storage()
@@ -83,10 +82,10 @@ async fn main() {
         .expect("Failed to load verified state")
         .1;
 
-    info!("Resotred state from db: {} s", timer.elapsed().as_secs());
+    log::info!("Resotred state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
-        prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
+        zksync_prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
             .expect("Failed to generate exit proof");
 
     let proof_data = ExitProofData {

@@ -4,9 +4,9 @@ use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 // Workspace uses
-use models::{
+use zksync_types::{
     tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, Token, TokenLike, TxFeeTypes,
+    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -31,7 +31,7 @@ pub trait Rpc {
     #[rpc(name = "tx_submit", returns = "TxHash")]
     fn tx_submit(
         &self,
-        tx: Box<FranklinTx>,
+        tx: Box<ZkSyncTx>,
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash>;
@@ -101,7 +101,7 @@ impl Rpc for RpcApp {
 
     fn tx_submit(
         &self,
-        tx: Box<FranklinTx>,
+        tx: Box<ZkSyncTx>,
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash> {

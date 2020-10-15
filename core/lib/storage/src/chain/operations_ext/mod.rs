@@ -1,11 +1,13 @@
 // Built-in deps
 // External imports
+use chrono::{DateTime, Utc};
 // Workspace imports
-use models::ActionType;
-use models::{Address, TokenId};
+use zksync_types::ActionType;
+use zksync_types::{Address, TokenId};
 // Local imports
 use self::records::{
-    PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
+    AccountCreatedAt, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,
+    TxReceiptResponse,
 };
 use crate::tokens::TokensSchema;
 use crate::StorageProcessor;
@@ -132,9 +134,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
             let tx_token = operation["token"].as_i64().unwrap_or(-1);
             let tx_type = operation["type"].as_str().unwrap_or("unknown tx_type");
-            let tx_amount = operation["amount"].as_str().unwrap_or("unknown amount");
             let nonce = operation["nonce"].as_i64().unwrap_or(-1);
-            let (tx_from, tx_to, tx_fee) = match tx_type {
+            let (tx_from, tx_to, tx_fee, tx_amount) = match tx_type {
                 "Withdraw" | "Transfer" | "TransferToNew" => (
                     operation["from"]
                         .as_str()
@@ -142,6 +143,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .to_string(),
                     operation["to"].as_str().unwrap_or("unknown to").to_string(),
                     operation["fee"].as_str().map(|v| v.to_string()),
+                    operation["amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount")
+                        .to_string(),
                 ),
                 "ChangePubKey" | "ChangePubKeyOffchain" => (
                     operation["account"]
@@ -153,11 +158,31 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .unwrap_or("unknown to")
                         .to_string(),
                     None,
+                    operation["amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount")
+                        .to_string(),
+                ),
+                "ForcedExit" => (
+                    operation["target"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["target"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    tx.operation["withdraw_amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount")
+                        .to_string(),
                 ),
                 &_ => (
                     "unknown from".to_string(),
                     "unknown to".to_string(),
                     Some("unknown fee".to_string()),
+                    "unknown amount".to_string(),
                 ),
             };
 
@@ -172,7 +197,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 from: tx_from,
                 to: tx_to,
                 token: tx_token as i32,
-                amount: tx_amount.to_string(),
+                amount: tx_amount,
                 fee: tx_fee,
                 block_number,
                 nonce,
@@ -261,6 +286,53 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(None)
     }
 
+    /// Loads the date and time of the moment when the first transaction for the account was executed.
+    /// Can be `None` if there were no transactions associated with provided address.
+    pub async fn account_created_on(
+        &mut self,
+        address: &Address,
+    ) -> QueryResult<Option<DateTime<Utc>>> {
+        // This query loads the `committed_at` field from both `executed_transactions` and
+        // `executed_priority_operations` tables and returns the oldest result.
+        let first_history_entry = sqlx::query_as!(
+            AccountCreatedAt,
+            r#"
+            select 
+                created_at as "created_at!"
+            from (
+                    select
+                        created_at
+                    from
+                        executed_transactions
+                    where
+                        from_account = $1
+                        or
+                        to_account = $1
+                        or
+                        primary_account_address = $1
+                    union all
+                    select
+                        created_at
+                    from 
+                        executed_priority_operations
+                    where 
+                        from_account = $1
+                        or
+                        to_account = $1
+            ) t
+            order by
+                created_at asc
+            limit 
+                1
+            "#,
+            address.as_ref(),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        Ok(first_history_entry.map(|entry| entry.created_at))
+    }
+
     /// Loads the range of the transactions applied to the account starting
     /// from the block with number $(offset) up to $(offset + limit).
     pub async fn get_account_transactions_history(
@@ -325,7 +397,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         eth_block,
-                        null as success,
+                        true as success,
                         null as fail_reason,
                         block_number,
                         created_at
@@ -482,7 +554,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         eth_block,
-                        null as success,
+                        true as success,
                         null as fail_reason,
                         block_number,
                         created_at
@@ -515,7 +587,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at as "created_at!"
             from transactions
             left join eth_ops committed on
-                committed.block_number = transactions.block_number and committed.action_type = 'COMMIT'
+                committed.block_number = transactions.block_number and committed.action_type = 'COMMIT' and committed.confirmed = true
             left join eth_ops verified on
                 verified.block_number = transactions.block_number and verified.action_type = 'VERIFY' and verified.confirmed = true
             order by transactions.block_number desc, created_at desc

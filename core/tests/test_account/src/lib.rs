@@ -3,14 +3,16 @@ use std::{fmt, sync::Mutex};
 // External uses
 use num::BigUint;
 // Workspace uses
-use models::tx::{ChangePubKey, PackedEthSignature, TxSignature};
-use models::{AccountId, Address, Close, Nonce, PubKeyHash, TokenId, Transfer, Withdraw};
 use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
+use zksync_types::tx::{ChangePubKey, PackedEthSignature, TxSignature};
+use zksync_types::{
+    AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
+};
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
-pub struct ZksyncAccount {
+pub struct ZkSyncAccount {
     pub private_key: PrivateKey,
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
@@ -19,7 +21,7 @@ pub struct ZksyncAccount {
     nonce: Mutex<Nonce>,
 }
 
-impl fmt::Debug for ZksyncAccount {
+impl fmt::Debug for ZkSyncAccount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // It is OK to disclose the private key contents for a testkit account.
         let mut pk_contents = Vec::new();
@@ -27,7 +29,7 @@ impl fmt::Debug for ZksyncAccount {
             .write(&mut pk_contents)
             .expect("Failed writing the private key contents");
 
-        f.debug_struct("ZksyncAccount")
+        f.debug_struct("ZkSyncAccount")
             .field("private_key", &pk_contents)
             .field("pubkey_hash", &self.pubkey_hash)
             .field("address", &self.address)
@@ -37,7 +39,7 @@ impl fmt::Debug for ZksyncAccount {
     }
 }
 
-impl ZksyncAccount {
+impl ZkSyncAccount {
     /// Note: probably not secure, use for testing.
     pub fn rand() -> Self {
         let rng = &mut thread_rng();
@@ -113,7 +115,7 @@ impl ZksyncAccount {
             self.account_id
                 .lock()
                 .unwrap()
-                .expect("can't sign tx withoud account id"),
+                .expect("can't sign tx without account id"),
             self.address,
             *to,
             token_id,
@@ -128,14 +130,39 @@ impl ZksyncAccount {
             *stored_nonce += 1;
         }
 
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            transfer
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-        )
-        .expect("Signing the transfer unexpectedly failed");
+        let message = transfer.get_ethereum_sign_message(token_symbol, 18);
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
+            .expect("Signing the transfer unexpectedly failed");
         (transfer, eth_signature)
+    }
+
+    pub fn sign_forced_exit(
+        &self,
+        token_id: TokenId,
+        fee: BigUint,
+        target: &Address,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> ForcedExit {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let forced_exit = ForcedExit::new_signed(
+            self.account_id
+                .lock()
+                .unwrap()
+                .expect("can't sign tx without account id"),
+            *target,
+            token_id,
+            fee,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            &self.private_key,
+        )
+        .expect("Failed to sign forced exit");
+
+        if increment_nonce {
+            *stored_nonce += 1;
+        }
+
+        forced_exit
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -154,7 +181,7 @@ impl ZksyncAccount {
             self.account_id
                 .lock()
                 .unwrap()
-                .expect("can't sign tx withoud account id"),
+                .expect("can't sign tx without account id"),
             self.address,
             *eth_address,
             token_id,
@@ -169,13 +196,9 @@ impl ZksyncAccount {
             *stored_nonce += 1;
         }
 
-        let eth_signature = PackedEthSignature::sign(
-            &self.eth_private_key,
-            withdraw
-                .get_ethereum_sign_message(token_symbol, 18)
-                .as_bytes(),
-        )
-        .expect("Signing the withdraw unexpectedly failed");
+        let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &message.as_bytes())
+            .expect("Signing the withdraw unexpectedly failed");
         (withdraw, eth_signature)
     }
 
@@ -194,10 +217,12 @@ impl ZksyncAccount {
         close
     }
 
-    pub fn create_change_pubkey_tx(
+    pub fn sign_change_pubkey_tx(
         &self,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        fee_token: TokenId,
+        fee: BigUint,
         auth_onchain: bool,
     ) -> ChangePubKey {
         let account_id = self
@@ -207,22 +232,27 @@ impl ZksyncAccount {
             .expect("can't sign tx withoud account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let nonce = nonce.unwrap_or_else(|| *stored_nonce);
-        let eth_signature = if auth_onchain {
+
+        let mut change_pubkey = ChangePubKey::new_signed(
+            account_id,
+            self.address,
+            self.pubkey_hash.clone(),
+            fee_token,
+            fee,
+            nonce,
+            None,
+            &self.private_key,
+        )
+        .expect("Can't sign ChangePubKey operation");
+        change_pubkey.eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes =
-                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
-                    .expect("Failed to construct change pubkey signed message.");
+            let sign_bytes = change_pubkey
+                .get_eth_signed_data()
+                .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)
-        };
-        let change_pubkey = ChangePubKey {
-            account_id,
-            account: self.address,
-            new_pk_hash: self.pubkey_hash.clone(),
-            nonce,
-            eth_signature,
         };
 
         if !auth_onchain {

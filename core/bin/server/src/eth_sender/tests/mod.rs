@@ -2,7 +2,7 @@
 use tokio::runtime::Builder;
 use tokio::time::timeout;
 // Workspace uses
-use models::ethereum::ETHOperation;
+use zksync_types::ethereum::ETHOperation;
 // Local uses
 use self::mock::{
     concurrent_eth_sender, create_signed_tx, create_signed_withdraw_tx, default_eth_sender,

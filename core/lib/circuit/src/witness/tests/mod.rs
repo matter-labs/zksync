@@ -10,16 +10,20 @@
 use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
-use models::{
+use zksync_state::{
+    handler::TxHandler,
+    state::{TransferOutcome, ZkSyncState},
+};
+use zksync_types::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
-    Address, Deposit, FullExit,
+    Address, Deposit, FullExit, Transfer, Withdraw,
 };
 // Local deps
 use crate::{
-    circuit::FranklinCircuit,
+    circuit::ZkSyncCircuit,
     witness::{
         tests::test_utils::{
-            check_circuit, check_circuit_non_panicking, PlasmaStateGenerator, WitnessTestAccount,
+            check_circuit, check_circuit_non_panicking, WitnessTestAccount, ZkSyncStateGenerator,
             FEE_ACCOUNT_ID,
         },
         utils::{SigDataInput, WitnessBuilder},
@@ -30,6 +34,7 @@ use crate::{
 
 mod change_pubkey_offchain;
 mod deposit;
+mod forced_exit;
 mod full_exit;
 mod noop;
 pub(crate) mod test_utils;
@@ -45,8 +50,8 @@ mod withdraw;
 /// - Withdraw some funds.
 ///
 /// Returns the resulting `WitnessBuilder` and the hash obtained
-/// from `PlasmaState` for further correctness checks.
-fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
+/// from `ZkSyncState` for further correctness checks.
+fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
     const ETH_TOKEN: u16 = 0;
     const NNM_TOKEN: u16 = 2;
 
@@ -149,7 +154,7 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     let full_exit_success = true;
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
+    let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Fees to be collected.
@@ -157,7 +162,8 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
 
     // Apply deposit ops.
     for deposit_op in deposit_ops {
-        plasma_state.apply_deposit_op(&deposit_op);
+        <ZkSyncState as TxHandler<Deposit>>::apply_op(&mut plasma_state, &deposit_op)
+            .expect("Deposit failed");
 
         let witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
         let circuit_operations = witness.calculate_operations(());
@@ -167,9 +173,11 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     }
 
     // Apply transfer op.
-    let (fee, _) = plasma_state
-        .apply_transfer_op(&transfer_op)
-        .expect("Transfer failed");
+    let raw_op = TransferOutcome::Transfer(transfer_op.clone());
+    let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
+        .expect("Operation failed")
+        .0
+        .unwrap();
     fees.push(fee);
 
     let witness = TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
@@ -179,9 +187,11 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
 
     // Apply transfer to new op.
-    let (fee, _) = plasma_state
-        .apply_transfer_to_new_op(&transfer_to_new_op)
-        .expect("Transfer to new failed");
+    let raw_op = TransferOutcome::TransferToNew(transfer_to_new_op.clone());
+    let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut plasma_state, &raw_op)
+        .expect("Operation failed")
+        .0
+        .unwrap();
     fees.push(fee);
 
     let witness =
@@ -192,9 +202,10 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
 
     // Apply withdraw op.
-    let (fee, _) = plasma_state
-        .apply_withdraw_op(&withdraw_op)
-        .expect("Withdraw failed");
+    let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(&mut plasma_state, &withdraw_op)
+        .expect("Operation failed")
+        .0
+        .unwrap();
     fees.push(fee);
 
     let witness = WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_op);
@@ -204,7 +215,9 @@ fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
 
     // Apply full exit op.
-    plasma_state.apply_full_exit_op(&full_exit_op);
+
+    <ZkSyncState as TxHandler<FullExit>>::apply_op(&mut plasma_state, &full_exit_op)
+        .expect("Operation failed");
 
     let witness = FullExitWitness::apply_tx(
         &mut witness_accum.account_tree,

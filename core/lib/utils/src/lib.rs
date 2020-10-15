@@ -1,3 +1,5 @@
+//! Various helpers used in the zkSync stack.
+
 mod convert;
 mod env_tools;
 mod format;

@@ -3,7 +3,7 @@
 //! This module provides building blocks for serializing and deserializing
 //! common `zksync` types.
 
-use crate::convert::{fe_from_hex, fe_to_hex};
+use crate::convert::FeConvert;
 use crate::Fr;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -33,7 +33,7 @@ impl FrSerde {
         S: Serializer,
     {
         // First, serialize `Fr` to hexadecimal string.
-        let hex_value = fe_to_hex(value);
+        let hex_value = value.to_hex();
 
         // Then, serialize it using `Serialize` trait implementation for `String`.
         String::serialize(&hex_value, serializer)
@@ -48,7 +48,7 @@ impl FrSerde {
         let deserialized_string = String::deserialize(deserializer)?;
 
         // Then, parse hexadecimal string to obtain `Fr`.
-        fe_from_hex(&deserialized_string).map_err(de::Error::custom)
+        Fr::from_hex(&deserialized_string).map_err(de::Error::custom)
     }
 }
 
@@ -74,7 +74,7 @@ impl OptionalFrSerde {
     where
         S: Serializer,
     {
-        let optional_hex_value = value.map(|a| fe_to_hex(&a));
+        let optional_hex_value = value.map(|fr| fr.to_hex());
 
         Option::serialize(&optional_hex_value, serializer)
     }
@@ -88,7 +88,7 @@ impl OptionalFrSerde {
         // Apply `fe_from_hex` to the contents of `Option`, then transpose result to have
         // `Result<Option<..>, ..>` and adapt error to the expected format.
         optional_deserialized_string
-            .map(|v| fe_from_hex(&v))
+            .map(|v| Fr::from_hex(&v))
             .transpose()
             .map_err(de::Error::custom)
     }
@@ -118,7 +118,7 @@ impl VecOptionalFrSerde {
     {
         let mut res = Vec::with_capacity(operations.len());
         for value in operations.iter() {
-            let v = value.map(|a| fe_to_hex(&a));
+            let v = value.map(|fr| fr.to_hex());
             res.push(v);
         }
         Vec::serialize(&res, ser)
@@ -132,7 +132,7 @@ impl VecOptionalFrSerde {
         let mut res = Vec::with_capacity(str_vec.len());
         for s in str_vec.into_iter() {
             if let Some(a) = s {
-                let v = fe_from_hex(&a).map_err(de::Error::custom)?;
+                let v = Fr::from_hex(&a).map_err(de::Error::custom)?;
                 res.push(Some(v));
             } else {
                 res.push(None);

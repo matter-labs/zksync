@@ -1,16 +1,22 @@
 // External imports
 use serde_json::Value;
 // Workspace imports
-use models::{AccountId, BlockNumber, FranklinOp};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use zksync_types::{AccountId, Address, BlockNumber, TokenId, ZkSyncOp};
 // Workspace imports
 // Local imports
+
+#[derive(Debug)]
+pub struct NewTokenEvent {
+    pub address: Address,
+    pub id: TokenId,
+}
 
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredRollupOpsBlock {
     pub block_num: BlockNumber,
-    pub ops: Vec<FranklinOp>,
+    pub ops: Vec<ZkSyncOp>,
     pub fee_account: AccountId,
 }
 
@@ -27,28 +33,28 @@ pub struct StoredLastWatchedEthBlockNumber {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct StoredFranklinOp {
+pub struct StoredZkSyncOp {
     pub id: i32,
     pub block_num: i64,
     pub operation: Value,
     pub fee_account: i64,
 }
 
-impl StoredFranklinOp {
-    pub fn into_franklin_op(self) -> FranklinOp {
-        serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db")
+impl StoredZkSyncOp {
+    pub fn into_franklin_op(self) -> ZkSyncOp {
+        serde_json::from_value(self.operation).expect("Unparsable ZkSyncOp in db")
     }
 }
 #[derive(Debug, Clone)]
-pub struct NewFranklinOp {
+pub struct NewZkSyncOp {
     pub block_num: i64,
     pub operation: Value,
     pub fee_account: i64,
 }
 
-impl NewFranklinOp {
+impl NewZkSyncOp {
     pub fn prepare_stored_op(
-        franklin_op: &FranklinOp,
+        franklin_op: &ZkSyncOp,
         block: BlockNumber,
         fee_account: AccountId,
     ) -> Self {

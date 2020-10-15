@@ -1,6 +1,6 @@
 // External imports
 use chrono::prelude::*;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
@@ -52,6 +52,8 @@ pub struct BlockTransactionItem {
     pub tx_hash: String,
     pub block_number: i64,
     pub op: Value,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 

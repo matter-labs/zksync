@@ -3,18 +3,18 @@
 use parity_crypto::publickey::{Generator, Random};
 use zksync_basic_types::Address;
 // Workspace imports
-use models::tx::{EthSignData, PackedEthSignature, TxEthSignature};
-use models::{
+use num::BigUint;
+use std::ops::Deref;
+use zksync_crypto::rand::Rng;
+use zksync_crypto::Fr;
+use zksync_types::tx::{EthSignData, PackedEthSignature, TxEthSignature};
+use zksync_types::{
     Action, Operation,
     {
         block::{Block, ExecutedOperations},
         AccountUpdate, BlockNumber, PubKeyHash,
     },
 };
-use num::BigUint;
-use std::ops::Deref;
-use zksync_crypto::rand::Rng;
-use zksync_crypto::Fr;
 // Local imports
 
 pub fn acc_create_random_updates<R: Rng>(
@@ -26,7 +26,7 @@ pub fn acc_create_random_updates<R: Rng>(
     let pub_key_hash = PubKeyHash { data: rng.gen() };
     let address: Address = rng.gen::<[u8; 20]>().into();
 
-    let mut a = models::account::Account::default_with_address(&address);
+    let mut a = zksync_types::account::Account::default_with_address(&address);
     let old_nonce = nonce;
     a.nonce = old_nonce + 2;
     a.pub_key_hash = pub_key_hash;
@@ -63,12 +63,7 @@ pub fn acc_create_random_updates<R: Rng>(
     .into_iter()
 }
 
-pub fn get_operation(
-    block_number: BlockNumber,
-    action: Action,
-    accounts_updated: Vec<(u32, AccountUpdate)>,
-    block_size: usize,
-) -> Operation {
+pub fn get_operation(block_number: BlockNumber, action: Action, block_size: usize) -> Operation {
     Operation {
         id: None,
         action,
@@ -82,14 +77,12 @@ pub fn get_operation(
             1_000_000.into(),
             1_500_000.into(),
         ),
-        accounts_updated,
     }
 }
 
 pub fn get_operation_with_txs(
     block_number: BlockNumber,
     action: Action,
-    accounts_updated: Vec<(u32, AccountUpdate)>,
     block_size: usize,
     txs: Vec<ExecutedOperations>,
 ) -> Operation {
@@ -106,7 +99,6 @@ pub fn get_operation_with_txs(
             1_000_000.into(),
             1_500_000.into(),
         ),
-        accounts_updated,
     }
 }
 
@@ -115,7 +107,7 @@ pub fn get_eth_sing_data(message: String) -> EthSignData {
     let keypair = Random.generate();
     let private_key = keypair.secret();
 
-    let signature = PackedEthSignature::sign(private_key.deref(), message.as_bytes()).unwrap();
+    let signature = PackedEthSignature::sign(private_key.deref(), &message.as_bytes()).unwrap();
 
     EthSignData {
         message,

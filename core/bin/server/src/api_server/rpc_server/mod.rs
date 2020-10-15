@@ -1,4 +1,3 @@
-use std::sync::{Arc, RwLock};
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -7,34 +6,33 @@ use futures::{
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use models::{
-    tx::{TxEthSignature, TxHash},
-    Address, FranklinTx, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes,
-};
-use storage::{
+use zksync_config::ConfigurationOptions;
+use zksync_storage::{
     chain::{
         block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
         operations_ext::records::TxReceiptResponse,
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_config::ConfigurationOptions;
+use zksync_types::{
+    tx::{TxEthSignature, TxHash},
+    Address, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+};
 // Local uses
 use crate::panic_notify::ThreadPanicNotify;
 use crate::{
-    api_server::ops_counter::ChangePubKeyOpsCounter,
     eth_watch::{EthBlockId, EthWatchRequest},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
     utils::{
-        current_zksync_info::CurrentZksyncInfo, shared_lru_cache::SharedLruCache,
+        current_zksync_info::CurrentZkSyncInfo, shared_lru_cache::SharedLruCache,
         token_db_cache::TokenDBCache,
     },
 };
 use bigdecimal::BigDecimal;
-use models::tx::EthSignData;
+use zksync_types::tx::EthSignData;
 
 pub mod error;
 mod rpc_impl;
@@ -96,10 +94,11 @@ pub struct RpcApp {
 
     pub confirmations_for_eth_event: u64,
     pub token_cache: TokenDBCache,
-    pub current_zksync_info: CurrentZksyncInfo,
+    pub current_zksync_info: CurrentZkSyncInfo,
 
-    /// Counter for ChangePubKey operations to filter the spam.
-    ops_counter: Arc<RwLock<ChangePubKeyOpsCounter>>,
+    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
+    forced_exit_minimum_account_age: chrono::Duration,
+    enforce_pubkey_change_fee: bool,
 }
 
 impl RpcApp {
@@ -112,7 +111,7 @@ impl RpcApp {
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        current_zksync_info: CurrentZksyncInfo,
+        current_zksync_info: CurrentZkSyncInfo,
     ) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
@@ -121,6 +120,11 @@ impl RpcApp {
 
         let api_requests_caches_size = config_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
+        let enforce_pubkey_change_fee = config_options.enforce_pubkey_change_fee;
+
+        let forced_exit_minimum_account_age =
+            chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
+                .expect("Unable to convert std::Duration to chrono::Duration");
 
         RpcApp {
             runtime_handle,
@@ -142,7 +146,8 @@ impl RpcApp {
             token_cache,
             current_zksync_info,
 
-            ops_counter: Arc::new(RwLock::new(ChangePubKeyOpsCounter::new())),
+            forced_exit_minimum_account_age,
+            enforce_pubkey_change_fee,
         }
     }
 
@@ -169,15 +174,15 @@ impl RpcApp {
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
-    async fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
+    async fn get_tx_info_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<String>> {
         match tx {
-            FranklinTx::Transfer(tx) => {
+            ZkSyncTx::Transfer(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
                     tx.get_ethereum_sign_message(&token.symbol, token.decimals),
                 ))
             }
-            FranklinTx::Withdraw(tx) => {
+            ZkSyncTx::Withdraw(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
                     tx.get_ethereum_sign_message(&token.symbol, token.decimals),
@@ -391,22 +396,68 @@ impl RpcApp {
         })
     }
 
-    async fn get_verified_account_state(&self, address: &Address) -> Result<ResponseAccountState> {
+    async fn get_account_state(&self, address: &Address) -> Result<AccountStateInfo> {
         let mut storage = self.access_storage().await?;
-        let account = storage
+        let account_info = storage
             .chain()
             .account_schema()
             .account_state_by_address(address)
             .await
             .map_err(|_| Error::internal_error())?;
 
-        let verified_state = if let Some((_, account)) = account.verified {
-            ResponseAccountState::try_restore(account, &self.token_cache).await?
-        } else {
-            Default::default()
+        let mut result = AccountStateInfo {
+            account_id: None,
+            committed: Default::default(),
+            verified: Default::default(),
         };
 
-        Ok(verified_state)
+        if let Some((account_id, commited_state)) = account_info.committed {
+            result.account_id = Some(account_id);
+            result.committed =
+                ResponseAccountState::try_restore(commited_state, &self.token_cache).await?;
+        };
+
+        if let Some((_, verified_state)) = account_info.verified {
+            result.verified =
+                ResponseAccountState::try_restore(verified_state, &self.token_cache).await?;
+        };
+
+        Ok(result)
+    }
+
+    /// For forced exits, we must check that target account exists for more
+    /// than 24 hours in order to give new account owners give an opportunity
+    /// to set the signing key. While `ForcedExit` operation doesn't do anything
+    /// bad to the account, it's more user-friendly to only allow this operation
+    /// after we're somewhat sure that zkSync account is not owned by anybody.
+    async fn check_forced_exit(&self, forced_exit: &zksync_types::ForcedExit) -> Result<()> {
+        let target_account_address = forced_exit.target;
+        let mut storage = self.access_storage().await?;
+        let account_age = storage
+            .chain()
+            .operations_ext_schema()
+            .account_created_on(&target_account_address)
+            .await
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, forced_exit);
+                Error::internal_error()
+            })?;
+
+        match account_age {
+            Some(age) => {
+                if (chrono::Utc::now() - age) >= self.forced_exit_minimum_account_age {
+                    // Account does exist long enough, everything is OK.
+                    Ok(())
+                } else {
+                    let err = format!(
+                        "Target account exists less than required minimum amount ({} hours)",
+                        self.forced_exit_minimum_account_age.num_hours()
+                    );
+                    Err(Error::invalid_params(err))
+                }
+            }
+            None => Err(Error::invalid_params("Target account does not exist")),
+        }
     }
 
     async fn eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> Result<Option<String>> {
@@ -453,23 +504,23 @@ pub fn start_rpc_server(
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 ) {
     let addr = config_options.json_rpc_http_server_address;
-    tokio::spawn(async move {
+
+    let rpc_app = RpcApp::new(
+        &config_options,
+        connection_pool,
+        mempool_request_sender,
+        state_keeper_request_sender,
+        sign_verify_request_sender,
+        eth_watcher_request_sender,
+        ticker_request_sender,
+        current_zksync_info,
+    );
+    std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
         let mut io = IoHandler::new();
-
-        let rpc_app = RpcApp::new(
-            &config_options,
-            connection_pool,
-            mempool_request_sender,
-            state_keeper_request_sender,
-            sign_verify_request_sender,
-            eth_watcher_request_sender,
-            ticker_request_sender,
-            current_zksync_info,
-        );
         rpc_app.extend(&mut io);
 
         let server = ServerBuilder::new(io)
@@ -477,13 +528,12 @@ pub fn start_rpc_server(
             .threads(8)
             .start_http(&addr)
             .unwrap();
-
         server.wait();
     });
 }
 
 async fn verify_tx_info_message_signature(
-    tx: &FranklinTx,
+    tx: &ZkSyncTx,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<String>,
     mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
@@ -548,6 +598,7 @@ async fn verify_tx_info_message_signature(
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn tx_fee_type_serialization() {

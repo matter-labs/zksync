@@ -1,7 +1,7 @@
 //! Module with utilities for prover scaler service.
 
 // Workspace deps
-use storage::ConnectionPool;
+use zksync_storage::ConnectionPool;
 
 /// Scaler oracle provides information for prover scaler
 /// service about required amount of provers for server
@@ -21,7 +21,7 @@ impl ScalerOracle {
     }
 
     /// Decides how many prover entities should be created depending on the amount of pending blocks.
-    pub async fn provers_required(&mut self) -> Result<u32, failure::Error> {
+    pub async fn provers_required(&mut self) -> Result<u32, anyhow::Error> {
         // Currently the logic of this method is very simple:
         // We require a prover for each pending block or IDLE_RROVERS amount if there are not so many
         // pending jobs.

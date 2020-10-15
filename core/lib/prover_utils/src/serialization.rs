@@ -4,12 +4,12 @@
 // External deps
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // Workspace deps
-use circuit::operation::Operation;
+use zksync_circuit::operation::Operation;
 use zksync_crypto::Engine;
 // Local
 use crate::prover_data::OperationDef;
 
-// Public re-exports of `models` serialization utilities, so the prover itself
+// Public re-exports of `types` serialization utilities, so the prover itself
 // can depend on its own serialization module.
 pub use zksync_crypto::serialization::*;
 

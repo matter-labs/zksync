@@ -1,17 +1,18 @@
 // Built-in deps
 // External uses
-use failure::ensure;
-use futures::compat::Future01CompatExt;
+
+use anyhow::ensure;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
-use web3::transports::{EventLoopHandle, Http};
+use web3::transports::Http;
 use zksync_basic_types::{TransactionReceipt, H256, U256};
+use zksync_eth_signer::EthereumSigner;
 // Workspace uses
 use super::ExecutedTxStatus;
-use eth_client::{ETHClient, SignedCallResult};
 use std::time::Duration;
 use zksync_config::ConfigurationOptions;
 use zksync_contracts::zksync_contract;
+use zksync_eth_client::{ETHClient, SignedCallResult};
 
 /// Sleep time between consecutive requests.
 const SLEEP_DURATION: Duration = Duration::from_millis(250);
@@ -33,16 +34,16 @@ pub(super) trait EthereumInterface {
     /// - If transaction was not executed, returned value is `None`.
     /// - If transaction was executed, the information about its success and amount
     ///   of confirmations is returned.
-    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error>;
+    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error>;
 
     /// Gets the actual block number.
-    async fn block_number(&self) -> Result<u64, failure::Error>;
+    async fn block_number(&self) -> Result<u64, anyhow::Error>;
 
     /// Gets the current gas price.
-    async fn gas_price(&self) -> Result<U256, failure::Error>;
+    async fn gas_price(&self) -> Result<U256, anyhow::Error>;
 
     /// Sends a signed transaction to the Ethereum blockchain.
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error>;
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error>;
 
     /// Encodes the transaction data (smart contract method and its input) to the bytes
     /// without creating an actual transaction.
@@ -54,7 +55,7 @@ pub(super) trait EthereumInterface {
         &self,
         data: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, failure::Error>;
+    ) -> Result<SignedCallResult, anyhow::Error>;
 }
 
 /// Wrapper over `ETHClient` using `Http` transport.
@@ -62,30 +63,28 @@ pub(super) trait EthereumInterface {
 #[derive(Debug)]
 pub struct EthereumHttpClient {
     eth_client: ETHClient<Http>,
-    // We have to prevent handle from drop, since it will cause event loop termination.
-    _event_loop: EventLoopHandle,
 }
 
 impl EthereumHttpClient {
-    pub fn new(options: &ConfigurationOptions) -> Result<Self, failure::Error> {
-        let (_event_loop, transport) = Http::new(&options.web3_url)?;
+    pub fn new(options: &ConfigurationOptions) -> Result<Self, anyhow::Error> {
+        let transport = Http::new(&options.web3_url)?;
+        let ethereum_signer = EthereumSigner::from_key(
+            options
+                .operator_private_key
+                .expect("Operator private key is required for eth_sender"),
+        );
 
         let eth_client = ETHClient::new(
             transport,
             zksync_contract(),
             options.operator_commit_eth_addr,
-            options
-                .operator_private_key
-                .expect("Operator private key is required for eth_sender"),
+            ethereum_signer,
             options.contract_eth_addr,
             options.chain_id,
             options.gas_price_factor,
         );
 
-        Ok(Self {
-            eth_client,
-            _event_loop,
-        })
+        Ok(Self { eth_client })
     }
 
     /// Sleep is required before each Ethereum query because infura blocks requests that are made too often
@@ -96,14 +95,13 @@ impl EthereumHttpClient {
 
 #[async_trait::async_trait]
 impl EthereumInterface for EthereumHttpClient {
-    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
+    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
         self.sleep();
         let receipt = self
             .eth_client
             .web3
             .eth()
             .transaction_receipt(*hash)
-            .compat()
             .await?;
 
         match receipt {
@@ -135,13 +133,13 @@ impl EthereumInterface for EthereumHttpClient {
         }
     }
 
-    async fn block_number(&self) -> Result<u64, failure::Error> {
+    async fn block_number(&self) -> Result<u64, anyhow::Error> {
         self.sleep();
-        let block_number = self.eth_client.web3.eth().block_number().compat().await?;
+        let block_number = self.eth_client.web3.eth().block_number().await?;
         Ok(block_number.as_u64())
     }
 
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error> {
         self.sleep();
         let hash = self
             .eth_client
@@ -154,7 +152,7 @@ impl EthereumInterface for EthereumHttpClient {
         Ok(())
     }
 
-    async fn gas_price(&self) -> Result<U256, failure::Error> {
+    async fn gas_price(&self) -> Result<U256, anyhow::Error> {
         self.sleep();
         self.eth_client.get_gas_price().await
     }
@@ -167,7 +165,7 @@ impl EthereumInterface for EthereumHttpClient {
         &self,
         data: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, failure::Error> {
+    ) -> Result<SignedCallResult, anyhow::Error> {
         self.sleep();
         self.eth_client.sign_prepared_tx(data, options).await
     }

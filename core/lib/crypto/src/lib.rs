@@ -1,3 +1,5 @@
+//! `zksync_crypto` is a crate containing essential zkSync cryptographic primitives, such as private keys and hashers.
+
 use crate::franklin_crypto::bellman::pairing::bn256;
 use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
@@ -34,11 +36,12 @@ pub type Fs = <Engine as JubjubEngine>::Fs;
 pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;
 
+/// Decodes a private key from a field element.
 pub fn priv_key_from_fs(fs: Fs) -> PrivateKey {
     PrivateKeyImport(fs)
 }
 
-/// Derives public key prom private
+/// Converts private key into a corresponding public key.
 pub fn public_key_from_private(pk: &PrivateKey) -> PublicKey {
     PublicKey::from_private(
         pk,

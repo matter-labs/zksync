@@ -29,13 +29,13 @@ pub struct PlonkVerificationKey(VerificationKey<Engine, PlonkCsWidth4WithNextSte
 impl PlonkVerificationKey {
     pub fn read_verification_key_for_main_circuit(
         block_chunks: usize,
-    ) -> Result<Self, failure::Error> {
+    ) -> Result<Self, anyhow::Error> {
         let verification_key =
             VerificationKey::read(File::open(get_block_verification_key_path(block_chunks))?)?;
         Ok(Self(verification_key))
     }
 
-    pub fn read_verification_key_for_exit_circuit() -> Result<Self, failure::Error> {
+    pub fn read_verification_key_for_exit_circuit() -> Result<Self, anyhow::Error> {
         let verification_key =
             VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
         Ok(Self(verification_key))
@@ -53,7 +53,7 @@ impl SetupForStepByStepProver {
     pub fn prepare_setup_for_step_by_step_prover<C: Circuit<Engine> + Clone>(
         circuit: C,
         download_setup_file: bool,
-    ) -> Result<Self, failure::Error> {
+    ) -> Result<Self, anyhow::Error> {
         let hints = transpile(circuit.clone())?;
         let setup_polynomials = setup(circuit, &hints)?;
         let size = setup_polynomials.n.next_power_of_two().trailing_zeros();
@@ -74,7 +74,7 @@ impl SetupForStepByStepProver {
         &self,
         circuit: C,
         vk: &PlonkVerificationKey,
-    ) -> Result<EncodedProofPlonk, failure::Error> {
+    ) -> Result<EncodedProofPlonk, anyhow::Error> {
         let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
             circuit,
             &self.hints,
@@ -86,7 +86,7 @@ impl SetupForStepByStepProver {
         )?;
 
         let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk.0)?;
-        failure::ensure!(valid, "proof for block is invalid");
+        anyhow::ensure!(valid, "proof for block is invalid");
         Ok(serialize_proof(&proof))
     }
 }
@@ -104,7 +104,7 @@ impl Drop for SetupForStepByStepProver {
 /// Generates proof for exit given circuit using step-by-step algorithm.
 pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     circuit: C,
-) -> Result<EncodedProofPlonk, failure::Error> {
+) -> Result<EncodedProofPlonk, anyhow::Error> {
     let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
 
     log::info!("Proof for circuit started");
@@ -125,7 +125,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     )?;
 
     let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
-    failure::ensure!(valid, "proof for exit is invalid");
+    anyhow::ensure!(valid, "proof for exit is invalid");
 
     log::info!("Proof for circuit successful");
     Ok(serialize_proof(&proof))
@@ -193,7 +193,7 @@ pub fn serialize_proof(
 pub fn get_universal_setup_monomial_form(
     power_of_two: u32,
     download_from_network: bool,
-) -> Result<Crs<Engine, CrsForMonomialForm>, failure::Error> {
+) -> Result<Crs<Engine, CrsForMonomialForm>, anyhow::Error> {
     if let Some(cached_setup) = UNIVERSAL_SETUP_CACHE.take_setup_struct(power_of_two) {
         Ok(cached_setup)
     } else if download_from_network {

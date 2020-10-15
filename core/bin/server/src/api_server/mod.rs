@@ -7,21 +7,20 @@
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
-use models::Operation;
-use storage::ConnectionPool;
 use zksync_config::{AdminServerOptions, ConfigurationOptions};
+use zksync_storage::ConnectionPool;
+use zksync_types::Operation;
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::{
     committer::ExecutedOpsNotify, eth_watch::EthWatchRequest, mempool::MempoolRequest,
     signature_checker, state_keeper::StateKeeperRequest,
-    utils::current_zksync_info::CurrentZksyncInfo,
+    utils::current_zksync_info::CurrentZkSyncInfo,
 };
 
 mod admin_server;
 mod event_notify;
 mod loggers;
-mod ops_counter;
 mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;
@@ -38,7 +37,7 @@ pub fn start_api_server(
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
     admin_server_opts: AdminServerOptions,
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
 

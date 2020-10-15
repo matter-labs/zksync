@@ -1,8 +1,15 @@
-use models::{AccountId, Address};
+use num::BigUint;
+use zksync_types::{AccountId, Address, TokenLike};
 
 use crate::{
-    credentials::WalletCredentials, error::ClientError, ethereum::EthereumProvider, operations::*,
-    provider::Provider, signer::Signer, tokens_cache::TokensCache,
+    credentials::WalletCredentials,
+    error::ClientError,
+    ethereum::EthereumProvider,
+    operations::*,
+    provider::Provider,
+    signer::Signer,
+    tokens_cache::TokensCache,
+    types::{AccountInfo, BlockStatus},
 };
 
 #[derive(Debug)]
@@ -20,7 +27,7 @@ impl Wallet {
         let mut signer = Signer::new(
             credentials.zksync_private_key,
             credentials.eth_address,
-            credentials.eth_private_key,
+            credentials.eth_signer,
         );
 
         let account_info = provider.account_info(credentials.eth_address).await?;
@@ -49,6 +56,34 @@ impl Wallet {
     /// Returns the wallet address.
     pub fn address(&self) -> Address {
         self.signer.address
+    }
+
+    /// Returns account state info.
+    pub async fn account_info(&self) -> Result<AccountInfo, ClientError> {
+        self.provider.account_info(self.address()).await
+    }
+
+    /// Returns balance in the account.
+    pub async fn get_balance(
+        &self,
+        block_status: BlockStatus,
+        token_like: impl Into<TokenLike>,
+    ) -> Result<BigUint, ClientError> {
+        let token = self
+            .tokens
+            .resolve(token_like.into())
+            .ok_or(ClientError::UnknownToken)?;
+
+        let account_state = match block_status {
+            BlockStatus::Committed => self.account_info().await?.committed,
+            BlockStatus::Verified => self.account_info().await?.verified,
+        };
+
+        Ok(account_state
+            .balances
+            .get(&token.symbol as &str)
+            .map(|x| x.0.clone())
+            .unwrap_or_default())
     }
 
     /// Returns the current account ID.
@@ -102,12 +137,12 @@ impl Wallet {
         &self,
         web3_addr: impl AsRef<str>,
     ) -> Result<EthereumProvider, ClientError> {
-        if let Some(eth_private_key) = self.signer.eth_private_key {
+        if let Some(eth_signer) = &self.signer.eth_signer {
             let ethereum_provider = EthereumProvider::new(
                 &self.provider,
                 self.tokens.clone(),
                 web3_addr,
-                eth_private_key,
+                eth_signer.clone(),
                 self.signer.address,
             )
             .await?;

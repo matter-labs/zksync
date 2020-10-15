@@ -42,18 +42,18 @@ COMMAND=${1:-restart}
 case $COMMAND in
   restart)
       zksync db-reset
-      f cargo run --bin data_restore --release -- --genesis --finite
+      f cargo run --bin zksync_data_restore --release -- --genesis --finite
     ;;
   restart)
-      f cargo run --bin data_restore --release -- --continue
+      f cargo run --bin zksync_data_restore --release -- --continue
     ;;
   run)
-      f cargo run --bin data_restore --release -- --genesis --finite
+      f cargo run --bin zksync_data_restore --release -- --genesis --finite
     ;;
   check)
       EXPECTED_HASH=$2
       zksync db-reset
-      f cargo run --bin data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
+      f cargo run --bin zksync_data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
     ;;
   check-existing)
       EXPECTED_HASH=`fetch_root_hash`
@@ -66,7 +66,7 @@ case $COMMAND in
       fi
       echo "Expected hash is $EXPECTED_HASH"
       zksync db-reset
-      f cargo run --bin data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
+      f cargo run --bin zksync_data_restore --release -- --genesis --finite --final_hash $EXPECTED_HASH
     ;;
   fetch-root-hash)
       fetch_root_hash

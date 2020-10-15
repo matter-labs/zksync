@@ -2,12 +2,12 @@
 // External imports
 use zksync_basic_types::U256;
 // Workspace imports
-use models::{block::PendingBlock, Action, ActionType, Operation};
-use models::{
+use zksync_crypto::convert::FeConvert;
+use zksync_types::{block::PendingBlock, Action, ActionType, Operation};
+use zksync_types::{
     block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, FranklinOp,
+    AccountId, BlockNumber, ZkSyncOp,
 };
-use zksync_crypto::convert::{fe_from_bytes, fe_to_bytes};
 // Local imports
 use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
@@ -39,10 +39,8 @@ pub struct BlockSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Executes an operation:
-    /// 1. Store the operation.
-    /// 2. Modify the state according to the operation changes:
-    ///   - Commit => store account updates.
-    ///   - Verify => apply account updates.
+    /// 1. Stores the operation.
+    /// 2. Applies account updates for the verify operation.
     pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
         let mut transaction = self.0.start_transaction().await?;
 
@@ -50,9 +48,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         match &op.action {
             Action::Commit => {
-                StateSchema(&mut transaction)
-                    .commit_state_update(block_number, &op.accounts_updated)
-                    .await?;
                 BlockSchema(&mut transaction).save_block(op.block).await?;
             }
             Action::Verify { proof } => {
@@ -142,7 +137,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let block_transactions = self.get_block_executed_ops(block).await?;
 
         // Encode the root hash as `0xFF..FF`.
-        let new_root_hash = fe_from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
+        let new_root_hash =
+            FeConvert::from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
         // Return the obtained block in the expected format.
         Ok(Some(Block::new(
@@ -160,12 +156,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         )))
     }
 
-    /// Same as `get_block_executed_ops`, but returns a vector of `FranklinOp` instead
+    /// Same as `get_block_executed_ops`, but returns a vector of `ZkSyncOp` instead
     /// of `ExecutedOperations`.
-    pub async fn get_block_operations(
-        &mut self,
-        block: BlockNumber,
-    ) -> QueryResult<Vec<FranklinOp>> {
+    pub async fn get_block_operations(&mut self, block: BlockNumber) -> QueryResult<Vec<ZkSyncOp>> {
         let executed_ops = self.get_block_executed_ops(block).await?;
         Ok(executed_ops
             .into_iter()
@@ -188,6 +181,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         '0x' || encode(tx_hash, 'hex') as tx_hash,
                         tx as op,
                         block_number,
+                        success,
+                        fail_reason,
                         created_at
                     FROM executed_transactions
                     WHERE block_number = $1
@@ -196,6 +191,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         '0x' || encode(eth_hash, 'hex') as tx_hash,
                         operation as op,
                         block_number,
+                        true as success,
+                        Null as fail_reason,
                         created_at
                     FROM executed_priority_operations
                     WHERE block_number = $1
@@ -208,6 +205,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     tx_hash as "tx_hash!",
                     block_number as "block_number!",
                     op as "op!",
+                    success as "success?",
+                    fail_reason as "fail_reason?",
                     created_at as "created_at!"
                 FROM everything
                 ORDER BY created_at DESC
@@ -318,10 +317,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 committed.created_at AS "committed_at!",
                 verified.created_at AS "verified_at?"
             FROM blocks
-            INNER JOIN eth_ops COMMITTED ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT'
+            INNER JOIN eth_ops committed ON
+                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY' and verified.confirmed = true
+                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
             WHERE
                 blocks.number <= $1
             ORDER BY blocks.number DESC
@@ -419,9 +418,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 verified.created_at AS "verified_at?"
             FROM blocks
             INNER JOIN eth_ops committed ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT'
+                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY' and verified.confirmed = true
+                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
             WHERE false
                 OR committed.tx_hash = $1
                 OR verified.tx_hash = $1
@@ -587,7 +586,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let number = i64::from(block.block_number);
-        let root_hash = fe_to_bytes(&block.new_root_hash);
+        let root_hash = block.new_root_hash.to_bytes();
         let fee_account_id = i64::from(block.fee_account);
         let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
         let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;

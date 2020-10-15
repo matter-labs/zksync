@@ -1,8 +1,8 @@
 //! This file contains representation of not signed transactions and builders for them.
 
 use crate::{error::ClientError, provider::Provider, types::TransactionInfo};
-use models::tx::TxHash;
 use std::time::{Duration, Instant};
+use zksync_types::tx::TxHash;
 
 mod change_pubkey;
 mod transfer;

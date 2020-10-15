@@ -2,13 +2,13 @@
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use models::block::Block;
-use models::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
-use models::{NewTokenEvent, Operation};
+use zksync_types::block::Block;
+use zksync_types::Operation;
+use zksync_types::{AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp};
 // Local imports
 use self::records::{
-    NewBlockEvent, NewFranklinOp, NewStorageState, StoredBlockEvent, StoredFranklinOp,
-    StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState,
+    NewBlockEvent, NewStorageState, NewTokenEvent, NewZkSyncOp, StoredBlockEvent,
+    StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState, StoredZkSyncOp,
 };
 use crate::{
     chain::{block::BlockSchema, state::StateSchema},
@@ -78,7 +78,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
         StateSchema(&mut transaction)
-            .commit_state_update(0, &[(0, genesis_acc_update)])
+            .commit_state_update(0, &[(0, genesis_acc_update)], 0)
             .await?;
         StateSchema(&mut transaction).apply_state_update(0).await?;
         transaction.commit().await?;
@@ -87,7 +87,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn load_rollup_ops_blocks(&mut self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
         let stored_operations = sqlx::query_as!(
-            StoredFranklinOp,
+            StoredZkSyncOp,
             "SELECT * FROM data_restore_rollup_ops
             ORDER BY id ASC"
         )
@@ -96,17 +96,17 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
         // let stored_operations = data_restore_rollup_ops::table
         //     .order(data_restore_rollup_ops::id.asc())
-        //     .load::<StoredFranklinOp>(self.0.conn())?;
+        //     .load::<StoredZkSyncOp>(self.0.conn())?;
         let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
             .into_iter()
             .group_by(|op| op.block_num)
             .into_iter()
             .map(|(_, stored_ops)| {
                 // let stored_ops = group.clone();
-                // let mut ops: Vec<FranklinOp> = vec![];
+                // let mut ops: Vec<ZkSyncOp> = vec![];
                 let mut block_num: i64 = 0;
                 let mut fee_account: i64 = 0;
-                let ops: Vec<FranklinOp> = stored_ops
+                let ops: Vec<ZkSyncOp> = stored_ops
                     .map(|stored_op| {
                         block_num = stored_op.block_num;
                         fee_account = stored_op.fee_account;
@@ -198,7 +198,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn save_rollup_ops(
         &mut self,
-        ops: &[(BlockNumber, &FranklinOp, AccountId)],
+        ops: &[(BlockNumber, &ZkSyncOp, AccountId)],
     ) -> QueryResult<()> {
         let new_state = self.new_storage_state("Operations");
         let mut transaction = self.0.start_transaction().await?;
@@ -207,7 +207,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .await?;
 
         for op in ops.iter() {
-            let stored_op = NewFranklinOp::prepare_stored_op(&op.1, op.0, op.2);
+            let stored_op = NewZkSyncOp::prepare_stored_op(&op.1, op.0, op.2);
 
             sqlx::query!(
                 "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account) VALUES ($1, $2, $3)",

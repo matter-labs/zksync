@@ -17,62 +17,63 @@
 // Built-in deps
 use std::collections::{HashMap, VecDeque};
 // External uses
-use failure::Fail;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::task::JoinHandle;
 // Workspace uses
-use models::{
+use zksync_storage::ConnectionPool;
+use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
-    SignedFranklinTx, TransferOp, TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
+    TransferOp, TransferToNewOp, ZkSyncTx,
 };
-use storage::ConnectionPool;
 // Local uses
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
 use zksync_config::ConfigurationOptions;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
 pub enum TxAddError {
-    #[fail(display = "Tx nonce is too low.")]
+    #[error("Tx nonce is too low.")]
     NonceMismatch,
 
-    #[fail(display = "Tx is incorrect")]
+    #[error("Tx is incorrect")]
     IncorrectTx,
 
-    #[fail(display = "Transaction fee is too low")]
+    #[error("Transaction fee is too low")]
     TxFeeTooLow,
 
-    #[fail(display = "Transactions batch summary fee is too low")]
+    #[error("Transactions batch summary fee is too low")]
     TxBatchFeeTooLow,
 
-    #[fail(display = "EIP1271 signature could not be verified")]
+    #[error("EIP1271 signature could not be verified")]
     EIP1271SignatureVerificationFail,
 
-    #[fail(display = "MissingEthSignature")]
+    #[error("MissingEthSignature")]
     MissingEthSignature,
 
-    #[fail(display = "Eth signature is incorrect")]
+    #[error("Eth signature is incorrect")]
     IncorrectEthSignature,
 
-    #[fail(display = "Change pubkey tx is not authorized onchain")]
+    #[error("Change pubkey tx is not authorized onchain")]
     ChangePkNotAuthorized,
 
-    #[fail(display = "Internal error")]
+    #[error("Internal error")]
     Other,
 
-    #[fail(display = "Database unavailable")]
+    #[error("Database unavailable")]
     DbError,
 
-    #[fail(display = "Transaction batch is empty")]
+    #[error("Transaction batch is empty")]
     EmptyBatch,
 
-    #[fail(display = "Batch will not fit in any of supported block sizes")]
+    #[error("Batch will not fit in any of supported block sizes")]
     BatchTooBig,
 
-    #[fail(display = "The number of withdrawals in the batch is too big")]
+    #[error("The number of withdrawals in the batch is too big")]
     BatchWithdrawalsOverload,
 }
 
@@ -117,9 +118,9 @@ struct MempoolState {
 }
 
 impl MempoolState {
-    fn chunks_for_tx(&self, tx: &FranklinTx) -> usize {
+    fn chunks_for_tx(&self, tx: &ZkSyncTx) -> usize {
         match tx {
-            FranklinTx::Transfer(tx) => {
+            ZkSyncTx::Transfer(tx) => {
                 if self.account_nonces.contains_key(&tx.to) {
                     TransferOp::CHUNKS
                 } else {
@@ -202,7 +203,7 @@ impl MempoolState {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
-    fn add_tx(&mut self, tx: SignedFranklinTx) -> Result<(), TxAddError> {
+    fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
         // Correctness should be checked by `signature_checker`, thus
         // `tx.check_correctness()` is not invoked here.
 
@@ -379,8 +380,8 @@ impl Mempool {
             .await;
         let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left);
 
-        trace!("Proposed priority ops for block: {:#?}", priority_ops);
-        trace!("Proposed txs for block: {:#?}", txs);
+        log::trace!("Proposed priority ops for block: {:#?}", priority_ops);
+        log::trace!("Proposed txs for block: {:#?}", txs);
         ProposedBlock { priority_ops, txs }
     }
 

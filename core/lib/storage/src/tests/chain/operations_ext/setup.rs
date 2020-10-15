@@ -3,21 +3,21 @@
 use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
-use models::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::operations::{ChangePubKeyOp, FranklinOp};
-use models::priority_ops::PriorityOp;
-use models::{
+use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
+use zksync_crypto::Fr;
+use zksync_test_account::ZkSyncAccount;
+use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
+use zksync_types::priority_ops::PriorityOp;
+use zksync_types::{
     Address, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token, TransferOp, TransferToNewOp,
     WithdrawOp,
 };
-use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
-use zksync_crypto::Fr;
-use zksync_test_account::ZksyncAccount;
 // Local imports
 
 pub struct TransactionsHistoryTestSetup {
-    pub from_zksync_account: ZksyncAccount,
-    pub to_zksync_account: ZksyncAccount,
+    pub from_zksync_account: ZkSyncAccount,
+    pub to_zksync_account: ZkSyncAccount,
 
     pub amount: BigUint,
 
@@ -36,11 +36,11 @@ impl TransactionsHistoryTestSetup {
         ];
 
         let from_account_id = 0xbabe;
-        let from_zksync_account = ZksyncAccount::rand();
+        let from_zksync_account = ZkSyncAccount::rand();
         from_zksync_account.set_account_id(Some(from_account_id));
 
         let to_account_id = 0xdcba;
-        let to_zksync_account = ZksyncAccount::rand();
+        let to_zksync_account = ZkSyncAccount::rand();
         to_zksync_account.set_account_id(Some(to_account_id));
 
         let amount = 1u32.into();
@@ -99,7 +99,7 @@ impl TransactionsHistoryTestSetup {
         block: u32,
         block_index: u32,
     ) -> ExecutedOperations {
-        let deposit_op = FranklinOp::Deposit(Box::new(DepositOp {
+        let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
             priority_op: Deposit {
                 from: self.from_zksync_account.address,
                 token: self.tokens[0].id,
@@ -131,7 +131,7 @@ impl TransactionsHistoryTestSetup {
         block: u32,
         block_index: u32,
     ) -> ExecutedOperations {
-        let full_exit_op = FranklinOp::FullExit(Box::new(FullExitOp {
+        let full_exit_op = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op: FullExit {
                 account_id: self.from_zksync_account.get_account_id().unwrap(),
                 eth_address: self.from_zksync_account.address,
@@ -157,7 +157,7 @@ impl TransactionsHistoryTestSetup {
     }
 
     fn create_transfer_to_new_op(&mut self, block_index: Option<u32>) -> ExecutedOperations {
-        let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+        let transfer_to_new_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
             tx: self
                 .from_zksync_account
                 .sign_transfer(
@@ -188,7 +188,7 @@ impl TransactionsHistoryTestSetup {
     }
 
     fn create_transfer_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
-        let transfer_op = FranklinOp::Transfer(Box::new(TransferOp {
+        let transfer_op = ZkSyncOp::Transfer(Box::new(TransferOp {
             tx: self
                 .from_zksync_account
                 .sign_transfer(
@@ -219,7 +219,7 @@ impl TransactionsHistoryTestSetup {
     }
 
     fn create_withdraw_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
-        let withdraw_op = FranklinOp::Withdraw(Box::new(WithdrawOp {
+        let withdraw_op = ZkSyncOp::Withdraw(Box::new(WithdrawOp {
             tx: self
                 .from_zksync_account
                 .sign_withdraw(
@@ -249,7 +249,7 @@ impl TransactionsHistoryTestSetup {
     }
 
     fn create_close_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
-        let close_op = FranklinOp::Close(Box::new(CloseOp {
+        let close_op = ZkSyncOp::Close(Box::new(CloseOp {
             tx: self.from_zksync_account.sign_close(None, false),
             account_id: self.from_zksync_account.get_account_id().unwrap(),
         }));
@@ -268,10 +268,14 @@ impl TransactionsHistoryTestSetup {
     }
 
     fn create_change_pubkey_tx(&mut self, block_index: Option<u32>) -> ExecutedOperations {
-        let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
-            tx: self
-                .from_zksync_account
-                .create_change_pubkey_tx(None, false, false),
+        let change_pubkey_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
+            tx: self.from_zksync_account.sign_change_pubkey_tx(
+                None,
+                false,
+                0,
+                Default::default(),
+                false,
+            ),
             account_id: self.from_zksync_account.get_account_id().unwrap(),
         }));
 

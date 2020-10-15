@@ -9,7 +9,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use models::{AccountId, TokenId};
 use zksync_crypto::{
     circuit::{
         utils::{append_be_fixed_width, be_bit_vector_into_bytes},
@@ -21,6 +20,7 @@ use zksync_crypto::{
     },
     Engine, Fr,
 };
+use zksync_types::{AccountId, TokenId};
 // Local deps
 use crate::{
     allocated_structures::*,
@@ -31,7 +31,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct ZksyncExitCircuit<'a, E: RescueEngine> {
+pub struct ZkSyncExitCircuit<'a, E: RescueEngine> {
     pub params: &'a E::Params,
     /// The old root of the tree
     pub pub_data_commitment: Option<E::Fr>,
@@ -40,7 +40,7 @@ pub struct ZksyncExitCircuit<'a, E: RescueEngine> {
 }
 
 // Implementation of our circuit:
-impl<'a, E: RescueEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
+impl<'a, E: RescueEngine> Circuit<E> for ZkSyncExitCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         // this is only public input to our circuit
         let public_data_commitment =
@@ -105,7 +105,7 @@ pub fn create_exit_circuit_with_public_input(
     account_tree: &mut CircuitAccountTree,
     account_id: AccountId,
     token_id: TokenId,
-) -> ZksyncExitCircuit<'static, Engine> {
+) -> ZkSyncExitCircuit<'static, Engine> {
     let account_address_fe = Fr::from_str(&account_id.to_string()).unwrap();
     let token_id_fe = Fr::from_str(&token_id.to_string()).unwrap();
     let root_hash = account_tree.root_hash();
@@ -152,7 +152,7 @@ pub fn create_exit_circuit_with_public_input(
 
     let pub_data_commitment = Fr::from_repr(repr).unwrap();
 
-    ZksyncExitCircuit {
+    ZkSyncExitCircuit {
         params: &zksync_crypto::params::RESCUE_PARAMS,
         pub_data_commitment: Some(pub_data_commitment),
         root_hash: Some(root_hash),
@@ -172,11 +172,11 @@ pub fn create_exit_circuit_with_public_input(
 #[cfg(test)]
 mod test {
     use super::*;
-    use models::Account;
     use num::BigUint;
     use zksync_crypto::circuit::account::CircuitAccount;
     use zksync_crypto::circuit::CircuitAccountTree;
     use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
+    use zksync_types::Account;
 
     #[test]
     #[ignore]

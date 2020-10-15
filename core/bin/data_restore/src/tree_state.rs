@@ -1,20 +1,23 @@
 use crate::rollup_ops::RollupOpsBlock;
-use failure::format_err;
-use models::account::Account;
-use models::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::operations::FranklinOp;
-use models::priority_ops::FranklinPriorityOp;
-use models::priority_ops::PriorityOp;
-use models::tx::FranklinTx;
-use models::{AccountId, AccountMap, AccountUpdates};
-use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
+use anyhow::format_err;
 use web3::types::Address;
 use zksync_crypto::Fr;
+use zksync_state::{
+    handler::TxHandler,
+    state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
+};
+use zksync_types::account::Account;
+use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use zksync_types::operations::ZkSyncOp;
+use zksync_types::priority_ops::PriorityOp;
+use zksync_types::priority_ops::ZkSyncPriorityOp;
+use zksync_types::tx::{ChangePubKey, Close, ForcedExit, Transfer, Withdraw, ZkSyncTx};
+use zksync_types::{AccountId, AccountMap, AccountUpdates};
 
 /// Rollup accounts states
 pub struct TreeState {
     /// Accounts stored in a spase merkle tree
-    pub state: PlasmaState,
+    pub state: ZkSyncState,
     /// Current unprocessed priority op number
     pub current_unprocessed_priority_op: u64,
     /// The last fee account address
@@ -27,7 +30,7 @@ impl TreeState {
     /// Returns empty self state
     pub fn new(available_block_chunk_sizes: Vec<usize>) -> Self {
         Self {
-            state: PlasmaState::empty(),
+            state: ZkSyncState::empty(),
             current_unprocessed_priority_op: 0,
             last_fee_account_address: Address::default(),
             available_block_chunk_sizes,
@@ -50,7 +53,7 @@ impl TreeState {
         fee_account: AccountId,
         available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
-        let state = PlasmaState::from_acc_map(accounts, current_block);
+        let state = ZkSyncState::from_acc_map(accounts, current_block);
         let last_fee_account_address = state
             .get_account(fee_account)
             .expect("Cant get fee account from tree state")
@@ -73,7 +76,7 @@ impl TreeState {
     pub fn update_tree_states_from_ops_block(
         &mut self,
         ops_block: &RollupOpsBlock,
-    ) -> Result<(Block, AccountUpdates), failure::Error> {
+    ) -> Result<(Block, AccountUpdates), anyhow::Error> {
         let operations = ops_block.ops.clone();
 
         let mut accounts_updated = Vec::new();
@@ -84,8 +87,8 @@ impl TreeState {
 
         for operation in operations {
             match operation {
-                FranklinOp::Deposit(op) => {
-                    let priority_op = FranklinPriorityOp::Deposit(op.priority_op);
+                ZkSyncOp::Deposit(op) => {
+                    let priority_op = ZkSyncPriorityOp::Deposit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());
                     current_op_block_index = self.update_from_priority_operation(
                         priority_op,
@@ -96,23 +99,24 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                FranklinOp::TransferToNew(mut op) => {
+                ZkSyncOp::TransferToNew(mut op) => {
                     let from = self
                         .state
                         .get_account(op.from)
                         .ok_or_else(|| format_err!("TransferToNew fail: Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.nonce = from.nonce;
-                    let tx = FranklinTx::Transfer(Box::new(op.tx.clone()));
+                    let tx = ZkSyncTx::Transfer(Box::new(op.tx.clone()));
 
-                    let (fee, updates) = self
-                        .state
-                        .apply_transfer_to_new_op(&op)
-                        .map_err(|e| format_err!("TransferToNew fail: {}", e))?;
+                    let raw_op = TransferOutcome::TransferToNew(*op.clone());
+
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
+                            .map_err(|e| format_err!("TransferToNew fail: {}", e))?;
                     let tx_result = OpSuccess {
-                        fee: Some(fee),
+                        fee,
                         updates,
-                        executed_op: FranklinOp::TransferToNew(op),
+                        executed_op: ZkSyncOp::TransferToNew(op),
                     };
 
                     current_op_block_index = self.update_from_tx(
@@ -124,63 +128,7 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                FranklinOp::Withdraw(mut op) => {
-                    // Withdraw op comes with empty Account Address and Nonce fields
-                    let account = self
-                        .state
-                        .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Withdraw fail: Nonexistent account"))?;
-                    op.tx.from = account.address;
-                    op.tx.nonce = account.nonce;
-
-                    let tx = FranklinTx::Withdraw(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_withdraw_op(&op)
-                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
-                    let tx_result = OpSuccess {
-                        fee: Some(fee),
-                        updates,
-                        executed_op: FranklinOp::Withdraw(op),
-                    };
-                    current_op_block_index = self.update_from_tx(
-                        tx,
-                        tx_result,
-                        &mut fees,
-                        &mut accounts_updated,
-                        current_op_block_index,
-                        &mut ops,
-                    );
-                }
-                FranklinOp::Close(mut op) => {
-                    // Close op comes with empty Account Address and Nonce fields
-                    let account = self
-                        .state
-                        .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Close fail: Nonexistent account"))?;
-                    op.tx.account = account.address;
-                    op.tx.nonce = account.nonce;
-
-                    let tx = FranklinTx::Close(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_close_op(&op)
-                        .map_err(|e| format_err!("Close fail: {}", e))?;
-                    let tx_result = OpSuccess {
-                        fee: Some(fee),
-                        updates,
-                        executed_op: FranklinOp::Close(op),
-                    };
-                    current_op_block_index = self.update_from_tx(
-                        tx,
-                        tx_result,
-                        &mut fees,
-                        &mut accounts_updated,
-                        current_op_block_index,
-                        &mut ops,
-                    );
-                }
-                FranklinOp::Transfer(mut op) => {
+                ZkSyncOp::Transfer(mut op) => {
                     let from = self
                         .state
                         .get_account(op.from)
@@ -193,15 +141,16 @@ impl TreeState {
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
 
-                    let tx = FranklinTx::Transfer(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_transfer_op(&op)
-                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let raw_op = TransferOutcome::Transfer(*op.clone());
+
+                    let tx = ZkSyncTx::Transfer(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
+                            .map_err(|e| format_err!("Withdraw fail: {}", e))?;
                     let tx_result = OpSuccess {
-                        fee: Some(fee),
+                        fee,
                         updates,
-                        executed_op: FranklinOp::Transfer(op),
+                        executed_op: ZkSyncOp::Transfer(op),
                     };
                     current_op_block_index = self.update_from_tx(
                         tx,
@@ -212,8 +161,92 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                FranklinOp::FullExit(op) => {
-                    let priority_op = FranklinPriorityOp::FullExit(op.priority_op);
+                ZkSyncOp::Withdraw(mut op) => {
+                    // Withdraw op comes with empty Account Address and Nonce fields
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Withdraw fail: Nonexistent account"))?;
+                    op.tx.from = account.address;
+                    op.tx.nonce = account.nonce;
+
+                    let tx = ZkSyncTx::Withdraw(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<Withdraw>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: ZkSyncOp::Withdraw(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                ZkSyncOp::ForcedExit(mut op) => {
+                    // Withdraw op comes with empty Account Address and Nonce fields
+                    let initiator_account = self
+                        .state
+                        .get_account(op.tx.initiator_account_id)
+                        .ok_or_else(|| {
+                            format_err!("ForcedExit fail: Nonexistent initiator account")
+                        })?;
+
+                    // Set the fields unknown from the pubdata.
+                    op.tx.nonce = initiator_account.nonce;
+
+                    let tx = ZkSyncTx::ForcedExit(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<ForcedExit>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("ForcedExit fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: ZkSyncOp::ForcedExit(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                ZkSyncOp::Close(mut op) => {
+                    // Close op comes with empty Account Address and Nonce fields
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Close fail: Nonexistent account"))?;
+                    op.tx.account = account.address;
+                    op.tx.nonce = account.nonce;
+
+                    let tx = ZkSyncTx::Close(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<Close>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("Close fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: ZkSyncOp::Close(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                ZkSyncOp::FullExit(op) => {
+                    let priority_op = ZkSyncPriorityOp::FullExit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());
                     current_op_block_index = self.update_from_priority_operation(
                         priority_op,
@@ -224,22 +257,21 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                FranklinOp::ChangePubKeyOffchain(mut op) => {
+                ZkSyncOp::ChangePubKeyOffchain(mut op) => {
                     let account = self.state.get_account(op.account_id).ok_or_else(|| {
                         format_err!("ChangePubKeyOffChain fail: Nonexistent account")
                     })?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
 
-                    let tx = FranklinTx::ChangePubKey(Box::new(op.tx.clone()));
-                    let (fee, updates) = self
-                        .state
-                        .apply_change_pubkey_op(&op)
-                        .map_err(|e| format_err!("ChangePubKeyOffChain fail: {}", e))?;
+                    let tx = ZkSyncTx::ChangePubKey(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<ChangePubKey>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("ChangePubKeyOffChain fail: {}", e))?;
                     let tx_result = OpSuccess {
-                        fee: Some(fee),
+                        fee,
                         updates,
-                        executed_op: FranklinOp::ChangePubKeyOffchain(op),
+                        executed_op: ZkSyncOp::ChangePubKeyOffchain(op),
                     };
                     current_op_block_index = self.update_from_tx(
                         tx,
@@ -250,7 +282,7 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                FranklinOp::Noop(_) => {}
+                ZkSyncOp::Noop(_) => {}
             }
         }
 
@@ -267,7 +299,7 @@ impl TreeState {
         // As we restoring an already executed block, this value isn't important.
         let gas_limit = 0.into();
 
-        let block = Block::new_from_availabe_block_sizes(
+        let block = Block::new_from_available_block_sizes(
             ops_block.block_num,
             self.state.root_hash(),
             ops_block.fee_account,
@@ -300,7 +332,7 @@ impl TreeState {
     ///
     fn update_from_priority_operation(
         &mut self,
-        priority_op: FranklinPriorityOp,
+        priority_op: ZkSyncPriorityOp,
         op_result: OpSuccess,
         fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
@@ -343,7 +375,7 @@ impl TreeState {
     ///
     fn update_from_tx(
         &mut self,
-        tx: FranklinTx,
+        tx: ZkSyncTx,
         tx_result: OpSuccess,
         fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
@@ -374,7 +406,7 @@ impl TreeState {
         current_op_block_index + 1
     }
 
-    /// Returns map of Franklin accounts ids and their descriptions
+    /// Returns map of ZkSync accounts ids and their descriptions
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
         self.state.get_accounts()
     }
@@ -384,12 +416,12 @@ impl TreeState {
         self.state.root_hash()
     }
 
-    /// Returns Franklin Account id and description by its address
+    /// Returns ZkSync Account id and description by its address
     pub fn get_account_by_address(&self, address: &Address) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
     }
 
-    /// Returns Franklin Account description by its id
+    /// Returns ZkSync Account description by its id
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         self.state.get_account(account_id)
     }
@@ -399,10 +431,10 @@ impl TreeState {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
-    use models::{
-        Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
-    };
     use num::BigUint;
+    use zksync_types::{
+        Deposit, DepositOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
+    };
 
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
@@ -412,7 +444,7 @@ mod test {
             amount: BigUint::from(1000u32),
             to: [7u8; 20].into(),
         };
-        let op1 = FranklinOp::Deposit(Box::new(DepositOp {
+        let op1 = ZkSyncOp::Deposit(Box::new(DepositOp {
             priority_op: tx1,
             account_id: 0,
         }));
@@ -435,7 +467,7 @@ mod test {
             1,
             None,
         );
-        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
+        let op2 = ZkSyncOp::Withdraw(Box::new(WithdrawOp {
             tx: tx2,
             account_id: 0,
         }));
@@ -458,7 +490,7 @@ mod test {
             3,
             None,
         );
-        let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+        let op3 = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
             tx: tx3,
             from: 0,
             to: 1,
@@ -482,7 +514,7 @@ mod test {
             1,
             None,
         );
-        let op4 = FranklinOp::Transfer(Box::new(TransferOp {
+        let op4 = ZkSyncOp::Transfer(Box::new(TransferOp {
             tx: tx4,
             from: 1,
             to: 0,
@@ -502,7 +534,7 @@ mod test {
         //     nonce: 2,
         //     signature: TxSignature::default(),
         // };
-        // let op5 = FranklinOp::Close(Box::new(CloseOp {
+        // let op5 = ZkSyncOp::Close(Box::new(CloseOp {
         //     tx: tx5,
         //     account_id: 1,
         // }));
@@ -546,7 +578,7 @@ mod test {
             amount: BigUint::from(1000u32),
             to: [7u8; 20].into(),
         };
-        let op1 = FranklinOp::Deposit(Box::new(DepositOp {
+        let op1 = ZkSyncOp::Deposit(Box::new(DepositOp {
             priority_op: tx1,
             account_id: 0,
         }));
@@ -562,7 +594,7 @@ mod test {
             1,
             None,
         );
-        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
+        let op2 = ZkSyncOp::Withdraw(Box::new(WithdrawOp {
             tx: tx2,
             account_id: 0,
         }));
@@ -578,7 +610,7 @@ mod test {
             3,
             None,
         );
-        let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+        let op3 = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
             tx: tx3,
             from: 0,
             to: 1,
@@ -595,7 +627,7 @@ mod test {
             1,
             None,
         );
-        let op4 = FranklinOp::Transfer(Box::new(TransferOp {
+        let op4 = ZkSyncOp::Transfer(Box::new(TransferOp {
             tx: tx4,
             from: 1,
             to: 0,

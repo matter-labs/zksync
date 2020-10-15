@@ -1,18 +1,21 @@
 //! Utilities for the on-chain operations, such as `Deposit` and `FullExit`.
 
-use eth_client::ETHClient;
-use futures::compat::Future01CompatExt;
-use models::{AccountId, TokenLike};
-use std::str::FromStr;
+use num::BigUint;
+use std::{convert::TryFrom, time::Duration};
+use std::{str::FromStr, time::Instant};
 use web3::contract::tokens::Tokenize;
 use web3::contract::{Contract, Options};
-use web3::transports::{EventLoopHandle, Http};
-use web3::types::{H160, H256, U256};
+use web3::transports::Http;
+use web3::types::{TransactionReceipt, H160, H256, U256};
 use web3::Web3;
 use zksync_contracts as abi;
+use zksync_eth_client::ETHClient;
+use zksync_eth_signer::EthereumSigner;
+use zksync_types::{AccountId, PriorityOp, TokenLike};
 
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, types::network::Network,
+    utils::u256_to_biguint,
 };
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
@@ -33,12 +36,11 @@ impl Network {
 /// Methods to interact with Ethereum return corresponding Ethereum transaction hash.
 /// In order to monitor transaction execution, an Etherereum node `web3` API is exposed
 /// via `EthereumProvider::web3` method.
+#[derive(Debug)]
 pub struct EthereumProvider {
     tokens_cache: TokensCache,
     eth_client: ETHClient<Http>,
     erc20_abi: ethabi::Contract,
-    // We have to prevent handle from drop, since it will cause event loop termination.
-    _event_loop: EventLoopHandle,
 }
 
 impl EthereumProvider {
@@ -47,10 +49,10 @@ impl EthereumProvider {
         provider: &Provider,
         tokens_cache: TokensCache,
         eth_web3_url: impl AsRef<str>,
-        eth_private_key: H256,
+        eth_signer: EthereumSigner,
         eth_addr: H160,
     ) -> Result<Self, ClientError> {
-        let (_event_loop, transport) = Http::new(eth_web3_url.as_ref())
+        let transport = Http::new(eth_web3_url.as_ref())
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
         let network = provider.network;
@@ -66,7 +68,7 @@ impl EthereumProvider {
             transport,
             abi::zksync_contract(),
             eth_addr,
-            eth_private_key,
+            eth_signer,
             contract_address
                 .parse()
                 .map_err(|err| ClientError::MalformedResponse(format!("{}", err)))?,
@@ -85,7 +87,6 @@ impl EthereumProvider {
             eth_client,
             erc20_abi,
             tokens_cache,
-            _event_loop,
         })
     }
 
@@ -97,6 +98,15 @@ impl EthereumProvider {
     /// Returns the zkSync contract address.
     pub fn contract_address(&self) -> H160 {
         self.eth_client.contract_addr
+    }
+
+    /// Returns the Ethereum account balance.
+    pub async fn balance(&self) -> Result<BigUint, ClientError> {
+        self.eth_client
+            .balance()
+            .await
+            .map_err(|err| ClientError::NetworkError(err.to_string()))
+            .map(u256_to_biguint)
     }
 
     /// Returns the pending nonce for the Ethereum account.
@@ -113,11 +123,7 @@ impl EthereumProvider {
         token: impl Into<TokenLike>,
     ) -> Result<bool, ClientError> {
         let token = token.into();
-        let erc20_approve_threshold: U256 =
-            "57896044618658097711785492504343953926634992332820282019728792003956564819968"
-                .parse()
-                .unwrap(); // 2^255
-
+        let erc20_approve_threshold: U256 = U256::from(2).pow(255.into());
         let token = self
             .tokens_cache
             .resolve(token)
@@ -137,7 +143,6 @@ impl EthereumProvider {
             None,
         );
         let current_allowance: U256 = query
-            .compat()
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
@@ -150,10 +155,7 @@ impl EthereumProvider {
         token: impl Into<TokenLike>,
     ) -> Result<H256, ClientError> {
         let token = token.into();
-        let max_erc20_approve_amount: U256 =
-            "115792089237316195423570985008687907853269984665640564039457584007913129639935"
-                .parse()
-                .unwrap(); // 2^256 - 1
+        let max_erc20_approve_amount: U256 = U256::max_value();
 
         let token = self
             .tokens_cache
@@ -175,13 +177,13 @@ impl EthereumProvider {
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
-        let transactin_hash = self
+        let transaction_hash = self
             .eth_client
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
-        Ok(transactin_hash)
+        Ok(transaction_hash)
     }
 
     /// Performs a transfer of funds from one Ethereum account to another.
@@ -254,10 +256,10 @@ impl EthereumProvider {
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
             let mut options = Options::default();
-            options.gas = Some(200_000.into());
+            options.gas = Some(300_000.into());
             let params = (token_info.address, amount, sync_address);
             self.eth_client
-                .sign_call_tx("depositETH", params, options)
+                .sign_call_tx("depositERC20", params, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
@@ -293,12 +295,50 @@ impl EthereumProvider {
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
-        let transactin_hash = self
+        let transaction_hash = self
             .eth_client
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
-        Ok(transactin_hash)
+        Ok(transaction_hash)
+    }
+
+    /// Waits until the transaction is confirmed by the Ethereum blockchain.
+    pub async fn wait_for_tx(&self, tx_hash: H256) -> Result<TransactionReceipt, ClientError> {
+        // TODO Make timeouts configurable, or use high level solution like tokio::retry.
+        let timeout = Duration::from_secs(10);
+        let mut poller = tokio::time::interval(Duration::from_millis(100));
+
+        let start = Instant::now();
+        loop {
+            if let Some(receipt) = self
+                .eth_client
+                .tx_receipt(tx_hash)
+                .await
+                .map_err(|err| ClientError::NetworkError(err.to_string()))?
+            {
+                return Ok(receipt);
+            }
+
+            if start.elapsed() > timeout {
+                return Err(ClientError::OperationTimeout);
+            }
+            poller.tick().await;
+        }
+    }
+}
+
+/// Trait describes the ability to receive the priority operation from this holder.
+pub trait PriorityOpHolder {
+    /// Returns the priority operation if exist.
+    fn priority_op(&self) -> Option<PriorityOp>;
+}
+
+impl PriorityOpHolder for TransactionReceipt {
+    fn priority_op(&self) -> Option<PriorityOp> {
+        self.logs
+            .iter()
+            .find_map(|op| PriorityOp::try_from(op.clone()).ok())
     }
 }

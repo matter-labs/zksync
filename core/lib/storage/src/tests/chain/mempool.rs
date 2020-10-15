@@ -1,10 +1,10 @@
 // External imports
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
-use models::{
+use zksync_types::{
     mempool::SignedTxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
-    Address, FranklinTx, SignedFranklinTx,
+    Address, SignedZkSyncTx, ZkSyncTx,
 };
 // Local imports
 use crate::tests::db_test;
@@ -19,7 +19,7 @@ use crate::{
 use crate::tests::chain::utils::get_eth_sing_data;
 
 /// Generates several different `SignedFranlinTx` objects.
-fn franklin_txs() -> Vec<SignedFranklinTx> {
+fn franklin_txs() -> Vec<SignedZkSyncTx> {
     let transfer_1 = Transfer::new(
         42,
         Address::random(),
@@ -53,19 +53,22 @@ fn franklin_txs() -> Vec<SignedFranklinTx> {
         None,
     );
 
-    let change_pubkey = ChangePubKey {
-        account_id: 123,
-        account: Address::random(),
-        new_pk_hash: Default::default(),
-        nonce: 13,
-        eth_signature: None,
-    };
+    let change_pubkey = ChangePubKey::new(
+        123,
+        Address::random(),
+        Default::default(),
+        0,
+        Default::default(),
+        13,
+        None,
+        None,
+    );
 
     let txs = [
-        FranklinTx::Transfer(Box::new(transfer_1)),
-        FranklinTx::Transfer(Box::new(transfer_2)),
-        FranklinTx::Withdraw(Box::new(withdraw)),
-        FranklinTx::ChangePubKey(Box::new(change_pubkey)),
+        ZkSyncTx::Transfer(Box::new(transfer_1)),
+        ZkSyncTx::Transfer(Box::new(transfer_2)),
+        ZkSyncTx::Withdraw(Box::new(withdraw)),
+        ZkSyncTx::ChangePubKey(Box::new(change_pubkey)),
     ];
 
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
@@ -74,7 +77,7 @@ fn franklin_txs() -> Vec<SignedFranklinTx> {
         .map(|tx| {
             let test_message = format!("test message {}", rng.gen::<u32>());
 
-            SignedFranklinTx {
+            SignedZkSyncTx {
                 tx: tx.clone(),
                 eth_sign_data: Some(get_eth_sing_data(test_message)),
             }
@@ -83,7 +86,7 @@ fn franklin_txs() -> Vec<SignedFranklinTx> {
 }
 
 /// Generates the required number of transfer transactions.
-fn gen_transfers(n: usize) -> Vec<SignedFranklinTx> {
+fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
 
     (0..n)
@@ -101,8 +104,8 @@ fn gen_transfers(n: usize) -> Vec<SignedFranklinTx> {
 
             let test_message = format!("test message {}", rng.gen::<u32>());
 
-            SignedFranklinTx {
-                tx: FranklinTx::Transfer(Box::new(transfer)),
+            SignedZkSyncTx {
+                tx: ZkSyncTx::Transfer(Box::new(transfer)),
                 eth_sign_data: Some(get_eth_sing_data(test_message)),
             }
         })
@@ -110,7 +113,7 @@ fn gen_transfers(n: usize) -> Vec<SignedFranklinTx> {
 }
 
 /// Gets a single transaction from a `SignedTxVariant`. Panics if variant is a batch.
-fn unwrap_tx(tx: SignedTxVariant) -> SignedFranklinTx {
+fn unwrap_tx(tx: SignedTxVariant) -> SignedZkSyncTx {
     match tx {
         SignedTxVariant::Tx(tx) => tx,
         SignedTxVariant::Batch(_) => panic!("Attempt to unwrap a single transaction from a batch"),

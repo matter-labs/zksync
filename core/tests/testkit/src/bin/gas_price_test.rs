@@ -9,15 +9,10 @@
 //! We don't take fees for deposit and full exit, but we must process them, so it is possible to spam us and force us to spend money.
 
 use crate::eth_account::EthereumAccount;
-use crate::external_commands::{deploy_test_contracts, get_test_accounts};
-use crate::zksync_account::ZksyncAccount;
-use models::{
-    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
-};
+use crate::external_commands::{deploy_contracts, get_test_accounts};
+use crate::zksync_account::ZkSyncAccount;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::str::FromStr;
-use testkit::*;
 use web3::transports::Http;
 use web3::types::U256;
 use zksync_crypto::params::{
@@ -25,6 +20,11 @@ use zksync_crypto::params::{
     FEE_MANTISSA_BIT_WIDTH,
 };
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+use zksync_testkit::*;
+use zksync_types::{
+    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
+    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
 /// Constant for gas_price_test
@@ -186,13 +186,13 @@ fn gen_unpacked_amount(rng: &mut impl Rng) -> BigUint {
 async fn gas_price_test() {
     let testkit_config = get_testkit_config_from_env();
 
-    let fee_account = ZksyncAccount::rand();
+    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
-    let contracts = deploy_test_contracts();
+    let contracts = deploy_contracts(false, Default::default());
 
-    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
         commit_account_info.private_key,
@@ -220,8 +220,8 @@ async fn gas_price_test() {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let rng_zksync_key = ZksyncAccount::rand().private_key;
-            ZksyncAccount::new(
+            let rng_zksync_key = ZkSyncAccount::rand().private_key;
+            ZkSyncAccount::new(
                 rng_zksync_key,
                 0,
                 eth_account.address,
@@ -292,6 +292,10 @@ async fn commit_cost_of_transfers(
     let mut tranfers_amount = Vec::new();
     let mut tranfers_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);
+
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
     for _ in 0..n_transfers {
         let amount = gen_packable_amount(rng);
         let fee = gen_packable_fee(rng);
@@ -319,7 +323,9 @@ async fn commit_cost_of_transfers(
             BigUint::from(0u32),
         )
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -359,6 +365,10 @@ async fn commit_cost_of_transfers_to_new(
     let mut tranfers_amount = Vec::new();
     let mut tranfers_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);
+
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
     for _ in 0..n_transfers {
         let amount = gen_packable_amount(rng);
         let fee = gen_packable_fee(rng);
@@ -376,7 +386,9 @@ async fn commit_cost_of_transfers_to_new(
             deposit_amount,
         )
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -422,6 +434,10 @@ async fn commit_cost_of_withdrawals(
     let mut withdraws_fee = Vec::new();
     let mut withdrawals_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);
+
+    let change_pk_fee = gen_packable_fee(rng);
+    deposit_amount += &change_pk_fee;
+
     for _ in 0..n_withdrawals {
         let amount = gen_unpacked_amount(rng);
         let fee = gen_packable_fee(rng);
@@ -434,7 +450,9 @@ async fn commit_cost_of_withdrawals(
     test_setup
         .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -572,13 +590,16 @@ async fn commit_cost_of_change_pubkey(
     n_change_pubkeys: usize,
 ) -> CostsSample {
     let token = Token(0);
-    let deposit_amount = 10u32.into();
+    let fee_amount = 100u32;
+    let deposit_amount = (fee_amount * (n_change_pubkeys + 1) as u32).into();
 
     test_setup.start_block();
     test_setup
         .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
         .await;
-    test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+        .await;
     test_setup
         .execute_commit_and_verify_block()
         .await
@@ -586,7 +607,9 @@ async fn commit_cost_of_change_pubkey(
 
     test_setup.start_block();
     for _ in 0..n_change_pubkeys {
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1)).await;
+        test_setup
+            .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+            .await;
     }
     let change_pubkey_execute_result = test_setup
         .execute_commit_and_verify_block()

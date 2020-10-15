@@ -29,7 +29,7 @@ fn parse_knobs(mut input: syn::ItemFn) -> Result<TokenStream, syn::Error> {
     sig.asyncness = None;
 
     if sig.inputs.len() != 1 || !is_arg_storage_processor(sig.inputs.first()) {
-        let msg = "the DB test function must take `mut storage: storage::StorageProcessor<'_>` as a single argument";
+        let msg = "the DB test function must take `mut storage: zksync_storage::StorageProcessor<'_>` as a single argument";
         return Err(syn::Error::new_spanned(&sig.inputs, msg));
     }
 

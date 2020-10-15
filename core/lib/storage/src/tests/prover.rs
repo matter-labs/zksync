@@ -2,7 +2,7 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use models::{block::PendingBlock, Action};
+use zksync_types::{block::PendingBlock, Action};
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
@@ -86,7 +86,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create a block.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, Vec::new(), block_size))
+        .execute_operation(get_operation(1, Action::Commit, block_size))
         .await?;
 
     // Get a prover run.
@@ -127,7 +127,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create one more block.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(2, Action::Commit, Vec::new(), block_size))
+        .execute_operation(get_operation(2, Action::Commit, block_size))
         .await?;
 
     // Now we should get a prover run for the second block.
@@ -160,13 +160,13 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
 
     // Create a some blocks.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, Vec::new(), block_size))
+        .execute_operation(get_operation(1, Action::Commit, block_size))
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(2, Action::Commit, Vec::new(), block_size))
+        .execute_operation(get_operation(2, Action::Commit, block_size))
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(3, Action::Commit, Vec::new(), block_size))
+        .execute_operation(get_operation(3, Action::Commit, block_size))
         .await?;
 
     // We've created 3 blocks and no jobs were assigned yet.
@@ -226,7 +226,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // Then, when all the blocks are verified, create on more commit and check
     // that amount is increased again.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(4, Action::Commit, Vec::new(), block_size))
+        .execute_operation(get_operation(4, Action::Commit, block_size))
         .await?;
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
     assert_eq!(blocks_count, 1);

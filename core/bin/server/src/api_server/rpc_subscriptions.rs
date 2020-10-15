@@ -11,9 +11,9 @@ use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 use zksync_basic_types::Address;
 // Workspace uses
-use models::{tx::TxHash, ActionType, Operation};
-use storage::ConnectionPool;
 use zksync_config::ConfigurationOptions;
+use zksync_storage::ConnectionPool;
+use zksync_types::{tx::TxHash, ActionType, Operation};
 // Local uses
 use crate::fee_ticker::TickerRequest;
 use crate::panic_notify::ThreadPanicNotify;
@@ -24,7 +24,7 @@ use crate::{
     mempool::MempoolRequest,
     signature_checker::VerifyTxSignatureRequest,
     state_keeper::StateKeeperRequest,
-    utils::current_zksync_info::CurrentZksyncInfo,
+    utils::current_zksync_info::CurrentZkSyncInfo,
 };
 
 #[rpc]
@@ -192,7 +192,7 @@ pub fn start_ws_server(
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
     each_cache_size: usize,
-    current_zksync_info: CurrentZksyncInfo,
+    current_zksync_info: CurrentZkSyncInfo,
 ) {
     let config_options = config_options.clone();
     let addr = config_options.json_rpc_ws_server_address;
@@ -208,21 +208,22 @@ pub fn start_ws_server(
         each_cache_size,
     );
 
-    tokio::spawn(async move {
+    let req_rpc_app = super::rpc_server::RpcApp::new(
+        &config_options,
+        db_pool,
+        mempool_request_sender,
+        state_keeper_request_sender,
+        sign_verify_request_sender,
+        eth_watcher_request_sender,
+        ticker_request_sender,
+        current_zksync_info,
+    );
+
+    std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
         let mut io = PubSubHandler::new(MetaIoHandler::default());
 
-        let req_rpc_app = super::rpc_server::RpcApp::new(
-            &config_options,
-            db_pool,
-            mempool_request_sender,
-            state_keeper_request_sender,
-            sign_verify_request_sender,
-            eth_watcher_request_sender,
-            ticker_request_sender,
-            current_zksync_info,
-        );
         req_rpc_app.extend(&mut io);
 
         let rpc_sub_app = RpcSubApp { event_sub_sender };

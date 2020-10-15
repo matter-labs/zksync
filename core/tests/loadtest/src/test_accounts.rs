@@ -1,165 +1,211 @@
 // Built-in import
+use std::sync::atomic::{AtomicU32, Ordering};
 // External uses
 use num::BigUint;
 use rand::Rng;
-use tokio::sync::Mutex;
-use tokio::time;
-use web3::transports::Http;
 // Workspace uses
-use models::{tx::PackedEthSignature, FranklinTx};
-use testkit::{eth_account::EthereumAccount, zksync_account::ZksyncAccount};
+use zksync::{
+    error::ClientError, web3::types::H256, EthereumProvider, Network, Provider, Wallet,
+    WalletCredentials,
+};
 use zksync_config::ConfigurationOptions;
+use zksync_eth_signer::EthereumSigner;
+use zksync_types::{tx::PackedEthSignature, AccountId, Address, ZkSyncTx};
+
 // Local uses
-use crate::{rpc_client::RpcClient, scenarios::configs::AccountInfo};
+use crate::scenarios::configs::AccountInfo;
 
 #[derive(Debug)]
-pub struct TestAccount {
-    pub zk_acc: ZksyncAccount,
-    pub eth_acc: EthereumAccount<Http>,
-    pub eth_nonce: Mutex<u32>,
+pub struct TestWallet {
+    pub eth_provider: EthereumProvider,
+    inner: Wallet,
+    nonce: AtomicU32,
 }
 
-impl TestAccount {
-    pub fn from_info(
-        acc_info: &AccountInfo,
-        transport: &Http,
+impl TestWallet {
+    pub const TOKEN_NAME: &'static str = "ETH";
+
+    pub async fn from_info(
+        info: &AccountInfo,
+        provider: Provider,
         config: &ConfigurationOptions,
     ) -> Self {
-        let addr = acc_info.address;
-        let pk = acc_info.private_key;
-        let eth_acc = EthereumAccount::new(
-            pk,
-            addr,
-            transport.clone(),
-            config.contract_eth_addr,
-            config.chain_id,
-            config.gas_price_factor,
-        );
+        let credentials = WalletCredentials::from_eth_signer(
+            info.address,
+            EthereumSigner::from_key(info.private_key),
+            Network::Localhost,
+        )
+        .await
+        .unwrap();
+
+        let inner = Wallet::new(provider, credentials).await.unwrap();
+        Self::from_wallet(inner, &config.web3_url).await
+    }
+
+    // Parses and builds a new wallets list.
+    pub async fn from_info_list(
+        input: &[AccountInfo],
+        provider: Provider,
+        config: &ConfigurationOptions,
+    ) -> Vec<Self> {
+        let mut wallets = Vec::new();
+
+        for info in input {
+            let wallet = Self::from_info(info, provider.clone(), config).await;
+            wallets.push(wallet)
+        }
+        wallets
+    }
+
+    // Creates a random wallet.
+    pub async fn new_random(provider: Provider, config: &ConfigurationOptions) -> Self {
+        let eth_private_key = gen_random_eth_private_key();
+        let address_from_pk =
+            PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
+
+        let inner = Wallet::new(
+            provider,
+            WalletCredentials::from_eth_signer(
+                address_from_pk,
+                EthereumSigner::from_key(eth_private_key),
+                Network::Localhost,
+            )
+            .await
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+        Self::from_wallet(inner, &config.web3_url).await
+    }
+
+    async fn from_wallet(inner: Wallet, web3_url: impl AsRef<str>) -> Self {
+        let eth_provider = inner.ethereum(web3_url).await.unwrap();
+        let zk_nonce = inner
+            .provider
+            .account_info(inner.address())
+            .await
+            .unwrap()
+            .committed
+            .nonce;
+
         Self {
-            zk_acc: ZksyncAccount::new(
-                ZksyncAccount::rand().private_key,
-                0,
-                eth_acc.address,
-                eth_acc.private_key,
-            ),
-            eth_acc,
-            eth_nonce: Mutex::new(0),
+            inner,
+            eth_provider,
+            nonce: AtomicU32::new(zk_nonce),
         }
     }
 
-    // Parses and builds a new accounts list.
-    pub fn construct_test_accounts(
-        input_accs: &[AccountInfo],
-        transport: Http,
-        config: &ConfigurationOptions,
-    ) -> Vec<Self> {
-        input_accs
-            .iter()
-            .map(|acc_info| Self::from_info(acc_info, &transport, config))
-            .collect()
+    /// Returns the wallet address.
+    pub fn address(&self) -> Address {
+        self.inner.address()
     }
 
-    // Updates the current Ethereum and ZKSync account nonce values.
-    pub async fn update_nonce_values(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
-        // Update ETH nonce.
-        let mut nonce = self.eth_nonce.lock().await;
-        let v = self
-            .eth_acc
-            .main_contract_eth_client
-            .pending_nonce()
-            .await
-            .map_err(|e| failure::format_err!("update_eth_nonce: {}", e))?;
-        *nonce = v.as_u32();
-
-        // Update ZKSync nonce.
-        let resp = rpc_client
-            .account_state_info(self.zk_acc.address)
-            .await
-            .expect("rpc error");
-        self.zk_acc.set_nonce(resp.committed.nonce);
-        Ok(())
+    /// Returns the current account ID.
+    pub fn account_id(&self) -> Option<AccountId> {
+        self.inner.account_id()
     }
 
     // Updates ZKSync account id.
-    pub async fn update_account_id(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
-        let mut ticker = time::interval(std::time::Duration::from_millis(500));
-        for _i in 1..100 {
-            let resp = rpc_client
-                .account_state_info(self.zk_acc.address)
-                .await
-                .expect("rpc error");
-            if resp.id.is_some() {
-                self.zk_acc.set_account_id(resp.id);
-                return Ok(());
-            }
-            ticker.tick().await;
-        }
-        failure::bail!("failed to update account_id: timeout")
+    pub async fn update_account_id(&mut self) -> Result<(), ClientError> {
+        self.inner.update_account_id().await
     }
 
-    pub fn sign_change_pubkey(&self) -> FranklinTx {
-        FranklinTx::ChangePubKey(Box::new(
-            self.zk_acc.create_change_pubkey_tx(None, true, false),
-        ))
+    // Creates a signed change public key transaction.
+    pub async fn sign_change_pubkey(&self, fee: BigUint) -> Result<ZkSyncTx, ClientError> {
+        self.inner
+            .start_change_pubkey()
+            .nonce(self.pending_nonce())
+            .fee_token(Self::TOKEN_NAME)?
+            .fee(fee)
+            .tx()
+            .await
     }
 
     // Creates a signed withdraw transaction.
-    pub fn sign_withdraw_single(
+    pub async fn sign_withdraw_single(
         &self,
         amount: BigUint,
-    ) -> (FranklinTx, Option<PackedEthSignature>) {
-        let (tx, eth_signature) = self.zk_acc.sign_withdraw(
-            0, // ETH
-            "ETH",
-            amount,
-            BigUint::from(0u32),
-            &self.eth_acc.address,
-            None,
-            true,
-        );
-        (FranklinTx::Withdraw(Box::new(tx)), Some(eth_signature))
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+        self.inner
+            .start_withdraw()
+            .nonce(self.pending_nonce())
+            .token(Self::TOKEN_NAME)?
+            .amount(amount)
+            .to(self.inner.address())
+            .tx()
+            .await
     }
 
     // Creates a signed withdraw transaction with a fee provided.
-    pub fn sign_withdraw(
+    pub async fn sign_withdraw(
         &self,
         amount: BigUint,
-        fee: BigUint,
-    ) -> (FranklinTx, Option<PackedEthSignature>) {
-        let (tx, eth_signature) = self.zk_acc.sign_withdraw(
-            0, // ETH
-            "ETH",
-            amount,
-            fee,
-            &self.eth_acc.address,
-            None,
-            true,
-        );
-        (FranklinTx::Withdraw(Box::new(tx)), Some(eth_signature))
+        fee: Option<BigUint>,
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+        let mut builder = self
+            .inner
+            .start_withdraw()
+            .nonce(self.pending_nonce())
+            .token(Self::TOKEN_NAME)?
+            .amount(amount)
+            .to(self.inner.address());
+        if let Some(fee) = fee {
+            builder = builder.fee(fee);
+        }
+
+        builder.tx().await
+    }
+
+    // Creates a signed transfer tx to a given receiver.
+    pub async fn sign_transfer(
+        &self,
+        to: impl Into<Address>,
+        amount: impl Into<BigUint>,
+        fee: Option<BigUint>,
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+        let mut builder = self
+            .inner
+            .start_transfer()
+            .nonce(self.pending_nonce())
+            .token(Self::TOKEN_NAME)?
+            .amount(amount)
+            .to(to.into());
+        if let Some(fee) = fee {
+            builder = builder.fee(fee);
+        }
+
+        builder.tx().await
     }
 
     // Creates a signed transfer tx to a random receiver.
-    pub fn sign_transfer_to_random(
+    pub async fn sign_transfer_to_random(
         &self,
         test_accounts: &[AccountInfo],
         amount: BigUint,
-    ) -> (FranklinTx, Option<PackedEthSignature>) {
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         let to = {
-            let mut to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
-            while test_accounts[to_idx].address == self.zk_acc.address {
-                to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
+            let mut rng = rand::thread_rng();
+            let count = test_accounts.len() - 1;
+
+            let mut to_idx = rng.gen_range(0, count);
+            while test_accounts[to_idx].address == self.inner.address() {
+                to_idx = rng.gen_range(0, count);
             }
             test_accounts[to_idx].address
         };
-        let (tx, eth_signature) = self.zk_acc.sign_transfer(
-            0, // ETH
-            "ETH",
-            amount,
-            BigUint::from(0u32),
-            &to,
-            None,
-            true,
-        );
-        (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
+
+        self.sign_transfer(to, amount, None).await
     }
+
+    /// Returns appropriate nonce for the new transaction and increments the nonce.
+    fn pending_nonce(&self) -> u32 {
+        self.nonce.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
+fn gen_random_eth_private_key() -> H256 {
+    let mut eth_private_key = H256::default();
+    eth_private_key.randomize();
+    eth_private_key
 }

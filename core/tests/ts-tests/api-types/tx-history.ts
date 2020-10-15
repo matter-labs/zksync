@@ -13,8 +13,8 @@ type Deposit = {
         };
         type: "Deposit";
     };
-    success: null;
-    fail_reason: null;
+    success: boolean;
+    fail_reason?: string;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -34,8 +34,8 @@ type FullExit = {
         withdraw_amount: string;
         type: "FullExit";
     };
-    success: null;
-    fail_reason: null;
+    success: boolean;
+    fail_reason?: string;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -79,6 +79,8 @@ type ChangePubKey = {
         newPkHash: string;
         nonce: number;
         type: string;
+        feeToken: number;
+        fee: string;
     };
     success: boolean;
     fail_reason?: string;
@@ -114,4 +116,28 @@ type Withdraw = {
     created_at: string;
 };
 
-export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit)[];
+type ForcedExit = {
+    tx_id: string;
+    hash: string;
+    eth_block: null;
+    pq_id: null;
+    tx: {
+        initiatorAccountId: number;
+        target: string;
+        token: string;
+        fee: string;
+        nonce: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
+        type: "ForcedExit";
+    };
+    success: boolean;
+    fail_reason?: string;
+    commited: boolean;
+    verified: boolean;
+    created_at: string;
+};
+
+export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit | ForcedExit)[];

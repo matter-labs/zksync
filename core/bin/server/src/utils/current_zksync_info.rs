@@ -1,19 +1,19 @@
-use models::BlockNumber;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
 };
-use storage::ConnectionPool;
+use zksync_storage::ConnectionPool;
+use zksync_types::BlockNumber;
 
 /// This struct knows current verified block number.
 /// It's like storage, but in memory.
 /// In the future, more fields might be added.
 #[derive(Debug, Clone)]
-pub struct CurrentZksyncInfo {
+pub struct CurrentZkSyncInfo {
     last_verified_block: Arc<AtomicU32>,
 }
 
-impl CurrentZksyncInfo {
+impl CurrentZkSyncInfo {
     pub async fn new(connection_pool: &ConnectionPool) -> Self {
         let mut storage = connection_pool.access_storage().await.expect("db failed");
 

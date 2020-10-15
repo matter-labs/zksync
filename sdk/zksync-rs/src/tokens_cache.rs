@@ -1,5 +1,5 @@
-use models::{Address, Token, TokenLike};
 use std::collections::HashMap;
+use zksync_types::{Address, Token, TokenLike};
 
 #[derive(Debug, Clone)]
 pub struct TokensCache {
