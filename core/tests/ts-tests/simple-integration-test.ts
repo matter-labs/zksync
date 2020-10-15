@@ -400,7 +400,7 @@ async function testWithdraw(
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
-    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+    assert(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash));
 
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
@@ -465,7 +465,7 @@ async function testFastWithdraw(
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
-    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+    assert(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash));
 
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
@@ -810,8 +810,13 @@ async function checkFailedTransactionResending(
         console.log("Move funds ETH OK");
 
         await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
+        console.log("Failed transaction resending OK");
 
+        console.log("Disconnecting provider");
+        const startTime = new Date().getTime();
         await syncProvider.disconnect();
+        console.log(`Disconnected provider: ${new Date().getTime() - startTime} ms`);
+        process.exit(0);
     } catch (e) {
         console.error("Error: ", e);
         process.exit(1);
