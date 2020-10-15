@@ -93,6 +93,18 @@ rustc --version
 rustc 1.41.0 (5e1a79984 2020-01-27)
 ```
 
+### `lld`
+
+Optionally, you may want to optimize the build time with the LLVM linker, `lld`.\
+Make sure you have it installed and append `"-C", "link-arg=-fuse-ld=lld"` to the `rustflags` in your `.cargo/config` file, so it looks like this:
+```
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+]
+```
+**Warning:** This is only viable for linux since `lld` doesn't work on mac.
+
 # `JQ`
 
 `jq` is used to work with JSON when managing DigitalOcean.
