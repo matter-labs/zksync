@@ -7,6 +7,7 @@ import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
+import './forced-exit';
 import './misc';
 
 const TX_AMOUNT = utils.parseEther('10.0');
@@ -67,7 +68,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should change pubkey offchain', async () => {
         await tester.testChangePubKey(alice, token, false);
-        await tester.testChangePubKey(bob, token, false);
     });
 
     step('should test multi-transfers', async () => {
@@ -81,7 +81,11 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a fast withdrawal', async () => {
-        await tester.testVerifiedWithdraw(bob, token, TX_AMOUNT, true);
+        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT, true);
+    });
+
+    step('should execute a ForcedExit', async () => {
+        await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
     it('should check collected fees', async () => {
@@ -135,7 +139,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
     });
 });
-
 
 const transports = process.env.TEST_TRANSPORT ? [process.env.TEST_TRANSPORT.toUpperCase()] : ['HTTP', 'WS'];
 const tokens = process.env.TEST_TOKEN ? [process.env.TEST_TOKEN.toUpperCase()] : ['ETH', 'DAI'];
