@@ -116,10 +116,11 @@ export default {
             txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
             if (txData.tx_type  == "Deposit" || txData.tx_type == "FullExit") {
                 txData.feeTokenName = "ETH";
-            } else if(txData.tx_type  == "ChangePubKey") {
-                /// TODO: Update API and remove this trick
-                txData.feeTokenName = txData.tx.feeToken === -1 ? "" : tokens[txData.tx.feeToken || 0].syncSymbol;
-                txData.fee = txData.tx.fee || 0;
+            } else if(txData.tx_type  == "ChangePubKey" || txData.tx_type == "ChangePubKeyOffchain") {
+                // Once upon a time there was no need to pay the fee for the `ChangePubKey` operations,
+                // so we need to check if `txData` contains fields associated with fee
+                txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token || 0].syncSymbol;
+                txData.fee = txData.fee || 0;
             }
             else {
                 txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
