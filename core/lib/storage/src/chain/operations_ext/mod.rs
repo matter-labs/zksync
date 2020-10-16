@@ -132,10 +132,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             let created_at = tx.created_at.format("%Y-%m-%dT%H:%M:%S%.6f").to_string();
             let operation = &tx.tx;
 
-            let tx_token = operation["token"].as_i64().unwrap_or(-1);
             let tx_type = operation["type"].as_str().unwrap_or("unknown tx_type");
             let nonce = operation["nonce"].as_i64().unwrap_or(-1);
-            let (tx_from, tx_to, tx_fee, tx_amount) = match tx_type {
+
+            let (tx_from, tx_to, tx_fee, tx_amount, tx_token) = match tx_type {
                 "Withdraw" | "Transfer" | "TransferToNew" => (
                     operation["from"]
                         .as_str()
@@ -147,6 +147,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .as_str()
                         .unwrap_or("unknown amount")
                         .to_string(),
+                    operation["token"].as_i64().unwrap_or(-1),
                 ),
                 "ChangePubKey" | "ChangePubKeyOffchain" => (
                     operation["account"]
@@ -157,11 +158,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
-                    None,
-                    operation["amount"]
-                        .as_str()
-                        .unwrap_or("unknown amount")
-                        .to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
+                    "unknown amount".to_string(),
+                    operation["feeToken"].as_i64().unwrap_or(-1),
                 ),
                 "ForcedExit" => (
                     operation["target"]
@@ -177,12 +176,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         .as_str()
                         .unwrap_or("unknown amount")
                         .to_string(),
+                    operation["token"].as_i64().unwrap_or(-1),
                 ),
                 &_ => (
                     "unknown from".to_string(),
                     "unknown to".to_string(),
                     Some("unknown fee".to_string()),
                     "unknown amount".to_string(),
+                    operation["token"].as_i64().unwrap_or(-1),
                 ),
             };
 

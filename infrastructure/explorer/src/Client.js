@@ -180,7 +180,6 @@ export class Client {
                     const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
                     const amount = formatToken(tx.tx.withdraw_amount || 0, token);
                     return {
-
                         ...data,
                         from: tx.tx.priority_op.eth_address,
                         to: tx.tx.priority_op.eth_address,
@@ -203,7 +202,6 @@ export class Client {
                 case type == 'ForcedExit': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
                     let amount = (await this.searchTx(hash)).amount;
-                    console.log(amount);
                     if (amount != "unknown amount") {
                         amount = formatToken(amount || 0, token);
                     }
