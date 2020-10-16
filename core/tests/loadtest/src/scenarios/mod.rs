@@ -33,11 +33,14 @@ pub struct ScenarioResources {
     pub balance_per_wallet: BigUint,
 }
 
+/// Describes the general steps of a load test scenario.
 #[async_trait]
 pub trait Scenario: Debug + Display {
     /// Returns resources that should be provided by the scenario executor.
     fn requested_resources(&self, sufficient_fee: &BigUint) -> ScenarioResources;
 
+    /// Performs actions before running the main scenario, for example, it can
+    /// fill the queue of transactions for execution.
     async fn prepare(
         &mut self,
         monitor: &Monitor,
@@ -45,6 +48,7 @@ pub trait Scenario: Debug + Display {
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 
+    /// Runs main scenario routine with the enabled load monitor.
     async fn run(
         &mut self,
         monitor: &Monitor,
@@ -52,6 +56,8 @@ pub trait Scenario: Debug + Display {
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 
+    /// Performs actions after running the main scenario, for example, it can
+    /// return the funds to the specified wallets.
     async fn finalize(
         &mut self,
         monitor: &Monitor,

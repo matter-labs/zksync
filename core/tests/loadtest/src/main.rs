@@ -42,17 +42,17 @@ struct LoadtestOpts {
 macro_rules! pretty_fmt {
     ($ms:expr) => {
         match ($ms as f64) {
-            ms if ms < 1_000_f64 => format!("{:.3}µs", ms),
-            ms if ms < 1_000_000_f64 => format!("{:.3}ms", ms / 1_000_f64),
-            ms => format!("{:.3}s", ms / 1_000_000_f64),
+            ms if ms < 1_000_f64 => format!("{:.1}µs", ms),
+            ms if ms < 1_000_000_f64 => format!("{:.2}ms", ms / 1_000_f64),
+            ms => format!("{:.2}s", ms / 1_000_000_f64),
         }
     };
 }
 
 fn print_stats_summary(name: impl AsRef<str>, summary: &FiveSummaryStats) {
+    println!("    {}:", name.as_ref().green(),);
     println!(
-        "    {}: [ {} {} {} {} {} ] (std_dev = {})",
-        name.as_ref().green(),
+        "        [ {} {} {} {} {} ] (std_dev = {})",
         pretty_fmt!(summary.min).dimmed(),
         pretty_fmt!(summary.lower_quartile),
         pretty_fmt!(summary.median).bold(),

@@ -60,8 +60,11 @@ struct MonitorInner {
     pending_tasks: Vec<JoinHandle<()>>,
 }
 
+/// Load monitor - measures the execution time of the main stages of the life cycle of
+/// transactions and priority operations.
 #[derive(Debug, Clone)]
 pub struct Monitor {
+    /// Underlying zkSync network provider.
     pub provider: Provider,
     inner: Arc<Mutex<MonitorInner>>,
 }
@@ -134,6 +137,7 @@ impl Monitor {
     const SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
     const POLLING_INTERVAL: Duration = Duration::from_millis(50);
 
+    /// Creates a new load monitor from the zkSync network provider.
     pub async fn new(provider: Provider) -> Self {
         let monitor = Self {
             provider,
@@ -185,7 +189,7 @@ impl Monitor {
         Ok(tx_hash)
     }
 
-    // Waits for the transaction to commit.
+    /// Waits for the transaction to reach the desired status.
     pub async fn wait_for_tx(
         &self,
         block_status: BlockStatus,
@@ -210,7 +214,7 @@ impl Monitor {
         Ok(())
     }
 
-    // Waits for the priority operation.
+    /// Waits for the priority operation to reach the desired status.
     pub async fn wait_for_priority_op(
         &self,
         block_status: BlockStatus,

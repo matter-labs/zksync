@@ -10,10 +10,16 @@ use num::BigUint;
 
 const CHUNK_SIZES: &[usize] = &[100];
 
+/// Converts "gwei" amount to the "wei".
 pub fn gwei_to_wei(gwei: impl Into<BigUint>) -> BigUint {
     gwei.into() * BigUint::from(10u64.pow(9))
 }
 
+/// Creates a future which represents a collection of the outputs of the futures
+/// given.
+///
+/// But unlike the `futures::future::join_all` method, it performs futures in chunks
+/// to reduce descriptors usage.
 pub async fn wait_all<I>(i: I) -> Vec<<I::Item as Future>::Output>
 where
     I: IntoIterator,
@@ -27,6 +33,11 @@ where
     output
 }
 
+/// Creates a future which represents either a collection of the results of the
+/// futures given or an error.
+///
+/// But unlike the `futures::future::try_join_all` method, it performs futures in chunks
+/// to reduce descriptors usage.
 pub async fn try_wait_all<I>(
     i: I,
 ) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
