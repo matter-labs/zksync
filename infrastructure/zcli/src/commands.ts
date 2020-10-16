@@ -70,7 +70,7 @@ export async function txInfo(
     const tokenInfo = Object.values(tokens).find((value) => value.id == tx.token);
     if (tokenInfo) {
         const token = tokenInfo.symbol; // @ts-ignore
-        info.transaction.amount = provider.tokenSet.formatToken(token, tx.amount);
+        info.transaction.amount = tx.amount == "unknown amount" ? null : provider.tokenSet.formatToken(token, tx.amount);
         if (tx.fee) {
             // @ts-ignore
             info.transaction.fee = provider.tokenSet.formatToken(token, tx.fee);
