@@ -115,7 +115,7 @@ type FullExit = {
             token: number;
         };
         type: 'FullExit';
-        withdraw_amount: string;
+        withdraw_amount: string | null;
     };
 };
 
