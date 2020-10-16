@@ -1,10 +1,9 @@
-import {deployContract} from "ethereum-waffle";
-import {ethers, Wallet} from "ethers";
-import {readContractCode} from "../src.ts/deploy";
-import {encodeConstructorArgs, publishSourceCodeToEtherscan} from "../src.ts/publish-utils";
+import { deployContract } from "ethereum-waffle";
+import { ethers, Wallet } from "ethers";
+import { readContractCode } from "../src.ts/deploy";
+import { encodeConstructorArgs, publishSourceCodeToEtherscan } from "../src.ts/publish-utils";
 import * as fs from "fs";
-import {ArgumentParser} from "argparse";
-
+import { ArgumentParser } from "argparse";
 
 const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
 
@@ -17,7 +16,7 @@ const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
     parser.addArgument("--publish", {
         required: false,
         action: "storeTrue",
-        help: "Only publish code for deployed tokens"
+        help: "Only publish code for deployed tokens",
     });
     const args = parser.parseArgs(process.argv.slice(2));
 
@@ -41,12 +40,7 @@ const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
                 console.log(`Publishing code for : ${token.symbol}, ${token.address}`);
                 const constructorArgs = [`${token.name} (${process.env.ETH_NETWORK})`, token.symbol, token.decimals];
                 const rawArgs = encodeConstructorArgs(contractCode, constructorArgs);
-                await publishSourceCodeToEtherscan(
-                    token.address,
-                    "TestnetERC20Token",
-                    rawArgs,
-                    "contracts/test",
-                );
+                await publishSourceCodeToEtherscan(token.address, "TestnetERC20Token", rawArgs, "contracts/test");
                 verifiedOnce = true;
             } catch (e) {
                 console.log("Error failed to verified code:", e);
@@ -61,11 +55,7 @@ const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
         const constructorArgs = [`${token.name} (${process.env.ETH_NETWORK})`, token.symbol, token.decimals];
 
         console.log(`Deploying testnet ERC20: ${constructorArgs.toString()}`);
-        const erc20 = await deployContract(
-            wallet,
-            contractCode, constructorArgs,
-            {gasLimit: 800000},
-        );
+        const erc20 = await deployContract(wallet, contractCode, constructorArgs, { gasLimit: 800000 });
 
         const testnetToken = token;
         testnetToken.address = erc20.address;
@@ -74,6 +64,6 @@ const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
 
     fs.writeFileSync(
         `${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.ETH_NETWORK}.json`,
-        JSON.stringify(result, null, 2),
+        JSON.stringify(result, null, 2)
     );
 })();

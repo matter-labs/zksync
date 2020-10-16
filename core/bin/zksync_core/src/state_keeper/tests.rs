@@ -1,4 +1,4 @@
-use super::{CommitRequest, ExecutedOpId, ZkSyncStateInitParams, ZkSyncStateKeeper};
+use super::{CommitRequest, ZkSyncStateInitParams, ZkSyncStateKeeper};
 use crate::mempool::ProposedBlock;
 use futures::{channel::mpsc, stream::StreamExt};
 use num::BigUint;
@@ -341,37 +341,6 @@ async fn store_pending_block() {
     } else {
         panic!("Block is not received!");
     }
-}
-
-/// Checks if tx search in pending_block is done correctly
-/// by searching for 1 priority_op, 1 non-existent priority_op, 1 failed tx and 1 succeeded tx
-#[test]
-fn check_executed_in_pending_block() {
-    let mut tester = StateKeeperTester::new(20, 3, 3, 2);
-    let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-    let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
-    let deposit = create_deposit(0, 12u32);
-
-    assert!(tester.state_keeper.apply_tx(&good_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_tx(&bad_withdraw).is_ok());
-    assert!(tester.state_keeper.apply_priority_op(deposit).is_ok());
-
-    assert!(tester
-        .state_keeper
-        .check_executed_in_pending_block(ExecutedOpId::PriorityOp(0))
-        .is_some());
-    assert!(tester
-        .state_keeper
-        .check_executed_in_pending_block(ExecutedOpId::PriorityOp(1))
-        .is_none());
-    assert!(tester
-        .state_keeper
-        .check_executed_in_pending_block(ExecutedOpId::Transaction(good_withdraw.tx.hash()))
-        .is_some());
-    assert!(tester
-        .state_keeper
-        .check_executed_in_pending_block(ExecutedOpId::Transaction(bad_withdraw.tx.hash()))
-        .is_some());
 }
 
 mod execute_proposed_block {

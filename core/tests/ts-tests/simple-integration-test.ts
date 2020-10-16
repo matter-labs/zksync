@@ -814,8 +814,13 @@ async function checkFailedTransactionResending(
         console.log("Move funds ETH OK");
 
         await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
+        console.log("Failed transaction resending OK");
 
+        console.log("Disconnecting provider");
+        const startTime = new Date().getTime();
         await syncProvider.disconnect();
+        console.log(`Disconnected provider: ${new Date().getTime() - startTime} ms`);
+        process.exit(0);
     } catch (e) {
         console.error("Error: ", e);
         process.exit(1);
