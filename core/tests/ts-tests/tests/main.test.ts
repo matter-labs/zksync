@@ -10,7 +10,6 @@ import './withdraw';
 import './misc';
 
 const TX_AMOUNT = utils.parseEther('10.0');
-const WITHDRAW_AMOUNT = utils.parseEther('1.0');
 // should be enough for ~100 test transactions (excluding fees), increase if needed
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(100);
 
@@ -78,11 +77,11 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, token, WITHDRAW_AMOUNT);
+        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
     step('should execute a fast withdrawal', async () => {
-        await tester.testVerifiedWithdraw(bob, token, WITHDRAW_AMOUNT, true);
+        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT, true);
     });
 
     it('should check collected fees', async () => {
