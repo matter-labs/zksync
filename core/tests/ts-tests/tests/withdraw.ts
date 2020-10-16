@@ -2,6 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, utils } from 'zksync';
 import { BigNumber } from 'ethers';
+import { sleep } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -29,8 +30,19 @@ Tester.prototype.testVerifiedWithdraw = async function (
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     // we should wait some time for `completeWithdrawals` transaction to be processed
-    await utils.sleep(10_000);
-    expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.exist;
+    let withdrawalTxHash = null;
+    // Poll the node for 5 seconds.
+    const polling_interval = 100; // ms
+    const polling_timeout = 5000; // ms
+    const polling_iterations = polling_timeout / polling_interval;
+    for (let i = 0; i < polling_iterations; i++) {
+        withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
+        if (withdrawalTxHash != null) {
+            break;
+        }
+        sleep(polling_interval);
+    }
+    expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
     const onchainBalanceAfter = await wallet.getEthereumBalance(token);
     const tokenId = wallet.provider.tokenSet.resolveTokenId(token);
