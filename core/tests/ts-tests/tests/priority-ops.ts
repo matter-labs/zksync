@@ -2,6 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
+import { sleep } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -22,15 +23,20 @@ Tester.prototype.testDeposit = async function (wallet: Wallet, token: TokenLike,
         approveDepositAmountForERC20: approve
     });
 
-    await depositHandle.awaitReceipt();
+    const receipt = await depositHandle.awaitReceipt();
+    expect(receipt.executed, 'Deposit was not executed').to.be.true;
     const balanceAfter = await wallet.getBalance(token);
-    expect(balanceAfter.sub(balanceBefore).eq(amount), 'Deposit failed').to.be.true;
+    expect(
+        balanceAfter.sub(balanceBefore).eq(amount),
+        `Deposit balance mismatch. Expected ${amount}, actual ${balanceAfter.sub(balanceBefore)}`
+    ).to.be.true;
 };
 
 Tester.prototype.testFullExit = async function (wallet: Wallet, token: TokenLike, accountId?: number) {
     const balanceBefore = await wallet.getBalance(token);
     const handle = await wallet.emergencyWithdraw({ token, accountId });
-    await handle.awaitReceipt();
+    let receipt = await handle.awaitReceipt();
+    expect(receipt.executed, 'Full Exit was not executed').to.be.true;
     const balanceAfter = await wallet.getBalance(token);
     return [balanceBefore, balanceAfter];
 };

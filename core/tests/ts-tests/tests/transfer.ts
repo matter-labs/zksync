@@ -48,8 +48,9 @@ Tester.prototype.testTransfer = async function (
     if (sender.address() === receiver.address()) {
         expect(senderBefore.sub(fee).eq(senderAfter), 'Transfer to self failed').to.be.true;
     } else {
-        expect(senderBefore.sub(senderAfter).eq(amount.add(fee)), 'Transfer failed').to.be.true;
-        expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed').to.be.true;
+        expect(senderBefore.sub(senderAfter).eq(amount.add(fee)), 'Transfer failed (incorrect sender balance)').to.be
+            .true;
+        expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed (incorrect receiver balance)').to.be.true;
     }
 
     this.runningFee = this.runningFee.add(fee);
