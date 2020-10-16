@@ -48,6 +48,8 @@ f cargo build --bin dummy_prover --release
 
 zksync server &> rust-sdk-server.log &
 SERVER_PID=$!
+# Wait a bit, so server and prover won't have conflicts about the workspace lockfile.
+sleep 1 
 zksync dummy-prover &> rust-sdk-prover.log &
 PROVER_PID=$!
 
