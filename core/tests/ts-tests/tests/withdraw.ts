@@ -71,7 +71,9 @@ Tester.prototype.testWithdraw = async function (
         fastProcessing
     });
 
-    await handle.awaitReceipt();
+    const receipt = await handle.awaitReceipt();
+    expect(receipt.success, `Withdraw transaction failed with a reason: ${receipt.failReason}`).to.be.true;
+
     const balanceAfter = await wallet.getBalance(token);
     expect(balanceBefore.sub(balanceAfter).eq(amount.add(fee)), 'Wrong amount in wallet after withdraw').to.be.true;
     this.runningFee = this.runningFee.add(fee);

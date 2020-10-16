@@ -40,7 +40,8 @@ Tester.prototype.testTransfer = async function (
     });
 
     await utils.sleep(timeout);
-    await handle.awaitReceipt();
+    const receipt = await handle.awaitReceipt();
+    expect(receipt.success, `Transfer transaction failed with a reason: ${receipt.failReason}`).to.be.true;
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
 
