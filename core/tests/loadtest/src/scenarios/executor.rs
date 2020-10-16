@@ -11,6 +11,7 @@ use zksync_utils::format_ether;
 // Local uses
 use super::Scenario;
 use crate::{
+    api::CancellationToken,
     config::Config,
     journal::Journal,
     monitor::Monitor,
@@ -35,7 +36,7 @@ pub struct ScenarioExecutor {
     /// Estimated fee amount for any zkSync operation.
     sufficient_fee: BigUint,
     scenarios: Vec<(Box<dyn Scenario>, Vec<TestWallet>)>,
-    api_tests: Option<ApiTestsFuture>,
+    api_tests: Option<(ApiTestsFuture, CancellationToken)>,
 }
 
 impl ScenarioExecutor {
@@ -57,11 +58,13 @@ impl ScenarioExecutor {
 
         log::info!("Fee is {}", format_ether(&sufficient_fee));
 
-        let api_tests = crate::api::run(
+        // TODO Use one of random wallets from the preparation step.
+        let (api_tests, cancel) = crate::api::run(
             monitor.clone(),
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options).await,
-        )
-        .boxed();
+            TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options)
+                .await
+                .into_inner(),
+        );
 
         Ok(Self {
             monitor,
@@ -69,15 +72,21 @@ impl ScenarioExecutor {
             main_wallet,
             scenarios,
             sufficient_fee,
-            api_tests: Some(api_tests),
+            api_tests: Some((api_tests.boxed(), cancel)),
         })
     }
 
     pub async fn run(mut self) -> anyhow::Result<Report> {
+        // Preliminary steps for creating wallets with funds.
         self.prepare().await?;
-        // Spawn an additional load routine with a lot of API requests.
-        let api_handle = tokio::spawn(self.api_tests.take().unwrap());
+        // Spawn an additional loadtest routine with a lot of API requests.
+        let (api_tests, token) = self.api_tests.take().unwrap();
+        let api_handle = tokio::spawn(api_tests);
+        // Launch the main loadtest routine.
         let journal = self.process().await?;
+        // Stop API loadtest routine
+        token.cancel();
+        // Refund remaining funds to the main wallet.
         self.refund().await?;
 
         Ok(Report {

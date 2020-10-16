@@ -1,26 +1,21 @@
 //! Load test aims the following purposes:
 //! - spamming the node with a big amount of transactions to simulate the big pressure;
 //! - measuring the metrics of the node txs processing progress;
+//! - making many API requests to simulate a typical user workflow.
 //! - quick filling the node's database with a lot of the real-world data.
 //!
 //! The behavior of the loadtest is flexible and determined by different "scenarios":
 //! every scenario is basically a function which interacts with a node according to some rules.
+//! All scenarios can be run simultaneously in any combination.
 //!
 //! Currently supported scenarios:
 //!
-//! - Outgoing TPS. Measures the throughput of the ZKSync node's mempool (time of the tx acceptance).
-//!   To run this scenario, use the following command:
-//!   
-//!   ```sh
-//!   f cargo run --release --bin loadtest -- --scenario outgoing core/loadtest/src/loadtest.json
-//!   ```
-//!   
-//! - Execution TPS. Measures the throughput of the ZKSync block executor (amount of txs executed per second)
-//!   To run this scenario, use the following command:
-//!   
-//!   ```sh
-//!   f cargo run --release --bin loadtest -- --scenario execution core/loadtest/src/loadtest.json
-//!   ```
+//! - Transfer - spamming the node with a big amount of transfer transactions.
+//!
+//! - withdraw - performs several withdraw / deposit operations.
+//!
+//! - full_exit (incomplete) - performs several full_exit / deposit operations.
+//!
 
 // Built-in import
 use std::path::PathBuf;
@@ -46,10 +41,10 @@ struct LoadtestOpts {
 
 macro_rules! pretty_fmt {
     ($ms:expr) => {
-        if ($ms as f64) < 1_000f64 {
-            format!("{:.3}µs", $ms)
-        } else {
-            format!("{:.3}s", $ms as f64 / 1_000_000_f64)
+        match ($ms as f64) {
+            ms if ms < 1_000_f64 => format!("{:.3}µs", ms),
+            ms if ms < 1_000_000_f64 => format!("{:.3}ms", ms / 1_000_f64),
+            ms => format!("{:.3}s", ms / 1_000_000_f64),
         }
     };
 }

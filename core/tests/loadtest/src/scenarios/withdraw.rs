@@ -34,6 +34,11 @@ impl From<WithdrawScenarioConfig> for WithdrawScenario {
     }
 }
 
+/// Withdraw scenario performs several deposit / withdraw operations.
+///
+/// The purpose of the withdraw scenario is to ensure that deposits
+/// and withdraws are processed correctly when the node is under a
+/// load of many transfers.
 #[derive(Debug)]
 pub struct WithdrawScenario {
     config: WithdrawScenarioConfig,

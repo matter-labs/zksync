@@ -235,6 +235,11 @@ impl TestWallet {
             .await
     }
 
+    /// Returns an underlying wallet.
+    pub fn into_inner(self) -> Wallet {
+        self.inner
+    }
+
     /// Returns appropriate nonce for the new transaction and increments the nonce.
     fn pending_nonce(&self) -> u32 {
         self.nonce.fetch_add(1, Ordering::SeqCst)
