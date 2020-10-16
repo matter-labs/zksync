@@ -26,13 +26,12 @@ async function reason() {
 
     const provider = new ethers.providers.JsonRpcProvider(web3);
 
-
     const tx = await provider.getTransaction(hash);
     if (!tx) {
         console.log("tx not found");
     } else {
         try {
-            const parsedTransaction = franklinInterface.parseTransaction({data: tx.data});
+            const parsedTransaction = franklinInterface.parseTransaction({ data: tx.data });
             if (parsedTransaction) {
                 console.log("parsed tx: ", parsedTransaction);
             } else {
@@ -88,9 +87,8 @@ async function reason() {
                 } else {
                     console.log(log);
                 }
-            } catch { }
+            } catch {}
         }
-
     }
 }
 

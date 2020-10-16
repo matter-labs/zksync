@@ -14,8 +14,7 @@ use zksync_types::Operation;
 use crate::fee_ticker::TickerRequest;
 use crate::{
     committer::ExecutedOpsNotify, eth_watch::EthWatchRequest, mempool::MempoolRequest,
-    signature_checker, state_keeper::StateKeeperRequest,
-    utils::current_zksync_info::CurrentZkSyncInfo,
+    signature_checker, utils::current_zksync_info::CurrentZkSyncInfo,
 };
 
 mod admin_server;
@@ -32,7 +31,6 @@ pub fn start_api_server(
     panic_notify: mpsc::Sender<bool>,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
-    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
@@ -62,7 +60,6 @@ pub fn start_api_server(
         connection_pool.clone(),
         mempool_request_sender.clone(),
         executed_tx_receiver,
-        state_keeper_request_sender.clone(),
         sign_check_sender.clone(),
         eth_watcher_request_sender.clone(),
         ticker_request_sender.clone(),
@@ -82,7 +79,6 @@ pub fn start_api_server(
         config_options,
         connection_pool,
         mempool_request_sender,
-        state_keeper_request_sender,
         sign_check_sender,
         eth_watcher_request_sender,
         ticker_request_sender,

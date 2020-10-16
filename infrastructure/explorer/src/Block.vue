@@ -140,7 +140,7 @@ export default {
             // TODO: Remove the hack to get the amount field in ForceExit operations
             // API needs to be updated
             
-            this.transactions = await Promise.all(txs.map(async (tx) => {
+            const transactions = await Promise.all(txs.map(async (tx) => {
                 const type = tx.op.type;
                 let fromAddr = "";
                 let toAddr = "";
@@ -168,7 +168,7 @@ export default {
                         to_onchain_icon    = '';
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.priority_op.amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.priority_op.amount || 0, token)} ${token}`;
                         success            = tx.success;
                         created_at         = tx.created_at;
                         fee                = '';
@@ -199,9 +199,9 @@ export default {
                         from_onchain_icon  = '';
                         to_onchain_icon    = '';
                         token              = tx.op.feeToken;
-                        token              = tokens[token].syncSymbol;
+                        token              = token == null ? '' : tokens[token].syncSymbol;
                         amount             = '';
-                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        fee                = tx.op.fee == null ? '' :`${formatToken(tx.op.fee, token)} ${token}`;
                         success            = tx.success;
                         created_at         = tx.created_at;
                         break;
@@ -216,7 +216,7 @@ export default {
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.amount || 0, token)} ${token}`;
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
                         success            = tx.success;
                         created_at         = tx.created_at;
@@ -233,7 +233,8 @@ export default {
                         token              = tx.op.token;
                         token              = tokens[token].syncSymbol;
                         amount             = (await client.searchTx(tx.tx_hash)).amount;
-                        amount             = `${formatToken(amount, token)} ${token}`;
+                        amount             = amount == "unknown amount" ? 0 : amount;
+                        amount             = `${formatToken(amount || 0, token)} ${token}`;
                         fee                = `${formatToken(tx.op.fee, token)} ${token}`;
                         success            = tx.success;
                         created_at         = tx.created_at;
@@ -281,6 +282,8 @@ export default {
                     created_at: formatDate(created_at),
                 };
             }));
+
+            this.transactions = transactions.filter(tx => tx.success);
             this.loadingStatus = 'ready';
         },
     },

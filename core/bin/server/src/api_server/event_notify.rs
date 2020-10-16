@@ -2,16 +2,9 @@ use super::rpc_server::types::{
     BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
 };
 use crate::committer::ExecutedOpsNotify;
-use crate::state_keeper::{ExecutedOpId, StateKeeperRequest};
 use crate::utils::token_db_cache::TokenDBCache;
 use anyhow::{bail, format_err};
-use futures::{
-    channel::{mpsc, oneshot},
-    compat::Future01CompatExt,
-    select,
-    stream::StreamExt,
-    FutureExt, SinkExt,
-};
+use futures::{channel::mpsc, compat::Future01CompatExt, select, stream::StreamExt, FutureExt};
 use jsonrpc_pubsub::{
     typed::{Sink, Subscriber},
     SubscriptionId,
@@ -67,7 +60,6 @@ struct OperationNotifier {
     tokens_cache: TokenDBCache,
 
     db_pool: ConnectionPool,
-    state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
     prior_op_subs: BTreeMap<(u64, ActionType), Vec<SubscriptionSender<ETHOpInfoResp>>>,
     account_subs: BTreeMap<(AccountId, ActionType), Vec<SubscriptionSender<ResponseAccountState>>>,
@@ -76,21 +68,6 @@ struct OperationNotifier {
 impl OperationNotifier {
     fn send_once<T: serde::Serialize>(&self, sink: &Sink<T>, val: T) {
         tokio::spawn(sink.notify(Ok(val)).compat().map(drop));
-    }
-
-    async fn check_op_executed_current_block(
-        &self,
-        op_id: ExecutedOpId,
-    ) -> Result<Option<(BlockNumber, bool, Option<String>)>, anyhow::Error> {
-        let response = oneshot::channel();
-        self.state_keeper_requests
-            .clone()
-            .send(StateKeeperRequest::GetExecutedInPendingBlock(
-                op_id, response.0,
-            ))
-            .await?;
-        let state_keeper_resp = response.1.await;
-        Ok(state_keeper_resp?)
     }
 
     fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), anyhow::Error> {
@@ -118,7 +95,7 @@ impl OperationNotifier {
             }
             TX_SUB_PREFIX => {
                 let hash = TxHash::from_str(sub_unique_id)?;
-                if let Some(mut subs) = self.tx_subs.remove(&(hash, sub_action)) {
+                if let Some(mut subs) = self.tx_subs.remove(&(hash.clone(), sub_action)) {
                     subs.retain(|sub| sub.id != sub_id);
                     if !subs.is_empty() {
                         self.tx_subs.insert((hash, sub_action), subs);
@@ -201,7 +178,10 @@ impl OperationNotifier {
         Ok(res)
     }
 
-    async fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, anyhow::Error> {
+    async fn get_block_info(
+        &mut self,
+        block_number: u32,
+    ) -> Result<Option<BlockInfo>, anyhow::Error> {
         let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
             block_info.clone()
         } else {
@@ -230,7 +210,8 @@ impl OperationNotifier {
                     verified,
                 }
             } else {
-                bail!("Transaction is executed but block is not committed. (bug)");
+                // It's OK: transaction is pending, block was not finalized yet.
+                return Ok(None);
             };
 
             transaction.commit().await?;
@@ -245,7 +226,7 @@ impl OperationNotifier {
 
             block_info
         };
-        Ok(res)
+        Ok(Some(res))
     }
 
     async fn handle_priority_op_sub(
@@ -262,30 +243,6 @@ impl OperationNotifier {
             zksync_crypto::rand::random::<u64>()
         ));
 
-        // Maybe it was executed already
-        if action == ActionType::COMMIT {
-            if let Some((block_number, _, _)) = self
-                .check_op_executed_current_block(ExecutedOpId::PriorityOp(serial_id))
-                .await?
-            {
-                let sink = sub
-                    .assign_id(sub_id)
-                    .map_err(|_| format_err!("SubIdAssign"))?;
-                self.send_once(
-                    &sink,
-                    ETHOpInfoResp {
-                        executed: true,
-                        block: Some(BlockInfo {
-                            block_number: i64::from(block_number),
-                            committed: true,
-                            verified: false,
-                        }),
-                    },
-                );
-                return Ok(());
-            }
-        }
-
         let executed_op = self
             .get_executed_priority_operation(serial_id as u32)
             .await?;
@@ -301,24 +258,26 @@ impl OperationNotifier {
                         &sink,
                         ETHOpInfoResp {
                             executed: true,
-                            block: Some(block_info),
+                            block: block_info,
                         },
                     );
                     return Ok(());
                 }
                 ActionType::VERIFY => {
-                    if block_info.verified {
-                        let sink = sub
-                            .assign_id(sub_id)
-                            .map_err(|_| format_err!("SubIdAssign"))?;
-                        self.send_once(
-                            &sink,
-                            ETHOpInfoResp {
-                                executed: true,
-                                block: Some(block_info),
-                            },
-                        );
-                        return Ok(());
+                    if let Some(block_info) = block_info {
+                        if block_info.verified {
+                            let sink = sub
+                                .assign_id(sub_id)
+                                .map_err(|_| format_err!("SubIdAssign"))?;
+                            self.send_once(
+                                &sink,
+                                ETHOpInfoResp {
+                                    executed: true,
+                                    block: Some(block_info),
+                                },
+                            );
+                            return Ok(());
+                        }
                     }
                 }
             }
@@ -381,30 +340,6 @@ impl OperationNotifier {
             zksync_crypto::rand::random::<u64>()
         ));
 
-        // Maybe tx was executed already.
-        if action == ActionType::COMMIT {
-            if let Some((block_number, success, fail_reason)) = self
-                .check_op_executed_current_block(ExecutedOpId::Transaction(hash))
-                .await?
-            {
-                let sink = sub.assign_id(id).map_err(|_| format_err!("SubIdAssign"))?;
-                self.send_once(
-                    &sink,
-                    TransactionInfoResp {
-                        executed: true,
-                        success: Some(success),
-                        fail_reason,
-                        block: Some(BlockInfo {
-                            block_number: i64::from(block_number),
-                            committed: true,
-                            verified: false,
-                        }),
-                    },
-                );
-                return Ok(());
-            }
-        }
-
         let tx_receipt = self.get_tx_receipt(&hash).await?;
 
         if let Some(receipt) = tx_receipt {
@@ -434,7 +369,10 @@ impl OperationNotifier {
             }
         }
 
-        let mut subs = self.tx_subs.remove(&(hash, action)).unwrap_or_default();
+        let mut subs = self
+            .tx_subs
+            .remove(&(hash.clone(), action))
+            .unwrap_or_default();
         if subs.len() < MAX_LISTENERS_PER_ENTITY {
             let sink = sub
                 .assign_id(id.clone())
@@ -634,7 +572,6 @@ pub fn start_sub_notifier(
     mut new_block_stream: mpsc::Receiver<Operation>,
     mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
     mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
-    state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     api_requests_caches_size: usize,
 ) -> tokio::task::JoinHandle<()> {
     let tokens_cache = TokenDBCache::new(db_pool.clone());
@@ -645,7 +582,6 @@ pub fn start_sub_notifier(
         cache_of_blocks_info: LruCache::new(api_requests_caches_size),
         tokens_cache,
         db_pool,
-        state_keeper_requests,
         tx_subs: BTreeMap::new(),
         prior_op_subs: BTreeMap::new(),
         account_subs: BTreeMap::new(),
