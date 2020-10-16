@@ -28,7 +28,8 @@ Tester.prototype.testChangePubKey = async function (wallet: Wallet, feeToken: To
         onchainAuth: onchain
     });
 
-    await changePubkeyHandle.awaitReceipt();
+    const receipt = await changePubkeyHandle.awaitReceipt();
+    expect(receipt.success, `ChangePubKey transaction failed with a reason: ${receipt.failReason}`).to.be.true;
     expect(await wallet.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
     this.runningFee = this.runningFee.add(fee);
 };

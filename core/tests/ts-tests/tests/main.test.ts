@@ -117,21 +117,21 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             const oldSigner = carl.ethSigner;
             carl.ethSigner = tester.ethWallet;
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0)).to.be.false;
-            expect(before.eq(after)).to.be.true;
+            expect(before.eq(0), "Balance before Full Exit must be non-zero").to.be.false;
+            expect(before.eq(after), "Balance after incorrect Full Exit should not change").to.be.true;
             carl.ethSigner = oldSigner;
         });
 
         step('should execute a normal full-exit', async () => {
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0)).to.be.false;
-            expect(after.eq(0)).to.be.true;
+            expect(before.eq(0), "Balance before Full Exit must be non-zero").to.be.false;
+            expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
         });
 
         step('should execute full-exit on an empty wallet', async () => {
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0)).to.be.true;
-            expect(after.eq(0)).to.be.true;
+            expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to.be.true;
+            expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
         });
     });
 });
