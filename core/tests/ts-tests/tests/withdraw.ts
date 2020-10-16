@@ -31,16 +31,15 @@ Tester.prototype.testVerifiedWithdraw = async function (
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     // we should wait some time for `completeWithdrawals` transaction to be processed
     let withdrawalTxHash = null;
-    // Poll the node for 5 seconds.
     const polling_interval = 100; // ms
-    const polling_timeout = 5000; // ms
+    const polling_timeout = 10000; // ms
     const polling_iterations = polling_timeout / polling_interval;
     for (let i = 0; i < polling_iterations; i++) {
         withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
         if (withdrawalTxHash != null) {
             break;
         }
-        sleep(polling_interval);
+        await sleep(polling_interval);
     }
     expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
