@@ -19,6 +19,7 @@ Tester.prototype.testChangePubKey = async function (wallet: Wallet, feeToken: To
     if (onchain) {
         const handle = await wallet.onchainAuthSigningKey();
         await handle.wait();
+        expect(await wallet.isOnchainAuthSigningKeySet(), 'ChangePubKey is unset onchain').to.be.true;
     }
 
     const changePubkeyHandle = await wallet.setSigningKey({

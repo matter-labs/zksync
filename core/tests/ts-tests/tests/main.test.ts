@@ -44,7 +44,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits(token);
             await approveERC20.wait();
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should be approved').to.be.true;
-            await tester.testDeposit(bob, token, DEPOSIT_AMOUNT);
+            await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should still be approved').to.be.true;
         }
     });
@@ -65,7 +65,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testTransfer(alice, alice, token, TX_AMOUNT);
     });
 
-    step('should change pubkey offchain', async () => {
+    step('should change pubkey offchain for alice', async () => {
         await tester.testChangePubKey(alice, token, false);
         await tester.testChangePubKey(bob, token, false);
     });
@@ -135,7 +135,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
     });
 });
-
 
 const transports = process.env.TEST_TRANSPORT ? [process.env.TEST_TRANSPORT.toUpperCase()] : ['HTTP', 'WS'];
 const tokens = process.env.TEST_TOKEN ? [process.env.TEST_TOKEN.toUpperCase()] : ['ETH', 'DAI'];
