@@ -9,6 +9,7 @@ use num::BigUint;
 // Local uses
 
 const CHUNK_SIZES: &[usize] = &[100];
+const ERRORS_CUTOFF: usize = 10;
 
 /// Converts "gwei" amount to the "wei".
 pub fn gwei_to_wei(gwei: impl Into<BigUint>) -> BigUint {
@@ -80,10 +81,21 @@ where
     }
 
     if oks.is_empty() {
-        return Err(errs.into_iter().next().unwrap());
+        match errs.into_iter().next() {
+            Some(err) => return Err(err),
+            None => return Ok(Vec::new()),
+        }
+    } else if errs.len() > ERRORS_CUTOFF {
+        log::warn!(
+            "A large number of errors occurred in during the `try_wait_all_failsafe`: {}.",
+            errs.len()
+        );
     } else {
         for err in errs {
-            log::warn!("{}", err);
+            log::warn!(
+                "An error occurred during the `try_wait_all_failsafe`: {}",
+                err
+            );
         }
     }
 
