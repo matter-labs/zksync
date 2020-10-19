@@ -1,0 +1,28 @@
+[package]
+name = "zksync_prometheus_exporter"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+
+[dependencies]
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+
+log = "0.4"
+env_logger = "0.6"
+
+tokio = { version = "0.2", features = ["full"] }
+futures = "0.3"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+ctrlc = { version = "3.1", features = ["termination"] }
+anyhow = "1.0"
+
+prometheus_exporter_base = "0.31.0"
+

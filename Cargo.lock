@@ -2512,7 +2512,6 @@ dependencies = [
  "zksync",
  "zksync_config",
  "zksync_eth_signer",
- "zksync_server",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5459,6 +5458,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "zksync_api"
+version = "1.0.0"
+dependencies = [
+ "actix-cors",
+ "actix-rt",
+ "actix-web",
+ "actix-web-httpauth",
+ "anyhow",
+ "async-trait",
+ "bigdecimal",
+ "chrono",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "ethabi 12.0.0",
+ "futures 0.1.30",
+ "futures 0.3.6",
+ "hex",
+ "itertools 0.8.2",
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "jsonrpc-http-server",
+ "jsonrpc-pubsub",
+ "jsonrpc-ws-server",
+ "jsonwebtoken",
+ "log 0.4.11",
+ "lru-cache",
+ "num",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tiny-keccak 1.5.0",
+ "tokio 0.1.22",
+ "tokio 0.2.22",
+ "vlog",
+ "web3 0.13.0",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_crypto",
+ "zksync_storage",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
 name = "zksync_basic_types"
 version = "1.0.0"
 dependencies = [
@@ -5498,6 +5543,35 @@ version = "1.0.0"
 dependencies = [
  "ethabi 12.0.0",
  "serde_json",
+]
+
+[[package]]
+name = "zksync_core"
+version = "1.0.0"
+dependencies = [
+ "actix-rt",
+ "actix-web",
+ "anyhow",
+ "chrono",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "ethabi 12.0.0",
+ "futures 0.3.6",
+ "log 0.4.11",
+ "num",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tiny-keccak 1.5.0",
+ "tokio 0.2.22",
+ "web3 0.13.0",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_crypto",
+ "zksync_state",
+ "zksync_storage",
+ "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -5557,6 +5631,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "zksync_eth_sender"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "ethabi 12.0.0",
+ "futures 0.3.6",
+ "hex",
+ "log 0.4.11",
+ "num",
+ "serde",
+ "serde_json",
+ "tokio 0.2.22",
+ "web3 0.13.0",
+ "zksync_basic_types",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_eth_client",
+ "zksync_eth_signer",
+ "zksync_storage",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
 name = "zksync_eth_signer"
 version = "1.0.0"
 dependencies = [
@@ -5569,6 +5671,23 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror",
+ "zksync_types",
+]
+
+[[package]]
+name = "zksync_prometheus_exporter"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "futures 0.3.6",
+ "log 0.4.11",
+ "prometheus_exporter_base",
+ "tokio 0.2.22",
+ "zksync_config",
+ "zksync_storage",
  "zksync_types",
 ]
 
@@ -5619,57 +5738,26 @@ dependencies = [
 name = "zksync_server"
 version = "1.0.0"
 dependencies = [
- "actix-cors",
- "actix-rt",
- "actix-web",
- "actix-web-httpauth",
  "anyhow",
- "async-trait",
- "bigdecimal",
- "chrono",
  "clap",
  "ctrlc",
  "env_logger 0.6.2",
- "ethabi 12.0.0",
- "futures 0.1.30",
  "futures 0.3.6",
- "hex",
- "itertools 0.8.2",
- "jsonrpc-core",
- "jsonrpc-core-client",
- "jsonrpc-derive",
- "jsonrpc-http-server",
- "jsonrpc-pubsub",
- "jsonrpc-ws-server",
- "jsonwebtoken",
- "lazy_static",
  "log 0.4.11",
- "lru-cache",
  "num",
- "prometheus_exporter_base",
- "rand 0.7.3",
- "reqwest",
  "serde",
  "serde_json",
- "thiserror",
- "tiny-keccak 1.5.0",
- "tokio 0.1.22",
  "tokio 0.2.22",
- "vlog",
- "web3 0.13.0",
- "zksync_basic_types",
- "zksync_circuit",
+ "zksync_api",
  "zksync_config",
- "zksync_contracts",
+ "zksync_core",
  "zksync_crypto",
- "zksync_eth_client",
- "zksync_eth_signer",
+ "zksync_eth_sender",
+ "zksync_prometheus_exporter",
  "zksync_prover",
- "zksync_prover_utils",
- "zksync_state",
  "zksync_storage",
  "zksync_types",
- "zksync_utils",
+ "zksync_witness_generator",
 ]
 
 [[package]]
@@ -5741,12 +5829,12 @@ dependencies = [
  "zksync_circuit",
  "zksync_config",
  "zksync_contracts",
+ "zksync_core",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_prover",
  "zksync_prover_utils",
- "zksync_server",
  "zksync_test_account",
  "zksync_types",
  "zksync_utils",
@@ -5778,6 +5866,36 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
+ "futures 0.3.6",
  "num",
  "serde",
+]
+
+[[package]]
+name = "zksync_witness_generator"
+version = "1.0.0"
+dependencies = [
+ "actix-rt",
+ "actix-web",
+ "anyhow",
+ "chrono",
+ "ctrlc",
+ "env_logger 0.6.2",
+ "futures 0.3.6",
+ "log 0.4.11",
+ "num",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio 0.2.22",
+ "vlog",
+ "zksync_circuit",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_prover",
+ "zksync_prover_utils",
+ "zksync_state",
+ "zksync_storage",
+ "zksync_types",
+ "zksync_utils",
 ]
