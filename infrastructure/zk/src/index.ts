@@ -4,7 +4,7 @@ import { program } from 'commander';
 import { command as server } from './server';
 import { command as up } from './up';
 import { command as down } from './down';
-import { command as db } from './db';
+import { command as db } from './db/db';
 import * as utils from './utils';
 
 async function main() {
