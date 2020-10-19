@@ -32,7 +32,7 @@ Tester.prototype.testVerifiedWithdraw = async function (
     // we should wait some time for `completeWithdrawals` transaction to be processed
     let withdrawalTxHash = null;
     const polling_interval = 100; // ms
-    const polling_timeout = 10000; // ms
+    const polling_timeout = 20000; // ms
     const polling_iterations = polling_timeout / polling_interval;
     for (let i = 0; i < polling_iterations; i++) {
         withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
