@@ -12,7 +12,7 @@ use super::{Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
-    utils::{gwei_to_wei, try_wait_all},
+    utils::{gwei_to_wei, try_wait_all, try_wait_all_failsafe},
 };
 
 /// Configuration options for the transfers scenario.
@@ -107,7 +107,7 @@ impl Scenario for TransferScenario {
             transfers_number
         );
 
-        self.txs = try_wait_all((0..transfers_number).map(|i| {
+        self.txs = try_wait_all_failsafe((0..transfers_number).map(|i| {
             let from = i % wallets.len();
             let to = (i + 1) % wallets.len();
 

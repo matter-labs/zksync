@@ -1,11 +1,14 @@
 pub use self::{config::Config, executor::LoadtestExecutor, journal::FiveSummaryStats};
 
 pub mod api;
-mod config;
-mod journal;
+
+#[macro_use]
+mod utils;
 #[macro_use]
 mod monitor;
+
+mod config;
 mod executor;
+mod journal;
 mod scenarios;
 mod test_wallet;
-mod utils;

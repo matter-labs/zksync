@@ -52,6 +52,44 @@ where
     Ok(output)
 }
 
+/// Creates a future which represents either a collection of the results of the
+/// futures given or an error.
+///
+/// But unlike the `try_wait_all` method, it returns an error of the first
+/// errored future if all futures ended with an error; otherwise returns results of succesful
+/// futures and writes warning about failed futures.
+pub async fn try_wait_all_failsafe<I>(
+    i: I,
+) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
+where
+    I: IntoIterator,
+    I::Item: TryFuture,
+    <I::Item as Future>::Output:
+        Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
+    <I::Item as TryFuture>::Error: std::fmt::Display,
+{
+    let output = wait_all(i).await;
+
+    let mut oks = Vec::with_capacity(output.len());
+    let mut errs = Vec::with_capacity(output.len());
+    for item in output {
+        match item.into() {
+            Ok(ok) => oks.push(ok),
+            Err(err) => errs.push(err),
+        }
+    }
+
+    if oks.is_empty() {
+        return Err(errs.into_iter().next().unwrap());
+    } else {
+        for err in errs {
+            log::warn!("{}", err);
+        }
+    }
+
+    Ok(oks)
+}
+
 /// An iterator similar to `.iter().chunks(..)`, but supporting multiple
 /// different chunk sizes. Size of yielded batches is chosen one-by-one
 /// from the provided list of sizes (preserving their order).
@@ -111,5 +149,44 @@ where
         } else {
             Some(items)
         }
+    }
+}
+
+pub trait ResultEx<O, E> {
+    fn split_errs(self) -> (Vec<O>, Vec<E>);
+
+    fn collect_oks(self) -> Result<Vec<O>, E>
+    where
+        Self: Sized,
+    {
+        let (oks, errs) = self.split_errs();
+
+        match errs.into_iter().next() {
+            Some(err) => Err(err),
+            None => Ok(oks),
+        }
+    }
+}
+
+impl<O, E> ResultEx<O, E> for Vec<Result<O, E>> {
+    fn split_errs(self) -> (Vec<O>, Vec<E>) {
+        let mut oks = Vec::with_capacity(self.len());
+        let mut errs = Vec::with_capacity(self.len());
+
+        for result in self {
+            match result {
+                Ok(ok) => oks.push(ok),
+                Err(err) => errs.push(err),
+            }
+        }
+
+        (oks, errs)
+    }
+
+    fn collect_oks(self) -> Result<Vec<O>, E>
+    where
+        Self: Sized,
+    {
+        self.into_iter().collect()
     }
 }

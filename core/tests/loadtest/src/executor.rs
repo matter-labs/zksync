@@ -16,7 +16,7 @@ use crate::{
     monitor::Monitor,
     scenarios::Scenario,
     test_wallet::TestWallet,
-    utils::{try_wait_all, wait_all},
+    utils::{try_wait_all_failsafe, wait_all},
     FiveSummaryStats,
 };
 
@@ -210,8 +210,7 @@ impl LoadtestExecutor {
                 tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
             }
 
-            // TODO Think about making this operation fail-safe.
-            try_wait_all(
+            try_wait_all_failsafe(
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
@@ -237,7 +236,7 @@ impl LoadtestExecutor {
                 tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
             }
 
-            try_wait_all(
+            try_wait_all_failsafe(
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
@@ -265,7 +264,7 @@ impl LoadtestExecutor {
 
         // Run scenarios concurrently.
         let sufficient_fee = self.sufficient_fee.clone();
-        try_wait_all(
+        try_wait_all_failsafe(
             self.scenarios
                 .iter_mut()
                 .map(|(scenario, wallets)| scenario.run(&monitor, &sufficient_fee, wallets)),
@@ -291,7 +290,7 @@ impl LoadtestExecutor {
                 .await?;
 
             let main_address = self.main_wallet.address();
-            let txs_queue = try_wait_all(scenario_wallets.iter().map(|wallet| {
+            let txs_queue = try_wait_all_failsafe(scenario_wallets.iter().map(|wallet| {
                 let sufficient_fee = sufficient_fee.clone();
                 async move {
                     let balance = wallet.balance(BlockStatus::Verified).await?;
@@ -309,14 +308,14 @@ impl LoadtestExecutor {
             }))
             .await?;
 
-            let tx_hashes = try_wait_all(
+            let tx_hashes = try_wait_all_failsafe(
                 txs_queue
                     .into_iter()
                     .map(|(tx, sign)| monitor.send_tx(tx, sign)),
             )
             .await?;
 
-            try_wait_all(
+            try_wait_all_failsafe(
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
