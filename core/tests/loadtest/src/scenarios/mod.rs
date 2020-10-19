@@ -1,11 +1,11 @@
-//! Module with different scenarios for a `loadtest`.
+//! Module with various scenarios for a `loadtest`.
 //! A scenario is basically is a behavior policy for sending the transactions.
 //! A simplest scenario will be: "get a bunch of accounts and just spawn a lot of transfer
 //! operations between them".
 
 pub use self::{
-    executor::ScenarioExecutor, full_exit::FullExitScenarioConfig,
-    transfers::TransferScenarioConfig, withdraw::WithdrawScenarioConfig,
+    full_exit::FullExitScenarioConfig, transfers::TransferScenarioConfig,
+    withdraw::WithdrawScenarioConfig,
 };
 
 // Built-in uses
@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::WithdrawScenario};
 use crate::{monitor::Monitor, test_wallet::TestWallet};
 
-mod executor;
 mod full_exit;
 mod transfers;
 mod withdraw;
@@ -66,15 +65,20 @@ pub trait Scenario: Debug + Display {
     ) -> anyhow::Result<()>;
 }
 
+/// Supported scenario types.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(tag = "name", rename_all = "snake_case")]
 pub enum ScenarioConfig {
+    /// Bunch of transfers scenario.
     Transfer(TransferScenarioConfig),
+    /// Withdraw / deposit scenario.
     Withdraw(WithdrawScenarioConfig),
+    /// Full exit / deposit scenario.
     FullExit(FullExitScenarioConfig),
 }
 
 impl ScenarioConfig {
+    /// Returns the scenario given its type.
     pub fn into_scenario(self) -> Box<dyn Scenario> {
         match self {
             Self::Transfer(cfg) => Box::new(TransferScenario::from(cfg)),

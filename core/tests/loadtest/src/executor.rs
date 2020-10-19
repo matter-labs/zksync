@@ -9,12 +9,12 @@ use zksync::{types::BlockStatus, utils::closest_packable_token_amount, Provider}
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local uses
-use super::Scenario;
 use crate::{
     api::CancellationToken,
     config::Config,
     journal::Journal,
     monitor::Monitor,
+    scenarios::Scenario,
     test_wallet::TestWallet,
     utils::{try_wait_all, wait_all},
     FiveSummaryStats,
@@ -22,13 +22,25 @@ use crate::{
 
 type ApiTestsFuture = BoxFuture<'static, anyhow::Result<BTreeMap<String, FiveSummaryStats>>>;
 
+/// Full report with the results of loadtest execution.
+///
+/// This report contains two major types: scenarios with transactions and API requests.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Report {
+    /// Scenarios report.
     pub scenarios: BTreeMap<String, FiveSummaryStats>,
+    /// API requests report.
     pub api: BTreeMap<String, FiveSummaryStats>,
 }
 
-pub struct ScenarioExecutor {
+/// Executor of load tests.
+
+/// In parallel, it exeuctes scenarios with transactions and performs load tests of the API.
+///
+/// During the scenarios execution, it uses the information from the `AccountInfo` to create
+/// a bunch of wallets and distribute the funds needed to perform transactions execution
+/// between them. Upon completion, the remaining balances are returned to the main wallet.
+pub struct LoadtestExecutor {
     /// Main account to deposit ETH from / return ETH back to.
     main_wallet: TestWallet,
     monitor: Monitor,
@@ -39,7 +51,8 @@ pub struct ScenarioExecutor {
     api_tests: Option<(ApiTestsFuture, CancellationToken)>,
 }
 
-impl ScenarioExecutor {
+impl LoadtestExecutor {
+    /// Creates a new executor instance.
     pub async fn new(config: Config, eth_options: ConfigurationOptions) -> anyhow::Result<Self> {
         let monitor = Monitor::new(Provider::new(config.network.name)).await;
 
@@ -76,6 +89,7 @@ impl ScenarioExecutor {
         })
     }
 
+    /// Performs configured loadtests routine.
     pub async fn run(mut self) -> anyhow::Result<Report> {
         // Preliminary steps for creating wallets with funds.
         self.prepare().await?;
@@ -103,6 +117,8 @@ impl ScenarioExecutor {
             .iter()
             .map(|x| x.0.requested_resources(&self.sufficient_fee));
 
+        // Create intermediate wallets and compute total amount to deposit and needed
+        // balances for wallets.
         let mut amount_to_deposit = BigUint::from(0_u64);
         let mut wallets = Vec::new();
         for resource in resources {
@@ -128,8 +144,8 @@ impl ScenarioExecutor {
             wallets.push((scenario_wallets, wallet_balance));
         }
 
+        // Make deposit from Ethereum network to the zkSync one.
         let amount_to_deposit = closest_packable_token_amount(&amount_to_deposit);
-
         let eth_balance = self.main_wallet.eth_balance().await?;
         anyhow::ensure!(
             eth_balance > amount_to_deposit,
@@ -194,6 +210,7 @@ impl ScenarioExecutor {
                 tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
             }
 
+            // TODO Think about making this operation fail-safe.
             try_wait_all(
                 tx_hashes
                     .into_iter()
@@ -240,11 +257,13 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Performs main step of the load tests.
     async fn process(&mut self) -> anyhow::Result<Journal> {
         log::info!("Starting TPS measuring...");
         let monitor = self.monitor.clone();
         monitor.start().await;
 
+        // Run scenarios concurrently.
         let sufficient_fee = self.sufficient_fee.clone();
         try_wait_all(
             self.scenarios
@@ -259,9 +278,11 @@ impl ScenarioExecutor {
         Ok(logs)
     }
 
+    /// Returns the remaining funds to the main wallet.
     async fn refund(&mut self) -> anyhow::Result<()> {
         log::info!("Refunding the remaining tokens to the main wallet.");
 
+        // Transfer the remaining balances of the intermediate wallets into the main one.
         for (scenario, scenario_wallets) in &mut self.scenarios {
             let monitor = self.monitor.clone();
             let sufficient_fee = self.sufficient_fee.clone();
@@ -303,6 +324,7 @@ impl ScenarioExecutor {
             .await?;
         }
 
+        // Withdraw remaining balance from the zkSync network back to the Ethereum one.
         let main_wallet_balance = self.main_wallet.balance(BlockStatus::Committed).await?;
         if main_wallet_balance > self.sufficient_fee {
             log::info!(

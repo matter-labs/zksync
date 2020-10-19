@@ -25,7 +25,7 @@ use structopt::StructOpt;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 // Local uses
-use loadtest::{Config, FiveSummaryStats, ScenarioExecutor};
+use loadtest::{Config, FiveSummaryStats, LoadtestExecutor};
 
 /// An utility for simulating a load similar to a real one.
 #[derive(Debug, StructOpt)]
@@ -75,7 +75,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .transpose()?
         .unwrap_or_default();
 
-    let executor = ScenarioExecutor::new(config, env_config).await?;
+    let executor = LoadtestExecutor::new(config, env_config).await?;
     let report = executor.run().await?;
 
     if opts.json_output {
