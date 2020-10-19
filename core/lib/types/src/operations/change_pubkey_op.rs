@@ -9,7 +9,7 @@ use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, FEE_EXPONENT_BIT_WIDTH,
     FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
-use zksync_crypto::primitives::{bytes_slice_to_uint16, bytes_slice_to_uint32};
+use zksync_crypto::primitives::FromBytes;
 
 /// ChangePubKey operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,13 +57,13 @@ impl ChangePubKeyOp {
             "Change pubkey offchain, pubdata too short"
         );
 
-        let account_id = bytes_slice_to_uint32(&bytes[account_id_offset..pk_hash_offset])
+        let account_id = u32::from_bytes(&bytes[account_id_offset..pk_hash_offset])
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get account id"))?;
         let new_pk_hash = PubKeyHash::from_bytes(&bytes[pk_hash_offset..account_offset])?;
         let account = Address::from_slice(&bytes[account_offset..nonce_offset]);
-        let nonce = bytes_slice_to_uint32(&bytes[nonce_offset..fee_token_offset])
+        let nonce = u32::from_bytes(&bytes[nonce_offset..fee_token_offset])
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get nonce"))?;
-        let fee_token = bytes_slice_to_uint16(&bytes[fee_token_offset..fee_offset])
+        let fee_token = u16::from_bytes(&bytes[fee_token_offset..fee_offset])
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get fee token ID"))?;
         let fee = unpack_fee_amount(&bytes[fee_offset..end])
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get fee"))?;

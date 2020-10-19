@@ -6,9 +6,7 @@ use zksync_basic_types::{AccountId, Address};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
-use zksync_crypto::primitives::{
-    bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
-};
+use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeWrapper;
 
 /// FullExit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
@@ -71,13 +69,13 @@ impl FullExitOp {
         let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
 
-        let account_id = bytes_slice_to_uint32(&bytes[account_id_offset..eth_address_offset])
+        let account_id = u32::from_bytes(&bytes[account_id_offset..eth_address_offset])
             .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
         let eth_address = Address::from_slice(&bytes[eth_address_offset..token_offset]);
-        let token = bytes_slice_to_uint16(&bytes[token_offset..amount_offset])
+        let token = u16::from_bytes(&bytes[token_offset..amount_offset])
             .ok_or_else(|| format_err!("Cant get token id from full exit pubdata"))?;
         let amount = BigUint::from_u128(
-            bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
+            u128::from_bytes(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get amount from full exit pubdata"))?,
         )
         .unwrap();
