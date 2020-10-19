@@ -68,7 +68,8 @@ Tester.prototype.testTransactionResending = async function (
     const changePubKeyFullFee = await this.syncProvider.getTransactionFee(feeType, from.address(), token);
     const changePubKeyFee = changePubKeyFullFee.totalFee;
 
-    await this.testDeposit(from, token, amount.div(2).add(transferFee).add(changePubKeyFee), true);
+    const insufficientDepositAmount = amount.div(2).add(transferFee).add(changePubKeyFee);
+    await this.testDeposit(from, token, insufficientDepositAmount, true);
     await this.testChangePubKey(from, token, true);
 
     let thrown = true;
@@ -80,7 +81,9 @@ Tester.prototype.testTransactionResending = async function (
     }
     expect(thrown).to.be.true;
 
-    await this.testDeposit(from, token, amount.div(2), true);
+    // We provide more funds here, so that test won't randomly fail if the expected fee has changed in server.
+    const sufficientDepositAmount = amount.add(transferFee).add(changePubKeyFee);
+    await this.testDeposit(from, token, sufficientDepositAmount, true);
 
     // We should wait some `timeoutBeforeReceipt` to give server enough time
     // to move our transaction with success flag from mempool to statekeeper
