@@ -48,6 +48,9 @@ pub mod priority_ops;
 pub mod tokens;
 pub mod tx;
 
+#[cfg(test)]
+mod tests;
+
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{

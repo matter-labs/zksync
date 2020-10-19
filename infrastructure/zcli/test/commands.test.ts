@@ -111,9 +111,9 @@ describe('Fetching Information', () => {
             expect(tx?.from).to.equal(alice.address.toLowerCase());
             expect(tx?.to).to.be.a('string');
             expect(tx?.nonce).to.equal(0);
-            expect(tx?.token).to.not.exist;
+            expect(tx?.token).to.equal('ETH');
             expect(tx?.amount).to.not.exist;
-            expect(tx?.fee).to.not.exist;
+            expect(tx?.fee).to.exist;
         });
 
         it('should fetch correct info - deposit', async () => {
