@@ -25,7 +25,6 @@ use crate::{
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
-    state_keeper::StateKeeperRequest,
     utils::{
         current_zksync_info::CurrentZkSyncInfo, shared_lru_cache::SharedLruCache,
         token_db_cache::TokenDBCache,
@@ -85,7 +84,6 @@ pub struct RpcApp {
     cache_of_complete_withdrawal_tx_hashes: SharedLruCache<TxHash, String>,
 
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
-    pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     pub ticker_request_sender: mpsc::Sender<TickerRequest>,
@@ -107,7 +105,6 @@ impl RpcApp {
         config_options: &ConfigurationOptions,
         connection_pool: ConnectionPool,
         mempool_request_sender: mpsc::Sender<MempoolRequest>,
-        state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
@@ -137,7 +134,6 @@ impl RpcApp {
             connection_pool,
 
             mempool_request_sender,
-            state_keeper_request_sender,
             sign_verify_request_sender,
             eth_watcher_request_sender,
             ticker_request_sender,
@@ -499,7 +495,6 @@ pub fn start_rpc_server(
     config_options: ConfigurationOptions,
     connection_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
-    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
@@ -512,7 +507,6 @@ pub fn start_rpc_server(
         &config_options,
         connection_pool,
         mempool_request_sender,
-        state_keeper_request_sender,
         sign_verify_request_sender,
         eth_watcher_request_sender,
         ticker_request_sender,
