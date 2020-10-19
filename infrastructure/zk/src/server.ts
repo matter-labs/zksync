@@ -30,7 +30,6 @@ export const command = new Command('server')
     .description('start zksync server')
     .option('--genesis', 'generate genesis data via server')
     .action(async (cmd: Command) => {
-        utils.loadEnv();
         if (cmd.genesis) {
             await genesis();
         } else {

@@ -5,6 +5,7 @@ import { command as server } from './server';
 import { command as up } from './up';
 import { command as down } from './down';
 import { command as db } from './db';
+import * as utils from './utils';
 
 async function main() {
     const ZKSYNC_HOME = process.env.ZKSYNC_HOME;
@@ -14,6 +15,8 @@ async function main() {
     } else {
         process.chdir(ZKSYNC_HOME);
     }
+
+    utils.loadEnv();
 
     program
         .version('0.1.0')

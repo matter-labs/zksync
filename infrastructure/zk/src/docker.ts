@@ -1,17 +1,7 @@
 import { Command } from 'commander';
 import * as utils from './utils';
 
-const IMAGES = [
-    'server',
-    'prover',
-    'nginx',
-    'geth',
-    'dev-ticker',
-    'keybase',
-    'ci',
-    'fee-seller',
-    'rust'
-];
+const IMAGES = ['server', 'prover', 'nginx', 'geth', 'dev-ticker', 'keybase', 'ci', 'fee-seller', 'rust'];
 
 export async function build(image: string) {
     if (!IMAGES.includes(image)) {
@@ -31,16 +21,10 @@ export async function build(image: string) {
     await utils.spawn(`DOCKER_BUILDKIT=1 docker build ${latestImage} ${taggedImage} -f ./docker/${image}/Dockerfile`);
 }
 
-export async function push(image: string) {
-
-}
+export async function push(image: string) {}
 
 const docker = new Command('docker').description('docker management');
-
-docker
-    .command('build <image>')
-    .description('build docker image')
-    .action(build);
+docker.command('build <image>').description('build docker image').action(build);
 
 docker
     .command('push <image>')
@@ -49,4 +33,3 @@ docker
         await build(image);
         await push(image);
     });
-
