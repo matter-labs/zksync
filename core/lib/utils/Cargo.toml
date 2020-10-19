@@ -14,3 +14,4 @@ num = { version = "0.2", features = ["serde"] }
 bigdecimal = { version = "0.1", features = ["serde"]}
 serde = "1.0"
 anyhow = "1.0"
+futures = "0.3"

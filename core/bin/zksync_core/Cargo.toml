@@ -1,0 +1,41 @@
+[package]
+name = "zksync_core"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+
+[dependencies]
+zksync_state = { path = "../../lib/state", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+
+ethabi = "12.0.0"
+web3 = "0.13.0"
+serde = "1.0.90"
+serde_json = "1.0.0"
+log = "0.4"
+env_logger = "0.6"
+
+tokio = { version = "0.2", features = ["full"] }
+futures = "0.3"
+actix-rt = "1.1.1"
+actix-web = "3.0.0"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+ctrlc = { version = "3.1", features = ["termination"] }
+anyhow = "1.0"
+thiserror = "1.0"
+tiny-keccak = "1.4.2"
+
+[dev-dependencies]
+num = { version = "0.2", features = ["serde"] }

@@ -24,6 +24,21 @@ zkSync repository consists of several applications:
   - Generating zkSync chain blocks.
   - Requesting proofs for executed blocks.
   - Publishing data to the smart contract.
+
+  Server application exists in two available forms:
+
+  - Monolithic application, which provides all the required functionality from one binary.
+    This form is convenient for the development needs.
+    Corresponding crate is `core/bin/server`.
+  - Microservices applications, which are capable of working independently from each other:
+    - `Core` service (`core/bin/zksync_core`) maintains transactions memory pool and commits new blocks.
+    - `API` service (`core/bin/zksync_api`) provides a server "front-end": REST API & JSON RPC HTTP/WS implementations.
+    - `Ethereum Sender` service (`core/bin/zksync_eth_sender`) finalizes the blocks by sending corresponding Ethereum transactions to the
+      L1 smart contract.
+    - `Witness Generator` service (`core/bin/zksync_witness_generator`) creates input data required for provers to prove blocks, and
+      implements a private API server for provers to interact with.
+    - `Prometheus Exporter` service (`core/bin/zksync_prometheus_exporter`) manages exporting data about the application state
+      for further node behavior analysis.
 - Explorer: zkSync network explorer. A web application that receives data from the Server API
   and renders it to the convenient blockchain explorer interface.
   
@@ -50,6 +65,11 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/key_generator`: Utility to generate verification keys for network.
     - `/gen_token_add_contract`: Utility to generate `TokenDeployInit` smart contract, required for initial network launch.
     - `/parse_pub_data`: Utility to parse zkSync operation pubdata.
+    - `/zksync_core`: zkSync server Core microservice.
+    - `/zksync_api`: zkSync server API microservice.
+    - `/zksync_eth_sender`: zkSync server Ethereum sender microservice.
+    - `/zksync_witness_generator`: zkSync server Witness Generator & Prover Server microservice.
+    - `/zksync_prometheus_exporter`: zkSync server Prometheus data exporter microservice.
   - `/lib`: Dependencies of the binaries above.
     - `/basic_types`: Crate with declaration of the essential zkSync primitives, such as `address`.
     - `/circuit`: Cryptographic environment enforsing the correctness of executed transactions in the zkSync network.

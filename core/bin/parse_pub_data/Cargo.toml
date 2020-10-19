@@ -11,6 +11,6 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
 [dependencies]
-zksync_types ={ path = "../../lib/types", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
 
 hex = "0.4"
