@@ -4,6 +4,7 @@ import { program } from 'commander';
 import { command as server } from './server';
 import { command as up } from './up';
 import { command as down } from './down';
+import { command as db } from './db';
 
 async function main() {
     const ZKSYNC_HOME = process.env.ZKSYNC_HOME;
@@ -20,7 +21,8 @@ async function main() {
         .description('ZkSync workflow tools')
         .addCommand(server)
         .addCommand(up)
-        .addCommand(down);
+        .addCommand(down)
+        .addCommand(db);
 
     await program.parseAsync(process.argv);
 }
