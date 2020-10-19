@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd $ZKSYNC_HOME
+yarn --cwd infrastructure/zk start $@

@@ -119,7 +119,8 @@ push-image-fee-seller: image-fee-seller
 # Rust: main stuff
 
 server:
-	@cargo run --bin zksync_server --release
+	# @cargo run --bin zksync_server --release
+	zk server
 
 image-server: build-contracts build-dev-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
@@ -267,12 +268,14 @@ nodes:
 # Dev environment
 
 dev-up:
-	@docker-compose up -d postgres geth dev-ticker
-	@docker-compose up -d tesseracts
+	# @docker-compose up -d postgres geth dev-ticker
+	# @docker-compose up -d tesseracts
+	zk up
 
 dev-down:
-	@docker-compose stop tesseracts
-	@docker-compose stop postgres geth dev-ticker
+	# @docker-compose stop tesseracts
+	# @docker-compose stop postgres geth dev-ticker
+	zk down
 
 geth-up: geth
 	@docker-compose up geth
