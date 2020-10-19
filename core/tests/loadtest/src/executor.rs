@@ -56,7 +56,7 @@ impl LoadtestExecutor {
     pub async fn new(config: Config, eth_options: ConfigurationOptions) -> anyhow::Result<Self> {
         let monitor = Monitor::new(Provider::new(config.network.name)).await;
 
-        log::info!("Creating scenarious...");
+        log::info!("Creating scenarios...");
 
         let scenarios = config
             .scenarios
