@@ -34,6 +34,7 @@ pub struct ETHParams {
     pub id: bool,
     pub nonce: i64,
     pub gas_price_limit: i64,
+    pub average_gas_price: Option<i64>,
     pub commit_ops: i64,
     pub verify_ops: i64,
     pub withdraw_ops: i64,

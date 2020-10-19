@@ -13,7 +13,7 @@ publish = false # We don't want to publish our binaries.
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-zksync_types ={ path = "../../lib/types", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 
 handlebars = "3.0.1"
