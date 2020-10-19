@@ -9,7 +9,7 @@ zkSync operations are split into the following categories:
   Currently includes `Transfer`, `Withdraw`, `ChangePubKey` and `ForcedExit`.
   All the transactions form an enum named `ZkSyncTx`.
 - **priority operations**: operations of zkSync network which are triggered by
-  invoking the zkSync smart contract method in L1. These operations are disovered by
+  invoking the zkSync smart contract method in L1. These operations are discovered by
   the zkSync server and included into the block just like L2 transactions.
   Currently includes `Deposit` and `FullExit`.
   All the priority operations form an enum named `ZkSyncPriorityOp`.

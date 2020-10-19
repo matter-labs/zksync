@@ -40,12 +40,16 @@ pub mod account;
 pub mod block;
 pub mod config;
 pub mod ethereum;
+pub mod gas_counter;
 pub mod helpers;
 pub mod mempool;
 pub mod operations;
 pub mod priority_ops;
 pub mod tokens;
 pub mod tx;
+
+#[cfg(test)]
+mod tests;
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -110,7 +114,7 @@ pub struct Operation {
     pub block: Block,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum ActionType {
     COMMIT,
     VERIFY,

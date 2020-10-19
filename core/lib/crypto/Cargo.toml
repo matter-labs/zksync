@@ -11,7 +11,7 @@ categories = ["cryptography"]
 readme = "README.md"
 
 [dependencies]
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
+franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
 rand = "0.4"
 
 num = { version = "0.2", features = ["serde"] }

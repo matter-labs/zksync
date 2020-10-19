@@ -201,6 +201,8 @@ async function testForcedExit(
     await promiseTimeout(VERIFY_TIMEOUT, forcedExitHandle.awaitVerifyReceipt());
     console.log(`ForcedExit verified: ${new Date().getTime() - startTime} ms`);
 
+    await sleep(10000); // We should wait some time for `completeWithdrawals` transaction to be processed
+
     const initiatorAfterWithdraw = await syncWallet.getBalance(token);
     const targetAfterWithdraw = await targetWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await targetWallet.getEthereumBalance(token);
@@ -400,7 +402,7 @@ async function testWithdraw(
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
-    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+    assert(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash));
 
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
@@ -465,7 +467,7 @@ async function testFastWithdraw(
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     await sleep(10000); // we should wait some time for `completeWithdrawals` transaction to be processed
-    assert((await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash)));
+    assert(await syncProvider.getEthTxForWithdrawal(withdrawHandle.txHash));
 
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
@@ -746,6 +748,8 @@ async function checkFailedTransactionResending(
     // which has the same hash. The new (successful) receipt will be available only
     // when tx will be executed again in state keeper, so we must wait for it.
     await testTransfer(syncWallet1, syncWallet2, "ETH", amount, feeInfo, 3000);
+
+    console.log("Invalid transaction resending OK");
 }
 
 (async () => {
@@ -810,8 +814,13 @@ async function checkFailedTransactionResending(
         console.log("Move funds ETH OK");
 
         await checkFailedTransactionResending(contract, zksyncDepositorWallet, syncWallet4, syncWallet5);
+        console.log("Failed transaction resending OK");
 
+        console.log("Disconnecting provider");
+        const startTime = new Date().getTime();
         await syncProvider.disconnect();
+        console.log(`Disconnected provider: ${new Date().getTime() - startTime} ms`);
+        process.exit(0);
     } catch (e) {
         console.error("Error: ", e);
         process.exit(1);

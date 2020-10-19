@@ -1,9 +1,9 @@
-import {ArgumentParser} from "argparse";
-import {deployContract} from "ethereum-waffle";
-import {constants, ethers} from "ethers";
-import {readTestContracts} from "../src.ts/deploy";
+import { ArgumentParser } from "argparse";
+import { deployContract } from "ethereum-waffle";
+import { constants, ethers } from "ethers";
+import { readTestContracts } from "../src.ts/deploy";
 
-const {expect} = require("chai");
+const { expect } = require("chai");
 
 export const FranklinTestUpgradeTargetContractCode = require(`../build/ZkSyncTestUpgradeTarget`);
 
@@ -29,41 +29,39 @@ async function main() {
 
         const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 
-        const proxyContract = new ethers.Contract(
-            args.contractAddress,
-            testContracts.proxy.abi,
-            wallet,
-        );
+        const proxyContract = new ethers.Contract(args.contractAddress, testContracts.proxy.abi, wallet);
 
         const upgradeGatekeeper = new ethers.Contract(
             args.upgradeGatekeeperAddress,
             testContracts.upgradeGatekeeper.abi,
-            wallet,
+            wallet
         );
 
-        const newTargetFranklin = await deployContract(
-            wallet,
-            FranklinTestUpgradeTargetContractCode,
-            [],
-            {gasLimit: 6500000},
-        );
+        const newTargetFranklin = await deployContract(wallet, FranklinTestUpgradeTargetContractCode, [], {
+            gasLimit: 6500000,
+        });
 
         console.log("Starting upgrade");
-        await (await upgradeGatekeeper.startUpgrade([constants.AddressZero, constants.AddressZero, newTargetFranklin.address])).wait();
+        await (
+            await upgradeGatekeeper.startUpgrade([
+                constants.AddressZero,
+                constants.AddressZero,
+                newTargetFranklin.address,
+            ])
+        ).wait();
 
         // wait notice period
         console.log("Waiting notice period");
-        while (parseInt(await upgradeGatekeeper.upgradeStatus()) !== 2/*Preparation*/) {
+        while (parseInt(await upgradeGatekeeper.upgradeStatus()) !== 2 /*Preparation*/) {
             await new Promise((r) => setTimeout(r, 1000));
-            await (await upgradeGatekeeper.startPreparation({gasLimit: 300000})).wait();
+            await (await upgradeGatekeeper.startPreparation({ gasLimit: 300000 })).wait();
         }
 
         console.log("Finish upgrade notice period");
         // finish upgrade
-        await (await upgradeGatekeeper.finishUpgrade([[], [], []],  {gasLimit: 300000})).wait();
+        await (await upgradeGatekeeper.finishUpgrade([[], [], []], { gasLimit: 300000 })).wait();
 
-        await expect(await proxyContract.getTarget())
-            .to.equal(newTargetFranklin.address, "upgrade was unsuccessful");
+        await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, "upgrade was unsuccessful");
     } catch (e) {
         console.error(JSON.stringify(e));
         process.exit(1);
