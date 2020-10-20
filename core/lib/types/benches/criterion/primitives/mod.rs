@@ -2,9 +2,7 @@
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 // Local uses
 use zksync_crypto::circuit::account::CircuitAccount;
-use zksync_crypto::primitives::{
-    bytes_into_be_bits, pack_bits_into_bytes, pack_bits_into_bytes_in_order, BitIteratorLe, GetBits,
-};
+use zksync_crypto::primitives::{BitConvert, BitIteratorLe, GetBits};
 use zksync_types::{Account, Address, PubKeyHash};
 
 /// Input size for byte slices (module-wide for calculating the throughput).
@@ -24,7 +22,7 @@ fn bench_bytes_into_be_bits(b: &mut Bencher<'_>) {
     let value_ref: &[u8] = value.as_ref();
 
     b.iter(|| {
-        let _ = bytes_into_be_bits(black_box(value_ref));
+        let _ = BitConvert::from_be_bytes(black_box(value_ref));
     });
 }
 
@@ -36,7 +34,7 @@ fn bench_pack_bits_into_bytes(b: &mut Bencher<'_>) {
     b.iter_batched(
         setup,
         |value| {
-            let _ = pack_bits_into_bytes(black_box(value));
+            let _ = BitConvert::into_bytes(black_box(value));
         },
         BatchSize::SmallInput,
     );
@@ -50,7 +48,7 @@ fn bench_pack_bits_into_bytes_in_order(b: &mut Bencher<'_>) {
     b.iter_batched(
         setup,
         |value| {
-            let _ = pack_bits_into_bytes_in_order(black_box(value));
+            let _ = BitConvert::into_bytes_ordered(black_box(value));
         },
         BatchSize::SmallInput,
     );

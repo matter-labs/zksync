@@ -198,7 +198,7 @@ impl WithdrawWitness<Bn256> {
         let token_fe = Fr::from_str(&withdraw.token.to_string()).unwrap();
         let amount_as_field_element = Fr::from_str(&withdraw.amount.to_string()).unwrap();
 
-        let amount_bits = FloatConversions::convert_to_float(
+        let amount_bits = FloatConversions::to_float(
             withdraw.amount,
             AMOUNT_EXPONENT_BIT_WIDTH,
             AMOUNT_MANTISSA_BIT_WIDTH,
@@ -210,7 +210,7 @@ impl WithdrawWitness<Bn256> {
 
         let fee_as_field_element = Fr::from_str(&withdraw.fee.to_string()).unwrap();
 
-        let fee_bits = FloatConversions::convert_to_float(
+        let fee_bits = FloatConversions::to_float(
             withdraw.fee,
             FEE_EXPONENT_BIT_WIDTH,
             FEE_MANTISSA_BIT_WIDTH,

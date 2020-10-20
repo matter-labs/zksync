@@ -43,7 +43,7 @@ pub fn sign_sha256<E>(
 where
     E: JubjubEngine,
 {
-    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
+    let message_bytes = BitConvert::into_bytes(msg_data.to_vec());
 
     let seed = Seed::deterministic_seed(&private_key, &message_bytes);
     let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
@@ -73,7 +73,7 @@ pub fn sign_rescue<E>(
 where
     E: RescueEngine + JubjubEngine,
 {
-    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
+    let message_bytes = BitConvert::into_bytes(msg_data.to_vec());
 
     let seed = Seed::deterministic_seed(&private_key, &message_bytes);
     let signature =

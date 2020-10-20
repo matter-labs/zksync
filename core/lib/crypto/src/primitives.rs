@@ -127,60 +127,85 @@ impl<E: AsRef<[u64]>> Iterator for BitIteratorLe<E> {
     }
 }
 
-pub fn pack_bits_into_bytes(bits: Vec<bool>) -> Vec<u8> {
-    assert_eq!(bits.len() % 8, 0);
-    let mut message_bytes: Vec<u8> = vec![];
+pub struct BitConvert;
 
-    let byte_chunks = bits.chunks(8);
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        for (i, bit) in byte_chunk.iter().enumerate() {
-            if *bit {
-                byte |= 1 << i;
+impl BitConvert {
+    /// Сonverts a set of bits to a set of bytes in direct order.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_bytes(bits: Vec<bool>) -> Vec<u8> {
+        assert_eq!(bits.len() % 8, 0);
+        let mut message_bytes: Vec<u8> = vec![];
+
+        let byte_chunks = bits.chunks(8);
+        for byte_chunk in byte_chunks {
+            let mut byte = 0u8;
+            for (i, bit) in byte_chunk.iter().enumerate() {
+                if *bit {
+                    byte |= 1 << i;
+                }
             }
+            message_bytes.push(byte);
         }
-        message_bytes.push(byte);
+
+        message_bytes
     }
 
-    message_bytes
-}
+    /// Сonverts a set of bits to a set of bytes in reverse order for each byte.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_bytes_ordered(bits: Vec<bool>) -> Vec<u8> {
+        assert_eq!(bits.len() % 8, 0);
+        let mut message_bytes: Vec<u8> = vec![];
 
-pub fn pack_bits_into_bytes_in_order(bits: Vec<bool>) -> Vec<u8> {
-    assert_eq!(bits.len() % 8, 0);
-    let mut message_bytes: Vec<u8> = vec![];
-
-    let byte_chunks = bits.chunks(8);
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        for (i, bit) in byte_chunk.iter().rev().enumerate() {
-            if *bit {
-                byte |= 1 << i;
+        let byte_chunks = bits.chunks(8);
+        for byte_chunk in byte_chunks {
+            let mut byte = 0u8;
+            for (i, bit) in byte_chunk.iter().rev().enumerate() {
+                if *bit {
+                    byte |= 1 << i;
+                }
             }
+            message_bytes.push(byte);
         }
-        message_bytes.push(byte);
+
+        message_bytes
     }
 
-    message_bytes
+    /// Сonverts a set of Big Endian bytes to a set of bits.
+    pub fn from_be_bytes(bytes: &[u8]) -> Vec<bool> {
+        let mut bits = vec![];
+        for byte in bytes {
+            let mut temp = *byte;
+            for _ in 0..8 {
+                bits.push(temp & 0x80 == 0x80);
+                temp <<= 1;
+            }
+        }
+        bits
+    }
 }
 
+/// Convert Uint to the floating-point and vice versa.
 pub struct FloatConversions;
 
 impl FloatConversions {
+    /// Packs a BigUint less than 2 ^ 128  to a floating-point number with an exponent base = 10.
+    /// Can lose accuracy with small parameters `exponent_len` and `mantissa_len`.
     pub fn pack(number: &BigUint, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
         let uint = number.to_u128().expect("Only u128 allowed");
 
-        let mut vec =
-            Self::convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
+        let mut vec = Self::to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
         vec.reverse();
-        pack_bits_into_bytes_in_order(vec)
+        BitConvert::into_bytes_ordered(vec)
     }
 
+    /// Unpacks a floating point number with the given parameters.
+    /// Returns `None` for numbers greater than 2 ^ 128.
     pub fn unpack(data: &[u8], exponent_len: usize, mantissa_len: usize) -> Option<u128> {
         if exponent_len + mantissa_len != data.len() * 8 {
             return None;
         }
 
-        let bits = bytes_into_be_bits(data);
+        let bits = BitConvert::from_be_bytes(data);
 
         let mut mantissa = 0u128;
         for (i, bit) in bits[0..mantissa_len].iter().rev().enumerate() {
@@ -205,7 +230,10 @@ impl FloatConversions {
         mantissa.checked_mul(exponent)
     }
 
-    pub fn convert_to_float(
+    /// Packs a u128 to a floating-point number with the given parameters.
+    /// Can lose accuracy with small parameters `exponent_len` and `mantissa_len`.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_float(
         integer: u128,
         exponent_length: usize,
         mantissa_length: usize,
@@ -280,33 +308,22 @@ impl FloatConversions {
     }
 }
 
-pub fn bytes_into_be_bits(bytes: &[u8]) -> Vec<bool> {
-    let mut bits = vec![];
-    for byte in bytes {
-        let mut temp = *byte;
-        for _ in 0..8 {
-            bits.push(temp & 0x80 == 0x80);
-            temp <<= 1;
-        }
-    }
-    bits
-}
-
 pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
-    let mut msg_bits = bytes_into_be_bits(msg);
+    let mut msg_bits = BitConvert::from_be_bytes(msg);
     msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
     let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
-    pack_bits_into_bytes(hash_bits)
+    BitConvert::into_bytes(hash_bits)
 }
 
 pub trait FromBytes: Sized {
+    /// Converts a sequence of bytes to a number.
     fn from_bytes(bytes: &[u8]) -> Option<Self>;
 }
 
-macro_rules! impl_primitive {
+macro_rules! impl_from_bytes_for_primitive {
     ($Type:ty) => {
         impl FromBytes for $Type {
             fn from_bytes(bytes: &[u8]) -> Option<Self> {
@@ -322,9 +339,9 @@ macro_rules! impl_primitive {
     };
 }
 
-impl_primitive!(u16);
-impl_primitive!(u32);
-impl_primitive!(u128);
+impl_from_bytes_for_primitive!(u16);
+impl_from_bytes_for_primitive!(u32);
+impl_from_bytes_for_primitive!(u128);
 
 #[cfg(test)]
 mod test {
@@ -351,13 +368,13 @@ mod test {
         bits.extend(vec![false, false, true, true, false, true, true, false]);
         bits.extend(vec![false, false, false, false, false, false, false, true]);
 
-        let bytes = pack_bits_into_bytes(bits.clone());
+        let bytes = BitConvert::into_bytes(bits.clone());
         assert_eq!(bytes, vec![89, 108, 128]);
 
-        let bytes = pack_bits_into_bytes_in_order(bits.clone());
+        let bytes = BitConvert::into_bytes_ordered(bits.clone());
         assert_eq!(bytes, vec![154, 54, 1]);
 
-        assert_eq!(bytes_into_be_bits(&[154, 54, 1]), bits);
+        assert_eq!(BitConvert::from_be_bytes(&[154, 54, 1]), bits);
     }
 
     #[test]
@@ -369,7 +386,7 @@ mod test {
             FloatConversions::pack(&num::BigUint::from(number), exponent_len, mantissa_len);
         let unpacked_number = FloatConversions::unpack(&packed_number, exponent_len, mantissa_len);
         let convert_number =
-            FloatConversions::convert_to_float(number, exponent_len, mantissa_len, exponent_base);
+            FloatConversions::to_float(number, exponent_len, mantissa_len, exponent_base);
 
         assert_eq!(unpacked_number, Some(number));
         assert_eq!(packed_number, vec![27, 213, 183, 213, 224]);

@@ -152,7 +152,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
         let fee_token_fe = Fr::from_str(&change_pubkey_offcahin.fee_token.to_string()).unwrap();
         let fee_as_field_element = Fr::from_str(&change_pubkey_offcahin.fee.to_string()).unwrap();
 
-        let fee_bits = FloatConversions::convert_to_float(
+        let fee_bits = FloatConversions::to_float(
             change_pubkey_offcahin.fee,
             FEE_EXPONENT_BIT_WIDTH,
             FEE_MANTISSA_BIT_WIDTH,

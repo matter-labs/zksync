@@ -248,7 +248,7 @@ impl TransferToNewWitness<Bn256> {
         let token_fe = Fr::from_str(&transfer_to_new.token.to_string()).unwrap();
         let amount_as_field_element = Fr::from_str(&transfer_to_new.amount.to_string()).unwrap();
 
-        let amount_bits = FloatConversions::convert_to_float(
+        let amount_bits = FloatConversions::to_float(
             transfer_to_new.amount,
             AMOUNT_EXPONENT_BIT_WIDTH,
             AMOUNT_MANTISSA_BIT_WIDTH,
@@ -264,7 +264,7 @@ impl TransferToNewWitness<Bn256> {
             "test transfer_to_new fee_as_field_element = {}",
             fee_as_field_element
         );
-        let fee_bits = FloatConversions::convert_to_float(
+        let fee_bits = FloatConversions::to_float(
             transfer_to_new.fee,
             FEE_EXPONENT_BIT_WIDTH,
             FEE_MANTISSA_BIT_WIDTH,
