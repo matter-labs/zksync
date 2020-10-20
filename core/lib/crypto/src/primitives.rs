@@ -276,7 +276,6 @@ impl FloatConversions {
         }
 
         debug_assert_eq!(encoding.len(), exponent_length + mantissa_length);
-
         Ok(encoding)
     }
 }
@@ -342,6 +341,76 @@ mod test {
 
         let bits = Fr::from_str("0").unwrap().get_bits_le_fixed(512);
         assert_eq!(bits, vec![false; 512]);
+    }
+
+    #[test]
+    fn test_bits_conversions() {
+        let mut bits = vec![];
+
+        bits.extend(vec![true, false, false, true, true, false, true, false]);
+        bits.extend(vec![false, false, true, true, false, true, true, false]);
+        bits.extend(vec![false, false, false, false, false, false, false, true]);
+
+        let bytes = pack_bits_into_bytes(bits.clone());
+        assert_eq!(bytes, vec![89, 108, 128]);
+
+        let bytes = pack_bits_into_bytes_in_order(bits.clone());
+        assert_eq!(bytes, vec![154, 54, 1]);
+
+        assert_eq!(bytes_into_be_bits(&[154, 54, 1]), bits);
+    }
+
+    #[test]
+    fn test_float_conversions() {
+        let (number, exponent_len, mantissa_len, exponent_base): (u128, usize, usize, u32) =
+            (0xDEADBEAF, 5, 35, 10);
+
+        let packed_number =
+            FloatConversions::pack(&num::BigUint::from(number), exponent_len, mantissa_len);
+        let unpacked_number = FloatConversions::unpack(&packed_number, exponent_len, mantissa_len);
+        let convert_number =
+            FloatConversions::convert_to_float(number, exponent_len, mantissa_len, exponent_base);
+
+        assert_eq!(unpacked_number, Some(number));
+        assert_eq!(packed_number, vec![27, 213, 183, 213, 224]);
+        assert_eq!(
+            convert_number.ok(),
+            Some(vec![
+                false, false, false, false, false, true, true, true, true, false, true, false,
+                true, false, true, true, true, true, true, false, true, true, false, true, true,
+                false, true, false, true, false, true, true, true, true, false, true, true, false,
+                false, false
+            ])
+        );
+    }
+
+    #[test]
+    fn test_rescue_hash_tx_msg() {
+        let msg = [1u8, 2u8, 3u8, 4u8];
+        let hash = rescue_hash_tx_msg(&msg);
+
+        assert_eq!(
+            hash,
+            vec![
+                249, 154, 208, 123, 96, 89, 132, 235, 231, 63, 56, 200, 153, 131, 27, 183, 128, 71,
+                26, 245, 208, 120, 49, 246, 233, 72, 230, 84, 66, 150, 170, 27
+            ]
+        );
+    }
+
+    #[test]
+    fn test_uint_from_bytes() {
+        let bytes = vec![1; 1];
+        let number: u32 = FromBytes::from_bytes(&bytes).unwrap();
+        assert_eq!(number, 1);
+
+        let bytes = [1u8, 2u8, 3u8, 4u8];
+        let number: u32 = FromBytes::from_bytes(&bytes).unwrap();
+        assert_eq!(number, 0x01020304);
+
+        let bytes = [1u8, 2u8, 3u8, 4u8, 5u8];
+        let number: u128 = FromBytes::from_bytes(&bytes).unwrap();
+        assert_eq!(number, 0x0102030405);
     }
 
     #[test]
