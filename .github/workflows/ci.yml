@@ -46,8 +46,8 @@ jobs:
     - name: zcli-tests
       run: ci-zcli.sh
 
-    - name: integration-simple-full-exit
-      run: ci-integration-simple-fullexit.sh
+    - name: integration-tests
+      run: ci-integration-tests.sh
 
     - name: data-restore
       run: zksync data-restore check-existing

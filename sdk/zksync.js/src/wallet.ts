@@ -383,7 +383,7 @@ export class Wallet {
 
         if (changePubKey.fee == null) {
             changePubKey.fee = 0;
-            
+
             const feeType = {
                 ChangePubKey: {
                     onchainPubkeyAuth: changePubKey.onchainAuth,
