@@ -29,4 +29,6 @@ pub enum SignerError {
     DefineAddress,
     #[error("Recover address from signature failed: {0}")]
     RecoverAddress(String),
+    #[error("{0}")]
+    CustomError(String),
 }

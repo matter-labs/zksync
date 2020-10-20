@@ -1,4 +1,5 @@
 use num::BigUint;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{
         closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
@@ -11,8 +12,8 @@ use zksync_types::{
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
 
 #[derive(Debug)]
-pub struct TransferBuilder<'a> {
-    wallet: &'a Wallet,
+pub struct TransferBuilder<'a, S: EthereumSigner> {
+    wallet: &'a Wallet<S>,
     token: Option<Token>,
     amount: Option<BigUint>,
     fee: Option<BigUint>,
@@ -20,9 +21,9 @@ pub struct TransferBuilder<'a> {
     nonce: Option<Nonce>,
 }
 
-impl<'a> TransferBuilder<'a> {
+impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
     /// Initializes a transfer transaction building process.
-    pub fn new(wallet: &'a Wallet) -> Self {
+    pub fn new(wallet: &'a Wallet<S>) -> Self {
         Self {
             wallet,
             token: None,
