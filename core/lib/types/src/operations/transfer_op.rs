@@ -10,7 +10,7 @@ use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
     FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
-use zksync_crypto::primitives::{bytes_slice_to_uint16, bytes_slice_to_uint32};
+use zksync_crypto::primitives::FromBytes;
 
 /// Transfer operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,9 +51,8 @@ impl TransferOp {
 
         let from_address = Address::zero(); // From pubdata its unknown
         let to_address = Address::zero(); // From pubdata its unknown
-        let token =
-            bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get token id from transfer pubdata"))?;
+        let token = u16::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+            .ok_or_else(|| format_err!("Cant get token id from transfer pubdata"))?;
         let amount = unpack_token_amount(
             &bytes[amount_offset
                 ..amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
@@ -64,10 +63,9 @@ impl TransferOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from transfer pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
-        let from_id =
-            bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get from account id from transfer pubdata"))?;
-        let to_id = bytes_slice_to_uint32(&bytes[to_offset..to_offset + ACCOUNT_ID_BIT_WIDTH / 8])
+        let from_id = u32::from_bytes(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
+            .ok_or_else(|| format_err!("Cant get from account id from transfer pubdata"))?;
+        let to_id = u32::from_bytes(&bytes[to_offset..to_offset + ACCOUNT_ID_BIT_WIDTH / 8])
             .ok_or_else(|| format_err!("Cant get to account id from transfer pubdata"))?;
 
         Ok(Self {
