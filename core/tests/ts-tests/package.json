@@ -10,7 +10,7 @@
     "trailingComma": "none"
   },
   "mocha": {
-    "timeout": 120000,
+    "timeout": 240000,
     "exit": true,
     "color": false,
     "slow": 0,
