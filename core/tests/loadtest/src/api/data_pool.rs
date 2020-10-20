@@ -6,7 +6,7 @@ use std::{collections::VecDeque, sync::Arc};
 use rand::{thread_rng, Rng};
 use tokio::sync::RwLock;
 // Workspace uses
-use zksync_types::{tx::TxHash, Address, PriorityOp};
+use zksync_types::{tx::TxHash, Address, BlockNumber, PriorityOp};
 // Local uses
 
 #[derive(Debug, Default)]
@@ -14,11 +14,12 @@ struct ApiDataPoolInner {
     addresses: Vec<Address>,
     txs: VecDeque<TxHash>,
     priority_ops: VecDeque<PriorityOp>,
+    max_block_number: BlockNumber,
 }
 
 impl ApiDataPoolInner {
     // TODO use array deque.
-    const MAX_QUEUE_LEN: usize = 32;
+    const MAX_QUEUE_LEN: usize = 100;
 
     fn store_address(&mut self, address: Address) {
         self.addresses.push(address)
@@ -51,6 +52,14 @@ impl ApiDataPoolInner {
     fn random_priority_op(&self) -> PriorityOp {
         let idx = thread_rng().gen_range(0, self.priority_ops.len());
         self.priority_ops[idx].clone()
+    }
+
+    fn store_max_block_number(&mut self, number: BlockNumber) {
+        self.max_block_number = std::cmp::max(self.max_block_number, number);
+    }
+
+    fn random_block_number(&self) -> BlockNumber {
+        thread_rng().gen_range(0, self.max_block_number + 1)
     }
 }
 
@@ -86,5 +95,13 @@ impl ApiDataPool {
 
     pub async fn random_priority_op(&self) -> PriorityOp {
         self.inner.read().await.random_priority_op()
+    }
+
+    pub async fn store_max_block_number(&self, number: BlockNumber) {
+        self.inner.write().await.store_max_block_number(number);
+    }
+
+    pub async fn random_block_number(&self) -> BlockNumber {
+        self.inner.read().await.random_block_number()
     }
 }

@@ -17,7 +17,7 @@ use zksync::{
 };
 use zksync_types::{
     tx::{PackedEthSignature, TxHash},
-    PriorityOp, ZkSyncTx, H256,
+    BlockNumber, PriorityOp, ZkSyncTx, H256,
 };
 // Local uses
 use crate::{
@@ -228,6 +228,13 @@ impl Monitor {
     ) -> anyhow::Result<()> {
         await_condition!(Self::POLLING_INTERVAL, {
             let info = self.provider.tx_info(tx_hash).await?;
+
+            // Update max block number for api test needs.
+            if let Some(block) = info.block.as_ref() {
+                self.api_data_pool
+                    .store_max_block_number(block.block_number as BlockNumber)
+                    .await;
+            }
 
             match block_status {
                 BlockStatus::Committed => match info.success {
