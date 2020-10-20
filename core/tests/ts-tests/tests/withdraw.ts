@@ -25,9 +25,6 @@ Tester.prototype.testVerifiedWithdraw = async function (
     const pendingBalanceBefore = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
     const handle = await this.testWithdraw(wallet, token, amount, fastProcessing);
 
-    // Checking that there are no complete withdrawals tx hash for this withdrawal
-    expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.not.exist;
-
     // Await for verification with a timeout set (through mocha's --timeout)
     await handle.awaitVerifyReceipt();
 
