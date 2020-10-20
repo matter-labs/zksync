@@ -27,17 +27,17 @@ Tester.prototype.testVerifiedForcedExit = async function (
     const balanceToWithdraw = await targetWallet.getBalance(token);
 
     const handle = await this.testForcedExit(initiatorWallet, targetWallet, token);
-    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Withdraw', initiatorWallet.address(), token);
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Withdraw', targetWallet.address(), token);
 
     // Await for verification with a timeout set (through mocha's --timeout)
     await handle.awaitVerifyReceipt();
 
+    // Wait some time for Ethereum transaction to be processed.
+    await utils.sleep(30_000); // ms
+
     const onchainBalanceAfter = await targetWallet.getEthereumBalance(token);
     const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(targetWallet.address(), tokenId);
     const initiatorBalanceAfter = await initiatorWallet.getBalance(token);
-
-    // Wait some time for Ethereum transaction to be processed.
-    await utils.sleep(10_000);
 
     expect(
         onchainBalanceAfter.add(pendingToBeOnchain).sub(onchainBalanceBefore).eq(balanceToWithdraw),
@@ -51,14 +51,16 @@ Tester.prototype.testVerifiedForcedExit = async function (
 
 Tester.prototype.testForcedExit = async function (initiatorWallet: Wallet, targetWallet: Wallet, token: TokenLike) {
     // Forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw).
-    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Withdraw', initiatorWallet.address(), token);
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee('Withdraw', targetWallet.address(), token);
     const handle = await initiatorWallet.syncForcedExit({
         target: targetWallet.address(),
         token,
         fee
     });
 
-    await handle.awaitReceipt();
+    const receipt = await handle.awaitReceipt();
+    expect(receipt.success, `Withdraw transaction failed with a reason: ${receipt.failReason}`).to.be.true;
+
     const balanceAfter = await targetWallet.getBalance(token);
     expect(balanceAfter.isZero(), 'Wrong amount in wallet after ForcedExit').to.be.true;
     this.runningFee = this.runningFee.add(fee);

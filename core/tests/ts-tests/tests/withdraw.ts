@@ -19,7 +19,10 @@ Tester.prototype.testVerifiedWithdraw = async function (
     amount: BigNumber,
     fastProcessing?: boolean
 ) {
+    const tokenId = wallet.provider.tokenSet.resolveTokenId(token);
+
     const onchainBalanceBefore = await wallet.getEthereumBalance(token);
+    const pendingBalanceBefore = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
     const handle = await this.testWithdraw(wallet, token, amount, fastProcessing);
 
     // Checking that there are no complete withdrawals tx hash for this withdrawal
@@ -44,10 +47,9 @@ Tester.prototype.testVerifiedWithdraw = async function (
     expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
     const onchainBalanceAfter = await wallet.getEthereumBalance(token);
-    const tokenId = wallet.provider.tokenSet.resolveTokenId(token);
-    const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
+    const pendingBalanceAfter = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
     expect(
-        onchainBalanceAfter.add(pendingToBeOnchain).sub(onchainBalanceBefore).eq(amount),
+        onchainBalanceAfter.sub(onchainBalanceBefore).add(pendingBalanceAfter).sub(pendingBalanceBefore).eq(amount),
         'Wrong amount onchain after withdraw'
     ).to.be.true;
 };
