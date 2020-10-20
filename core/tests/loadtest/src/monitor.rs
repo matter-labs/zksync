@@ -1,6 +1,7 @@
 // Built-in import
 use std::{
     mem::swap,
+    ops::{Add, AddAssign},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -19,12 +20,15 @@ use zksync_types::{
     PriorityOp, ZkSyncTx, H256,
 };
 // Local uses
-use crate::journal::{Journal, TxLifecycle};
+use crate::{
+    api::ApiDataPool,
+    journal::{Journal, TxLifecycle},
+};
 
 type SerialId = u64;
 
 #[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-struct Stats {
+struct Counters {
     created: u64,
     executed: u64,
     verified: u64,
@@ -32,9 +36,31 @@ struct Stats {
 }
 
 #[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-struct Sample {
-    txs: Stats,
-    ops: Stats,
+struct Stats {
+    txs: Counters,
+    ops: Counters,
+}
+
+impl Add for Counters {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            created: self.created + rhs.created,
+            executed: self.executed + rhs.executed,
+            verified: self.verified + rhs.verified,
+            errored: self.errored + rhs.errored,
+        }
+    }
+}
+
+impl AddAssign for Stats {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = Self {
+            txs: self.txs + rhs.txs,
+            ops: self.ops + rhs.ops,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -55,7 +81,8 @@ enum Event {
 #[derive(Debug, Default)]
 struct MonitorInner {
     enabled: bool,
-    current_sample: Sample,
+    current_stats: Stats,
+    total_stats: Stats,
     journal: Journal,
     pending_tasks: Vec<JoinHandle<()>>,
 }
@@ -66,47 +93,41 @@ struct MonitorInner {
 pub struct Monitor {
     /// Underlying zkSync network provider.
     pub provider: Provider,
+    /// A pool of data required for api tests.
+    pub api_data_pool: ApiDataPool,
     inner: Arc<Mutex<MonitorInner>>,
 }
 
 impl MonitorInner {
     fn log_event(&mut self, event: Event) {
-        if self.enabled {
-            match event {
-                Event::TxCreated(_) => self.current_sample.txs.created += 1,
-                Event::TxExecuted(_) => self.current_sample.txs.executed += 1,
-                Event::TxVerified(_) => self.current_sample.txs.verified += 1,
-                Event::TxErrored(_) => self.current_sample.txs.errored += 1,
+        match event {
+            Event::TxCreated(_) => self.current_stats.txs.created += 1,
+            Event::TxExecuted(_) => self.current_stats.txs.executed += 1,
+            Event::TxVerified(_) => self.current_stats.txs.verified += 1,
+            Event::TxErrored(_) => self.current_stats.txs.errored += 1,
 
-                Event::OpCreated(_) => self.current_sample.ops.created += 1,
-                Event::OpExecuted(_) => self.current_sample.ops.executed += 1,
-                Event::OpVerified(_) => self.current_sample.ops.verified += 1,
-                Event::OpErrored(_) => self.current_sample.ops.errored += 1,
-            }
+            Event::OpCreated(_) => self.current_stats.ops.created += 1,
+            Event::OpExecuted(_) => self.current_stats.ops.executed += 1,
+            Event::OpVerified(_) => self.current_stats.ops.verified += 1,
+            Event::OpErrored(_) => self.current_stats.ops.errored += 1,
         }
     }
 
     fn record_tx(&mut self, tx_hash: TxHash, tx_result: anyhow::Result<TxLifecycle>) {
-        self.journal.record_tx(tx_hash, tx_result);
+        if self.enabled {
+            self.journal.record_tx(tx_hash, tx_result);
+        }
     }
 
     fn store_stats(&mut self) {
-        if self.enabled {
-            let mut sample = Sample::default();
+        let mut stats = Stats::default();
 
-            if self.current_sample != sample {
-                log::info!(
-                    "Transactions stats: created: {}, executed: {}, verified: {}; operations: created: {}, executed: {}, verified: {}",
-                    self.current_sample.txs.created,
-                    self.current_sample.txs.executed,
-                    self.current_sample.txs.verified,
-                    self.current_sample.ops.created,
-                    self.current_sample.ops.executed,
-                    self.current_sample.ops.verified,
-                );
+        if self.current_stats != stats {
+            self.total_stats += self.current_stats;
 
-                swap(&mut self.current_sample, &mut sample);
-            }
+            log::info!("Transactions {:?}", self.current_stats);
+
+            swap(&mut self.current_stats, &mut stats);
         }
     }
 
@@ -116,6 +137,14 @@ impl MonitorInner {
         let journal = self.journal.clone();
         self.journal.clear();
         journal
+    }
+}
+
+impl Drop for MonitorInner {
+    fn drop(&mut self) {
+        self.total_stats += self.current_stats;
+
+        log::info!("Total {:?}", self.total_stats);
     }
 }
 
@@ -142,6 +171,7 @@ impl Monitor {
         let monitor = Self {
             provider,
             inner: Arc::new(Mutex::new(MonitorInner::default())),
+            api_data_pool: ApiDataPool::new(),
         };
         tokio::spawn(monitor.run_counter());
 
@@ -186,6 +216,7 @@ impl Monitor {
         });
         self.inner().await.pending_tasks.push(handle);
 
+        self.api_data_pool.store_tx_hash(tx_hash).await;
         Ok(tx_hash)
     }
 
@@ -268,7 +299,7 @@ impl Monitor {
         eth_provider: &EthereumProvider,
         eth_tx_hash: H256,
     ) -> anyhow::Result<PriorityOp> {
-        // FIXME Make this task completely async.
+        // TODO Make this task completely async.
 
         // Wait for the corresponing priority operation ID.
         let priority_op = eth_provider
@@ -278,6 +309,9 @@ impl Monitor {
             .ok_or_else(|| {
                 ClientError::MalformedResponse("There is no priority op in the deposit".into())
             })?;
+        self.api_data_pool
+            .store_priority_op(priority_op.clone())
+            .await;
 
         let monitor = self.clone();
         let priority_op2 = priority_op.clone();

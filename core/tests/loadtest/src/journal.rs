@@ -72,7 +72,12 @@ impl Journal {
             ("verifying", verifying),
         ]
         .iter()
-        .map(|(category, data)| (category.to_string(), FiveSummaryStats::from_data(data)))
+        .map(|(category, data)| {
+            (
+                category.to_string(),
+                FiveSummaryStats::from_data(data).unwrap(),
+            )
+        })
         .collect())
     }
 }
@@ -89,7 +94,7 @@ impl Sample {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub struct FiveSummaryStats {
     pub min: u128,
     pub lower_quartile: u128,
@@ -100,14 +105,17 @@ pub struct FiveSummaryStats {
 }
 
 impl FiveSummaryStats {
-    pub fn from_data<'a, I>(data: I) -> Self
+    pub const MIN_SAMPLES_COUNT: usize = 10;
+
+    pub fn from_data<'a, I>(data: I) -> Option<Self>
     where
         I: IntoIterator<Item = &'a u128>,
     {
         let mut data = data.into_iter().copied().collect::<Vec<_>>();
-        data.sort_unstable();
 
-        assert!(data.len() >= 4);
+        if data.len() < Self::MIN_SAMPLES_COUNT {
+            return None;
+        }
 
         // Compute std dev.
         let n = data.len() as u128;
@@ -120,18 +128,19 @@ impl FiveSummaryStats {
         let std_dev = (square_sum as f64 / n as f64).sqrt();
 
         // Compute five summary stats
+        data.sort_unstable();
         let idx = data.len() - 1;
-        Self {
+        Some(Self {
             min: data[0],
             lower_quartile: data[idx / 4],
             median: data[idx / 2],
             upper_quartile: data[idx * 3 / 4],
             max: data[idx],
             std_dev,
-        }
+        })
     }
 
-    pub fn from_samples<'a, I>(samples: I) -> Self
+    pub fn from_samples<'a, I>(samples: I) -> Option<Self>
     where
         I: IntoIterator<Item = &'a Sample>,
     {

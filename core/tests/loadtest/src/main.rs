@@ -62,6 +62,23 @@ fn print_stats_summary(name: impl AsRef<str>, summary: &FiveSummaryStats) {
     );
 }
 
+fn print_api_counters(failed: usize, total: usize) {
+    if failed > 0 {
+        println!(
+            "          {} of {} equests have been {}.",
+            failed.to_string().red(),
+            total,
+            "failed".red(),
+        );
+    } else {
+        println!(
+            "          All of {} requests have been {}.",
+            total,
+            "successful".green()
+        );
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
@@ -90,7 +107,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
         println!("Statistics for API tests:");
         for (category, stats) in &report.api {
-            print_stats_summary(category, stats);
+            if let Some(summary) = &stats.summary {
+                print_stats_summary(category, summary);
+            }
+            print_api_counters(stats.failed_requests_count, stats.total_requests_count);
         }
     }
 

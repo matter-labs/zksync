@@ -1,7 +1,6 @@
 // Built-in uses
 use std::{collections::BTreeMap, fmt::Debug};
 // External uses
-use futures::{future::BoxFuture, FutureExt};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
@@ -10,7 +9,7 @@ use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local uses
 use crate::{
-    api::CancellationToken,
+    api::{self, ApiTestsFuture, ApiTestsReport, CancellationToken},
     config::Config,
     journal::Journal,
     monitor::Monitor,
@@ -20,8 +19,6 @@ use crate::{
     FiveSummaryStats,
 };
 
-type ApiTestsFuture = BoxFuture<'static, anyhow::Result<BTreeMap<String, FiveSummaryStats>>>;
-
 /// Full report with the results of loadtest execution.
 ///
 /// This report contains two major types: scenarios with transactions and API requests.
@@ -30,7 +27,7 @@ pub struct Report {
     /// Scenarios report.
     pub scenarios: BTreeMap<String, FiveSummaryStats>,
     /// API requests report.
-    pub api: BTreeMap<String, FiveSummaryStats>,
+    pub api: BTreeMap<String, ApiTestsReport>,
 }
 
 /// Executor of load tests.
@@ -71,13 +68,7 @@ impl LoadtestExecutor {
 
         log::info!("Fee is {}", format_ether(&sufficient_fee));
 
-        // TODO Use one of random wallets from the preparation step.
-        let (api_tests, cancel) = crate::api::run(
-            monitor.clone(),
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options)
-                .await
-                .into_inner(),
-        );
+        let api_tests = api::run(monitor.clone());
 
         Ok(Self {
             monitor,
@@ -85,7 +76,7 @@ impl LoadtestExecutor {
             main_wallet,
             scenarios,
             sufficient_fee,
-            api_tests: Some((api_tests.boxed(), cancel)),
+            api_tests: Some(api_tests),
         })
     }
 
@@ -105,7 +96,7 @@ impl LoadtestExecutor {
 
         Ok(Report {
             scenarios: journal.five_stats_summary()?,
-            api: api_handle.await??,
+            api: api_handle.await?,
         })
     }
 
@@ -293,7 +284,7 @@ impl LoadtestExecutor {
             let txs_queue = try_wait_all_failsafe(scenario_wallets.iter().map(|wallet| {
                 let sufficient_fee = sufficient_fee.clone();
                 async move {
-                    let balance = wallet.balance(BlockStatus::Verified).await?;
+                    let balance = wallet.balance(BlockStatus::Committed).await?;
                     let withdraw_amount =
                         closest_packable_token_amount(&(balance - &sufficient_fee));
 

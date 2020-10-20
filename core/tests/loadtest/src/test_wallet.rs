@@ -93,6 +93,8 @@ impl TestWallet {
             .committed
             .nonce;
 
+        monitor.api_data_pool.store_address(inner.address()).await;
+
         Self {
             monitor,
             inner,
