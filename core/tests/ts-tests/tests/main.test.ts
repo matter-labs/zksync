@@ -12,7 +12,7 @@ import './misc';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~100 test transactions (excluding fees), increase if needed
-const DEPOSIT_AMOUNT = TX_AMOUNT.mul(100);
+const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
 // prettier-ignore
 const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS') =>
@@ -24,7 +24,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport);
-        alice = await tester.fundedWallet('1.0');
+        alice = await tester.fundedWallet('5.0');
         bob = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
@@ -45,7 +45,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits(token);
             await approveERC20.wait();
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should be approved').to.be.true;
-            await tester.testDeposit(bob, token, DEPOSIT_AMOUNT);
+            await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should still be approved').to.be.true;
         }
     });
@@ -66,7 +66,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testTransfer(alice, alice, token, TX_AMOUNT);
     });
 
-    step('should change pubkey offchain', async () => {
+    step('should change pubkey offchain for alice', async () => {
         await tester.testChangePubKey(alice, token, false);
     });
 
@@ -98,7 +98,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     it('should succeed resending a previously failed tx', async () => {
-        let nick = await tester.fundedWallet('1.0');
+        let nick = await tester.fundedWallet('5.0');
         let mike = await tester.emptyWallet();
         await tester.testTransactionResending(nick, mike, token, TX_AMOUNT);
     })
@@ -107,7 +107,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         let carl: Wallet;
 
         before('create a test wallet', async () => {
-            carl = await tester.fundedWallet('1.0');
+            carl = await tester.fundedWallet('5.0');
         });
 
         step('should execute full-exit on random wallet', async () => {
@@ -121,21 +121,21 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             const oldSigner = carl.ethSigner;
             carl.ethSigner = tester.ethWallet;
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0)).to.be.false;
-            expect(before.eq(after)).to.be.true;
+            expect(before.eq(0), "Balance before Full Exit must be non-zero").to.be.false;
+            expect(before.eq(after), "Balance after incorrect Full Exit should not change").to.be.true;
             carl.ethSigner = oldSigner;
         });
 
         step('should execute a normal full-exit', async () => {
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0)).to.be.false;
-            expect(after.eq(0)).to.be.true;
+            expect(before.eq(0), "Balance before Full Exit must be non-zero").to.be.false;
+            expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
         });
 
         step('should execute full-exit on an empty wallet', async () => {
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0)).to.be.true;
-            expect(after.eq(0)).to.be.true;
+            expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to.be.true;
+            expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
         });
     });
 });

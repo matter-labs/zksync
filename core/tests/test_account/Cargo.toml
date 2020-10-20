@@ -11,7 +11,7 @@ categories = ["cryptography"]
 # This Crate must be published, as it's a dev-dependency of some our library crates.
 
 [dependencies]
-zksync_types ={ path = "../../lib/types", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_basic_types = { path = "../../lib/basic_types", version = "1.0" }
 

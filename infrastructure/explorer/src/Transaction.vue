@@ -116,12 +116,17 @@ export default {
             txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
             if (txData.tx_type  == "Deposit" || txData.tx_type == "FullExit") {
                 txData.feeTokenName = "ETH";
-            } else {
+            } else if(txData.tx_type  == "ChangePubKey" || txData.tx_type == "ChangePubKeyOffchain") {
+                // Once upon a time there was no need to pay the fee for the `ChangePubKey` operations,
+                // so we need to check if `txData` contains fields associated with fee
+                txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token || 0].syncSymbol;
+                txData.fee = txData.fee || 0;
+            }
+            else {
                 txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
             }
-
             txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;
-            
+
             let block = {
                 verified_at: null,
                 committed_at: null,
@@ -216,7 +221,7 @@ export default {
                     { name: "Type",                     value: `${this.txData.tx_type}`   },
                     { name: "Status",                   value: `${this.txData.status}` },
                     { name: "Account",                  value: `<a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
-                    { name: "fee",                      value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee, this.txData.tokenName)}` },
+                    { name: "fee",                      value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee || 0, this.txData.feeTokenName)}` },
                     { name: "New signer key hash",      value: `${this.txData.to.replace('sync:', '')}`},
                     { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ]
@@ -227,7 +232,7 @@ export default {
                     { name: "Status",         value: `${this.txData.status}` },
                     { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
                     { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}">${this.txData.to}${onchain_to}</a>`      },
-                    { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount, this.txData.tokenName)}`    },
+                    { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.tokenName)}`    },
                 ]
                 : [
                     { name: 'zkSync tx hash', value: tx_hash},
@@ -235,7 +240,7 @@ export default {
                     { name: "Status",         value: `${this.txData.status}` },
                     { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
                     { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}">${this.txData.to}${onchain_to}</a>`      },
-                    { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount, this.txData.tokenName)}`    },
+                    { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.tokenName)}`    },
                     { name: "fee",            value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee, this.txData.tokenName)}` },
                     { name: "Created at",     value: formatDate(this.txData.created_at) },
                 ];

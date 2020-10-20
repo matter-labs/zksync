@@ -167,7 +167,7 @@ export class Client {
             switch (true) {
                 case type == 'Deposit': {
                     const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
-                    const amount = formatToken(tx.tx.priority_op.amount, token);
+                    const amount = formatToken(tx.tx.priority_op.amount || 0, token);
                     return {
                         ...data,
                         from: tx.tx.priority_op.from,
@@ -180,7 +180,6 @@ export class Client {
                     const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
                     const amount = formatToken(tx.tx.withdraw_amount || 0, token);
                     return {
-
                         ...data,
                         from: tx.tx.priority_op.eth_address,
                         to: tx.tx.priority_op.eth_address,
@@ -191,7 +190,7 @@ export class Client {
                 }
                 case type == 'Transfer' || type == 'Withdraw': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
-                    const amount = formatToken(tx.tx.amount, token);
+                    const amount = formatToken(tx.tx.amount || 0, token);
                     return {
                         ...data,
                         from: tx.tx.from,
@@ -203,7 +202,9 @@ export class Client {
                 case type == 'ForcedExit': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
                     let amount = (await this.searchTx(hash)).amount;
-                    amount = formatToken(amount, token);
+                    if (amount != "unknown amount") {
+                        amount = formatToken(amount || 0, token);
+                    }
                     return {
                         ...data,
                         from: tx.tx.target,

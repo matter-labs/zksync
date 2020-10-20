@@ -11,16 +11,16 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our tests.
 
 [dependencies]
-zksync_server = { path = "../../bin/server", version = "1.0" }
+zksync_core = { path = "../../bin/zksync_core", version = "1.0" }
 zksync_prover = { path = "../../bin/prover", version = "1.0" }
-zksync_types ={ path = "../../lib/types", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_circuit = { path = "../../lib/circuit", version = "1.0" }
 zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
-zksync_eth_client ={ path = "../../lib/eth_client", version = "1.0" }
+zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
 zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0"  }
 zksync_test_account = { path = "../test_account", version = "1.0" }
 

@@ -8,6 +8,13 @@ members = [
     "core/bin/gen_token_add_contract",
     "core/bin/parse_pub_data",
 
+    # Server micro-services
+    "core/bin/zksync_api",
+    "core/bin/zksync_core",
+    "core/bin/zksync_eth_sender",
+    "core/bin/zksync_witness_generator",
+    "core/bin/zksync_prometheus_exporter",
+
     # Libraries
     "core/lib/circuit",
     "core/lib/eth_client",

@@ -2,6 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, utils } from 'zksync';
 import { BigNumber } from 'ethers';
+import { sleep } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -29,8 +30,18 @@ Tester.prototype.testVerifiedWithdraw = async function (
 
     // Checking that there are some complete withdrawals tx hash for this withdrawal
     // we should wait some time for `completeWithdrawals` transaction to be processed
-    await utils.sleep(10_000);
-    expect(await this.syncProvider.getEthTxForWithdrawal(handle.txHash)).to.exist;
+    let withdrawalTxHash = null;
+    const polling_interval = 200; // ms
+    const polling_timeout = 30000; // ms
+    const polling_iterations = polling_timeout / polling_interval;
+    for (let i = 0; i < polling_iterations; i++) {
+        withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
+        if (withdrawalTxHash != null) {
+            break;
+        }
+        await sleep(polling_interval);
+    }
+    expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
     const onchainBalanceAfter = await wallet.getEthereumBalance(token);
     const tokenId = wallet.provider.tokenSet.resolveTokenId(token);
@@ -59,7 +70,9 @@ Tester.prototype.testWithdraw = async function (
         fastProcessing
     });
 
-    await handle.awaitReceipt();
+    const receipt = await handle.awaitReceipt();
+    expect(receipt.success, `Withdraw transaction failed with a reason: ${receipt.failReason}`).to.be.true;
+
     const balanceAfter = await wallet.getBalance(token);
     expect(balanceBefore.sub(balanceAfter).eq(amount.add(fee)), 'Wrong amount in wallet after withdraw').to.be.true;
     this.runningFee = this.runningFee.add(fee);

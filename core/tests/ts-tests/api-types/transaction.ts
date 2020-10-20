@@ -10,6 +10,8 @@ type ChangePubKey = {
     created_at: string;
     fail_reason: string | null;
     tx: {
+        fee?: string;
+        feeToken?: number;
         account: string;
         accountId: number;
         ethSignature: string | null;
@@ -115,7 +117,7 @@ type FullExit = {
             token: number;
         };
         type: 'FullExit';
-        withdraw_amount: string;
+        withdraw_amount: string | null;
     };
 };
 

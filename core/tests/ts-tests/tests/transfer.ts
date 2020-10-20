@@ -40,15 +40,17 @@ Tester.prototype.testTransfer = async function (
     });
 
     await utils.sleep(timeout);
-    await handle.awaitReceipt();
+    const receipt = await handle.awaitReceipt();
+    expect(receipt.success, `Transfer transaction failed with a reason: ${receipt.failReason}`).to.be.true;
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
 
     if (sender.address() === receiver.address()) {
         expect(senderBefore.sub(fee).eq(senderAfter), 'Transfer to self failed').to.be.true;
     } else {
-        expect(senderBefore.sub(senderAfter).eq(amount.add(fee)), 'Transfer failed').to.be.true;
-        expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed').to.be.true;
+        expect(senderBefore.sub(senderAfter).eq(amount.add(fee)), 'Transfer failed (incorrect sender balance)').to.be
+            .true;
+        expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed (incorrect receiver balance)').to.be.true;
     }
 
     this.runningFee = this.runningFee.add(fee);

@@ -21,7 +21,7 @@ function cat_logs() {
     exitcode=$?
     echo "Termination started"
     # Wait for server to finish any ongoing jobs
-    sleep 30
+    sleep 5
 
     set +e
     pkill -P $SERVER_PID
@@ -34,7 +34,7 @@ function cat_logs() {
     cat integration-prover.log
 
     # Wait for server to be surely killed
-    sleep 10
+    sleep 5
 
     exit $exitcode
 }
