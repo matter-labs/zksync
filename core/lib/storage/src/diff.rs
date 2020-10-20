@@ -97,30 +97,30 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
 }
 
 impl StorageAccountDiff {
-    /// Returns the index of the operation within block.
-    pub fn update_order_id(&self) -> i32 {
-        *match self {
-            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate {
-                update_order_id, ..
-            }) => update_order_id,
-            StorageAccountDiff::Create(StorageAccountCreation {
-                update_order_id, ..
-            }) => update_order_id,
-            StorageAccountDiff::Delete(StorageAccountCreation {
-                update_order_id, ..
-            }) => update_order_id,
-            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
-                update_order_id,
-                ..
-            }) => update_order_id,
-        }
-    }
-
     /// Compares updates by `block number` then by `update_order_id` (which is number within block).
     pub fn cmp_order(&self, other: &Self) -> Ordering {
         self.block_number()
             .cmp(&other.block_number())
             .then(self.update_order_id().cmp(&other.update_order_id()))
+    }
+
+    /// Returns the index of the operation within block.
+    pub fn update_order_id(&self) -> i32 {
+        match self {
+            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate {
+                update_order_id, ..
+            }) => *update_order_id,
+            StorageAccountDiff::Create(StorageAccountCreation {
+                update_order_id, ..
+            }) => *update_order_id,
+            StorageAccountDiff::Delete(StorageAccountCreation {
+                update_order_id, ..
+            }) => *update_order_id,
+            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
+                update_order_id,
+                ..
+            }) => *update_order_id,
+        }
     }
 
     /// Returns the block index to which the operation belongs.
