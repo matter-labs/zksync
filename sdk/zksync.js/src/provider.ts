@@ -122,6 +122,7 @@ export class Provider {
     async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise((resolve) => {
+                const startTime = new Date().getTime();
                 const subscribe = this.transport.subscribe(
                     "ethop_subscribe",
                     [serialId, action],

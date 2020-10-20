@@ -14,8 +14,8 @@ default = []
 playground = []
 
 [dependencies]
-zksync_state ={ path = "../state", version = "1.0" }
-zksync_types ={ path = "../types", version = "1.0" }
+zksync_state = { path = "../state", version = "1.0" }
+zksync_types = { path = "../types", version = "1.0" }
 zksync_crypto = { path = "../crypto", version = "1.0" }
 rust-crypto = "0.2"
 num = { version = "0.2", features = ["serde"] }

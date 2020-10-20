@@ -11,7 +11,7 @@ categories = ["cryptography"]
 
 
 [dependencies]
-zksync_circuit ={ path = "../circuit", version = "1.0" }
+zksync_circuit = { path = "../circuit", version = "1.0" }
 zksync_crypto = { path = "../crypto", version = "1.0" }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
 

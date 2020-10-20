@@ -11,3 +11,5 @@ pub type AccountId = u32;
 pub type BlockNumber = u32;
 /// zkSync account nonce.
 pub type Nonce = u32;
+/// Unique identifier of the priority operation in the zkSync network.
+pub type PriorityOpId = u64;

@@ -352,7 +352,8 @@ describe('Making Transactions', () => {
             token: 'DAI',
             amount: '2.0'
         });
-        const hash = await commands.transfer(
+        const start = new Date().getTime();
+        await commands.transfer(
             {
                 to: poor2.address,
                 privkey: poor1.privateKey,
@@ -361,8 +362,9 @@ describe('Making Transactions', () => {
             },
             true
         );
-        const info = await commands.txInfo(hash);
-        expect(info.transaction).to.be.null;
+        const elapsed = new Date().getTime() - start;
+        expect(elapsed).to.be.lessThan(200, 'Transfer took more than 200 ms to execute');
+        // Checking that tx was not created is not safe and error-prone, since transfer may be processed (almost) immediately.
     });
 
     it('should wait for commitment', async () => {
