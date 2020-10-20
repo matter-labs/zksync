@@ -138,7 +138,7 @@ impl<S: EthereumSigner + Clone> Wallet<S> {
         &self,
         web3_addr: impl AsRef<str>,
     ) -> Result<EthereumProvider<S>, ClientError> {
-        if let Some(eth_signer) = self.signer.eth_signer.clone() {
+        if let Some(eth_signer) = &self.signer.eth_signer {
             let ethereum_provider = EthereumProvider::new(
                 &self.provider,
                 self.tokens.clone(),
