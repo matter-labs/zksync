@@ -220,7 +220,7 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<TransactionInfoResp>,
     ) -> Result<(), anyhow::Error> {
-        let sub_id = self.tx_subs.generate_sub_id(hash.clone(), action);
+        let sub_id = self.tx_subs.generate_sub_id(hash, action);
 
         let tx_receipt = self.state.get_tx_receipt(&hash).await?;
 

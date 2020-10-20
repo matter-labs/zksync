@@ -1,94 +1,95 @@
-//! Module with different scenarios for a `loadtest`.
+//! Module with various scenarios for a `loadtest`.
 //! A scenario is basically is a behavior policy for sending the transactions.
 //! A simplest scenario will be: "get a bunch of accounts and just spawn a lot of transfer
 //! operations between them".
 
-// Built-in import
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+pub use self::{
+    full_exit::FullExitScenarioConfig, transfers::TransferScenarioConfig,
+    withdraw::WithdrawScenarioConfig,
+};
+
+// Built-in uses
+use std::fmt::{Debug, Display};
 // External uses
-use tokio::runtime::Runtime;
+use async_trait::async_trait;
+use num::BigUint;
+use serde::{Deserialize, Serialize};
 // Workspace uses
-use zksync_config::ConfigurationOptions;
 // Local uses
-use super::tps_counter::TPSCounter;
+use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::WithdrawScenario};
+use crate::{monitor::Monitor, test_wallet::TestWallet};
 
-pub(crate) mod configs;
-mod execution_tps;
-mod outgoing_tps;
-mod real_life;
-mod utils;
+mod full_exit;
+mod transfers;
+mod withdraw;
 
-pub type Scenario = Box<dyn Fn(ScenarioContext)>;
+/// Resources that are needed from the scenario executor to perform the scenario.
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct ScenarioResources {
+    /// Total amount of non-empty wallets.
+    pub wallets_amount: u64,
+    /// Wei balance in each wallet.
+    pub balance_per_wallet: BigUint,
+}
+
+/// Describes the general steps of a load test scenario.
+#[async_trait]
+pub trait Scenario: Debug + Display {
+    /// Returns resources that should be provided by the scenario executor.
+    fn requested_resources(&self, sufficient_fee: &BigUint) -> ScenarioResources;
+
+    /// Performs actions before running the main scenario, for example, it can
+    /// fill the queue of transactions for execution.
+    async fn prepare(
+        &mut self,
+        monitor: &Monitor,
+        sufficient_fee: &BigUint,
+        wallets: &[TestWallet],
+    ) -> anyhow::Result<()>;
+
+    /// Runs main scenario routine with the enabled load monitor.
+    async fn run(
+        &mut self,
+        monitor: &Monitor,
+        sufficient_fee: &BigUint,
+        wallets: &[TestWallet],
+    ) -> anyhow::Result<()>;
+
+    /// Performs actions after running the main scenario, for example, it can
+    /// return the funds to the specified wallets.
+    async fn finalize(
+        &mut self,
+        monitor: &Monitor,
+        sufficient_fee: &BigUint,
+        wallets: &[TestWallet],
+    ) -> anyhow::Result<()>;
+}
 
 /// Supported scenario types.
-#[derive(Debug, Clone, Copy)]
-pub enum ScenarioType {
-    /// Measure the outgoing TPS (ZKSync node mempool acceptance throughput).
-    OutgoingTps,
-    /// Measure the TPS for transactions execution (not including verifying).
-    ExecutionTps,
-    /// Run the real-life scenario.
-    RealLife,
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(tag = "name", rename_all = "snake_case")]
+pub enum ScenarioConfig {
+    /// Bunch of transfers scenario.
+    Transfer(TransferScenarioConfig),
+    /// Withdraw / deposit scenario.
+    Withdraw(WithdrawScenarioConfig),
+    /// Full exit / deposit scenario.
+    FullExit(FullExitScenarioConfig),
 }
 
-impl ScenarioType {
-    /// Returns the scenario function given its type.
-    pub fn into_scenario(self) -> Scenario {
+impl ScenarioConfig {
+    /// Returns the scenario given its type.
+    pub fn into_scenario(self) -> Box<dyn Scenario> {
         match self {
-            Self::OutgoingTps => Box::new(outgoing_tps::run_scenario),
-            Self::ExecutionTps => Box::new(execution_tps::run_scenario),
-            Self::RealLife => Box::new(real_life::run_scenario),
+            Self::Transfer(cfg) => Box::new(TransferScenario::from(cfg)),
+            Self::Withdraw(cfg) => Box::new(WithdrawScenario::from(cfg)),
+            Self::FullExit(cfg) => Box::new(FullExitScenario::from(cfg)),
         }
     }
 }
 
-impl FromStr for ScenarioType {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let scenario = match s {
-            "outgoing" | "outgoing_tps" => Self::OutgoingTps,
-            "execution" | "execution_tps" => Self::ExecutionTps,
-            "reallife" | "real-life" | "real_life" => Self::RealLife,
-            other => {
-                anyhow::bail!(
-                    "Unknown scenario type '{}'. \
-                     Available options are: \
-                     'outgoing_tps', 'execution_tps', 'real_life', \
-                     'api_test'",
-                    other
-                );
-            }
-        };
-
-        Ok(scenario)
-    }
-}
-
-#[derive(Debug)]
-pub struct ScenarioContext {
-    pub options: ConfigurationOptions,
-    pub config_path: PathBuf,
-    pub rpc_addr: String,
-    pub tps_counter: Arc<TPSCounter>,
-    pub rt: Runtime,
-}
-
-impl ScenarioContext {
-    pub fn new(
-        options: ConfigurationOptions,
-        config_path: PathBuf,
-        rpc_addr: String,
-        rt: Runtime,
-    ) -> Self {
-        let tps_counter = Arc::new(TPSCounter::default());
-
-        Self {
-            options,
-            config_path,
-            rpc_addr,
-            tps_counter,
-            rt,
-        }
+impl From<TransferScenarioConfig> for ScenarioConfig {
+    fn from(cfg: TransferScenarioConfig) -> Self {
+        Self::Transfer(cfg)
     }
 }
