@@ -28,17 +28,29 @@ export function spawn(command: string) {
 // loads environment variables
 export function loadEnv() {
     const current = 'etc/env/current';
-    const ZKSYNC_ENV = process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString() : 'dev');
-    const ENV_FILE = `etc/env/${ZKSYNC_ENV}.env`;
-    if (ZKSYNC_ENV == 'dev' && !fs.existsSync('etc/env/dev.env')) {
+    const zksyncEnv = process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString() : 'dev');
+    const envFile = `etc/env/${zksyncEnv}.env`;
+    if (zksyncEnv == 'dev' && !fs.existsSync('etc/env/dev.env')) {
         fs.copyFileSync('etc/env/dev.env.example', 'etc/env/dev.env');
     }
-    if (!fs.existsSync(ENV_FILE)) {
-        throw new Error('ZkSync config file not found: ' + ENV_FILE);
+    if (!fs.existsSync(envFile)) {
+        throw new Error('ZkSync config file not found: ' + envFile);
     }
-    process.env.ZKSYNC_ENV = ZKSYNC_ENV;
-    process.env.ENV_FILE = ENV_FILE;
-    dotenv.config({ path: ENV_FILE });
+    process.env.ZKSYNC_ENV = zksyncEnv;
+    process.env.ENV_FILE = envFile;
+    dotenv.config({ path: envFile });
+}
+
+// replaces an env variable in current .env file
+// takes variable name, e.g. VARIABLE
+// and the new assignment, e.g. VARIABLE=foo
+export function modifyEnv(variable: string, assignedVariable: string) {
+    const envFile = process.env.ENV_FILE as string;
+    const env = fs.readFileSync(envFile).toString();
+    const pattern = new RegExp(`${variable}=.*`, 'g');
+    fs.writeFileSync(envFile, env.replace(pattern, assignedVariable.trim()));
+    // reload env variables
+    dotenv.config({ path: envFile });
 }
 
 export async function sleep(seconds: number) {

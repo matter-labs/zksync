@@ -8,7 +8,7 @@ export async function server() {
 
 export async function genesis() {
     await utils.spawn('cargo run --bin zksync_server --release -- --genesis | tee genesis.log');
-    const genesisRoot = fs.readFileSync('genesis.log').toString().trim();
+    const genesisRoot = fs.readFileSync('genesis.log').toString();
     const date = new Date();
     const [year, month, day, hour, minute, second] = [
         date.getFullYear(),
@@ -21,9 +21,10 @@ export async function genesis() {
     const label = `${process.env.ZKSYNC_ENV}-Genesis_gen-${year}-${month}-${day}-${hour}${minute}${second}`;
     fs.mkdirSync(`logs/${label}`, { recursive: true });
     fs.copyFileSync('genesis.log', `logs/${label}/genesis.log`);
-    const envFile = process.env.ENV_FILE as string;
-    const env = fs.readFileSync(envFile).toString();
-    fs.writeFileSync(envFile, env.replace(/GENESIS_ROOT=.*/g, genesisRoot));
+    // const envFile = process.env.ENV_FILE as string;
+    // const env = fs.readFileSync(envFile).toString();
+    // fs.writeFileSync(envFile, env.replace(/GENESIS_ROOT=.*/g, genesisRoot));
+    utils.modifyEnv('GENESIS_ROOT', genesisRoot);
 }
 
 export const command = new Command('server')

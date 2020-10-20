@@ -2,10 +2,20 @@ import { Command } from 'commander';
 import * as utils from '../utils';
 import fs from 'fs';
 
-import { command as insertCommand } from './insert';
-import { command as updateCommand } from './update';
+import * as insert from './insert';
+import * as update from './update';
+
+export { insert, update };
 
 const SQL = `psql "${process.env.DATABASE_URL}" -c`;
+
+export async function reset() {
+    await wait();
+    await drop();
+    await setup();
+    await insert.contract();
+    await insert.ethData();
+}
 
 export async function drop() {
     console.log('Dropping DB...');
@@ -64,12 +74,17 @@ const waitCommand = new Command('wait')
     .description('wait for database to get ready for interaction')
     .action(wait);
 
+const resetCommand = new Command('reset')
+    .description('reinitialize the database')
+    .action(reset);
+
 export const command = new Command('db')
     .description('database management')
     .addCommand(dropCommand)
     .addCommand(migrateCommand)
     .addCommand(setupCommand)
-    .addCommand(updateCommand)
-    .addCommand(insertCommand)
-    .addCommand(waitCommand);
+    .addCommand(update.command)
+    .addCommand(insert.command)
+    .addCommand(waitCommand)
+    .addCommand(resetCommand);
 

@@ -5,6 +5,8 @@ import { command as server } from './server';
 import { command as up } from './up';
 import { command as down } from './down';
 import { command as db } from './db/db';
+import { command as contract } from './contract';
+import { command as dummyProver } from './dummy-prover';
 import * as utils from './utils';
 
 async function main() {
@@ -25,7 +27,9 @@ async function main() {
         .addCommand(server)
         .addCommand(up)
         .addCommand(down)
-        .addCommand(db);
+        .addCommand(db)
+        .addCommand(contract)
+        .addCommand(dummyProver);
 
     await program.parseAsync(process.argv);
 }
