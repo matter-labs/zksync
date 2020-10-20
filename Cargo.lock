@@ -952,6 +952,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2497,7 +2508,9 @@ name = "loadtest"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
+ "colored",
  "env_logger 0.6.2",
  "futures 0.3.6",
  "hex",
@@ -2508,6 +2521,7 @@ dependencies = [
  "serde_json",
  "structopt",
  "tokio 0.2.22",
+ "toml",
  "web3 0.13.0",
  "zksync",
  "zksync_config",
@@ -5662,6 +5676,7 @@ dependencies = [
 name = "zksync_eth_signer"
 version = "1.0.0"
 dependencies = [
+ "async-trait",
  "hex",
  "jsonrpc-core",
  "parity-crypto",

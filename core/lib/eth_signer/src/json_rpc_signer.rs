@@ -1,5 +1,6 @@
 use crate::error::{RpcSignerError, SignerError};
 use crate::json_rpc_signer::messages::JsonRpcRequest;
+use crate::EthereumSigner;
 use crate::RawTransaction;
 
 use jsonrpc_core::types::response::Output;
@@ -17,7 +18,7 @@ pub fn recover_eth_signer(signature: &Signature, msg: &[u8]) -> Result<Address, 
     Ok(public_to_address(&public_key))
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum AddressOrIndex {
     Address(Address),
     Index(usize),
@@ -25,18 +26,93 @@ pub enum AddressOrIndex {
 
 /// Describes whether to add a prefix `\x19Ethereum Signed Message:\n`
 /// when requesting a message signature.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum SignerType {
     NotNeedPrefix,
     NeedPrefix,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct JsonRpcSigner {
     rpc_addr: String,
     client: reqwest::Client,
     address: Option<Address>,
     signer_type: Option<SignerType>,
+}
+
+#[async_trait::async_trait]
+impl EthereumSigner for JsonRpcSigner {
+    /// The sign method calculates an Ethereum specific signature with:
+    /// checks if the server adds a prefix if not then adds
+    /// return sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
+    async fn sign_message(&self, msg: &[u8]) -> Result<TxEthSignature, SignerError> {
+        let signature: PackedEthSignature = {
+            let msg = match &self.signer_type {
+                Some(SignerType::NotNeedPrefix) => msg.to_vec(),
+                Some(SignerType::NeedPrefix) => {
+                    let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+                    let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
+                    bytes.extend_from_slice(prefix.as_bytes());
+                    bytes.extend_from_slice(msg);
+
+                    bytes
+                }
+                None => {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            };
+
+            let message = JsonRpcRequest::sign_message(self.address()?, &msg);
+            let ret = self
+                .post(&message)
+                .await
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+            serde_json::from_value(ret)
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
+        };
+
+        // Checks the correctness of the message signature without a prefix
+        if signature
+            .signature_recover_signer(msg)
+            .map_err(|_| SignerError::DefineAddress)?
+            == self.address()?
+        {
+            Ok(TxEthSignature::EthereumSignature(signature))
+        } else {
+            Err(SignerError::SigningFailed(
+                "Invalid signature from JsonRpcSigner".to_string(),
+            ))
+        }
+    }
+
+    /// Signs and returns the RLP-encoded transaction.
+    async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
+        let msg = JsonRpcRequest::sign_transaction(self.address()?, raw_tx);
+
+        let ret = self
+            .post(&msg)
+            .await
+            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+
+        // get Json object and parse it to get raw Transaction
+        let json: Value = serde_json::from_value(ret)
+            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
+
+        let raw_tx: Option<&str> = json
+            .get("raw")
+            .and_then(|value| value.as_str())
+            .map(|value| &value["0x".len()..]);
+
+        if let Some(raw_tx) = raw_tx {
+            hex::decode(raw_tx).map_err(|err| SignerError::DecodeRawTxFailed(err.to_string()))
+        } else {
+            Err(SignerError::DefineAddress)
+        }
+    }
+
+    async fn get_address(&self) -> Result<Address, SignerError> {
+        self.address()
+    }
 }
 
 impl JsonRpcSigner {
@@ -76,6 +152,11 @@ impl JsonRpcSigner {
         };
 
         Ok(signer)
+    }
+
+    /// Get Ethereum address.
+    pub fn address(&self) -> Result<Address, SignerError> {
+        self.address.ok_or(SignerError::DefineAddress)
     }
 
     /// Specifies the Ethreum address which sets the address for which all other requests will be processed.
@@ -145,11 +226,6 @@ impl JsonRpcSigner {
         }
     }
 
-    /// Get Ethereum address.
-    pub fn address(&self) -> Result<Address, SignerError> {
-        self.address.ok_or(SignerError::DefineAddress)
-    }
-
     /// Unlocks the current account, after that the server can sign messages and transactions.
     pub async fn unlock(&self, password: &str) -> Result<(), SignerError> {
         let message = JsonRpcRequest::unlock_account(self.address()?, password);
@@ -167,74 +243,6 @@ impl JsonRpcSigner {
             Err(SignerError::UnlockingFailed(
                 "Server response: false".to_string(),
             ))
-        }
-    }
-
-    /// The sign method calculates an Ethereum specific signature with:
-    /// checks if the server adds a prefix if not then adds
-    /// return sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message))).
-    pub async fn sign_message(&self, msg: &[u8]) -> Result<TxEthSignature, SignerError> {
-        let signature: PackedEthSignature = {
-            let msg = match &self.signer_type {
-                Some(SignerType::NotNeedPrefix) => msg.to_vec(),
-                Some(SignerType::NeedPrefix) => {
-                    let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
-                    let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
-                    bytes.extend_from_slice(prefix.as_bytes());
-                    bytes.extend_from_slice(msg);
-
-                    bytes
-                }
-                None => {
-                    return Err(SignerError::MissingEthSigner);
-                }
-            };
-
-            let message = JsonRpcRequest::sign_message(self.address()?, &msg);
-            let ret = self
-                .post(&message)
-                .await
-                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
-            serde_json::from_value(ret)
-                .map_err(|err| SignerError::SigningFailed(err.to_string()))?
-        };
-
-        // Checks the correctness of the message signature without a prefix
-        if signature
-            .signature_recover_signer(msg)
-            .map_err(|_| SignerError::DefineAddress)?
-            == self.address()?
-        {
-            Ok(TxEthSignature::EthereumSignature(signature))
-        } else {
-            Err(SignerError::SigningFailed(
-                "Invalid signature from JsonRpcSigner".to_string(),
-            ))
-        }
-    }
-
-    /// Signs and returns the RLP-encoded transaction.
-    pub async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError> {
-        let msg = JsonRpcRequest::sign_transaction(self.address()?, raw_tx);
-
-        let ret = self
-            .post(&msg)
-            .await
-            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
-
-        // get Json object and parse it to get raw Transaction
-        let json: Value = serde_json::from_value(ret)
-            .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
-
-        let raw_tx: Option<&str> = json
-            .get("raw")
-            .and_then(|value| value.as_str())
-            .map(|value| &value["0x".len()..]);
-
-        if let Some(raw_tx) = raw_tx {
-            hex::decode(raw_tx).map_err(|err| SignerError::DecodeRawTxFailed(err.to_string()))
-        } else {
-            Err(SignerError::DefineAddress)
         }
     }
 

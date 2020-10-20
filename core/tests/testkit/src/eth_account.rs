@@ -14,7 +14,7 @@ use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_eth_client::ETHClient;
-use zksync_eth_signer::EthereumSigner;
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::block::Block;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 
@@ -44,7 +44,7 @@ pub fn parse_ether(eth_value: &str) -> Result<BigUint, anyhow::Error> {
 pub struct EthereumAccount<T: Transport> {
     pub private_key: H256,
     pub address: Address,
-    pub main_contract_eth_client: ETHClient<T>,
+    pub main_contract_eth_client: ETHClient<T, PrivateKeySigner>,
 }
 
 fn big_dec_to_u256(bd: BigUint) -> U256 {
@@ -71,7 +71,7 @@ impl<T: Transport> EthereumAccount<T> {
         chain_id: u8,
         gas_price_factor: f64,
     ) -> Self {
-        let eth_signer = EthereumSigner::from_key(private_key);
+        let eth_signer = PrivateKeySigner::new(private_key);
         let main_contract_eth_client = ETHClient::new(
             transport,
             zksync_contract(),
@@ -304,7 +304,7 @@ impl<T: Transport> EthereumAccount<T> {
         token_contract: Address,
         amount: BigUint,
     ) -> Result<TransactionReceipt, anyhow::Error> {
-        let eth_signer = EthereumSigner::from_key(self.private_key);
+        let eth_signer = PrivateKeySigner::new(self.private_key);
         let erc20_client = ETHClient::new(
             self.main_contract_eth_client.web3.transport().clone(),
             erc20_contract(),

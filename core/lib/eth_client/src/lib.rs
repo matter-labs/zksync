@@ -18,8 +18,8 @@ use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
 const FALLBACK_GAS_LIMIT: u64 = 3_000_000;
 
 #[derive(Clone)]
-pub struct ETHClient<T: Transport> {
-    eth_signer: EthereumSigner,
+pub struct ETHClient<T: Transport, S: EthereumSigner> {
+    eth_signer: S,
     pub sender_account: Address,
     pub contract_addr: H160,
     pub contract: ethabi::Contract,
@@ -28,7 +28,7 @@ pub struct ETHClient<T: Transport> {
     pub web3: Web3<T>,
 }
 
-impl<T: Transport> fmt::Debug for ETHClient<T> {
+impl<T: Transport, S: EthereumSigner> fmt::Debug for ETHClient<T, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // We do not want to have a private key in the debug representation.
 
@@ -49,12 +49,12 @@ pub struct SignedCallResult {
     pub hash: H256,
 }
 
-impl<T: Transport> ETHClient<T> {
+impl<T: Transport, S: EthereumSigner> ETHClient<T, S> {
     pub fn new(
         transport: T,
         contract: ethabi::Contract,
         operator_eth_addr: H160,
-        eth_signer: EthereumSigner,
+        eth_signer: S,
         contract_eth_addr: H160,
         chain_id: u8,
         gas_price_factor: f64,

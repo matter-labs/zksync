@@ -11,7 +11,7 @@ use zksync::{
     EthereumProvider, Network, Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
-use zksync_eth_signer::EthereumSigner;
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{
     tx::PackedEthSignature, AccountId, Address, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
 };
@@ -22,8 +22,8 @@ use crate::{config::AccountInfo, monitor::Monitor};
 #[derive(Debug)]
 pub struct TestWallet {
     monitor: Monitor,
-    eth_provider: EthereumProvider,
-    inner: Wallet,
+    eth_provider: EthereumProvider<PrivateKeySigner>,
+    inner: Wallet<PrivateKeySigner>,
     token_name: TokenLike,
 
     nonce: AtomicU32,
@@ -40,7 +40,7 @@ impl TestWallet {
     ) -> Self {
         let credentials = WalletCredentials::from_eth_signer(
             info.address,
-            EthereumSigner::from_key(info.private_key),
+            PrivateKeySigner::new(info.private_key),
             Network::Localhost,
         )
         .await
@@ -66,7 +66,7 @@ impl TestWallet {
             monitor.provider.clone(),
             WalletCredentials::from_eth_signer(
                 address_from_pk,
-                EthereumSigner::from_key(eth_private_key),
+                PrivateKeySigner::new(eth_private_key),
                 Network::Localhost,
             )
             .await
@@ -81,7 +81,7 @@ impl TestWallet {
     async fn from_wallet(
         token_name: TokenLike,
         monitor: Monitor,
-        inner: Wallet,
+        inner: Wallet<PrivateKeySigner>,
         web3_url: impl AsRef<str>,
     ) -> Self {
         let eth_provider = inner.ethereum(web3_url).await.unwrap();
@@ -236,7 +236,7 @@ impl TestWallet {
     }
 
     /// Returns an underlying wallet.
-    pub fn into_inner(self) -> Wallet {
+    pub fn into_inner(self) -> Wallet<PrivateKeySigner> {
         self.inner
     }
 

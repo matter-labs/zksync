@@ -14,6 +14,7 @@ use tokio::{
 use zksync::{
     error::ClientError, ethereum::PriorityOpHolder, types::BlockStatus, EthereumProvider, Provider,
 };
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     tx::{PackedEthSignature, TxHash},
     PriorityOp, ZkSyncTx, H256,
@@ -263,9 +264,9 @@ impl Monitor {
 
     /// Returns the priority operation for the given transaction and monitors its progress in
     /// the zkSync network.
-    pub(crate) async fn get_priority_op(
+    pub(crate) async fn get_priority_op<S: EthereumSigner + Clone>(
         &self,
-        eth_provider: &EthereumProvider,
+        eth_provider: &EthereumProvider<S>,
         eth_tx_hash: H256,
     ) -> anyhow::Result<PriorityOp> {
         // FIXME Make this task completely async.

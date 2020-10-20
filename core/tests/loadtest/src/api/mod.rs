@@ -13,6 +13,7 @@ use std::{
 use futures::{future::BoxFuture, Future, FutureExt};
 // Workspace uses
 use zksync::{types::BlockStatus, Wallet};
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{Address, TxFeeTypes};
 // Local uses
 use crate::{
@@ -118,7 +119,7 @@ impl<'a> ApiTestsBuilder<'a> {
 
 pub fn run(
     monitor: Monitor,
-    wallet: Wallet,
+    wallet: Wallet<PrivateKeySigner>,
 ) -> (
     impl Future<Output = anyhow::Result<BTreeMap<String, FiveSummaryStats>>>,
     CancellationToken,

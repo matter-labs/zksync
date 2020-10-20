@@ -6,7 +6,7 @@ use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::transports::Http;
 use zksync_basic_types::{TransactionReceipt, H256, U256};
-use zksync_eth_signer::EthereumSigner;
+use zksync_eth_signer::PrivateKeySigner;
 // Workspace uses
 use super::ExecutedTxStatus;
 use std::time::Duration;
@@ -62,13 +62,13 @@ pub(super) trait EthereumInterface {
 /// Supposed to be an actual Ethereum intermediator for the `ETHSender`.
 #[derive(Debug)]
 pub struct EthereumHttpClient {
-    eth_client: ETHClient<Http>,
+    eth_client: ETHClient<Http, PrivateKeySigner>,
 }
 
 impl EthereumHttpClient {
     pub fn new(options: &ConfigurationOptions) -> Result<Self, anyhow::Error> {
         let transport = Http::new(&options.web3_url)?;
-        let ethereum_signer = EthereumSigner::from_key(
+        let ethereum_signer = PrivateKeySigner::new(
             options
                 .operator_private_key
                 .expect("Operator private key is required for eth_sender"),
