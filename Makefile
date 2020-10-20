@@ -170,11 +170,8 @@ ci-check:
 integration-testkit:
 	@bin/integration-testkit.sh $(filter-out $@,$(MAKECMDGOALS))
 
-integration-simple:
-	@cd core/tests/ts-tests && yarn && yarn simple $(filter-out $@,$(MAKECMDGOALS))
-
-integration-full-exit:
-	@cd core/tests/ts-tests && yarn && yarn full-exit
+integration-test:
+	@cd core/tests/ts-tests && yarn && yarn test
 
 price:
 	@node contracts/scripts/check-price.js
@@ -295,5 +292,5 @@ image-dev-ticker:
 push-image-dev-ticker: image-dev-ticker
 	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
-api-type-validate:
-	@cd core/tests/ts-tests && yarn && yarn api-type-validate --test
+api-test:
+	@cd core/tests/ts-tests && yarn && yarn api-test

@@ -21,7 +21,7 @@ function cat_logs() {
     exitcode=$?
     echo "Termination started"
     # Wait for server to finish any ongoing jobs
-    sleep 30
+    sleep 5
 
     set +e
     pkill -P $SERVER_PID
@@ -34,7 +34,7 @@ function cat_logs() {
     cat integration-prover.log
 
     # Wait for server to be surely killed
-    sleep 10
+    sleep 5
 
     exit $exitcode
 }
@@ -53,11 +53,5 @@ zksync dummy-prover &> integration-prover.log &
 PROVER_PID=$!
 
 sleep 15
-echo "Performing integration-simple test..."
-zksync integration-simple
-echo "Performing integration-simple test http provider..."
-zksync integration-simple http
-echo "Performing integration-full-exit test..."
-zksync integration-full-exit
-echo "Performing api-type-validate test..."
-zksync api-type-validate
+zksync integration-test
+zksync api-test
