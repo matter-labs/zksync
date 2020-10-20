@@ -11,7 +11,7 @@ use serde::Serialize;
 ///
 /// Network to be used for a zkSync client.
 ///
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Network {
     /// Ethereum Mainnet.
