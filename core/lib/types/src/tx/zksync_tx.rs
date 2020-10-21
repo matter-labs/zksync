@@ -8,6 +8,7 @@ use num::BigUint;
 use parity_crypto::digest::sha256;
 
 use crate::operations::ChangePubKeyOp;
+use crate::tx::ChangePubKeyType;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 
@@ -210,7 +211,7 @@ impl ZkSyncTx {
             )),
             ZkSyncTx::ChangePubKey(change_pubkey) => Some((
                 TxFeeTypes::ChangePubKey {
-                    onchain_pubkey_auth: change_pubkey.eth_signature.is_none(),
+                    onchain_pubkey_auth: !matches!(change_pubkey.change_pubkey_type, ChangePubKeyType::EthereumSignature{..}),
                 },
                 TokenLike::Id(change_pubkey.fee_token),
                 change_pubkey.account,

@@ -7,7 +7,7 @@ use crate::account::PubKeyHash;
 use anyhow::ensure;
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::{Address, TokenId};
+use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
     params::{max_account_id, max_token_id},
     PrivateKey,
@@ -15,6 +15,25 @@ use zksync_crypto::{
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{PackedEthSignature, TxSignature, VerifiedSignatureCache};
+use parity_crypto::Keccak256;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ChangePubKeyType {
+    EthereumSignature {
+        #[serde(rename = "ethSignature")]
+        eth_signature: PackedEthSignature,
+    },
+    OnchainTransaction,
+    Create2Contract {
+        #[serde(rename = "creatorAddress")]
+        creator_address: Address,
+        #[serde(rename = "codeHash")]
+        code_hash: H256,
+        #[serde(rename = "saltArg")]
+        salt_arg: H256,
+    },
+}
 
 /// `ChangePubKey` transaction is used to set the owner's public key hash
 /// associated with the account.
@@ -45,7 +64,7 @@ pub struct ChangePubKey {
     /// Transaction Ethereum signature. It may be `None` if `ChangePubKey` operation is authorized
     /// onchain, otherwise the message must be signed by the Ethereum private key corresponding
     /// to the account address.
-    pub eth_signature: Option<PackedEthSignature>,
+    pub change_pubkey_type: ChangePubKeyType,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
 }
@@ -67,7 +86,7 @@ impl ChangePubKey {
         fee: BigUint,
         nonce: Nonce,
         signature: Option<TxSignature>,
-        eth_signature: Option<PackedEthSignature>,
+        change_pubkey_type: ChangePubKeyType,
     ) -> Self {
         let mut tx = Self {
             account_id,
@@ -76,8 +95,8 @@ impl ChangePubKey {
             fee_token,
             fee,
             nonce,
+            change_pubkey_type,
             signature: signature.clone().unwrap_or_default(),
-            eth_signature,
             cached_signer: VerifiedSignatureCache::NotCached,
         };
         if signature.is_some() {
@@ -96,7 +115,7 @@ impl ChangePubKey {
         fee_token: TokenId,
         fee: BigUint,
         nonce: Nonce,
-        eth_signature: Option<PackedEthSignature>,
+        change_pubkey_type: ChangePubKeyType,
         private_key: &PrivateKey,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
@@ -107,7 +126,7 @@ impl ChangePubKey {
             fee,
             nonce,
             None,
-            eth_signature,
+            change_pubkey_type,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
@@ -175,13 +194,44 @@ impl ChangePubKey {
         Ok(eth_signed_msg)
     }
 
-    /// Decodes the Ethereum address from the provided Ethereum signature.
-    pub fn verify_eth_signature(&self) -> Option<Address> {
-        self.eth_signature.as_ref().and_then(|sign| {
-            self.get_eth_signed_data()
-                .ok()
-                .and_then(|msg| sign.signature_recover_signer(&msg).ok())
-        })
+    pub fn verify_change_pubkey_type_correctness(&self) -> bool {
+        match &self.change_pubkey_type {
+            ChangePubKeyType::Create2Contract {
+                creator_address,
+                salt_arg,
+                code_hash,
+            } => {
+                let salt = {
+                    let mut bytes = Vec::new();
+                    bytes.extend_from_slice(&self.new_pk_hash.data);
+                    bytes.extend_from_slice(salt_arg.as_bytes());
+                    bytes.keccak256()
+                };
+
+                let mut bytes = Vec::new();
+                bytes.push(0xff);
+                bytes.extend_from_slice(creator_address.as_bytes());
+                bytes.extend_from_slice(&salt);
+                bytes.extend_from_slice(code_hash.as_bytes());
+                let address = Address::from_slice(&bytes.keccak256()[12..]);
+
+                if address == self.account {
+                    true
+                } else {
+                    log::error!("Incorrect change pubkey create2 signature");
+                    false
+                }
+            }
+            ChangePubKeyType::EthereumSignature { eth_signature } => {
+                let recovered_address = self
+                    .get_eth_signed_data()
+                    .ok()
+                    .and_then(|msg| eth_signature.signature_recover_signer(&msg).ok());
+
+                recovered_address == Some(self.account)
+            }
+            ChangePubKeyType::OnchainTransaction => true,
+        }
     }
 
     /// Verifies the transaction correctness:
@@ -192,7 +242,7 @@ impl ChangePubKey {
     /// - `fee_token` field must be within supported range.
     /// - `fee` field must represent a packable value.
     pub fn check_correctness(&self) -> bool {
-        (self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account))
+        (self.verify_change_pubkey_type_correctness())
             && self.verify_signature() == Some(self.new_pk_hash.clone())
             && self.account_id <= max_account_id()
             && self.fee_token <= max_token_id()

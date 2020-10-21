@@ -104,7 +104,7 @@ mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use num::BigUint;
     use zksync_types::operations::ChangePubKeyOp;
-    use zksync_types::tx::{ChangePubKey, TxSignature};
+    use zksync_types::tx::{ChangePubKey, ChangePubKeyType, TxSignature};
     use zksync_types::{
         Close, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, PubKeyHash, Transfer, TransferOp,
         TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
@@ -272,7 +272,7 @@ mod test {
             Default::default(),
             3,
             None,
-            None,
+            ChangePubKeyType::OnchainTransaction,
         );
         let op1 = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp { tx, account_id: 11 }));
         let pub_data1 = op1.public_data();

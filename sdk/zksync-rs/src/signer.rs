@@ -2,7 +2,7 @@
 use std::fmt;
 use zksync_eth_signer::error::SignerError;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::tx::TxEthSignature;
+use zksync_types::tx::{ChangePubKeyType, TxEthSignature};
 // External uses
 use num::BigUint;
 // Workspace uses
@@ -80,14 +80,12 @@ impl Signer {
             fee_token.id,
             fee,
             nonce,
-            None,
+            ChangePubKeyType::OnchainTransaction,
             &self.private_key,
         )
         .map_err(signing_failed_error)?;
 
-        let eth_signature = if auth_onchain {
-            None
-        } else {
+        if !auth_onchain {
             let eth_signer = self
                 .eth_signer
                 .as_ref()
@@ -101,20 +99,17 @@ impl Signer {
                 .await
                 .map_err(signing_failed_error)?;
 
-            match eth_signature {
-                TxEthSignature::EthereumSignature(packed_signature) => Some(packed_signature),
-                _ => None,
-            }
+            let eth_signature =
+                if let TxEthSignature::EthereumSignature(eth_signature) = eth_signature {
+                    eth_signature
+                } else {
+                    return Err(signing_failed_error(
+                        "Incorrect signature type, should be ECDSA signature",
+                    ));
+                };
+            change_pubkey.change_pubkey_type =
+                ChangePubKeyType::EthereumSignature { eth_signature };
         };
-
-        change_pubkey.eth_signature = eth_signature;
-
-        if !auth_onchain {
-            assert!(
-                change_pubkey.verify_eth_signature() == Some(self.address),
-                "eth signature is incorrect"
-            );
-        }
 
         Ok(change_pubkey)
     }

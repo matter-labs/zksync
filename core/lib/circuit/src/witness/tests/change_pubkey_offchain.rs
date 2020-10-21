@@ -13,6 +13,7 @@ use crate::witness::{
     tests::test_utils::{generic_test_scenario, incorrect_op_test_scenario, WitnessTestAccount},
     utils::SigDataInput,
 };
+use zksync_test_account::ChangePubkeyTypeArguments;
 
 const FEE_TOKEN: u16 = 0; // ETH
 
@@ -30,7 +31,7 @@ fn test_change_pubkey_offchain_success() {
             true,
             FEE_TOKEN,
             Default::default(),
-            false,
+            ChangePubkeyTypeArguments::SignWithEthSignature,
         ),
         account_id: account.id,
     };
@@ -62,9 +63,13 @@ fn test_change_pubkey_offchain_nonzero_fee() {
     let accounts = vec![WitnessTestAccount::new(0xc1, 500u64)];
     let account = &accounts[0];
     let change_pkhash_op = ChangePubKeyOp {
-        tx: account
-            .zksync_account
-            .sign_change_pubkey_tx(None, true, FEE_TOKEN, fee, false),
+        tx: account.zksync_account.sign_change_pubkey_tx(
+            None,
+            true,
+            FEE_TOKEN,
+            fee,
+            ChangePubkeyTypeArguments::SignWithEthSignature,
+        ),
         account_id: account.id,
     };
 
@@ -107,7 +112,7 @@ fn test_incorrect_change_pubkey_account() {
             true,
             FEE_TOKEN,
             Default::default(),
-            false,
+            ChangePubkeyTypeArguments::SignWithEthSignature,
         ),
         account_id: account.id,
     };
@@ -157,7 +162,7 @@ fn test_incorrect_change_pubkey_signature() {
         true,
         FEE_TOKEN,
         Default::default(),
-        false,
+        ChangePubkeyTypeArguments::SignWithEthSignature,
     );
 
     // Change fee.

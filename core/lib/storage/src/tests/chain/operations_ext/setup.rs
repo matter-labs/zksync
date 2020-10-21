@@ -5,7 +5,7 @@ use num::BigUint;
 // Workspace imports
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
 use zksync_crypto::Fr;
-use zksync_test_account::ZkSyncAccount;
+use zksync_test_account::{ChangePubkeyTypeArguments, ZkSyncAccount};
 use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
 use zksync_types::priority_ops::PriorityOp;
@@ -274,7 +274,7 @@ impl TransactionsHistoryTestSetup {
                 false,
                 0,
                 Default::default(),
-                false,
+                ChangePubkeyTypeArguments::SignWithEthSignature,
             ),
             account_id: self.from_zksync_account.get_account_id().unwrap(),
         }));

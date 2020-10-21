@@ -15,7 +15,7 @@ use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
 use zksync_config::ConfigurationOptions;
-use zksync_types::tx::EthSignData;
+use zksync_types::tx::{ChangePubKeyType, EthSignData};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// Wrapper on a `ZkSyncTx` which guarantees that
@@ -63,7 +63,10 @@ async fn verify_eth_signature(
 ) -> Result<(), TxAddError> {
     // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
     if let ZkSyncTx::ChangePubKey(change_pk) = &request.tx {
-        if change_pk.eth_signature.is_none() {
+        if matches!(
+            change_pk.change_pubkey_type,
+            ChangePubKeyType::OnchainTransaction
+        ) {
             // Check that user is allowed to perform this operation.
             let is_authorized = eth_checker
                 .is_new_pubkey_hash_authorized(

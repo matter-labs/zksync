@@ -1,4 +1,4 @@
-use crate::tx::ChangePubKey;
+use crate::tx::{ChangePubKey, ChangePubKeyType};
 use crate::*;
 use chrono::Utc;
 
@@ -63,7 +63,7 @@ pub fn create_change_pubkey_tx() -> ExecutedOperations {
             Default::default(),
             Default::default(),
             None,
-            None,
+            ChangePubKeyType::OnchainTransaction,
         ),
         account_id: 0,
     }));

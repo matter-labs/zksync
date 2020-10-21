@@ -15,7 +15,7 @@ mod tests;
 #[doc(hidden)]
 pub use self::close::Close;
 pub use self::{
-    change_pubkey::ChangePubKey,
+    change_pubkey::{ChangePubKey, ChangePubKeyType},
     forced_exit::ForcedExit,
     transfer::Transfer,
     withdraw::Withdraw,

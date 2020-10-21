@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish } from "ethers";
+import { BigNumber, BigNumberish, utils } from "ethers";
 
 // 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
@@ -98,6 +98,24 @@ export interface ForcedExit {
     signature: Signature;
 }
 
+export type ChangePubkeyTypes = "OnchainTransaction" | "EthereumSignature" | "Create2Contract";
+
+export interface ChangePubkeyEthereumSignature {
+    type: "EthereumSignature";
+    ethSignature: string;
+}
+
+export interface ChangePubkeyOnchainTransaction {
+    type: "OnchainTransaction";
+}
+
+export interface ChangePubkeyCreate2Contract {
+    type: "Create2Contract";
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+}
+
 export interface ChangePubKey {
     type: "ChangePubKey";
     accountId: number;
@@ -107,7 +125,7 @@ export interface ChangePubKey {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
-    ethSignature: string;
+    changePubkeyType: ChangePubkeyEthereumSignature | ChangePubkeyOnchainTransaction | ChangePubkeyCreate2Contract;
 }
 
 export interface CloseAccount {
@@ -184,4 +202,11 @@ export interface Fee {
 export interface BatchFee {
     // Total fee amount (in wei)
     totalFee: BigNumber;
+}
+
+export interface Create2WalletData {
+    creatorAddress: string;
+    // 32 bytes of additional data to code in the resulting wallet
+    saltArg: string;
+    codeHash: string;
 }

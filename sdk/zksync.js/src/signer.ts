@@ -10,7 +10,7 @@ import {
     serializeAmountPacked,
     serializeFeePacked,
     serializeNonce,
-    serializeAmountFull,
+    serializeAmountFull
 } from "./utils";
 import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from "./types";
 
@@ -55,7 +55,7 @@ export class Signer {
             amount: BigNumber.from(transfer.amount).toString(),
             fee: BigNumber.from(transfer.fee).toString(),
             nonce: transfer.nonce,
-            signature,
+            signature
         };
     }
 
@@ -84,7 +84,7 @@ export class Signer {
             tokenIdBytes,
             amountBytes,
             feeBytes,
-            nonceBytes,
+            nonceBytes
         ]);
         const signature = signTransactionBytes(this.privateKey, msgBytes);
         return {
@@ -96,7 +96,7 @@ export class Signer {
             amount: BigNumber.from(withdraw.amount).toString(),
             fee: BigNumber.from(withdraw.fee).toString(),
             nonce: withdraw.nonce,
-            signature,
+            signature
         };
     }
 
@@ -119,7 +119,7 @@ export class Signer {
             targetBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes,
+            nonceBytes
         ]);
         const signature = signTransactionBytes(this.privateKey, msgBytes);
         return {
@@ -129,7 +129,7 @@ export class Signer {
             token: forcedExit.tokenId,
             fee: BigNumber.from(forcedExit.fee).toString(),
             nonce: forcedExit.nonce,
-            signature,
+            signature
         };
     }
 
@@ -155,7 +155,7 @@ export class Signer {
             pubKeyHashBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes,
+            nonceBytes
         ]);
         const signature = signTransactionBytes(this.privateKey, msgBytes);
         return {
@@ -167,7 +167,7 @@ export class Signer {
             fee: BigNumber.from(changePubKey.fee).toString(),
             nonce: changePubKey.nonce,
             signature,
-            ethSignature: null,
+            changePubkeyType: null
         };
     }
 

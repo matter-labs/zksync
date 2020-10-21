@@ -1,6 +1,6 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use zksync_types::account::{AccountUpdate, PubKeyHash};
-use zksync_types::tx::ChangePubKey;
+use zksync_types::tx::{ChangePubKey, ChangePubKeyType};
 
 /// Check ChangePubKey operation on new account
 #[test]
@@ -20,7 +20,7 @@ fn success() {
         token_id,
         balance.into(),
         account.nonce,
-        None,
+        ChangePubKeyType::OnchainTransaction,
         &sk,
     )
     .expect("Failed to sign ChangePubkey");
@@ -63,7 +63,7 @@ fn nonce_mismatch() {
         0,
         0u32.into(),
         account.nonce + 1,
-        None,
+        ChangePubKeyType::OnchainTransaction,
         &sk,
     )
     .expect("Failed to sign ChangePubkey");
@@ -86,7 +86,7 @@ fn invalid_account_id() {
         0,
         0u32.into(),
         account.nonce + 1,
-        None,
+        ChangePubKeyType::OnchainTransaction,
         &sk,
     )
     .expect("Failed to sign ChangePubkey");

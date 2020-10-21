@@ -121,7 +121,9 @@ impl RpcApp {
         io.extend_with(self.to_delegate())
     }
 
+    #[allow(dead_code)]
     async fn token_info_from_id(&self, token_id: TokenId) -> Result<Token> {
+        #[allow(dead_code)]
         fn rpc_message(error: impl ToString) -> Error {
             Error {
                 code: RpcErrorCodes::Other.into(),
@@ -140,22 +142,24 @@ impl RpcApp {
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
-    async fn get_tx_info_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<String>> {
-        match tx {
-            ZkSyncTx::Transfer(tx) => {
-                let token = self.token_info_from_id(tx.token).await?;
-                Ok(Some(
-                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
-                ))
-            }
-            ZkSyncTx::Withdraw(tx) => {
-                let token = self.token_info_from_id(tx.token).await?;
-                Ok(Some(
-                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
-                ))
-            }
-            _ => Ok(None),
-        }
+    async fn get_tx_info_message_to_sign(&self, _tx: &ZkSyncTx) -> Result<Option<String>> {
+        Ok(None)
+        // TODO: disbale 2fa for this branch
+        // match tx {
+        //     ZkSyncTx::Transfer(tx) => {
+        //         let token = self.token_info_from_id(tx.token).await?;
+        //         Ok(Some(
+        //             tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+        //         ))
+        //     }
+        //     ZkSyncTx::Withdraw(tx) => {
+        //         let token = self.token_info_from_id(tx.token).await?;
+        //         Ok(Some(
+        //             tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+        //         ))
+        //     }
+        //     _ => Ok(None),
+        // }
     }
 }
 

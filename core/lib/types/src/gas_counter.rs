@@ -6,7 +6,7 @@
 // Workspace deps
 use zksync_basic_types::U256;
 // Local deps
-use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, ZkSyncOp};
+use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, tx::ChangePubKeyType, ZkSyncOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -42,7 +42,8 @@ impl CommitCost {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                if change_pubkey.tx.eth_signature.is_some() {
+                if matches!(change_pubkey.tx.change_pubkey_type, ChangePubKeyType::EthereumSignature{..})
+                {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
                     Self::CHANGE_PUBKEY_COST_ONCHAIN
@@ -198,7 +199,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 None,
-                None,
+                ChangePubKeyType::OnchainTransaction,
             ),
             account_id: 1,
         };
@@ -226,7 +227,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 None,
-                None,
+                ChangePubKeyType::OnchainTransaction,
             ),
             account_id: 1,
         };
@@ -254,7 +255,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 None,
-                None,
+                ChangePubKeyType::OnchainTransaction,
             ),
             account_id: 1,
         };

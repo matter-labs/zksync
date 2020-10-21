@@ -42,10 +42,10 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
             id: 1,
             jsonrpc: "2.0",
             method,
-            params,
+            params
         };
 
-        const response = await Axios.post(this.address, request).then((resp) => {
+        const response = await Axios.post(this.address, request).then(resp => {
             return resp.data;
         });
 
@@ -71,17 +71,17 @@ export class WSTransport extends AbstractJSONRPCTransport {
     private constructor(public address: string) {
         super();
         this.ws = new WebSocketAsPromised(address, {
-            createWebSocket: (url) => new W3CWebSocket(url),
-            packMessage: (data) => JSON.stringify(data),
-            unpackMessage: (data) => JSON.parse(data as string),
+            createWebSocket: url => new W3CWebSocket(url),
+            packMessage: data => JSON.stringify(data),
+            unpackMessage: data => JSON.parse(data as string),
             attachRequestId: (data, requestId) => Object.assign({ id: requestId }, data), // attach requestId to message as `id` field
-            extractRequestId: (data) => data && data.id,
+            extractRequestId: data => data && data.id
         });
 
         this.subscriptionCallback = new Map();
 
         // Call all subscription callbacks
-        this.ws.onUnpackedMessage.addListener((data) => {
+        this.ws.onUnpackedMessage.addListener(data => {
             if (data.params && data.params.subscription) {
                 const params = data.params;
                 if (this.subscriptionCallback.has(params.subscription)) {
@@ -116,7 +116,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
             const unsubRep = await this.ws.sendRequest({
                 jsonrpc: "2.0",
                 method: unsubMethod,
-                params: [subId],
+                params: [subId]
             });
             if (unsubRep.error) {
                 throw new JRPCError(`Unsubscribe failed: ${subId}, ${JSON.stringify(unsubRep.error)}`, unsubRep.error);
@@ -135,7 +135,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
         const request = {
             jsonrpc: "2.0",
             method,
-            params,
+            params
         };
 
         const response = await this.ws.sendRequest(request);

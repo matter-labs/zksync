@@ -6,10 +6,21 @@ use num::BigUint;
 use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
-use zksync_types::tx::{ChangePubKey, PackedEthSignature, TxSignature};
+use zksync_types::tx::{ChangePubKey, ChangePubKeyType, PackedEthSignature, TxSignature};
 use zksync_types::{
     AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
 };
+
+#[derive(Debug)]
+pub enum ChangePubkeyTypeArguments {
+    OnchainTransaction,
+    SignWithEthSignature,
+    Create2Args {
+        creator_address: Address,
+        code_hash: H256,
+        salt_arg: H256,
+    },
+}
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZkSyncAccount {
@@ -223,7 +234,7 @@ impl ZkSyncAccount {
         increment_nonce: bool,
         fee_token: TokenId,
         fee: BigUint,
-        auth_onchain: bool,
+        change_pubkey_args: ChangePubkeyTypeArguments,
     ) -> ChangePubKey {
         let account_id = self
             .account_id
@@ -240,26 +251,35 @@ impl ZkSyncAccount {
             fee_token,
             fee,
             nonce,
-            None,
+            ChangePubKeyType::OnchainTransaction,
             &self.private_key,
         )
         .expect("Can't sign ChangePubKey operation");
-        change_pubkey.eth_signature = if auth_onchain {
-            None
-        } else {
-            let sign_bytes = change_pubkey
-                .get_eth_signed_data()
-                .expect("Failed to construct change pubkey signed message.");
-            let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
-                .expect("Signature should succeed");
-            Some(eth_signature)
-        };
 
-        if !auth_onchain {
-            assert!(
-                change_pubkey.verify_eth_signature() == Some(self.address),
-                "eth signature is incorrect"
-            );
+        match change_pubkey_args {
+            ChangePubkeyTypeArguments::SignWithEthSignature => {
+                let sign_bytes = change_pubkey
+                    .get_eth_signed_data()
+                    .expect("Failed to construct change pubkey signed message.");
+                let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
+                    .expect("Signature should succeed");
+                change_pubkey.change_pubkey_type =
+                    ChangePubKeyType::EthereumSignature { eth_signature };
+            }
+            ChangePubkeyTypeArguments::OnchainTransaction => {
+                change_pubkey.change_pubkey_type = ChangePubKeyType::OnchainTransaction;
+            }
+            ChangePubkeyTypeArguments::Create2Args {
+                creator_address,
+                code_hash,
+                salt_arg,
+            } => {
+                change_pubkey.change_pubkey_type = ChangePubKeyType::Create2Contract {
+                    creator_address,
+                    code_hash,
+                    salt_arg,
+                };
+            }
         }
 
         if increment_nonce {

@@ -1,5 +1,5 @@
 use crate::helpers::{pack_fee_amount, unpack_fee_amount};
-use crate::tx::ChangePubKey;
+use crate::tx::{ChangePubKey, ChangePubKeyType};
 use crate::AccountId;
 use crate::PubKeyHash;
 use anyhow::{ensure, format_err};
@@ -36,11 +36,25 @@ impl ChangePubKeyOp {
     }
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
-        if let Some(eth_signature) = &self.tx.eth_signature {
-            eth_signature.serialize_packed().to_vec()
-        } else {
-            Vec::new()
+        let mut eth_witness = Vec::new();
+        match &self.tx.change_pubkey_type {
+            ChangePubKeyType::EthereumSignature { eth_signature } => {
+                eth_witness.push(0x01);
+                eth_witness.extend_from_slice(&eth_signature.serialize_packed());
+            }
+            ChangePubKeyType::Create2Contract {
+                creator_address,
+                salt_arg,
+                code_hash,
+            } => {
+                eth_witness.push(0x02);
+                eth_witness.extend_from_slice(creator_address.as_bytes());
+                eth_witness.extend_from_slice(salt_arg.as_bytes());
+                eth_witness.extend_from_slice(code_hash.as_bytes());
+            }
+            ChangePubKeyType::OnchainTransaction => {}
         }
+        eth_witness
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
@@ -77,7 +91,7 @@ impl ChangePubKeyOp {
                 fee,
                 nonce,
                 None,
-                None,
+                ChangePubKeyType::OnchainTransaction,
             ),
             account_id,
         })

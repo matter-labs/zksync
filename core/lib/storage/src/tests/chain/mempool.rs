@@ -3,7 +3,7 @@ use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
 use zksync_types::{
     mempool::SignedTxVariant,
-    tx::{ChangePubKey, Transfer, Withdraw},
+    tx::{ChangePubKey, ChangePubKeyType, Transfer, Withdraw},
     Address, SignedZkSyncTx, ZkSyncTx,
 };
 // Local imports
@@ -61,7 +61,7 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
         Default::default(),
         13,
         None,
-        None,
+        ChangePubKeyType::OnchainTransaction,
     );
 
     let txs = [

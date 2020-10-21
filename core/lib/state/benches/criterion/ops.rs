@@ -16,6 +16,7 @@ use zksync_types::{
 };
 // Local uses
 use zksync_state::state::ZkSyncState;
+use zksync_types::tx::ChangePubKeyType;
 
 const ETH_TOKEN_ID: TokenId = 0x00;
 // The amount is not important, since we always work with 1 account.
@@ -232,17 +233,15 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         Default::default(),
         nonce,
         None,
-        None,
+        ChangePubKeyType::OnchainTransaction,
     );
 
-    change_pubkey.eth_signature = {
-        let sign_bytes = change_pubkey
-            .get_eth_signed_data()
-            .expect("Failed to construct ChangePubKey signed message.");
-        let eth_signature =
-            PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
-        Some(eth_signature)
-    };
+    let sign_bytes = change_pubkey
+        .get_eth_signed_data()
+        .expect("Failed to construct ChangePubKey signed message.");
+    let eth_signature =
+        PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
+    change_pubkey.change_pubkey_type = ChangePubKeyType::EthereumSignature { eth_signature };
 
     let change_pubkey_tx = ZkSyncTx::ChangePubKey(Box::new(change_pubkey));
 

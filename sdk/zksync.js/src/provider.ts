@@ -11,7 +11,7 @@ import {
     TokenAddress,
     TxEthSignature,
     Fee,
-    ChangePubKeyFee,
+    ChangePubKeyFee
 } from "./types";
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from "./utils";
 
@@ -121,16 +121,16 @@ export class Provider {
 
     async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
-            return await new Promise((resolve) => {
+            return await new Promise(resolve => {
                 const startTime = new Date().getTime();
                 const subscribe = this.transport.subscribe(
                     "ethop_subscribe",
                     [serialId, action],
                     "ethop_unsubscribe",
-                    (resp) => {
+                    resp => {
                         subscribe
-                            .then((sub) => sub.unsubscribe())
-                            .catch((err) => console.log(`WebSocket connection closed with reason: ${err}`));
+                            .then(sub => sub.unsubscribe())
+                            .catch(err => console.log(`WebSocket connection closed with reason: ${err}`));
                         resolve(resp);
                     }
                 );
@@ -153,11 +153,11 @@ export class Provider {
 
     async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<TransactionReceipt> {
         if (this.transport.subscriptionsSupported()) {
-            return await new Promise((resolve) => {
-                const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", (resp) => {
+            return await new Promise(resolve => {
+                const subscribe = this.transport.subscribe("tx_subscribe", [hash, action], "tx_unsubscribe", resp => {
                     subscribe
-                        .then((sub) => sub.unsubscribe())
-                        .catch((err) => console.log(`WebSocket connection closed with reason: ${err}`));
+                        .then(sub => sub.unsubscribe())
+                        .catch(err => console.log(`WebSocket connection closed with reason: ${err}`));
                     resolve(resp);
                 });
             });
@@ -189,7 +189,7 @@ export class Provider {
             gasPriceWei: BigNumber.from(transactionFee.gasPriceWei),
             gasFee: BigNumber.from(transactionFee.gasFee),
             zkpFee: BigNumber.from(transactionFee.zkpFee),
-            totalFee: BigNumber.from(transactionFee.totalFee),
+            totalFee: BigNumber.from(transactionFee.totalFee)
         };
     }
 

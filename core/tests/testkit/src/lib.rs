@@ -35,6 +35,7 @@ use itertools::Itertools;
 use web3::types::{TransactionReceipt, U64};
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::rand::Rng;
+use zksync_test_account::ChangePubkeyTypeArguments;
 use zksync_types::block::Block;
 
 /// Constant for testkit
@@ -311,7 +312,7 @@ impl<T: Transport> AccountSet<T> {
             increment_nonce,
             fee_token,
             fee,
-            true,
+            ChangePubkeyTypeArguments::OnchainTransaction,
         )))
     }
 
@@ -329,7 +330,7 @@ impl<T: Transport> AccountSet<T> {
             increment_nonce,
             fee_token,
             fee,
-            false,
+            ChangePubkeyTypeArguments::SignWithEthSignature,
         )))
     }
 }

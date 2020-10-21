@@ -1,5 +1,14 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from "ethers";
-import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address } from "./types";
+import {
+    PubKeyHash,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TokenSymbol,
+    EthSignerType,
+    Address,
+    Create2WalletData
+} from "./types";
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -432,4 +441,37 @@ function numberToBytesBE(number: number, bytes: number): Uint8Array {
         number >>= 8;
     }
     return result;
+}
+
+export function calculateCreate2WalletAddressAndSalt(
+    syncPubkeyHash: string,
+    create2Data: Create2WalletData
+): { salt: string; address: string } {
+    const pubkeyHashHex = syncPubkeyHash.replace("sync:", "0x");
+
+    const additionalSaltArgument = ethers.utils.arrayify(create2Data.saltArg);
+    if (additionalSaltArgument.length !== 32) {
+        throw new Error("create2Data.saltArg should be exactly 32 bytes long");
+    }
+
+    // CREATE2 salt
+    const salt = ethers.utils.keccak256(
+        ethers.utils.concat([ethers.utils.arrayify(pubkeyHashHex), additionalSaltArgument])
+    );
+
+    // Address according to CREATE2 specification
+    const address =
+        "0x" +
+        ethers.utils
+            .keccak256(
+                ethers.utils.concat([
+                    ethers.utils.arrayify(0xff),
+                    ethers.utils.arrayify(create2Data.creatorAddress),
+                    salt,
+                    ethers.utils.arrayify(create2Data.codeHash)
+                ])
+            )
+            .slice(2 + 12 * 2);
+
+    return { address: address, salt: ethers.utils.hexlify(salt) };
 }

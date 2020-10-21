@@ -547,10 +547,17 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
 
                     if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
-                        bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
+                        bytes memory currentEthWitnessWithoutType = Bytes.slice(_ethWitness, ethWitnessOffset + 1, _ethWitnessSizes[processedOperationsRequiringEthWitness] - 1);
 
-                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
-                        require(valid, "fpp15"); // failed to verify change pubkey hash signature
+                        if (_ethWitness[ethWitnessOffset] == 0x01) {
+                            bool valid = verifyChangePubkeySignature(currentEthWitnessWithoutType, op.pubKeyHash, op.nonce, op.owner, op.accountId);
+                            require(valid, "chp1"); // failed to verify change pubkey hash signature
+                        } else if (_ethWitness[ethWitnessOffset] == 0x02) {
+                            bool valid = verifyChangePubkeyCreate2(currentEthWitnessWithoutType, op.pubKeyHash, op.nonce, op.owner);
+                            require(valid, "chp2"); // failed to verify CREATE2 signature
+                        } else {
+                            revert("chp00"); // unknown verify signature type
+                        }
                     } else {
                         bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
                         require(valid, "fpp16"); // new pub key hash is not authenticated properly
@@ -591,6 +598,21 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;
+    }
+
+    /// @notice Checks that signature is valid for pubkey change message
+
+    function verifyChangePubkeyCreate2(bytes memory _args, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
+        uint offset  = 0;
+        address creatorAddress;
+        bytes32 saltArg;
+        bytes32 codeHash;
+        (offset, creatorAddress) = Bytes.readAddress(_args, offset);
+        (offset, saltArg) = Bytes.readBytes32(_args, offset);
+        (offset, codeHash) = Bytes.readBytes32(_args, offset);
+        bytes32 salt = keccak256(abi.encodePacked(_newPkHash,saltArg));
+        address recoveredAddress = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), creatorAddress, salt, codeHash)))));
+        return recoveredAddress == _ethAddress && _nonce == 0;
     }
 
     /// @notice Creates block commitment from its data
