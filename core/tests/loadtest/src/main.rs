@@ -49,23 +49,25 @@ macro_rules! pretty_fmt {
     };
 }
 
-fn print_stats_summary(name: impl AsRef<str>, summary: &FiveSummaryStats) {
-    println!("    {}:", name.as_ref().green(),);
-    println!(
-        "        [ {} {} {} {} {} ] (std_dev = {})",
-        pretty_fmt!(summary.min).dimmed(),
-        pretty_fmt!(summary.lower_quartile),
-        pretty_fmt!(summary.median).bold(),
-        pretty_fmt!(summary.upper_quartile),
-        pretty_fmt!(summary.max).dimmed(),
-        pretty_fmt!(summary.std_dev).yellow()
-    );
+fn print_stats_summary(name: impl AsRef<str>, summary: Option<&FiveSummaryStats>) {
+    println!("    {}:", name.as_ref().green());
+    if let Some(summary) = summary {
+        println!(
+            "        [ {} {} {} {} {} ] (std_dev = {})",
+            pretty_fmt!(summary.min).dimmed(),
+            pretty_fmt!(summary.lower_quartile),
+            pretty_fmt!(summary.median).bold(),
+            pretty_fmt!(summary.upper_quartile),
+            pretty_fmt!(summary.max).dimmed(),
+            pretty_fmt!(summary.std_dev).yellow()
+        );
+    }
 }
 
 fn print_api_counters(failed: usize, total: usize) {
     if failed > 0 {
         println!(
-            "          {} of {} equests have been {}.",
+            "          {} of {} requests have been {}.",
             failed.to_string().red(),
             total,
             "failed".red(),
@@ -102,14 +104,12 @@ async fn main() -> Result<(), anyhow::Error> {
 
         println!("Statistics for scenarios:");
         for (category, stats) in &report.scenarios {
-            print_stats_summary(category, stats);
+            print_stats_summary(category, Some(stats));
         }
 
         println!("Statistics for API tests:");
         for (category, stats) in &report.api {
-            if let Some(summary) = &stats.summary {
-                print_stats_summary(category, summary);
-            }
+            print_stats_summary(category, stats.summary.as_ref());
             print_api_counters(stats.failed_requests_count, stats.total_requests_count);
         }
     }

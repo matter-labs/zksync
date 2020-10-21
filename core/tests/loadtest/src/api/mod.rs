@@ -15,7 +15,8 @@ use std::{
 use futures::{future::BoxFuture, Future, FutureExt};
 use serde::{Deserialize, Serialize};
 // Workspace uses
-use zksync_types::TxFeeTypes;
+use zksync::Network;
+use zksync_config::ConfigurationOptions;
 // Local uses
 use crate::{
     journal::{FiveSummaryStats, Sample},
@@ -24,9 +25,12 @@ use crate::{
 };
 
 mod data_pool;
+mod rest_api_tests;
+mod sdk_tests;
 
 // TODO Make it configurable
 const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const API_REQUEST_LIMIT: usize = 1_000_000_000;
 
 #[derive(Debug, Clone)]
 pub struct CancellationToken(Arc<AtomicBool>);
@@ -108,15 +112,13 @@ where
     output
 }
 
-struct ApiTestsBuilder<'a> {
+pub struct ApiTestsBuilder<'a> {
     cancellation: CancellationToken,
     categories: Vec<String>,
     tests: Vec<BoxFuture<'a, MeasureOutput>>,
 }
 
 impl<'a> ApiTestsBuilder<'a> {
-    const LIMIT: usize = 1_000_000_000;
-
     fn new(cancellation: CancellationToken) -> Self {
         Self {
             cancellation,
@@ -132,7 +134,7 @@ impl<'a> ApiTestsBuilder<'a> {
         Fut: Future<Output = anyhow::Result<()>> + Send + 'a,
     {
         let category = category.into();
-        let future = measure_future(self.cancellation.clone(), Self::LIMIT, factory).boxed();
+        let future = measure_future(self.cancellation.clone(), API_REQUEST_LIMIT, factory).boxed();
 
         self.categories.push(category);
         self.tests.push(future);
@@ -167,49 +169,10 @@ pub fn run(monitor: Monitor) -> (ApiTestsFuture, CancellationToken) {
     let future = async move {
         log::info!("API tests starting...");
 
-        let report = ApiTestsBuilder::new(token.clone())
-            .append("provider/tokens", || async {
-                monitor.provider.tokens().await?;
-                Ok(())
-            })
-            .append("provider/contract_address", || async {
-                monitor.provider.contract_address().await?;
-                Ok(())
-            })
-            .append("provider/account_info", || async {
-                monitor
-                    .provider
-                    .account_info(monitor.api_data_pool.random_address().await)
-                    .await?;
-                Ok(())
-            })
-            .append("provider/get_tx_fee", || async {
-                monitor
-                    .provider
-                    .get_tx_fee(
-                        TxFeeTypes::FastWithdraw,
-                        monitor.api_data_pool.random_address().await,
-                        "ETH",
-                    )
-                    .await?;
-                Ok(())
-            })
-            .append("provider/tx_info", || async {
-                monitor
-                    .provider
-                    .tx_info(monitor.api_data_pool.random_tx_hash().await)
-                    .await?;
-                Ok(())
-            })
-            .append("provider/ethop_info", || async {
-                monitor
-                    .provider
-                    .ethop_info(monitor.api_data_pool.random_priority_op().await.serial_id as u32)
-                    .await?;
-                Ok(())
-            })
-            .run()
-            .await;
+        let mut builder = ApiTestsBuilder::new(token.clone());
+        builder = sdk_tests::wire_tests(builder, &monitor);
+        builder = rest_api_tests::wire_tests(builder, &monitor);
+        let report = builder.run().await;
 
         log::info!("API tests finished");
 

@@ -10,7 +10,7 @@ name = 'localhost'
 name = 'transfer'
 transfer_size = 1
 transfer_rounds = 10
-wallets_amount = 100
+wallets_amount = 10
 
 [[scenarios]]
 name = "withdraw"

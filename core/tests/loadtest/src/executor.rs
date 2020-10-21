@@ -41,7 +41,7 @@ pub struct LoadtestExecutor {
     /// Main account to deposit ETH from / return ETH back to.
     main_wallet: TestWallet,
     monitor: Monitor,
-    eth_options: ConfigurationOptions,
+    env_options: ConfigurationOptions,
     /// Estimated fee amount for any zkSync operation.
     sufficient_fee: BigUint,
     scenarios: Vec<(Box<dyn Scenario>, Vec<TestWallet>)>,
@@ -50,7 +50,7 @@ pub struct LoadtestExecutor {
 
 impl LoadtestExecutor {
     /// Creates a new executor instance.
-    pub async fn new(config: Config, eth_options: ConfigurationOptions) -> anyhow::Result<Self> {
+    pub async fn new(config: Config, env_options: ConfigurationOptions) -> anyhow::Result<Self> {
         let monitor = Monitor::new(Provider::new(config.network.name)).await;
 
         log::info!("Creating scenarios...");
@@ -63,7 +63,7 @@ impl LoadtestExecutor {
 
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options).await;
+            TestWallet::from_info(monitor.clone(), &config.main_wallet, &env_options).await;
         let sufficient_fee = main_wallet.sufficient_fee().await?;
 
         log::info!("Fee is {}", format_ether(&sufficient_fee));
@@ -72,7 +72,7 @@ impl LoadtestExecutor {
 
         Ok(Self {
             monitor,
-            eth_options,
+            env_options,
             main_wallet,
             scenarios,
             sufficient_fee,
@@ -127,7 +127,7 @@ impl LoadtestExecutor {
                 TestWallet::new_random(
                     self.main_wallet.token_name().clone(),
                     self.monitor.clone(),
-                    &self.eth_options,
+                    &self.env_options,
                 )
             }))
             .await;
