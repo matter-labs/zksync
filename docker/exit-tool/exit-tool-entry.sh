@@ -17,6 +17,8 @@ then
   exit 1
 fi
 
+zksync plonk-setup check || zksync plonk-setup download
+
 COMMAND=$1
 
 case $COMMAND in

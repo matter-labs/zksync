@@ -2,6 +2,8 @@
 
 set -e
 
+cd core/lib/storage
+
 # Check generated sqlx data
 if ! cargo sqlx prepare --check
 then
