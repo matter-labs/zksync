@@ -16,7 +16,7 @@ import {
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from "./utils";
 
 export async function getDefaultProvider(
-    network: "localhost" | "rinkeby" | "ropsten" | "mainnet",
+    network: "localhost" | "rinkeby" | "ropsten" | "mainnet" | "ropsten-beta",
     transport: "WS" | "HTTP" = "WS"
 ): Promise<Provider> {
     if (network === "localhost") {
@@ -30,6 +30,12 @@ export async function getDefaultProvider(
             return await Provider.newWebsocketProvider("wss://ropsten-api.zksync.io/jsrpc-ws");
         } else if (transport === "HTTP") {
             return await Provider.newHttpProvider("https://ropsten-api.zksync.io/jsrpc");
+        }
+    } else if (network === "ropsten-beta") {
+        if (transport === "WS") {
+            return await Provider.newWebsocketProvider("wss://ropsten-beta-api.zksync.io/jsrpc-ws");
+        } else if (transport === "HTTP") {
+            return await Provider.newHttpProvider("https://ropsten-beta-api.zksync.io/jsrpc");
         }
     } else if (network === "rinkeby") {
         if (transport === "WS") {
