@@ -49,10 +49,8 @@ export async function updateToken(token: string, symbol: string) {
 
 export async function wait(tries: number = 4) {
     for (let i = 0; i < tries; i++) {
-        try {
-            await utils.exec(`pg_isready -d "${process.env.DATABASE_URL}"`);
-            return;
-        } catch (err) {}
+        const result = await utils.allowFail(utils.exec(`pg_isready -d "${process.env.DATABASE_URL}"`));
+        if (result !== null) return;  // null means failure
         await utils.sleep(5);
     }
     await utils.exec(`pg_isready -d "${process.env.DATABASE_URL}"`);

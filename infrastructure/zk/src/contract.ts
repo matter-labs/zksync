@@ -19,6 +19,7 @@ export function prepareVerify() {
 }
 
 export async function build() {
+    prepareVerify();
     await utils.spawn('cargo run --release --bin gen_token_add_contract');
     await utils.spawn('yarn --cwd contracts build')
 }

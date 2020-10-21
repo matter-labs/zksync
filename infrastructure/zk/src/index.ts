@@ -7,6 +7,9 @@ import { command as down } from './down';
 import { command as db } from './db/db';
 import { command as contract } from './contract';
 import { command as dummyProver } from './dummy-prover';
+import { command as init } from './init';
+import { command as kube } from './kube';
+import { command as prover } from './prover';
 import * as utils from './utils';
 
 async function main() {
@@ -29,7 +32,10 @@ async function main() {
         .addCommand(down)
         .addCommand(db)
         .addCommand(contract)
-        .addCommand(dummyProver);
+        .addCommand(dummyProver)
+        .addCommand(kube)
+        .addCommand(init)
+        .addCommand(prover);
 
     await program.parseAsync(process.argv);
 }

@@ -56,3 +56,11 @@ export function modifyEnv(variable: string, assignedVariable: string) {
 export async function sleep(seconds: number) {
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 }
+
+export async function allowFail<T>(promise: Promise<T>) {
+    try {
+        return await promise;
+    } catch {
+        return null;
+    }
+}
