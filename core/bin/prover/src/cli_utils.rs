@@ -29,7 +29,7 @@ fn api_client_from_env(worker_name: &str) -> client::ApiClient {
 )]
 struct Opt {
     /// Name of the worker. Must be unique!
-    #[structopt(long)]
+    #[structopt(index = 1)]
     worker_name: String,
 }
 
