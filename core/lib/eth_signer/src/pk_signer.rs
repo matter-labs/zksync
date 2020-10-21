@@ -23,7 +23,7 @@ impl PrivateKeySigner {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl EthereumSigner for PrivateKeySigner {
     /// Get Ethereum address that matches the private key.
     async fn get_address(&self) -> Result<Address, SignerError> {

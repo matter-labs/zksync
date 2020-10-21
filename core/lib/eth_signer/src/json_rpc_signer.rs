@@ -40,7 +40,7 @@ pub struct JsonRpcSigner {
     signer_type: Option<SignerType>,
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl EthereumSigner for JsonRpcSigner {
     /// The sign method calculates an Ethereum specific signature with:
     /// checks if the server adds a prefix if not then adds
