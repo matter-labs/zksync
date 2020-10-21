@@ -1,6 +1,6 @@
 {
     "name": "zksync",
-    "version": "0.8.1-beta",
+    "version": "0.8.2-beta",
     "license": "MIT",
     "main": "build/index.js",
     "types": "build/index.d.ts",
