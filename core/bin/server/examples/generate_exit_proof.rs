@@ -26,7 +26,7 @@ async fn main() {
         .author("Matter Labs")
         .arg(
             Arg::with_name("Account id")
-                .long("accound_id")
+                .long("account_id")
                 .takes_value(true)
                 .required(true)
                 .help("Account id of the account"),

@@ -59,6 +59,11 @@ async fn main() {
     let cli = App::new("Data restore driver")
         .author("Matter Labs")
         .arg(
+            Arg::with_name("web3-url")
+                .long("web3")
+                .help("Sets the web3 API to be used to interact with the Ethereum blockchain"),
+        )
+        .arg(
             Arg::with_name("genesis")
                 .long("genesis")
                 .help("Restores data with provided genesis (zero) block"),
@@ -81,7 +86,12 @@ async fn main() {
         )
         .get_matches();
 
-    let transport = Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
+    let web3_url = cli
+        .value_of("web3-url")
+        .map(|value| value.to_string())
+        .unwrap_or(config_opts.web3_url);
+
+    let transport = Http::new(&web3_url).expect("failed to start web3 transport");
     let governance_addr = config_opts.governance_eth_addr;
     let genesis_tx_hash = config_opts.genesis_tx_hash;
     let contract_addr = config_opts.contract_eth_addr;
