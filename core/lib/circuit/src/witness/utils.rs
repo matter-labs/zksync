@@ -429,11 +429,11 @@ impl SigDataInput {
         pub_key: &PackedPublicKey,
     ) -> Result<SigDataInput, anyhow::Error> {
         let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-        let r_bits: Vec<_> = zksync_crypto::primitives::bytes_into_be_bits(&r_bytes)
+        let r_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(&r_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
-        let s_bits: Vec<_> = zksync_crypto::primitives::bytes_into_be_bits(&s_bytes)
+        let s_bits: Vec<_> = zksync_crypto::primitives::BitConvert::from_be_bytes(&s_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
@@ -441,13 +441,13 @@ impl SigDataInput {
             r_packed: r_bits,
             s: s_bits,
         };
-        let sig_bits: Vec<bool> = zksync_crypto::primitives::bytes_into_be_bits(&tx_bytes);
+        let sig_bits: Vec<bool> = zksync_crypto::primitives::BitConvert::from_be_bytes(&tx_bytes);
 
         let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(&sig_bits);
 
         let signer_packed_key_bytes = pub_key.serialize_packed()?;
         let signer_pub_key_packed: Vec<_> =
-            zksync_crypto::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+            zksync_crypto::primitives::BitConvert::from_be_bytes(&signer_packed_key_bytes)
                 .iter()
                 .map(|x| Some(*x))
                 .collect();

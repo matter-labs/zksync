@@ -1,5 +1,6 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
+use structopt::StructOpt;
 use zksync_api::run_api;
 use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
@@ -15,27 +16,24 @@ pub enum ServerCommand {
     Launch,
 }
 
-fn read_cli() -> ServerCommand {
-    let cli = clap::App::new("zkSync operator node")
-        .author("Matter Labs")
-        .arg(
-            clap::Arg::with_name("genesis")
-                .long("genesis")
-                .help("Generate genesis block for the first contract deployment"),
-        )
-        .get_matches();
-
-    if cli.is_present("genesis") {
-        ServerCommand::Genesis
-    } else {
-        ServerCommand::Launch
-    }
+#[derive(StructOpt)]
+#[structopt(name = "zkSync operator node", author = "Matter Labs")]
+struct Opt {
+    /// Generate genesis block for the first contract deployment
+    #[structopt(long)]
+    genesis: bool,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    let server_mode = read_cli();
+    let opt = Opt::from_args();
+
+    let server_mode = if opt.genesis {
+        ServerCommand::Genesis
+    } else {
+        ServerCommand::Launch
+    };
 
     if let ServerCommand::Genesis = server_mode {
         log::info!("Performing the server genesis initialization");

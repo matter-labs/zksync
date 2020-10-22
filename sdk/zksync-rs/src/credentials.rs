@@ -2,16 +2,16 @@ use crate::{error::ClientError, types::network::Network, utils::private_key_from
 
 use web3::types::{Address, H256};
 use zksync_crypto::PrivateKey;
-use zksync_eth_signer::EthereumSigner;
+use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 use zksync_types::tx::TxEthSignature;
 
-pub struct WalletCredentials {
-    pub(crate) eth_signer: Option<EthereumSigner>,
+pub struct WalletCredentials<S: EthereumSigner> {
+    pub(crate) eth_signer: Option<S>,
     pub(crate) eth_address: Address,
     pub(crate) zksync_private_key: PrivateKey,
 }
 
-impl std::fmt::Debug for WalletCredentials {
+impl<S: EthereumSigner> std::fmt::Debug for WalletCredentials<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WalletCredentials")
             .field("eth_address", &self.eth_address)
@@ -19,7 +19,7 @@ impl std::fmt::Debug for WalletCredentials {
     }
 }
 
-impl WalletCredentials {
+impl<S: EthereumSigner> WalletCredentials<S> {
     /// Creates wallet credentials from the provided Ethereum wallet private key.
     ///
     /// ## Arguments
@@ -29,7 +29,7 @@ impl WalletCredentials {
     /// - `network`: Network this wallet is used on.
     pub async fn from_eth_signer(
         eth_address: Address,
-        eth_signer: EthereumSigner,
+        eth_signer: S,
         network: Network,
     ) -> Result<Self, ClientError> {
         // Pre-defined message to generate seed from.
@@ -107,10 +107,10 @@ impl WalletCredentials {
         eth_address: Address,
         private_key: PrivateKey,
         eth_private_key: Option<H256>,
-    ) -> Self {
-        let eth_signer = eth_private_key.map(EthereumSigner::from_key);
+    ) -> WalletCredentials<PrivateKeySigner> {
+        let eth_signer = eth_private_key.map(PrivateKeySigner::new);
 
-        Self {
+        WalletCredentials {
             eth_address,
             eth_signer,
             zksync_private_key: private_key,

@@ -345,28 +345,6 @@ describe('Making Transactions', () => {
         })).to.be.rejected;
     });
 
-    it('should not wait for commitment', async () => {
-        await commands.deposit({
-            to: poor1.address,
-            privkey: rich.privateKey,
-            token: 'DAI',
-            amount: '2.0'
-        });
-        const start = new Date().getTime();
-        await commands.transfer(
-            {
-                to: poor2.address,
-                privkey: poor1.privateKey,
-                token: 'DAI',
-                amount: '1.0'
-            },
-            true
-        );
-        const elapsed = new Date().getTime() - start;
-        expect(elapsed).to.be.lessThan(200, 'Transfer took more than 200 ms to execute');
-        // Checking that tx was not created is not safe and error-prone, since transfer may be processed (almost) immediately.
-    });
-
     it('should wait for commitment', async () => {
         await commands.deposit({
             to: poor1.address,

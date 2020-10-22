@@ -34,7 +34,7 @@ use zksync::{
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
 use zksync_contracts::{erc20_contract, zksync_contract};
-use zksync_eth_signer::EthereumSigner;
+use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
@@ -61,8 +61,8 @@ fn one_ether() -> U256 {
 }
 
 /// Auxiliary function that returns the balance of the account on Ethereum.
-async fn get_ethereum_balance(
-    eth_provider: &EthereumProvider,
+async fn get_ethereum_balance<S: EthereumSigner + Clone>(
+    eth_provider: &EthereumProvider<S>,
     address: Address,
     token: &Token,
 ) -> Result<U256, anyhow::Error> {
@@ -82,7 +82,7 @@ async fn get_ethereum_balance(
         .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }
 
-async fn wait_for_deposit_and_update_account_id(wallet: &mut Wallet) {
+async fn wait_for_deposit_and_update_account_id<S: EthereumSigner + Clone>(wallet: &mut Wallet<S>) {
     let timeout = Duration::from_secs(60);
     let mut poller = tokio::time::interval(std::time::Duration::from_millis(100));
     let start = Instant::now();
@@ -112,7 +112,7 @@ async fn transfer_to(
     let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
 
     let provider = Provider::new(Network::Localhost);
-    let eth_signer = EthereumSigner::from_key(main_eth_private_key);
+    let eth_signer = PrivateKeySigner::new(main_eth_private_key);
     let credentials =
         WalletCredentials::from_eth_signer(main_eth_address, eth_signer, Network::Localhost)
             .await
@@ -131,11 +131,13 @@ async fn transfer_to(
 
 /// Creates a new wallet and tries to make a transfer
 /// from a new wallet without SigningKey.
-async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Error> {
+async fn test_tx_fail<S: EthereumSigner + Clone>(
+    zksync_depositor_wallet: &Wallet<S>,
+) -> Result<(), anyhow::Error> {
     let provider = Provider::new(Network::Localhost);
 
     let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-    let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+    let eth_signer = PrivateKeySigner::new(random_eth_private_key);
     let random_credentials =
         WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
             .await?;
@@ -158,9 +160,9 @@ async fn test_tx_fail(zksync_depositor_wallet: &Wallet) -> Result<(), anyhow::Er
 }
 
 /// Checks the correctness of the `Deposit` operation.
-async fn test_deposit(
-    deposit_wallet: &Wallet,
-    sync_wallet: &mut Wallet,
+async fn test_deposit<S: EthereumSigner + Clone>(
+    deposit_wallet: &Wallet<S>,
+    sync_wallet: &mut Wallet<S>,
     token: &Token,
     amount: u128,
 ) -> Result<(), anyhow::Error> {
@@ -204,7 +206,10 @@ async fn test_deposit(
 }
 
 /// Checks the correctness of the `ChangePubKey` operation.
-async fn test_change_pubkey(sync_wallet: &Wallet, token_symbol: &str) -> Result<(), anyhow::Error> {
+async fn test_change_pubkey<S: EthereumSigner + Clone>(
+    sync_wallet: &Wallet<S>,
+    token_symbol: &str,
+) -> Result<(), anyhow::Error> {
     if !sync_wallet.is_signing_key_set().await? {
         let handle = sync_wallet
             .start_change_pubkey()
@@ -223,9 +228,9 @@ async fn test_change_pubkey(sync_wallet: &Wallet, token_symbol: &str) -> Result<
 
 /// Makes a transfer from Alice to Bob inside zkSync
 /// checks the correctness of the amount of money before the transaction and after.
-async fn test_transfer(
-    alice: &Wallet,
-    bob: &Wallet,
+async fn test_transfer<S: EthereumSigner + Clone>(
+    alice: &Wallet<S>,
+    bob: &Wallet<S>,
     token_symbol: &str,
     transfer_amount: u128,
 ) -> Result<(), anyhow::Error> {
@@ -275,8 +280,8 @@ async fn test_transfer(
 
 /// Makes a transaction from the account to its own address
 /// checks if the expected amount of fee has been spent.
-async fn test_transfer_to_self(
-    sync_wallet: &Wallet,
+async fn test_transfer_to_self<S: EthereumSigner + Clone>(
+    sync_wallet: &Wallet<S>,
     token_symbol: &str,
     transfer_amount: u128,
 ) -> Result<(), anyhow::Error> {
@@ -314,11 +319,11 @@ async fn test_transfer_to_self(
 
 /// Makes a withdraw operation on L2
 /// checks the correctness of their execution.
-async fn test_withdraw(
-    eth_provider: &EthereumProvider,
+async fn test_withdraw<S: EthereumSigner + Clone>(
+    eth_provider: &EthereumProvider<S>,
     main_contract: &Contract<Http>,
-    sync_wallet: &Wallet,
-    withdraw_to: &Wallet,
+    sync_wallet: &Wallet<S>,
+    withdraw_to: &Wallet<S>,
     token: &Token,
     amount: u128,
 ) -> Result<(), anyhow::Error> {
@@ -394,12 +399,12 @@ async fn test_withdraw(
 
 /// Makes transfers for different types of operations
 /// checks the correctness of their execution.
-async fn move_funds(
+async fn move_funds<S: EthereumSigner + Clone>(
     main_contract: &Contract<Http>,
-    eth_provider: &EthereumProvider,
-    depositor_wallet: &Wallet,
-    alice: &mut Wallet,
-    bob: &Wallet,
+    eth_provider: &EthereumProvider<S>,
+    depositor_wallet: &Wallet<S>,
+    alice: &mut Wallet<S>,
+    bob: &Wallet<S>,
     token_like: impl Into<TokenLike>,
     deposit_amount: u128,
 ) -> Result<(), anyhow::Error> {
@@ -450,7 +455,7 @@ async fn move_funds(
 }
 
 /// Auxiliary function that generates a new wallet, performs an initial deposit and changes the public key.
-async fn init_account_with_one_ether() -> Result<Wallet, anyhow::Error> {
+async fn init_account_with_one_ether() -> Result<Wallet<PrivateKeySigner>, anyhow::Error> {
     let (eth_address, eth_private_key) = eth_random_account_credentials();
 
     // Transfer funds from "rich" account to a randomly created one (so we won't reuse the same
@@ -459,7 +464,7 @@ async fn init_account_with_one_ether() -> Result<Wallet, anyhow::Error> {
 
     let provider = Provider::new(Network::Localhost);
 
-    let eth_signer = EthereumSigner::from_key(eth_private_key);
+    let eth_signer = PrivateKeySigner::new(eth_private_key);
     let credentials =
         WalletCredentials::from_eth_signer(eth_address, eth_signer, Network::Localhost)
             .await
@@ -500,7 +505,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let main_wallet = {
         let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
-        let eth_signer = EthereumSigner::from_key(main_eth_private_key);
+        let eth_signer = PrivateKeySigner::new(main_eth_private_key);
         let main_credentials =
             WalletCredentials::from_eth_signer(main_eth_address, eth_signer, Network::Localhost)
                 .await?;
@@ -509,7 +514,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let sync_depositor_wallet = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
         let random_credentials =
             WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
                 .await?;
@@ -518,7 +523,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let mut alice_wallet1 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
         let random_credentials =
             WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
                 .await?;
@@ -527,7 +532,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let mut alice_wallet2 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
         let random_credentials =
             WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
                 .await?;
@@ -536,7 +541,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let bob_wallet1 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
         let random_credentials =
             WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
                 .await?;
@@ -545,7 +550,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let bob_wallet2 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = EthereumSigner::from_key(random_eth_private_key);
+        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
         let random_credentials =
             WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
                 .await?;

@@ -37,19 +37,19 @@ impl Network {
 /// In order to monitor transaction execution, an Etherereum node `web3` API is exposed
 /// via `EthereumProvider::web3` method.
 #[derive(Debug)]
-pub struct EthereumProvider {
+pub struct EthereumProvider<S: EthereumSigner> {
     tokens_cache: TokensCache,
-    eth_client: ETHClient<Http>,
+    eth_client: ETHClient<Http, S>,
     erc20_abi: ethabi::Contract,
 }
 
-impl EthereumProvider {
+impl<S: EthereumSigner> EthereumProvider<S> {
     /// Creates a new Ethereum provider.
     pub async fn new(
         provider: &Provider,
         tokens_cache: TokensCache,
         eth_web3_url: impl AsRef<str>,
-        eth_signer: EthereumSigner,
+        eth_signer: S,
         eth_addr: H160,
     ) -> Result<Self, ClientError> {
         let transport = Http::new(eth_web3_url.as_ref())

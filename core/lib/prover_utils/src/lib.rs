@@ -11,7 +11,7 @@ use zksync_crypto::bellman::plonk::better_cs::{
 use zksync_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
 use zksync_crypto::bellman::plonk::{prove_by_steps, setup, transpile, verify};
 use zksync_crypto::franklin_crypto::bellman::Circuit;
-use zksync_crypto::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethereum};
+use zksync_crypto::primitives::EthereumSerializer;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::{Engine, Fr};
 
@@ -136,50 +136,54 @@ pub fn serialize_proof(
 ) -> EncodedProofPlonk {
     let mut inputs = vec![];
     for input in proof.input_values.iter() {
-        let ser = serialize_fe_for_ethereum(input);
+        let ser = EthereumSerializer::serialize_fe(input);
         inputs.push(ser);
     }
     let mut serialized_proof = vec![];
 
     for c in proof.wire_commitments.iter() {
-        let (x, y) = serialize_g1_for_ethereum(c);
+        let (x, y) = EthereumSerializer::serialize_g1(c);
         serialized_proof.push(x);
         serialized_proof.push(y);
     }
 
-    let (x, y) = serialize_g1_for_ethereum(&proof.grand_product_commitment);
+    let (x, y) = EthereumSerializer::serialize_g1(&proof.grand_product_commitment);
     serialized_proof.push(x);
     serialized_proof.push(y);
 
     for c in proof.quotient_poly_commitments.iter() {
-        let (x, y) = serialize_g1_for_ethereum(c);
+        let (x, y) = EthereumSerializer::serialize_g1(c);
         serialized_proof.push(x);
         serialized_proof.push(y);
     }
 
     for c in proof.wire_values_at_z.iter() {
-        serialized_proof.push(serialize_fe_for_ethereum(c));
+        serialized_proof.push(EthereumSerializer::serialize_fe(c));
     }
 
     for c in proof.wire_values_at_z_omega.iter() {
-        serialized_proof.push(serialize_fe_for_ethereum(c));
+        serialized_proof.push(EthereumSerializer::serialize_fe(c));
     }
 
-    serialized_proof.push(serialize_fe_for_ethereum(&proof.grand_product_at_z_omega));
-    serialized_proof.push(serialize_fe_for_ethereum(&proof.quotient_polynomial_at_z));
-    serialized_proof.push(serialize_fe_for_ethereum(
+    serialized_proof.push(EthereumSerializer::serialize_fe(
+        &proof.grand_product_at_z_omega,
+    ));
+    serialized_proof.push(EthereumSerializer::serialize_fe(
+        &proof.quotient_polynomial_at_z,
+    ));
+    serialized_proof.push(EthereumSerializer::serialize_fe(
         &proof.linearization_polynomial_at_z,
     ));
 
     for c in proof.permutation_polynomials_at_z.iter() {
-        serialized_proof.push(serialize_fe_for_ethereum(c));
+        serialized_proof.push(EthereumSerializer::serialize_fe(c));
     }
 
-    let (x, y) = serialize_g1_for_ethereum(&proof.opening_at_z_proof);
+    let (x, y) = EthereumSerializer::serialize_g1(&proof.opening_at_z_proof);
     serialized_proof.push(x);
     serialized_proof.push(y);
 
-    let (x, y) = serialize_g1_for_ethereum(&proof.opening_at_z_omega_proof);
+    let (x, y) = EthereumSerializer::serialize_g1(&proof.opening_at_z_omega_proof);
     serialized_proof.push(x);
     serialized_proof.push(y);
 

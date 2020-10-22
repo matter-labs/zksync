@@ -4,6 +4,7 @@ import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
+import './forced-exit';
 
 import * as api from './api';
 
@@ -20,6 +21,7 @@ describe('ZkSync REST API tests', () => {
             await tester.testDeposit(alice, token, thousand, true);
             await tester.testChangePubKey(alice, token, false);
             await tester.testTransfer(alice, bob, token, thousand.div(4));
+            await tester.testForcedExit(alice, bob, token);
             await tester.testWithdraw(alice, token, thousand.div(5));
             await tester.testFullExit(alice, token);
             await tester.testDeposit(alice, token, thousand.div(10), true);

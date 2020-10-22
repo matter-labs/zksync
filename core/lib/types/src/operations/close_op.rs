@@ -5,7 +5,7 @@ use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES};
-use zksync_crypto::primitives::bytes_slice_to_uint32;
+use zksync_crypto::primitives::FromBytes;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloseOp {
@@ -32,7 +32,7 @@ impl CloseOp {
         );
 
         let account_id_offset = 1;
-        let account_id = bytes_slice_to_uint32(
+        let account_id = u32::from_bytes(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or_else(|| format_err!("Cant get from account id from close pubdata"))?;

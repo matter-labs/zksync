@@ -7,10 +7,11 @@ import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
+import './forced-exit';
 import './misc';
 
 const TX_AMOUNT = utils.parseEther('10.0');
-// should be enough for ~100 test transactions (excluding fees), increase if needed
+// should be enough for ~200 test transactions (excluding fees), increase if needed
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
 // prettier-ignore
@@ -67,7 +68,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should change pubkey offchain for alice', async () => {
         await tester.testChangePubKey(alice, token, false);
-        await tester.testChangePubKey(bob, token, false);
     });
 
     step('should test multi-transfers', async () => {
@@ -82,6 +82,10 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should execute a fast withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT, true);
+    });
+
+    step('should execute a ForcedExit', async () => {
+        await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
     it('should check collected fees', async () => {
