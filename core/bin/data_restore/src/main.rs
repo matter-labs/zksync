@@ -19,7 +19,8 @@ use zksync_types::{
     Address, TokenId, H256,
 };
 
-const ETH_BLOCKS_STEP: u64 = 1;
+// How many blocks we will process at once.
+const ETH_BLOCKS_STEP: u64 = 10_000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {

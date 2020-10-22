@@ -19,6 +19,7 @@ fi
 
 zksync plonk-setup check || zksync plonk-setup download
 zksync verify-keys unpack
+f db-wait
 
 COMMAND=$1
 
@@ -52,6 +53,18 @@ TOKEN=$4
 WEB3_URL=$5
 
 CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
+
+# Set the required verification keys dir
+case $NETWORK in
+  mainnet | rinkeby | ropsten)
+    export KEY_DIR=keys/plonk-975ae851
+    ;;
+  *)
+      echo "Unknown Ethereum network"
+      echo "$USAGE"
+      exit 1
+    ;;
+esac
 
 f ./target/release/zksync_data_restore $COMMAND --finite --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
 
