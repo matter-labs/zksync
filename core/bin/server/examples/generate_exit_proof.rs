@@ -56,7 +56,10 @@ async fn main() {
         .get_token(token)
         .await
         .expect("Db access fail")
-        .expect("Token not found")
+        .expect(
+            "Token not found. If you're addressing an ERC-20 token by it's symbol, \
+                  it may not be available after data restore. Try using token address in that case",
+        )
         .id;
     let address = storage
         .chain()
@@ -88,8 +91,17 @@ async fn main() {
         proof,
     };
 
+    println!("\n\n");
+    println!("==========================");
+    println!("Generating proof completed");
+    println!("Below you can see the input data for the exit transaction on zkSync contract");
+    println!("Look up the manuals of your desired smart wallet in order to know how to sign and send this transaction to the Ethereum");
+    println!("==========================");
+
+    println!("Exit transaction inputs:");
+
     println!(
         "{}",
-        serde_json::to_string(&proof_data).expect("proof data serialize")
+        serde_json::to_string_pretty(&proof_data).expect("proof data serialize")
     );
 }
