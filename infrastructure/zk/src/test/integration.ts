@@ -1,11 +1,10 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
-import { spawn } from 'child_process';
 import fs from 'fs';
 import * as dummyProver from '../dummy-prover';
 
 
-export async function withServer(testSuite: CallableFunction, timeout = 120) {
+export async function withServer(testSuite: CallableFunction, timeout: number) {
 	if (!await dummyProver.status()) {
 		await dummyProver.enable();
 	}
@@ -19,25 +18,28 @@ export async function withServer(testSuite: CallableFunction, timeout = 120) {
 	const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance &> prover.log');
 	await utils.sleep(10)
 
-	const cleanup = () => {
+	const cleanup = (code: number) => {
 		console.log('Termination started...')
 		utils.sleepSync(5);
-		process.kill(-server.pid, 'SIGKILL');
-		process.kill(-prover.pid, 'SIGKILL');
-		clearTimeout(timer);
+		utils.allowFailSync(() => process.kill(-server.pid, 'SIGKILL'))
+		utils.allowFailSync(() => process.kill(-prover.pid, 'SIGKILL'));
+		utils.allowFailSync(() => clearTimeout(timer));
 		console.log('SERVER LOGS:')
 		console.log(fs.readFileSync('server.log').toString());
 		console.log('\n\nPROVER LOGS:')
 		console.log(fs.readFileSync('prover.log').toString());
 		utils.sleepSync(5);
-		process.exit(0)
+		console.log(`exit code: ${code}`);
 	}
 
-	const timer = setTimeout(cleanup, timeout * 1000);
+	const timer = setTimeout(() => {
+		console.log('Timeout reached!');
+		process.exit(1);
+	}, timeout * 1000);
 
-	process.on('exit', cleanup);
-	// process.on('SIGINT', cleanup);
-	// process.on('uncaughtException', cleanup);
+	process.on('exit', (code) => cleanup(code));
+	process.on('SIGINT', () => process.exit(130));
+	process.on('SIGTERM', () => process.exit(143));
 
 	await testSuite();
 }
@@ -71,7 +73,7 @@ command
 	.description('run zcli integration tests')
 	.option('--with-server')
 	.action(async (cmd: Command) => {
-		cmd.withServer ? await withServer(zcli) : await zcli();
+		cmd.withServer ? await withServer(zcli, 240) : await zcli();
 	});
 
 command
@@ -79,7 +81,7 @@ command
 	.description('run server integration tests')
 	.option('--with-server')
 	.action(async (cmd: Command) => {
-		cmd.withServer ? await withServer(server) : await server();
+		cmd.withServer ? await withServer(server, 1200) : await server();
 	});
 
 command
@@ -87,7 +89,7 @@ command
 	.description('run rust SDK integration tests')
 	.option('--with-server')
 	.action(async (cmd: Command) => {
-		cmd.withServer ? await withServer(rustSDK) : await rustSDK();
+		cmd.withServer ? await withServer(rustSDK, 1200) : await rustSDK();
 	});
 	
 command
@@ -95,5 +97,5 @@ command
 	.description('run api integration tests')
 	.option('--with-server')
 	.action(async (cmd: Command) => {
-		cmd.withServer ? await withServer(api) : await api();
+		cmd.withServer ? await withServer(api, 240) : await api();
 	});

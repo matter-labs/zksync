@@ -77,3 +77,11 @@ export async function allowFail<T>(promise: Promise<T>) {
         return null;
     }
 }
+
+export function allowFailSync<T>(func: () => T) {
+    try {
+        return func()
+    } catch {
+        return null;
+    }
+}
