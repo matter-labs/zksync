@@ -20,7 +20,7 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
         .append("provider/account_info", move || async move {
             monitor
                 .provider
-                .account_info(monitor.api_data_pool.random_address().await)
+                .account_info(monitor.api_data_pool.random_address().await.0)
                 .await?;
             Ok(())
         })
@@ -29,7 +29,7 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
                 .provider
                 .get_tx_fee(
                     TxFeeTypes::FastWithdraw,
-                    monitor.api_data_pool.random_address().await,
+                    monitor.api_data_pool.random_address().await.0,
                     "ETH",
                 )
                 .await?;

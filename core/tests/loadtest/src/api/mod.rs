@@ -15,8 +15,6 @@ use std::{
 use futures::{future::BoxFuture, Future, FutureExt};
 use serde::{Deserialize, Serialize};
 // Workspace uses
-use zksync::Network;
-use zksync_config::ConfigurationOptions;
 // Local uses
 use crate::{
     journal::{FiveSummaryStats, Sample},

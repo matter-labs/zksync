@@ -13,6 +13,16 @@ struct RestApiClient {
     pool: ApiDataPool,
 }
 
+trait ToHexId {
+    fn to_hex_id(&self) -> String;
+}
+
+impl<T: AsRef<[u8]>> ToHexId for T {
+    fn to_hex_id(&self) -> String {
+        format!("0x{}", hex::encode(self))
+    }
+}
+
 impl RestApiClient {
     pub fn new(url: String, pool: ApiDataPool) -> Self {
         Self {
@@ -26,23 +36,84 @@ impl RestApiClient {
         [&self.url, "/api/v0.1"].concat()
     }
 
-    async fn get(&self, method: impl AsRef<str>) -> reqwest::Result<serde_json::Value> {
-        let url = [&self.api_prefix(), "/", method.as_ref()].concat();
-        self.inner.get(&url).send().await?.json().await
+    async fn get(&self, method: impl AsRef<str>) -> anyhow::Result<Option<serde_json::Value>> {
+        let url = [&self.api_prefix(), method.as_ref()].concat();
+        let response = self.inner.get(&url).send().await?;
+        // Special case for the empty responses.
+        let status = response.status();
+        let text = response.text().await?;
+        if status.is_success() {
+            if text.is_empty() {
+                Ok(None)
+            } else {
+                let json = serde_json::from_str(&text)?;
+                Ok(Some(json))
+            }
+        } else {
+            Err(anyhow::anyhow!("HTTP error {} with body: {}", status, text))
+        }
     }
+}
 
+// Tests for the relevant API methods declared in the
+// `core/bin/zksync_api/src/api_server/rest/v01/api_decl.rs` file.
+impl RestApiClient {
     pub async fn testnet_config(&self) -> anyhow::Result<()> {
-        self.get("testnet_config").await?;
+        self.get("/testnet_config").await?;
         Ok(())
     }
 
     pub async fn status(&self) -> anyhow::Result<()> {
-        self.get("status").await?;
+        self.get("/status").await?;
         Ok(())
     }
 
     pub async fn tokens(&self) -> anyhow::Result<()> {
-        self.get("tokens").await?;
+        self.get("/tokens").await?;
+        Ok(())
+    }
+
+    pub async fn tx_history(&self) -> anyhow::Result<()> {
+        let (address, data) = self.pool.random_address().await;
+        let (offset, limit) = data.gen_txs_offset_limit();
+
+        let url = format!(
+            "/account/{}/history/{}/{}",
+            address.to_hex_id(),
+            limit,
+            offset
+        );
+        self.get(&url).await?;
+        Ok(())
+    }
+
+    pub async fn tx_history_older_than(&self) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    pub async fn tx_history_newer_than(&self) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    pub async fn executed_tx_by_hash(&self) -> anyhow::Result<()> {
+        let tx = self
+            .get(&format!(
+                "/transactions/{}",
+                self.pool.random_tx_hash().await.to_hex_id()
+            ))
+            .await?;
+        anyhow::ensure!(tx.is_some(), "Unable to get executed transaction by hash");
+        Ok(())
+    }
+
+    pub async fn tx_by_hash(&self) -> anyhow::Result<()> {
+        let tx = self
+            .get(&format!(
+                "/transactions_all/{}",
+                self.pool.random_tx_hash().await.to_string()
+            ))
+            .await?;
+        anyhow::ensure!(tx.is_some(), "Unable to get executed transaction by hash");
         Ok(())
     }
 }
@@ -73,5 +144,8 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
             testnet_config,
             status,
             tokens,
+            tx_history,
+            executed_tx_by_hash,
+            tx_by_hash,
     )
 }

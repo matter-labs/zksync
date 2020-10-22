@@ -9,14 +9,14 @@ name = 'localhost'
 [[scenarios]]
 name = 'transfer'
 transfer_size = 1
-transfer_rounds = 10
+transfer_rounds = 2
 wallets_amount = 10
 
-[[scenarios]]
-name = "withdraw"
-wallets_amount = 10
-withdraw_rounds = 3
+# [[scenarios]]
+# name = "withdraw"
+# wallets_amount = 10
+# withdraw_rounds = 3
 
-[[scenarios]]
-name = "full_exit"
-wallets_amount = 10
+# [[scenarios]]
+# name = "full_exit"
+# wallets_amount = 10

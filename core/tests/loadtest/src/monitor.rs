@@ -197,6 +197,7 @@ impl Monitor {
         eth_signature: Option<PackedEthSignature>,
     ) -> anyhow::Result<TxHash> {
         let created_at = Instant::now();
+        let address = tx.account();
         let tx_hash = self.provider.send_tx(tx, eth_signature).await?;
         let sent_at = Instant::now();
 
@@ -216,7 +217,7 @@ impl Monitor {
         });
         self.inner().await.pending_tasks.push(handle);
 
-        self.api_data_pool.store_tx_hash(tx_hash).await;
+        self.api_data_pool.store_tx_hash(address, tx_hash).await;
         Ok(tx_hash)
     }
 
