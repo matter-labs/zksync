@@ -19,6 +19,9 @@ RUN cargo install --version=0.1.0-beta.1 sqlx-cli
 # Copy workspace
 COPY . .
 
+# Copy data-restore configuration files
+COPY docker/exit-tool/configs /usr/src/configs
+
 # Build all the required zkSync binaries
 RUN cargo build --release
 RUN cargo build --release --example generate_exit_proof

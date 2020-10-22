@@ -28,10 +28,10 @@ case $COMMAND in
     exit 0
     ;;
   run)
-      f cargo run --bin zksync_data_restore --release -- --genesis --finite
+      f ./target/release/zksync_data_restore --genesis --finite --config_path=/usr/src/configs/rinkeby.json
     ;;
   continue)
-      f cargo run --bin zksync_data_restore --release -- --continue --finite
+      f ./target/release/zksync_data_restore --continue --finite --config_pathg=/usr/src/configs/rinkeby.json
     ;;
   -h | --help)
       echo "$USAGE"

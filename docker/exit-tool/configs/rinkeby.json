@@ -1,0 +1,7 @@
+{
+    "eth_network": "localhost",
+    "governance_addr": "0x2A0bD2E9D01024e714cDDD8a6b94eB9219663107",
+    "genesis_tx_hash": "0x0dc9b2387b0d3f80adcece49936ed3efec27c2845ed7ca72d01e567c872cfa1f",
+    "contract_addr": "0x04eff60dD5D6E171BdB808fb4af35689968F3172",
+    "available_block_chunk_sizes": [6,30,74,150,320,630]
+}

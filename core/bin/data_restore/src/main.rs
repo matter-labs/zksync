@@ -8,6 +8,7 @@ pub mod storage_interactor;
 pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
+use serde::Deserialize;
 use structopt::StructOpt;
 use web3::transports::Http;
 use zksync_config::ConfigurationOptions;
@@ -15,7 +16,7 @@ use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::{get_genesis_token_list, Token},
-    TokenId,
+    Address, TokenId, H256,
 };
 
 const ETH_BLOCKS_STEP: u64 = 1;
@@ -71,6 +72,43 @@ struct Opt {
     /// Expected tree root hash after restoring. This argument is ignored if mode is not `finite`
     #[structopt(long)]
     final_hash: Option<String>,
+
+    /// Sets the web3 API to be used to interact with the Ethereum blockchain
+    #[structopt(long, name = "web3")]
+    web3_url: Option<String>,
+
+    /// Provides a path to the configuration file for data restore
+    #[structopt(long, name = "config")]
+    config_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ContractsConfig {
+    eth_network: String,
+    governance_addr: Address,
+    genesis_tx_hash: H256,
+    contract_addr: Address,
+    available_block_chunk_sizes: Vec<usize>,
+}
+
+impl ContractsConfig {
+    pub fn from_file(path: &str) -> Self {
+        let content =
+            std::fs::read_to_string(path).expect("Unable to find the specified config file");
+        serde_json::from_str(&content).expect("Invalid configuration file provided")
+    }
+
+    pub fn from_env() -> Self {
+        let config_opts = ConfigurationOptions::from_env();
+
+        Self {
+            eth_network: config_opts.eth_network,
+            governance_addr: config_opts.governance_eth_addr,
+            genesis_tx_hash: config_opts.genesis_tx_hash,
+            contract_addr: config_opts.contract_eth_addr,
+            available_block_chunk_sizes: config_opts.available_block_chunk_sizes,
+        }
+    }
 }
 
 #[tokio::main]
@@ -82,16 +120,14 @@ async fn main() {
 
     let opt = Opt::from_args();
 
-    let web3_url = cli
-        .value_of("web3-url")
-        .map(|value| value.to_string())
-        .unwrap_or(config_opts.web3_url);
+    let web3_url = opt.web3_url.unwrap_or(config_opts.web3_url);
 
     let transport = Http::new(&web3_url).expect("failed to start web3 transport");
-    let governance_addr = config_opts.governance_eth_addr;
-    let genesis_tx_hash = config_opts.genesis_tx_hash;
-    let contract_addr = config_opts.contract_eth_addr;
-    let available_block_chunk_sizes = config_opts.available_block_chunk_sizes;
+
+    let config = opt
+        .config_path
+        .map(|path| ContractsConfig::from_file(&path))
+        .unwrap_or_else(ContractsConfig::from_env);
 
     let finite_mode = opt.finite;
     let final_hash = if finite_mode {
@@ -104,11 +140,11 @@ async fn main() {
     let mut driver = DataRestoreDriver::new(
         connection_pool,
         transport,
-        governance_addr,
-        contract_addr,
+        config.governance_addr,
+        config.contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        available_block_chunk_sizes,
+        config.available_block_chunk_sizes,
         finite_mode,
         final_hash,
     );
@@ -117,9 +153,9 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_db(&driver.connection_pool, &config_opts.eth_network).await;
+        add_tokens_to_db(&driver.connection_pool, &config.eth_network).await;
 
-        driver.set_genesis_state(genesis_tx_hash).await;
+        driver.set_genesis_state(config.genesis_tx_hash).await;
     }
 
     if opt.continue_mode {
