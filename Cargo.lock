@@ -5772,6 +5772,7 @@ dependencies = [
  "zksync_prover",
  "zksync_storage",
  "zksync_types",
+ "zksync_utils",
  "zksync_witness_generator",
 ]
 

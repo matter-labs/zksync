@@ -1,20 +1,20 @@
 //! Generate exit proof for exodus mode given account and token
 //! correct verified state should be present in the db (could be restored using `data-restore` module)
 
-use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;
 use structopt::StructOpt;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_storage::ConnectionPool;
 use zksync_types::{AccountId, Address, TokenId, TokenLike};
+use zksync_utils::BigUintSerdeWrapper;
 
 #[derive(Serialize, Debug)]
 struct ExitProofData {
     token_id: TokenId,
     account_id: AccountId,
     account_address: Address,
-    amount: BigUint,
+    amount: BigUintSerdeWrapper,
     proof: EncodedProofPlonk,
 }
 
@@ -77,7 +77,7 @@ async fn main() {
         .expect("Failed to load verified state")
         .1;
 
-    log::info!("Resotred state from db: {} s", timer.elapsed().as_secs());
+    log::info!("Restored state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
         zksync_prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
@@ -87,7 +87,7 @@ async fn main() {
         token_id,
         account_id,
         account_address: address,
-        amount,
+        amount: amount.into(),
         proof,
     };
 

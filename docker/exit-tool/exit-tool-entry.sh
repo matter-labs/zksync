@@ -22,8 +22,6 @@ zksync verify-keys unpack
 
 COMMAND=$1
 
-CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
-
 case $COMMAND in
   init)
     f db-setup
@@ -52,6 +50,8 @@ NETWORK=$2
 ACCOUNT_ID=$3
 TOKEN=$4
 WEB3_URL=$5
+
+CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
 
 f ./target/release/zksync_data_restore $COMMAND --finite --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
 
