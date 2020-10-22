@@ -237,6 +237,11 @@ impl<T: Transport> DataRestoreDriver<T> {
             total_verified_blocks,
             self.tree_state.root_hash()
         );
+
+        if self.finite_mode && (total_verified_blocks == last_verified_block) {
+            // We've already completed finalizing the state, so exit immediately.
+            std::process::exit(0);
+        }
     }
 
     /// Activates states updates

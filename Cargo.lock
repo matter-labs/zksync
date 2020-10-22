@@ -5615,6 +5615,7 @@ dependencies = [
  "hex",
  "log 0.4.11",
  "num",
+ "serde",
  "serde_json",
  "structopt",
  "tiny-keccak 1.5.0",
@@ -5771,6 +5772,7 @@ dependencies = [
  "zksync_prover",
  "zksync_storage",
  "zksync_types",
+ "zksync_utils",
  "zksync_witness_generator",
 ]
 

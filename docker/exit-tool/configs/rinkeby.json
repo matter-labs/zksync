@@ -1,0 +1,7 @@
+{
+    "eth_network": "rinkeby",
+    "governance_addr": "0xC8568F373484Cd51FDc1FE3675E46D8C0dc7D246",
+    "genesis_tx_hash": "0x043a7662b0c747169d3700ea2ca9328e05f235a93223962d41eed7825d4aaf52",
+    "contract_addr": "0x82F67958A5474e40E1485742d648C0b0686b6e5D",
+    "available_block_chunk_sizes": [6,30,74,150,320,630]
+}

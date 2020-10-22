@@ -1,0 +1,7 @@
+{
+    "eth_network": "mainnet",
+    "governance_addr": "0x34460C0EB5074C29A9F6FE13b8e7E23A0D08aF01",
+    "genesis_tx_hash": "0x21dfeea6c82d47203f91aba30af5e5ef3d623aa8206596fbd8c466a5b1586f02",
+    "contract_addr": "0xaBEA9132b05A70803a4E85094fD0e1800777fBEF",
+    "available_block_chunk_sizes": [6,30,74,150,320,630,678]
+}
