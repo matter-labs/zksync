@@ -23,10 +23,15 @@ export async function build(image: string) {
 
 export async function push(image: string) {}
 
-const docker = new Command('docker').description('docker management');
-docker.command('build <image>').description('build docker image').action(build);
+const command = new Command('docker')
+    .description('docker management');
 
-docker
+command
+    .command('build <image>')
+    .description('build docker image')
+    .action(build);
+
+command
     .command('push <image>')
     .description('build and push docker image')
     .action(async (image: string) => {

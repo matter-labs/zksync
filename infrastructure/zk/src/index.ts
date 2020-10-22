@@ -10,6 +10,7 @@ import { command as dummyProver } from './dummy-prover';
 import { command as init } from './init';
 import { command as kube } from './kube';
 import { command as prover } from './prover';
+import { command as run } from './run';
 import * as utils from './utils';
 
 async function main() {
@@ -26,7 +27,7 @@ async function main() {
     program
         .version('0.1.0')
         .name('zk')
-        .description('ZkSync workflow tools')
+        .description('zksync workflow tools')
         .addCommand(server)
         .addCommand(up)
         .addCommand(down)
@@ -35,7 +36,8 @@ async function main() {
         .addCommand(dummyProver)
         .addCommand(kube)
         .addCommand(init)
-        .addCommand(prover);
+        .addCommand(prover)
+        .addCommand(run);
 
     await program.parseAsync(process.argv);
 }
@@ -43,6 +45,6 @@ async function main() {
 main()
     .then(() => process.exit(0))
     .catch((err: Error) => {
-        console.error(err);
+        console.error('Error:', err.message);
         process.exit(1);
     });

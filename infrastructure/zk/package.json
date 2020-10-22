@@ -20,6 +20,7 @@
     "dependencies": {
         "commander": "^6.0.0",
         "dotenv": "^8.2.0",
+        "ethers": "^5.0.18",
         "node-fetch": "^2.6.1"
     },
     "devDependencies": {

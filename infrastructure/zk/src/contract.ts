@@ -13,7 +13,7 @@ export function prepareVerify() {
     try {
         fs.copyFileSync(source, dest);
     } catch (err) {
-        console.error("Please download keys");
+        console.error("Please download the keys");
         throw err;
     }
 }
