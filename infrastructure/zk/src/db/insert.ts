@@ -2,13 +2,13 @@ import { Command } from 'commander';
 import * as utils from '../utils';
 import fetch from 'node-fetch';
 
-const SQL = `psql "${process.env.DATABASE_URL}" -c`;
+const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 
 export async function token(id: string, address: string, symbol: string, precison: string) {
     // force read env
     delete process.env.ZKSYNC_ENV;
     utils.loadEnv();
-    await utils.exec(`${SQL} "INSERT INTO tokens VALUES (${id}, '${address}', '${symbol}', ${precison});"`);
+    await utils.exec(`${SQL()} "INSERT INTO tokens VALUES (${id}, '${address}', '${symbol}', ${precison});"`);
     console.log('Successfully inserted token into the database');
 }
 
@@ -18,7 +18,7 @@ export async function contract() {
     utils.loadEnv();
     const contractAddress = process.env.CONTRACT_ADDR;
     const govarnanceAddress = process.env.GOVERNANCE_ADDR;
-    await utils.exec(`${SQL} "INSERT INTO server_config (contract_addr, gov_contract_addr)
+    await utils.exec(`${SQL()} "INSERT INTO server_config (contract_addr, gov_contract_addr)
 					 VALUES ('${contractAddress}', '${govarnanceAddress}')
 					 ON CONFLICT (id) DO UPDATE
 					 SET (contract_addr, gov_contract_addr) = ('${contractAddress}', '${govarnanceAddress}')"`);
@@ -48,7 +48,7 @@ export async function ethData() {
         }
     );
     const nonce = parseInt((await reponse.json()).result);
-    await utils.exec(`${SQL} "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
+    await utils.exec(`${SQL()} "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
                      VALUES ('${nonce}', '${process.env.ETH_GAS_PRICE_DEFAULT_LIMIT}', 0, 0, 0)
                      ON CONFLICT (id) DO UPDATE SET (commit_ops, verify_ops, withdraw_ops) = (0, 0, 0)"`);
 }

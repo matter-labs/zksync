@@ -7,7 +7,7 @@ import * as update from './update';
 
 export { insert, update };
 
-const SQL = `psql "${process.env.DATABASE_URL}" -c`;
+const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 
 export async function reset() {
     await wait();
@@ -19,8 +19,8 @@ export async function reset() {
 
 export async function drop() {
     console.log('Dropping DB...');
-    await utils.exec(`${SQL} 'DROP OWNED BY CURRENT_USER CASCADE' ||
-                     (${SQL} 'DROP SCHEMA IF EXISTS public CASCADE' && ${SQL} 'CREATE SCHEMA public')`);
+    await utils.exec(`${SQL()} 'DROP OWNED BY CURRENT_USER CASCADE' ||
+                     (${SQL()} 'DROP SCHEMA IF EXISTS public CASCADE' && ${SQL()} 'CREATE SCHEMA public')`);
 }
 
 export async function migrate() {
@@ -44,7 +44,7 @@ export async function setup() {
 
 export async function updateToken(token: string, symbol: string) {
     console.log(`Setting token ${token} symbol to ${symbol}`);
-    await utils.exec(`${SQL} "UPDATE tokens SET symbol = '${symbol}' WHERE address = '${token}'"`);
+    await utils.exec(`${SQL()} "UPDATE tokens SET symbol = '${symbol}' WHERE address = '${token}'"`);
 }
 
 export async function wait(tries: number = 4) {
