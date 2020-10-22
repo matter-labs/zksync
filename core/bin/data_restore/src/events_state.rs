@@ -307,24 +307,21 @@ impl EventsState {
 
         for log in logs {
             let topic = log.topics[0];
-            assert!(log.topics.len() >= 2, "Cant get enouth topics from event");
 
             // Remove reverted committed blocks first
             if topic == reverted_topic {
-                assert_eq!(
-                    log.topics.len(),
-                    3,
-                    "Cant get enouth topics from reverted event"
-                );
-                let committed_total = U256::from(log.topics[2].as_bytes()).as_u32();
-                let mut i = 0;
-                while i != self.committed_events.len() {
-                    if self.committed_events[i].block_num > committed_total {
-                        self.committed_events.remove(i);
-                    } else {
-                        i += 1;
-                    }
-                }
+                const U256_SIZE: usize = 32;
+                // Fields in `BlocksRevert` are not `indexed`, thus they're located in `data`.
+                assert_eq!(log.data.0.len(), U256_SIZE * 2);
+                let total_verified = U256::from_big_endian(&log.data.0[..U256_SIZE]).as_u32();
+                let total_committed = U256::from_big_endian(&log.data.0[U256_SIZE..]).as_u32();
+
+                self.committed_events
+                    .retain(|bl| bl.block_num <= total_committed);
+                self.verified_events
+                    .retain(|bl| bl.block_num <= total_verified);
+
+                continue;
             }
 
             // Go into new blocks
