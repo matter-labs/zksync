@@ -5,7 +5,7 @@
 # 3. Run data-restore in the finite mode
 # 4. Run gen-exit-proof
 
-USAGE="exit_tool_entry.sh init|restart|run|continue account_id token web3_url"
+USAGE="exit_tool_entry.sh init|restart|run|continue network account_id token web3_url"
 
 . .setup_env
 
@@ -22,6 +22,8 @@ zksync verify-keys unpack
 
 COMMAND=$1
 
+CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
+
 case $COMMAND in
   init)
     f db-setup
@@ -29,10 +31,10 @@ case $COMMAND in
     exit 0
     ;;
   run)
-      f ./target/release/zksync_data_restore --genesis --finite --config=/usr/src/configs/rinkeby.json || exit 1
+      COMMAND="--genesis"
     ;;
   continue)
-      f ./target/release/zksync_data_restore --continue --finite --config=/usr/src/configs/rinkeby.json || exit 1
+      COMMAND="--continue"
     ;;
   -h | --help)
       echo "$USAGE"
@@ -45,4 +47,12 @@ case $COMMAND in
     ;;
 esac
 
-./target/release/examples/generate_exit_proof --account_id 1 --token ETH
+# Load the rest of arguments now, since they're not required for the init command.
+NETWORK=$2
+ACCOUNT_ID=$3
+TOKEN=$4
+WEB3_URL=$5
+
+f ./target/release/zksync_data_restore $COMMAND --finite --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
+
+./target/release/examples/generate_exit_proof --account_id $ACCOUNT_ID --token $TOKEN
