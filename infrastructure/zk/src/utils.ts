@@ -3,6 +3,8 @@ import { promisify } from 'util';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
+export type { ChildProcess } from 'child_process';
+
 // async executor of shell commands
 // spawns a new shell and can execute arbitrary commands, like "ls -la | grep .env"
 // returns { stdout, stderr }
@@ -12,8 +14,8 @@ export function exec(command: string) {
     return promisified(command);
 }
 
-// executes a signle command in a new process
-// pipes data to parent's stdout/stderr
+// executes a command in a new shell
+// but pipes data to parent's stdout/stderr
 export function spawn(command: string) {
     command = command.replace('\n', '');
     const child = _spawn(command, { stdio: 'inherit', shell: true });
@@ -23,6 +25,13 @@ export function spawn(command: string) {
             code == 0 ? resolve() : reject(`Child process exited with code ${code}`);
         });
     });
+}
+
+// executes a command in background and returns a child process handle
+// by default pipes data to parent's stdio but this can be overriden
+export function background(command: string, stdio: any = 'inherit') {
+    command = command.replace('\n', '');
+    return _spawn(command, { stdio, shell: true });
 }
 
 // loads environment variables

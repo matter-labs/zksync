@@ -29,8 +29,11 @@ async function testAccounts() {
 }
 
 async function verifyKeys() {}
-async function loadtest() {}
 
+async function loadtest(scenario: string, config: string) {
+    console.log(`Executing loadtest: scenario = ${scenario}, config-path = ${config}`);
+    await utils.spawn(`cargo run --release --bin loadtest -- --scenario ${scenario} ${config}`);
+}
 
 export const command = new Command('run')
     .description('run miscellaneous applications')
@@ -62,4 +65,20 @@ command
         } else {
             await exitProof('--account_id', cmd.account, '--token', cmd.token);
         }
+    });
+
+command
+    .command('loadtest [scenario] [config_path]')
+    .description('run the loadtest')
+    .action(async (scenario: string | null, config: string | null, cmd: Command) => {
+        scenario = scenario || 'outgoing';
+        if (scenario == 'outgoing' || scenario == 'execution') {
+            config = config || './core/tests/loadtest/src/configs/loadtest.json';
+        } else if (scenario.match(/real[-_]?life/)) {
+            config = config || './core/tests/loadtest/src/config/reallife.json';
+        } else {
+            cmd.outputHelp();
+            throw new Error('Unknown loadtest scenario');
+        }
+        await loadtest(scenario, config);
     });

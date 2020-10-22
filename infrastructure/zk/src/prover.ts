@@ -1,16 +1,12 @@
 import { Command } from 'commander';
 import * as utils from './utils';
-import { spawn, ChildProcess } from 'child_process';
 
-export async function prover(totalProvers: number = 1) {
-    let children: ChildProcess[] = [];
+export async function prover(totalProvers: number) {
+    let children: utils.ChildProcess[] = [];
     for (let id = 1; id <= totalProvers; id++) {
         const name = `${process.env.HOSTNAME}_${id}_blocks`;
         console.log('Started prover', name);
-        const child = spawn(
-            `cargo run --release --bin plonk_step_by_step_prover ${name}`,
-            { shell: true, stdio: 'inherit' }
-        );
+        const child = utils.background(`cargo run --release --bin plonk_step_by_step_prover ${name}`);
         children.push(child);
     }
     process.on('SIGINT', () => {
@@ -26,4 +22,7 @@ export async function prover(totalProvers: number = 1) {
 
 export const command = new Command('prover')
     .description('run zksync prover')
-    .action(async () => await prover());
+    .arguments('[number_of_provers]')
+    .action(async (number_of_provers?: number) => {
+        await prover(number_of_provers || 1);
+    });
