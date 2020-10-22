@@ -1,6 +1,6 @@
 version: '3.2'
 services:
-  postgres:
+  data-restore-postgres:
     image: "postgres:12"
     ports:
       - "5432:5432"

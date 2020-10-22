@@ -19,13 +19,26 @@ Example workflow:
 ./exit-tool.sh run rinkeby 12 ETH http://127.0.0.1:8545
 '
 
+# Function to stop PostgreSQL container on exit
+function docker_down() {
+    exitcode=$?
+    docker-compose -f ./docker-compose.yml stop data-restore-postgres
+    exit $exitcode
+}
+
 COMMAND=$1
 
+# Directories for universal setup
 CURRENT_DIR=`pwd`
 mkdir -p "$CURRENT_DIR/setup"
 KEYS_FOLDER_LOCAL="$CURRENT_DIR/setup"
 KEYS_FOLDER_CONTAINER="/usr/src/zksync/keys/setup"
 
+# Run PostgresSQL
+docker-compose -f ./docker-compose.yml up -d data-restore-postgres
+trap docker_down EXIT
+
+# Decide which command has to be run
 case $COMMAND in
   init)
     SUBCOMMAND="init"
@@ -48,8 +61,6 @@ case $COMMAND in
       exit 1
     ;;
 esac
-
-docker-compose up -f ./docker-compose.yml -d postgres
 
 DOCKER_ARGS="--net=host -v $KEYS_FOLDER_LOCAL:$KEYS_FOLDER_CONTAINER"
 DOCKER_IMAGE="matterlabs/exit-tool:latest"
