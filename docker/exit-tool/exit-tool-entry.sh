@@ -18,6 +18,7 @@ then
 fi
 
 zksync plonk-setup check || zksync plonk-setup download
+zksync verify-keys unpack
 
 COMMAND=$1
 
@@ -28,10 +29,10 @@ case $COMMAND in
     exit 0
     ;;
   run)
-      f ./target/release/zksync_data_restore --genesis --finite --config_path=/usr/src/configs/rinkeby.json
+      f ./target/release/zksync_data_restore --genesis --finite --config=/usr/src/configs/rinkeby.json || exit 1
     ;;
   continue)
-      f ./target/release/zksync_data_restore --continue --finite --config_pathg=/usr/src/configs/rinkeby.json
+      f ./target/release/zksync_data_restore --continue --finite --config=/usr/src/configs/rinkeby.json || exit 1
     ;;
   -h | --help)
       echo "$USAGE"
@@ -44,3 +45,4 @@ case $COMMAND in
     ;;
 esac
 
+./target/release/examples/generate_exit_proof --account_id 1 --token ETH

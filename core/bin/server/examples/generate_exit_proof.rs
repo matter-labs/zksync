@@ -41,10 +41,7 @@ async fn main() {
     let opt = Opt::from_args();
 
     let account_id = opt.account_id.parse::<AccountId>().unwrap();
-    let token = {
-        let token = &opt.token;
-        serde_json::from_str::<TokenLike>(token).expect("invalid token argument")
-    };
+    let token = TokenLike::parse(&opt.token);
 
     let timer = Instant::now();
     log::info!("Restoring state from db");

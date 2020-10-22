@@ -62,7 +62,7 @@ struct Opt {
     genesis: bool,
 
     /// Continues data restoring
-    #[structopt(long, name = "continue")]
+    #[structopt(long = "continue", name = "continue")]
     continue_mode: bool,
 
     /// Restore data until the last verified block and exit
@@ -74,11 +74,11 @@ struct Opt {
     final_hash: Option<String>,
 
     /// Sets the web3 API to be used to interact with the Ethereum blockchain
-    #[structopt(long, name = "web3")]
+    #[structopt(long = "web3", name = "web3")]
     web3_url: Option<String>,
 
     /// Provides a path to the configuration file for data restore
-    #[structopt(long, name = "config")]
+    #[structopt(long = "config", name = "config")]
     config_path: Option<String>,
 }
 
