@@ -14,6 +14,7 @@ target
 a.out 
 .gitconfig
 tags
+*.orig
 
 zksync_pk.key
 dist

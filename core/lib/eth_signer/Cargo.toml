@@ -26,3 +26,4 @@ reqwest = { version = "0.10", features = ["json", "blocking"] }
 thiserror = "1.0"
 
 jsonrpc-core = "14.0.3"
+async-trait = "0.1"

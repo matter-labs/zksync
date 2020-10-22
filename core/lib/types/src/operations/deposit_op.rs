@@ -7,9 +7,7 @@ use zksync_basic_types::Address;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
-use zksync_crypto::primitives::{
-    bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
-};
+use zksync_crypto::primitives::FromBytes;
 
 /// Deposit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,15 +42,14 @@ impl DepositOp {
         let amount_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
         let account_address_offset = amount_offset + BALANCE_BIT_WIDTH / 8;
 
-        let account_id = bytes_slice_to_uint32(
+        let account_id = u32::from_bytes(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or_else(|| format_err!("Cant get account id from deposit pubdata"))?;
-        let token =
-            bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get token id from deposit pubdata"))?;
+        let token = u16::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+            .ok_or_else(|| format_err!("Cant get token id from deposit pubdata"))?;
         let amount = BigUint::from(
-            bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
+            u128::from_bytes(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get amount from deposit pubdata"))?,
         );
         let to = Address::from_slice(
