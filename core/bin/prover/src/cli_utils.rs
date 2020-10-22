@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 // External deps
-use clap::{App, Arg};
+use structopt::StructOpt;
 // Workspace deps
 use zksync_config::ProverOptions;
 use zksync_utils::parse_env;
@@ -21,17 +21,21 @@ fn api_client_from_env(worker_name: &str) -> client::ApiClient {
     client::ApiClient::new(&server_api_url, worker_name, request_timout)
 }
 
+#[derive(StructOpt)]
+#[structopt(
+    name = "zkSync operator node",
+    author = "Matter Labs",
+    rename_all = "snake_case"
+)]
+struct Opt {
+    /// Name of the worker. Must be unique!
+    #[structopt(index = 1)]
+    worker_name: String,
+}
+
 pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + Sync>() {
-    let cli = App::new("Plonk step by step prover")
-        .author("Matter Labs")
-        .arg(
-            Arg::with_name("worker_name")
-                .help("Name of the worker. Must be unique!")
-                .required(true)
-                .index(1),
-        )
-        .get_matches();
-    let worker_name = cli.value_of("worker_name").unwrap();
+    let opt = Opt::from_args();
+    let worker_name = opt.worker_name;
 
     // used env
     let heartbeat_interval = ProverOptions::from_env().heartbeat_interval;
