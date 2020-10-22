@@ -153,7 +153,7 @@ export class Wallet {
         }
         await this.setRequiredAccountIdFromServer("perform a Forced Exit");
 
-        const tokenId = await this.provider.tokenSet.resolveTokenId(forcedExit.token);
+        const tokenId = this.provider.tokenSet.resolveTokenId(forcedExit.token);
 
         const transactionData = {
             initiatorAccountId: this.accountId,
