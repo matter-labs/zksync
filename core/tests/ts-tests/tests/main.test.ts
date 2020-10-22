@@ -11,7 +11,7 @@ import './forced-exit';
 import './misc';
 
 const TX_AMOUNT = utils.parseEther('10.0');
-// should be enough for ~100 test transactions (excluding fees), increase if needed
+// should be enough for ~200 test transactions (excluding fees), increase if needed
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
 // prettier-ignore

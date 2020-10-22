@@ -2,6 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, utils } from 'zksync';
 import { BigNumber } from 'ethers';
+import { sleep } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -32,8 +33,20 @@ Tester.prototype.testVerifiedForcedExit = async function (
     // Await for verification with a timeout set (through mocha's --timeout)
     await handle.awaitVerifyReceipt();
 
-    // Wait some time for Ethereum transaction to be processed.
-    await utils.sleep(30_000); // ms
+    // Checking that there are some complete withdrawals tx hash for this ForcedExit
+    // we should wait some time for `completeWithdrawals` transaction to be processed
+    let withdrawalTxHash = null;
+    const polling_interval = 200; // ms
+    const polling_timeout = 30000; // ms
+    const polling_iterations = polling_timeout / polling_interval;
+    for (let i = 0; i < polling_iterations; i++) {
+        withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
+        if (withdrawalTxHash != null) {
+            break;
+        }
+        await sleep(polling_interval);
+    }
+    expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
     const onchainBalanceAfter = await targetWallet.getEthereumBalance(token);
     const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(targetWallet.address(), tokenId);
