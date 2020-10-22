@@ -20,7 +20,7 @@ export async function prover(totalProvers: number) {
         process.exit();
     });
 
-    while (true) await utils.sleep(1_000_000);
+    while (true) await utils.sleep(1000);
 }
 
 export const command = new Command('prover')

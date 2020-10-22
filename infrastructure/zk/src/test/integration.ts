@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
+import { spawn } from 'child_process';
 import fs from 'fs';
 import * as dummyProver from '../dummy-prover';
 
@@ -18,25 +19,25 @@ export async function withServer(testSuite: CallableFunction, timeout = 120) {
 	const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance &> prover.log');
 	await utils.sleep(10)
 
-	const cleanup = async () => {
+	const cleanup = () => {
 		console.log('Termination started...')
-		await utils.sleep(5);
-		server.kill();
-		prover.kill();
+		utils.sleepSync(5);
+		process.kill(-server.pid, 'SIGKILL');
+		process.kill(-prover.pid, 'SIGKILL');
 		clearTimeout(timer);
 		console.log('SERVER LOGS:')
 		console.log(fs.readFileSync('server.log').toString());
 		console.log('\n\nPROVER LOGS:')
 		console.log(fs.readFileSync('prover.log').toString());
-		await utils.sleep(5);
-		process.exit()
+		utils.sleepSync(5);
+		process.exit(0)
 	}
 
 	const timer = setTimeout(cleanup, timeout * 1000);
 
 	process.on('exit', cleanup);
-	process.on('SIGINT', cleanup);
-	process.on('uncaughtException', cleanup);
+	// process.on('SIGINT', cleanup);
+	// process.on('uncaughtException', cleanup);
 
 	await testSuite();
 }

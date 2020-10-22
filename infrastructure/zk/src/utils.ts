@@ -29,9 +29,9 @@ export function spawn(command: string) {
 
 // executes a command in background and returns a child process handle
 // by default pipes data to parent's stdio but this can be overriden
-export function background(command: string, stdio: any = 'inherit') {
+export function background(command: string) {
     command = command.replace('\n', '');
-    return _spawn(command, { stdio, shell: true });
+    return _spawn(command, { stdio: 'inherit', shell: true, detached: true });
 }
 
 // loads environment variables
@@ -64,6 +64,10 @@ export function modifyEnv(variable: string, assignedVariable: string) {
 
 export async function sleep(seconds: number) {
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+}
+
+export function sleepSync(seconds: number) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
 }
 
 export async function allowFail<T>(promise: Promise<T>) {
