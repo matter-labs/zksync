@@ -1,6 +1,9 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
 
+import * as integration from './integration';
+export { integration };
+
 export async function db(reset: boolean) {
     const databaseUrl = process.env.DATABASE_URL as string;
     process.env.DATABASE_URL = databaseUrl.replace('plasma', 'plasma_test');
@@ -58,14 +61,16 @@ command
         await db(cmd.reset);
     });
 
-command
-    .command('circuit [threads] [test_name] [options...]')
-    .description('run unit-tests for the circuit')
-    .action(async (threads: string | null, testName: string | null, options: string[]) => {
-        await circuit(threads ? parseInt(threads) : 1, testName, ...options);
-    });
+// command
+//     .command('circuit [threads] [test_name] [options...]')
+//     .description('run unit-tests for the circuit')
+//     .action(async (threads: string | null, testName: string, options: string[]) => {
+//         await circuit(threads ? parseInt(threads) : 1, testName, ...options);
+//     });
 
 command
     .command('contracts')
     .description('run unit-tests for the contracts')
     .action(contracts);
+
+command.addCommand(integration.command);

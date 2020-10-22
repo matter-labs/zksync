@@ -11,6 +11,7 @@ import { command as init } from './init';
 import { command as kube } from './kube';
 import { command as prover } from './prover';
 import { command as run } from './run';
+import { command as test } from './test/test';
 import * as utils from './utils';
 
 async function main() {
@@ -37,7 +38,8 @@ async function main() {
         .addCommand(kube)
         .addCommand(init)
         .addCommand(prover)
-        .addCommand(run);
+        .addCommand(run)
+        .addCommand(test);
 
     await program.parseAsync(process.argv);
 }

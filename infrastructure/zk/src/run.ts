@@ -2,19 +2,19 @@ import { Command } from 'commander';
 import * as utils from './utils';
 import { Wallet } from 'ethers';
 
-async function revertReason(txHash: string, web3url?: string) {
+export async function revertReason(txHash: string, web3url?: string) {
     await utils.spawn(`cd contracts && npx ts-node revert-reason.ts ${txHash} ${web3url || ''}`);
 }
 
-async function explorer() {
+export async function explorer() {
     await utils.spawn('yarn --cwd infrastructure/explorer serve');
 }
 
-async function exitProof(...args: string[]) {
+export async function exitProof(...args: string[]) {
     await utils.spawn(`cargo run --example generate_exit_proof --release -- ${args.join(' ')}`);
 }
 
-async function testAccounts() {
+export async function testAccounts() {
     const NUM_TEST_WALLETS = 10;
     const baseWalletPath = "m/44'/60'/0'/0/";
     const walletKeys = [];
@@ -28,9 +28,9 @@ async function testAccounts() {
     console.log(JSON.stringify(walletKeys, null, 4));
 }
 
-async function verifyKeys() {}
+export async function verifyKeys() {}
 
-async function loadtest(scenario: string, config: string) {
+export async function loadtest(scenario: string, config: string) {
     console.log(`Executing loadtest: scenario = ${scenario}, config-path = ${config}`);
     await utils.spawn(`cargo run --release --bin loadtest -- --scenario ${scenario} ${config}`);
 }
