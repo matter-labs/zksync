@@ -28,6 +28,7 @@ mod sdk_tests;
 
 // TODO Make it configurable
 const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+// const API_REQUEST_LIMIT: usize = 10;
 const API_REQUEST_LIMIT: usize = 1_000_000_000;
 
 #[derive(Debug, Clone)]

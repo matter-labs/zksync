@@ -213,11 +213,15 @@ impl Monitor {
                 monitor.log_event(Event::TxErrored(tx_hash)).await;
             }
 
+            monitor
+                .api_data_pool
+                .write()
+                .await
+                .store_tx_hash(address, tx_hash);
+
             monitor.record_tx(tx_hash, tx_result).await;
         });
         self.inner().await.pending_tasks.push(handle);
-
-        self.api_data_pool.store_tx_hash(address, tx_hash).await;
         Ok(tx_hash)
     }
 
@@ -229,14 +233,6 @@ impl Monitor {
     ) -> anyhow::Result<()> {
         await_condition!(Self::POLLING_INTERVAL, {
             let info = self.provider.tx_info(tx_hash).await?;
-
-            // Update max block number for api test needs.
-            if let Some(block) = info.block.as_ref() {
-                self.api_data_pool
-                    .store_max_block_number(block.block_number as BlockNumber)
-                    .await;
-            }
-
             match block_status {
                 BlockStatus::Committed => match info.success {
                     Some(true) => true,
@@ -318,8 +314,9 @@ impl Monitor {
                 ClientError::MalformedResponse("There is no priority op in the deposit".into())
             })?;
         self.api_data_pool
-            .store_priority_op(priority_op.clone())
-            .await;
+            .write()
+            .await
+            .store_priority_op(priority_op.clone());
 
         let monitor = self.clone();
         let priority_op2 = priority_op.clone();
@@ -369,6 +366,15 @@ impl Monitor {
         self.wait_for_tx(BlockStatus::Verified, tx_hash).await?;
         let verified_at = Instant::now();
         self.log_event(Event::TxVerified(tx_hash)).await;
+
+        // Store block number for api test needs.
+        let info = self.provider.tx_info(tx_hash).await?;
+        if let Some(block) = info.block.as_ref() {
+            self.api_data_pool
+                .write()
+                .await
+                .store_block(block.block_number as BlockNumber);
+        }
 
         Ok(TxLifecycle {
             created_at,

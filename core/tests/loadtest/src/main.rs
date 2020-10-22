@@ -56,7 +56,7 @@ fn print_stats_summary(name: impl AsRef<str>, summary: Option<&FiveSummaryStats>
             "        [ {} {} {} {} {} ] (std_dev = {})",
             pretty_fmt!(summary.min).dimmed(),
             pretty_fmt!(summary.lower_quartile),
-            pretty_fmt!(summary.median).bold(),
+            pretty_fmt!(summary.median).bright_blue().bold(),
             pretty_fmt!(summary.upper_quartile),
             pretty_fmt!(summary.max).dimmed(),
             pretty_fmt!(summary.std_dev).yellow()

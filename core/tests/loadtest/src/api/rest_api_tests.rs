@@ -1,6 +1,8 @@
 // Built-in uses
 // External uses
+use serde::Serialize;
 // Workspace uses
+use zksync_types::{tx::TxHash, Address};
 use zksync_utils::parse_env;
 // Local uses
 use super::{ApiDataPool, ApiTestsBuilder};
@@ -17,7 +19,13 @@ trait ToHexId {
     fn to_hex_id(&self) -> String;
 }
 
-impl<T: AsRef<[u8]>> ToHexId for T {
+impl ToHexId for TxHash {
+    fn to_hex_id(&self) -> String {
+        format!("0x{}", hex::encode(self))
+    }
+}
+
+impl ToHexId for Address {
     fn to_hex_id(&self) -> String {
         format!("0x{}", hex::encode(self))
     }
@@ -50,9 +58,16 @@ impl RestApiClient {
                 Ok(Some(json))
             }
         } else {
+            dbg!(&url, &text);
             Err(anyhow::anyhow!("HTTP error {} with body: {}", status, text))
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct TxHistoryQuery {
+    pub tx_id: Option<TxHash>,
+    pub limit: Option<usize>,
 }
 
 // Tests for the relevant API methods declared in the
@@ -74,8 +89,12 @@ impl RestApiClient {
     }
 
     pub async fn tx_history(&self) -> anyhow::Result<()> {
-        let (address, data) = self.pool.random_address().await;
-        let (offset, limit) = data.gen_txs_offset_limit();
+        let (address, offset, limit) = {
+            let pool = self.pool.read().await;
+            let (address, data) = pool.random_address();
+            let (offset, limit) = data.gen_txs_offset_limit();
+            (address, offset, limit)
+        };
 
         let url = format!(
             "/account/{}/history/{}/{}",
@@ -88,18 +107,34 @@ impl RestApiClient {
     }
 
     pub async fn tx_history_older_than(&self) -> anyhow::Result<()> {
-        todo!()
+        let address = self.pool.read().await.random_address().0;
+        // TODO Implement queries.
+        let url = format!(
+            "/account/{}/history/older_than?limit={}",
+            address.to_hex_id(),
+            ApiDataPool::MAX_LIMIT
+        );
+        self.get(&url).await?;
+        Ok(())
     }
 
     pub async fn tx_history_newer_than(&self) -> anyhow::Result<()> {
-        todo!()
+        let address = self.pool.read().await.random_address().0;
+        // TODO Implement queries.
+        let url = format!(
+            "/account/{}/history/newer_than?limit={}",
+            address.to_hex_id(),
+            ApiDataPool::MAX_LIMIT
+        );
+        self.get(&url).await?;
+        Ok(())
     }
 
     pub async fn executed_tx_by_hash(&self) -> anyhow::Result<()> {
         let tx = self
             .get(&format!(
                 "/transactions/{}",
-                self.pool.random_tx_hash().await.to_hex_id()
+                self.pool.read().await.random_tx_hash().to_hex_id()
             ))
             .await?;
         anyhow::ensure!(tx.is_some(), "Unable to get executed transaction by hash");
@@ -110,10 +145,55 @@ impl RestApiClient {
         let tx = self
             .get(&format!(
                 "/transactions_all/{}",
-                self.pool.random_tx_hash().await.to_string()
+                self.pool.read().await.random_tx_hash().to_string()
             ))
             .await?;
         anyhow::ensure!(tx.is_some(), "Unable to get executed transaction by hash");
+        Ok(())
+    }
+
+    pub async fn priority_operations(&self) -> anyhow::Result<()> {
+        let url = format!(
+            "/priority_operations/{}/",
+            self.pool.read().await.random_priority_op().serial_id,
+        );
+        self.get(&url).await?;
+        Ok(())
+    }
+
+    pub async fn block_tx(&self) -> anyhow::Result<()> {
+        let (block_id, tx_id) = self.pool.read().await.random_tx_id();
+        let url = format!("/blocks/{}/transactions/{}", block_id, tx_id);
+        self.get(&url).await?;
+        Ok(())
+    }
+
+    pub async fn block_transactions(&self) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    pub async fn block_by_id(&self) -> anyhow::Result<()> {
+        let url = format!("/blocks/{}", self.pool.read().await.random_block());
+        self.get(&url).await?;
+        Ok(())
+    }
+
+    pub async fn blocks(&self) -> anyhow::Result<()> {
+        let url = format!(
+            "/blocks?max_block={}&limit={}",
+            self.pool.read().await.random_block(),
+            ApiDataPool::MAX_LIMIT
+        );
+        self.get(&url).await?;
+        Ok(())
+    }
+
+    pub async fn explorer_search(&self) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    pub async fn withdrawal_processing_time(&self) -> anyhow::Result<()> {
+        self.get("/withdrawal_processing_time").await?;
         Ok(())
     }
 }
@@ -145,7 +225,14 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
             status,
             tokens,
             tx_history,
+            tx_history_older_than,
+            tx_history_newer_than,
             executed_tx_by_hash,
             tx_by_hash,
+            priority_operations,
+            block_tx,
+            block_by_id,
+            blocks,
+            withdrawal_processing_time,
     )
 }
