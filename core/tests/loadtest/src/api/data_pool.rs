@@ -28,7 +28,7 @@ impl AddressData {
         let mut rng = thread_rng();
 
         let offset = rng.gen_range(0, std::cmp::max(1, self.txs_count));
-        let limit = rng.gen_range(0, std::cmp::max(MAX_LIMIT, offset));
+        let limit = rng.gen_range(0, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 1)));
         (offset, limit)
     }
 
@@ -36,18 +36,19 @@ impl AddressData {
         let mut rng = thread_rng();
 
         let offset = rng.gen_range(0, std::cmp::max(1, self.ops_count));
-        let limit = rng.gen_range(0, std::cmp::max(MAX_LIMIT, offset));
+        let limit = rng.gen_range(0, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 1)));
         (offset, limit)
     }
 }
 
+/// API data pool contents.
 #[derive(Debug, Default)]
 pub struct ApiDataPoolInner {
     addresses: Vec<Address>,
     data_by_address: HashMap<Address, AddressData>,
     txs: VecDeque<TxHash>,
     priority_ops: VecDeque<PriorityOp>,
-    // Blocks with the number of known transactions in them.
+    // Blocks with the counter of known transactions in them.
     blocks: BTreeMap<BlockNumber, usize>,
     max_block_number: BlockNumber,
 }
@@ -107,7 +108,7 @@ impl ApiDataPoolInner {
     }
 
     pub fn random_block(&self) -> BlockNumber {
-        thread_rng().gen_range(1, self.max_block_number + 1)
+        self.random_tx_id().0
     }
 
     pub fn random_tx_id(&self) -> (BlockNumber, usize) {
@@ -115,28 +116,44 @@ impl ApiDataPoolInner {
         let to = self.max_block_number;
 
         let mut rng = thread_rng();
-        let number = rng.gen_range(from, to + 1);
-        let tx_id = rng.gen_range(0, self.blocks[&number]);
-        (number, tx_id)
+        // Sometimes we have gaps in the block list, so it is not always
+        // possible to randomly generate an existing block number.
+        for _ in 0..MAX_LIMIT {
+            let number = rng.gen_range(from, to + 1);
+            if let Some(&block_txs) = self.blocks.get(&number) {
+                let tx_id = rng.gen_range(0, block_txs);
+                return (number, tx_id);
+            }
+        }
+
+        unreachable!(
+            "Unable to find the appropriate block number after {} attempts.",
+            MAX_LIMIT
+        );
     }
 }
 
+/// Provides needed data for the API load tests.
 #[derive(Debug, Clone, Default)]
 pub struct ApiDataPool {
     inner: Arc<RwLock<ApiDataPoolInner>>,
 }
 
 impl ApiDataPool {
+    /// Max limit in the API requests with limit.
     pub const MAX_LIMIT: usize = MAX_LIMIT;
 
+    /// Creates a new pool instance.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Gets readonly access to the pool content.
     pub async fn read(&self) -> RwLockReadGuard<'_, ApiDataPoolInner> {
         self.inner.read().await
     }
 
+    /// Gets writeable access to the pool content.
     pub async fn write(&self) -> RwLockWriteGuard<'_, ApiDataPoolInner> {
         self.inner.write().await
     }

@@ -213,19 +213,22 @@ impl LoadtestExecutor {
                 self.scenarios[scenario_index].0,
             );
 
-            let mut tx_hashes = Vec::new();
-            for wallet in &mut scenario_wallets {
-                wallet.update_account_id().await?;
-                assert!(
-                    wallet.account_id().is_some(),
-                    "Account ID was not set after deposit for the account"
-                );
+            let tx_hashes = try_wait_all_failsafe(scenario_wallets.iter_mut().map(|wallet| {
+                let sufficient_fee = self.sufficient_fee.clone();
+                let monitor = self.monitor.clone();
+                async move {
+                    wallet.update_account_id().await?;
+                    assert!(
+                        wallet.account_id().is_some(),
+                        "Account ID was not set after deposit for the account"
+                    );
 
-                let (tx, sign) = wallet
-                    .sign_change_pubkey(self.sufficient_fee.clone())
-                    .await?;
-                tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
-            }
+                    let (tx, sign) = wallet.sign_change_pubkey(sufficient_fee.clone()).await?;
+
+                    monitor.send_tx(tx, sign).await
+                }
+            }))
+            .await?;
 
             try_wait_all_failsafe(
                 tx_hashes
@@ -272,6 +275,7 @@ impl LoadtestExecutor {
     async fn refund(&mut self) -> anyhow::Result<()> {
         log::info!("Refunding the remaining tokens to the main wallet.");
 
+        self.main_wallet.refresh_nonce().await?;
         // Transfer the remaining balances of the intermediate wallets into the main one.
         for (scenario, scenario_wallets) in &mut self.scenarios {
             let monitor = self.monitor.clone();
@@ -284,6 +288,7 @@ impl LoadtestExecutor {
             let txs_queue = try_wait_all_failsafe(scenario_wallets.iter().map(|wallet| {
                 let sufficient_fee = sufficient_fee.clone();
                 async move {
+                    wallet.refresh_nonce().await?;
                     let balance = wallet.balance(BlockStatus::Committed).await?;
                     let withdraw_amount =
                         closest_packable_token_amount(&(balance - &sufficient_fee));

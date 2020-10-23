@@ -58,8 +58,18 @@ impl RestApiClient {
                 Ok(Some(json))
             }
         } else {
-            dbg!(&url, &text);
-            Err(anyhow::anyhow!("HTTP error {} with body: {}", status, text))
+            log::warn!(
+                "For {}: a HTTP error occurred {} with body: {}",
+                url,
+                status,
+                text
+            );
+            Err(anyhow::anyhow!(
+                "For {}: a HTTP error occurred {} with body: {}",
+                url,
+                status,
+                text
+            ))
         }
     }
 }
@@ -99,8 +109,8 @@ impl RestApiClient {
         let url = format!(
             "/account/{}/history/{}/{}",
             address.to_hex_id(),
+            offset,
             limit,
-            offset
         );
         self.get(&url).await?;
         Ok(())
@@ -169,7 +179,12 @@ impl RestApiClient {
     }
 
     pub async fn block_transactions(&self) -> anyhow::Result<()> {
-        todo!()
+        let url = format!(
+            "/blocks/{}/transactions",
+            self.pool.read().await.random_block()
+        );
+        self.get(&url).await?;
+        Ok(())
     }
 
     pub async fn block_by_id(&self) -> anyhow::Result<()> {
@@ -231,6 +246,7 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
             tx_by_hash,
             priority_operations,
             block_tx,
+            block_transactions,
             block_by_id,
             blocks,
             withdrawal_processing_time,

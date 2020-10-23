@@ -108,6 +108,22 @@ impl TestWallet {
         }
     }
 
+    /// Sets the correct nonce from the zkSync network.
+    ///
+    /// This method fixes further "nonce mismatch" errors.
+    pub async fn refresh_nonce(&self) -> Result<(), ClientError> {
+        let zk_nonce = self
+            .inner
+            .provider
+            .account_info(self.address())
+            .await?
+            .committed
+            .nonce;
+
+        self.nonce.store(zk_nonce, Ordering::SeqCst);
+        Ok(())
+    }
+
     /// Returns the wallet address.
     pub fn address(&self) -> Address {
         self.inner.address()
