@@ -20,3 +20,10 @@ withdraw_rounds = 3
 [[scenarios]]
 name = "full_exit"
 wallets_amount = 10
+
+# For quick tests
+# [[scenarios]]
+# name = 'transfer'
+# transfer_size = 1
+# transfer_rounds = 1
+# wallets_amount = 10

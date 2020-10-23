@@ -204,7 +204,9 @@ impl RestApiClient {
     }
 
     pub async fn explorer_search(&self) -> anyhow::Result<()> {
-        todo!()
+        let url = format!("/search?query={}", self.pool.read().await.random_block());
+        self.get(&url).await?;
+        Ok(())
     }
 
     pub async fn withdrawal_processing_time(&self) -> anyhow::Result<()> {
@@ -249,6 +251,7 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
             block_transactions,
             block_by_id,
             blocks,
+            explorer_search,
             withdrawal_processing_time,
     )
 }
