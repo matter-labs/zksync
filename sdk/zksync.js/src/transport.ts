@@ -138,7 +138,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
             params,
         };
 
-        const response = await this.ws.sendRequest(request);
+        const response = await this.ws.sendRequest(request, {requestId: 1});
 
         if ("result" in response) {
             return response.result;

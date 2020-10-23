@@ -1,0 +1,12 @@
+version: '3.2'
+services:
+  data-restore-postgres:
+    image: "postgres:12"
+    ports:
+      - "5432:5432"
+    volumes:
+    - type: bind
+      source: ./volumes/postgres
+      target: /var/lib/postgresql/data
+    environment:
+        - POSTGRES_HOST_AUTH_METHOD=trust

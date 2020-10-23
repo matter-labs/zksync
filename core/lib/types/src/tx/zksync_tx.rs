@@ -161,7 +161,7 @@ impl ZkSyncTx {
 
     /// Returns `true` if transaction is `ZkSyncTx::Withdraw`.
     pub fn is_withdraw(&self) -> bool {
-        matches!(self, ZkSyncTx::Withdraw(_))
+        matches!(self, ZkSyncTx::Withdraw(_) | ZkSyncTx::ForcedExit(_))
     }
 
     /// Returns `true` if transaction is `ZkSyncTx::Withdraw`.

@@ -29,7 +29,7 @@ case $COMMAND in
         {"name":"wBTC","symbol":"wBTC","decimals":8},
         {"name": "BAT", "symbol": "BAT", "decimals": 18},
         {"name": "MLTT", "symbol": "MLTT", "decimals": 18}
-      ]' > $ZKSYNC_HOME/etc/tokens/localhost.json >> $ZKSYNC_HOME/etc/tokens/localhost.json
+      ]' > $ZKSYNC_HOME/etc/tokens/localhost.json 
       ;;
   -h | --help)
       echo "$USAGE"

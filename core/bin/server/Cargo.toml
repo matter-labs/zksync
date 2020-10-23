@@ -21,7 +21,7 @@ zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 
 anyhow = "1.0"
-clap = "2.33.0"
+structopt = "0.3.20"
 log = "0.4"
 env_logger = "0.6"
 ctrlc = { version = "3.1", features = ["termination"] }
@@ -32,6 +32,7 @@ tokio = { version = "0.2", features = ["full"] }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_prover = { path = "../prover", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
 
 num = { version = "0.2", features = ["serde"] }
 serde = "1.0.90"

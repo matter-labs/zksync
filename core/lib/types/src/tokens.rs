@@ -2,8 +2,8 @@ use crate::{Address, TokenId};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
-use std::fs::read_to_string;
 use std::path::PathBuf;
+use std::{fs::read_to_string, str::FromStr};
 use zksync_utils::parse_env;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -35,6 +35,18 @@ impl From<Address> for TokenLike {
 impl From<&str> for TokenLike {
     fn from(symbol: &str) -> Self {
         Self::Symbol(symbol.to_string())
+    }
+}
+
+impl TokenLike {
+    pub fn parse(value: &str) -> Self {
+        if let Ok(id) = TokenId::from_str(value) {
+            return Self::Id(id);
+        }
+        if let Ok(address) = Address::from_str(value) {
+            return Self::Address(address);
+        }
+        Self::Symbol(value.to_string())
     }
 }
 

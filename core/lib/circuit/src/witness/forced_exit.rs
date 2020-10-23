@@ -19,7 +19,7 @@ use zksync_crypto::{
         FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
         TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
-    primitives::convert_to_float,
+    primitives::FloatConversions,
 };
 use zksync_types::operations::ForcedExitOp;
 // Local deps
@@ -253,7 +253,7 @@ impl ForcedExitWitness<Bn256> {
         let token_fe = Fr::from_str(&forced_exit.token.to_string()).unwrap();
         let amount_as_field_element = Fr::from_str(&forced_exit.amount.to_string()).unwrap();
 
-        let amount_bits = convert_to_float(
+        let amount_bits = FloatConversions::to_float(
             forced_exit.amount,
             AMOUNT_EXPONENT_BIT_WIDTH,
             AMOUNT_MANTISSA_BIT_WIDTH,
@@ -265,7 +265,7 @@ impl ForcedExitWitness<Bn256> {
 
         let fee_as_field_element = Fr::from_str(&forced_exit.fee.to_string()).unwrap();
 
-        let fee_bits = convert_to_float(
+        let fee_bits = FloatConversions::to_float(
             forced_exit.fee,
             FEE_EXPONENT_BIT_WIDTH,
             FEE_MANTISSA_BIT_WIDTH,

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -e
+
+cd core/lib/storage
+
+# Check generated sqlx data
+if ! cargo sqlx prepare --check
+then
+    # Prepare sqlx bindings
+    # We're going to do it even on CI, since it seems that this file can be invalidated after several subsequent compilations.
+    echo "Going to rerun 'sqlx prepare'"
+    cargo sqlx prepare
+fi
