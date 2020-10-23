@@ -42,6 +42,7 @@ export async function rust() {
 
 export const command = new Command('test')
     .description('run test suites')
+    .addCommand(integration.command);
 
 command
     .command('js')
@@ -73,4 +74,3 @@ command
     .description('run unit-tests for the contracts')
     .action(contracts);
 
-command.addCommand(integration.command);

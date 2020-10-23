@@ -21,9 +21,6 @@ export async function genesis() {
     const label = `${process.env.ZKSYNC_ENV}-Genesis_gen-${year}-${month}-${day}-${hour}${minute}${second}`;
     fs.mkdirSync(`logs/${label}`, { recursive: true });
     fs.copyFileSync('genesis.log', `logs/${label}/genesis.log`);
-    // const envFile = process.env.ENV_FILE as string;
-    // const env = fs.readFileSync(envFile).toString();
-    // fs.writeFileSync(envFile, env.replace(/GENESIS_ROOT=.*/g, genesisRoot));
     utils.modifyEnv('GENESIS_ROOT', genesisRoot);
 }
 

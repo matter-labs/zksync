@@ -81,8 +81,9 @@ async function prepareTestContracts() {
     const gatekeeper = fs.readFileSync(`${outDir}/UpgradeGatekeeper.sol`).toString();
     fs.writeFileSync(`${outDir}/UpgradeGatekeeper.sol`, createGetter(gatekeeper, 'UPGRADE_NOTICE_PERIOD'));
 
-    const zksync = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString();
-    fs.writeFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`, zksync.replace(/revert\("upgzk"\);(.*)/, '/*revert("upgzk");*/$1'));
+    const zksync = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString()
+        .replace(/revert\("upgzk"\);(.*)/g, '/*revert("upgzk");*/$1');
+    fs.writeFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`, zksync);
 }
 
 export async function buildDev() {

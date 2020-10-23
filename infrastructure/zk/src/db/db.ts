@@ -56,33 +56,33 @@ export async function wait(tries: number = 4) {
     await utils.exec(`pg_isready -d "${process.env.DATABASE_URL}"`);
 }
 
-const dropCommand = new Command('drop')
+export const command = new Command('db')
+    .description('database management')
+    .addCommand(update.command)
+    .addCommand(insert.command)
+
+command
+    .command('drop')
     .description('drop the database')
     .action(drop);
 
-const migrateCommand = new Command('migrate')
+command
+    .command('migrate')
     .description('run migrations')
     .action(migrate);
 
-const setupCommand = new Command('setup')
+command
+    .command('setup')
     .description('initialize the database and perform migrations')
     .action(setup);
 
-const waitCommand = new Command('wait')
+command
+    .command('wait')
     .description('wait for database to get ready for interaction')
     .action(wait);
 
-const resetCommand = new Command('reset')
+command
+    .command('reset')
     .description('reinitialize the database')
     .action(reset);
-
-export const command = new Command('db')
-    .description('database management')
-    .addCommand(dropCommand)
-    .addCommand(migrateCommand)
-    .addCommand(setupCommand)
-    .addCommand(update.command)
-    .addCommand(insert.command)
-    .addCommand(waitCommand)
-    .addCommand(resetCommand);
 

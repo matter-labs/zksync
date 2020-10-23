@@ -38,6 +38,7 @@ export async function loadtest(scenario: string, config: string) {
 
 export const command = new Command('run')
     .description('run miscellaneous applications')
+    .addCommand(verifyKeys.command);
 
 command
     .command('test-accounts')
