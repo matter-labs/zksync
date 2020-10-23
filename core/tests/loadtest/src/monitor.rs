@@ -29,7 +29,7 @@ type SerialId = u64;
 
 #[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 struct Counters {
-    created: u64,
+    sent: u64,
     executed: u64,
     verified: u64,
     errored: u64,
@@ -46,7 +46,7 @@ impl Add for Counters {
 
     fn add(self, rhs: Self) -> Self::Output {
         Self {
-            created: self.created + rhs.created,
+            sent: self.sent + rhs.sent,
             executed: self.executed + rhs.executed,
             verified: self.verified + rhs.verified,
             errored: self.errored + rhs.errored,
@@ -66,13 +66,13 @@ impl AddAssign for Stats {
 #[derive(Debug)]
 enum Event {
     // Transactions block.
-    TxCreated(TxHash),
+    TxSent(TxHash),
     TxExecuted(TxHash),
     TxVerified(TxHash),
     TxErrored(TxHash),
 
     // Priority ops block.
-    OpCreated(SerialId),
+    OpSent(SerialId),
     OpExecuted(SerialId),
     OpVerified(SerialId),
     OpErrored(SerialId),
@@ -101,12 +101,12 @@ pub struct Monitor {
 impl MonitorInner {
     fn log_event(&mut self, event: Event) {
         match event {
-            Event::TxCreated(_) => self.current_stats.txs.created += 1,
+            Event::TxSent(_) => self.current_stats.txs.sent += 1,
             Event::TxExecuted(_) => self.current_stats.txs.executed += 1,
             Event::TxVerified(_) => self.current_stats.txs.verified += 1,
             Event::TxErrored(_) => self.current_stats.txs.errored += 1,
 
-            Event::OpCreated(_) => self.current_stats.ops.created += 1,
+            Event::OpSent(_) => self.current_stats.ops.sent += 1,
             Event::OpExecuted(_) => self.current_stats.ops.executed += 1,
             Event::OpVerified(_) => self.current_stats.ops.verified += 1,
             Event::OpErrored(_) => self.current_stats.ops.errored += 1,
@@ -125,7 +125,7 @@ impl MonitorInner {
         if self.current_stats != stats {
             self.total_stats += self.current_stats;
 
-            log::info!("Transactions {:?}", self.current_stats);
+            log::trace!("Transactions {:?}", self.current_stats);
 
             swap(&mut self.current_stats, &mut stats);
         }
@@ -144,7 +144,7 @@ impl Drop for MonitorInner {
     fn drop(&mut self) {
         self.total_stats += self.current_stats;
 
-        log::info!("Total {:?}", self.total_stats);
+        log::trace!("Total {:?}", self.total_stats);
     }
 }
 
@@ -190,7 +190,7 @@ impl Monitor {
     }
 
     /// Submits a transaction to the zkSync network and monitors its progress.
-    /// Returns the hash of the created transaction.
+    /// Returns the hash of the sent transaction.
     pub async fn send_tx(
         &self,
         tx: ZkSyncTx,
@@ -355,7 +355,7 @@ impl Monitor {
         sent_at: Instant,
         tx_hash: TxHash,
     ) -> anyhow::Result<TxLifecycle> {
-        self.log_event(Event::TxCreated(tx_hash)).await;
+        self.log_event(Event::TxSent(tx_hash)).await;
 
         // Wait for the transaction to commit.
         self.wait_for_tx(BlockStatus::Committed, tx_hash).await?;
@@ -385,8 +385,7 @@ impl Monitor {
     }
 
     async fn monitor_priority_op(self, priority_op: PriorityOp) -> anyhow::Result<()> {
-        self.log_event(Event::OpCreated(priority_op.serial_id))
-            .await;
+        self.log_event(Event::OpSent(priority_op.serial_id)).await;
 
         // Wait until the priority operation is committed.
         self.wait_for_priority_op(BlockStatus::Committed, &priority_op)

@@ -1,6 +1,8 @@
+//! Tests for the relevant API methods declared in the
+//! `core/bin/zksync_api/src/api_server/rest/v01/api_decl.rs` file.
+
 // Built-in uses
 // External uses
-use serde::Serialize;
 // Workspace uses
 use zksync_types::{tx::TxHash, Address};
 use zksync_utils::parse_env;
@@ -31,6 +33,7 @@ impl ToHexId for Address {
     }
 }
 
+// Client implementation.
 impl RestApiClient {
     pub fn new(url: String, pool: ApiDataPool) -> Self {
         Self {
@@ -74,14 +77,7 @@ impl RestApiClient {
     }
 }
 
-#[derive(Debug, Serialize)]
-pub struct TxHistoryQuery {
-    pub tx_id: Option<TxHash>,
-    pub limit: Option<usize>,
-}
-
-// Tests for the relevant API methods declared in the
-// `core/bin/zksync_api/src/api_server/rest/v01/api_decl.rs` file.
+// Tests implementation.
 impl RestApiClient {
     pub async fn testnet_config(&self) -> anyhow::Result<()> {
         self.get("/testnet_config").await?;

@@ -30,7 +30,7 @@ pub struct TestWallet {
 }
 
 impl TestWallet {
-    const FEE_FACTOR: u64 = 2;
+    const FEE_FACTOR: u64 = 3;
 
     /// Creates a new wallet from the given account information and Ethereum configuration options.
     pub async fn from_info(

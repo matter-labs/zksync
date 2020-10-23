@@ -19,24 +19,28 @@ const MAX_QUEUE_LEN: usize = 100;
 
 #[derive(Debug, Default, Clone)]
 pub struct AddressData {
+    /// Total count of transactions related to the address.
     pub txs_count: usize,
+    /// Total count of priority operations related to the address.
     pub ops_count: usize,
 }
 
 impl AddressData {
+    /// Generates a `(offset, limit)` pair for transaction requests related to the address.
     pub fn gen_txs_offset_limit(&self) -> (usize, usize) {
         let mut rng = thread_rng();
 
         let offset = rng.gen_range(0, std::cmp::max(1, self.txs_count));
-        let limit = rng.gen_range(0, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 1)));
+        let limit = rng.gen_range(1, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 2)));
         (offset, limit)
     }
 
+    /// Generates a `(offset, limit)` pair for priority operation requests related to the address.
     pub fn gen_ops_offset_limit(&self) -> (usize, usize) {
         let mut rng = thread_rng();
 
         let offset = rng.gen_range(0, std::cmp::max(1, self.ops_count));
-        let limit = rng.gen_range(0, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 1)));
+        let limit = rng.gen_range(1, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 2)));
         (offset, limit)
     }
 }
@@ -107,10 +111,12 @@ impl ApiDataPoolInner {
         }
     }
 
+    /// Generates a random block number in range [0, max block number].
     pub fn random_block(&self) -> BlockNumber {
         self.random_tx_id().0
     }
 
+    /// Generates a random transaction identifier (block number, position in block).
     pub fn random_tx_id(&self) -> (BlockNumber, usize) {
         let from = *self.blocks.keys().next().unwrap();
         let to = self.max_block_number;

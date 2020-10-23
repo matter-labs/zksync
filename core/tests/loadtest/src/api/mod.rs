@@ -14,6 +14,7 @@ use std::{
 // External uses
 use futures::{future::BoxFuture, Future, FutureExt};
 use serde::{Deserialize, Serialize};
+use tokio::time::timeout;
 // Workspace uses
 // Local uses
 use crate::{
@@ -85,18 +86,22 @@ where
     loop {
         output.total_requests_count += 1;
 
-        let future = factory();
+        let future = timeout(API_REQUEST_TIMEOUT, factory());
         let started_at = Instant::now();
-        if future.await.is_err() {
-            // Just increment amount of failed requests.
-            output.failed_requests_count += 1;
-        } else {
-            // Store successful sample.
-            let finished_at = Instant::now();
-            output.samples.push(Sample {
-                started_at,
-                finished_at,
-            });
+
+        match future.await {
+            Ok(Ok(..)) => {
+                // Store successful sample.
+                let finished_at = Instant::now();
+                output.samples.push(Sample {
+                    started_at,
+                    finished_at,
+                });
+            }
+            _ => {
+                // Just increment amount of failed requests.
+                output.failed_requests_count += 1;
+            }
         }
 
         if cancellation.is_canceled() {
@@ -154,13 +159,20 @@ impl<'a> ApiTestsBuilder<'a> {
 
 pub type ApiTestsFuture = BoxFuture<'static, BTreeMap<String, ApiTestsReport>>;
 
+/// API load test report for the concrete endpoint.
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ApiTestsReport {
+    /// A five numbers summary statistic if the number of successful requests is sufficient.
     pub summary: Option<FiveSummaryStats>,
+    /// Total amount of sent requests.
     pub total_requests_count: usize,
+    /// Amount of failed requests regardless of the cause of the failure.
     pub failed_requests_count: usize,
 }
 
+/// Runs the massive API spam routine.
+///
+/// This process will continue until the cancel command is occurred or the limit is reached.
 pub fn run(monitor: Monitor) -> (ApiTestsFuture, CancellationToken) {
     let cancellation = CancellationToken::default();
 
