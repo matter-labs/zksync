@@ -1,6 +1,9 @@
 import { Command } from 'commander';
-import * as utils from './utils';
+import * as utils from '../utils';
 import { Wallet } from 'ethers';
+import * as verifyKeys from './verify-keys';
+
+export { verifyKeys };
 
 export async function revertReason(txHash: string, web3url?: string) {
     await utils.spawn(`cd contracts && npx ts-node revert-reason.ts ${txHash} ${web3url || ''}`);
@@ -27,8 +30,6 @@ export async function testAccounts() {
     }
     console.log(JSON.stringify(walletKeys, null, 4));
 }
-
-export async function verifyKeys() {}
 
 export async function loadtest(scenario: string, config: string) {
     console.log(`Executing loadtest: scenario = ${scenario}, config-path = ${config}`);

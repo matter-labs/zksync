@@ -18,30 +18,37 @@ export async function withServer(testSuite: CallableFunction, timeout: number) {
 	const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance &> prover.log');
 	await utils.sleep(10)
 
-	const cleanup = (code: number) => {
-		console.log('Termination started...')
-		utils.sleepSync(5);
-		utils.allowFailSync(() => process.kill(-server.pid, 'SIGKILL'))
-		utils.allowFailSync(() => process.kill(-prover.pid, 'SIGKILL'));
-		utils.allowFailSync(() => clearTimeout(timer));
-		console.log('SERVER LOGS:')
-		console.log(fs.readFileSync('server.log').toString());
-		console.log('\n\nPROVER LOGS:')
-		console.log(fs.readFileSync('prover.log').toString());
-		utils.sleepSync(5);
-		console.log(`exit code: ${code}`);
-	}
+    const timer = setTimeout(() => {
+        console.log('Timeout reached!');
+        process.exit(1);
+    }, timeout * 1000);
+    timer.unref();
 
-	const timer = setTimeout(() => {
-		console.log('Timeout reached!');
-		process.exit(1);
-	}, timeout * 1000);
+    process.on('SIGINT', () => {
+        console.log('Interrupt received...')
+        process.exit(130);
+    });
+    
+    process.on('SIGTERM', () => {
+        console.log('Being murdered...')
+        process.exit(143);
+    });
 
-	process.on('exit', (code) => cleanup(code));
-	process.on('SIGINT', () => process.exit(130));
-	process.on('SIGTERM', () => process.exit(143));
+    process.on('exit', (code) => {
+        console.log('Termination started...');
+        utils.sleepSync(5);
+        utils.allowFailSync(() => process.kill(-server.pid, 'SIGKILL'));
+        utils.allowFailSync(() => process.kill(-prover.pid, 'SIGKILL'));
+        utils.allowFailSync(() => clearTimeout(timer));
+        console.log('SERVER LOGS:');
+        console.log(fs.readFileSync('server.log').toString());
+        console.log('\n\nPROVER LOGS:');
+        console.log(fs.readFileSync('prover.log').toString());
+        utils.sleepSync(5);
+        console.log('Exit code:', code);
+	});
 
-	await testSuite();
+    await testSuite();
 }
 
 export async function api() {

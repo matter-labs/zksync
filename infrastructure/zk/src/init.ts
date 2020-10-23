@@ -1,20 +1,21 @@
 import { Command } from 'commander';
 import * as utils from './utils';
 import fs from 'fs';
-import path from 'path';
 
 import * as db from './db/db';
 import * as server from './server';
 import * as contract from './contract';
+import * as run from './run/run';
 import { up } from './up';
 
 export async function init() {
+    await checkEnv();
     if (!process.env.CI) {
         await up();
     }
     await utils.allowFail(yarn());
     await downloadMissingKeys();
-    await unpackKeys();
+    await run.verifyKeys.unpack();
     await db.setup();
     await contract.buildDev();
     await deployERC20('dev');
@@ -50,16 +51,21 @@ async function yarn() {
     await utils.spawn('yarn --cwd infrastructure/analytics');
 }
 
-async function unpackKeys() {
-    const accountTreeDepth = process.env.ACCOUNT_TREE_DEPTH;
-    const balanceTreeDepth = process.env.BALANCE_TREE_DEPTH;
-    const keyDir = path.basename(process.env.KEY_DIR as string);
-    const keysTarball = `verify-keys-${keyDir}-account-${accountTreeDepth}_-balance-${balanceTreeDepth}.tar.gz`;
-    if (!fs.existsSync(`keys/packed/${keysTarball}`)) {
-        throw new Error(`Keys file ${keysTarball} not found`);
+async function checkEnv() {
+    await utils.exec('which node');
+    const { stdout: version } = await utils.exec('node --version')
+    if ('v10.20' >= version) {
+        throw new Error('Error, node.js version 10.20.1 or higher is required')
     }
-    await utils.exec(`tar xf keys/packed/${keysTarball}`);
-    console.log('Keys unpacked');
+    await utils.exec('which yarn');
+    await utils.exec('which docker');
+    await utils.exec('which docker-compose');
+    await utils.exec('which cargo');
+    await utils.exec('cargo sqlx --version');
+    await utils.exec('which psql');
+    await utils.exec('which pg_isready');
+    await utils.exec('which diesel');
+    await utils.exec('which solc');
 }
 
 async function downloadMissingKeys() {

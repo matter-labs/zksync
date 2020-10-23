@@ -24,8 +24,69 @@ export async function build() {
     await utils.spawn('yarn --cwd contracts build')
 }
 
+async function prepareTestContracts() {
+    const inDir = 'contracts/contracts';
+    const outDir = 'contracts/dev-contracts/generated';
+    fs.rmdirSync(outDir, { recursive: true });
+    fs.mkdirSync(outDir, { recursive: true });
+    
+    fs.copyFileSync(`${inDir}/Governance.sol`, `${outDir}/GovernanceTest.sol`);
+    fs.copyFileSync(`${inDir}/Verifier.sol`, `${outDir}/VerifierTest.sol`);
+    fs.copyFileSync(`${inDir}/ZkSync.sol`, `${outDir}/ZkSyncTest.sol`);
+    fs.copyFileSync(`${inDir}/Storage.sol`, `${outDir}/StorageTest.sol`);
+    fs.copyFileSync(`${inDir}/Config.sol`, `${outDir}/ConfigTest.sol`);
+    fs.copyFileSync(`${inDir}/UpgradeGatekeeper.sol`, `${outDir}/UpgradeGatekeeperTest.sol`);
+    fs.copyFileSync(`${inDir}/ZkSync.sol`, `${outDir}/ZkSyncTestUpgradeTarget.sol`);
+
+    fs.readdirSync(outDir).forEach(file => {
+        if (!file.endsWith('.sol')) return;
+        const source = fs.readFileSync(`${outDir}/${file}`)
+            .toString()
+            .replace('Governance', 'GovernanceTest')
+            .replace(/\bVerifier\b/g, 'VerifierTest')
+            .replace('ZkSync', 'ZkSyncTest')
+            .replace('Storage', 'StorageTest')
+            .replace('Config', 'ConfigTest')
+            .replace('UpgradeGatekeeper', 'UpgradeGatekeeperTest')
+        fs.writeFileSync(`${outDir}/${file}`, source);
+    });
+
+    const source = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString()
+        .replace('contract ZkSyncTest', 'contract ZkSyncTestUpgradeTarget')
+    fs.writeFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`, source);
+
+    const setConstant = (target: string, name: string, value: string) => {
+        const regex = new RegExp(`(.*constant ${name} =)(.*);`, 'g');
+        return target.replace(regex, `$1 ${value};`); 
+    }
+
+    const createGetter = (target: string, name: string) => {
+        const regex = new RegExp(`    (.*) (constant ${name} =)(.*);(.*)`, 'g');
+        return target.replace(regex, `    $1 $2$3;$4\n    function get_${name}() external pure returns ($1) {\n        return ${name};\n    }`);
+    }
+
+    let config = fs.readFileSync(`${outDir}/ConfigTest.sol`).toString();
+    config = setConstant(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS', '5');
+    config = setConstant(config, 'EXPECT_VERIFICATION_IN', '8');
+    config = setConstant(config, 'MAX_UNVERIFIED_BLOCKS', '4');
+    config = setConstant(config, 'PRIORITY_EXPIRATION', '101');
+    config = setConstant(config, 'UPGRADE_NOTICE_PERIOD', '4');
+    config = createGetter(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS');
+    config = createGetter(config, 'EXPECT_VERIFICATION_IN');
+    fs.writeFileSync(`${outDir}/ConfigTest.sol`, config);
+
+    const verifier = fs.readFileSync(`${outDir}/VerifierTest.sol`).toString();
+    fs.writeFileSync(`${outDir}/VerifierTest.sol`, setConstant(verifier, 'DUMMY_VERIFIER', 'true'));
+
+    const gatekeeper = fs.readFileSync(`${outDir}/UpgradeGatekeeper.sol`).toString();
+    fs.writeFileSync(`${outDir}/UpgradeGatekeeper.sol`, createGetter(gatekeeper, 'UPGRADE_NOTICE_PERIOD'));
+
+    const zksync = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString();
+    fs.writeFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`, zksync.replace(/revert\("upgzk"\);(.*)/, '/*revert("upgzk");*/$1'));
+}
+
 export async function buildDev() {
-    // TODO: prepare-test-contracts.sh
+    await prepareTestContracts();
     await utils.spawn('yarn --cwd contracts build-dev');
 }
 
