@@ -4,18 +4,26 @@ import * as contract from './contract';
 
 const IMAGES = ['server', 'prover', 'nginx', 'geth', 'dev-ticker', 'keybase', 'ci', 'fee-seller', 'rust'];
 
-export async function build(image: string) {
+async function dockerCommand(command: 'push' | 'build', image: string) {
+    if (image == 'rust') {
+        await dockerCommand(command, 'server');
+        await dockerCommand(command, 'prover');
+        return;
+    }
     if (!IMAGES.includes(image)) {
         throw new Error(`Wrong image name: ${image}`);
-    }
-    if (image == 'rust') {
-        await build('server');
-        await build('prover');
-        return;
     }
     if (image == 'keybase') {
         image = 'keybase-secret';
     }
+    if (command == 'build') {
+        await _build(image);
+    } else if (command == 'push') {
+        await _push(image);
+    }
+}
+
+async function _build(image: string) {
     if (image == 'nginx') {
         await utils.spawn('yarn --cwd infrastructure/explorer build');
     }
@@ -29,28 +37,24 @@ export async function build(image: string) {
     await utils.spawn(`DOCKER_BUILDKIT=1 docker build ${latestImage} ${taggedImage} -f ./docker/${image}/Dockerfile`);
 }
 
-export async function push(image: string) {
-    if (!IMAGES.includes(image)) {
-        throw new Error(`Wrong image name: ${image}`);
-    }
-    if (image == 'rust') {
-        await push('server');
-        await push('prover');
-        return;
-    }
-    if (image == 'keybase') {
-        image = 'keybase-secret';
-    }
-    const latestImage = `matterlabs/${image}:latest`;
-    await utils.spawn(`docker push ${latestImage}`);
+async function _push(image: string) {
+    await utils.spawn(`docker push matterlabs/${image}:latest`);
     if (['nginx', 'server', 'prover'].includes(image)) {
         const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
-        const taggedImage =  `matterlabs/${image}:${imageTag}`;
-        await utils.spawn(`docker push ${taggedImage}`);
+        await utils.spawn(`docker push matterlabs/${image}:${imageTag}`);
     }
 }
 
-const command = new Command('docker')
+export async function build(image: string) {
+    await dockerCommand('build', image);
+}
+
+export async function push(image: string) {
+    await dockerCommand('build', image);
+    await dockerCommand('push', image);
+}
+
+export const command = new Command('docker')
     .description('docker management');
 
 command
@@ -61,7 +65,4 @@ command
 command
     .command('push <image>')
     .description('build and push docker image')
-    .action(async (image: string) => {
-        await build(image);
-        await push(image);
-    });
+    .action(push);

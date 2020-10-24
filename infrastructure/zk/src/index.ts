@@ -10,8 +10,9 @@ import { command as dummyProver } from './dummy-prover';
 import { command as init } from './init';
 import { command as kube } from './kube';
 import { command as prover } from './prover';
-import { command as run } from './run';
+import { command as run } from './run/run';
 import { command as test } from './test/test';
+import { command as docker } from './docker';
 import * as utils from './utils';
 
 async function main() {
@@ -39,7 +40,8 @@ async function main() {
         .addCommand(init)
         .addCommand(prover)
         .addCommand(run)
-        .addCommand(test);
+        .addCommand(test)
+        .addCommand(docker);
 
     await program.parseAsync(process.argv);
 }
