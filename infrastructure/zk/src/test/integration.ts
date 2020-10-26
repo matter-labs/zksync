@@ -71,8 +71,10 @@ export async function testkit(command: string) {
 		containerID = stdout;
 		process.env.WEB3_URL = 'http://localhost:7545';
 	}
-	process.env.ETH_NETWORK = 'test';
-	await contract.build();
+	process.on('SIGINT', () => {
+		console.log('interrupt received');
+		process.emit('beforeExit', 130);
+	});
 
 	process.on('beforeExit', async (code) => {
 		if (process.env.ZKSYNC_ENV == 'dev') {
@@ -85,6 +87,9 @@ export async function testkit(command: string) {
 			process.exit(code);
 		}
 	});
+
+	process.env.ETH_NETWORK = 'test';
+	await contract.build();
 
 	if (command == 'block-sizes') {
 		await utils.spawn('cargo run --bin block_sizes_test --release');
