@@ -111,9 +111,9 @@ describe('Fetching Information', () => {
             expect(tx?.from).to.equal(alice.address.toLowerCase());
             expect(tx?.to).to.be.a('string');
             expect(tx?.nonce).to.equal(0);
-            expect(tx?.token).to.not.exist;
+            expect(tx?.token).to.equal('ETH');
             expect(tx?.amount).to.not.exist;
-            expect(tx?.fee).to.not.exist;
+            expect(tx?.fee).to.exist;
         });
 
         it('should fetch correct info - deposit', async () => {
@@ -343,26 +343,6 @@ describe('Making Transactions', () => {
             token: 'MLTT',
             amount: '73.0'
         })).to.be.rejected;
-    });
-
-    it('should not wait for commitment', async () => {
-        await commands.deposit({
-            to: poor1.address,
-            privkey: rich.privateKey,
-            token: 'DAI',
-            amount: '2.0'
-        });
-        const hash = await commands.transfer(
-            {
-                to: poor2.address,
-                privkey: poor1.privateKey,
-                token: 'DAI',
-                amount: '1.0'
-            },
-            true
-        );
-        const info = await commands.txInfo(hash);
-        expect(info.transaction).to.be.null;
     });
 
     it('should wait for commitment', async () => {

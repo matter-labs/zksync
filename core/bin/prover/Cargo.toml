@@ -11,9 +11,9 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
 [dependencies]
-zksync_state ={ path = "../../lib/state", version = "1.0" }
-zksync_types ={ path = "../../lib/types", version = "1.0" }
-zksync_circuit ={ path = "../../lib/circuit", version = "1.0" }
+zksync_state = { path = "../../lib/state", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_circuit = { path = "../../lib/circuit", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
@@ -33,5 +33,5 @@ env_logger = "0.6"
 reqwest = { version = "0.10", features = ["blocking", "json"] }
 anyhow = "1.0"
 backoff = "0.1.6"
-clap = "2.33.0"
+structopt = "0.3.20"
 ctrlc = { version = "3.1", features = ["termination"] }

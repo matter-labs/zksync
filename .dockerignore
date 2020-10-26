@@ -1,6 +1,10 @@
 *
 !docker/prover/prover-entry.sh
+!docker/exit-tool/exit-tool-entry.sh
+!docker/exit-tool/configs
 !docker/keybase-secrets/entrypoint.sh
+!etc/env/dev.env.example
+!etc/tokens
 !keys/packed
 !docker/nginx/nginx.conf
 !bin/

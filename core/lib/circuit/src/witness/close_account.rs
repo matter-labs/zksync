@@ -193,7 +193,7 @@ impl CloseAccountWitness<Bn256> {
 //    use super::*;
 //    use crate::witness::utils::public_data_commitment;
 //    use zksync_types::merkle_tree::PedersenHasher;
-//    use zksync_types::primitives::bytes_into_be_bits;
+//    use zksync_types::primitives::BitConvert::from_be_bytes;
 //
 //    use crate::circuit::ZkSyncCircuit;
 //    use bellman::Circuit;
@@ -267,7 +267,7 @@ impl CloseAccountWitness<Bn256> {
 //        );
 //        let packed_public_key = PackedPublicKey(sender_pk);
 //        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-//        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+//        let signer_packed_key_bits: Vec<_> = BitConvert::from_be_bytes(&packed_public_key_bytes)
 //            .iter()
 //            .map(|x| Some(input.x))
 //            .collect();

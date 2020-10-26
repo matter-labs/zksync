@@ -3,7 +3,7 @@ use std::{convert::TryInto, str::FromStr};
 
 /// Transaction hash.
 /// Essentially, a SHA-256 hash of transaction bytes encoded according to the zkSync protocol.
-#[derive(Debug, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct TxHash {
     pub(crate) data: [u8; 32],
 }

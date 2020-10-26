@@ -13,10 +13,10 @@ type Transfer = {
         };
         to: string;
         token: number;
-        type: "Transfer";
+        type: 'Transfer';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -31,10 +31,10 @@ type Deposit = {
             to: string;
             token: number;
         };
-        type: "Deposit";
+        type: 'Deposit';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -44,7 +44,7 @@ type ChangePubKey = {
     op: {
         account: string;
         accountId: number;
-        ethSignature?: string;
+        ethSignature: string | null;
         newPkHash: string;
         feeToken: number;
         fee: string;
@@ -53,10 +53,10 @@ type ChangePubKey = {
             pubKey: string;
             signature: string;
         };
-        type: "ChangePubKey";
+        type: 'ChangePubKey';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -75,11 +75,11 @@ type Withdraw = {
         };
         to: string;
         token: number;
-        type: "Withdraw";
+        type: 'Withdraw';
         fast: boolean;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -92,11 +92,11 @@ type FullExit = {
             eth_address: string;
             token: number;
         };
-        type: "FullExit";
-        withdraw_amount: string;
+        type: 'FullExit';
+        withdraw_amount: string | null;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 
@@ -104,7 +104,7 @@ type ForcedExit = {
     tx_hash: string;
     block_number: number;
     op: {
-        type: "ForcedExit";
+        type: 'ForcedExit';
         initiatorAccountId: number;
         target: string;
         token: number;
@@ -116,7 +116,7 @@ type ForcedExit = {
         };
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     created_at: string;
 };
 

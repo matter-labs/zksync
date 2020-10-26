@@ -14,15 +14,15 @@ fn signing_failed_error(err: impl ToString) -> SignerError {
     SignerError::SigningFailed(err.to_string())
 }
 
-pub struct Signer {
+pub struct Signer<S: EthereumSigner> {
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
     pub(crate) private_key: PrivateKey,
-    pub(crate) eth_signer: Option<EthereumSigner>,
+    pub(crate) eth_signer: Option<S>,
     pub(crate) account_id: Option<AccountId>,
 }
 
-impl fmt::Debug for Signer {
+impl<S: EthereumSigner> fmt::Debug for Signer<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut pk_contents = Vec::new();
         self.private_key
@@ -35,12 +35,8 @@ impl fmt::Debug for Signer {
     }
 }
 
-impl Signer {
-    pub fn new(
-        private_key: PrivateKey,
-        address: Address,
-        eth_signer: Option<EthereumSigner>,
-    ) -> Self {
+impl<S: EthereumSigner> Signer<S> {
+    pub fn new(private_key: PrivateKey, address: Address, eth_signer: Option<S>) -> Self {
         let pubkey_hash = PubKeyHash::from_privkey(&private_key);
 
         Self {

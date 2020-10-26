@@ -153,7 +153,7 @@ export class Wallet {
         }
         await this.setRequiredAccountIdFromServer("perform a Forced Exit");
 
-        const tokenId = await this.provider.tokenSet.resolveTokenId(forcedExit.token);
+        const tokenId = this.provider.tokenSet.resolveTokenId(forcedExit.token);
 
         const transactionData = {
             initiatorAccountId: this.accountId,
@@ -383,7 +383,7 @@ export class Wallet {
 
         if (changePubKey.fee == null) {
             changePubKey.fee = 0;
-            
+
             const feeType = {
                 ChangePubKey: {
                     onchainPubkeyAuth: changePubKey.onchainAuth,

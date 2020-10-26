@@ -1,0 +1,60 @@
+[package]
+name = "zksync_api"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+
+[dependencies]
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
+vlog = { path = "../../lib/vlog", version = "1.0" }
+
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+
+hex = "0.4"
+ethabi = "12.0.0"
+web3 = "0.13.0"
+serde = "1.0.90"
+serde_json = "1.0.0"
+log = "0.4"
+env_logger = "0.6"
+itertools = "0.8"
+jsonrpc-core = "14.0.3"
+jsonrpc-core-client = "14.0.3"
+jsonrpc-pubsub = "14.0.3"
+jsonrpc-ws-server = "14.0.3"
+jsonrpc-http-server = "14.0.3"
+jsonrpc-derive = "14.0.3"
+
+tokio = { version = "0.2", features = ["full"] }
+tokio_old = { package = "tokio", version = "0.1.22" }
+futures = { version = "0.3", features = ["compat"] }
+actix-rt = "1.1.1"
+actix-cors = "0.3.0"
+actix-web = "3.0.0"
+actix-web-httpauth = "0.5.0"
+
+num = { version = "0.2", features = ["serde"] }
+bigdecimal = { version = "0.1", features = ["serde"]}
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+ctrlc = { version = "3.1", features = ["termination"] }
+anyhow = "1.0"
+thiserror = "1.0"
+# TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
+futures01 = { package = "futures", version = "0.1" }
+reqwest = { version = "0.10", features = ["blocking"] }
+tiny-keccak = "1.4.2"
+async-trait = "0.1.31"
+jsonwebtoken = "7"
+
+lru-cache = "0.1.2"
+

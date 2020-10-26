@@ -1,4 +1,5 @@
 use num::BigUint;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
     tokens::TxFeeTypes,
@@ -8,17 +9,17 @@ use zksync_types::{
 use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
 
 #[derive(Debug)]
-pub struct ChangePubKeyBuilder<'a> {
-    wallet: &'a Wallet,
+pub struct ChangePubKeyBuilder<'a, S: EthereumSigner> {
+    wallet: &'a Wallet<S>,
     onchain_auth: bool,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     nonce: Option<Nonce>,
 }
 
-impl<'a> ChangePubKeyBuilder<'a> {
+impl<'a, S: EthereumSigner + Clone> ChangePubKeyBuilder<'a, S> {
     /// Initializes a change public key transaction building process.
-    pub fn new(wallet: &'a Wallet) -> Self {
+    pub fn new(wallet: &'a Wallet<S>) -> Self {
         Self {
             wallet,
             onchain_auth: false,

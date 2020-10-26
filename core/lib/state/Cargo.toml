@@ -12,7 +12,7 @@ categories = ["cryptography"]
 [dependencies]
 zksync_crypto = { path = "../crypto", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
-zksync_types ={ path = "../types", version = "1.0" }
+zksync_types = { path = "../types", version = "1.0" }
 
 num = { version = "0.2", features = ["serde"] }
 log = "0.4"

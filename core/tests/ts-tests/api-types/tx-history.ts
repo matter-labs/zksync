@@ -11,10 +11,10 @@ type Deposit = {
             to: string;
             token: string;
         };
-        type: "Deposit";
+        type: 'Deposit';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -32,10 +32,10 @@ type FullExit = {
             eth_address: string;
         };
         withdraw_amount: string;
-        type: "FullExit";
+        type: 'FullExit';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -58,10 +58,10 @@ type Transfer = {
         };
         to: string;
         token: string;
-        type: "Transfer";
+        type: 'Transfer';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -75,15 +75,19 @@ type ChangePubKey = {
     tx: {
         account: string;
         accountId: number;
-        ethSignature?: string;
+        ethSignature: string | null;
         newPkHash: string;
         nonce: number;
         type: string;
         feeToken: number;
         fee: string;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -106,11 +110,11 @@ type Withdraw = {
         };
         to: string;
         token: string;
-        type: "Withdraw";
-        fast?: boolean;
+        type: 'Withdraw';
+        fast: boolean;
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;
@@ -131,10 +135,10 @@ type ForcedExit = {
             pubKey: string;
             signature: string;
         };
-        type: "ForcedExit";
+        type: 'ForcedExit';
     };
     success: boolean;
-    fail_reason?: string;
+    fail_reason: string | null;
     commited: boolean;
     verified: boolean;
     created_at: string;

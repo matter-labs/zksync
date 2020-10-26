@@ -17,16 +17,17 @@ ethabi = "12.0.0"
 web3 = "0.13.0"
 hex = "0.4"
 log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.0"
 env_logger = "0.6"
 anyhow = "1.0"
-clap = "2.33.0"
+structopt = "0.3.20"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 tokio = { version = "0.2", features = ["full"] }
 
-zksync_state ={ path = "../../lib/state", version = "1.0" }
-zksync_types ={ path = "../../lib/types", version = "1.0" }
-zksync_storage ={ path = "../../lib/storage", version = "1.0" }
+zksync_state = { path = "../../lib/state", version = "1.0" }
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }

@@ -11,7 +11,7 @@ use zksync_basic_types::{Address, Log, U256};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
-use zksync_crypto::primitives::bytes_slice_to_uint32;
+use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::operations::{DepositOp, FullExitOp};
@@ -108,7 +108,7 @@ impl ZkSyncPriorityOp {
                 // account_id
                 let (account_id, pub_data_left) = {
                     let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
-                    (bytes_slice_to_uint32(account_id).unwrap(), left)
+                    (u32::from_bytes(account_id).unwrap(), left)
                 };
 
                 // owner

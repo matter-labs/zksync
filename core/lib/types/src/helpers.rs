@@ -1,6 +1,6 @@
 use num::{BigUint, FromPrimitive};
 use zksync_crypto::params;
-use zksync_crypto::primitives::{pack_as_float, unpack_float};
+use zksync_crypto::primitives::FloatConversions;
 
 use crate::{Account, AccountMap, AccountUpdates};
 
@@ -27,7 +27,7 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
 /// If the provided token amount is not packable, it is rounded down to the
 /// closest amount that fits in packed form. As a result, some precision will be lost.
 pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {
-    pack_as_float(
+    FloatConversions::pack(
         amount,
         params::AMOUNT_EXPONENT_BIT_WIDTH,
         params::AMOUNT_MANTISSA_BIT_WIDTH,
@@ -41,7 +41,7 @@ pub fn pack_token_amount(amount: &BigUint) -> Vec<u8> {
 /// If the provided fee amount is not packable, it is rounded down to the
 /// closest amount that fits in packed form. As a result, some precision will be lost.
 pub fn pack_fee_amount(amount: &BigUint) -> Vec<u8> {
-    pack_as_float(
+    FloatConversions::pack(
         amount,
         params::FEE_EXPONENT_BIT_WIDTH,
         params::FEE_MANTISSA_BIT_WIDTH,
@@ -60,7 +60,7 @@ pub fn is_fee_amount_packable(amount: &BigUint) -> bool {
 
 /// Attempts to unpack the token amount.
 pub fn unpack_token_amount(data: &[u8]) -> Option<BigUint> {
-    unpack_float(
+    FloatConversions::unpack(
         data,
         params::AMOUNT_EXPONENT_BIT_WIDTH,
         params::AMOUNT_MANTISSA_BIT_WIDTH,
@@ -70,7 +70,7 @@ pub fn unpack_token_amount(data: &[u8]) -> Option<BigUint> {
 
 /// Attempts to unpack the fee amount.
 pub fn unpack_fee_amount(data: &[u8]) -> Option<BigUint> {
-    unpack_float(
+    FloatConversions::unpack(
         data,
         params::FEE_EXPONENT_BIT_WIDTH,
         params::FEE_MANTISSA_BIT_WIDTH,

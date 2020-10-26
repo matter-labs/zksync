@@ -1,4 +1,5 @@
 use num::BigUint;
+use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, Address, TokenLike};
 
 use crate::{
@@ -13,16 +14,16 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Wallet {
+pub struct Wallet<S: EthereumSigner> {
     pub provider: Provider,
-    pub signer: Signer,
+    pub signer: Signer<S>,
     pub tokens: TokensCache,
 }
 
-impl Wallet {
+impl<S: EthereumSigner + Clone> Wallet<S> {
     pub async fn new(
         provider: Provider,
-        credentials: WalletCredentials,
+        credentials: WalletCredentials<S>,
     ) -> Result<Self, ClientError> {
         let mut signer = Signer::new(
             credentials.zksync_private_key,
@@ -116,17 +117,17 @@ impl Wallet {
     }
 
     /// Initializes `Transfer` transaction sending.
-    pub fn start_transfer(&self) -> TransferBuilder<'_> {
+    pub fn start_transfer(&self) -> TransferBuilder<'_, S> {
         TransferBuilder::new(self)
     }
 
     /// Initializes `ChangePubKey` transaction sending.
-    pub fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_> {
+    pub fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_, S> {
         ChangePubKeyBuilder::new(self)
     }
 
     /// Initializes `Withdraw` transaction sending.
-    pub fn start_withdraw(&self) -> WithdrawBuilder<'_> {
+    pub fn start_withdraw(&self) -> WithdrawBuilder<'_, S> {
         WithdrawBuilder::new(self)
     }
 
@@ -136,7 +137,7 @@ impl Wallet {
     pub async fn ethereum(
         &self,
         web3_addr: impl AsRef<str>,
-    ) -> Result<EthereumProvider, ClientError> {
+    ) -> Result<EthereumProvider<S>, ClientError> {
         if let Some(eth_signer) = &self.signer.eth_signer {
             let ethereum_provider = EthereumProvider::new(
                 &self.provider,
