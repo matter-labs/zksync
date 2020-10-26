@@ -89,6 +89,7 @@ async function prepareTestContracts() {
 }
 
 export async function buildDev() {
+    prepareVerify();
     await prepareTestContracts();
     await utils.spawn('yarn --cwd contracts build-dev');
 }
