@@ -59,7 +59,7 @@ jobs:
       run: zk run data-restore check-existing
 
     - name: integration-testkit
-      run: zk test i testkit --with-server
+      run: zk test i testkit
 
     - name: test-contracts
       run: zk test contracts

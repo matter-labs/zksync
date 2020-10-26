@@ -58,7 +58,7 @@ export async function zcli() {
 }
 
 export async function server() {
-	await utils.spawn('yarn --cwd core/tests/ts-test test');
+	await utils.spawn('yarn --cwd core/tests/ts-tests test');
 }
 
 export async function testkit(command: string) {
