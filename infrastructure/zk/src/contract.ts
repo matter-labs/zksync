@@ -42,7 +42,7 @@ async function prepareTestContracts() {
 
     fs.readdirSync(outDir).forEach(file => {
         if (!file.endsWith('.sol')) return;
-        const source = fs.readFileSync(`${outDir}/${file}`)
+        utils.modifyFile(`${outDir}/${file}`, source => source
             .toString()
             .replace(/Governance/g, 'GovernanceTest')
             .replace(/\bVerifier\b/g, 'VerifierTest')
@@ -50,12 +50,8 @@ async function prepareTestContracts() {
             .replace(/Storage/g, 'StorageTest')
             .replace(/Config/g, 'ConfigTest')
             .replace(/UpgradeGatekeeper/g, 'UpgradeGatekeeperTest')
-        fs.writeFileSync(`${outDir}/${file}`, source);
+        );
     });
-
-    const source = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString()
-        .replace(/contract ZkSyncTest/g, 'contract ZkSyncTestUpgradeTarget')
-    fs.writeFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`, source);
 
     const setConstant = (target: string, name: string, value: string) => {
         const regex = new RegExp(`(.*constant ${name} =)(.*);`, 'g');
@@ -67,25 +63,21 @@ async function prepareTestContracts() {
         return target.replace(regex, `    $1 $2$3;$4\n    function get_${name}() external pure returns ($1) {\n        return ${name};\n    }`);
     }
 
-    let config = fs.readFileSync(`${outDir}/ConfigTest.sol`).toString();
-    config = setConstant(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS', '5');
-    config = setConstant(config, 'EXPECT_VERIFICATION_IN', '8');
-    config = setConstant(config, 'MAX_UNVERIFIED_BLOCKS', '4');
-    config = setConstant(config, 'PRIORITY_EXPIRATION', '101');
-    config = setConstant(config, 'UPGRADE_NOTICE_PERIOD', '4');
-    config = createGetter(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS');
-    config = createGetter(config, 'EXPECT_VERIFICATION_IN');
-    fs.writeFileSync(`${outDir}/ConfigTest.sol`, config);
+    utils.modifyFile(`${outDir}/ConfigTest.sol`, config => {
+        config = setConstant(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS', '5');
+        config = setConstant(config, 'EXPECT_VERIFICATION_IN', '8');
+        config = setConstant(config, 'MAX_UNVERIFIED_BLOCKS', '4');
+        config = setConstant(config, 'PRIORITY_EXPIRATION', '101');
+        config = setConstant(config, 'UPGRADE_NOTICE_PERIOD', '4');
+        config = createGetter(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS');
+        config = createGetter(config, 'EXPECT_VERIFICATION_IN');
+        return config;
+    });
 
-    const verifier = fs.readFileSync(`${outDir}/VerifierTest.sol`).toString();
-    fs.writeFileSync(`${outDir}/VerifierTest.sol`, setConstant(verifier, 'DUMMY_VERIFIER', 'true'));
-
-    const gatekeeper = fs.readFileSync(`${outDir}/UpgradeGatekeeperTest.sol`).toString();
-    fs.writeFileSync(`${outDir}/UpgradeGatekeeperTest.sol`, createGetter(gatekeeper, 'UPGRADE_NOTICE_PERIOD'));
-
-    const zksync = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString()
-        .replace(/revert\("upgzk"\);(.*)/g, '/*revert("upgzk");*/$1');
-    fs.writeFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`, zksync);
+    utils.modifyFile(`${outDir}/VerifierTest.sol`, s => setConstant(s, 'DUMMY_VERIFIER', 'true'));
+    utils.modifyFile(`${outDir}/UpgradeGatekeeperTest.sol`, s => createGetter(s, 'UPGRADE_NOTICE_PERIOD'));
+    utils.replaceInFile(`${outDir}/ZkSyncTestUpgradeTarget.sol`, 'contract ZkSyncTest', 'contract ZkSyncTestUpgradeTarget');
+    utils.replaceInFile(`${outDir}/ZkSyncTestUpgradeTarget.sol`, /revert\("upgzk"\);(.*)/g, '/*revert("upgzk");*/$1');
 }
 
 export async function buildDev() {

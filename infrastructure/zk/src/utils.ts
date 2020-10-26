@@ -85,3 +85,13 @@ export function allowFailSync<T>(func: () => T) {
         return null;
     }
 }
+
+export function replaceInFile(filename: string, before: string | RegExp, after: string) {
+    before = new RegExp(before, 'g');
+    modifyFile(filename, source => source.replace(before, after));
+}
+
+export function modifyFile(filename: string, modifier: (s: string) => string) {
+    const source = fs.readFileSync(filename).toString();
+    fs.writeFileSync(filename, modifier(source));
+}
