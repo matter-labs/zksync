@@ -1,0 +1,7 @@
+{
+    "eth_network": "ropsten",
+    "governance_addr": "0x0C5C6cD4E2436B1b308A0C11942705418F41F730",
+    "genesis_tx_hash": "0xd37743975fbad2d8be5fc75ecb4299c2eef36e483ad1a12f74777e8b86a952b5",
+    "contract_addr": "0x17dE8874259c59cd9f7E6ec86b6813Bda661A57c",
+    "available_block_chunk_sizes": [6,30,74,150,320,630]
+}

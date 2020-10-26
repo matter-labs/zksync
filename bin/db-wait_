@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Checks if db is up and accepting connections.
+
+. .setup_env
+
+echo $DATABASE_URL
+for i in $(seq 1 5);
+    do pg_isready -d "$DATABASE_URL" && s=0 && break || s=$? && sleep 5;
+done;
+exit $s

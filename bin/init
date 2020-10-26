@@ -10,6 +10,7 @@ zksync yarn || true # It can fail.
 zksync plonk-setup check || zksync plonk-setup download
 zksync verify-keys unpack
 zksync db-setup
+zksync db-check-sqlx
 zksync build-dev-contracts
 zksync deploy-erc20 dev
 zksync build-contracts

@@ -10,6 +10,7 @@ export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 export FEE_SELLER_IMAGE ?=matterlabs/fee-seller:latest
+export EXIT_TOOL_IMAGE ?=matterlabs/exit-tool:latest
 
 # Getting started
 
@@ -294,3 +295,9 @@ push-image-dev-ticker: image-dev-ticker
 
 api-test:
 	@cd core/tests/ts-tests && yarn && yarn api-test
+
+image-exit-tool:
+	@docker build -t "${EXIT_TOOL_IMAGE}" -f ./docker/exit-tool/Dockerfile .
+
+push-image-exit-tool: image-exit-tool
+	@docker push "${EXIT_TOOL_IMAGE}"
