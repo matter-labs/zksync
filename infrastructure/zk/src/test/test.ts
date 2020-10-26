@@ -75,3 +75,7 @@ command
     .description('run unit-tests for the contracts')
     .action(contracts);
 
+command
+    .command('rust')
+    .description('run unit-tests for rust binaries')
+    .action(rust);
