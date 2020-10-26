@@ -98,8 +98,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     it('should succeed resending a previously failed tx', async () => {
-        let nick = await tester.fundedWallet('5.0');
-        let mike = await tester.emptyWallet();
+        const nick = await tester.fundedWallet('5.0');
+        const mike = await tester.emptyWallet();
         await tester.testTransactionResending(nick, mike, token, TX_AMOUNT);
     })
 

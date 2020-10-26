@@ -64,7 +64,7 @@ Tester.prototype.testTransactionResending = async function (
     const transferFullFee = await this.syncProvider.getTransactionFee('Transfer', to.address(), token);
     const transferFee = transferFullFee.totalFee;
 
-    const feeType = { ChangePubKey: { onchainPubkeyAuth: false } };
+    const feeType = { ChangePubKey: { onchainPubkeyAuth: true } };
     const changePubKeyFullFee = await this.syncProvider.getTransactionFee(feeType, from.address(), token);
     const changePubKeyFee = changePubKeyFullFee.totalFee;
 
