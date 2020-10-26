@@ -80,7 +80,7 @@ export async function allowFail<T>(promise: Promise<T>) {
 
 export function allowFailSync<T>(func: () => T) {
     try {
-        return func()
+        return func();
     } catch {
         return null;
     }
@@ -88,7 +88,7 @@ export function allowFailSync<T>(func: () => T) {
 
 export function replaceInFile(filename: string, before: string | RegExp, after: string) {
     before = new RegExp(before, 'g');
-    modifyFile(filename, source => source.replace(before, after));
+    modifyFile(filename, (source) => source.replace(before, after));
 }
 
 export function modifyFile(filename: string, modifier: (s: string) => string) {

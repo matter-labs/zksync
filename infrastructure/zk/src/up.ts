@@ -6,7 +6,4 @@ export async function up() {
     await utils.spawn('docker-compose up -d tesseracts');
 }
 
-// prettier-ignore
-export const command = new Command('up')
-    .description('start development containers')
-    .action(up);
+export const command = new Command('up').description('start development containers').action(up);

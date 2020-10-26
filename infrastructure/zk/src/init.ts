@@ -33,10 +33,11 @@ async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: strin
                 { "name": "wBTC", "symbol": "wBTC", "decimals":  8 },
                 { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
-            ]' > ./etc/tokens/localhost.json`
-        );
+            ]' > ./etc/tokens/localhost.json`);
     } else if (command == 'new') {
-       await utils.exec(`yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`);
+        await utils.exec(
+            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
+        );
     }
 }
 
@@ -54,9 +55,9 @@ async function yarn() {
 
 async function checkEnv() {
     await utils.exec('which node');
-    const { stdout: version } = await utils.exec('node --version')
+    const { stdout: version } = await utils.exec('node --version');
     if ('v10.20' >= version) {
-        throw new Error('Error, node.js version 10.20.1 or higher is required')
+        throw new Error('Error, node.js version 10.20.1 or higher is required');
     }
     await utils.exec('which yarn');
     await utils.exec('which docker');

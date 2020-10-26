@@ -46,8 +46,7 @@ async function main() {
     await program.parseAsync(process.argv);
 }
 
-main()
-    .catch((err: Error) => {
-        console.error('Error:', err.message || err);
-        process.exitCode = 1;
-    });
+main().catch((err: Error) => {
+    console.error('Error:', err.message || err);
+    process.exitCode = 1;
+});

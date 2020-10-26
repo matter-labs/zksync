@@ -16,17 +16,17 @@ async function performRedeployment() {
 }
 
 export async function run() {
-    await utils.spawn("cargo run --release --bin dummy_prover dummy-prover-instance");
+    await utils.spawn('cargo run --release --bin dummy_prover dummy-prover-instance');
 }
 
 export async function status() {
     try {
         // using grep and not native fs.readFile because grep -l stops after first match
         await utils.exec(`grep -l 'constant DUMMY_VERIFIER = true' ${VERIFIER_FILE}`);
-        console.log("Dummy Prover status: enabled");
+        console.log('Dummy Prover status: enabled');
         return true;
     } catch (err) {
-        console.log("Dummy Prover status: disabled");
+        console.log('Dummy Prover status: disabled');
         return false;
     }
 }
@@ -43,42 +43,30 @@ async function toggle(from: string, to: string) {
     const replaced = verifierSource.replace(`constant DUMMY_VERIFIER = ${from}`, `constant DUMMY_VERIFIER = ${to}`);
     fs.writeFileSync(VERIFIER_FILE, replaced);
     await status();
-    console.log("Redeploying the contract...");
+    console.log('Redeploying the contract...');
     await performRedeployment();
-    console.log("Done.")
+    console.log('Done.');
 }
 
 export async function enable() {
-    await toggle("false", "true");
+    await toggle('false', 'true');
 }
 
 export async function disable() {
-    await toggle("true", "false");
+    await toggle('true', 'false');
 }
 
-export const command = new Command('dummy-prover')
-    .description('commands for zksync dummy prover');
+export const command = new Command('dummy-prover').description('commands for zksync dummy prover');
 
-command
-    .command('run')
-    .description('launch the dummy prover')
-    .action(run);
+command.command('run').description('launch the dummy prover').action(run);
+command.command('enable').description('enable the dummy prover').action(enable);
+command.command('disable').description('disable the dummy prover').action(disable);
 
 command
     .command('status')
     .description('check if dummy prover is enabled')
     // @ts-ignore
     .action(status);
-
-command
-    .command('enable')
-    .description('enable the dummy prover')
-    .action(enable);
-
-command
-    .command('disable')
-    .description('disable the dummy prover')
-    .action(disable);
 
 command
     .command('ensure-disabled')

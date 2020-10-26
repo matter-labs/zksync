@@ -6,7 +6,7 @@ export async function updateConfig() {
     const env = process.env.ZKSYNC_ENV as string;
     const envFile = process.env.ENV_FILE;
     if (env == 'dev') {
-        throw new Error("This command requires environment with k8s cluster");
+        throw new Error('This command requires environment with k8s cluster');
     } else if (env == 'development') {
         namespace = 'dev';
     } else if (env == 'prod') {
@@ -17,16 +17,11 @@ export async function updateConfig() {
         console.error('Unknown environment');
         return;
     }
-    const configmap =
-        `kubectl create configmap server-env-custom --from-env-file=${envFile} -n ${namespace} -o yaml --dry-run`;
+    const configmap = `kubectl create configmap server-env-custom --from-env-file=${envFile} -n ${namespace} -o yaml --dry-run`;
     await utils.spawn(`${configmap} | kubectl diff -f - || true`);
     await utils.spawn(`${configmap} | kubectl apply -f -`);
 }
 
-export const command = new Command('kube')
-    .description('kubernetes management');
+export const command = new Command('kube').description('kubernetes management');
 
-command
-    .command('update-config')
-    .description('update kubernetes config')
-    .action(updateConfig);
+command.command('update-config').description('update kubernetes config').action(updateConfig);

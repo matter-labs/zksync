@@ -2,17 +2,7 @@ import { Command } from 'commander';
 import * as utils from './utils';
 import * as contract from './contract';
 
-const IMAGES = [
-    'server', 
-    'prover', 
-    'nginx', 
-    'geth', 
-    'dev-ticker', 
-    'keybase', 
-    'ci', 
-    'fee-seller', 
-    'exit-tool'
-];
+const IMAGES = ['server', 'prover', 'nginx', 'geth', 'dev-ticker', 'keybase', 'ci', 'fee-seller', 'exit-tool'];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
     if (image == 'rust') {
@@ -64,15 +54,7 @@ export async function push(image: string) {
     await dockerCommand('push', image);
 }
 
-export const command = new Command('docker')
-    .description('docker management');
+export const command = new Command('docker').description('docker management');
 
-command
-    .command('build <image>')
-    .description('build docker image')
-    .action(build);
-
-command
-    .command('push <image>')
-    .description('build and push docker image')
-    .action(push);
+command.command('build <image>').description('build docker image').action(build);
+command.command('push <image>').description('build and push docker image').action(push);
