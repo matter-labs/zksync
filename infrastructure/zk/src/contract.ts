@@ -29,7 +29,7 @@ async function prepareTestContracts() {
     const outDir = 'contracts/dev-contracts/generated';
     fs.rmdirSync(outDir, { recursive: true });
     fs.mkdirSync(outDir, { recursive: true });
-    
+
     fs.copyFileSync(`${inDir}/Governance.sol`, `${outDir}/GovernanceTest.sol`);
     fs.copyFileSync(`${inDir}/Verifier.sol`, `${outDir}/VerifierTest.sol`);
     fs.copyFileSync(`${inDir}/ZkSync.sol`, `${outDir}/ZkSyncTest.sol`);
@@ -42,17 +42,17 @@ async function prepareTestContracts() {
         if (!file.endsWith('.sol')) return;
         const source = fs.readFileSync(`${outDir}/${file}`)
             .toString()
-            .replace('Governance', 'GovernanceTest')
+            .replace(/Governance/g, 'GovernanceTest')
             .replace(/\bVerifier\b/g, 'VerifierTest')
-            .replace('ZkSync', 'ZkSyncTest')
-            .replace('Storage', 'StorageTest')
-            .replace('Config', 'ConfigTest')
-            .replace('UpgradeGatekeeper', 'UpgradeGatekeeperTest')
+            .replace(/ZkSync/g, 'ZkSyncTest')
+            .replace(/Storage/g, 'StorageTest')
+            .replace(/Config/g, 'ConfigTest')
+            .replace(/UpgradeGatekeeper/g, 'UpgradeGatekeeperTest')
         fs.writeFileSync(`${outDir}/${file}`, source);
     });
 
     const source = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString()
-        .replace('contract ZkSyncTest', 'contract ZkSyncTestUpgradeTarget')
+        .replace(/contract ZkSyncTest/g, 'contract ZkSyncTestUpgradeTarget')
     fs.writeFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`, source);
 
     const setConstant = (target: string, name: string, value: string) => {
@@ -78,8 +78,8 @@ async function prepareTestContracts() {
     const verifier = fs.readFileSync(`${outDir}/VerifierTest.sol`).toString();
     fs.writeFileSync(`${outDir}/VerifierTest.sol`, setConstant(verifier, 'DUMMY_VERIFIER', 'true'));
 
-    const gatekeeper = fs.readFileSync(`${outDir}/UpgradeGatekeeper.sol`).toString();
-    fs.writeFileSync(`${outDir}/UpgradeGatekeeper.sol`, createGetter(gatekeeper, 'UPGRADE_NOTICE_PERIOD'));
+    const gatekeeper = fs.readFileSync(`${outDir}/UpgradeGatekeeperTest.sol`).toString();
+    fs.writeFileSync(`${outDir}/UpgradeGatekeeperTest.sol`, createGetter(gatekeeper, 'UPGRADE_NOTICE_PERIOD'));
 
     const zksync = fs.readFileSync(`${outDir}/ZkSyncTestUpgradeTarget.sol`).toString()
         .replace(/revert\("upgzk"\);(.*)/g, '/*revert("upgzk");*/$1');

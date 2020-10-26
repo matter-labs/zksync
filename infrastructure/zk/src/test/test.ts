@@ -6,7 +6,7 @@ export { integration };
 
 export async function db(reset: boolean) {
     const databaseUrl = process.env.DATABASE_URL as string;
-    process.env.DATABASE_URL = databaseUrl.replace('plasma', 'plasma_test');
+    process.env.DATABASE_URL = databaseUrl.replace(/plasma/g, 'plasma_test');
     process.chdir('core/lib/storage');
     if (reset) {
         await utils.exec('diesel database reset')
