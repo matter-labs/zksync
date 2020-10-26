@@ -2,8 +2,9 @@ import { Command } from 'commander';
 import * as utils from '../utils';
 import { Wallet } from 'ethers';
 import * as verifyKeys from './verify-keys';
+import * as dataRestore from './data-restore';
 
-export { verifyKeys };
+export { verifyKeys, dataRestore };
 
 export async function revertReason(txHash: string, web3url?: string) {
     await utils.spawn(`cd contracts && npx ts-node revert-reason.ts ${txHash} ${web3url || ''}`);
