@@ -4,7 +4,7 @@ import fs from 'fs';
 import * as dummyProver from '../dummy-prover';
 import * as contract from '../contract';
 
-export async function withServer(testSuite: CallableFunction, timeout: number) {
+export async function withServer<T>(testSuite: () => Promise<T>, timeout: number) {
 	if (!await dummyProver.status()) {
 		await dummyProver.enable();
 	}
@@ -67,7 +67,7 @@ export async function testkit(command: string) {
 	if (process.env.ZKSYNC_ENV == 'ci') {
 		process.env.WEB3_URL = 'http://geth-fast:8545'
 	} else if (process.env.ZKSYNC_ENV == 'dev') {
-		let { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
+		const { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
 		containerID = stdout;
 		process.env.WEB3_URL = 'http://localhost:7545';
 	}

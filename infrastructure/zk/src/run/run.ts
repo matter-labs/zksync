@@ -32,9 +32,9 @@ export async function testAccounts() {
     console.log(JSON.stringify(walletKeys, null, 4));
 }
 
-export async function loadtest(scenario: string, config: string) {
-    console.log(`Executing loadtest: scenario = ${scenario}, config-path = ${config}`);
-    await utils.spawn(`cargo run --release --bin loadtest -- --scenario ${scenario} ${config}`);
+export async function loadtest(...args: string[]) {
+    console.log(args);
+    await utils.spawn(`cargo run --release --bin loadtest -- ${args.join(' ')}`);
 }
 
 export const command = new Command('run')
@@ -71,17 +71,9 @@ command
     });
 
 command
-    .command('loadtest [scenario] [config_path]')
+    .command('loadtest [options...]')
     .description('run the loadtest')
-    .action(async (scenario: string | null, config: string | null, cmd: Command) => {
-        scenario = scenario || 'outgoing';
-        if (scenario == 'outgoing' || scenario == 'execution') {
-            config = config || './core/tests/loadtest/src/configs/loadtest.json';
-        } else if (scenario.match(/real[-_]?life/)) {
-            config = config || './core/tests/loadtest/src/config/reallife.json';
-        } else {
-            cmd.outputHelp();
-            throw new Error('Unknown loadtest scenario');
-        }
-        await loadtest(scenario, config);
+    .allowUnknownOption()
+    .action(async (...options: string[]) => {
+        await loadtest(...options[0]);
     });

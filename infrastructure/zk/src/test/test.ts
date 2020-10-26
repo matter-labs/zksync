@@ -62,12 +62,13 @@ command
         await db(cmd.reset);
     });
 
-// command
-//     .command('circuit [threads] [test_name] [options...]')
-//     .description('run unit-tests for the circuit')
-//     .action(async (threads: string | null, testName: string, options: string[]) => {
-//         await circuit(threads ? parseInt(threads) : 1, testName, ...options);
-//     });
+command
+    .command('circuit [threads] [test_name] [options...]')
+    .description('run unit-tests for the circuit')
+    .allowUnknownOption()
+    .action(async (threads: number | null, testName: string | null, ...options: string[]) => {
+        await circuit(threads || 1, testName || '', ...options[0]);
+    });
 
 command
     .command('contracts')
