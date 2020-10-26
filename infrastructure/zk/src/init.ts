@@ -20,6 +20,7 @@ export async function init() {
     await contract.buildDev();
     await deployERC20('dev');
     await contract.build();
+    await db.reset();
     await server.genesis();
     await contract.redeploy();
 }

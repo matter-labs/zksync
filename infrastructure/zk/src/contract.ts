@@ -114,8 +114,10 @@ export async function deploy() {
     ];
     for (const envVar of envVars) {
         const pattern = new RegExp(`${envVar}=.*`, 'g');
-        // @ts-ignore
-        utils.modifyEnv(envVar, deployLog.match(pattern)[0]);
+        const matches = deployLog.match(pattern);
+        if (matches !== null) {
+            utils.modifyEnv(envVar, matches[0]);
+        }
     }
 }
 
