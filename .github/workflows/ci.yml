@@ -26,10 +26,13 @@ jobs:
         rustup update stable
         cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
 
+    - name: zk
+      run: pushd infrastructure/zk && yarn && yarn build
+
     - name: lints
       run: |
-        zksync db-setup # So database will be created for compilation.
-        zksync dummy-prover ensure-disabled
+        zk db setup # So database will be created for compilation.
+        zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
         f cargo clippy --tests --benches -- -D warnings
@@ -38,43 +41,46 @@ jobs:
         cargo clippy --all --tests --benches -- -D warnings
 
     - name: init
-      run: zksync init
+      run: zk init
 
     - name: js-tests
-      run: zksync js-tests
+      run: zk test js
 
     - name: zcli-tests
-      run: ci-zcli.sh
+      run: zk test i zcli --with-server
 
     - name: integration-tests
-      run: ci-integration-tests.sh
+      run: zk test i server --with-server
+
+    - name: api-tests
+      run: zk test i api --with-server
 
     - name: data-restore
-      run: zksync data-restore check-existing
+      run: zk run data-restore check-existing
 
     - name: integration-testkit
-      run: zksync integration-testkit
+      run: zk test i testkit --with-server
 
     - name: test-contracts
-      run: zksync test-contracts
+      run: zk test contracts
 
     - name: rust-tests
-      run: f cargo test --release
+      run: zk test rust
 
     - name: rust-sdk-tests
-      run: zksync rust-sdk-tests
+      run: zk test i rust-sdk --with-server
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && f cargo test --release
 
     - name: db-tests
-      run: zksync db-test
+      run: zk test db
 
     - name: prover-tests
-      run: zksync prover-tests
+      run: zk test prover
 
     - name: circuit-tests
-      run: zksync circuit-tests "" `nproc`
+      run: zk test circuit `nproc`
 
     services:
       geth:
