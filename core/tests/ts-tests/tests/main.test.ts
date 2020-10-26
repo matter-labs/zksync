@@ -97,12 +97,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
     });
 
-    it('should succeed resending a previously failed tx', async () => {
-        const nick = await tester.fundedWallet('5.0');
-        const mike = await tester.emptyWallet();
-        await tester.testTransactionResending(nick, mike, token, TX_AMOUNT);
-    })
-
     describe('Full Exit tests', () => {
         let carl: Wallet;
 
