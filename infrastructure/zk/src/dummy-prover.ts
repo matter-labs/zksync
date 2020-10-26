@@ -31,6 +31,13 @@ export async function status() {
     }
 }
 
+export async function ensureDisabled() {
+    const enabled = await status();
+    if (enabled) {
+        throw new Error("This is not allowed, please change DUMMY_VERIFIER constant value to 'false'");
+    }
+}
+
 async function toggle(from: string, to: string) {
     const verifierSource = fs.readFileSync(VERIFIER_FILE).toString();
     const replaced = verifierSource.replace(`constant DUMMY_VERIFIER = ${from}`, `constant DUMMY_VERIFIER = ${to}`);
@@ -73,3 +80,7 @@ command
     .description('disable the dummy prover')
     .action(disable);
 
+command
+    .command('ensure-disabled')
+    .description('checks if dummy-prover is disabled and exits with code 1 otherwise')
+    .action(ensureDisabled);
