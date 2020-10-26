@@ -27,7 +27,9 @@ export async function build() {
 async function prepareTestContracts() {
     const inDir = 'contracts/contracts';
     const outDir = 'contracts/dev-contracts/generated';
-    fs.rmdirSync(outDir, { recursive: true });
+    if (fs.existsSync(outDir)) {
+        fs.rmdirSync(outDir, { recursive: true });
+    }
     fs.mkdirSync(outDir, { recursive: true });
 
     fs.copyFileSync(`${inDir}/Governance.sol`, `${outDir}/GovernanceTest.sol`);
