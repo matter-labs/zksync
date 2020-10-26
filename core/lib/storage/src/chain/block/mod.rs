@@ -448,13 +448,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::COMMIT)
+            .get_last_block_by_action(ActionType::COMMIT, None)
             .await
     }
 
     pub async fn get_last_verified_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::VERIFY)
+            .get_last_block_by_action(ActionType::VERIFY, None)
+            .await
+    }
+
+    pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        OperationsSchema(self.0)
+            .get_last_block_by_action(ActionType::VERIFY, Some(true))
             .await
     }
 
