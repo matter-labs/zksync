@@ -1,4 +1,3 @@
 #!/bin/bash
 
-cd $ZKSYNC_HOME
-yarn --cwd infrastructure/zk start $@
+yarn --cwd $ZKSYNC_HOME/infrastructure/zk start $@
