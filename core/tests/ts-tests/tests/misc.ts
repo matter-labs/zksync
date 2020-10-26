@@ -91,5 +91,5 @@ Tester.prototype.testTransactionResending = async function (
     // If we won't wait enough, then we'll get the receipt for the previous, failed tx,
     // which has the same hash. The new (successful) receipt will be available only
     // when tx will be executed again in state keeper, so we must wait for it.
-    await this.testTransfer(from, to, token, amount, 3000);
+    await this.testTransfer(from, to, token, amount, 4000);
 };
