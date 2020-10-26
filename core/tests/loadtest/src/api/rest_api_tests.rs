@@ -118,7 +118,7 @@ impl RestApiClient {
         let url = format!(
             "/account/{}/history/older_than?limit={}",
             address.to_hex_id(),
-            ApiDataPool::MAX_LIMIT
+            ApiDataPool::MAX_REQUEST_LIMIT
         );
         self.get(&url).await?;
         Ok(())
@@ -130,7 +130,7 @@ impl RestApiClient {
         let url = format!(
             "/account/{}/history/newer_than?limit={}",
             address.to_hex_id(),
-            ApiDataPool::MAX_LIMIT
+            ApiDataPool::MAX_REQUEST_LIMIT
         );
         self.get(&url).await?;
         Ok(())
@@ -193,7 +193,7 @@ impl RestApiClient {
         let url = format!(
             "/blocks?max_block={}&limit={}",
             self.pool.read().await.random_block(),
-            ApiDataPool::MAX_LIMIT
+            ApiDataPool::MAX_REQUEST_LIMIT
         );
         self.get(&url).await?;
         Ok(())

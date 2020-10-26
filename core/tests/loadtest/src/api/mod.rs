@@ -20,7 +20,6 @@ use tokio::time::timeout;
 use crate::{
     journal::{FiveSummaryStats, Sample},
     monitor::Monitor,
-    utils::wait_all,
 };
 
 mod data_pool;
@@ -29,8 +28,7 @@ mod sdk_tests;
 
 // TODO Make it configurable
 const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
-// const API_REQUEST_LIMIT: usize = 10;
-const API_REQUEST_LIMIT: usize = 1_000_000_000;
+const MAX_API_REQUEST_COUNT: usize = 1_000_000_000;
 
 #[derive(Debug, Clone)]
 pub struct CancellationToken(Arc<AtomicBool>);
@@ -131,23 +129,23 @@ impl<'a> ApiTestsBuilder<'a> {
         }
     }
 
-    fn append<S, F, Fut>(mut self, category: S, factory: F) -> Self
+    fn append<F, Fut>(mut self, category: &str, factory: F) -> Self
     where
-        S: Into<String>,
         F: Fn() -> Fut + Send + 'a,
         Fut: Future<Output = anyhow::Result<()>> + Send + 'a,
     {
-        let category = category.into();
-        let future = measure_future(self.cancellation.clone(), API_REQUEST_LIMIT, factory).boxed();
+        let token = self.cancellation.clone();
+        let future = measure_future(token, MAX_API_REQUEST_COUNT, factory).boxed();
 
-        self.categories.push(category);
         self.tests.push(future);
+        self.categories.push(category.to_owned());
 
         self
     }
 
     async fn run(self) -> BTreeMap<String, ApiTestsReport> {
-        let results = wait_all(self.tests.into_iter()).await;
+        // Unlike other places, we have to progress all futures simultaneously.
+        let results = futures::future::join_all(self.tests.into_iter()).await;
 
         self.categories
             .into_iter()

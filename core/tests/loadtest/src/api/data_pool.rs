@@ -2,6 +2,7 @@
 
 // Built-in uses
 use std::{
+    cmp::max,
     collections::{BTreeMap, HashMap, VecDeque},
     sync::Arc,
 };
@@ -12,9 +13,9 @@ use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use zksync_types::{tx::TxHash, Address, BlockNumber, PriorityOp, ZkSyncPriorityOp};
 // Local uses
 
-// TODO use array deque.
-
-const MAX_LIMIT: usize = 100;
+/// Maximum limit value in the requests.
+const MAX_REQUEST_LIMIT: usize = 100;
+/// The maximum number of items in queues to reduce memory consumption.
 const MAX_QUEUE_LEN: usize = 100;
 
 #[derive(Debug, Default, Clone)]
@@ -25,25 +26,30 @@ pub struct AddressData {
     pub ops_count: usize,
 }
 
+/// Generates a `(offset, limit)` pair for the corresponding API request.
+fn gen_offset_limit_pair(count: usize) -> (usize, usize) {
+    let mut rng = thread_rng();
+    // First argument of `gen_range` should be less than the second,
+    // so if count is zero we should return zero to create a correct pair.
+    let offset = rng.gen_range(0, max(1, count));
+    // We can safely use any value in range `[0, MAX_REQUEST_LIMIT]` as the limit.
+    let limit = rng.gen_range(1, MAX_REQUEST_LIMIT + 1);
+    (offset, limit)
+}
+
 impl AddressData {
     /// Generates a `(offset, limit)` pair for transaction requests related to the address.
     pub fn gen_txs_offset_limit(&self) -> (usize, usize) {
-        let mut rng = thread_rng();
-
-        let offset = rng.gen_range(0, std::cmp::max(1, self.txs_count));
-        let limit = rng.gen_range(1, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 2)));
-        (offset, limit)
+        gen_offset_limit_pair(self.txs_count)
     }
 
     /// Generates a `(offset, limit)` pair for priority operation requests related to the address.
     pub fn gen_ops_offset_limit(&self) -> (usize, usize) {
-        let mut rng = thread_rng();
-
-        let offset = rng.gen_range(0, std::cmp::max(1, self.ops_count));
-        let limit = rng.gen_range(1, std::cmp::min(MAX_LIMIT, std::cmp::max(offset, 2)));
-        (offset, limit)
+        gen_offset_limit_pair(self.ops_count)
     }
 }
+
+// TODO In theory, we can use a simpler, fixed size deque instead of the standard one.
 
 /// API data pool contents.
 #[derive(Debug, Default)]
@@ -100,7 +106,7 @@ impl ApiDataPoolInner {
     }
 
     pub fn store_block(&mut self, number: BlockNumber) {
-        self.max_block_number = std::cmp::max(self.max_block_number, number);
+        self.max_block_number = max(self.max_block_number, number);
         // Update known transactions count in the block.
         *self.blocks.entry(number).or_default() += 1;
 
@@ -124,7 +130,7 @@ impl ApiDataPoolInner {
         let mut rng = thread_rng();
         // Sometimes we have gaps in the block list, so it is not always
         // possible to randomly generate an existing block number.
-        for _ in 0..MAX_LIMIT {
+        for _ in 0..MAX_REQUEST_LIMIT {
             let number = rng.gen_range(from, to + 1);
             if let Some(&block_txs) = self.blocks.get(&number) {
                 let tx_id = rng.gen_range(0, block_txs);
@@ -134,7 +140,7 @@ impl ApiDataPoolInner {
 
         unreachable!(
             "Unable to find the appropriate block number after {} attempts.",
-            MAX_LIMIT
+            MAX_REQUEST_LIMIT
         );
     }
 }
@@ -147,7 +153,7 @@ pub struct ApiDataPool {
 
 impl ApiDataPool {
     /// Max limit in the API requests with limit.
-    pub const MAX_LIMIT: usize = MAX_LIMIT;
+    pub const MAX_REQUEST_LIMIT: usize = MAX_REQUEST_LIMIT;
 
     /// Creates a new pool instance.
     pub fn new() -> Self {
