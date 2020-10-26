@@ -32,13 +32,15 @@ async function prepareTestContracts() {
     }
     fs.mkdirSync(outDir, { recursive: true });
 
-    fs.copyFileSync(`${inDir}/Governance.sol`, `${outDir}/GovernanceTest.sol`);
-    fs.copyFileSync(`${inDir}/Verifier.sol`, `${outDir}/VerifierTest.sol`);
-    fs.copyFileSync(`${inDir}/ZkSync.sol`, `${outDir}/ZkSyncTest.sol`);
-    fs.copyFileSync(`${inDir}/Storage.sol`, `${outDir}/StorageTest.sol`);
-    fs.copyFileSync(`${inDir}/Config.sol`, `${outDir}/ConfigTest.sol`);
-    fs.copyFileSync(`${inDir}/UpgradeGatekeeper.sol`, `${outDir}/UpgradeGatekeeperTest.sol`);
-    fs.copyFileSync(`${inDir}/ZkSync.sol`, `${outDir}/ZkSyncTestUpgradeTarget.sol`);
+    await Promise.all([
+        fs.promises.copyFile(`${inDir}/Governance.sol`, `${outDir}/GovernanceTest.sol`),
+        fs.promises.copyFile(`${inDir}/Verifier.sol`, `${outDir}/VerifierTest.sol`),
+        fs.promises.copyFile(`${inDir}/ZkSync.sol`, `${outDir}/ZkSyncTest.sol`),
+        fs.promises.copyFile(`${inDir}/Storage.sol`, `${outDir}/StorageTest.sol`),
+        fs.promises.copyFile(`${inDir}/Config.sol`, `${outDir}/ConfigTest.sol`),
+        fs.promises.copyFile(`${inDir}/UpgradeGatekeeper.sol`, `${outDir}/UpgradeGatekeeperTest.sol`),
+        fs.promises.copyFile(`${inDir}/ZkSync.sol`, `${outDir}/ZkSyncTestUpgradeTarget.sol`)
+    ]);
 
     fs.readdirSync(outDir).forEach((file) => {
         if (!file.endsWith('.sol')) return;
