@@ -18,9 +18,9 @@ export async function gen(command: 'contract' | 'all') {
 
     if (command == 'all') {
         const time = new Date();
-        fs.utimesSync('core/models/src/lib.rs', time, time); 
+        fs.utimesSync('core/models/src/lib.rs', time, time);
         fs.mkdirSync(outputDir, { recursive: true });
-        await utils.spawn('cargo run --bin key_generator --release -- keys')
+        await utils.spawn('cargo run --bin key_generator --release -- keys');
     }
 
     await utils.spawn('cargo run --bin key_generator --release -- contract');
@@ -39,23 +39,15 @@ export async function unpack() {
 export async function pack() {
     const keysTarball = verfiyKeysTarball();
     await utils.exec(`tar cvzf ${keysTarball}`);
-    fs.mkdirSync('keys/packed', { recursive: true })
+    fs.mkdirSync('keys/packed', { recursive: true });
     fs.renameSync(keysTarball, `keys/packed/${keysTarball}`);
     console.log('Keys packed');
 }
 
-export const command = new Command('verify-keys')
-    .description('manage verification keys')
+export const command = new Command('verify-keys').description('manage verification keys');
 
-command
-    .command('pack')
-    .description('reverse of unpack')
-    .action(pack)
-
-command
-    .command('unpack')
-    .description('unpacks verification keys for your current circuit parameters')
-    .action(unpack)
+command.command('pack').description('reverse of unpack').action(pack);
+command.command('unpack').description('unpacks verification keys for your current circuit parameters').action(unpack);
 
 command
     .command('gen [contract|all]')

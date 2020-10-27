@@ -36,37 +36,22 @@ export async function ethData() {
         params: [process.env.OPERATOR_COMMIT_ETH_ADDRESS as string, 'pending'],
         id: 1
     };
-    const reponse = await fetch(
-        process.env.WEB3_URL as string,
-        {
-            method: 'post',
-            body: JSON.stringify(body),
-            headers: {
-                Accept: 'application/json',
-                'Content-type': 'application/json'
-            },
+    const reponse = await fetch(process.env.WEB3_URL as string, {
+        method: 'post',
+        body: JSON.stringify(body),
+        headers: {
+            Accept: 'application/json',
+            'Content-type': 'application/json'
         }
-    );
+    });
     const nonce = parseInt((await reponse.json()).result);
     await utils.exec(`${SQL()} "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
                      VALUES ('${nonce}', '${process.env.ETH_GAS_PRICE_DEFAULT_LIMIT}', 0, 0, 0)
                      ON CONFLICT (id) DO UPDATE SET (commit_ops, verify_ops, withdraw_ops) = (0, 0, 0)"`);
 }
 
-export const command = new Command('insert')
-    .description('insert pre-defined data into the database');
+export const command = new Command('insert').description('insert pre-defined data into the database');
 
-command
-    .command('contract')
-    .description('insert contract addresses')
-    .action(contract);
-
-command
-    .command('token <id> <address> <symbol> <precision>')
-    .description('insert token information')
-    .action(token);
-
-command
-    .command('eth-data')
-    .description('insert info about Ethereum blockchain')
-    .action(ethData);
+command.command('contract').description('insert contract addresses').action(contract);
+command.command('token <id> <address> <symbol> <precision>').description('insert token information').action(token);
+command.command('eth-data').description('insert info about Ethereum blockchain').action(ethData);

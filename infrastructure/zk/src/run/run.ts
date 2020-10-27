@@ -39,17 +39,11 @@ export async function loadtest(...args: string[]) {
 
 export const command = new Command('run')
     .description('run miscellaneous applications')
-    .addCommand(verifyKeys.command);
+    .addCommand(verifyKeys.command)
+    .addCommand(dataRestore.command);
 
-command
-    .command('test-accounts')
-    .description('print ethereum test accounts')
-    .action(testAccounts);
-
-command
-    .command('explorer')
-    .description('run zksync explorer locally')
-    .action(explorer)
+command.command('test-accounts').description('print ethereum test accounts').action(testAccounts);
+command.command('explorer').description('run zksync explorer locally').action(explorer);
 
 command
     .command('revert-reason <tx_hash> [web3_url]')

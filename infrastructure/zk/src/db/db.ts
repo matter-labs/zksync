@@ -50,7 +50,7 @@ export async function updateToken(token: string, symbol: string) {
 export async function wait(tries: number = 4) {
     for (let i = 0; i < tries; i++) {
         const result = await utils.allowFail(utils.exec(`pg_isready -d "${process.env.DATABASE_URL}"`));
-        if (result !== null) return;  // null means failure
+        if (result !== null) return; // null means failure
         await utils.sleep(5);
     }
     await utils.exec(`pg_isready -d "${process.env.DATABASE_URL}"`);
@@ -59,30 +59,10 @@ export async function wait(tries: number = 4) {
 export const command = new Command('db')
     .description('database management')
     .addCommand(update.command)
-    .addCommand(insert.command)
+    .addCommand(insert.command);
 
-command
-    .command('drop')
-    .description('drop the database')
-    .action(drop);
-
-command
-    .command('migrate')
-    .description('run migrations')
-    .action(migrate);
-
-command
-    .command('setup')
-    .description('initialize the database and perform migrations')
-    .action(setup);
-
-command
-    .command('wait')
-    .description('wait for database to get ready for interaction')
-    .action(wait);
-
-command
-    .command('reset')
-    .description('reinitialize the database')
-    .action(reset);
-
+command.command('drop').description('drop the database').action(drop);
+command.command('migrate').description('run migrations').action(migrate);
+command.command('setup').description('initialize the database and perform migrations').action(setup);
+command.command('wait').description('wait for database to get ready for interaction').action(wait);
+command.command('reset').description('reinitialize the database').action(reset);

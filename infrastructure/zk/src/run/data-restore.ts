@@ -34,7 +34,9 @@ export async function run() {
 
 export async function check(expectedHash: string) {
     await db.reset();
-    await utils.spawn(`cargo run --bin zksync_data_restore --release -- --genesis --finite --final_hash ${expectedHash}`);
+    await utils.spawn(
+        `cargo run --bin zksync_data_restore --release -- --genesis --finite --final_hash ${expectedHash}`
+    );
 }
 
 export async function checkExisting() {
@@ -44,21 +46,9 @@ export async function checkExisting() {
 
 export const command = new Command('data-restore');
 
-command
-    .command('restart')
-    .description('wipe the database and run data restore in finite mode')
-    .action(restart);
-
-command
-    .command('resume')
-    .description('run data restore in "resume" mode')
-    .action(resume);
-
-command
-    .command('run')
-    .description('do not wipe the database and run data restore in finite mode')
-    .action(run);
-
+command.command('restart').description('wipe the database and run data restore in finite mode').action(restart);
+command.command('resume').description('run data restore in "resume" mode').action(resume);
+command.command('run').description('do not wipe the database and run data restore in finite mode').action(run);
 
 command
     .command('check <hash>')
@@ -67,8 +57,10 @@ command
 
 command
     .command('check-existing')
-    .description(`like "check", but instead of taking expected hash as an argument,
-                 it is loaded from the database before wiping it`)
+    .description(
+        `like "check", but instead of taking expected hash as an argument,
+         it is loaded from the database before wiping it`
+    )
     .action(checkExisting);
 
 command

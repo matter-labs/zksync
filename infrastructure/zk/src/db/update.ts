@@ -8,10 +8,6 @@ export async function token(address: string, symbol: string) {
     await utils.exec(`${SQL()} "UPDATE tokens SET symbol = '${symbol}' WHERE address = '${address}'"`);
 }
 
-export const command = new Command('update')
-    .description('update information in the database');
+export const command = new Command('update').description('update information in the database');
 
-command
-    .command('token <address> <symbol>')
-    .description('update token symbol')
-    .action(token);
+command.command('token <address> <symbol>').description('update token symbol').action(token);

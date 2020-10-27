@@ -9,8 +9,8 @@ export async function db(reset: boolean) {
     process.env.DATABASE_URL = databaseUrl.replace(/plasma/g, 'plasma_test');
     process.chdir('core/lib/storage');
     if (reset) {
-        await utils.exec('diesel database reset')
-        await utils.exec('diesel migration run')
+        await utils.exec('diesel database reset');
+        await utils.exec('diesel migration run');
     }
     await utils.spawn('cargo test --release -p zksync_storage --features db_test -- --nocapture');
 }
@@ -31,7 +31,7 @@ export async function prover() {
 }
 
 export async function js() {
-	await utils.spawn('yarn --cwd sdk/zksync.js tests');
+    await utils.spawn('yarn --cwd sdk/zksync.js tests');
     await utils.spawn('yarn --cwd infrastructure/fee-seller tests');
 }
 
@@ -39,20 +39,12 @@ export async function rust() {
     await utils.spawn('cargo test --release');
 }
 
+export const command = new Command('test').description('run test suites').addCommand(integration.command);
 
-export const command = new Command('test')
-    .description('run test suites')
-    .addCommand(integration.command);
-
-command
-    .command('js')
-    .description('run unit-tests for javascript packages')
-    .action(js);
-
-command
-    .command('prover')
-    .description('run unit-tests for the prover')
-    .action(prover);
+command.command('js').description('run unit-tests for javascript packages').action(js);
+command.command('prover').description('run unit-tests for the prover').action(prover);
+command.command('contracts').description('run unit-tests for the contracts').action(contracts);
+command.command('rust').description('run unit-tests for rust binaries').action(rust);
 
 command
     .command('db')
@@ -69,13 +61,3 @@ command
     .action(async (threads: number | null, testName: string | null, ...options: string[]) => {
         await circuit(threads || 1, testName || '', ...options[0]);
     });
-
-command
-    .command('contracts')
-    .description('run unit-tests for the contracts')
-    .action(contracts);
-
-command
-    .command('rust')
-    .description('run unit-tests for rust binaries')
-    .action(rust);
