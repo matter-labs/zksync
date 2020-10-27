@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
+import * as contract from '../contract';
 
 import * as integration from './integration';
 export { integration };
@@ -17,6 +18,7 @@ export async function db(reset: boolean) {
 }
 
 export async function contracts() {
+    await contract.build();
     await utils.spawn('yarn --cwd contracts unit-test');
 }
 

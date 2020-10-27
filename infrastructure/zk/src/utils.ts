@@ -2,6 +2,7 @@ import { exec as _exec, spawn as _spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import readline from 'readline';
 
 export type { ChildProcess } from 'child_process';
 
@@ -32,6 +33,27 @@ export function spawn(command: string) {
 export function background(command: string, stdio: any = 'inherit') {
     command = command.replace(/\n/g, '');
     return _spawn(command, { stdio, shell: true, detached: true });
+}
+
+export async function confirmAction() {
+    if (process.env.ZKSYNC_ACTION == 'dont_ask') return;
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    const input = await new Promise((resolve) => {
+        rl.question(
+            'Dangerous action! (set ZKSYNC_ACTION=dont_ask to always allow)\n' +
+                `Type environment name (${process.env.ZKSYNC_ENV}) to confirm: `,
+            (input) => {
+                rl.close();
+                resolve(input);
+            }
+        );
+    });
+    if (input !== process.env.ZKSYNC_ENV) {
+        throw new Error('[aborted] action was not confirmed');
+    }
 }
 
 function overrideEnv() {

@@ -10,6 +10,7 @@ export { insert, update };
 const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 
 export async function reset() {
+    await utils.confirmAction();
     await wait();
     await drop();
     await setup();
@@ -18,12 +19,14 @@ export async function reset() {
 }
 
 export async function drop() {
+    await utils.confirmAction();
     console.log('Dropping DB...');
     await utils.exec(`${SQL()} 'DROP OWNED BY CURRENT_USER CASCADE' ||
                      (${SQL()} 'DROP SCHEMA IF EXISTS public CASCADE' && ${SQL()} 'CREATE SCHEMA public')`);
 }
 
 export async function migrate() {
+    await utils.confirmAction();
     console.log('Running migrations...');
     await utils.exec('cd core/storage && diesel migration run');
 }

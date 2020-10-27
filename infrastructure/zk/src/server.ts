@@ -7,6 +7,7 @@ export async function server() {
 }
 
 export async function genesis() {
+    await utils.confirmAction();
     await utils.spawn('cargo run --bin zksync_server --release -- --genesis | tee genesis.log');
     const genesisRoot = fs.readFileSync('genesis.log').toString();
     const date = new Date();

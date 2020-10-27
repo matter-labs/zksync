@@ -19,6 +19,7 @@ export async function updateConfig() {
     }
     const configmap = `kubectl create configmap server-env-custom --from-env-file=${envFile} -n ${namespace} -o yaml --dry-run`;
     await utils.spawn(`${configmap} | kubectl diff -f - || true`);
+    await utils.confirmAction();
     await utils.spawn(`${configmap} | kubectl apply -f -`);
 }
 

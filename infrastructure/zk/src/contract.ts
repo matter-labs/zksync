@@ -19,6 +19,7 @@ export function prepareVerify() {
 }
 
 export async function build() {
+    await utils.confirmAction();
     prepareVerify();
     await utils.spawn('cargo run --release --bin gen_token_add_contract');
     await utils.spawn('yarn --cwd contracts build');
@@ -90,6 +91,7 @@ async function prepareTestContracts() {
 }
 
 export async function buildDev() {
+    await utils.confirmAction();
     prepareVerify();
     await prepareTestContracts();
     await utils.spawn('yarn --cwd contracts build-dev');
@@ -100,6 +102,7 @@ export async function publish() {
 }
 
 export async function deploy() {
+    await utils.confirmAction();
     console.log('Deploying contracts, results will be inserted into the db');
     await utils.spawn('yarn --cwd contracts deploy-no-build | tee deploy.log');
     const deployLog = fs.readFileSync('deploy.log').toString();
