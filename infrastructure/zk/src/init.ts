@@ -80,7 +80,7 @@ async function downloadMissingKeys() {
             await utils.sleep(1);
         }
     }
-    process.chdir(process.env.ZKSYNC_HOME as string);
+    process.chdir('../..');
 }
 
 export const command = new Command('init')

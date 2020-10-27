@@ -74,7 +74,7 @@ jobs:
       run: pushd sdk/zksync-crypto && f cargo test --release
 
     - name: db-tests
-      run: zk test db
+      run: zk test db --reset
 
     - name: prover-tests
       run: zk test prover

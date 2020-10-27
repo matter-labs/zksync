@@ -39,7 +39,7 @@ export async function setup() {
     await utils.exec('diesel migration run');
     fs.unlinkSync('src/schema.rs.generated');
     await utils.spawn('cargo sqlx prepare --check || cargo sqlx prepare');
-    process.chdir(process.env.ZKSYNC_HOME as string);
+    process.chdir('../../..');
 }
 
 export async function updateToken(token: string, symbol: string) {
