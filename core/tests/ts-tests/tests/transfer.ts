@@ -20,13 +20,7 @@ async function suppress<T>(promise: Promise<T>) {
     } catch (_) {}
 }
 
-Tester.prototype.testTransfer = async function (
-    sender: Wallet,
-    receiver: Wallet,
-    token: TokenLike,
-    amount: BigNumber,
-    timeout: number = 0
-) {
+Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet, token: TokenLike, amount: BigNumber) {
     const fullFee = await this.syncProvider.getTransactionFee('Transfer', receiver.address(), token);
     const fee = fullFee.totalFee;
     const senderBefore = await sender.getBalance(token);
@@ -39,7 +33,6 @@ Tester.prototype.testTransfer = async function (
         fee
     });
 
-    await utils.sleep(timeout);
     const receipt = await handle.awaitReceipt();
     expect(receipt.success, `Transfer transaction failed with a reason: ${receipt.failReason}`).to.be.true;
     const senderAfter = await sender.getBalance(token);
