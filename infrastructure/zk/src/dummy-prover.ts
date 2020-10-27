@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import * as utils from './utils';
-import fs from 'fs';
 
 import * as server from './server';
 import * as contract from './contract';
@@ -38,10 +37,8 @@ export async function ensureDisabled() {
     }
 }
 
-async function toggle(from: string, to: string) {
-    const verifierSource = fs.readFileSync(VERIFIER_FILE).toString();
-    const replaced = verifierSource.replace(`constant DUMMY_VERIFIER = ${from}`, `constant DUMMY_VERIFIER = ${to}`);
-    fs.writeFileSync(VERIFIER_FILE, replaced);
+async function setStatus(value: boolean) {
+    utils.replaceInFile(VERIFIER_FILE, '(.*constant DUMMY_VERIFIER)(.*);', `$1 = ${value};`);
     await status();
     console.log('Redeploying the contract...');
     await performRedeployment();
@@ -49,11 +46,11 @@ async function toggle(from: string, to: string) {
 }
 
 export async function enable() {
-    await toggle('false', 'true');
+    await setStatus(true);
 }
 
 export async function disable() {
-    await toggle('true', 'false');
+    await setStatus(false);
 }
 
 export const command = new Command('dummy-prover').description('commands for zksync dummy prover');

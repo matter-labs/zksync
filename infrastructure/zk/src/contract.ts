@@ -46,7 +46,6 @@ async function prepareTestContracts() {
         if (!file.endsWith('.sol')) return;
         utils.modifyFile(`${outDir}/${file}`, (source) =>
             source
-                .toString()
                 .replace(/Governance/g, 'GovernanceTest')
                 .replace(/\bVerifier\b/g, 'VerifierTest')
                 .replace(/ZkSync/g, 'ZkSyncTest')
@@ -101,7 +100,7 @@ export async function publish() {
 }
 
 export async function deploy() {
-    console.log('Redeploying contracts, results will be inserted into the db');
+    console.log('Deploying contracts, results will be inserted into the db');
     await utils.spawn('yarn --cwd contracts deploy-no-build | tee deploy.log');
     const deployLog = fs.readFileSync('deploy.log').toString();
     const envVars = [

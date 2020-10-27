@@ -37,7 +37,8 @@ export function background(command: string, stdio: any = 'inherit') {
 // loads environment variables
 export function loadEnv() {
     const current = 'etc/env/current';
-    const zksyncEnv = process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString() : 'dev');
+    const zksyncEnv =
+        process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString().trim() : 'dev');
     const envFile = `etc/env/${zksyncEnv}.env`;
     if (zksyncEnv == 'dev' && !fs.existsSync('etc/env/dev.env')) {
         fs.copyFileSync('etc/env/dev.env.example', 'etc/env/dev.env');
@@ -55,10 +56,7 @@ export function loadEnv() {
 // and the new assignment, e.g. VARIABLE=foo
 export function modifyEnv(variable: string, assignedVariable: string) {
     const envFile = process.env.ENV_FILE as string;
-    const env = fs.readFileSync(envFile).toString();
-    const pattern = new RegExp(`${variable}=.*`, 'g');
-    fs.writeFileSync(envFile, env.replace(pattern, assignedVariable.trim()));
-    // reload env variables
+    replaceInFile(envFile, `${variable}=.*`, assignedVariable.trim());
     dotenv.config({ path: envFile });
 }
 

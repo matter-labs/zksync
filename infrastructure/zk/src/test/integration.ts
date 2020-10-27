@@ -17,7 +17,11 @@ export async function withServer<T>(testSuite: () => Promise<T>, timeout: number
     await utils.sleep(1);
 
     const proverLog = fs.openSync('prover.log', 'w');
-    const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance', ['ignore', proverLog, proverLog]);
+    const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance', [
+        'ignore',
+        proverLog,
+        proverLog
+    ]);
     await utils.sleep(10);
 
     const timer = setTimeout(() => {
