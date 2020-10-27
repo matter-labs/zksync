@@ -5,6 +5,8 @@ use std::iter::Iterator;
 // External uses
 use futures::{Future, TryFuture};
 use num::BigUint;
+
+use crate::session::save_error;
 // Workspace uses
 // Local uses
 
@@ -69,6 +71,7 @@ where
         Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
     <I::Item as TryFuture>::Error: std::fmt::Display,
 {
+    // TODO Save errors as soon as they occur.
     let output = wait_all(i).await;
 
     let mut oks = Vec::with_capacity(output.len());
@@ -76,7 +79,10 @@ where
     for item in output {
         match item.into() {
             Ok(ok) => oks.push(ok),
-            Err(err) => errs.push(err),
+            Err(err) => {
+                save_error("try_wait_all_failsafe", &err);
+                errs.push(err)
+            }
         }
     }
 
@@ -90,13 +96,6 @@ where
             "A large number of errors occurred in during the `try_wait_all_failsafe`: {}.",
             errs.len()
         );
-    } else {
-        for err in errs {
-            log::warn!(
-                "An error occurred during the `try_wait_all_failsafe`: {}",
-                err
-            );
-        }
     }
 
     Ok(oks)

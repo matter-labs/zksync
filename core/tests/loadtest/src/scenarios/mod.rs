@@ -9,7 +9,10 @@ pub use self::{
 };
 
 // Built-in uses
-use std::fmt::{Debug, Display};
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Display},
+};
 // External uses
 use async_trait::async_trait;
 use num::BigUint;
@@ -17,7 +20,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 // Local uses
 use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::WithdrawScenario};
-use crate::{monitor::Monitor, test_wallet::TestWallet};
+use crate::{monitor::Monitor, test_wallet::TestWallet, FiveSummaryStats};
 
 mod full_exit;
 mod transfers;
@@ -92,4 +95,15 @@ impl From<TransferScenarioConfig> for ScenarioConfig {
     fn from(cfg: TransferScenarioConfig) -> Self {
         Self::Transfer(cfg)
     }
+}
+
+/// Load test report for the transactions scenarios.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScenariosTestsReport {
+    /// A five numbers summary statistic for each transaction lifecycle step.
+    pub summary: BTreeMap<String, FiveSummaryStats>,
+    /// Total amount of sent requests.
+    pub total_txs_count: usize,
+    /// Amount of failed requests regardless of the cause of the failure.
+    pub failed_txs_count: usize,
 }

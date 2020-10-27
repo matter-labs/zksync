@@ -13,19 +13,18 @@ use crate::{
     config::Config,
     journal::Journal,
     monitor::Monitor,
-    scenarios::Scenario,
+    scenarios::{Scenario, ScenariosTestsReport},
     test_wallet::TestWallet,
     utils::{try_wait_all_failsafe, wait_all},
-    FiveSummaryStats,
 };
 
 /// Full report with the results of loadtest execution.
 ///
 /// This report contains two major types: scenarios with transactions and API requests.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
     /// Scenarios report.
-    pub scenarios: BTreeMap<String, FiveSummaryStats>,
+    pub scenarios: ScenariosTestsReport,
     /// API requests report.
     pub api: BTreeMap<String, ApiTestsReport>,
 }
@@ -95,7 +94,7 @@ impl LoadtestExecutor {
         self.refund().await?;
 
         Ok(Report {
-            scenarios: journal.five_stats_summary()?,
+            scenarios: journal.report(),
             api: api_handle.await?,
         })
     }

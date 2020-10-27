@@ -16,7 +16,7 @@ use zksync_types::{
     tx::PackedEthSignature, AccountId, Address, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
-use crate::{config::AccountInfo, monitor::Monitor};
+use crate::{config::AccountInfo, monitor::Monitor, session::save_wallet};
 
 /// A wrapper over `zksync::Wallet` to make testing more convenient.
 #[derive(Debug)]
@@ -49,7 +49,11 @@ impl TestWallet {
         let inner = Wallet::new(monitor.provider.clone(), credentials)
             .await
             .unwrap();
-        Self::from_wallet(info.token_name.clone(), monitor, inner, &options.web3_url).await
+
+        let wallet =
+            Self::from_wallet(info.token_name.clone(), monitor, inner, &options.web3_url).await;
+        save_wallet(info.clone());
+        wallet
     }
 
     /// Creates a random wallet.
@@ -62,20 +66,13 @@ impl TestWallet {
         let address_from_pk =
             PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
 
-        let inner = Wallet::new(
-            monitor.provider.clone(),
-            WalletCredentials::from_eth_signer(
-                address_from_pk,
-                PrivateKeySigner::new(eth_private_key),
-                Network::Localhost,
-            )
-            .await
-            .unwrap(),
-        )
-        .await
-        .unwrap();
+        let info = AccountInfo {
+            address: address_from_pk,
+            private_key: eth_private_key,
+            token_name,
+        };
 
-        Self::from_wallet(token_name, monitor, inner, &options.web3_url).await
+        Self::from_info(monitor, &info, options).await
     }
 
     async fn from_wallet(

@@ -209,8 +209,7 @@ impl Monitor {
                 .monitor_tx(created_at, sent_at, tx_hash)
                 .await;
 
-            if let Err(e) = tx_result.as_ref() {
-                log::warn!("Monitored transaction execution failed. {}", e);
+            if tx_result.is_err() {
                 monitor.log_event(Event::TxErrored(tx_hash)).await;
             }
 
@@ -239,7 +238,11 @@ impl Monitor {
                     Some(true) => true,
                     None => false,
                     Some(false) => {
-                        anyhow::bail!("Transaction failed with a reason: {:?}", info.fail_reason);
+                        anyhow::bail!(
+                            "Transaction `{}` failed with a reason: {:?}",
+                            tx_hash.to_string(),
+                            info.fail_reason
+                        );
                     }
                 },
 

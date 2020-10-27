@@ -1,7 +1,7 @@
 // Built-in import
 use std::{
     cmp::{max, min},
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     time::{Duration, Instant},
 };
 // External uses
@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_types::tx::TxHash;
 // Local uses
+use crate::{scenarios::ScenariosTestsReport, session::save_error};
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct TxLifecycle {
@@ -34,39 +35,42 @@ impl TxLifecycle {
 
 #[derive(Debug, Clone, Default)]
 pub struct Journal {
-    txs: HashMap<TxHash, Result<TxLifecycle, String>>,
+    txs: HashMap<TxHash, TxLifecycle>,
+    total_count: usize,
+    errored_count: usize,
 }
 
 impl Journal {
     pub fn record_tx(&mut self, tx_hash: TxHash, tx_result: Result<TxLifecycle, anyhow::Error>) {
-        self.txs
-            .insert(tx_hash, tx_result.map_err(|e| e.to_string()));
+        self.total_count += 1;
+
+        match tx_result {
+            Ok(tx_lifecycle) => {
+                self.txs.insert(tx_hash, tx_lifecycle);
+            }
+            Err(err) => {
+                self.errored_count += 1;
+                save_error("scenarios", err);
+            }
+        }
     }
 
     pub fn clear(&mut self) {
         self.txs.clear()
     }
 
-    pub fn five_stats_summary(&self) -> anyhow::Result<BTreeMap<String, FiveSummaryStats>> {
+    pub fn report(&self) -> ScenariosTestsReport {
         let mut sending = Vec::new();
         let mut committing = Vec::new();
         let mut verifying = Vec::new();
 
-        for (tx_hash, tx_result) in &self.txs {
-            let tx_lifecycle = tx_result.as_ref().map_err(|err| {
-                anyhow::anyhow!(
-                    "An error occured while processing a transaction {}: {}",
-                    tx_hash.to_string(),
-                    err
-                )
-            })?;
-
+        for tx_lifecycle in self.txs.values() {
             sending.push(tx_lifecycle.send_duration().as_micros());
             committing.push(tx_lifecycle.commit_duration().as_micros());
             verifying.push(tx_lifecycle.verify_duration().as_micros());
         }
 
-        Ok([
+        let summary = [
             ("sending", sending),
             ("committing", committing),
             ("verifying", verifying),
@@ -78,7 +82,13 @@ impl Journal {
                 FiveSummaryStats::from_data(data).unwrap(),
             )
         })
-        .collect())
+        .collect();
+
+        ScenariosTestsReport {
+            summary,
+            total_txs_count: self.total_count,
+            failed_txs_count: self.errored_count,
+        }
     }
 }
 
