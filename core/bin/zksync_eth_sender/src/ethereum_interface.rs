@@ -17,6 +17,15 @@ use zksync_eth_client::{ETHClient, SignedCallResult};
 /// Sleep time between consecutive requests.
 const SLEEP_DURATION: Duration = Duration::from_millis(250);
 
+/// Information about transaction failure.
+#[derive(Debug, Clone)]
+pub struct FailureInfo {
+    pub revert_code: String,
+    pub revert_reason: String,
+    pub gas_used: Option<U256>,
+    pub gas_limit: U256,
+}
+
 /// Ethereum Interface module provides an abstract interface to
 /// interact with the Ethereum blockchain.
 ///
@@ -56,6 +65,9 @@ pub(super) trait EthereumInterface {
         data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, anyhow::Error>;
+
+    /// Returns the information about transaction failure reason.
+    async fn failure_reason(&self, tx_hash: H256) -> Option<FailureInfo>;
 }
 
 /// Wrapper over `ETHClient` using `Http` transport.
@@ -168,5 +180,64 @@ impl EthereumInterface for EthereumHttpClient {
     ) -> Result<SignedCallResult, anyhow::Error> {
         self.sleep();
         self.eth_client.sign_prepared_tx(data, options).await
+    }
+
+    async fn failure_reason(&self, tx_hash: H256) -> Option<FailureInfo> {
+        let transaction = self
+            .eth_client
+            .web3
+            .eth()
+            .transaction(tx_hash.into())
+            .await
+            .ok()??;
+        let receipt = self
+            .eth_client
+            .web3
+            .eth()
+            .transaction_receipt(tx_hash)
+            .await
+            .ok()??;
+
+        let gas_limit = transaction.gas;
+        let gas_used = receipt.gas_used;
+
+        let call_request = web3::types::CallRequest {
+            from: Some(transaction.from),
+            to: transaction.to,
+            gas: Some(transaction.gas),
+            gas_price: Some(transaction.gas_price),
+            value: Some(transaction.value),
+            data: Some(transaction.input),
+        };
+
+        let encoded_revert_reason = self
+            .eth_client
+            .web3
+            .eth()
+            .call(call_request, receipt.block_number.map(Into::into))
+            .await
+            .ok()?;
+        let revert_code = hex::encode(&encoded_revert_reason.0);
+        let revert_reason = if encoded_revert_reason.0.len() >= 4 {
+            let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+
+            ethabi::decode(
+                &[ethabi::ParamType::String],
+                encoded_string_without_function_hash,
+            )
+            .ok()?
+            .into_iter()
+            .next()?
+            .to_string()?
+        } else {
+            "unknown".to_string()
+        };
+
+        Some(FailureInfo {
+            gas_limit,
+            gas_used,
+            revert_code,
+            revert_reason,
+        })
     }
 }

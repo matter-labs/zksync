@@ -80,10 +80,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
-    step('should execute a fast withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT, true);
-    });
-
     step('should execute a ForcedExit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
@@ -96,12 +92,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     it('should fail trying to send tx with wrong signature', async () => {
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
     });
-
-    it('should succeed resending a previously failed tx', async () => {
-        let nick = await tester.fundedWallet('5.0');
-        let mike = await tester.emptyWallet();
-        await tester.testTransactionResending(nick, mike, token, TX_AMOUNT);
-    })
 
     describe('Full Exit tests', () => {
         let carl: Wallet;
