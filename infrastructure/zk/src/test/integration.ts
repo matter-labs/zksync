@@ -57,7 +57,7 @@ export async function withServer<T>(testSuite: () => Promise<T>, timeout: number
 }
 
 export async function api() {
-    await utils.spawn('yarn --cwd core/tests/ts-test api-test');
+    await utils.spawn('yarn --cwd core/tests/ts-tests api-test');
 }
 
 export async function zcli() {

@@ -12,7 +12,7 @@ export async function rootHash() {
         SELECT encode(root_hash, 'hex') 
         FROM blocks, last_block 
         WHERE blocks.number = last_block.number;`;
-    const { stdout: blockHash } = await utils.exec(`echo ${query} | psql "${process.env.DATABASE_URL}" -t`);
+    const { stdout: blockHash } = await utils.exec(`echo "${query}" | psql "${process.env.DATABASE_URL}" -t`);
     if (blockHash.trim() == '') {
         throw new Error('Unable to load the latest block hash');
     }
