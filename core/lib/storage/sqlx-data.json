@@ -1555,21 +1555,6 @@
       ]
     }
   },
-  "5560855a03eac30b4e4d7e5b040624e6075b9a418b1c7696b84097a66b0fd319": {
-    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals )\n            VALUES ( $1, $2, $3, $4 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET id = $1, address = $2, symbol = $3, decimals = $4\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "5de811d61e00fd7b93311aa825d17e2b2f0ee46ee762f5064e842f5d0f2b5ad7": {
     "query": "UPDATE eth_parameters\n            SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3\n            WHERE id = true",
     "describe": {

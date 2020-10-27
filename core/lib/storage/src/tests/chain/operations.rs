@@ -192,3 +192,80 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
 
     Ok(())
 }
+
+/// Checks that sending a successfull operation after a failed one works.
+#[db_test]
+async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    const BLOCK_NUMBER: i64 = 1;
+
+    let mut executed_tx = NewExecutedTransaction {
+        block_number: BLOCK_NUMBER,
+        tx_hash: vec![0x12, 0xAD, 0xBE, 0xEF],
+        tx: Default::default(),
+        operation: Default::default(),
+        from_account: Default::default(),
+        to_account: None,
+        success: false, // <- Note that success is false. We'll replace this tx with succeeded one.
+        fail_reason: None,
+        block_index: None,
+        primary_account_address: Default::default(),
+        nonce: Default::default(),
+        created_at: chrono::Utc::now(),
+        eth_sign_data: None,
+        batch_id: None,
+    };
+
+    // Save the failed operation.
+    OperationsSchema(&mut storage)
+        .store_executed_operation(executed_tx.clone())
+        .await?;
+
+    // Check that we can still load it.
+    assert!(OperationsSchema(&mut storage)
+        .get_executed_operation(executed_tx.tx_hash.as_ref())
+        .await?
+        .is_some());
+
+    // Replace failed tx with a successfull one.
+    executed_tx.success = true;
+
+    OperationsSchema(&mut storage)
+        .store_executed_operation(executed_tx.clone())
+        .await?;
+
+    // Obtain tx and check that it's now successful.
+    let loaded_tx = OperationsSchema(&mut storage)
+        .get_executed_operation(executed_tx.tx_hash.as_ref())
+        .await?
+        .unwrap();
+    assert_eq!(loaded_tx.tx_hash, executed_tx.tx_hash);
+    assert_eq!(loaded_tx.success, true);
+
+    // Get the block transactions and check if there is exactly 1 tx (failed tx not copied but replaced).
+    let block_txs = BlockSchema(&mut storage)
+        .get_block_transactions(BLOCK_NUMBER as u32)
+        .await?;
+    assert_eq!(block_txs.len(), 1);
+
+    // Now try to replace successfull transation wi`th a failed one.
+    executed_tx.success = false;
+    OperationsSchema(&mut storage)
+        .store_executed_operation(executed_tx.clone())
+        .await?;
+
+    // ...it should not be replaced.
+    let loaded_tx = OperationsSchema(&mut storage)
+        .get_executed_operation(executed_tx.tx_hash.as_ref())
+        .await?
+        .unwrap();
+    assert_eq!(loaded_tx.tx_hash, executed_tx.tx_hash);
+    assert_eq!(loaded_tx.success, true);
+
+    // ...and there still must be one operation.
+    let block_txs = BlockSchema(&mut storage)
+        .get_block_transactions(BLOCK_NUMBER as u32)
+        .await?;
+    assert_eq!(block_txs.len(), 1);
+
+    Ok(())
+}
