@@ -352,7 +352,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let last_block = BlockSchema(&mut transaction)
-            .get_last_verified_block()
+            .get_last_verified_confirmed_block()
             .await?;
 
         let accounts = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")

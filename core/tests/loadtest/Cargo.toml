@@ -34,4 +34,5 @@ hex = "0.4"
 log = "0.4"
 num = { version = "0.2", features = ["serde"] }
 rand = "0.4"
+reqwest = "0.10"
 structopt = "0.3"

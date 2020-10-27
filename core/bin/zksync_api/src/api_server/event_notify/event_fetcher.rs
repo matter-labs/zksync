@@ -215,7 +215,7 @@ impl EventFetcher {
         let last_block = storage
             .chain()
             .block_schema()
-            .get_last_verified_block()
+            .get_last_verified_confirmed_block()
             .await?;
 
         Ok(last_block)

@@ -546,26 +546,6 @@
       ]
     }
   },
-  "1d858470bc506f57ea923272258fcd63e4ac6ce5000899cc091387ee6cd622b1": {
-    "query": "SELECT max(block_number) FROM operations WHERE action_type = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
@@ -1964,6 +1944,27 @@
       ]
     }
   },
+  "85f509373fbcfdd2e477fe2458f1035be06e1a51f20979fa9dc0e5144e1de084": {
+    "query": "SELECT max(block_number) FROM operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -2345,6 +2346,20 @@
           "Int4",
           "Numeric",
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a36e324b9f22ff0e3e9ac59c73807480fc4774ea43c06f1505d10d68ae06c567": {
+    "query": "UPDATE operations\n                SET confirmed = $1\n                WHERE block_number = $2 AND action_type = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Int8",
+          "Text"
         ]
       },
       "nullable": []
