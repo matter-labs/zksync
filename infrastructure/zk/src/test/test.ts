@@ -13,7 +13,7 @@ export async function db(reset: boolean) {
         await utils.exec('diesel migration run');
     }
     await utils.spawn('cargo test --release -p zksync_storage --features db_test -- --nocapture');
-    process.chdir('../../..');
+    process.chdir(process.env.ZKSYNC_HOME as string);
 }
 
 export async function contracts() {

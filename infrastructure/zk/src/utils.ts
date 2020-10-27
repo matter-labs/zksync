@@ -36,9 +36,9 @@ export function background(command: string, stdio: any = 'inherit') {
 
 function overrideEnv() {
     const envFile = process.env.ENV_FILE as string;
-    const env = dotenv.parse(fs.readFileSync(envFile))
+    const env = dotenv.parse(fs.readFileSync(envFile));
     for (const envVar in env) {
-        process.env[envVar] = env[envVar]
+        process.env[envVar] = env[envVar];
     }
 }
 
