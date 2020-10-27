@@ -32,7 +32,7 @@ Tester.prototype.testVerifiedWithdraw = async function (
     // we should wait some time for `completeWithdrawals` transaction to be processed
     let withdrawalTxHash = null;
     const polling_interval = 200; // ms
-    const polling_timeout = 30000; // ms
+    const polling_timeout = 35000; // ms
     const polling_iterations = polling_timeout / polling_interval;
     for (let i = 0; i < polling_iterations; i++) {
         withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
@@ -42,6 +42,8 @@ Tester.prototype.testVerifiedWithdraw = async function (
         await sleep(polling_interval);
     }
     expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
+
+    await this.ethProvider.waitForTransaction(withdrawalTxHash as string);
 
     const onchainBalanceAfter = await wallet.getEthereumBalance(token);
     const pendingBalanceAfter = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
