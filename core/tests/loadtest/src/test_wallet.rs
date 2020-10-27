@@ -30,7 +30,7 @@ pub struct TestWallet {
 }
 
 impl TestWallet {
-    const FEE_FACTOR: u64 = 2;
+    const FEE_FACTOR: u64 = 3;
 
     /// Creates a new wallet from the given account information and Ethereum configuration options.
     pub async fn from_info(
@@ -93,6 +93,12 @@ impl TestWallet {
             .committed
             .nonce;
 
+        monitor
+            .api_data_pool
+            .write()
+            .await
+            .store_address(inner.address());
+
         Self {
             monitor,
             inner,
@@ -100,6 +106,22 @@ impl TestWallet {
             nonce: AtomicU32::new(zk_nonce),
             token_name,
         }
+    }
+
+    /// Sets the correct nonce from the zkSync network.
+    ///
+    /// This method fixes further "nonce mismatch" errors.
+    pub async fn refresh_nonce(&self) -> Result<(), ClientError> {
+        let zk_nonce = self
+            .inner
+            .provider
+            .account_info(self.address())
+            .await?
+            .committed
+            .nonce;
+
+        self.nonce.store(zk_nonce, Ordering::SeqCst);
+        Ok(())
     }
 
     /// Returns the wallet address.

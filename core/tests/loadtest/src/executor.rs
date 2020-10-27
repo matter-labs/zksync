@@ -1,7 +1,6 @@
 // Built-in uses
 use std::{collections::BTreeMap, fmt::Debug};
 // External uses
-use futures::{future::BoxFuture, FutureExt};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
@@ -10,7 +9,7 @@ use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local uses
 use crate::{
-    api::CancellationToken,
+    api::{self, ApiTestsFuture, ApiTestsReport, CancellationToken},
     config::Config,
     journal::Journal,
     monitor::Monitor,
@@ -20,8 +19,6 @@ use crate::{
     FiveSummaryStats,
 };
 
-type ApiTestsFuture = BoxFuture<'static, anyhow::Result<BTreeMap<String, FiveSummaryStats>>>;
-
 /// Full report with the results of loadtest execution.
 ///
 /// This report contains two major types: scenarios with transactions and API requests.
@@ -30,7 +27,7 @@ pub struct Report {
     /// Scenarios report.
     pub scenarios: BTreeMap<String, FiveSummaryStats>,
     /// API requests report.
-    pub api: BTreeMap<String, FiveSummaryStats>,
+    pub api: BTreeMap<String, ApiTestsReport>,
 }
 
 /// Executor of load tests.
@@ -44,7 +41,7 @@ pub struct LoadtestExecutor {
     /// Main account to deposit ETH from / return ETH back to.
     main_wallet: TestWallet,
     monitor: Monitor,
-    eth_options: ConfigurationOptions,
+    env_options: ConfigurationOptions,
     /// Estimated fee amount for any zkSync operation.
     sufficient_fee: BigUint,
     scenarios: Vec<(Box<dyn Scenario>, Vec<TestWallet>)>,
@@ -53,7 +50,7 @@ pub struct LoadtestExecutor {
 
 impl LoadtestExecutor {
     /// Creates a new executor instance.
-    pub async fn new(config: Config, eth_options: ConfigurationOptions) -> anyhow::Result<Self> {
+    pub async fn new(config: Config, env_options: ConfigurationOptions) -> anyhow::Result<Self> {
         let monitor = Monitor::new(Provider::new(config.network.name)).await;
 
         log::info!("Creating scenarios...");
@@ -66,26 +63,20 @@ impl LoadtestExecutor {
 
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options).await;
+            TestWallet::from_info(monitor.clone(), &config.main_wallet, &env_options).await;
         let sufficient_fee = main_wallet.sufficient_fee().await?;
 
         log::info!("Fee is {}", format_ether(&sufficient_fee));
 
-        // TODO Use one of random wallets from the preparation step.
-        let (api_tests, cancel) = crate::api::run(
-            monitor.clone(),
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &eth_options)
-                .await
-                .into_inner(),
-        );
+        let api_tests = api::run(monitor.clone());
 
         Ok(Self {
             monitor,
-            eth_options,
+            env_options,
             main_wallet,
             scenarios,
             sufficient_fee,
-            api_tests: Some((api_tests.boxed(), cancel)),
+            api_tests: Some(api_tests),
         })
     }
 
@@ -105,7 +96,7 @@ impl LoadtestExecutor {
 
         Ok(Report {
             scenarios: journal.five_stats_summary()?,
-            api: api_handle.await??,
+            api: api_handle.await?,
         })
     }
 
@@ -136,7 +127,7 @@ impl LoadtestExecutor {
                 TestWallet::new_random(
                     self.main_wallet.token_name().clone(),
                     self.monitor.clone(),
-                    &self.eth_options,
+                    &self.env_options,
                 )
             }))
             .await;
@@ -222,19 +213,22 @@ impl LoadtestExecutor {
                 self.scenarios[scenario_index].0,
             );
 
-            let mut tx_hashes = Vec::new();
-            for wallet in &mut scenario_wallets {
-                wallet.update_account_id().await?;
-                assert!(
-                    wallet.account_id().is_some(),
-                    "Account ID was not set after deposit for the account"
-                );
+            let tx_hashes = try_wait_all_failsafe(scenario_wallets.iter_mut().map(|wallet| {
+                let sufficient_fee = self.sufficient_fee.clone();
+                let monitor = self.monitor.clone();
+                async move {
+                    wallet.update_account_id().await?;
+                    assert!(
+                        wallet.account_id().is_some(),
+                        "Account ID was not set after deposit for the account"
+                    );
 
-                let (tx, sign) = wallet
-                    .sign_change_pubkey(self.sufficient_fee.clone())
-                    .await?;
-                tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
-            }
+                    let (tx, sign) = wallet.sign_change_pubkey(sufficient_fee.clone()).await?;
+
+                    monitor.send_tx(tx, sign).await
+                }
+            }))
+            .await?;
 
             try_wait_all_failsafe(
                 tx_hashes
@@ -281,6 +275,7 @@ impl LoadtestExecutor {
     async fn refund(&mut self) -> anyhow::Result<()> {
         log::info!("Refunding the remaining tokens to the main wallet.");
 
+        self.main_wallet.refresh_nonce().await?;
         // Transfer the remaining balances of the intermediate wallets into the main one.
         for (scenario, scenario_wallets) in &mut self.scenarios {
             let monitor = self.monitor.clone();
@@ -293,7 +288,8 @@ impl LoadtestExecutor {
             let txs_queue = try_wait_all_failsafe(scenario_wallets.iter().map(|wallet| {
                 let sufficient_fee = sufficient_fee.clone();
                 async move {
-                    let balance = wallet.balance(BlockStatus::Verified).await?;
+                    wallet.refresh_nonce().await?;
+                    let balance = wallet.balance(BlockStatus::Committed).await?;
                     let withdraw_amount =
                         closest_packable_token_amount(&(balance - &sufficient_fee));
 
