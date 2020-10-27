@@ -34,6 +34,14 @@ export function background(command: string, stdio: any = 'inherit') {
     return _spawn(command, { stdio, shell: true, detached: true });
 }
 
+function overrideEnv() {
+    const envFile = process.env.ENV_FILE as string;
+    const env = dotenv.parse(fs.readFileSync(envFile))
+    for (const envVar in env) {
+        process.env[envVar] = env[envVar]
+    }
+}
+
 // loads environment variables
 export function loadEnv() {
     const current = 'etc/env/current';
@@ -48,7 +56,7 @@ export function loadEnv() {
     }
     process.env.ZKSYNC_ENV = zksyncEnv;
     process.env.ENV_FILE = envFile;
-    dotenv.config({ path: envFile });
+    overrideEnv();
 }
 
 // replaces an env variable in current .env file
@@ -57,7 +65,7 @@ export function loadEnv() {
 export function modifyEnv(variable: string, assignedVariable: string) {
     const envFile = process.env.ENV_FILE as string;
     replaceInFile(envFile, `${variable}=.*`, assignedVariable.trim());
-    dotenv.config({ path: envFile });
+    overrideEnv();
 }
 
 export async function sleep(seconds: number) {

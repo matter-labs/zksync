@@ -17,11 +17,11 @@ export async function contract() {
     delete process.env.ZKSYNC_ENV;
     utils.loadEnv();
     const contractAddress = process.env.CONTRACT_ADDR;
-    const govarnanceAddress = process.env.GOVERNANCE_ADDR;
+    const governanceAddress = process.env.GOVERNANCE_ADDR;
     await utils.exec(`${SQL()} "INSERT INTO server_config (contract_addr, gov_contract_addr)
-					 VALUES ('${contractAddress}', '${govarnanceAddress}')
+					 VALUES ('${contractAddress}', '${governanceAddress}')
 					 ON CONFLICT (id) DO UPDATE
-					 SET (contract_addr, gov_contract_addr) = ('${contractAddress}', '${govarnanceAddress}')"`);
+					 SET (contract_addr, gov_contract_addr) = ('${contractAddress}', '${governanceAddress}')"`);
     console.log('Successfully inserted contract address into the database');
 }
 
