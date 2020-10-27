@@ -53,6 +53,7 @@ export async function withServer<T>(testSuite: () => Promise<T>, timeout: number
     });
 
     await testSuite();
+    process.exit(0);
 }
 
 export async function api() {
