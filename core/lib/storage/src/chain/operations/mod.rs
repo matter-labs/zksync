@@ -117,6 +117,25 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
+    #[allow(dead_code)]
+    pub(crate) async fn confirm_operation(
+        &mut self,
+        block_number: BlockNumber,
+        action_type: ActionType,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "UPDATE operations
+                SET confirmed = $1
+                WHERE block_number = $2 AND action_type = $3",
+            true,
+            i64::from(block_number),
+            action_type.to_string()
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
     /// Stores the executed operation in the database.
     pub(crate) async fn store_executed_operation(
         &mut self,
