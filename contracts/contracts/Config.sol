@@ -31,7 +31,7 @@ contract Config {
     uint8 constant SUCCESS_FLAG_BYTES = 1;
 
     /// @dev Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
-    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = 128 - 1;
+    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = $(MAX_AMOUNT_OF_REGISTERED_TOKENS);
 
     /// @dev Max account id that could be registered in the network
     uint32 constant MAX_ACCOUNT_ID = (2 ** 24) - 1;
@@ -80,5 +80,6 @@ contract Config {
 
     /// @dev Notice period before activation preparation status of upgrade mode (in seconds)
     /// @dev NOTE: we must reserve for users enough time to send full exit operation, wait maximum time for processing this operation and withdraw funds from it.
-    uint constant UPGRADE_NOTICE_PERIOD = MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
+    // ifde
+    uint constant UPGRADE_NOTICE_PERIOD = $(defined(UPGRADE_NOTICE_PERIOD) ? UPGRADE_NOTICE_PERIOD : MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT);
 }

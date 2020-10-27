@@ -2,7 +2,7 @@ const ethers = require("ethers")
 const { expect, use } = require("chai")
 const { defaultAccounts, solidity, deployContract, MockProvider } = require("ethereum-waffle");
 
-const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
+const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
 const {rawEncode} = require('ethereumjs-abi')
 
 // For: geth

@@ -126,4 +126,8 @@ contract Storage {
     function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
         return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
+
+    mapping(uint32 => bytes32) public hashedBlocks;
+
+    mapping(bytes32 => bool) public hashedVerifiedCommitments;
 }

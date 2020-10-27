@@ -62,7 +62,7 @@ library Operations {
         returns (Deposit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = 0;
+        uint offset = 1;
         (offset, parsed.accountId) = Bytes.readUInt32(_data, offset); // accountId
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);   // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset);   // amount
@@ -105,7 +105,7 @@ library Operations {
         returns (FullExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = 0;
+        uint offset = 1;
         (offset, parsed.accountId) = Bytes.readUInt32(_data, offset);      // accountId
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
@@ -145,7 +145,7 @@ library Operations {
         returns (PartialExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
+        uint offset = _offset + 1 + ACCOUNT_ID_BYTES;                   // accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES;                                        // fee (ignored)
@@ -177,7 +177,7 @@ library Operations {
         returns (ForcedExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES * 2;               // initiatorAccountId + targetAccountId (ignored)
+        uint offset = _offset + 1 + ACCOUNT_ID_BYTES * 2;               // initiatorAccountId + targetAccountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES;                                        // fee (ignored)

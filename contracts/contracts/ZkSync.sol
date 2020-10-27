@@ -2,6 +2,8 @@
 
 pragma solidity ^0.7.0;
 
+pragma experimental ABIEncoderV2;
+
 import "./ReentrancyGuard.sol";
 import "./SafeMath.sol";
 import "./SafeMathUInt128.sol";
@@ -73,13 +75,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         (
         address _governanceAddress,
         address _verifierAddress,
-        bytes32 _genesisRoot
+        bytes32 _hashedFirstBlock
         ) = abi.decode(initializationParameters, (address, address, bytes32));
 
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
 
-        blocks[0].stateRoot = _genesisRoot;
+        hashedBlocks[0] = _hashedFirstBlock;
     }
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -102,47 +104,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(balance_diff <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
 
         return SafeCast.toUint128(balance_diff);
-    }
-
-    /// @notice executes pending withdrawals
-    /// @param _n The number of withdrawals to complete starting from oldest
-    function completeWithdrawals(uint32 _n) external nonReentrant {
-        // TODO: when switched to multi validators model we need to add incentive mechanism to call complete.
-        uint32 toProcess = Utils.minU32(_n, numberOfPendingWithdrawals);
-        uint32 startIndex = firstPendingWithdrawalIndex;
-        numberOfPendingWithdrawals -= toProcess;
-        firstPendingWithdrawalIndex += toProcess;
-
-        for (uint32 i = startIndex; i < startIndex + toProcess; ++i) {
-            uint16 tokenId = pendingWithdrawals[i].tokenId;
-            address to = pendingWithdrawals[i].to;
-            // send fails are ignored hence there is always a direct way to withdraw.
-            delete pendingWithdrawals[i];
-
-            bytes22 packedBalanceKey = packAddressAndTokenId(to, tokenId);
-            uint128 amount = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-            // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
-            if (amount != 0) {
-                balancesToWithdraw[packedBalanceKey].balanceToWithdraw -= amount;
-                bool sent = false;
-                if (tokenId == 0) {
-                    address payable toPayable = address(uint160(to));
-                    sent = Utils.sendETHNoRevert(toPayable, amount);
-                } else {
-                    address tokenAddr = governance.tokenAddresses(tokenId);
-                    // we can just check that call not reverts because it wants to withdraw all amount
-                    (sent, ) = address(this).call{ gas: ERC20_WITHDRAWAL_GAS_LIMIT }(
-                        abi.encodeWithSignature("withdrawERC20Guarded(address,address,uint128,uint128)", tokenAddr, to, amount, amount)
-                    );
-                }
-                if (!sent) {
-                    balancesToWithdraw[packedBalanceKey].balanceToWithdraw += amount;
-                }
-            }
-        }
-        if (toProcess > 0) {
-            emit PendingWithdrawalsComplete(startIndex, startIndex + toProcess);
-        }
     }
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
@@ -239,40 +200,96 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         balancesToWithdraw[packedBalanceKey].gasReserveValue = 0xff;
     }
 
+    struct StoredBlockInfo {
+        bytes32 processableOnchainOperationsHash;
+        bytes32 stateHash;
+        bytes32 commitment;
+    }
+
+    struct OnchainOperationData {
+        uint32 publicDataOffset;
+        bytes ethWitness;
+    }
+
+    struct CommitBlockInfo {
+        uint32 blockNumber;
+        uint32 feeAccount;
+        bytes32 newStateRoot;
+        bytes publicData;
+        OnchainOperationData[] onchainOperations;
+    }
+
+    function hashStoredBlockInfo(StoredBlockInfo memory _storedBlockInfo) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_storedBlockInfo));
+    }
+
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
-    /// @param _blockNumber Block number
-    /// @param _feeAccount Account to collect fees
-    /// @param _newBlockInfo New state of the block. (first element is the account tree root hash, rest of the array is reserved for the future)
-    /// @param _publicData Operations pubdata
-    /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
-    /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     function commitBlock(
-        uint32 _blockNumber,
-        uint32 _feeAccount,
-        bytes32[] calldata _newBlockInfo,
-        bytes calldata _publicData,
-        bytes calldata _ethWitness,
-        uint32[] calldata _ethWitnessSizes
+        StoredBlockInfo memory _oldBlockData,
+        CommitBlockInfo memory _newBlockData
     ) external nonReentrant {
         requireActive();
-        require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
+        require(hashStoredBlockInfo(_oldBlockData) == hashedBlocks[totalBlocksCommitted], "fck10"); // incorrect previous block data
+        require(_newBlockData.blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
-        require(_newBlockInfo.length == 1, "fck13"); // This version of the contract expects only account tree root hash
 
-        bytes memory publicData = _publicData;
-
-        // Unpack onchain operations and store them.
-        // Get priority operations number for this block.
         uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-        bytes32 withdrawalsDataHash = collectOnchainOps(_blockNumber, publicData, _ethWitness, _ethWitnessSizes);
+        bytes32 processedOnchainOpsHash = collectOnchainOps(_newBlockData.blockNumber, _newBlockData.publicData, _newBlockData.onchainOperations);
 
         uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
-        createCommittedBlock(_blockNumber, _feeAccount, _newBlockInfo[0], publicData, withdrawalsDataHash, nPriorityRequestProcessed);
+        createCommittedBlock(_newBlockData, _oldBlockData.stateHash, processedOnchainOpsHash);
         totalBlocksCommitted++;
 
-        emit BlockCommit(_blockNumber);
+        emit BlockCommit(_newBlockData.blockNumber);
+    }
+
+    struct ExecutableOnchainOperations {
+        bytes publicData;
+    }
+
+    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
+    function executeBlock(
+        StoredBlockInfo memory _blockData,
+        ExecutableOnchainOperations[] memory _executableOnchainOperations
+    ) external nonReentrant {
+        requireActive();
+        require(hashStoredBlockInfo(_blockData) == hashedBlocks[totalBlocksVerified + 1], "fck10"); // incorrect previous block data
+        governance.requireActiveValidator(msg.sender);
+
+        for (uint32 i = 0; i < _executableOnchainOperations.length; ++i) {
+            bytes memory pubData = _executableOnchainOperations[i].publicData;
+
+            Operations.OpType opType;
+            // read operation type from public data (the first byte per each operation)
+            assembly {
+                opType := shr(0xf8, mload(pubdataOffset))
+            }
+
+            if (opType == Operations.OpType.Deposit) {
+                firstPriorityRequestId++;
+                totalCommittedPriorityRequests--;
+            } else if (opType == Operations.OpType.PartialExit) {
+                Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData, 0);
+
+                // todo: try withdraw here
+            } else if (opType == Operations.OpType.ForcedExit) {
+                Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData, 0);
+
+                // todo: try withdraw here
+            } else if (opType == Operations.OpType.FullExit) {
+                Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
+
+                firstPriorityRequestId++;
+                totalCommittedPriorityRequests--;
+            } else {
+                revert("fpp14"); // unsupported op
+            }
+        }
+
+        --totalBlocksCommitted;
+        ++totalBlocksVerified;
     }
 
     /// @notice Block verification.
@@ -280,24 +297,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _blockNumber Block number
     /// @param _proof Block proof
     /// @param _withdrawalsData Block withdrawals data
-    function verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
+    function verifyCommitments(uint256[] calldata _commitments, uint256[] calldata _proof)
         external nonReentrant
     {
-        requireActive();
-        require(_blockNumber == totalBlocksVerified + 1, "fvk11"); // only verify next block
-        governance.requireActiveValidator(msg.sender);
-
-        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
-
-        processOnchainWithdrawals(_withdrawalsData, blocks[_blockNumber].withdrawalsDataHash);
-
-        deleteRequests(
-            blocks[_blockNumber].priorityOperations
-        );
-
-        totalBlocksVerified += 1;
-
-        emit BlockVerification(_blockNumber);
+        // todo actually verify
+//        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
+        hashedVerifiedCommitments[keccak256(abi.encode(_commitments))] = true;
     }
 
 
@@ -413,37 +418,28 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Store committed block structure to the storage.
-    /// @param _nCommittedPriorityRequests - number of priority requests in block
     function createCommittedBlock(
-        uint32 _blockNumber,
-        uint32 _feeAccount,
-        bytes32 _newRoot,
-        bytes memory _publicData,
-        bytes32 _withdrawalDataHash,
-        uint64 _nCommittedPriorityRequests
+        CommitBlockInfo memory _newBlockData,
+        bytes32 oldBlockStateRoot,
+        bytes32 processableOnchainOperationsHash
     ) internal {
-        require(_publicData.length % CHUNK_BYTES == 0, "cbb10"); // Public data size is not multiple of CHUNK_BYTES
+        require(_newBlockData.publicData.length % CHUNK_BYTES == 0, "cbb10"); // Public data size is not multiple of CHUNK_BYTES
 
-        uint32 blockChunks = uint32(_publicData.length / CHUNK_BYTES);
+        uint32 blockChunks = uint32(_newBlockData.publicData.length / CHUNK_BYTES);
         require(verifier.isBlockSizeSupported(blockChunks), "ccb11");
 
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(
-            _blockNumber,
-            _feeAccount,
-            blocks[_blockNumber - 1].stateRoot,
-            _newRoot,
-            _publicData
+            _newBlockData.blockNumber,
+            _newBlockData.feeAccount,
+            oldBlockStateRoot,
+            _newBlockData.newStateRoot,
+            _newBlockData.publicData
         );
 
-        blocks[_blockNumber] = Block(
-            uint32(block.number), // committed at
-            _nCommittedPriorityRequests, // number of priority onchain ops in block
-            blockChunks,
-            _withdrawalDataHash, // hash of onchain withdrawals data (will be used during checking block withdrawal data in verifyBlock function)
-            commitment, // blocks' commitment
-            _newRoot // new root
-        );
+        StoredBlockInfo memory newBlock = StoredBlockInfo(processableOnchainOperationsHash, _newBlockData.newStateRoot, commitment);
+
+        hashedBlocks[_newBlockData.blockNumber] = hashStoredBlockInfo(newBlock);
     }
 
     function emitDepositCommitEvent(uint32 _blockNumber, Operations.Deposit memory depositData) internal {
@@ -455,121 +451,77 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
-    /// @param _blockNumber Franklin block number
-    /// @param _publicData Operations packed in bytes array
-    /// @param _ethWitness Eth witness that was posted with commit
-    /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     /// Priority operations must be committed in the same order as they are in the priority queue.
-    function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
-        internal returns (bytes32 withdrawalsDataHash) {
+    function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, OnchainOperationData[] memory _onchainOps)
+        internal returns (bytes32 processableOperationsData) {
         require(_publicData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
 
         uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
 
-        uint256 pubDataPtr = 0;
-        uint256 pubDataStartPtr = 0;
-        uint256 pubDataEndPtr = 0;
+        processableOperationsData = EMPTY_STRING_KECCAK;
 
-        assembly { pubDataStartPtr := add(_publicData, 0x20) }
-        pubDataPtr = pubDataStartPtr;
-        pubDataEndPtr = pubDataStartPtr + _publicData.length;
+        for (uint32 i = 0; i < _onchainOps.length; ++i) {
+            OnchainOperationData memory onchainOpData = _onchainOps[i];
+            uint pubdataOffset = onchainOpData.publicDataOffset;
 
-        uint64 ethWitnessOffset = 0;
-        uint16 processedOperationsRequiringEthWitness = 0;
-
-        withdrawalsDataHash = EMPTY_STRING_KECCAK;
-
-        while (pubDataPtr < pubDataEndPtr) {
             Operations.OpType opType;
             // read operation type from public data (the first byte per each operation)
             assembly {
-                opType := shr(0xf8, mload(pubDataPtr))
+                opType := shr(0xf8, mload(pubdataOffset))
             }
 
-            // cheap operations processing
-            if (opType == Operations.OpType.Transfer) {
-                pubDataPtr += TRANSFER_BYTES;
-            } else if (opType == Operations.OpType.Noop) {
-                pubDataPtr += NOOP_BYTES;
-            } else if (opType == Operations.OpType.TransferToNew) {
-                pubDataPtr += TRANSFER_TO_NEW_BYTES;
-            } else {
-                // other operations processing
+            if (opType == Operations.OpType.Deposit) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, DEPOSIT_BYTES);
 
-                // calculation of public data offset
-                uint256 pubdataOffset = pubDataPtr - pubDataStartPtr;
+                Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
+                emitDepositCommitEvent(_blockNumber, depositData);
 
-                if (opType == Operations.OpType.Deposit) {
-                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
+                OnchainOperation memory onchainOp = OnchainOperation(
+                    Operations.OpType.Deposit,
+                    pubData
+                );
+                commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
+                currentPriorityRequestId++;
 
-                    Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
-                    emitDepositCommitEvent(_blockNumber, depositData);
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+            } else if (opType == Operations.OpType.PartialExit) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, PARTIAL_EXIT_BYTES);
 
-                    OnchainOperation memory onchainOp = OnchainOperation(
-                        Operations.OpType.Deposit,
-                        pubData
-                    );
-                    commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
-                    currentPriorityRequestId++;
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+            } else if (opType == Operations.OpType.ForcedExit) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, FORCED_EXIT_BYTES);
 
-                    pubDataPtr += DEPOSIT_BYTES;
-                } else if (opType == Operations.OpType.PartialExit) {
-                    Operations.PartialExit memory data = Operations.readPartialExitPubdata(_publicData, pubdataOffset + 1);
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+            } else if (opType == Operations.OpType.FullExit) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, FULL_EXIT_BYTES);
 
-                    bool addToPendingWithdrawalsQueue = true;
-                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
+                Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
+                emitFullExitCommitEvent(_blockNumber, fullExitData);
 
-                    pubDataPtr += PARTIAL_EXIT_BYTES;
-                } else if (opType == Operations.OpType.ForcedExit) {
-                    Operations.ForcedExit memory data = Operations.readForcedExitPubdata(_publicData, pubdataOffset + 1);
+                OnchainOperation memory onchainOp = OnchainOperation(
+                    Operations.OpType.FullExit,
+                    pubData
+                );
+                commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
+                currentPriorityRequestId++;
 
-                    bool addToPendingWithdrawalsQueue = true;
-                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.target, data.tokenId, data.amount));
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+            } else if (opType == Operations.OpType.ChangePubKey) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, CHANGE_PUBKEY_BYTES);
 
-                    pubDataPtr += FORCED_EXIT_BYTES;
-                } else if (opType == Operations.OpType.FullExit) {
-                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
+                Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(pubData, 1);
 
-                    Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
-                    emitFullExitCommitEvent(_blockNumber, fullExitData);
-
-                    bool addToPendingWithdrawalsQueue = false;
-                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, fullExitData.owner, fullExitData.tokenId, fullExitData.amount));
-
-                    OnchainOperation memory onchainOp = OnchainOperation(
-                        Operations.OpType.FullExit,
-                        pubData
-                    );
-                    commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
-                    currentPriorityRequestId++;
-
-                    pubDataPtr += FULL_EXIT_BYTES;
-                } else if (opType == Operations.OpType.ChangePubKey) {
-                    require(processedOperationsRequiringEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
-                    Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
-
-                    if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
-                        bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
-
-                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
-                        require(valid, "fpp15"); // failed to verify change pubkey hash signature
-                    } else {
-                        bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
-                        require(valid, "fpp16"); // new pub key hash is not authenticated properly
-                    }
-
-                    ethWitnessOffset += _ethWitnessSizes[processedOperationsRequiringEthWitness];
-                    processedOperationsRequiringEthWitness++;
-
-                    pubDataPtr += CHANGE_PUBKEY_BYTES;
+                if (onchainOpData.ethWitness.length > 0) {
+                    bool valid = verifyChangePubkeySignature(onchainOpData.ethWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
+                    require(valid, "fpp15"); // failed to verify change pubkey hash signature
                 } else {
-                    revert("fpp14"); // unsupported op
+                    bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
+                    require(valid, "fpp16"); // new pub key hash is not authenticated properly
                 }
+            } else {
+                revert("fpp14"); // unsupported op
             }
         }
-        require(pubDataPtr == pubDataEndPtr, "fcs12"); // last chunk exceeds pubdata
-        require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
-        require(processedOperationsRequiringEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
 
         require(currentPriorityRequestId <= firstPriorityRequestId + totalOpenPriorityRequests, "fcs16"); // fcs16 - excess priority requests in pubdata
         totalCommittedPriorityRequests = currentPriorityRequestId - firstPriorityRequestId;
@@ -698,16 +650,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             emit PendingWithdrawalsAdd(firstPendingWithdrawalIndex + numberOfPendingWithdrawals, firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals);
         }
         numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
-    }
-
-    /// @notice Checks whether oldest unverified block has expired
-    /// @return bool flag that indicates whether oldest unverified block has expired
-    function isBlockCommitmentExpired() internal view returns (bool) {
-        return (
-            totalBlocksCommitted > totalBlocksVerified &&
-            blocks[totalBlocksVerified + 1].committedAtBlock > 0 &&
-            block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN
-        );
     }
 
     /// @notice Checks that current state not is exodus mode
