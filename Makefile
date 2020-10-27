@@ -11,6 +11,7 @@ export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 export FEE_SELLER_IMAGE ?=matterlabs/fee-seller:latest
 export EXIT_TOOL_IMAGE ?=matterlabs/exit-tool:latest
+export CI_INTEGRATION_TEST_IMAGE ?=matterlabs/ci-integration-test:latest
 
 # Getting started
 
@@ -298,3 +299,9 @@ image-exit-tool:
 
 push-image-exit-tool: image-exit-tool
 	@docker push "${EXIT_TOOL_IMAGE}"
+
+image-ci-integration:
+	@docker build -t "${CI_INTEGRATION_TEST_IMAGE}" ./docker/integration-test/
+
+push-image-ci-integration: image-ci-integration
+	@docker push "${CI_INTEGRATION_TEST_IMAGE}"
