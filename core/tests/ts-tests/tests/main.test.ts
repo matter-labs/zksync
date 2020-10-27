@@ -80,10 +80,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
-    step('should execute a fast withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT, true);
-    });
-
     step('should execute a ForcedExit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
