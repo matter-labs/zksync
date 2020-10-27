@@ -30,6 +30,7 @@ interface StorageInterface extends ethers.utils.Interface {
     "firstPriorityRequestId()": FunctionFragment;
     "getBalanceToWithdraw(address,uint16)": FunctionFragment;
     "hashedBlocks(uint32)": FunctionFragment;
+    "hashedVerifiedCommitments(bytes32)": FunctionFragment;
     "numberOfPendingWithdrawals()": FunctionFragment;
     "pendingWithdrawals(uint32)": FunctionFragment;
     "priorityRequests(uint64)": FunctionFragment;
@@ -76,6 +77,10 @@ interface StorageInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "hashedBlocks",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "hashedVerifiedCommitments",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "numberOfPendingWithdrawals",
@@ -136,6 +141,10 @@ interface StorageInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "hashedBlocks",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "hashedVerifiedCommitments",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -344,6 +353,20 @@ export class Storage extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: string;
+    }>;
+
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
     }>;
 
     numberOfPendingWithdrawals(
@@ -586,6 +609,16 @@ export class Storage extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
+  hashedVerifiedCommitments(
+    arg0: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "hashedVerifiedCommitments(bytes32)"(
+    arg0: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
   numberOfPendingWithdrawals(overrides?: CallOverrides): Promise<number>;
 
   "numberOfPendingWithdrawals()"(overrides?: CallOverrides): Promise<number>;
@@ -779,6 +812,16 @@ export class Storage extends Contract {
       overrides?: CallOverrides
     ): Promise<string>;
 
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
     numberOfPendingWithdrawals(overrides?: CallOverrides): Promise<number>;
 
     "numberOfPendingWithdrawals()"(overrides?: CallOverrides): Promise<number>;
@@ -942,6 +985,16 @@ export class Storage extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     numberOfPendingWithdrawals(overrides?: CallOverrides): Promise<BigNumber>;
 
     "numberOfPendingWithdrawals()"(
@@ -1087,6 +1140,16 @@ export class Storage extends Contract {
 
     "hashedBlocks(uint32)"(
       arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 

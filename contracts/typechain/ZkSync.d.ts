@@ -31,6 +31,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     "commitBlock(tuple,tuple)": FunctionFragment;
     "depositERC20(address,uint104,address)": FunctionFragment;
     "depositETH(address)": FunctionFragment;
+    "executeBlock(tuple,tuple[])": FunctionFragment;
     "exit(uint32,uint16,uint128,uint256[])": FunctionFragment;
     "exited(uint32,uint16)": FunctionFragment;
     "exodusMode()": FunctionFragment;
@@ -40,6 +41,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     "getBalanceToWithdraw(address,uint16)": FunctionFragment;
     "getNoticePeriod()": FunctionFragment;
     "hashedBlocks(uint32)": FunctionFragment;
+    "hashedVerifiedCommitments(bytes32)": FunctionFragment;
     "initialize(bytes)": FunctionFragment;
     "isReadyForUpgrade()": FunctionFragment;
     "numberOfPendingWithdrawals()": FunctionFragment;
@@ -59,7 +61,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     "upgradePreparationActivationTime()": FunctionFragment;
     "upgradePreparationActive()": FunctionFragment;
     "upgradePreparationStarted()": FunctionFragment;
-    "verifyBlock(uint32,uint256[],bytes)": FunctionFragment;
+    "verifyCommitments(uint256[],uint256[])": FunctionFragment;
     "withdrawERC20(address,uint128)": FunctionFragment;
     "withdrawERC20Guarded(address,address,uint128,uint128)": FunctionFragment;
     "withdrawETH(uint128)": FunctionFragment;
@@ -111,6 +113,17 @@ interface ZkSyncInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "depositETH", values: [string]): string;
   encodeFunctionData(
+    functionFragment: "executeBlock",
+    values: [
+      {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      { publicData: BytesLike }[]
+    ]
+  ): string;
+  encodeFunctionData(
     functionFragment: "exit",
     values: [BigNumberish, BigNumberish, BigNumberish, BigNumberish[]]
   ): string;
@@ -145,6 +158,10 @@ interface ZkSyncInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "hashedBlocks",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "hashedVerifiedCommitments",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "initialize",
@@ -220,8 +237,8 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "verifyBlock",
-    values: [BigNumberish, BigNumberish[], BytesLike]
+    functionFragment: "verifyCommitments",
+    values: [BigNumberish[], BigNumberish[]]
   ): string;
   encodeFunctionData(
     functionFragment: "withdrawERC20",
@@ -259,6 +276,10 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "depositETH", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "executeBlock",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "exit", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "exited", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "exodusMode", data: BytesLike): Result;
@@ -281,6 +302,10 @@ interface ZkSyncInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "hashedBlocks",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "hashedVerifiedCommitments",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "initialize", data: BytesLike): Result;
@@ -354,7 +379,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "verifyBlock",
+    functionFragment: "verifyCommitments",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -569,6 +594,26 @@ export class ZkSync extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
+    executeBlock(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "executeBlock(tuple,tuple[])"(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     exit(
       _accountId: BigNumberish,
       _tokenId: BigNumberish,
@@ -689,6 +734,20 @@ export class ZkSync extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: string;
+    }>;
+
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
     }>;
 
     initialize(
@@ -903,17 +962,15 @@ export class ZkSync extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    verifyBlock(
-      _blockNumber: BigNumberish,
+    verifyCommitments(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "verifyBlock(uint32,uint256[],bytes)"(
-      _blockNumber: BigNumberish,
+    "verifyCommitments(uint256[],uint256[])"(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -1100,6 +1157,26 @@ export class ZkSync extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
+  executeBlock(
+    _blockData: {
+      processableOnchainOperationsHash: BytesLike;
+      stateHash: BytesLike;
+      commitment: BytesLike;
+    },
+    _executableOnchainOperations: { publicData: BytesLike }[],
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "executeBlock(tuple,tuple[])"(
+    _blockData: {
+      processableOnchainOperationsHash: BytesLike;
+      stateHash: BytesLike;
+      commitment: BytesLike;
+    },
+    _executableOnchainOperations: { publicData: BytesLike }[],
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   exit(
     _accountId: BigNumberish,
     _tokenId: BigNumberish,
@@ -1174,6 +1251,16 @@ export class ZkSync extends Contract {
     arg0: BigNumberish,
     overrides?: CallOverrides
   ): Promise<string>;
+
+  hashedVerifiedCommitments(
+    arg0: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "hashedVerifiedCommitments(bytes32)"(
+    arg0: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   initialize(
     initializationParameters: BytesLike,
@@ -1329,17 +1416,15 @@ export class ZkSync extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  verifyBlock(
-    _blockNumber: BigNumberish,
+  verifyCommitments(
+    _commitments: BigNumberish[],
     _proof: BigNumberish[],
-    _withdrawalsData: BytesLike,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "verifyBlock(uint32,uint256[],bytes)"(
-    _blockNumber: BigNumberish,
+  "verifyCommitments(uint256[],uint256[])"(
+    _commitments: BigNumberish[],
     _proof: BigNumberish[],
-    _withdrawalsData: BytesLike,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1523,6 +1608,26 @@ export class ZkSync extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    executeBlock(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "executeBlock(tuple,tuple[])"(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     exit(
       _accountId: BigNumberish,
       _tokenId: BigNumberish,
@@ -1600,6 +1705,16 @@ export class ZkSync extends Contract {
       arg0: BigNumberish,
       overrides?: CallOverrides
     ): Promise<string>;
+
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     initialize(
       initializationParameters: BytesLike,
@@ -1749,17 +1864,15 @@ export class ZkSync extends Contract {
 
     "upgradePreparationStarted()"(overrides?: CallOverrides): Promise<void>;
 
-    verifyBlock(
-      _blockNumber: BigNumberish,
+    verifyCommitments(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "verifyBlock(uint32,uint256[],bytes)"(
-      _blockNumber: BigNumberish,
+    "verifyCommitments(uint256[],uint256[])"(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1970,6 +2083,26 @@ export class ZkSync extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
+    executeBlock(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "executeBlock(tuple,tuple[])"(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     exit(
       _accountId: BigNumberish,
       _tokenId: BigNumberish,
@@ -2047,6 +2180,16 @@ export class ZkSync extends Contract {
 
     "hashedBlocks(uint32)"(
       arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -2176,17 +2319,15 @@ export class ZkSync extends Contract {
 
     "upgradePreparationStarted()"(overrides?: Overrides): Promise<BigNumber>;
 
-    verifyBlock(
-      _blockNumber: BigNumberish,
+    verifyCommitments(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "verifyBlock(uint32,uint256[],bytes)"(
-      _blockNumber: BigNumberish,
+    "verifyCommitments(uint256[],uint256[])"(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -2342,6 +2483,26 @@ export class ZkSync extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
+    executeBlock(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "executeBlock(tuple,tuple[])"(
+      _blockData: {
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      },
+      _executableOnchainOperations: { publicData: BytesLike }[],
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     exit(
       _accountId: BigNumberish,
       _tokenId: BigNumberish,
@@ -2427,6 +2588,16 @@ export class ZkSync extends Contract {
 
     "hashedBlocks(uint32)"(
       arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    hashedVerifiedCommitments(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "hashedVerifiedCommitments(bytes32)"(
+      arg0: BytesLike,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -2584,17 +2755,15 @@ export class ZkSync extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    verifyBlock(
-      _blockNumber: BigNumberish,
+    verifyCommitments(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "verifyBlock(uint32,uint256[],bytes)"(
-      _blockNumber: BigNumberish,
+    "verifyCommitments(uint256[],uint256[])"(
+      _commitments: BigNumberish[],
       _proof: BigNumberish[],
-      _withdrawalsData: BytesLike,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

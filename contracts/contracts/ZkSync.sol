@@ -18,6 +18,7 @@ import "./Bytes.sol";
 import "./Operations.sol";
 
 import "./UpgradeableMaster.sol";
+import "hardhat/console.sol";
 
 /// @title zkSync main contract
 /// @author Matter Labs
@@ -229,18 +230,24 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         CommitBlockInfo memory _newBlockData
     ) external nonReentrant {
         requireActive();
-        require(hashStoredBlockInfo(_oldBlockData) == hashedBlocks[totalBlocksCommitted], "fck10"); // incorrect previous block data
-        require(_newBlockData.blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
+        uint32 tbc = totalBlocksCommitted;
+        require(hashStoredBlockInfo(_oldBlockData) == hashedBlocks[tbc], "fck10"); // incorrect previous block data
+        require(_newBlockData.blockNumber == tbc + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
 
-        uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-        bytes32 processedOnchainOpsHash = collectOnchainOps(_newBlockData.blockNumber, _newBlockData.publicData, _newBlockData.onchainOperations);
+        bytes32 processedOnchainOpsHash = collectOnchainOps(_newBlockData);
 
-        uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
+        // Create block commitment for verification proof
+        bytes32 commitment = createBlockCommitment(
+            _oldBlockData.stateHash,
+            _newBlockData
+        );
 
-        createCommittedBlock(_newBlockData, _oldBlockData.stateHash, processedOnchainOpsHash);
-        totalBlocksCommitted++;
+        StoredBlockInfo memory newBlock = StoredBlockInfo(processedOnchainOpsHash, _newBlockData.newStateRoot, bytes32(0));
+
+        hashedBlocks[_newBlockData.blockNumber] = hashStoredBlockInfo(newBlock);
+        totalBlocksCommitted = tbc + 1;
 
         emit BlockCommit(_newBlockData.blockNumber);
     }
@@ -261,11 +268,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         for (uint32 i = 0; i < _executableOnchainOperations.length; ++i) {
             bytes memory pubData = _executableOnchainOperations[i].publicData;
 
-            Operations.OpType opType;
-            // read operation type from public data (the first byte per each operation)
-            assembly {
-                opType := shr(0xf8, mload(pubdataOffset))
-            }
+            Operations.OpType opType = Operations.OpType(uint8(pubData[0]));
 
             if (opType == Operations.OpType.Deposit) {
                 firstPriorityRequestId++;
@@ -294,9 +297,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Block verification.
     /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
-    /// @param _blockNumber Block number
-    /// @param _proof Block proof
-    /// @param _withdrawalsData Block withdrawals data
     function verifyCommitments(uint256[] calldata _commitments, uint256[] calldata _proof)
         external nonReentrant
     {
@@ -309,7 +309,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Reverts unverified blocks
     /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
     function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+//        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
         governance.requireActiveValidator(msg.sender);
 
         uint32 blocksCommited = totalBlocksCommitted;
@@ -417,30 +417,34 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         );
     }
 
-    /// @notice Store committed block structure to the storage.
-    function createCommittedBlock(
-        CommitBlockInfo memory _newBlockData,
-        bytes32 oldBlockStateRoot,
-        bytes32 processableOnchainOperationsHash
-    ) internal {
-        require(_newBlockData.publicData.length % CHUNK_BYTES == 0, "cbb10"); // Public data size is not multiple of CHUNK_BYTES
-
-        uint32 blockChunks = uint32(_newBlockData.publicData.length / CHUNK_BYTES);
-        require(verifier.isBlockSizeSupported(blockChunks), "ccb11");
-
-        // Create block commitment for verification proof
-        bytes32 commitment = createBlockCommitment(
-            _newBlockData.blockNumber,
-            _newBlockData.feeAccount,
-            oldBlockStateRoot,
-            _newBlockData.newStateRoot,
-            _newBlockData.publicData
-        );
-
-        StoredBlockInfo memory newBlock = StoredBlockInfo(processableOnchainOperationsHash, _newBlockData.newStateRoot, commitment);
-
-        hashedBlocks[_newBlockData.blockNumber] = hashStoredBlockInfo(newBlock);
-    }
+//    /// @notice Store committed block structure to the storage.
+//    function createCommittedBlock(
+//        CommitBlockInfo memory _newBlockData,
+//        bytes32 oldBlockStateRoot,
+//        bytes32 processableOnchainOperationsHash
+//    ) internal {
+//        uint gasv = gasleft();
+//        require(_newBlockData.publicData.length % CHUNK_BYTES == 0, "cbb10"); // Public data size is not multiple of CHUNK_BYTES
+//
+//        uint32 blockChunks = uint32(_newBlockData.publicData.length / CHUNK_BYTES);
+////        require(verifier.isBlockSizeSupported(blockChunks), "ccb11");
+//
+//        // Create block commitment for verification proof
+//        bytes32 commitment = createBlockCommitment(
+//            _newBlockData.blockNumber,
+//            _newBlockData.feeAccount,
+//            oldBlockStateRoot,
+//            _newBlockData.newStateRoot,
+//            _newBlockData.publicData
+//        );
+//        console.log("cost of commitment %d", gasv - gasleft());
+//
+//        gasv = gasleft();
+//        StoredBlockInfo memory newBlock = StoredBlockInfo(processableOnchainOperationsHash, _newBlockData.newStateRoot, bytes32(0));
+//
+//        hashedBlocks[_newBlockData.blockNumber] = hashStoredBlockInfo(newBlock);
+//        console.log("storeblock %d", gasv - gasleft());
+//    }
 
     function emitDepositCommitEvent(uint32 _blockNumber, Operations.Deposit memory depositData) internal {
         emit DepositCommit(_blockNumber, depositData.accountId, depositData.owner, depositData.tokenId, depositData.amount);
@@ -452,29 +456,24 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
     /// Priority operations must be committed in the same order as they are in the priority queue.
-    function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, OnchainOperationData[] memory _onchainOps)
+    function collectOnchainOps(CommitBlockInfo memory _newBlockData)
         internal returns (bytes32 processableOperationsData) {
-        require(_publicData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
+        bytes memory pubData = _newBlockData.publicData;
 
+        require(pubData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
         uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
-
         processableOperationsData = EMPTY_STRING_KECCAK;
-
-        for (uint32 i = 0; i < _onchainOps.length; ++i) {
-            OnchainOperationData memory onchainOpData = _onchainOps[i];
+        for (uint32 i = 0; i < _newBlockData.onchainOperations.length; ++i) {
+            OnchainOperationData memory onchainOpData = _newBlockData.onchainOperations[i];
             uint pubdataOffset = onchainOpData.publicDataOffset;
 
-            Operations.OpType opType;
-            // read operation type from public data (the first byte per each operation)
-            assembly {
-                opType := shr(0xf8, mload(pubdataOffset))
-            }
+            Operations.OpType opType = Operations.OpType(uint8(pubData[pubdataOffset]));
 
             if (opType == Operations.OpType.Deposit) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, DEPOSIT_BYTES);
+                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, DEPOSIT_BYTES);
 
                 Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
-                emitDepositCommitEvent(_blockNumber, depositData);
+                emitDepositCommitEvent(_newBlockData.blockNumber, depositData);
 
                 OnchainOperation memory onchainOp = OnchainOperation(
                     Operations.OpType.Deposit,
@@ -485,18 +484,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
                 processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
             } else if (opType == Operations.OpType.PartialExit) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, PARTIAL_EXIT_BYTES);
+                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, PARTIAL_EXIT_BYTES);
 
                 processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
             } else if (opType == Operations.OpType.ForcedExit) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, FORCED_EXIT_BYTES);
+                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, FORCED_EXIT_BYTES);
 
                 processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
             } else if (opType == Operations.OpType.FullExit) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, FULL_EXIT_BYTES);
+                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, FULL_EXIT_BYTES);
 
                 Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
-                emitFullExitCommitEvent(_blockNumber, fullExitData);
+                emitFullExitCommitEvent(_newBlockData.blockNumber, fullExitData);
 
                 OnchainOperation memory onchainOp = OnchainOperation(
                     Operations.OpType.FullExit,
@@ -507,7 +506,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
                 processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
             } else if (opType == Operations.OpType.ChangePubKey) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset, CHANGE_PUBKEY_BYTES);
+                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, CHANGE_PUBKEY_BYTES);
 
                 Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(pubData, 1);
 
@@ -548,24 +547,17 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @dev Creates block commitment from its data
-    /// @param _blockNumber Block number
-    /// @param _feeAccount Account to collect fees
-    /// @param _oldRoot Old tree root
-    /// @param _newRoot New tree root
-    /// @param _publicData Operations pubdata
-    /// @return commitment block commitment
     function createBlockCommitment(
-        uint32 _blockNumber,
-        uint32 _feeAccount,
         bytes32 _oldRoot,
-        bytes32 _newRoot,
-        bytes memory _publicData
+        CommitBlockInfo memory _newBlockData
     ) internal view returns (bytes32 commitment) {
         bytes32 hash = sha256(
-            abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
+            abi.encodePacked(uint256(_newBlockData.blockNumber), uint256(_newBlockData.feeAccount))
         );
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
-        hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
+        hash = sha256(abi.encodePacked(hash, uint256(_newBlockData.newStateRoot)));
+
+        bytes memory pubdata = _newBlockData.publicData;
 
         /// The code below is equivalent to `commitment = sha256(abi.encodePacked(hash, _publicData))`
 
@@ -577,18 +569,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         /// Finally, we put the `_publicData.length` back to its original location (to the first word of `_publicData`).
         assembly {
             let hashResult := mload(0x40)
-            let pubDataLen := mload(_publicData)
-            mstore(_publicData, hash)
+            let pubDataLen := mload(pubdata)
+            mstore(pubdata, hash)
             // staticcall to the sha256 precompile at address 0x2
             let success := staticcall(
                 gas(),
                 0x2,
-                _publicData,
+                pubdata,
                 add(pubDataLen, 0x20),
                 hashResult,
                 0x20
             )
-            mstore(_publicData, pubDataLen)
+            mstore(pubdata, pubDataLen)
 
             // Use "invalid" to make gas estimation work
             switch success case 0 { invalid() }
