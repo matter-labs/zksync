@@ -91,10 +91,38 @@ fn create_account_and_withdrawal<B: Into<BigUint>>(
     balance: B,
     withdraw_amount: B,
 ) -> SignedZkSyncTx {
+    create_account_and_withdrawal_impl(
+        tester,
+        token_id,
+        account_id,
+        balance,
+        withdraw_amount,
+        false,
+    )
+}
+
+fn create_account_and_fast_withdrawal<B: Into<BigUint>>(
+    tester: &mut StateKeeperTester,
+    token_id: TokenId,
+    account_id: AccountId,
+    balance: B,
+    withdraw_amount: B,
+) -> SignedZkSyncTx {
+    create_account_and_withdrawal_impl(tester, token_id, account_id, balance, withdraw_amount, true)
+}
+
+fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
+    tester: &mut StateKeeperTester,
+    token_id: TokenId,
+    account_id: AccountId,
+    balance: B,
+    withdraw_amount: B,
+    fast: bool,
+) -> SignedZkSyncTx {
     let (account, sk) = tester.add_account(account_id);
     tester.set_balance(account_id, token_id, balance);
 
-    let withdraw = Withdraw::new_signed(
+    let mut withdraw = Withdraw::new_signed(
         account_id,
         account.address,
         account.address,
@@ -105,6 +133,8 @@ fn create_account_and_withdrawal<B: Into<BigUint>>(
         &sk,
     )
     .unwrap();
+
+    withdraw.fast = fast;
 
     SignedZkSyncTx {
         tx: ZkSyncTx::Withdraw(Box::new(withdraw)),
@@ -185,6 +215,20 @@ mod apply_tx {
         assert!(!pending_block.success_operations.is_empty());
         assert!(!pending_block.collected_fees.is_empty());
         assert_eq!(pending_block.withdrawals_amount, 1);
+    }
+
+    /// Checks if fast withdrawal makes fast processing required
+    #[test]
+    fn fast_withdrawal() {
+        let mut tester = StateKeeperTester::new(6, 1, 1, 1);
+        let old_pending_block = tester.state_keeper.pending_block.clone();
+        let withdraw = create_account_and_fast_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+        let result = tester.state_keeper.apply_tx(&withdraw);
+        let pending_block = tester.state_keeper.pending_block;
+
+        assert!(result.is_ok());
+        assert_eq!(old_pending_block.fast_processing_required, false);
+        assert_eq!(pending_block.fast_processing_required, true);
     }
 
     /// Checks if withdrawal that will fail is processed correctly
@@ -477,6 +521,32 @@ mod execute_proposed_block {
             .state_keeper
             .execute_proposed_block(proposed_block)
             .await;
+        assert!(matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::Block(_))
+        ));
+    }
+
+    /// Checks that fast withdrawal causes block to be sealed faster.
+    #[tokio::test]
+    async fn fast_withdrawal() {
+        const MAX_ITERATIONS: usize = 100;
+        const FAST_ITERATIONS: usize = 0; // Seal block right after fast withdrawal.
+
+        let mut tester = StateKeeperTester::new(6, MAX_ITERATIONS, FAST_ITERATIONS, 2);
+        let withdraw = create_account_and_fast_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+
+        let proposed_block = ProposedBlock {
+            priority_ops: Vec::new(),
+            txs: vec![withdraw.into()],
+        };
+
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+
+        // We should receive the next block, since it must be sealed right after.
         assert!(matches!(
             tester.response_rx.next().await,
             Some(CommitRequest::Block(_))

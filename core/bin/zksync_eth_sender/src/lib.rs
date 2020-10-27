@@ -470,7 +470,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                         receipt,
                     );
                     // Process the failure according to the chosen policy.
-                    self.failure_handler(&receipt);
+                    self.failure_handler(&receipt).await;
                 }
             }
         }
@@ -510,11 +510,16 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 
     /// Handles a transaction execution failure by reporting the issue to the log
     /// and terminating the node.
-    fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
+    async fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
         log::error!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );
+        if let Some(reason) = self.ethereum.failure_reason(receipt.transaction_hash).await {
+            log::error!("Failure reason for Ethereum tx: {:#?}", reason);
+        } else {
+            log::error!("Unable to receive failure reason for Ethereum tx");
+        }
         panic!("Cannot operate after unexpected TX failure");
     }
 
