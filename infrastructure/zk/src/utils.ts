@@ -29,9 +29,9 @@ export function spawn(command: string) {
 
 // executes a command in background and returns a child process handle
 // by default pipes data to parent's stdio but this can be overriden
-export function background(command: string) {
+export function background(command: string, stdio: any = 'inherit') {
     command = command.replace(/\n/g, '');
-    return _spawn(command, { stdio: 'inherit', shell: true, detached: true });
+    return _spawn(command, { stdio, shell: true, detached: true });
 }
 
 // loads environment variables

@@ -12,10 +12,12 @@ export async function withServer<T>(testSuite: () => Promise<T>, timeout: number
     await utils.spawn('cargo build --bin zksync_server --release');
     await utils.spawn('cargo build --bin dummy_prover --release');
 
-    const server = utils.background('cargo run --bin zksync_server --release &> server.log');
+    const serverLog = fs.openSync('server.log', 'w');
+    const server = utils.background('cargo run --bin zksync_server --release', ['ignore', serverLog, serverLog]);
     await utils.sleep(1);
 
-    const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance &> prover.log');
+    const proverLog = fs.openSync('prover.log', 'w');
+    const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance', ['ignore', proverLog, proverLog]);
     await utils.sleep(10);
 
     const timer = setTimeout(() => {

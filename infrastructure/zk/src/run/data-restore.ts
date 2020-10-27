@@ -57,10 +57,7 @@ command
 
 command
     .command('check-existing')
-    .description(
-        `like "check", but instead of taking expected hash as an argument,
-         it is loaded from the database before wiping it`
-    )
+    .description(`like "check", but instead hash is loaded from the database before wiping it`)
     .action(checkExisting);
 
 command
