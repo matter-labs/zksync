@@ -13,7 +13,7 @@ name = 'localhost'
 name = 'transfer'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
-transfer_rounds = 1
+transfer_rounds = 5
 wallets_amount = 200
 
 [[scenarios]]
