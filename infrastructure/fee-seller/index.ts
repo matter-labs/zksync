@@ -172,7 +172,7 @@ async function sendETH(zksWallet: zksync.Wallet) {
     try {
         if (!await zksWallet.isSigningKeySet()) {
             console.log("Changing fee account signing key");
-            const signingKeyTx = await zksWallet.setSigningKey();
+            const signingKeyTx = await zksWallet.setSigningKey({feeToken: "ETH"});
             await signingKeyTx.awaitReceipt();
         }
 
