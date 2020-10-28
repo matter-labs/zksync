@@ -5,8 +5,10 @@ nohup /usr/local/bin/geth-entry.sh &>/dev/null &
 
 # Initialize database
 service postgresql restart
-
 zksync db-setup
+
+# Prepare dummy-prover in the contract (so the redeployed version will be OK)
+zksync dummy-prover enable-no-redeploy
 
 # Build deps for contracts
 pushd $ZKSYNC_HOME/contracts > /dev/null
