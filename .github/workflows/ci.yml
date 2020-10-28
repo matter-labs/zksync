@@ -42,7 +42,11 @@ jobs:
       run: zksync init
 
     - name: integration-tests
-      run: ci_docker_container.sh "all_integration_tests.sh || cat_logs.sh"
+      run: |
+        f cargo build --bin zksync_server --release
+        f cargo build --bin dummy_prover --release
+        f cargo build --bin dev-ticker-server --release
+        ci_docker_container.sh "all_integration_tests.sh || cat_logs.sh"
 
     - name: integration-testkit
       run: zksync integration-testkit

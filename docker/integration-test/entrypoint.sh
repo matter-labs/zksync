@@ -23,19 +23,13 @@ f deploy-contracts.sh
 popd > /dev/null
 
 # Run server genesis
-zksync genesis
+f $ZKSYNC_HOME/target/release/zksync_server --genesis
 
 # Redeploy contracts after genesis
 zksync redeploy
 zksync db-insert-contract
 
-# Ensure that all the required binaries are compiled
-pushd $ZKSYNC_HOME > /dev/null
-f cargo build --bin zksync_server --release
-f cargo build --bin dummy_prover --release
-f cargo build --bin dev-ticker-server --release
-popd > /dev/null
-
+# Launch binaries
 echo "Launching dev-ticker-server..."
 nohup f $ZKSYNC_HOME/target/release/dev-ticker-server &>/dev/null &
 sleep 1
