@@ -37,27 +37,43 @@ export async function ensureDisabled() {
     }
 }
 
-async function setStatus(value: boolean) {
+async function setStatus(value: boolean, redeploy: boolean) {
     utils.replaceInFile(VERIFIER_FILE, '(.*constant DUMMY_VERIFIER)(.*);', `$1 = ${value};`);
     await status();
-    console.log('Redeploying the contract...');
-    await performRedeployment();
-    console.log('Done.');
+    if (redeploy) {
+        console.log('Redeploying the contract...');
+        await performRedeployment();
+        console.log('Done.');
+    }
 }
 
-export async function enable() {
-    await setStatus(true);
+export async function enable(redeploy: boolean = true) {
+    await setStatus(true, redeploy);
 }
 
-export async function disable() {
-    await setStatus(false);
+export async function disable(redeploy: boolean = true) {
+    await setStatus(false, redeploy);
 }
 
 export const command = new Command('dummy-prover').description('commands for zksync dummy prover');
 
 command.command('run').description('launch the dummy prover').action(run);
-command.command('enable').description('enable the dummy prover').action(enable);
-command.command('disable').description('disable the dummy prover').action(disable);
+
+command
+    .command('enable')
+    .description('enable the dummy prover')
+    .option('--no-redeploy')
+    .action(async (cmd: Command) => {
+        await enable(cmd.redeploy);
+    });
+
+command
+    .command('disable')
+    .description('disable the dummy prover')
+    .option('--no-redeploy')
+    .action(async (cmd: Command) => {
+        await disable(cmd.redeploy);
+    });
 
 command
     .command('status')
