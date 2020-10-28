@@ -4,9 +4,13 @@
 nohup /usr/local/bin/geth-entry.sh &>/dev/null &
 
 # Initialize database
-service postgresql restart
-
+postgresql-setup --initdb --unit postgresql
 zksync db-setup
+
+# Build deps for contracts
+pushd $ZKSYNC_HOME/contracts > /dev/null
+yarn
+popd > /dev/null
 
 # Deploy contracts (they must be already compiled, as we mounted prepared directory)
 zksync deploy-erc20 dev
@@ -17,6 +21,10 @@ popd > /dev/null
 
 # Run server genesis
 zksync genesis
+
+# Redeploy contracts after genesis
+zksync redeploy
+zksync db-insert-contract
 
 # Ensure that all the required binaries are compiled
 pushd $ZKSYNC_HOME > /dev/null
