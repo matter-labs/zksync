@@ -61,12 +61,7 @@ impl RestApiClient {
                 Ok(Some(json))
             }
         } else {
-            Err(anyhow::anyhow!(
-                "For {}: a HTTP error occurred {} with body: {}",
-                url,
-                status,
-                text
-            ))
+            Err(anyhow::anyhow!("{} ({}) {}", url, status, text))
         }
     }
 }

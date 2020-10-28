@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use zksync::utils::closest_packable_token_amount;
 use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
 // Local uses
-use super::{Scenario, ScenarioResources};
+use super::{Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
@@ -84,8 +84,9 @@ impl fmt::Display for TransferScenario {
 
 #[async_trait]
 impl Scenario for TransferScenario {
-    fn requested_resources(&self, fee: &BigUint) -> ScenarioResources {
-        let balance_per_wallet = &self.transfer_size + (fee * BigUint::from(self.transfer_rounds));
+    fn requested_resources(&self, fees: &Fees) -> ScenarioResources {
+        let balance_per_wallet =
+            &self.transfer_size + (&fees.zksync * BigUint::from(self.transfer_rounds));
 
         ScenarioResources {
             balance_per_wallet: closest_packable_token_amount(&balance_per_wallet),
@@ -96,7 +97,7 @@ impl Scenario for TransferScenario {
     async fn prepare(
         &mut self,
         _monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
@@ -107,16 +108,19 @@ impl Scenario for TransferScenario {
             transfers_number
         );
 
-        self.txs = try_wait_all_failsafe((0..transfers_number).map(|i| {
-            let from = i % wallets.len();
-            let to = (i + 1) % wallets.len();
+        self.txs = try_wait_all_failsafe(
+            "prepare/transfers",
+            (0..transfers_number).map(|i| {
+                let from = i % wallets.len();
+                let to = (i + 1) % wallets.len();
 
-            wallets[from].sign_transfer(
-                wallets[to].address(),
-                closest_packable_token_amount(&self.transfer_size),
-                sufficient_fee.clone(),
-            )
-        }))
+                wallets[from].sign_transfer(
+                    wallets[to].address(),
+                    closest_packable_token_amount(&self.transfer_size),
+                    fees.zksync.clone(),
+                )
+            }),
+        )
         .await?;
 
         log::info!("Created {} transactions...", self.txs.len());
@@ -127,7 +131,7 @@ impl Scenario for TransferScenario {
     async fn run(
         &mut self,
         monitor: &Monitor,
-        _sufficient_fee: &BigUint,
+        _fees: &Fees,
         _wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         try_wait_all(
@@ -143,7 +147,7 @@ impl Scenario for TransferScenario {
     async fn finalize(
         &mut self,
         _monitor: &Monitor,
-        _sufficient_fee: &BigUint,
+        _fees: &Fees,
         _wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         Ok(())

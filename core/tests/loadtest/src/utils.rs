@@ -10,7 +10,7 @@ use crate::session::save_error;
 // Workspace uses
 // Local uses
 
-const CHUNK_SIZES: &[usize] = &[100];
+const CHUNK_SIZES: &[usize] = &[1000];
 const ERRORS_CUTOFF: usize = 10;
 
 /// Converts "gwei" amount to the "wei".
@@ -62,6 +62,7 @@ where
 /// errored future if all futures ended with an error; otherwise returns results of succesful
 /// futures and writes warning about failed futures.
 pub async fn try_wait_all_failsafe<I>(
+    category: &str,
     i: I,
 ) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
 where
@@ -80,7 +81,7 @@ where
         match item.into() {
             Ok(ok) => oks.push(ok),
             Err(err) => {
-                save_error("try_wait_all_failsafe", &err);
+                save_error(category, &err);
                 errs.push(err)
             }
         }
@@ -93,8 +94,9 @@ where
         }
     } else if errs.len() > ERRORS_CUTOFF {
         log::warn!(
-            "A large number of errors occurred in during the `try_wait_all_failsafe`: {}.",
-            errs.len()
+            "A {} errors occurred during the `{}` execution.",
+            errs.len(),
+            category,
         );
     }
 

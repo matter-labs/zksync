@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
 // Local uses
-use super::{Scenario, ScenarioResources};
+use super::{Fees, Scenario, ScenarioResources};
 use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all_failsafe};
 
 /// Configuration options for the withdraw scenario.
@@ -52,8 +52,9 @@ impl fmt::Display for WithdrawScenario {
 
 #[async_trait]
 impl Scenario for WithdrawScenario {
-    fn requested_resources(&self, sufficient_fee: &BigUint) -> ScenarioResources {
-        let balance_per_wallet = sufficient_fee * (BigUint::from(self.config.withdraw_rounds * 2));
+    fn requested_resources(&self, fees: &Fees) -> ScenarioResources {
+        let balance_per_wallet =
+            (&fees.zksync + &fees.eth) * (BigUint::from(self.config.withdraw_rounds));
 
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
@@ -64,7 +65,7 @@ impl Scenario for WithdrawScenario {
     async fn prepare(
         &mut self,
         _monitor: &Monitor,
-        _sufficient_fee: &BigUint,
+        _fees: &Fees,
         _wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         Ok(())
@@ -73,7 +74,7 @@ impl Scenario for WithdrawScenario {
     async fn run(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         for i in 0..self.config.withdraw_rounds {
@@ -85,9 +86,9 @@ impl Scenario for WithdrawScenario {
 
             let futures = wallets
                 .iter()
-                .map(|wallet| Self::withdraw_and_deposit(monitor, sufficient_fee, wallet))
+                .map(|wallet| Self::withdraw_and_deposit(monitor, fees, wallet))
                 .collect::<Vec<_>>();
-            try_wait_all_failsafe(futures).await?;
+            try_wait_all_failsafe("withdraw/run", futures).await?;
 
             log::info!(
                 "Withdraw and deposit cycle [{}/{}] finished",
@@ -104,7 +105,7 @@ impl Scenario for WithdrawScenario {
     async fn finalize(
         &mut self,
         _monitor: &Monitor,
-        _sufficient_fee: &BigUint,
+        _fees: &Fees,
         _wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         Ok(())
@@ -114,15 +115,15 @@ impl Scenario for WithdrawScenario {
 impl WithdrawScenario {
     async fn withdraw_and_deposit(
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallet: &TestWallet,
     ) -> anyhow::Result<()> {
         let amount = closest_packable_token_amount(
-            &(wallet.balance(BlockStatus::Committed).await? - sufficient_fee),
+            &(wallet.balance(BlockStatus::Committed).await? - &fees.zksync),
         );
 
         let (tx, sign) = wallet
-            .sign_withdraw(amount.clone(), sufficient_fee.clone())
+            .sign_withdraw(amount.clone(), fees.zksync.clone())
             .await?;
         monitor
             .wait_for_tx(BlockStatus::Verified, monitor.send_tx(tx, sign).await?)
@@ -133,7 +134,7 @@ impl WithdrawScenario {
             wallet.eth_balance().await? >= amount
         );
 
-        let amount = closest_packable_token_amount(&(wallet.eth_balance().await? - sufficient_fee));
+        let amount = closest_packable_token_amount(&(wallet.eth_balance().await? - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Verified, &wallet.deposit(amount).await?)
             .await?;

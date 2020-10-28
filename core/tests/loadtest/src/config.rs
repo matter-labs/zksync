@@ -27,10 +27,16 @@ pub struct AccountInfo {
     pub token_name: TokenLike,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
 pub struct NetworkConfig {
     /// Network kind used for testing.
     pub name: Network,
+    /// Fee for the Ethereum transactions in gwei.
+    #[serde(default)]
+    pub eth_fee: Option<u64>,
+    /// Fee for the zkSync transactions in gwei.
+    #[serde(default)]
+    pub zksync_fee: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

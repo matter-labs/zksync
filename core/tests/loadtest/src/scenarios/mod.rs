@@ -35,18 +35,27 @@ pub struct ScenarioResources {
     pub balance_per_wallet: BigUint,
 }
 
+/// Sufficient fee for the related type of transaction.
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct Fees {
+    /// Fee for the Ethereum transactions.
+    pub eth: BigUint,
+    /// Fee for the zkSync transactions.
+    pub zksync: BigUint,
+}
+
 /// Describes the general steps of a load test scenario.
 #[async_trait]
 pub trait Scenario: Debug + Display {
     /// Returns resources that should be provided by the scenario executor.
-    fn requested_resources(&self, sufficient_fee: &BigUint) -> ScenarioResources;
+    fn requested_resources(&self, fees: &Fees) -> ScenarioResources;
 
     /// Performs actions before running the main scenario, for example, it can
     /// fill the queue of transactions for execution.
     async fn prepare(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 
@@ -54,7 +63,7 @@ pub trait Scenario: Debug + Display {
     async fn run(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 
@@ -63,7 +72,7 @@ pub trait Scenario: Debug + Display {
     async fn finalize(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 }
@@ -88,12 +97,6 @@ impl ScenarioConfig {
             Self::Withdraw(cfg) => Box::new(WithdrawScenario::from(cfg)),
             Self::FullExit(cfg) => Box::new(FullExitScenario::from(cfg)),
         }
-    }
-}
-
-impl From<TransferScenarioConfig> for ScenarioConfig {
-    fn from(cfg: TransferScenarioConfig) -> Self {
-        Self::Transfer(cfg)
     }
 }
 

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
 // Local uses
-use super::{Scenario, ScenarioResources};
+use super::{Fees, Scenario, ScenarioResources};
 use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all_failsafe};
 
 /// Configuration options for the full exit scenario.
@@ -40,10 +40,14 @@ impl fmt::Display for FullExitScenario {
     }
 }
 
+fn balance_per_wallet(fees: &Fees) -> BigUint {
+    &fees.eth * BigUint::from(2_u64)
+}
+
 #[async_trait]
 impl Scenario for FullExitScenario {
-    fn requested_resources(&self, sufficient_fee: &BigUint) -> ScenarioResources {
-        let balance_per_wallet = sufficient_fee * (BigUint::from(4_u64));
+    fn requested_resources(&self, fees: &Fees) -> ScenarioResources {
+        let balance_per_wallet = balance_per_wallet(fees);
 
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
@@ -54,16 +58,15 @@ impl Scenario for FullExitScenario {
     async fn prepare(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         for wallet in wallets {
             // Withdraw some amount to have enough funds to perform `full_exit` operation.
-            let withdraw_amount =
-                closest_packable_token_amount(&(sufficient_fee * BigUint::from(4_u64)));
+            let withdraw_amount = closest_packable_token_amount(&balance_per_wallet(fees));
 
             let (tx, sign) = wallet
-                .sign_withdraw(withdraw_amount.clone(), sufficient_fee.clone())
+                .sign_withdraw(withdraw_amount.clone(), fees.zksync.clone())
                 .await?;
             monitor
                 .wait_for_tx(BlockStatus::Verified, monitor.send_tx(tx, sign).await?)
@@ -80,16 +83,16 @@ impl Scenario for FullExitScenario {
     async fn run(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         log::info!("Full exit and deposit cycle started");
 
         let futures = wallets
             .iter()
-            .map(|wallet| Self::full_exit_and_deposit(monitor, sufficient_fee, wallet))
+            .map(|wallet| Self::full_exit_and_deposit(monitor, fees, wallet))
             .collect::<Vec<_>>();
-        try_wait_all_failsafe(futures).await?;
+        try_wait_all_failsafe("full_exit/run", futures).await?;
 
         log::info!("Full exit scenario has been finished");
 
@@ -99,7 +102,7 @@ impl Scenario for FullExitScenario {
     async fn finalize(
         &mut self,
         _monitor: &Monitor,
-        _sufficient_fee: &BigUint,
+        _fees: &Fees,
         _wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         Ok(())
@@ -109,16 +112,14 @@ impl Scenario for FullExitScenario {
 impl FullExitScenario {
     async fn full_exit_and_deposit(
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallet: &TestWallet,
     ) -> anyhow::Result<()> {
         monitor
             .wait_for_priority_op(BlockStatus::Verified, &wallet.full_exit().await?)
             .await?;
 
-        let amount = closest_packable_token_amount(
-            &(wallet.eth_balance().await? - sufficient_fee * BigUint::from(2_u64)),
-        );
+        let amount = closest_packable_token_amount(&(wallet.eth_balance().await? - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Committed, &wallet.deposit(amount).await?)
             .await?;
