@@ -25,6 +25,7 @@ jobs:
       run: |
         rustup update stable
         cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
+        docker pull matterlabs/ci-integration-test:latest
 
     - name: zk
       run: pushd infrastructure/zk && yarn && yarn build
@@ -40,47 +41,23 @@ jobs:
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
 
-    - name: init
-      run: zk init
-
-    - name: js-tests
-      run: zk test js
-
-    - name: zcli-tests
-      run: zk test i zcli --with-server
-
     - name: integration-tests
-      run: zk test i server --with-server
-
-    - name: api-tests
-      run: zk test i api --with-server
-
-    - name: data-restore
-      run: zk run data-restore check-existing
+      run: zk test integration all --in-docker
 
     - name: integration-testkit
       run: zk test i testkit
 
-    - name: test-contracts
+    - name: contracts-unit-tests
       run: zk test contracts
 
-    - name: rust-tests
-      run: zk test rust
+    - name: js-unit-tests
+      run: zk test js
 
-    - name: rust-sdk-tests
-      run: zk test i rust-sdk --with-server
+    - name: rust-unit-tests
+      run: zk test rust
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && f cargo test --release
-
-    - name: db-tests
-      run: zk test db --reset
-
-    - name: prover-tests
-      run: zk test prover
-
-    - name: circuit-tests
-      run: zk test circuit `nproc`
 
     services:
       geth:
