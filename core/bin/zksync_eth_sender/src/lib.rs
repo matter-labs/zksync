@@ -452,7 +452,9 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                         op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
                     let mut connection = self.db.acquire_connection().await?;
-                    self.db.confirm_operation(&mut connection, tx_hash).await?;
+                    self.db
+                        .confirm_operation(&mut connection, tx_hash, op)
+                        .await?;
                     return Ok(OperationCommitment::Committed);
                 }
                 TxCheckOutcome::Stuck => {
