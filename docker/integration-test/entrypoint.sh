@@ -4,7 +4,8 @@
 nohup /usr/local/bin/geth-entry.sh &>/dev/null &
 
 # Initialize database
-postgresql-setup --initdb --unit postgresql
+service postgresql restart
+
 zksync db-setup
 
 # Build deps for contracts
