@@ -31,6 +31,14 @@ export async function withServer(testSuite: () => Promise<void>, timeout: number
     }, timeout * 1000);
     timer.unref();
 
+    // for unknown reason, when ctrl+c is pressed, the exit hook
+    // is only triggered after the current process has exited,
+    // so you will see logs appearing out of nowhere.
+    // child processes are detached (because it's the only
+    // way to kill them recursively in node), but the hook itself
+    // is not, despite its weid behaviour. if anyone can fix this,
+    // I would appreciate it, otherwise, it's not a big deal,
+    // since --with-server is only meant to be run on CI.
     process.on('SIGINT', () => {
         console.log('Interrupt received...');
         process.exit(130);
