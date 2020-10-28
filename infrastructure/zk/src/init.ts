@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import * as utils from './utils';
-import fs from 'fs';
 
 import * as db from './db/db';
 import * as server from './server';
@@ -14,7 +13,7 @@ export async function init() {
         await up();
     }
     await utils.allowFail(yarn());
-    await downloadMissingKeys();
+    await run.plonkSetup();
     await run.verifyKeys.unpack();
     await db.setup();
     await contract.buildDev();
@@ -68,19 +67,6 @@ async function checkEnv() {
     await utils.exec('which pg_isready');
     await utils.exec('which diesel');
     await utils.exec('which solc');
-}
-
-async function downloadMissingKeys() {
-    const URL = 'https://universal-setup.ams3.digitaloceanspaces.com';
-    fs.mkdirSync('keys/setup', { recursive: true });
-    process.chdir('keys/setup');
-    for (let power = 20; power <= 26; power++) {
-        if (!fs.existsSync(`setup_2^${power}.key`)) {
-            await utils.spawn(`axel -c ${URL}/setup_2%5E${power}.key`);
-            await utils.sleep(1);
-        }
-    }
-    process.chdir(process.env.ZKSYNC_HOME as string);
 }
 
 export const command = new Command('init')

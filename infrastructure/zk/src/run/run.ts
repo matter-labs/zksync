@@ -7,6 +7,19 @@ import * as dataRestore from './data-restore';
 
 export { verifyKeys, dataRestore };
 
+export async function plonkSetup() {
+    const URL = 'https://universal-setup.ams3.digitaloceanspaces.com';
+    fs.mkdirSync('keys/setup', { recursive: true });
+    process.chdir('keys/setup');
+    for (let power = 20; power <= 26; power++) {
+        if (!fs.existsSync(`setup_2^${power}.key`)) {
+            await utils.spawn(`axel -c ${URL}/setup_2%5E${power}.key`);
+            await utils.sleep(1);
+        }
+    }
+    process.chdir(process.env.ZKSYNC_HOME as string);
+}
+
 export async function revertReason(txHash: string, web3url?: string) {
     await utils.spawn(`cd contracts && npx ts-node revert-reason.ts ${txHash} ${web3url || ''}`);
 }
@@ -56,6 +69,7 @@ export const command = new Command('run')
 command.command('test-accounts').description('print ethereum test accounts').action(testAccounts);
 command.command('explorer').description('run zksync explorer locally').action(explorer);
 command.command('cat-logs').description('print server and prover logs').action(catLogs);
+command.command('plonk-setup').description('download missing keys').action(plonkSetup);
 
 command
     .command('revert-reason <tx_hash> [web3_url]')
