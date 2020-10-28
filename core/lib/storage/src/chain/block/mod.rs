@@ -13,15 +13,12 @@ use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
 };
 use crate::{
-    chain::{
-        operations::{
-            records::{
-                NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-                StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
-            },
-            OperationsSchema,
+    chain::operations::{
+        records::{
+            NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
+            StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
         },
-        state::StateSchema,
+        OperationsSchema,
     },
     prover::ProverSchema,
     QueryResult, StorageProcessor,
@@ -40,7 +37,7 @@ pub struct BlockSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Executes an operation:
     /// 1. Stores the operation.
-    /// 2. Applies account updates for the verify operation.
+    /// 2. Stores the proof (if it isn't stored already) for the verify operation.
     pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
         let mut transaction = self.0.start_transaction().await?;
 
@@ -62,9 +59,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     }
                     Some(_) => {}
                 };
-                StateSchema(&mut transaction)
-                    .apply_state_update(block_number)
-                    .await?
             }
         };
 
@@ -454,13 +448,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::COMMIT)
+            .get_last_block_by_action(ActionType::COMMIT, None)
             .await
     }
 
     pub async fn get_last_verified_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::VERIFY)
+            .get_last_block_by_action(ActionType::VERIFY, None)
+            .await
+    }
+
+    pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        OperationsSchema(self.0)
+            .get_last_block_by_action(ActionType::VERIFY, Some(true))
             .await
     }
 

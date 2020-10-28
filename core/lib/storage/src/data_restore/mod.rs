@@ -54,6 +54,11 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         let verify_op = BlockSchema(&mut transaction)
             .execute_operation(verify_op)
             .await?;
+        // The state is expected to be updated, so it's necessary
+        // to do it here.
+        StateSchema(&mut transaction)
+            .apply_state_update(verify_op.block.block_number)
+            .await?;
         sqlx::query!(
             "UPDATE operations
             SET confirmed = $1

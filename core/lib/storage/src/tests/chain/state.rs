@@ -77,6 +77,9 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
             action_type: ActionType::VERIFY.to_string(),
         })
         .await?;
+    OperationsSchema(&mut storage)
+        .confirm_operation(1, ActionType::VERIFY)
+        .await?;
 
     // Check that the verified state is now equals to the committed state.
     let committed_1 = StateSchema(&mut storage)
@@ -93,6 +96,9 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
             action_type: ActionType::VERIFY.to_string(),
         })
         .await?;
+    OperationsSchema(&mut storage)
+        .confirm_operation(2, ActionType::VERIFY)
+        .await?;
     let committed_2 = StateSchema(&mut storage)
         .load_committed_state(Some(2))
         .await?;
@@ -105,6 +111,9 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
             block_number: 3,
             action_type: ActionType::VERIFY.to_string(),
         })
+        .await?;
+    OperationsSchema(&mut storage)
+        .confirm_operation(3, ActionType::VERIFY)
         .await?;
     let committed_3 = StateSchema(&mut storage)
         .load_committed_state(Some(3))

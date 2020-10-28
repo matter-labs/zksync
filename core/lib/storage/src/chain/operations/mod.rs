@@ -24,10 +24,12 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     pub async fn get_last_block_by_action(
         &mut self,
         action_type: ActionType,
+        confirmed: Option<bool>,
     ) -> QueryResult<BlockNumber> {
         let max_block = sqlx::query!(
-            r#"SELECT max(block_number) FROM operations WHERE action_type = $1"#,
-            action_type.to_string()
+            r#"SELECT max(block_number) FROM operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2"#,
+            action_type.to_string(),
+            confirmed.map(|value| !value)
         )
         .fetch_one(self.0.conn())
         .await?
@@ -113,6 +115,25 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
         Ok(op)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) async fn confirm_operation(
+        &mut self,
+        block_number: BlockNumber,
+        action_type: ActionType,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "UPDATE operations
+                SET confirmed = $1
+                WHERE block_number = $2 AND action_type = $3",
+            true,
+            i64::from(block_number),
+            action_type.to_string()
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
     }
 
     /// Stores the executed operation in the database.

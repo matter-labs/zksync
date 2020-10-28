@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
 // Local uses
 use super::{Scenario, ScenarioResources};
-use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all};
+use crate::{monitor::Monitor, test_wallet::TestWallet, utils::try_wait_all_failsafe};
 
 /// Configuration options for the full exit scenario.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -89,7 +89,7 @@ impl Scenario for FullExitScenario {
             .iter()
             .map(|wallet| Self::full_exit_and_deposit(monitor, sufficient_fee, wallet))
             .collect::<Vec<_>>();
-        try_wait_all(futures).await?;
+        try_wait_all_failsafe(futures).await?;
 
         log::info!("Full exit scenario has been finished");
 
