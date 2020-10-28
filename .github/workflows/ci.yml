@@ -45,7 +45,7 @@ jobs:
       run: zk test integration all --in-docker
 
     - name: integration-testkit
-      run: zk test i testkit
+      run: zk test integraion testkit
 
     - name: contracts-unit-tests
       run: zk test contracts
