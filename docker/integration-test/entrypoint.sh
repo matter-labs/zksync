@@ -5,34 +5,23 @@ nohup /usr/local/bin/geth-entry.sh &>/dev/null &
 
 # Initialize database
 service postgresql restart
+
+# Prepare dummy-prover in the contract (so the redeployed version will be OK)
+zksync dummy-prover enable-no-redeploy
+
+# Initialize the stack (mostly, it's an init command with some steps skipped for docker environment)
+zksync yarn || true # It can fail.
 zksync db-setup
+zksync build-dev-contracts
+zksync deploy-erc20 dev
+zksync build-contracts
+zksync genesis
+zksync redeploy
 
 # Compile required dependencies
 f cargo build --bin zksync_server --release
 f cargo build --bin dummy_prover --release
 f cargo build --bin dev-ticker-server --release
-
-# Prepare dummy-prover in the contract (so the redeployed version will be OK)
-zksync dummy-prover enable-no-redeploy
-
-# Build deps for contracts
-pushd $ZKSYNC_HOME/contracts > /dev/null
-yarn
-popd > /dev/null
-
-# Deploy contracts (they must be already compiled, as we mounted prepared directory)
-zksync deploy-erc20 dev
-# `deploy-contracts` command from makefile triggers contracts rebuild which we don't want.
-pushd $ZKSYNC_HOME > /dev/null
-f deploy-contracts.sh
-popd > /dev/null
-
-# Run server genesis
-f $ZKSYNC_HOME/target/release/zksync_server --genesis
-
-# Redeploy contracts after genesis
-zksync redeploy
-zksync db-insert-contract
 
 # Launch binaries
 echo "Launching dev-ticker-server..."

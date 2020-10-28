@@ -38,9 +38,6 @@ jobs:
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
 
-    - name: init
-      run: zksync init
-
     - name: integration-tests
       run: ci_docker_container.sh "all_integration_tests.sh || cat_logs.sh"
 
