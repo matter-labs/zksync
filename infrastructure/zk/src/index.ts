@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { program } from 'commander';
+import { program, Command } from 'commander';
 import { command as server } from './server';
 import { command as up } from './up';
 import { command as down } from './down';
@@ -13,6 +13,7 @@ import { command as prover } from './prover';
 import { command as run } from './run/run';
 import { command as test } from './test/test';
 import { command as docker } from './docker';
+import * as completion from './completion';
 import * as utils from './utils';
 
 async function main() {
@@ -41,7 +42,8 @@ async function main() {
         .addCommand(prover)
         .addCommand(run)
         .addCommand(test)
-        .addCommand(docker);
+        .addCommand(docker)
+        .addCommand(completion.command(program as Command));
 
     await program.parseAsync(process.argv);
 }
