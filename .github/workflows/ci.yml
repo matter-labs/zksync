@@ -25,6 +25,7 @@ jobs:
       run: |
         rustup update stable
         cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
+        docker pull matterlabs/ci-integration-test:latest
 
     - name: lints
       run: |
@@ -37,44 +38,27 @@ jobs:
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
 
-    - name: init
-      run: zksync init
-
-    - name: js-tests
-      run: zksync js-tests
-
-    - name: zcli-tests
-      run: ci-zcli.sh
-
     - name: integration-tests
-      run: ci-integration-tests.sh
-
-    - name: data-restore
-      run: zksync data-restore check-existing
+      run: ci_docker_container.sh "all_integration_tests.sh || cat_logs.sh"
 
     - name: integration-testkit
       run: zksync integration-testkit
 
-    - name: test-contracts
+    - name: contracts-unit-tests
       run: zksync test-contracts
 
-    - name: rust-tests
-      run: f cargo test --release
+    - name: js-unit-tests
+      run: zksync js-tests
 
-    - name: rust-sdk-tests
-      run: zksync rust-sdk-tests
+    - name: rust-unit-tests
+      run: |
+        f cargo test --release
+        zksync db-test
+        zksync prover-tests
+        zksync circuit-tests "" `nproc`
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && f cargo test --release
-
-    - name: db-tests
-      run: zksync db-test
-
-    - name: prover-tests
-      run: zksync prover-tests
-
-    - name: circuit-tests
-      run: zksync circuit-tests "" `nproc`
 
     services:
       geth:
