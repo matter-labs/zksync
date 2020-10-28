@@ -10,6 +10,7 @@ service postgresql restart
 zksync dummy-prover enable-no-redeploy
 
 # Initialize the stack (mostly, it's an init command with some steps skipped for docker environment)
+zksync verify-keys unpack
 zksync yarn || true # It can fail.
 zksync db-setup
 zksync build-dev-contracts
