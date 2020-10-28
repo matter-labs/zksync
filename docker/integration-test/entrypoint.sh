@@ -7,6 +7,11 @@ nohup /usr/local/bin/geth-entry.sh &>/dev/null &
 service postgresql restart
 zksync db-setup
 
+# Compile required dependencies
+f cargo build --bin zksync_server --release
+f cargo build --bin dummy_prover --release
+f cargo build --bin dev-ticker-server --release
+
 # Prepare dummy-prover in the contract (so the redeployed version will be OK)
 zksync dummy-prover enable-no-redeploy
 

@@ -8,4 +8,4 @@
 # `entrypoint.sh` prepares database and network for interaction, and also launches `dev-ticker-server`, `server` and `dummy-prover`.
 # Note that contracts must be compiled and dummy-prover should be enabled prior to the command launch, as we mount $ZKSYNC_HOME from
 # the host system inside of the container, and expect environment to be prepared for the launch.
-docker run --mount type=bind,src=$ZKSYNC_HOME,dst=/usr/src/zksync matterlabs/ci-integration-test:latest bash -c "/usr/local/bin/entrypoint.sh && $1"
+docker run  -v $ZKSYNC_HOME:/usr/src/zksync matterlabs/ci-integration-test:latest bash -c "/usr/local/bin/entrypoint.sh && $1"
