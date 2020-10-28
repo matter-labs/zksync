@@ -3,8 +3,9 @@ import * as utils from '../utils';
 import fs from 'fs';
 import * as dummyProver from '../dummy-prover';
 import * as contract from '../contract';
+import * as run from '../run/run';
 
-export async function withServer<T>(testSuite: () => Promise<T>, timeout: number) {
+export async function withServer(testSuite: () => Promise<void>, timeout: number) {
     if (!(await dummyProver.status())) {
         await dummyProver.enable();
     }
@@ -13,15 +14,15 @@ export async function withServer<T>(testSuite: () => Promise<T>, timeout: number
     await utils.spawn('cargo build --bin dummy_prover --release');
 
     const serverLog = fs.openSync('server.log', 'w');
-    const server = utils.background('cargo run --bin zksync_server --release', ['ignore', serverLog, serverLog]);
+    const server = utils.background('cargo run --bin zksync_server --release', [0, serverLog, serverLog]);
     await utils.sleep(1);
 
-    const proverLog = fs.openSync('prover.log', 'w');
-    const prover = utils.background('cargo run --bin dummy_prover --release dummy-prover-instance', [
-        'ignore',
-        proverLog,
-        proverLog
-    ]);
+    const proverLog = fs.openSync('dummy_prover.log', 'w');
+    // prettier-ignore
+    const prover = utils.background(
+        'cargo run --bin dummy_prover --release dummy-prover-instance',
+        [0, proverLog, proverLog]
+    );
     await utils.sleep(10);
 
     const timer = setTimeout(() => {
@@ -46,14 +47,37 @@ export async function withServer<T>(testSuite: () => Promise<T>, timeout: number
         utils.allowFailSync(() => process.kill(-server.pid, 'SIGKILL'));
         utils.allowFailSync(() => process.kill(-prover.pid, 'SIGKILL'));
         utils.allowFailSync(() => clearTimeout(timer));
-        console.log('\nSERVER LOGS:\n', fs.readFileSync('server.log').toString());
-        console.log('\nPROVER LOGS:\n', fs.readFileSync('prover.log').toString());
+        if (code !== 0) {
+            run.catLogs();
+        }
         utils.sleepSync(5);
-        console.log('Exit code:', code);
     });
 
     await testSuite();
     process.exit(0);
+}
+
+export async function inDocker(command: string, timeout: number) {
+    const timer = setTimeout(() => {
+        console.log('Timeout reached!');
+        run.catLogs(1);
+    }, timeout * 1000);
+    timer.unref();
+
+    const volume = `${process.env.ZKSYNC_HOME}:/usr/src/zksync`;
+    const image = `matterlabs/ci-integration-test:latest`;
+    await utils.spawn(
+        `docker run -v ${volume} ${image} bash -c "/usr/local/bin/entrypoint.sh && ${command} || zk run cat-logs"`
+    );
+}
+
+export async function all() {
+    await server();
+    await api();
+    await zcli();
+    await rustSDK();
+    await utils.spawn('killall zksync_server');
+    await run.dataRestore.checkExisting();
 }
 
 export async function api() {
@@ -114,6 +138,22 @@ export async function rustSDK() {
 }
 
 export const command = new Command('integration').description('zksync integration tests').alias('i');
+
+command
+    .command('all')
+    .description('run all integration tests (no testkit)')
+    .option('--with-server')
+    .option('--in-docker')
+    .action(async (cmd: Command) => {
+        const timeout = 1800;
+        if (cmd.withServer) {
+            await withServer(all, timeout);
+        } else if (cmd.inDocker) {
+            await inDocker('zk test i all', timeout);
+        } else {
+            await all();
+        }
+    });
 
 command
     .command('zcli')

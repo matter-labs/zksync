@@ -11,14 +11,14 @@ export type { ChildProcess } from 'child_process';
 // returns { stdout, stderr }
 const promisified = promisify(_exec);
 export function exec(command: string) {
-    command = command.replace(/\n/g, '');
+    command = command.replace(/\n/g, ' ');
     return promisified(command);
 }
 
 // executes a command in a new shell
 // but pipes data to parent's stdout/stderr
 export function spawn(command: string) {
-    command = command.replace(/\n/g, '');
+    command = command.replace(/\n/g, ' ');
     const child = _spawn(command, { stdio: 'inherit', shell: true });
     return new Promise((resolve, reject) => {
         child.on('error', reject);
@@ -31,7 +31,7 @@ export function spawn(command: string) {
 // executes a command in background and returns a child process handle
 // by default pipes data to parent's stdio but this can be overriden
 export function background(command: string, stdio: any = 'inherit') {
-    command = command.replace(/\n/g, '');
+    command = command.replace(/\n/g, ' ');
     return _spawn(command, { stdio, shell: true, detached: true });
 }
 

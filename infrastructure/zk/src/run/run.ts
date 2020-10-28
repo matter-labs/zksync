@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
 import { Wallet } from 'ethers';
+import fs from 'fs';
 import * as verifyKeys from './verify-keys';
 import * as dataRestore from './data-restore';
 
@@ -16,6 +17,16 @@ export async function explorer() {
 
 export async function exitProof(...args: string[]) {
     await utils.spawn(`cargo run --example generate_exit_proof --release -- ${args.join(' ')}`);
+}
+
+export async function catLogs(exitCode?: number) {
+    utils.allowFailSync(() => {
+        console.log('\nSERVER LOGS:\n', fs.readFileSync('server.log').toString());
+        console.log('\nPROVER LOGS:\n', fs.readFileSync('dummy_prover.log').toString());
+    });
+    if (exitCode !== undefined) {
+        process.exit(exitCode);
+    }
 }
 
 export async function testAccounts() {
@@ -44,6 +55,7 @@ export const command = new Command('run')
 
 command.command('test-accounts').description('print ethereum test accounts').action(testAccounts);
 command.command('explorer').description('run zksync explorer locally').action(explorer);
+command.command('cat-logs').description('print server and prover logs').action(catLogs);
 
 command
     .command('revert-reason <tx_hash> [web3_url]')
