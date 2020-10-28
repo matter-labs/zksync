@@ -7,17 +7,10 @@ nohup /usr/local/bin/geth-entry.sh &>/dev/null &
 service postgresql restart
 
 # Prepare dummy-prover in the contract (so the redeployed version will be OK)
-zksync dummy-prover enable-no-redeploy
+zk dummy-prover enable --no-redeploy
 
-# Initialize the stack (mostly, it's an init command with some steps skipped for docker environment)
-zksync verify-keys unpack
-zksync yarn || true # It can fail.
-zksync db-setup
-zksync build-dev-contracts
-zksync deploy-erc20 dev
-zksync build-contracts
-zksync genesis
-zksync redeploy
+# Initialize the stack
+zk init
 
 # Compile required dependencies
 f cargo build --bin zksync_server --release

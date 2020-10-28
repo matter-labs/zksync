@@ -17,8 +17,8 @@ then
   exit 1
 fi
 
-zksync plonk-setup check || zksync plonk-setup download
-zksync verify-keys unpack
+zk run plonk-setup
+zk run verify-keys unpack
 f db-wait
 
 COMMAND=$1
