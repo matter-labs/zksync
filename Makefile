@@ -27,6 +27,7 @@ init:
 	@bin/init
 
 yarn:
+	@cd infrastructure/explorer && yarn
 	@yarn && yarn zksync build
 
 
@@ -81,10 +82,10 @@ genesis: confirm_action db-reset
 # Frontend clients
 
 explorer:
-	@yarn explorer serve
+	@cd infrastructure/explorer && yarn serve
 
 dist-explorer: yarn build-contracts
-	@yarn explorer build
+	@cd infrastructure/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -t "${NGINX_DOCKER_IMAGE_LATEST}" -f ./docker/nginx/Dockerfile .
