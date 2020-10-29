@@ -34,6 +34,7 @@ describe("Token", function () {
 
     it("commit", async function () {
         const zeroBlockStored = {
+            blockNumber: 0,
             processableOnchainOperationsHash: ethers.constants.HashZero,
             stateHash: ethers.constants.HashZero,
             commitment: ethers.constants.HashZero,
@@ -46,22 +47,27 @@ describe("Token", function () {
             publicData: "0x05aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             onchainOperations: [],
         };
-        await zkSync.commitBlock(zeroBlockStored, blockOne);
+        await zkSync.commitBlocks(zeroBlockStored, [blockOne]);
 
         const oneBlockStored = {
+            blockNumber: 1,
             processableOnchainOperationsHash: ethers.utils.keccak256("0x"),
             stateHash: ethers.constants.HashZero,
             commitment: ethers.constants.HashZero,
         };
-        const blockTwo = {
-            blockNumber: 2,
-            feeAccount: 0,
-            newStateRoot: ethers.constants.HashZero,
-            publicData: "0x05aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            onchainOperations: [],
-        };
 
-        const tx = await zkSync.commitBlock(oneBlockStored, blockTwo);
+        const blocks = [];
+        for (let i = 0; i < 5; ++i) {
+            blocks.push({
+                    blockNumber: 2+i,
+                    feeAccount: 0,
+                    newStateRoot: ethers.constants.HashZero,
+                    publicData: "0x05aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    onchainOperations: [],
+                });
+        }
+
+        const tx = await zkSync.commitBlocks(oneBlockStored, blocks);
         const receipt = await tx.wait();
         console.log(receipt.gasUsed.toString());
     });

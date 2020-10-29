@@ -202,6 +202,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     struct StoredBlockInfo {
+        uint32 blockNumber;
         bytes32 processableOnchainOperationsHash;
         bytes32 stateHash;
         bytes32 commitment;
@@ -224,32 +225,37 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return keccak256(abi.encode(_storedBlockInfo));
     }
 
-    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
-    function commitBlock(
-        StoredBlockInfo memory _oldBlockData,
-        CommitBlockInfo memory _newBlockData
-    ) external nonReentrant {
-        requireActive();
-        uint32 tbc = totalBlocksCommitted;
-        require(hashStoredBlockInfo(_oldBlockData) == hashedBlocks[tbc], "fck10"); // incorrect previous block data
-        require(_newBlockData.blockNumber == tbc + 1, "fck11"); // only commit next block
-        governance.requireActiveValidator(msg.sender);
+    function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo memory _newBlock)
+        internal returns (StoredBlockInfo memory storedNewBlock) {
+        require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "fck11"); // only commit next block
 
-
-        bytes32 processedOnchainOpsHash = collectOnchainOps(_newBlockData);
+        bytes32 processedOnchainOpsHash = collectOnchainOps(_newBlock);
 
         // Create block commitment for verification proof
-        bytes32 commitment = createBlockCommitment(
-            _oldBlockData.stateHash,
-            _newBlockData
-        );
+        bytes32 commitment = createBlockCommitment(_previousBlock.stateHash, _newBlock);
 
-        StoredBlockInfo memory newBlock = StoredBlockInfo(processedOnchainOpsHash, _newBlockData.newStateRoot, bytes32(0));
+        storedNewBlock = StoredBlockInfo(_newBlock.blockNumber, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
 
-        hashedBlocks[_newBlockData.blockNumber] = hashStoredBlockInfo(newBlock);
-        totalBlocksCommitted = tbc + 1;
+        hashedBlocks[storedNewBlock.blockNumber] = hashStoredBlockInfo(storedNewBlock);
+        emit BlockCommit(_newBlock.blockNumber);
+    }
 
-        emit BlockCommit(_newBlockData.blockNumber);
+    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
+    function commitBlocks(
+        StoredBlockInfo memory _lastCommittedBlockData,
+        CommitBlockInfo[] memory _newBlocksData
+    ) external nonReentrant {
+        requireActive();
+//        require(hashedBlocks[_lastCommittedBlockData.blockNumber] == hashStoredBlockInfo(_lastCommittedBlockData), "fck10"); // incorrect previous block data
+        require(_lastCommittedBlockData.blockNumber == totalBlocksCommitted, "fck11"); // not last comitted block
+        governance.requireActiveValidator(msg.sender);
+
+        StoredBlockInfo memory lastCommittedBlock = _lastCommittedBlockData;
+        for (uint32 i = 0; i < _newBlocksData.length; ++i) {
+            lastCommittedBlock = commitOneBlock(lastCommittedBlock, _newBlocksData[i]);
+        }
+
+        totalBlocksCommitted += uint32(_newBlocksData.length);
     }
 
     struct ExecutableOnchainOperations {
@@ -264,6 +270,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         requireActive();
         require(hashStoredBlockInfo(_blockData) == hashedBlocks[totalBlocksVerified + 1], "fck10"); // incorrect previous block data
         governance.requireActiveValidator(msg.sender);
+
+        // todo: check proof
 
         for (uint32 i = 0; i < _executableOnchainOperations.length; ++i) {
             bytes memory pubData = _executableOnchainOperations[i].publicData;
@@ -416,35 +424,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             _amount
         );
     }
-
-//    /// @notice Store committed block structure to the storage.
-//    function createCommittedBlock(
-//        CommitBlockInfo memory _newBlockData,
-//        bytes32 oldBlockStateRoot,
-//        bytes32 processableOnchainOperationsHash
-//    ) internal {
-//        uint gasv = gasleft();
-//        require(_newBlockData.publicData.length % CHUNK_BYTES == 0, "cbb10"); // Public data size is not multiple of CHUNK_BYTES
-//
-//        uint32 blockChunks = uint32(_newBlockData.publicData.length / CHUNK_BYTES);
-////        require(verifier.isBlockSizeSupported(blockChunks), "ccb11");
-//
-//        // Create block commitment for verification proof
-//        bytes32 commitment = createBlockCommitment(
-//            _newBlockData.blockNumber,
-//            _newBlockData.feeAccount,
-//            oldBlockStateRoot,
-//            _newBlockData.newStateRoot,
-//            _newBlockData.publicData
-//        );
-//        console.log("cost of commitment %d", gasv - gasleft());
-//
-//        gasv = gasleft();
-//        StoredBlockInfo memory newBlock = StoredBlockInfo(processableOnchainOperationsHash, _newBlockData.newStateRoot, bytes32(0));
-//
-//        hashedBlocks[_newBlockData.blockNumber] = hashStoredBlockInfo(newBlock);
-//        console.log("storeblock %d", gasv - gasleft());
-//    }
 
     function emitDepositCommitEvent(uint32 _blockNumber, Operations.Deposit memory depositData) internal {
         emit DepositCommit(_blockNumber, depositData.accountId, depositData.owner, depositData.tokenId, depositData.amount);
@@ -605,43 +584,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         } else {
             revert("vnp15"); // invalid or non-priority operation
         }
-    }
-
-    /// @notice Processes onchain withdrawals. Full exit withdrawals will not be added to pending withdrawals queue
-    /// @dev NOTICE: must process only withdrawals which hash matches with expectedWithdrawalsDataHash.
-    /// @param withdrawalsData Withdrawals data
-    /// @param expectedWithdrawalsDataHash Expected withdrawals data hash
-    function processOnchainWithdrawals(bytes memory withdrawalsData, bytes32 expectedWithdrawalsDataHash) internal {
-        require(withdrawalsData.length % ONCHAIN_WITHDRAWAL_BYTES == 0, "pow11"); // pow11 - withdrawalData length is not multiple of ONCHAIN_WITHDRAWAL_BYTES
-
-        bytes32 withdrawalsDataHash = EMPTY_STRING_KECCAK;
-
-        uint offset = 0;
-        uint32 localNumberOfPendingWithdrawals = numberOfPendingWithdrawals;
-        while (offset < withdrawalsData.length) {
-            (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
-            bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
-
-            uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-            // after this all writes to this slot will cost 5k gas
-            balancesToWithdraw[packedBalanceKey] = BalanceToWithdraw({
-                balanceToWithdraw: balance.add(_amount),
-                gasReserveValue: 0xff
-            });
-
-            if (addToPendingWithdrawalsQueue) {
-                pendingWithdrawals[firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
-                localNumberOfPendingWithdrawals++;
-            }
-
-            withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, _to, _tokenId, _amount));
-            offset += ONCHAIN_WITHDRAWAL_BYTES;
-        }
-        require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
-        if (numberOfPendingWithdrawals != localNumberOfPendingWithdrawals) {
-            emit PendingWithdrawalsAdd(firstPendingWithdrawalIndex + numberOfPendingWithdrawals, firstPendingWithdrawalIndex + localNumberOfPendingWithdrawals);
-        }
-        numberOfPendingWithdrawals = localNumberOfPendingWithdrawals;
     }
 
     /// @notice Checks that current state not is exodus mode

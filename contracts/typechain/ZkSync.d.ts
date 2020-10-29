@@ -28,7 +28,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     "balancesToWithdraw(bytes22)": FunctionFragment;
     "blocks(uint32)": FunctionFragment;
     "cancelOutstandingDepositsForExodusMode(uint64)": FunctionFragment;
-    "commitBlock(tuple,tuple)": FunctionFragment;
+    "commitBlocks(tuple,tuple[])": FunctionFragment;
     "depositERC20(address,uint104,address)": FunctionFragment;
     "depositETH(address)": FunctionFragment;
     "executeBlock(tuple,tuple[])": FunctionFragment;
@@ -88,9 +88,10 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "commitBlock",
+    functionFragment: "commitBlocks",
     values: [
       {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -104,7 +105,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      }
+      }[]
     ]
   ): string;
   encodeFunctionData(
@@ -116,6 +117,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     functionFragment: "executeBlock",
     values: [
       {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -268,7 +270,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "commitBlock",
+    functionFragment: "commitBlocks",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -532,13 +534,14 @@ export class ZkSync extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    commitBlock(
-      _oldBlockData: {
+    commitBlocks(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -547,17 +550,18 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "commitBlock(tuple,tuple)"(
-      _oldBlockData: {
+    "commitBlocks(tuple,tuple[])"(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -566,7 +570,7 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -596,6 +600,7 @@ export class ZkSync extends Contract {
 
     executeBlock(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -606,6 +611,7 @@ export class ZkSync extends Contract {
 
     "executeBlock(tuple,tuple[])"(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -1095,13 +1101,14 @@ export class ZkSync extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  commitBlock(
-    _oldBlockData: {
+  commitBlocks(
+    _lastCommittedBlockData: {
+      blockNumber: BigNumberish;
       processableOnchainOperationsHash: BytesLike;
       stateHash: BytesLike;
       commitment: BytesLike;
     },
-    _newBlockData: {
+    _newBlocksData: {
       blockNumber: BigNumberish;
       feeAccount: BigNumberish;
       newStateRoot: BytesLike;
@@ -1110,17 +1117,18 @@ export class ZkSync extends Contract {
         publicDataOffset: BigNumberish;
         ethWitness: BytesLike;
       }[];
-    },
+    }[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "commitBlock(tuple,tuple)"(
-    _oldBlockData: {
+  "commitBlocks(tuple,tuple[])"(
+    _lastCommittedBlockData: {
+      blockNumber: BigNumberish;
       processableOnchainOperationsHash: BytesLike;
       stateHash: BytesLike;
       commitment: BytesLike;
     },
-    _newBlockData: {
+    _newBlocksData: {
       blockNumber: BigNumberish;
       feeAccount: BigNumberish;
       newStateRoot: BytesLike;
@@ -1129,7 +1137,7 @@ export class ZkSync extends Contract {
         publicDataOffset: BigNumberish;
         ethWitness: BytesLike;
       }[];
-    },
+    }[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1159,6 +1167,7 @@ export class ZkSync extends Contract {
 
   executeBlock(
     _blockData: {
+      blockNumber: BigNumberish;
       processableOnchainOperationsHash: BytesLike;
       stateHash: BytesLike;
       commitment: BytesLike;
@@ -1169,6 +1178,7 @@ export class ZkSync extends Contract {
 
   "executeBlock(tuple,tuple[])"(
     _blockData: {
+      blockNumber: BigNumberish;
       processableOnchainOperationsHash: BytesLike;
       stateHash: BytesLike;
       commitment: BytesLike;
@@ -1549,13 +1559,14 @@ export class ZkSync extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    commitBlock(
-      _oldBlockData: {
+    commitBlocks(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -1564,17 +1575,18 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "commitBlock(tuple,tuple)"(
-      _oldBlockData: {
+    "commitBlocks(tuple,tuple[])"(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -1583,7 +1595,7 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1610,6 +1622,7 @@ export class ZkSync extends Contract {
 
     executeBlock(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -1620,6 +1633,7 @@ export class ZkSync extends Contract {
 
     "executeBlock(tuple,tuple[])"(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2021,13 +2035,14 @@ export class ZkSync extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    commitBlock(
-      _oldBlockData: {
+    commitBlocks(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -2036,17 +2051,18 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "commitBlock(tuple,tuple)"(
-      _oldBlockData: {
+    "commitBlocks(tuple,tuple[])"(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -2055,7 +2071,7 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -2085,6 +2101,7 @@ export class ZkSync extends Contract {
 
     executeBlock(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2095,6 +2112,7 @@ export class ZkSync extends Contract {
 
     "executeBlock(tuple,tuple[])"(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2421,13 +2439,14 @@ export class ZkSync extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    commitBlock(
-      _oldBlockData: {
+    commitBlocks(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -2436,17 +2455,18 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "commitBlock(tuple,tuple)"(
-      _oldBlockData: {
+    "commitBlocks(tuple,tuple[])"(
+      _lastCommittedBlockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
       },
-      _newBlockData: {
+      _newBlocksData: {
         blockNumber: BigNumberish;
         feeAccount: BigNumberish;
         newStateRoot: BytesLike;
@@ -2455,7 +2475,7 @@ export class ZkSync extends Contract {
           publicDataOffset: BigNumberish;
           ethWitness: BytesLike;
         }[];
-      },
+      }[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
@@ -2485,6 +2505,7 @@ export class ZkSync extends Contract {
 
     executeBlock(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2495,6 +2516,7 @@ export class ZkSync extends Contract {
 
     "executeBlock(tuple,tuple[])"(
       _blockData: {
+        blockNumber: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
