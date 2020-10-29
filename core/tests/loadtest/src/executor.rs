@@ -219,10 +219,6 @@ impl LoadtestExecutor {
                         self.fees.zksync.clone(),
                     )
                     .await?;
-                log::debug!(
-                    "Balance in main wallet after sign is {}",
-                    format_ether(&self.main_wallet.balance(BlockStatus::Committed).await?)
-                );
                 tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
             }
 

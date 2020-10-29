@@ -9,7 +9,7 @@ token_name = 'ETH'
 # Network kind used for testing.
 name = 'localhost'
 # Fee for the Ethereum transactions in gwei.
-eth_fee = 100000000
+eth_fee = 500000000
 # Fee for the zkSync transactions in gwei.
 zksync_fee = 1000000
 
@@ -17,13 +17,13 @@ zksync_fee = 1000000
 name = 'transfer'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
-transfer_rounds = 1
-wallets_amount = 50
+transfer_rounds = 5
+wallets_amount = 400
 
 [[scenarios]]
 name = "withdraw"
 wallets_amount = 50
-withdraw_rounds = 3
+withdraw_rounds = 4
 
 [[scenarios]]
 name = "full_exit"

@@ -88,7 +88,7 @@ impl Scenario for WithdrawScenario {
                 .iter()
                 .map(|wallet| Self::withdraw_and_deposit(monitor, fees, wallet))
                 .collect::<Vec<_>>();
-            wait_all_failsafe("withdraw/run", futures).await?;
+            wait_all_failsafe(&format!("withdraw/run/cycle/{}", i), futures).await?;
 
             log::info!(
                 "Withdraw and deposit cycle [{}/{}] finished",
@@ -134,7 +134,10 @@ impl WithdrawScenario {
             wallet.eth_balance().await? >= amount
         );
 
-        let amount = closest_packable_token_amount(&(wallet.eth_balance().await? - &fees.eth));
+        let eth_balance = wallet.eth_balance().await?;
+        anyhow::ensure!(eth_balance > fees.eth, "Ethereum fee is too low");
+
+        let amount = closest_packable_token_amount(&(eth_balance - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Verified, &wallet.deposit(amount).await?)
             .await?;

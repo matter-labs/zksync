@@ -53,8 +53,6 @@ where
         Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
     <I::Item as TryFuture>::Error: std::fmt::Display,
 {
-    log::debug!("started {}", category);
-
     let mut oks = Vec::new();
     let mut errs = Vec::new();
 
@@ -68,8 +66,6 @@ where
             }
         }
     }
-
-    log::debug!("completed {} {}", category, oks.len() + errs.len());
 
     if oks.is_empty() {
         match errs.into_iter().next() {
@@ -103,8 +99,6 @@ where
         Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
     <I::Item as TryFuture>::Error: std::fmt::Display,
 {
-    log::debug!("started {}", category);
-
     let mut oks = Vec::new();
     let mut errs = Vec::new();
     for chunk in DynamicChunks::new(i, &CHUNK_SIZES) {
@@ -119,8 +113,6 @@ where
             }
         }
     }
-
-    log::debug!("completed {} {}", category, oks.len() + errs.len());
 
     if oks.is_empty() {
         match errs.into_iter().next() {
