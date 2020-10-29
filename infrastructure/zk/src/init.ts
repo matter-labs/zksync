@@ -5,10 +5,12 @@ import * as db from './db/db';
 import * as server from './server';
 import * as contract from './contract';
 import * as run from './run/run';
+import * as env from './env';
 import { up } from './up';
 
 export async function init() {
     await checkEnv();
+    await env.gitHooks();
     if (!process.env.CI) {
         await up();
     }

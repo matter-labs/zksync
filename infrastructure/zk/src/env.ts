@@ -17,6 +17,15 @@ export function get() {
     });
 }
 
+export async function gitHooks() {
+    if (fs.existsSync('.git')) {
+        await utils.exec(`
+            git config --local core.hooksPath ||
+            git config --local core.hooksPath ${process.env.ZKSYNC_HOME}/.githooks
+        `);
+    }
+}
+
 export function set(env: string) {
     const envFile = `etc/env/${env}.env`;
     if (!fs.existsSync(envFile)) {

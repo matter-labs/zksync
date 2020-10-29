@@ -62,7 +62,7 @@ command.command('run').description('launch the dummy prover').action(run);
 command
     .command('enable')
     .description('enable the dummy prover')
-    .option('--no-redeploy')
+    .option('--no-redeploy', 'do not redeploy the contracts')
     .action(async (cmd: Command) => {
         await enable(cmd.redeploy);
     });
@@ -70,7 +70,7 @@ command
 command
     .command('disable')
     .description('disable the dummy prover')
-    .option('--no-redeploy')
+    .option('--no-redeploy', 'do not redeploy the contracts')
     .action(async (cmd: Command) => {
         await disable(cmd.redeploy);
     });
