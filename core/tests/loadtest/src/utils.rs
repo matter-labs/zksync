@@ -10,7 +10,7 @@ use crate::session::save_error;
 // Workspace uses
 // Local uses
 
-const CHUNK_SIZES: &[usize] = &[1000];
+const CHUNK_SIZES: &[usize] = &[25, 50, 100, 50];
 const ERRORS_CUTOFF: usize = 10;
 
 /// Converts "gwei" amount to the "wei".
@@ -23,7 +23,7 @@ pub fn gwei_to_wei(gwei: impl Into<BigUint>) -> BigUint {
 ///
 /// But unlike the `futures::future::join_all` method, it performs futures in chunks
 /// to reduce descriptors usage.
-pub async fn wait_all<I>(i: I) -> Vec<<I::Item as Future>::Output>
+pub async fn wait_all_chunks<I>(i: I) -> Vec<<I::Item as Future>::Output>
 where
     I: IntoIterator,
     I::Item: Future,
@@ -39,29 +39,10 @@ where
 /// Creates a future which represents either a collection of the results of the
 /// futures given or an error.
 ///
-/// But unlike the `futures::future::try_join_all` method, it performs futures in chunks
-/// to reduce descriptors usage.
-pub async fn try_wait_all<I>(
-    i: I,
-) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
-where
-    I: IntoIterator,
-    I::Item: TryFuture,
-{
-    let mut output = Vec::new();
-    for chunk in DynamicChunks::new(i, &CHUNK_SIZES) {
-        output.extend(futures::future::try_join_all(chunk).await?);
-    }
-    Ok(output)
-}
-
-/// Creates a future which represents either a collection of the results of the
-/// futures given or an error.
-///
-/// But unlike the `try_wait_all` method, it returns an error of the first
-/// errored future if all futures ended with an error; otherwise returns results of succesful
-/// futures and writes warning about failed futures.
-pub async fn try_wait_all_failsafe<I>(
+/// But unlike the `futures::future::try_join_all` method, it returns an error if all futures ended with
+/// an error; otherwise returns results of succesful futures and saves errors of the failed
+/// futures.
+pub async fn wait_all_failsafe<I>(
     category: &str,
     i: I,
 ) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
@@ -72,11 +53,10 @@ where
         Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
     <I::Item as TryFuture>::Error: std::fmt::Display,
 {
-    // TODO Save errors as soon as they occur.
-    let output = wait_all(i).await;
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
 
-    let mut oks = Vec::with_capacity(output.len());
-    let mut errs = Vec::with_capacity(output.len());
+    let output = futures::future::join_all(i).await;
     for item in output {
         match item.into() {
             Ok(ok) => oks.push(ok),
@@ -86,6 +66,58 @@ where
             }
         }
     }
+
+    log::debug!("completed {} {}", category, oks.len() + errs.len());
+
+    if oks.is_empty() {
+        match errs.into_iter().next() {
+            Some(err) => return Err(err),
+            None => return Ok(Vec::new()),
+        }
+    } else if errs.len() > ERRORS_CUTOFF {
+        log::warn!(
+            "A {} errors occurred during the `{}` execution.",
+            errs.len(),
+            category,
+        );
+    }
+
+    Ok(oks)
+}
+
+/// Creates a future which represents either a collection of the results of the
+/// futures given or an error.
+///
+/// But unlike the `try_wait_all_failsafe` method, it performs futures in chunks
+/// to reduce descriptors usage.
+pub async fn wait_all_failsafe_chunks<I>(
+    category: &str,
+    i: I,
+) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
+where
+    I: IntoIterator,
+    I::Item: TryFuture,
+    <I::Item as Future>::Output:
+        Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
+    <I::Item as TryFuture>::Error: std::fmt::Display,
+{
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
+    for chunk in DynamicChunks::new(i, &CHUNK_SIZES) {
+        let output = futures::future::join_all(chunk).await;
+        log::debug!("processed {} {}", category, &output.len());
+        for item in output {
+            match item.into() {
+                Ok(ok) => oks.push(ok),
+                Err(err) => {
+                    save_error(category, &err);
+                    errs.push(err)
+                }
+            }
+        }
+    }
+
+    log::debug!("completed {} {}", category, oks.len() + errs.len());
 
     if oks.is_empty() {
         match errs.into_iter().next() {

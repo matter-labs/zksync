@@ -24,6 +24,7 @@ use zksync_types::{
 use crate::{
     api::ApiDataPool,
     journal::{Journal, TxLifecycle},
+    utils::wait_all_chunks,
 };
 
 type SerialId = u64;
@@ -283,7 +284,9 @@ impl Monitor {
             .drain(..)
             .collect::<Vec<_>>();
 
-        futures::future::join_all(tasks).await;
+        log::debug!("Awaiting for verification, pending tasks {}", tasks.len());
+
+        wait_all_chunks(tasks).await;
     }
 
     /// Enables a collecting metrics process.

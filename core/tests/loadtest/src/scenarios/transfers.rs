@@ -12,7 +12,7 @@ use super::{Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
-    utils::{gwei_to_wei, try_wait_all, try_wait_all_failsafe},
+    utils::{gwei_to_wei, wait_all_failsafe_chunks},
 };
 
 /// Configuration options for the transfers scenario.
@@ -108,7 +108,7 @@ impl Scenario for TransferScenario {
             transfers_number
         );
 
-        self.txs = try_wait_all_failsafe(
+        self.txs = wait_all_failsafe_chunks(
             "prepare/transfers",
             (0..transfers_number).map(|i| {
                 let from = i % wallets.len();
@@ -134,7 +134,8 @@ impl Scenario for TransferScenario {
         _fees: &Fees,
         _wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
-        try_wait_all(
+        wait_all_failsafe_chunks(
+            "run/transfers",
             self.txs
                 .drain(..)
                 .map(|(tx, sign)| monitor.send_tx(tx, sign)),

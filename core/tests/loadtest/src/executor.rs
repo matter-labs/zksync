@@ -19,7 +19,7 @@ use crate::{
     monitor::Monitor,
     scenarios::{Fees, Scenario, ScenariosTestsReport},
     test_wallet::TestWallet,
-    utils::{gwei_to_wei, try_wait_all_failsafe, wait_all},
+    utils::{gwei_to_wei, wait_all_chunks, wait_all_failsafe, wait_all_failsafe_chunks},
 };
 
 /// Full report with the results of loadtest execution.
@@ -58,7 +58,7 @@ impl Fees {
                 &config
                     .eth_fee
                     .map(gwei_to_wei)
-                    .unwrap_or_else(|| &default_fee * BigUint::from(100_u64)),
+                    .unwrap_or_else(|| &default_fee * BigUint::from(10_u64)),
             ),
             zksync: closest_packable_fee_amount(
                 &config.zksync_fee.map(gwei_to_wei).unwrap_or(default_fee),
@@ -132,17 +132,19 @@ impl LoadtestExecutor {
 
         // Create intermediate wallets and compute total amount to deposit and needed
         // balances for wallets.
-        let mut amount_to_deposit = &self.fees.eth + &self.fees.zksync * BigUint::from(4_u64);
+        let mut amount_to_deposit = &self.fees.eth + &self.fees.zksync * BigUint::from(10_u64);
         let mut wallets = Vec::new();
         for resource in resources {
             let wallet_balance = closest_packable_token_amount(
-                &(&resource.balance_per_wallet + BigUint::from(4_u64) * &self.fees.zksync),
+                &(&resource.balance_per_wallet + BigUint::from(5_u64) * &self.fees.zksync),
             );
 
-            let scenario_amount = BigUint::from(resource.wallets_amount) * &wallet_balance;
+            let scenario_amount = BigUint::from(resource.wallets_amount) * &wallet_balance
+                + BigUint::from(10_u64) * &self.fees.zksync
+                + &self.fees.eth;
             amount_to_deposit += scenario_amount;
 
-            let scenario_wallets = wait_all((0..resource.wallets_amount).map(|_| {
+            let scenario_wallets = wait_all_chunks((0..resource.wallets_amount).map(|_| {
                 TestWallet::new_random(
                     self.main_wallet.token_name().clone(),
                     self.monitor.clone(),
@@ -217,11 +219,15 @@ impl LoadtestExecutor {
                         self.fees.zksync.clone(),
                     )
                     .await?;
+                log::debug!(
+                    "Balance in main wallet after sign is {}",
+                    format_ether(&self.main_wallet.balance(BlockStatus::Committed).await?)
+                );
                 tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
             }
 
-            try_wait_all_failsafe(
-                "executor/prepare/wait_for_tx",
+            wait_all_failsafe_chunks(
+                "executor/prepare/wait_for_tx/committed",
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
@@ -229,16 +235,17 @@ impl LoadtestExecutor {
             .await?;
 
             log::info!(
-                "All the initial transfers for `{}` scenario have been committed.",
+                "All the initial transfers for the `{}` scenario have been committed.",
                 self.scenarios[scenario_index].0,
             );
 
-            let tx_hashes = try_wait_all_failsafe(
+            let tx_hashes = wait_all_failsafe_chunks(
                 "executor/prepare/sign_change_pubkey",
                 scenario_wallets.iter_mut().map(|wallet| {
                     let fees = self.fees.clone();
                     let monitor = self.monitor.clone();
                     async move {
+                        log::debug!("Update account id {}", wallet.address().to_string());
                         wallet.update_account_id().await?;
 
                         anyhow::ensure!(
@@ -248,14 +255,23 @@ impl LoadtestExecutor {
                         );
 
                         let (tx, sign) = wallet.sign_change_pubkey(fees.zksync.clone()).await?;
+                        log::debug!(
+                            "sign_change_pubkey created {}",
+                            wallet.address().to_string()
+                        );
                         monitor.send_tx(tx, sign).await
                     }
                 }),
             )
             .await?;
 
-            try_wait_all_failsafe(
-                "executor/prepare/wait_for_tx",
+            log::info!(
+                "All the initial sign change pubkeys for the `{}` scenario have been committed.",
+                self.scenarios[scenario_index].0,
+            );
+
+            wait_all_failsafe_chunks(
+                "executor/prepare/wait_for_tx/committed",
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
@@ -283,7 +299,7 @@ impl LoadtestExecutor {
 
         // Run scenarios concurrently.
         let fees = self.fees.clone();
-        try_wait_all_failsafe(
+        wait_all_failsafe(
             "executor/process",
             self.scenarios
                 .iter_mut()
@@ -311,7 +327,7 @@ impl LoadtestExecutor {
                 .await?;
 
             let main_address = self.main_wallet.address();
-            let txs_queue = try_wait_all_failsafe(
+            let txs_queue = wait_all_failsafe_chunks(
                 "executor/refund/sign_transfer",
                 scenario_wallets.iter().map(|wallet| {
                     let zksync_fee = fees.zksync.clone();
@@ -339,7 +355,7 @@ impl LoadtestExecutor {
             )
             .await?;
 
-            let tx_hashes = try_wait_all_failsafe(
+            let tx_hashes = wait_all_failsafe_chunks(
                 "executor/refund/send_tx",
                 txs_queue
                     .into_iter()
@@ -348,8 +364,8 @@ impl LoadtestExecutor {
             )
             .await?;
 
-            try_wait_all_failsafe(
-                "executor/refund/wait_for_tx",
+            wait_all_failsafe_chunks(
+                "executor/refund/wait_for_tx/committed",
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
