@@ -19,7 +19,9 @@ use crate::{
     monitor::Monitor,
     scenarios::{Fees, Scenario, ScenariosTestsReport},
     test_wallet::TestWallet,
-    utils::{gwei_to_wei, wait_all_chunks, wait_all_failsafe, wait_all_failsafe_chunks},
+    utils::{
+        gwei_to_wei, wait_all_chunks, wait_all_failsafe, wait_all_failsafe_chunks, CHUNK_SIZES,
+    },
 };
 
 /// Full report with the results of loadtest execution.
@@ -144,13 +146,16 @@ impl LoadtestExecutor {
                 + &self.fees.eth;
             amount_to_deposit += scenario_amount;
 
-            let scenario_wallets = wait_all_chunks((0..resource.wallets_amount).map(|_| {
-                TestWallet::new_random(
-                    self.main_wallet.token_name().clone(),
-                    self.monitor.clone(),
-                    &self.env_options,
-                )
-            }))
+            let scenario_wallets = wait_all_chunks(
+                CHUNK_SIZES,
+                (0..resource.wallets_amount).map(|_| {
+                    TestWallet::new_random(
+                        self.main_wallet.token_name().clone(),
+                        self.monitor.clone(),
+                        &self.env_options,
+                    )
+                }),
+            )
             .await;
 
             wallets.push((scenario_wallets, wallet_balance));
@@ -171,7 +176,7 @@ impl LoadtestExecutor {
             format_ether(&amount_to_deposit),
         );
 
-        let priority_op = self.main_wallet.deposit(amount_to_deposit).await.unwrap();
+        let priority_op = self.main_wallet.deposit(amount_to_deposit).await?;
         self.monitor
             .wait_for_priority_op(BlockStatus::Committed, &priority_op)
             .await?;
@@ -209,21 +214,31 @@ impl LoadtestExecutor {
                 scenario_wallets.len()
             );
 
-            let mut tx_hashes = Vec::new();
-            for wallet in &scenario_wallets {
-                let (tx, sign) = self
-                    .main_wallet
-                    .sign_transfer(
+            let txs = wait_all_failsafe_chunks(
+                "executor/prepare/sign_transfer",
+                CHUNK_SIZES,
+                scenario_wallets.iter().map(|wallet| {
+                    self.main_wallet.sign_transfer(
                         wallet.address(),
                         scenario_amount.clone(),
                         self.fees.zksync.clone(),
                     )
-                    .await?;
-                tx_hashes.push(self.monitor.send_tx(tx, sign).await?);
-            }
+                }),
+            )
+            .await?;
+
+            // Preserve transactions order to prevent "nonce mismatch" errors.
+            let tx_hashes = wait_all_failsafe_chunks(
+                "executor/prepare/wait_for_tx/send_tx",
+                &[1],
+                txs.into_iter()
+                    .map(|(tx, sign)| self.monitor.send_tx(tx, sign)),
+            )
+            .await?;
 
             wait_all_failsafe_chunks(
                 "executor/prepare/wait_for_tx/committed",
+                CHUNK_SIZES,
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
@@ -237,6 +252,7 @@ impl LoadtestExecutor {
 
             let tx_hashes = wait_all_failsafe_chunks(
                 "executor/prepare/sign_change_pubkey",
+                CHUNK_SIZES,
                 scenario_wallets.iter_mut().map(|wallet| {
                     let fees = self.fees.clone();
                     let monitor = self.monitor.clone();
@@ -258,6 +274,7 @@ impl LoadtestExecutor {
 
             wait_all_failsafe_chunks(
                 "executor/prepare/wait_for_tx/committed",
+                CHUNK_SIZES,
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| self.monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
@@ -320,6 +337,7 @@ impl LoadtestExecutor {
             let main_address = self.main_wallet.address();
             let txs_queue = wait_all_failsafe_chunks(
                 "executor/refund/sign_transfer",
+                CHUNK_SIZES,
                 scenario_wallets.iter().map(|wallet| {
                     let zksync_fee = fees.zksync.clone();
                     async move {
@@ -348,6 +366,7 @@ impl LoadtestExecutor {
 
             let tx_hashes = wait_all_failsafe_chunks(
                 "executor/refund/send_tx",
+                CHUNK_SIZES,
                 txs_queue
                     .into_iter()
                     .filter_map(|x| x)
@@ -357,6 +376,7 @@ impl LoadtestExecutor {
 
             wait_all_failsafe_chunks(
                 "executor/refund/wait_for_tx/committed",
+                CHUNK_SIZES,
                 tx_hashes
                     .into_iter()
                     .map(|tx_hash| monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),

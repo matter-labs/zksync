@@ -10,7 +10,9 @@ use crate::session::save_error;
 // Workspace uses
 // Local uses
 
-const CHUNK_SIZES: &[usize] = &[25, 50, 100, 50];
+/// Default chunk sizes for the `wait_all_chunks` methods.
+pub const CHUNK_SIZES: &[usize] = &[25, 50, 100, 50];
+
 const ERRORS_CUTOFF: usize = 10;
 
 /// Converts "gwei" amount to the "wei".
@@ -23,13 +25,13 @@ pub fn gwei_to_wei(gwei: impl Into<BigUint>) -> BigUint {
 ///
 /// But unlike the `futures::future::join_all` method, it performs futures in chunks
 /// to reduce descriptors usage.
-pub async fn wait_all_chunks<I>(i: I) -> Vec<<I::Item as Future>::Output>
+pub async fn wait_all_chunks<I>(chunk_sizes: &[usize], i: I) -> Vec<<I::Item as Future>::Output>
 where
     I: IntoIterator,
     I::Item: Future,
 {
     let mut output = Vec::new();
-    for chunk in DynamicChunks::new(i, CHUNK_SIZES) {
+    for chunk in DynamicChunks::new(i, chunk_sizes) {
         let values = futures::future::join_all(chunk).await;
         output.extend(values);
     }
@@ -90,6 +92,7 @@ where
 /// to reduce descriptors usage.
 pub async fn wait_all_failsafe_chunks<I>(
     category: &str,
+    chunk_sizes: &[usize],
     i: I,
 ) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
 where
@@ -101,7 +104,7 @@ where
 {
     let mut oks = Vec::new();
     let mut errs = Vec::new();
-    for chunk in DynamicChunks::new(i, &CHUNK_SIZES) {
+    for chunk in DynamicChunks::new(i, chunk_sizes) {
         let output = futures::future::join_all(chunk).await;
         for item in output {
             match item.into() {
