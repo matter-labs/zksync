@@ -133,7 +133,14 @@ export default {
             };
             
             if (txData.block_number != -1) {
-                block = await client.getBlock(txData.block_number);
+                const fetchedBlock = await client.getBlock(txData.block_number);
+                // Only update block if it's created already.
+                // If you query API with a block with a number greater than the last committed block,
+                // it will return the last actually committed block (which will be indicated by the block number
+                // in the response).
+                if (fetchedBlock.block_number == txData.block_number) {
+                    block = fetchedBlock;
+                }
             }
 
             if (txData.tx.eth_block_number) {
