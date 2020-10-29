@@ -13,9 +13,9 @@ jobs:
 
     - name: setup-env
       run: |
-        echo "::set-env name=ZKSYNC_HOME::$(pwd)"
-        echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
-        echo "::set-env name=CI::1"
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
 
     - name: init
       run: |
