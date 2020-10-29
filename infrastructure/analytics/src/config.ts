@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { Network, Config } from "./types";
+import {Network, Config} from "./types";
 
 const CONFIG_FILE = ".analytics-config.json";
 

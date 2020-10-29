@@ -114,5 +114,5 @@ export async function getBlockInterval(etherscanApiURL: string, etherscanApiKey:
 
     if (startBlock == null || endBlock == null) throw new Error(`Failed to get block by time from ${etherscanApiURL}`);
 
-    return { startBlock, endBlock };
+    return {startBlock, endBlock};
 }

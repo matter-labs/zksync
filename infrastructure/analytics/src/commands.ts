@@ -1,5 +1,5 @@
 import "isomorphic-fetch";
-import { Network, TokensInfo } from "./types";
+import {Network, TokensInfo} from "./types";
 import * as zksync from "zksync";
 import * as ethers from "ethers";
 import * as utils from "./utils";
@@ -9,7 +9,7 @@ export async function currentBalances(network: Network, operator_address: string
     const ethProvider =
         network == "localhost" ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
 
-    const balances: TokensInfo = { total: { eth: 0, usd: 0 } };
+    const balances: TokensInfo = {total: {eth: 0, usd: 0}};
 
     const eth_price = await zksProvider.getTokenPrice("ETH");
     const tokens = await zksProvider.getTokens();
@@ -58,8 +58,8 @@ export async function collectedFees(network: Network, providerAddress: string, t
     const eth_price = await zksProvider.getTokenPrice("ETH");
     const tokens = await zksProvider.getTokens();
 
-    const senderAccountStat = { eth: 0, usd: 0 };
-    const tokensStat: TokensInfo = { total: { eth: 0, usd: 0 } };
+    const senderAccountStat = {eth: 0, usd: 0};
+    const tokensStat: TokensInfo = {total: {eth: 0, usd: 0}};
 
     // structure that stores data about each token from zSync
     // so as not to request the server many times for the same data
@@ -71,7 +71,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
         const tokenPrice = await zksProvider.getTokenPrice(token);
 
         tokensCashed.addToken(tokenSymbol, todenId, tokenPrice);
-        tokensStat[token] = { amount: 0, eth: 0, usd: 0 };
+        tokensStat[token] = {amount: 0, eth: 0, usd: 0};
     }
 
     // traverse all blocks starting from the last one
@@ -147,7 +147,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
         }
     }
 
-    return Object.assign({ "spent by SENDER ACCOUNT": senderAccountStat }, { "collected fees": tokensStat });
+    return Object.assign({"spent by SENDER ACCOUNT": senderAccountStat}, {"collected fees": tokensStat});
 }
 
 export async function collectedTokenLiquidations(
@@ -167,11 +167,7 @@ export async function collectedTokenLiquidations(
     // Etherscan API has limits on the number of transactions in one request
     // so request transactions until getting an empty list
     do {
-        const { startBlock, endBlock } = await utils.getBlockInterval(
-            ethProvider.baseUrl,
-            etherscan_api_key,
-            timePeriod
-        );
+        const {startBlock, endBlock} = await utils.getBlockInterval(ethProvider.baseUrl, etherscan_api_key, timePeriod);
 
         history = await ethProvider.getHistory(operatorAddress, startBlock, endBlock);
 
@@ -190,5 +186,5 @@ export async function collectedTokenLiquidations(
         }
     } while (history.length > 0 && timePeriod.isValid());
 
-    return { "Total amount of ETH": liquidationAmount };
+    return {"Total amount of ETH": liquidationAmount};
 }

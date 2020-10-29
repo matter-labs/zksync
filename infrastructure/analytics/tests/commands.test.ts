@@ -1,10 +1,10 @@
 import chaiAsPromised from "chai-as-promised";
-import { expect, use } from "chai";
+import {expect, use} from "chai";
 import * as ethers from "ethers";
 import * as zksync from "zksync";
-import { Config, Network } from "../src/types";
-import { loadConfig } from "../src/config";
-import { TimePeriod } from "../src/utils";
+import {Config, Network} from "../src/types";
+import {loadConfig} from "../src/config";
+import {TimePeriod} from "../src/utils";
 import * as commands from "../src/commands";
 
 use(chaiAsPromised);

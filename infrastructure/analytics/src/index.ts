@@ -1,6 +1,6 @@
-import { Command } from "commander";
-import { loadConfig } from "./config";
-import { TimePeriod } from "./utils";
+import {Command} from "commander";
+import {loadConfig} from "./config";
+import {TimePeriod} from "./utils";
 import * as commands from "./commands";
 
 function print(object: any) {
