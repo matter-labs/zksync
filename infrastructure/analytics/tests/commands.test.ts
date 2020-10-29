@@ -41,7 +41,7 @@ describe("Tests", () => {
         });
 
         await daiDeposit.awaitReceipt();
-        const changePubkey = await aliceWallet.setSigningKey();
+        const changePubkey = await aliceWallet.setSigningKey({feeToken: "ETH"});
         await changePubkey.awaitReceipt();
 
         const txHandle = await aliceWallet.syncTransfer({
