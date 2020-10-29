@@ -53,6 +53,8 @@ where
         Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
     <I::Item as TryFuture>::Error: std::fmt::Display,
 {
+    log::debug!("started {}", category);
+
     let mut oks = Vec::new();
     let mut errs = Vec::new();
 
@@ -101,6 +103,8 @@ where
         Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
     <I::Item as TryFuture>::Error: std::fmt::Display,
 {
+    log::debug!("started {}", category);
+
     let mut oks = Vec::new();
     let mut errs = Vec::new();
     for chunk in DynamicChunks::new(i, &CHUNK_SIZES) {

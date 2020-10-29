@@ -79,7 +79,8 @@ impl Journal {
         .map(|(category, data)| {
             (
                 category.to_string(),
-                FiveSummaryStats::from_data(data).unwrap(),
+                FiveSummaryStats::from_data(data)
+                    .expect("Not enough data to compute summary stats"),
             )
         })
         .collect();

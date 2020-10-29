@@ -13,17 +13,17 @@ eth_fee = 100000000
 # Fee for the zkSync transactions in gwei.
 zksync_fee = 1000000
 
-# [[scenarios]]
-# name = 'transfer'
-# # Amount of money to be used in the transfer, in gwei.
-# transfer_size = 1
-# transfer_rounds = 10
-# wallets_amount = 100
+[[scenarios]]
+name = 'transfer'
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 1
+wallets_amount = 50
 
-# [[scenarios]]
-# name = "withdraw"
-# wallets_amount = 50
-# withdraw_rounds = 3
+[[scenarios]]
+name = "withdraw"
+wallets_amount = 50
+withdraw_rounds = 3
 
 [[scenarios]]
 name = "full_exit"

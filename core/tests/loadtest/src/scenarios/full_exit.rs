@@ -80,10 +80,6 @@ impl Scenario for FullExitScenario {
         let expected_balance = withdraw_amount - &fees.zksync * BigUint::from(2_u64);
         for wallet in wallets {
             await_condition!(std::time::Duration::from_millis(1_00), {
-                dbg!(
-                    zksync_utils::format_ether(&wallet.eth_balance().await?),
-                    zksync_utils::format_ether(&expected_balance)
-                );
                 wallet.eth_balance().await? >= expected_balance
             });
         }
