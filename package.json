@@ -20,7 +20,7 @@
     "contracts" : "yarn workspace franklin-contracts",
     "analytics" : "yarn workspace analytics",
     "fee-seller" : "yarn workspace fee-seller",
-    "explorer" : "yarn workspace explorer",
+    "explorer" : "yarn workspace sync-explorer",
     "zcli" : "yarn workspace zcli",
     "ts-tests" : "yarn workspace ts-tests"
   }
