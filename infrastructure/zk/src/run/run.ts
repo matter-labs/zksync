@@ -7,6 +7,18 @@ import * as dataRestore from './data-restore';
 
 export { verifyKeys, dataRestore };
 
+// installs all dependencies and builds our js packages
+export async function yarn() {
+    await utils.spawn('yarn --cwd sdk/zksync.js');
+    await utils.spawn('yarn --cwd sdk/zksync.js build');
+    await utils.spawn('yarn --cwd contracts');
+    await utils.spawn('yarn --cwd core/tests/ts-tests');
+    await utils.spawn('yarn --cwd infrastructure/explorer');
+    await utils.spawn('yarn --cwd infrastructure/fee-seller');
+    await utils.spawn('yarn --cwd infrastructure/zcli');
+    await utils.spawn('yarn --cwd infrastructure/analytics');
+}
+
 export async function plonkSetup() {
     const URL = 'https://universal-setup.ams3.digitaloceanspaces.com';
     fs.mkdirSync('keys/setup', { recursive: true });
@@ -70,6 +82,7 @@ command.command('test-accounts').description('print ethereum test accounts').act
 command.command('explorer').description('run zksync explorer locally').action(explorer);
 command.command('cat-logs').description('print server and prover logs').action(catLogs);
 command.command('plonk-setup').description('download missing keys').action(plonkSetup);
+command.command('yarn').description('install all JS dependencies').action(yarn);
 
 command
     .command('revert-reason <tx_hash> [web3_url]')

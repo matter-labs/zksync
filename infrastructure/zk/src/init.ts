@@ -12,7 +12,7 @@ export async function init() {
     if (!process.env.CI) {
         await up();
     }
-    await utils.allowFail(yarn());
+    await utils.allowFail(run.yarn());
     await run.plonkSetup();
     await run.verifyKeys.unpack();
     await db.setup();
@@ -38,18 +38,6 @@ async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: strin
             `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
         );
     }
-}
-
-// installs all dependencies and builds our js packages
-async function yarn() {
-    await utils.spawn('yarn --cwd sdk/zksync.js');
-    await utils.spawn('yarn --cwd sdk/zksync.js build');
-    await utils.spawn('yarn --cwd contracts');
-    await utils.spawn('yarn --cwd core/tests/ts-tests');
-    await utils.spawn('yarn --cwd infrastructure/explorer');
-    await utils.spawn('yarn --cwd infrastructure/fee-seller');
-    await utils.spawn('yarn --cwd infrastructure/zcli');
-    await utils.spawn('yarn --cwd infrastructure/analytics');
 }
 
 async function checkEnv() {
