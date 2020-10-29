@@ -130,12 +130,44 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 });
 
-const transports = process.env.TEST_TRANSPORT ? [process.env.TEST_TRANSPORT.toUpperCase()] : ['HTTP', 'WS'];
-const tokens = process.env.TEST_TOKEN ? [process.env.TEST_TOKEN.toUpperCase()] : ['ETH', 'DAI'];
-
-for (const transport of transports) {
-    for (const token of tokens) {
-        // @ts-ignore
-        TestSuite(token, transport);
+let token_transport = [];
+if (process.env.TEST_TRANSPORT) {
+    if (process.env.TEST_TOKEN) {
+        // Both transport and token are set, use config from env.
+        const env_transport = process.env.TEST_TRANSPORT.toUpperCase();
+        const env_token = process.env.TEST_TOKEN.toUpperCase();
+        token_transport = [
+            {
+                transport: env_transport,
+                token: env_token
+            }
+        ];
+    } else {
+        // Only transport is set, use DAI as default token for this transport.
+        const env_transport = process.env.TEST_TRANSPORT.toUpperCase();
+        const default_token = 'DAI';
+        token_transport = [
+            {
+                transport: env_transport,
+                token: default_token
+            }
+        ];
     }
+} else {
+    // Default case: run HTTP&ETH / WS&DAI.
+    token_transport = [
+        {
+            transport: 'HTTP',
+            token: 'ETH'
+        },
+        {
+            transport: 'WS',
+            token: 'DAI'
+        }
+    ];
+}
+
+for (const input of token_transport) {
+    // @ts-ignore
+    TestSuite(input.token, input.transport);
 }
