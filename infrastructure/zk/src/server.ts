@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import * as utils from './utils';
+import * as env from './env';
 import fs from 'fs';
 
 export async function server() {
@@ -22,7 +23,7 @@ export async function genesis() {
     const label = `${process.env.ZKSYNC_ENV}-Genesis_gen-${year}-${month}-${day}-${hour}${minute}${second}`;
     fs.mkdirSync(`logs/${label}`, { recursive: true });
     fs.copyFileSync('genesis.log', `logs/${label}/genesis.log`);
-    utils.modifyEnv('GENESIS_ROOT', genesisRoot);
+    env.modify('GENESIS_ROOT', genesisRoot);
 }
 
 export const command = new Command('server')

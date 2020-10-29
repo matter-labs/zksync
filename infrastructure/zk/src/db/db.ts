@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
+import * as env from '../env';
 import fs from 'fs';
 
 import * as insert from './insert';
@@ -34,7 +35,7 @@ export async function migrate() {
 export async function setup() {
     // force read env
     delete process.env.ZKSYNC_ENV;
-    utils.loadEnv();
+    env.load();
 
     process.chdir('core/lib/storage');
     console.log(`DATABASE_URL = ${process.env.DATABASE_URL}`);

@@ -13,8 +13,9 @@ import { command as prover } from './prover';
 import { command as run } from './run/run';
 import { command as test } from './test/test';
 import { command as docker } from './docker';
-import * as completion from './completion';
-import * as utils from './utils';
+import { command as completion } from './completion';
+
+import * as env from './env';
 
 async function main() {
     const ZKSYNC_HOME = process.env.ZKSYNC_HOME;
@@ -25,7 +26,7 @@ async function main() {
         process.chdir(ZKSYNC_HOME);
     }
 
-    utils.loadEnv();
+    env.load();
 
     program
         .version('0.1.0')
@@ -43,7 +44,8 @@ async function main() {
         .addCommand(run)
         .addCommand(test)
         .addCommand(docker)
-        .addCommand(completion.command(program as Command));
+        .addCommand(env.command)
+        .addCommand(completion(program as Command));
 
     await program.parseAsync(process.argv);
 }

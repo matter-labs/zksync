@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import * as utils from './utils';
+import * as env from './env';
 import fs from 'fs';
 
 import * as db from './db/db';
@@ -121,7 +122,7 @@ export async function deploy() {
         const pattern = new RegExp(`${envVar}=.*`, 'g');
         const matches = deployLog.match(pattern);
         if (matches !== null) {
-            utils.modifyEnv(envVar, matches[0]);
+            env.modify(envVar, matches[0]);
         }
     }
 }
