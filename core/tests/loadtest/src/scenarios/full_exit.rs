@@ -61,19 +61,30 @@ impl Scenario for FullExitScenario {
         fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
+        // Withdraw some amount to have enough funds to perform `full_exit` operation.
+        let withdraw_amount = closest_packable_token_amount(&balance_per_wallet(fees));
+        let mut txs_queue = Vec::with_capacity(wallets.len());
         for wallet in wallets {
-            // Withdraw some amount to have enough funds to perform `full_exit` operation.
-            let withdraw_amount = closest_packable_token_amount(&balance_per_wallet(fees));
-
             let (tx, sign) = wallet
                 .sign_withdraw(withdraw_amount.clone(), fees.zksync.clone())
                 .await?;
-            monitor
-                .wait_for_tx(BlockStatus::Verified, monitor.send_tx(tx, sign).await?)
-                .await?;
 
+            let tx_hash = monitor.send_tx(tx, sign).await?;
+            txs_queue.push(monitor.wait_for_tx(BlockStatus::Verified, tx_hash));
+        }
+        wait_all_failsafe("full_exit/prepare", txs_queue.into_iter()).await?;
+
+        log::info!("All withdrawal transactions have been verified");
+
+        // Wait until the balance becomes as expected.
+        let expected_balance = withdraw_amount - &fees.zksync * BigUint::from(2_u64);
+        for wallet in wallets {
             await_condition!(std::time::Duration::from_millis(1_00), {
-                wallet.eth_balance().await? >= withdraw_amount
+                dbg!(
+                    zksync_utils::format_ether(&wallet.eth_balance().await?),
+                    zksync_utils::format_ether(&expected_balance)
+                );
+                wallet.eth_balance().await? >= expected_balance
             });
         }
 

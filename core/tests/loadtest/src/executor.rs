@@ -245,7 +245,6 @@ impl LoadtestExecutor {
                     let fees = self.fees.clone();
                     let monitor = self.monitor.clone();
                     async move {
-                        log::debug!("Update account id {}", wallet.address().to_string());
                         wallet.update_account_id().await?;
 
                         anyhow::ensure!(
@@ -255,20 +254,11 @@ impl LoadtestExecutor {
                         );
 
                         let (tx, sign) = wallet.sign_change_pubkey(fees.zksync.clone()).await?;
-                        log::debug!(
-                            "sign_change_pubkey created {}",
-                            wallet.address().to_string()
-                        );
                         monitor.send_tx(tx, sign).await
                     }
                 }),
             )
             .await?;
-
-            log::info!(
-                "All the initial sign change pubkeys for the `{}` scenario have been committed.",
-                self.scenarios[scenario_index].0,
-            );
 
             wait_all_failsafe_chunks(
                 "executor/prepare/wait_for_tx/committed",
@@ -284,6 +274,11 @@ impl LoadtestExecutor {
                 .prepare(&self.monitor, &self.fees, &scenario_wallets)
                 .await?;
             scenario_handle.1 = scenario_wallets;
+
+            log::info!(
+                "All the preparation steps for the `{}` scenario have been finished.",
+                self.scenarios[scenario_index].0,
+            );
         }
 
         log::info!("Awaiting for pending tasks verification...",);

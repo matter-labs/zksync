@@ -105,7 +105,6 @@ where
     let mut errs = Vec::new();
     for chunk in DynamicChunks::new(i, &CHUNK_SIZES) {
         let output = futures::future::join_all(chunk).await;
-        log::debug!("processed {} {}", category, &output.len());
         for item in output {
             match item.into() {
                 Ok(ok) => oks.push(ok),
