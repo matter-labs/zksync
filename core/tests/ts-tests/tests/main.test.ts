@@ -130,44 +130,47 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 });
 
-let token_transport = [];
+// wBTC is chosen because it has decimals different from ETH (8 instead of 18).
+// Using this token will help us to detect decimals-related errors.
+const defaultERC20 = 'wBTC';
+
+let tokenAndTransport = [];
 if (process.env.TEST_TRANSPORT) {
     if (process.env.TEST_TOKEN) {
         // Both transport and token are set, use config from env.
-        const env_transport = process.env.TEST_TRANSPORT.toUpperCase();
-        const env_token = process.env.TEST_TOKEN.toUpperCase();
-        token_transport = [
+        const envTransport = process.env.TEST_TRANSPORT.toUpperCase();
+        const envToken = process.env.TEST_TOKEN.toUpperCase();
+        tokenAndTransport = [
             {
-                transport: env_transport,
-                token: env_token
+                transport: envTransport,
+                token: envToken
             }
         ];
     } else {
-        // Only transport is set, use DAI as default token for this transport.
-        const env_transport = process.env.TEST_TRANSPORT.toUpperCase();
-        const default_token = 'DAI';
-        token_transport = [
+        // Only transport is set, use wBTC as default token for this transport.
+        const envTransport = process.env.TEST_TRANSPORT.toUpperCase();
+        tokenAndTransport = [
             {
-                transport: env_transport,
-                token: default_token
+                transport: envTransport,
+                token: defaultERC20
             }
         ];
     }
 } else {
-    // Default case: run HTTP&ETH / WS&DAI.
-    token_transport = [
+    // Default case: run HTTP&ETH / WS&wBTC.
+    tokenAndTransport = [
         {
             transport: 'HTTP',
             token: 'ETH'
         },
         {
             transport: 'WS',
-            token: 'DAI'
+            token: defaultERC20
         }
     ];
 }
 
-for (const input of token_transport) {
+for (const input of tokenAndTransport) {
     // @ts-ignore
     TestSuite(input.token, input.transport);
 }
