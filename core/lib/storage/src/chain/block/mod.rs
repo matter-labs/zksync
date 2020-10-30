@@ -444,18 +444,26 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         self.load_commit_op(block_number).await.map(|r| r.block)
     }
 
+    /// Returns the number of last block
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::COMMIT, None)
             .await
     }
 
+    /// Returns the number of last block for which proof has been created.
+    ///
+    /// Note: having a proof for the block doesn't mean that state was updated. Chain state
+    /// is updated only after corresponding transaction is confirmed on the Ethereum blockchain.
+    /// In order to see the last block with updated state, use `get_last_verified_confirmed_block` method.
     pub async fn get_last_verified_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::VERIFY, None)
             .await
     }
 
+    /// Returns the number of last block for which proof has been confirmed on Ethereum.
+    /// Essentially, it's number of last block for which updates were applied to the chain state.
     pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::VERIFY, Some(true))
