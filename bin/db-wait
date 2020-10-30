@@ -1,5 +1,0 @@
-#!/bin/bash
-
-# Checks if db is up and accepting connections.
-
-zk db wait

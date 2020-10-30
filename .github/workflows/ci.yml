@@ -36,7 +36,7 @@ jobs:
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
-        f cargo clippy --tests --benches -- -D warnings
+        zk f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
@@ -57,7 +57,7 @@ jobs:
       run: zk test rust
 
     - name: zksync-crypto-tests
-      run: pushd sdk/zksync-crypto && f cargo test --release
+      run: pushd sdk/zksync-crypto && zk f cargo test --release
 
     services:
       geth:

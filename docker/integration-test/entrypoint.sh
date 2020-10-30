@@ -13,21 +13,21 @@ zk dummy-prover enable --no-redeploy
 zk init
 
 # Compile required dependencies
-f cargo build --bin zksync_server --release
-f cargo build --bin dummy_prover --release
-f cargo build --bin dev-ticker-server --release
+zk f cargo build --bin zksync_server --release
+zk f cargo build --bin dummy_prover --release
+zk f cargo build --bin dev-ticker-server --release
 
 # Launch binaries
 echo "Launching dev-ticker-server..."
-nohup f $ZKSYNC_HOME/target/release/dev-ticker-server &>/dev/null &
+nohup zk f $ZKSYNC_HOME/target/release/dev-ticker-server &>/dev/null &
 sleep 1
 
 echo "Launching server..."
-nohup f $ZKSYNC_HOME/target/release/zksync_server &>$ZKSYNC_HOME/server.log &
+nohup zk f $ZKSYNC_HOME/target/release/zksync_server &>$ZKSYNC_HOME/server.log &
 sleep 1
 
 echo "Launching dummy-prover..."
-nohup f $ZKSYNC_HOME/target/release/dummy_prover "dummy-prover-instance" &>$ZKSYNC_HOME/dummy_prover.log &
+nohup zk f $ZKSYNC_HOME/target/release/dummy_prover "dummy-prover-instance" &>$ZKSYNC_HOME/dummy_prover.log &
 
 # Wait for server to start
 sleep 10

@@ -19,13 +19,13 @@ fi
 
 zk run plonk-setup
 zk run verify-keys unpack
-f db-wait
+zk db wait
 
 COMMAND=$1
 
 case $COMMAND in
   init)
-    f db-setup
+    zk db setup
     echo "Database set up"
     exit 0
     ;;

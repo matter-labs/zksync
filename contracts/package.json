@@ -31,7 +31,7 @@
   "scripts": {
     "build-dev": "waffle .waffle-dev.json",
     "build": "waffle .waffle.json",
-    "test": "yarn build && f mocha -r ts-node/register test/**/*.ts",
+    "test": "yarn build && zk f mocha -r ts-node/register test/**/*.ts",
     "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
     "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",
     "unit-test-watch": "yarn build && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
