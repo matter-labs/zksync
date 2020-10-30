@@ -13,6 +13,7 @@ use std::{
 };
 // External uses
 use anyhow::format_err;
+use crypto::{digest::Digest, sha2::Sha256};
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
@@ -416,11 +417,17 @@ impl<T: Transport> EthWatch<T> {
         message: Vec<u8>,
         signature: EIP1271Signature,
     ) -> Result<bool, anyhow::Error> {
+        let mut hash = [0u8; 32];
+
+        let mut hasher = Sha256::new();
+        hasher.input(&message);
+        hasher.result(&mut hash);
+
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
                 "isValidSignature",
-                (message, signature.0),
+                (hash, signature.0),
                 None,
                 Options::default(),
                 None,
