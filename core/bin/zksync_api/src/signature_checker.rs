@@ -173,7 +173,7 @@ async fn verify_eth_signature_single_tx(
 }
 
 async fn verify_eth_signature_txs_batch(
-    txs: &Vec<TxWithSignData>,
+    txs: &[TxWithSignData],
     eth_sign_data: &EthSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {

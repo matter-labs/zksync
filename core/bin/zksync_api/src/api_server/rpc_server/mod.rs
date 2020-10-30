@@ -567,9 +567,9 @@ async fn verify_tx_info_message_signature(
 }
 
 async fn veryfy_txs_batch_signature(
-    batch: &Vec<TxWithSignature>,
+    batch: &[TxWithSignature],
     signature: TxEthSignature,
-    msgs_to_sign: &Vec<Option<String>>,
+    msgs_to_sign: &[Option<String>],
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
     let mut txs = Vec::with_capacity(batch.len());
