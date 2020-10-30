@@ -5574,7 +5574,6 @@ dependencies = [
  "futures 0.3.6",
  "log 0.4.11",
  "num",
- "rust-crypto",
  "serde",
  "serde_json",
  "thiserror",
