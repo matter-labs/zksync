@@ -117,7 +117,6 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
-    #[allow(dead_code)]
     pub(crate) async fn confirm_operation(
         &mut self,
         block_number: BlockNumber,
