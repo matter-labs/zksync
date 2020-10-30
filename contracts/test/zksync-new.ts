@@ -57,7 +57,7 @@ describe("Token", function () {
         };
 
         const blocks = [];
-        for (let i = 0; i < 5; ++i) {
+        for (let i = 0; i < 2; ++i) {
             blocks.push({
                     blockNumber: 2+i,
                     feeAccount: 0,
@@ -67,8 +67,27 @@ describe("Token", function () {
                 });
         }
 
-        const tx = await zkSync.commitBlocks(oneBlockStored, blocks);
-        const receipt = await tx.wait();
-        console.log(receipt.gasUsed.toString());
+        let tx = await zkSync.commitBlocks(oneBlockStored, blocks);
+        let receipt = await tx.wait();
+        console.log("commit", receipt.gasUsed.toString());
+
+        for (let i = 0; i < 2; ++i) {
+            const blockData = blocks[i];
+            blocks[i] = {
+                storedBlock: {
+                blockNumber: blockData.blockNumber,
+                processableOnchainOperationsHash: ethers.utils.keccak256("0x"),
+                stateHash: ethers.constants.HashZero,
+                commitment: ethers.constants.HashZero,
+              },
+              onchainOpsPubdata: [],
+                commitmentsInSlot: [ethers.utils.keccak256("0x")],
+                commitmentIndex: 0,
+            };
+        }
+
+        tx = await zkSync.executeBlocks(blocks);
+        receipt = await tx.wait();
+        console.log("execute", receipt.gasUsed.toString());
     });
 });

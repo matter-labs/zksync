@@ -258,49 +258,97 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalBlocksCommitted += uint32(_newBlocksData.length);
     }
 
-    struct ExecutableOnchainOperations {
-        bytes publicData;
+    struct ExecuteBlockInfo {
+        StoredBlockInfo storedBlock;
+        bytes[] onchainOpsPubdata;
+        bytes32[] commitmentsInSlot;
+        uint256 commitmentIndex;
     }
 
-    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
-    function executeBlock(
-        StoredBlockInfo memory _blockData,
-        ExecutableOnchainOperations[] memory _executableOnchainOperations
-    ) external nonReentrant {
-        requireActive();
-        require(hashStoredBlockInfo(_blockData) == hashedBlocks[totalBlocksVerified + 1], "fck10"); // incorrect previous block data
-        governance.requireActiveValidator(msg.sender);
+    function withdrawOrStore(uint16 _tokenId, address _recipient, uint128 _amount) internal {
+        bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
 
-        // todo: check proof
+        bool sent = false;
+        if (_tokenId == 0) {
+            address payable toPayable = address(uint160(_recipient));
+            sent = Utils.sendETHNoRevert(toPayable, _amount);
+        } else {
+            address tokenAddr = governance.tokenAddresses(_tokenId);
+            // we can just check that call not reverts because it wants to withdraw all amount
+            try this.withdrawERC20Guarded{gas: ERC20_WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
+                sent = true;
+            } catch {
+                sent = false;
+            }
+        }
+        if (!sent) {
+            incrementBalanceToWithdraw(_tokenId, _recipient, _amount);
+        }
+    }
 
-        for (uint32 i = 0; i < _executableOnchainOperations.length; ++i) {
-            bytes memory pubData = _executableOnchainOperations[i].publicData;
+    function incrementBalanceToWithdraw(uint16 _tokenId, address _recipient, uint128 _amount) internal {
+        bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
+        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+        balancesToWithdraw[packedBalanceKey] = BalanceToWithdraw(balance.add(_amount), 0xff);
+    }
+
+    function executeOneBlock(
+        ExecuteBlockInfo memory _blockExecuteData,
+        uint32 executedBlockIdx
+    ) internal returns (uint32 priorityRequestsExecuted) {
+//        require(hashStoredBlockInfo(_blockData) == hashedBlocks[totalBlocksVerified + 1 + executedBlockIdx], "exe10"); // incorrect previous block data
+//        require(hashedVerifiedCommitments[keccak256(abi.encode(_blockExecuteData.commitmentsInSlot))], "exe11"); // commitments verified
+//        require(_blockExecuteData.commitmentsInSlot[_blockExecuteData.commitmentsIndex] == _blockData.commitment, "exe12"); // block commitment incorrect
+
+        priorityRequestsExecuted = 0;
+        bytes32 processableOnchainOpsHash = EMPTY_STRING_KECCAK;
+        for (uint32 i = 0; i < _blockExecuteData.onchainOpsPubdata.length; ++i) {
+            bytes memory pubData = _blockExecuteData.onchainOpsPubdata[i];
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[0]));
 
             if (opType == Operations.OpType.Deposit) {
-                firstPriorityRequestId++;
-                totalCommittedPriorityRequests--;
+                ++priorityRequestsExecuted;
             } else if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData, 0);
+                withdrawOrStore(op.tokenId, op.owner, op.amount);
 
-                // todo: try withdraw here
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData, 0);
+                withdrawOrStore(op.tokenId, op.target, op.amount);
 
-                // todo: try withdraw here
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
+                incrementBalanceToWithdraw(fullExitData.tokenId, fullExitData.owner, fullExitData.amount);
 
-                firstPriorityRequestId++;
-                totalCommittedPriorityRequests--;
+                ++priorityRequestsExecuted;
             } else {
-                revert("fpp14"); // unsupported op
+                revert("exe13"); // unsupported op in block execution
             }
+
+            processableOnchainOpsHash = keccak256(abi.encodePacked(processableOnchainOpsHash, pubData));
+        }
+        require(processableOnchainOpsHash == _blockExecuteData.storedBlock.processableOnchainOperationsHash, "exe13"); // incorrect onchain ops executed
+    }
+
+    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
+    function executeBlocks(
+        ExecuteBlockInfo[] memory _blocksData
+    ) external nonReentrant {
+        requireActive();
+        governance.requireActiveValidator(msg.sender);
+
+        uint32 priorityRequestsExecuted = 0;
+        uint32 nBlocks = uint32(_blocksData.length);
+        for (uint32 i = 0; i < nBlocks; ++i) {
+            priorityRequestsExecuted += executeOneBlock(_blocksData[i], i);
         }
 
-        --totalBlocksCommitted;
-        ++totalBlocksVerified;
+        firstPriorityRequestId += priorityRequestsExecuted;
+        totalCommittedPriorityRequests -= priorityRequestsExecuted;
+
+        totalBlocksCommitted -= nBlocks;
+        totalBlocksVerified += nBlocks;
     }
 
     /// @notice Block verification.

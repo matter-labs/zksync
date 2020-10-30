@@ -31,7 +31,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     "commitBlocks(tuple,tuple[])": FunctionFragment;
     "depositERC20(address,uint104,address)": FunctionFragment;
     "depositETH(address)": FunctionFragment;
-    "executeBlock(tuple,tuple[])": FunctionFragment;
+    "executeBlocks(tuple[])": FunctionFragment;
     "exit(uint32,uint16,uint128,uint256[])": FunctionFragment;
     "exited(uint32,uint16)": FunctionFragment;
     "exodusMode()": FunctionFragment;
@@ -114,15 +114,19 @@ interface ZkSyncInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "depositETH", values: [string]): string;
   encodeFunctionData(
-    functionFragment: "executeBlock",
+    functionFragment: "executeBlocks",
     values: [
       {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      { publicData: BytesLike }[]
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[]
     ]
   ): string;
   encodeFunctionData(
@@ -279,7 +283,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "depositETH", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "executeBlock",
+    functionFragment: "executeBlocks",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "exit", data: BytesLike): Result;
@@ -598,25 +602,33 @@ export class ZkSync extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    executeBlock(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    executeBlocks(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "executeBlock(tuple,tuple[])"(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    "executeBlocks(tuple[])"(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -1165,25 +1177,33 @@ export class ZkSync extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  executeBlock(
-    _blockData: {
-      blockNumber: BigNumberish;
-      processableOnchainOperationsHash: BytesLike;
-      stateHash: BytesLike;
-      commitment: BytesLike;
-    },
-    _executableOnchainOperations: { publicData: BytesLike }[],
+  executeBlocks(
+    _blocksData: {
+      storedBlock: {
+        blockNumber: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      };
+      onchainOpsPubdata: BytesLike[];
+      commitmentsInSlot: BytesLike[];
+      commitmentIndex: BigNumberish;
+    }[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "executeBlock(tuple,tuple[])"(
-    _blockData: {
-      blockNumber: BigNumberish;
-      processableOnchainOperationsHash: BytesLike;
-      stateHash: BytesLike;
-      commitment: BytesLike;
-    },
-    _executableOnchainOperations: { publicData: BytesLike }[],
+  "executeBlocks(tuple[])"(
+    _blocksData: {
+      storedBlock: {
+        blockNumber: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      };
+      onchainOpsPubdata: BytesLike[];
+      commitmentsInSlot: BytesLike[];
+      commitmentIndex: BigNumberish;
+    }[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1620,25 +1640,33 @@ export class ZkSync extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    executeBlock(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    executeBlocks(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "executeBlock(tuple,tuple[])"(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    "executeBlocks(tuple[])"(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -2099,25 +2127,33 @@ export class ZkSync extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    executeBlock(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    executeBlocks(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "executeBlock(tuple,tuple[])"(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    "executeBlocks(tuple[])"(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -2503,25 +2539,33 @@ export class ZkSync extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    executeBlock(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    executeBlocks(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "executeBlock(tuple,tuple[])"(
-      _blockData: {
-        blockNumber: BigNumberish;
-        processableOnchainOperationsHash: BytesLike;
-        stateHash: BytesLike;
-        commitment: BytesLike;
-      },
-      _executableOnchainOperations: { publicData: BytesLike }[],
+    "executeBlocks(tuple[])"(
+      _blocksData: {
+        storedBlock: {
+          blockNumber: BigNumberish;
+          processableOnchainOperationsHash: BytesLike;
+          stateHash: BytesLike;
+          commitment: BytesLike;
+        };
+        onchainOpsPubdata: BytesLike[];
+        commitmentsInSlot: BytesLike[];
+        commitmentIndex: BigNumberish;
+      }[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

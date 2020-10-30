@@ -8,7 +8,7 @@ pragma solidity ^0.7.0;
 contract Config {
 
     /// @dev ERC20 token withdrawal gas limit, used only for complete withdrawals
-    uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 250000;
+    uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 50000;
 
     /// @dev ETH token withdrawal gas limit, used only for complete withdrawals
     uint256 constant ETH_WITHDRAWAL_GAS_LIMIT = 10000;
