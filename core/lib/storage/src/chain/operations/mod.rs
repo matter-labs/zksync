@@ -135,8 +135,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Stores the executed operation in the database.
-    pub(crate) async fn store_executed_operation(
+    /// Stores the executed transaction in the database.
+    pub(crate) async fn store_executed_tx(
         &mut self,
         operation: NewExecutedTransaction,
     ) -> QueryResult<()> {
@@ -204,7 +204,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
-    pub(crate) async fn store_executed_priority_operation(
+    pub(crate) async fn store_executed_priority_op(
         &mut self,
         operation: NewExecutedPriorityOperation,
     ) -> QueryResult<()> {

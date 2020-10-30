@@ -86,9 +86,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 ExecutedOperations::Tx(tx) => {
                     // Store the executed operation in the corresponding schema.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
-                    OperationsSchema(self.0)
-                        .store_executed_operation(new_tx)
-                        .await?;
+                    OperationsSchema(self.0).store_executed_tx(new_tx).await?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     // For priority operation we should only store it in the Operations schema.
@@ -97,7 +95,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         block_number,
                     );
                     OperationsSchema(self.0)
-                        .store_executed_priority_operation(new_priority_op)
+                        .store_executed_priority_op(new_priority_op)
                         .await?;
                 }
             }
