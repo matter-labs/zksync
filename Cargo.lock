@@ -5501,6 +5501,7 @@ dependencies = [
  "lru-cache",
  "num",
  "reqwest",
+ "rust-crypto",
  "serde",
  "serde_json",
  "thiserror",
