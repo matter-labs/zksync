@@ -55,31 +55,6 @@ On debian-based linux:
 sudo apt-get install axel
 ```
 
-## `gnu-sed`
-
-On mac:
-
-```sh
-brew install gnu-sed
-```
-
-On linux `sed` is available by default in most cases.
-
-## `Envsubst` (to transpile k8s `yaml` files)
-
-On mac:
-
-```sh
-brew install gettext
-brew link --force gettext 
-```
-
-On debian-based linux it should be available by default, if not, run:
-
-```sh
-sudo apt-get install gettext
-```
-
 ## `Rust`
 
 Install the latest `rust` version.
@@ -104,20 +79,6 @@ rustflags = [
 ]
 ```
 **Warning:** This is only viable for linux since `lld` doesn't work on mac.
-
-# `JQ`
-
-`jq` is used to work with JSON when managing DigitalOcean.
-
-On mac:
-
-```brew install jq```
-
-On debian-based linux:
-
-```sh
-sudo apt-get install jq
-```
 
 # PSQL
 
@@ -186,29 +147,3 @@ export PATH=$ZKSYNC_HOME/bin:$PATH
 # If you're like me, uncomment:
 # cd $ZKSYNC_HOME
 ```
-
-Autocomplete configuration:
-
-- `bash`:
-
-  ```sh
-  complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $ZKSYNC_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//'\`" zksync
-  ```
-
-- `zsh`:
-
-  ```sh
-  echo "fpath=(~/.zsh_comp $fpath)" >> ~/.zshrc
-  
-  mkdir -p ~/.zsh_comp
-  ```
-
-  add `~/.zsh_comp/_zksync`:
-
-  ```sh
-  #compdef zksync
-  
-  cmds=( ${(uf)"$(grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $ZKSYNC_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//')"} )
-  
-  _describe 'zksync make cmds' cmds
-  ```

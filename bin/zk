@@ -1,3 +1,9 @@
 #!/bin/bash
 
-yarn --silent --cwd $ZKSYNC_HOME/infrastructure/zk start $@
+cd $ZKSYNC_HOME/infrastructure/zk
+
+if [ -z $@ ]; then
+    yarn && yarn build
+else
+    yarn --silent start $@
+fi

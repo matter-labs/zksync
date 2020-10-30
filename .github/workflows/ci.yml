@@ -28,7 +28,7 @@ jobs:
         docker pull matterlabs/ci-integration-test:latest
 
     - name: zk
-      run: pushd infrastructure/zk && yarn && yarn build
+      run: zk
 
     - name: lints
       run: |
