@@ -29,7 +29,7 @@ export async function drop() {
 export async function migrate() {
     await utils.confirmAction();
     console.log('Running migrations...');
-    await utils.exec('cd core/storage && diesel migration run');
+    await utils.exec('cd core/lib/storage && diesel migration run');
 }
 
 export async function setup() {

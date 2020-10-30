@@ -2,6 +2,7 @@
 // If the completion script is installed, there is no need to update it after adding a new subcommand
 
 import { Command, Option } from 'commander';
+import * as utils from './utils';
 import tabtab from 'tabtab';
 
 type CommandInfo = {
@@ -60,6 +61,11 @@ export function command(program: Command) {
                 name: 'zk',
                 completer: 'zk'
             });
+            utils.replaceInFile(
+                `${process.env.HOME}/.config/tabtab/zk.bash`,
+                'zk completion --',
+                'zk completion'
+            );
         });
 
     completion
