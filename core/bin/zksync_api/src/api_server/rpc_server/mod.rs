@@ -569,7 +569,7 @@ async fn verify_tx_info_message_signature(
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx_variant: TxVariant::Tx(tx.clone()),
+        tx: TxVariant::Tx(tx.clone()),
         eth_sign_data,
         response: sender,
     };
@@ -594,7 +594,7 @@ async fn veryfy_txs_batch_signature(
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx_variant: TxVariant::Batch(txs),
+        tx: TxVariant::Batch(txs),
         eth_sign_data,
         response: sender,
     };

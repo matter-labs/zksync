@@ -74,19 +74,8 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
             match batch_id {
                 Some(batch_id) => {
-                    let eth_signature = sqlx::query!(
-                        "SELECT eth_signature FROM mempool_batches_signatures
-                        WHERE batch_id = $1",
-                        batch_id
-                    )
-                    .fetch_optional(self.0.conn())
-                    .await?;
-                    let eth_signature: Option<TxEthSignature> = match eth_signature {
-                        Some(value) => Some(serde_json::from_value(value.eth_signature)?),
-                        None => None,
-                    };
                     // Group of batched transactions.
-                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id, eth_signature);
+                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id, None);
                     txs.push(variant);
                 }
                 None => {
@@ -97,6 +86,23 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                         .collect();
                     txs.append(&mut variants);
                 }
+            }
+        }
+
+        for tx in &mut txs {
+            if let SignedTxVariant::Batch(batch) = tx {
+                let eth_signature = sqlx::query!(
+                    "SELECT eth_signature FROM mempool_batches_signatures
+                    WHERE batch_id = $1",
+                    batch.batch_id
+                )
+                .fetch_optional(self.0.conn())
+                .await?;
+
+                batch.eth_signature = match eth_signature {
+                    Some(value) => Some(serde_json::from_value(value.eth_signature)?),
+                    None => None,
+                };
             }
         }
 

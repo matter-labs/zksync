@@ -42,8 +42,8 @@ impl VerifiedTx {
     ) -> Result<Self, TxAddError> {
         verify_eth_signature(&request, eth_checker)
             .await
-            .and_then(|_| verify_tx_correctness(&mut request.tx_variant))
-            .map(|_| match &request.tx_variant {
+            .and_then(|_| verify_tx_correctness(&mut request.tx))
+            .map(|_| match &request.tx {
                 TxVariant::Tx(tx) => Self(Some(SignedZkSyncTx {
                     tx: tx.clone(),
                     eth_sign_data: request.eth_sign_data.clone(),
@@ -68,7 +68,7 @@ async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
-    if let TxVariant::Tx(tx) = &request.tx_variant {
+    if let TxVariant::Tx(tx) = &request.tx {
         // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
         if let ZkSyncTx::ChangePubKey(change_pk) = tx {
             if change_pk.eth_signature.is_none() {
@@ -91,7 +91,7 @@ async fn verify_eth_signature(
 
     // Check the signature.
     if let Some(sign_data) = &request.eth_sign_data {
-        let tx = match &request.tx_variant {
+        let tx = match &request.tx {
             TxVariant::Tx(tx) => tx,
             TxVariant::Batch(batch) => batch.first().unwrap(),
         };
@@ -106,7 +106,7 @@ async fn verify_eth_signature(
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
-                let message = match &request.tx_variant {
+                let message = match &request.tx {
                     TxVariant::Tx(_) => format!(
                         "\x19Ethereum Signed Message:\n{}{}",
                         sign_data.message.len(),
@@ -133,8 +133,8 @@ async fn verify_eth_signature(
 
 /// Verifies the correctness of the ZKSync transaction (including the
 /// signature check).
-fn verify_tx_correctness(tx_variant: &mut TxVariant) -> Result<(), TxAddError> {
-    match tx_variant {
+fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
+    match tx {
         TxVariant::Tx(tx) => {
             if !tx.check_correctness() {
                 return Err(TxAddError::IncorrectTx);
@@ -152,7 +152,7 @@ fn verify_tx_correctness(tx_variant: &mut TxVariant) -> Result<(), TxAddError> {
 /// Request for the signature check.
 #[derive(Debug)]
 pub struct VerifyTxSignatureRequest {
-    pub tx_variant: TxVariant,
+    pub tx: TxVariant,
     /// `eth_sign_data` is a tuple of the Ethereum signature and the message
     /// which user should have signed with their private key.
     /// Can be `None` if the Ethereum signature is not required.
