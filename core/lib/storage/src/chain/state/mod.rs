@@ -164,6 +164,9 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     }
 
     /// Applies the previously stored list of account changes to the stored state.
+    ///
+    /// This method is invoked from the `zksync_eth_sender` after corresponding `Verify` transaction
+    /// is confirmed on Ethereum blockchain.
     pub async fn apply_state_update(&mut self, block_number: u32) -> QueryResult<()> {
         log::info!("Applying state update for block: {}", block_number);
 
