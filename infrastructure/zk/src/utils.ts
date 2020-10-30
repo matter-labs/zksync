@@ -59,6 +59,9 @@ export async function sleep(seconds: number) {
     return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 }
 
+// the sync version of sleep is needed
+// for process.on('exit') hook, which MUST be synchronous.
+// no idea why it has to be so ugly, though
 export function sleepSync(seconds: number) {
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
 }
@@ -84,6 +87,7 @@ export function replaceInFile(filename: string, before: string | RegExp, after: 
     modifyFile(filename, (source) => source.replace(before, after));
 }
 
+// performs an operation on the content of `filename`
 export function modifyFile(filename: string, modifier: (s: string) => string) {
     const source = fs.readFileSync(filename).toString();
     fs.writeFileSync(filename, modifier(source));

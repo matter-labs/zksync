@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import * as utils from './utils';
 
 export function get() {
-    fs.readdirSync('etc/env').forEach(file => {
+    fs.readdirSync('etc/env').forEach((file) => {
         if (file.endsWith('.bak') || file.endsWith('example') || file == 'current') {
             return;
         }
@@ -37,6 +37,8 @@ export function set(env: string) {
     get();
 }
 
+// we have to manually override the environment
+// because dotenv won't override variables that are already set
 function override() {
     const envFile = process.env.ENV_FILE as string;
     const env = dotenv.parse(fs.readFileSync(envFile));

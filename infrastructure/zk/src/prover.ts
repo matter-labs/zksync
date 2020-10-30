@@ -20,6 +20,7 @@ export async function prover(totalProvers: number) {
         process.exit();
     });
 
+    // now we have to just wait for ctrl+c
     while (true) await utils.sleep(1000);
 }
 

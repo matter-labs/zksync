@@ -1,3 +1,6 @@
+// This file is responsible for generating shell completion
+// If the completion script is installed, there is no need to update it after adding a new subcommand
+
 import { Command, Option } from 'commander';
 import tabtab from 'tabtab';
 
@@ -17,6 +20,8 @@ function commandInfo(cmd: Command): CommandInfo {
     };
 }
 
+// this actually completes the current subcommand
+// see `tabtab` docs for a better understanding
 function completer(env: any, info: CommandInfo) {
     if (!env.complete) return;
     if (env.prev == info.command) {
@@ -34,6 +39,9 @@ function completer(env: any, info: CommandInfo) {
     info.subcommands.map((subcmd) => completer(env, subcmd));
 }
 
+// the commant `completion` without subcommands
+// is only meant to be used internally by the completion
+// engine of the shell and not by actual users.
 export function command(program: Command) {
     // prettier-ignore
     const completion = new Command('completion')

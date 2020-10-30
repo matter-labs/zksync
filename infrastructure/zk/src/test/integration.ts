@@ -14,22 +14,25 @@ export async function withServer(testSuite: () => Promise<void>, timeout: number
     await utils.spawn('cargo build --bin dummy_prover --release');
 
     const serverLog = fs.openSync('server.log', 'w');
-    const server = utils.background('cargo run --bin zksync_server --release', [0, serverLog, serverLog]);
+    const server = utils.background(
+        'cargo run --bin zksync_server --release',
+        [0, serverLog, serverLog] // redirect stdout and stderr to server.log
+    );
     await utils.sleep(1);
 
     const proverLog = fs.openSync('dummy_prover.log', 'w');
-    // prettier-ignore
     const prover = utils.background(
         'cargo run --bin dummy_prover --release dummy-prover-instance',
-        [0, proverLog, proverLog]
+        [0, proverLog, proverLog] // redirect stdout and stderr to dummy_prover.log
     );
     await utils.sleep(10);
 
+    // set a timeout in case tests hang
     const timer = setTimeout(() => {
         console.log('Timeout reached!');
         process.exit(1);
     }, timeout * 1000);
-    timer.unref();
+    timer.unref(); // this is here to make sure process does not wait for timeout to fire
 
     // for unknown reason, when ctrl+c is pressed, the exit hook
     // is only triggered after the current process has exited,
@@ -49,19 +52,28 @@ export async function withServer(testSuite: () => Promise<void>, timeout: number
         process.exit(143);
     });
 
+    // this code runs when tests finish or fail,
+    // ctrl+c is pressed an or external kill signal is received
     process.on('exit', (code) => {
         console.log('Termination started...');
+        // sleeps are here to let every process finish its work
         utils.sleepSync(5);
+        // server or prover might also crash, so killing may be unsuccessful
+        // but we still want to see the logs in this case.
+        // using process.kill(-child.pid) and not child.kill() along with the fact than 
+        // child is detached guarantees that processes are killed recursively (by group id)
         utils.allowFailSync(() => process.kill(-server.pid, 'SIGKILL'));
         utils.allowFailSync(() => process.kill(-prover.pid, 'SIGKILL'));
         utils.allowFailSync(() => clearTimeout(timer));
         if (code !== 0) {
+            // we only wan't to see the logs if something's wrong
             run.catLogs();
         }
         utils.sleepSync(5);
     });
 
     await testSuite();
+    // without this, process hangs even though timeout is .unref()'d and tests finished sucessfully
     process.exit(0);
 }
 
@@ -84,6 +96,7 @@ export async function all() {
     await api();
     await zcli();
     await rustSDK();
+    // have to kill server before running data-restore
     await utils.spawn('killall zksync_server');
     await run.dataRestore.checkExisting();
 }
@@ -112,9 +125,14 @@ export async function testkit(command: string) {
     }
     process.on('SIGINT', () => {
         console.log('interrupt received');
+        // we have to emit this manually, as SIGINT is considered explicit termination
         process.emit('beforeExit', 130);
     });
 
+    // since we HAVE to make an async call upon exit,
+    // the only solution is to use beforeExit hook
+    // but be careful! this is not called upon explicit termination
+    // e.g. on SIGINT or process.exit()
     process.on('beforeExit', async (code) => {
         if (process.env.ZKSYNC_ENV == 'dev') {
             try {
@@ -123,6 +141,7 @@ export async function testkit(command: string) {
                 console.error('Problem killing', containerID);
             }
             process.env.WEB3_URL = prevUrl;
+            // this has to be here - or else we will call this hook again
             process.exit(code);
         }
     });

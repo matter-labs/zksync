@@ -14,7 +14,6 @@ import { command as run } from './run/run';
 import { command as test } from './test/test';
 import { command as docker } from './docker';
 import { command as completion } from './completion';
-
 import * as env from './env';
 
 async function main() {

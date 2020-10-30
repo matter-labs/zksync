@@ -45,8 +45,8 @@ async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: strin
 async function checkEnv() {
     await utils.exec('which node');
     const { stdout: version } = await utils.exec('node --version');
-    if ('v10.20' >= version) {
-        throw new Error('Error, node.js version 10.20.1 or higher is required');
+    if ('v14' >= version) {
+        throw new Error('Error, node.js version 14 or higher is required');
     }
     await utils.exec('which yarn');
     await utils.exec('which docker');
