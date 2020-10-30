@@ -28,6 +28,7 @@ use tokio::task::JoinHandle;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
+    tx::TxEthSignature,
     AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
@@ -105,7 +106,11 @@ pub enum MempoolRequest {
     /// be either executed successfully, or otherwise fail all together.
     /// Invariants for each individual transaction in the batch are the same as in
     /// `NewTx` variant of this enum.
-    NewTxsBatch(Vec<SignedZkSyncTx>, oneshot::Sender<Result<(), TxAddError>>),
+    NewTxsBatch(
+        Vec<SignedZkSyncTx>,
+        Option<TxEthSignature>,
+        oneshot::Sender<Result<(), TxAddError>>,
+    ),
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -270,7 +275,11 @@ impl Mempool {
         self.mempool_state.add_tx(tx)
     }
 
-    async fn add_batch(&mut self, txs: Vec<SignedZkSyncTx>) -> Result<(), TxAddError> {
+    async fn add_batch(
+        &mut self,
+        txs: Vec<SignedZkSyncTx>,
+        eth_signature: Option<TxEthSignature>,
+    ) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -279,6 +288,7 @@ impl Mempool {
         let mut batch: SignedTxsBatch = SignedTxsBatch {
             txs: txs.clone(),
             batch_id: 0, // Will be determined after inserting to the database
+            eth_signature: eth_signature.clone(),
         };
 
         if self.mempool_state.chunks_for_batch(&batch) > self.max_block_size_chunks {
@@ -302,7 +312,7 @@ impl Mempool {
         let batch_id = transaction
             .chain()
             .mempool_schema()
-            .insert_batch(&batch.txs)
+            .insert_batch(&batch.txs, eth_signature.as_ref())
             .await
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);
@@ -325,8 +335,8 @@ impl Mempool {
                     let tx_add_result = self.add_tx(*tx).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
-                MempoolRequest::NewTxsBatch(txs, resp) => {
-                    let tx_add_result = self.add_batch(txs).await;
+                MempoolRequest::NewTxsBatch(txs, eth_signature, resp) => {
+                    let tx_add_result = self.add_batch(txs, eth_signature).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {

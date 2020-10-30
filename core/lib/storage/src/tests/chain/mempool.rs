@@ -168,15 +168,21 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         MempoolSchema(&mut storage).insert_tx(tx).await?;
     }
 
-    MempoolSchema(&mut storage).insert_batch(batch_1).await?;
+    MempoolSchema(&mut storage)
+        .insert_batch(batch_1, None)
+        .await?;
 
-    MempoolSchema(&mut storage).insert_batch(batch_2).await?;
+    MempoolSchema(&mut storage)
+        .insert_batch(batch_2, None)
+        .await?;
 
     for tx in alone_txs_2 {
         MempoolSchema(&mut storage).insert_tx(tx).await?;
     }
 
-    MempoolSchema(&mut storage).insert_batch(batch_3).await?;
+    MempoolSchema(&mut storage)
+        .insert_batch(batch_3, None)
+        .await?;
 
     // Load the txs and check that they match the expected list.
     let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
