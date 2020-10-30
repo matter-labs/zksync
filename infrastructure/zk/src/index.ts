@@ -14,6 +14,7 @@ import { command as run } from './run/run';
 import { command as test } from './test/test';
 import { command as docker } from './docker';
 import { command as completion } from './completion';
+import { command as f } from './f';
 import * as env from './env';
 
 async function main() {
@@ -43,6 +44,7 @@ async function main() {
         .addCommand(run)
         .addCommand(test)
         .addCommand(docker)
+        .addCommand(f)
         .addCommand(env.command)
         .addCommand(completion(program as Command));
 

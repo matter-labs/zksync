@@ -107,6 +107,6 @@ command
     .command('loadtest [options...]')
     .description('run the loadtest')
     .allowUnknownOption()
-    .action(async (...options: string[]) => {
-        await loadtest(...options[0]);
+    .action(async (options: string[]) => {
+        await loadtest(...options);
     });

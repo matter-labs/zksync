@@ -65,6 +65,6 @@ command
     .command('circuit [threads] [test_name] [options...]')
     .description('run unit-tests for the circuit')
     .allowUnknownOption()
-    .action(async (threads: number | null, testName: string | null, ...options: string[]) => {
-        await circuit(threads || 1, testName || '', ...options[0]);
+    .action(async (threads: number | null, testName: string | null, options: string[]) => {
+        await circuit(threads || 1, testName || '', ...options);
     });
