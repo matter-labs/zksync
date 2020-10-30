@@ -2,7 +2,7 @@
 
 cd $ZKSYNC_HOME/infrastructure/zk
 
-if [ -z $@ ]; then
+if [ -z "$1" ]; then
     yarn && yarn build
 else
     yarn --silent start $@
