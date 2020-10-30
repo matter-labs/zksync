@@ -25,6 +25,7 @@ use zksync_types::{
 use crate::{
     core_api_client::{CoreApiClient, EthBlockId},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
+    signature_checker::TxWithSignData,
     signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
     tx_error::TxAddError,
     utils::{shared_lru_cache::SharedLruCache, token_db_cache::TokenDBCache},
@@ -492,20 +493,6 @@ pub fn start_rpc_server(
     });
 }
 
-fn get_txs_batch_message_to_sign(txs: &Vec<ZkSyncTx>) -> String {
-    unsafe {
-        String::from_utf8_unchecked(
-            tiny_keccak::keccak256(
-                txs.iter()
-                    .flat_map(ZkSyncTx::get_bytes)
-                    .collect::<Vec<u8>>()
-                    .as_slice(),
-            )
-            .to_vec(),
-        )
-    }
-}
-
 fn rpc_message(error: TxAddError) -> Error {
     Error {
         code: RpcErrorCodes::from(error).into(),
@@ -569,8 +556,10 @@ async fn verify_tx_info_message_signature(
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Tx(tx.clone()),
-        eth_sign_data,
+        tx: TxVariant::Tx(TxWithSignData {
+            tx: tx.clone(),
+            eth_sign_data,
+        }),
         response: sender,
     };
 
@@ -578,24 +567,44 @@ async fn verify_tx_info_message_signature(
 }
 
 async fn veryfy_txs_batch_signature(
-    txs: &Vec<TxWithSignature>,
+    batch: &Vec<TxWithSignature>,
     signature: TxEthSignature,
+    msgs_to_sign: &Vec<Option<String>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
-    let txs = txs
-        .iter()
-        .map(|tx| tx.tx.clone())
-        .collect::<Vec<ZkSyncTx>>();
-    let eth_sign_data = Some(EthSignData {
-        signature,
-        message: get_txs_batch_message_to_sign(&txs),
-    });
+    let mut txs = Vec::with_capacity(batch.len());
+    for (tx, message) in batch.iter().zip(msgs_to_sign.iter()) {
+        let eth_sign_data = if let (Some(signature), Some(message)) = (&tx.signature, message) {
+            Some(EthSignData {
+                signature: signature.clone(),
+                message: message.clone(),
+            })
+        } else {
+            None
+        };
+        txs.push(TxWithSignData {
+            tx: tx.tx.clone(),
+            eth_sign_data,
+        });
+    }
+    let message = unsafe {
+        String::from_utf8_unchecked(
+            tiny_keccak::keccak256(
+                batch
+                    .iter()
+                    .flat_map(|tx| tx.tx.get_bytes())
+                    .collect::<Vec<u8>>()
+                    .as_slice(),
+            )
+            .to_vec(),
+        )
+    };
+    let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs),
-        eth_sign_data,
+        tx: TxVariant::Batch(txs, eth_sign_data),
         response: sender,
     };
 

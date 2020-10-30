@@ -5,7 +5,7 @@ use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
 use zksync_types::{
     tx::{TxEthSignature, TxHash},
-    Address, SignedZkSyncTx, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -176,7 +176,7 @@ impl RpcApp {
             sign_verify_channel,
         )
         .await?
-        .into_inner();
+        .unwrap_tx();
 
         let hash = tx.hash();
 
@@ -273,20 +273,26 @@ impl RpcApp {
         }
 
         let mut verified_txs = Vec::new();
+        let mut verified_signature = None;
+        let mut messages_to_sign = vec![];
+
+        for tx in &txs {
+            messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
+        }
 
         if let Some(signature) = eth_signature.clone() {
-            veryfy_txs_batch_signature(&txs, signature, self.sign_verify_request_sender.clone())
-                .await?;
-            verified_txs.extend(txs.iter().map(|tx| SignedZkSyncTx {
-                tx: tx.tx.clone(),
-                eth_sign_data: None,
-            }));
-        } else {
-            let mut messages_to_sign = vec![];
-            for tx in &txs {
-                messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
-            }
+            let (verified_batch, signature) = veryfy_txs_batch_signature(
+                &txs,
+                signature,
+                &messages_to_sign,
+                self.sign_verify_request_sender.clone(),
+            )
+            .await?
+            .unwrap_batch();
 
+            verified_signature = Some(signature);
+            verified_txs.extend(verified_batch.into_iter());
+        } else {
             for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.tx,
@@ -294,9 +300,10 @@ impl RpcApp {
                     msg_to_sign.clone(),
                     self.sign_verify_request_sender.clone(),
                 )
-                .await?;
+                .await?
+                .unwrap_tx();
 
-                verified_txs.push(verified_tx.into_inner());
+                verified_txs.push(verified_tx);
             }
         }
 
@@ -305,7 +312,7 @@ impl RpcApp {
         // Send verified transactions to the mempool.
         let tx_add_result = self
             .api_client
-            .send_txs_batch(verified_txs, eth_signature)
+            .send_txs_batch(verified_txs, verified_signature)
             .await
             .map_err(|_| Error {
                 code: RpcErrorCodes::Other.into(),

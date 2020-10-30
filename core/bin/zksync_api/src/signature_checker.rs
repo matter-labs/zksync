@@ -19,9 +19,23 @@ use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
+pub struct TxWithSignData {
+    pub tx: ZkSyncTx,
+    /// `eth_sign_data` is a tuple of the Ethereum signature and the message
+    /// which user should have signed with their private key.
+    /// Can be `None` if the Ethereum signature is not required.
+    pub eth_sign_data: Option<EthSignData>,
+}
+#[derive(Debug, Clone)]
 pub enum TxVariant {
-    Tx(ZkSyncTx),
-    Batch(Vec<ZkSyncTx>),
+    Tx(TxWithSignData),
+    Batch(Vec<TxWithSignData>, EthSignData),
+}
+
+#[derive(Debug, Clone)]
+pub enum SignedTxVariant {
+    Tx(SignedZkSyncTx),
+    Batch(Vec<SignedZkSyncTx>, TxEthSignature),
 }
 
 /// Wrapper on a `ZkSyncTx` which guarantees that
@@ -31,7 +45,7 @@ pub enum TxVariant {
 /// Underlying `ZkSyncTx` is a private field, thus no such
 /// object can be created without verification.
 #[derive(Debug, Clone)]
-pub struct VerifiedTx(Option<SignedZkSyncTx>);
+pub struct VerifiedTx(SignedTxVariant);
 
 impl VerifiedTx {
     /// Checks the transaction correctness by verifying its
@@ -44,22 +58,36 @@ impl VerifiedTx {
             .await
             .and_then(|_| verify_tx_correctness(&mut request.tx))
             .map(|_| match &request.tx {
-                TxVariant::Tx(tx) => Self(Some(SignedZkSyncTx {
-                    tx: tx.clone(),
-                    eth_sign_data: request.eth_sign_data.clone(),
+                TxVariant::Tx(tx) => Self(SignedTxVariant::Tx(SignedZkSyncTx {
+                    tx: tx.tx.clone(),
+                    eth_sign_data: tx.eth_sign_data.clone(),
                 })),
-                TxVariant::Batch(_) => Self(None),
+                TxVariant::Batch(txs, eth_sign_data) => {
+                    let txs = txs
+                        .iter()
+                        .map(|tx| SignedZkSyncTx {
+                            tx: tx.tx.clone(),
+                            eth_sign_data: tx.eth_sign_data.clone(),
+                        })
+                        .collect::<Vec<_>>();
+                    Self(SignedTxVariant::Batch(txs, eth_sign_data.signature.clone()))
+                }
             })
     }
 
     /// Takes the `ZkSyncTx` out of the wrapper.
-    pub fn into_inner(self) -> SignedZkSyncTx {
-        self.0.unwrap()
+    pub fn unwrap_tx(self) -> SignedZkSyncTx {
+        match self.0 {
+            SignedTxVariant::Tx(tx) => tx,
+            SignedTxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
+        }
     }
 
-    /// Takes reference to the inner `ZkSyncTx`.
-    pub fn inner(&self) -> &SignedZkSyncTx {
-        self.0.as_ref().unwrap()
+    pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, TxEthSignature) {
+        match self.0 {
+            SignedTxVariant::Batch(txs, eth_signature) => (txs, eth_signature),
+            SignedTxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
+        }
     }
 }
 
@@ -68,56 +96,69 @@ async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
-    if let TxVariant::Tx(tx) = &request.tx {
-        // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
-        if let ZkSyncTx::ChangePubKey(change_pk) = tx {
-            if change_pk.eth_signature.is_none() {
-                // Check that user is allowed to perform this operation.
-                let is_authorized = eth_checker
-                    .is_new_pubkey_hash_authorized(
-                        change_pk.account,
-                        change_pk.nonce,
-                        &change_pk.new_pk_hash,
-                    )
-                    .await
-                    .expect("Unable to check onchain ChangePubKey Authorization");
+    match &request.tx {
+        TxVariant::Tx(tx) => {
+            verify_eth_signature_single_tx(tx, eth_checker).await?;
+        }
+        TxVariant::Batch(txs, eth_sign_data) => {
+            verify_eth_signature_txs_batch(txs, eth_sign_data, eth_checker).await?;
+            for tx in txs {
+                verify_eth_signature_single_tx(tx, eth_checker).await?;
+            }
+        }
+    }
 
-                if !is_authorized {
-                    return Err(TxAddError::ChangePkNotAuthorized);
-                }
+    Ok(())
+}
+
+async fn verify_eth_signature_single_tx(
+    tx: &TxWithSignData,
+    eth_checker: &EthereumChecker<web3::transports::Http>,
+) -> Result<(), TxAddError> {
+    // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
+    if let ZkSyncTx::ChangePubKey(change_pk) = &tx.tx {
+        if change_pk.eth_signature.is_none() {
+            // Check that user is allowed to perform this operation.
+            let is_authorized = eth_checker
+                .is_new_pubkey_hash_authorized(
+                    change_pk.account,
+                    change_pk.nonce,
+                    &change_pk.new_pk_hash,
+                )
+                .await
+                .expect("Unable to check onchain ChangePubKey Authorization");
+
+            if !is_authorized {
+                return Err(TxAddError::ChangePkNotAuthorized);
             }
         }
     }
 
     // Check the signature.
-    if let Some(sign_data) = &request.eth_sign_data {
-        let tx = match &request.tx {
-            TxVariant::Tx(tx) => tx,
-            TxVariant::Batch(batch) => batch.first().unwrap(),
-        };
+    if let Some(sign_data) = &tx.eth_sign_data {
         match &sign_data.signature {
             TxEthSignature::EthereumSignature(packed_signature) => {
                 let signer_account = packed_signature
                     .signature_recover_signer(sign_data.message.as_bytes())
                     .or(Err(TxAddError::IncorrectEthSignature))?;
 
-                if signer_account != tx.account() {
+                if signer_account != tx.tx.account() {
                     return Err(TxAddError::IncorrectEthSignature);
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
-                let message = match &request.tx {
-                    TxVariant::Tx(_) => format!(
-                        "\x19Ethereum Signed Message:\n{}{}",
-                        sign_data.message.len(),
-                        &sign_data.message
-                    )
-                    .into_bytes(),
-                    TxVariant::Batch(_) => Vec::from(sign_data.message.as_bytes()),
-                };
+                let message = format!(
+                    "\x19Ethereum Signed Message:\n{}{}",
+                    sign_data.message.len(),
+                    &sign_data.message
+                );
 
                 let signature_correct = eth_checker
-                    .is_eip1271_signature_correct(tx.account(), message, signature.clone())
+                    .is_eip1271_signature_correct(
+                        tx.tx.account(),
+                        message.into_bytes(),
+                        signature.clone(),
+                    )
                     .await
                     .expect("Unable to check EIP1271 signature");
 
@@ -131,17 +172,52 @@ async fn verify_eth_signature(
     Ok(())
 }
 
+async fn verify_eth_signature_txs_batch(
+    txs: &Vec<TxWithSignData>,
+    eth_sign_data: &EthSignData,
+    eth_checker: &EthereumChecker<web3::transports::Http>,
+) -> Result<(), TxAddError> {
+    match &eth_sign_data.signature {
+        TxEthSignature::EthereumSignature(packed_signature) => {
+            let signer_account = packed_signature
+                .signature_recover_signer(&eth_sign_data.message.as_bytes())
+                .or(Err(TxAddError::IncorrectEthSignature))?;
+
+            if txs.iter().any(|tx| tx.tx.account() != signer_account) {
+                return Err(TxAddError::IncorrectEthSignature);
+            }
+        }
+        TxEthSignature::EIP1271Signature(signature) => {
+            let tx = txs.first().unwrap();
+            let signature_correct = eth_checker
+                .is_eip1271_signature_correct(
+                    tx.tx.account(),
+                    eth_sign_data.message.as_bytes().to_vec(),
+                    signature.clone(),
+                )
+                .await
+                .expect("Unable to check EIP1271 signature");
+
+            if !signature_correct {
+                return Err(TxAddError::IncorrectTx);
+            }
+        }
+    };
+
+    Ok(())
+}
+
 /// Verifies the correctness of the ZKSync transaction (including the
 /// signature check).
 fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
     match tx {
         TxVariant::Tx(tx) => {
-            if !tx.check_correctness() {
+            if !tx.tx.check_correctness() {
                 return Err(TxAddError::IncorrectTx);
             }
         }
-        TxVariant::Batch(batch) => {
-            if !batch.iter_mut().all(|tx| tx.check_correctness()) {
+        TxVariant::Batch(batch, _) => {
+            if !batch.iter_mut().all(|tx| tx.tx.check_correctness()) {
                 return Err(TxAddError::IncorrectTx);
             }
         }
@@ -153,10 +229,6 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
 #[derive(Debug)]
 pub struct VerifyTxSignatureRequest {
     pub tx: TxVariant,
-    /// `eth_sign_data` is a tuple of the Ethereum signature and the message
-    /// which user should have signed with their private key.
-    /// Can be `None` if the Ethereum signature is not required.
-    pub eth_sign_data: Option<EthSignData>,
     /// Channel for sending the check response.
     pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
 }
