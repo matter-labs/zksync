@@ -284,7 +284,7 @@ impl Monitor {
             .drain(..)
             .collect::<Vec<_>>();
 
-        log::debug!("Awaiting for verification, pending tasks {}", tasks.len());
+        log::trace!("Awaiting for verification, pending tasks {}", tasks.len());
 
         wait_all_chunks(CHUNK_SIZES, tasks).await;
     }
