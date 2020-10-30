@@ -25,7 +25,7 @@ use web3::{
 };
 // Workspace deps
 use zksync_config::ConfigurationOptions;
-use zksync_contracts::{eip1271_contract, zksync_contract};
+use zksync_contracts::zksync_contract;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
