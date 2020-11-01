@@ -276,7 +276,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn collect_garbage(&mut self) -> QueryResult<()> {
         let all_txs: Vec<_> = self.load_txs().await?.into_iter().collect();
         let mut tx_hashes_to_remove = Vec::new();
-        let mut batches_to_remove = Vec::new();
 
         for tx in all_txs {
             let should_remove = match &tx {
@@ -291,7 +290,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                         .is_some()
                 }
                 SignedTxVariant::Batch(batch) => {
-                    batches_to_remove.push(batch.batch_id);
                     // We assume that for batch one executed transaction <=> all the transactions are executed.
                     let tx_hash = batch.txs[0].hash();
                     self.0
@@ -310,17 +308,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         }
 
         self.remove_txs(&tx_hashes_to_remove).await?;
-
-        // Remove the corresponding signatures if such present.
-        for batch_id in batches_to_remove {
-            sqlx::query!(
-                "DELETE FROM mempool_batches_signatures
-                WHERE batch_id = $1",
-                batch_id
-            )
-            .execute(self.0.conn())
-            .await?;
-        }
 
         Ok(())
     }
