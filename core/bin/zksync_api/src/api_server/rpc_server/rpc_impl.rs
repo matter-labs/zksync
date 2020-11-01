@@ -281,8 +281,9 @@ impl RpcApp {
         }
 
         if let Some(signature) = eth_signature {
+            // User provided the signature for the whole batch.
             let (verified_batch, signature) = veryfy_txs_batch_signature(
-                txs.clone(),
+                txs,
                 signature,
                 messages_to_sign,
                 self.sign_verify_request_sender.clone(),
@@ -293,7 +294,8 @@ impl RpcApp {
             verified_signature = Some(signature);
             verified_txs.extend(verified_batch.into_iter());
         } else {
-            for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.into_iter()) {
+            // Otherwise, we process every transaction in turn.
+            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.tx,
                     tx.signature.clone(),
@@ -307,7 +309,7 @@ impl RpcApp {
             }
         }
 
-        let tx_hashes: Vec<TxHash> = txs.iter().map(|tx| tx.tx.hash()).collect();
+        let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
 
         // Send verified transactions to the mempool.
         let tx_add_result = self

@@ -75,6 +75,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             match batch_id {
                 Some(batch_id) => {
                     // Group of batched transactions.
+                    // Signatures will be loaded afterwards.
                     let variant = SignedTxVariant::batch(deserialized_txs, batch_id, None);
                     txs.push(variant);
                 }
@@ -89,6 +90,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             }
         }
 
+        // Load signatures for batches.
         for tx in &mut txs {
             if let SignedTxVariant::Batch(batch) = tx {
                 let eth_signature = sqlx::query!(
@@ -193,6 +195,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
+        // If there's a signature for the whole batch, store it too.
         if let Some(signature) = eth_signature {
             let signature = serde_json::to_value(signature)?;
             sqlx::query!(
@@ -308,6 +311,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         self.remove_txs(&tx_hashes_to_remove).await?;
 
+        // Remove the corresponding signatures if such present.
         for batch_id in batches_to_remove {
             sqlx::query!(
                 "DELETE FROM mempool_batches_signatures

@@ -18,6 +18,8 @@ use zksync_config::ConfigurationOptions;
 use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
+/// Represents yet unverified transaction with the corresponding
+/// Ethereum signature and the message.
 #[derive(Debug, Clone)]
 pub struct TxWithSignData {
     pub tx: ZkSyncTx,
@@ -26,6 +28,9 @@ pub struct TxWithSignData {
     /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<EthSignData>,
 }
+
+/// `TxVariant` is used to form a verify request. It is possible to wrap
+/// either a single transaction, or the transaction batch.
 #[derive(Debug, Clone)]
 pub enum TxVariant {
     Tx(TxWithSignData),
@@ -38,17 +43,17 @@ pub enum SignedTxVariant {
     Batch(Vec<SignedZkSyncTx>, TxEthSignature),
 }
 
-/// Wrapper on a `ZkSyncTx` which guarantees that
-/// transaction was checked and signatures associated with
+/// Wrapper on a `SignedTxVariant` which guarantees that (a batch of)
+/// transaction(s) was checked and signatures associated with
 /// this transactions are correct.
 ///
-/// Underlying `ZkSyncTx` is a private field, thus no such
+/// Underlying `SignedTxVariant` is a private field, thus no such
 /// object can be created without verification.
 #[derive(Debug, Clone)]
 pub struct VerifiedTx(SignedTxVariant);
 
 impl VerifiedTx {
-    /// Checks the transaction correctness by verifying its
+    /// Checks the (batch of) transaction(s) correctness by verifying its
     /// Ethereum signature (if required) and `ZKSync` signature.
     pub async fn verify(
         request: &mut VerifyTxSignatureRequest,
@@ -75,7 +80,7 @@ impl VerifiedTx {
             })
     }
 
-    /// Takes the `ZkSyncTx` out of the wrapper.
+    /// Takes the `SignedZkSyncTx` out of the wrapper.
     pub fn unwrap_tx(self) -> SignedZkSyncTx {
         match self.0 {
             SignedTxVariant::Tx(tx) => tx,
@@ -83,6 +88,7 @@ impl VerifiedTx {
         }
     }
 
+    /// Takes the Vec of `SignedZkSyncTx` and the verified signature out of the wrapper.
     pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, TxEthSignature) {
         match self.0 {
             SignedTxVariant::Batch(txs, eth_signature) => (txs, eth_signature),
@@ -91,7 +97,7 @@ impl VerifiedTx {
     }
 }
 
-/// Verifies the Ethereum signature of the transaction.
+/// Verifies the Ethereum signature of the (batch of) transaction(s).
 async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
     eth_checker: &EthereumChecker<web3::transports::Http>,
@@ -102,6 +108,8 @@ async fn verify_eth_signature(
         }
         TxVariant::Batch(txs, eth_sign_data) => {
             verify_eth_signature_txs_batch(txs, eth_sign_data, eth_checker).await?;
+            // In case there're signatures provided for some of transactions
+            // we still verify them.
             for tx in txs {
                 verify_eth_signature_single_tx(tx, eth_checker).await?;
             }
@@ -208,7 +216,7 @@ async fn verify_eth_signature_txs_batch(
     Ok(())
 }
 
-/// Verifies the correctness of the ZKSync transaction (including the
+/// Verifies the correctness of the ZKSync transaction(s) (including the
 /// signature check).
 fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
     match tx {
@@ -218,7 +226,7 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
             }
         }
         TxVariant::Batch(batch, _) => {
-            if !batch.iter_mut().all(|tx| tx.tx.check_correctness()) {
+            if batch.iter_mut().any(|tx| !tx.tx.check_correctness()) {
                 return Err(TxAddError::IncorrectTx);
             }
         }

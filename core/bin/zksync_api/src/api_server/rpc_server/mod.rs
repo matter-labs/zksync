@@ -574,6 +574,8 @@ async fn veryfy_txs_batch_signature(
 ) -> Result<VerifiedTx> {
     let mut txs = Vec::with_capacity(batch.len());
     for (tx, message) in batch.into_iter().zip(msgs_to_sign.into_iter()) {
+        // If we have more signatures provided than required,
+        // we will verify those too.
         let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
             Some(EthSignData { signature, message })
         } else {
@@ -584,6 +586,12 @@ async fn veryfy_txs_batch_signature(
             eth_sign_data,
         });
     }
+    // User is expected to sign concatenated hashes of batch
+    // transactions.
+    //
+    // We do not require this to be valid UTF-8, this message
+    // is supposed to be used as a sequence of bytes for
+    // signature verification and to be discarded afterwards.
     let message = unsafe {
         String::from_utf8_unchecked(
             tiny_keccak::keccak256(
