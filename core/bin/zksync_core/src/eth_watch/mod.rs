@@ -36,7 +36,7 @@ use zksync_types::{
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
 
 /// isValidSignature return value according to EIP1271 standard
-/// bytes4(keccak256("isValidSignature(bytes,bytes)")
+/// bytes4(keccak256("isValidSignature(bytes32,bytes)")
 pub const EIP1271_SUCCESS_RETURN_VALUE: [u8; 4] = [0x20, 0xc1, 0x3b, 0x0b];
 
 mod eth_state;
