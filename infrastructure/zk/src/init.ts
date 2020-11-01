@@ -9,9 +9,9 @@ import * as env from './env';
 import { up } from './up';
 
 export async function init() {
-    await checkEnv();
-    await env.gitHooks();
     if (!process.env.CI) {
+        await checkEnv();
+        await env.gitHooks();
         await up();
     }
     await utils.allowFail(run.yarn());

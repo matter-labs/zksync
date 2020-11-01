@@ -49,7 +49,7 @@ async function main() {
         .addCommand(completion(program as Command));
 
     // f command is special-cased because it is necessary
-    // that for it to run from $PWD and not from $ZKSYNC_HOME
+    // for it to run from $PWD and not from $ZKSYNC_HOME
     program
         .command('f <command...>')
         .allowUnknownOption()

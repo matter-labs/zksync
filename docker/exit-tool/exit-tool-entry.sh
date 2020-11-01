@@ -17,6 +17,7 @@ then
   exit 1
 fi
 
+zk
 zk run plonk-setup
 zk run verify-keys unpack
 zk db wait
