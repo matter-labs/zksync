@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { program, Command } from 'commander';
+import { spawnSync } from 'child_process';
 import { command as server } from './server';
 import { command as up } from './up';
 import { command as down } from './down';
@@ -14,10 +15,10 @@ import { command as run } from './run/run';
 import { command as test } from './test/test';
 import { command as docker } from './docker';
 import { command as completion } from './completion';
-import { command as f } from './f';
 import * as env from './env';
 
 async function main() {
+    const cwd = process.cwd();
     const ZKSYNC_HOME = process.env.ZKSYNC_HOME;
 
     if (!ZKSYNC_HOME) {
@@ -44,9 +45,22 @@ async function main() {
         .addCommand(run)
         .addCommand(test)
         .addCommand(docker)
-        .addCommand(f)
         .addCommand(env.command)
         .addCommand(completion(program as Command));
+
+    // f command is special-cased because it is necessary
+    // that for it to run from $PWD and not from $ZKSYNC_HOME
+    program
+        .command('f <command...>')
+        .allowUnknownOption()
+        .action((command: string[]) => {
+            process.chdir(cwd);
+            const result = spawnSync(command[0], command.slice(1), { stdio: 'inherit' });
+            if (result.error) {
+                throw result.error;
+            }
+            process.exitCode = result.status || undefined;
+        });
 
     await program.parseAsync(process.argv);
 }

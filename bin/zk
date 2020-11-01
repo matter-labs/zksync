@@ -5,5 +5,5 @@ cd $ZKSYNC_HOME/infrastructure/zk
 if [ -z "$1" ]; then
     yarn && yarn build
 else
-    yarn --silent start "$@"
+    node build/index.js -- "$@"
 fi
