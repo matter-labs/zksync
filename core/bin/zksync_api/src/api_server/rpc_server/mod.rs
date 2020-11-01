@@ -567,31 +567,27 @@ async fn verify_tx_info_message_signature(
 }
 
 async fn veryfy_txs_batch_signature(
-    batch: &[TxWithSignature],
+    batch: Vec<TxWithSignature>,
     signature: TxEthSignature,
-    msgs_to_sign: &[Option<String>],
+    msgs_to_sign: Vec<Option<String>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
     let mut txs = Vec::with_capacity(batch.len());
-    for (tx, message) in batch.iter().zip(msgs_to_sign.iter()) {
-        let eth_sign_data = if let (Some(signature), Some(message)) = (&tx.signature, message) {
-            Some(EthSignData {
-                signature: signature.clone(),
-                message: message.clone(),
-            })
+    for (tx, message) in batch.into_iter().zip(msgs_to_sign.into_iter()) {
+        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
+            Some(EthSignData { signature, message })
         } else {
             None
         };
         txs.push(TxWithSignData {
-            tx: tx.tx.clone(),
+            tx: tx.tx,
             eth_sign_data,
         });
     }
     let message = unsafe {
         String::from_utf8_unchecked(
             tiny_keccak::keccak256(
-                batch
-                    .iter()
+                txs.iter()
                     .flat_map(|tx| tx.tx.get_bytes())
                     .collect::<Vec<u8>>()
                     .as_slice(),

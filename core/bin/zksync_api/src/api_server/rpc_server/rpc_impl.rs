@@ -282,9 +282,9 @@ impl RpcApp {
 
         if let Some(signature) = eth_signature {
             let (verified_batch, signature) = veryfy_txs_batch_signature(
-                &txs,
+                txs.clone(),
                 signature,
-                &messages_to_sign,
+                messages_to_sign,
                 self.sign_verify_request_sender.clone(),
             )
             .await?
@@ -293,11 +293,11 @@ impl RpcApp {
             verified_signature = Some(signature);
             verified_txs.extend(verified_batch.into_iter());
         } else {
-            for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {
+            for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.into_iter()) {
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.tx,
                     tx.signature.clone(),
-                    msg_to_sign.clone(),
+                    msg_to_sign,
                     self.sign_verify_request_sender.clone(),
                 )
                 .await?
