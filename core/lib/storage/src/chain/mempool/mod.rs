@@ -97,12 +97,13 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                     batch.batch_id
                 )
                 .fetch_optional(self.0.conn())
-                .await?;
+                .await?
+                .map(|value| {
+                    serde_json::from_value(value.eth_signature)
+                        .expect("failed to decode TxEthSignature")
+                });
 
-                batch.eth_signature = match eth_signature {
-                    Some(value) => Some(serde_json::from_value(value.eth_signature)?),
-                    None => None,
-                };
+                batch.eth_signature = eth_signature;
             }
         }
 
@@ -193,8 +194,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         }
 
         if let Some(signature) = eth_signature {
-            let signature =
-                serde_json::to_value(signature).expect("failed to encode TxEthSignature");
+            let signature = serde_json::to_value(signature)?;
             sqlx::query!(
                 "INSERT INTO mempool_batches_signatures VALUES($1, $2)",
                 batch_id,

@@ -188,18 +188,19 @@ async fn verify_eth_signature_txs_batch(
             }
         }
         TxEthSignature::EIP1271Signature(signature) => {
-            let tx = txs.first().unwrap();
-            let signature_correct = eth_checker
-                .is_eip1271_signature_correct(
-                    tx.tx.account(),
-                    eth_sign_data.message.as_bytes().to_vec(),
-                    signature.clone(),
-                )
-                .await
-                .expect("Unable to check EIP1271 signature");
+            for tx in txs {
+                let signature_correct = eth_checker
+                    .is_eip1271_signature_correct(
+                        tx.tx.account(),
+                        eth_sign_data.message.as_bytes().to_vec(),
+                        signature.clone(),
+                    )
+                    .await
+                    .expect("Unable to check EIP1271 signature");
 
-            if !signature_correct {
-                return Err(TxAddError::IncorrectTx);
+                if !signature_correct {
+                    return Err(TxAddError::IncorrectTx);
+                }
             }
         }
     };

@@ -274,13 +274,13 @@ impl RpcApp {
 
         let mut verified_txs = Vec::new();
         let mut verified_signature = None;
-        let mut messages_to_sign = vec![];
 
+        let mut messages_to_sign = vec![];
         for tx in &txs {
             messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
         }
 
-        if let Some(signature) = eth_signature.clone() {
+        if let Some(signature) = eth_signature {
             let (verified_batch, signature) = veryfy_txs_batch_signature(
                 &txs,
                 signature,
