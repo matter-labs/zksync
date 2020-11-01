@@ -19,7 +19,10 @@ export async function yarn() {
     await utils.spawn('yarn --cwd infrastructure/analytics');
 }
 
-export async function plonkSetup() {
+export async function plonkSetup(powers?: number[]) {
+    if (!powers) {
+        powers = [20, 21, 22, 23, 24, 25, 26];
+    }
     const URL = 'https://universal-setup.ams3.digitaloceanspaces.com';
     fs.mkdirSync('keys/setup', { recursive: true });
     process.chdir('keys/setup');
@@ -81,8 +84,18 @@ export const command = new Command('run')
 command.command('test-accounts').description('print ethereum test accounts').action(testAccounts);
 command.command('explorer').description('run zksync explorer locally').action(explorer);
 command.command('cat-logs').description('print server and prover logs').action(catLogs);
-command.command('plonk-setup').description('download missing keys').action(plonkSetup);
 command.command('yarn').description('install all JS dependencies').action(yarn);
+
+command
+    .command('plonk-setup [powers]')
+    .description('download missing keys')
+    .action(async (powers?: string) => {
+        const powersArray = powers
+            ?.split(' ')
+            .map(x => parseInt(x))
+            .filter(x => !Number.isNaN(x));
+        await plonkSetup(powersArray);
+    });
 
 command
     .command('revert-reason <tx_hash> [web3_url]')
