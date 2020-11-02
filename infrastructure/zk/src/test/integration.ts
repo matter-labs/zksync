@@ -60,7 +60,7 @@ export async function withServer(testSuite: () => Promise<void>, timeout: number
         utils.sleepSync(5);
         // server or prover might also crash, so killing may be unsuccessful
         // but we still want to see the logs in this case.
-        // using process.kill(-child.pid) and not child.kill() along with the fact than 
+        // using process.kill(-child.pid) and not child.kill() along with the fact than
         // child is detached guarantees that processes are killed recursively (by group id)
         utils.allowFailSync(() => process.kill(-server.pid, 'SIGKILL'));
         utils.allowFailSync(() => process.kill(-prover.pid, 'SIGKILL'));
@@ -136,6 +136,8 @@ export async function testkit(command: string) {
     process.on('beforeExit', async (code) => {
         if (process.env.ZKSYNC_ENV == 'dev') {
             try {
+                // probably should be replaced with child_process.execSync in future
+                // to change the hook to program.on('exit', ...)
                 await utils.exec(`docker kill ${containerID}`);
             } catch {
                 console.error('Problem killing', containerID);
@@ -147,6 +149,7 @@ export async function testkit(command: string) {
     });
 
     process.env.ETH_NETWORK = 'test';
+    await run.verifyKeys.unpack();
     await contract.build();
 
     if (command == 'block-sizes') {

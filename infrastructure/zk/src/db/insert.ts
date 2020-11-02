@@ -7,16 +7,14 @@ const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 
 export async function token(id: string, address: string, symbol: string, precison: string) {
     // force read env
-    delete process.env.ZKSYNC_ENV;
-    env.load();
+    env.reload();
     await utils.exec(`${SQL()} "INSERT INTO tokens VALUES (${id}, '${address}', '${symbol}', ${precison});"`);
     console.log('Successfully inserted token into the database');
 }
 
 export async function contract() {
     // force read env
-    delete process.env.ZKSYNC_ENV;
-    env.load();
+    env.reload();
     const contractAddress = process.env.CONTRACT_ADDR;
     const governanceAddress = process.env.GOVERNANCE_ADDR;
     await utils.exec(`${SQL()} "INSERT INTO server_config (contract_addr, gov_contract_addr)
@@ -28,8 +26,7 @@ export async function contract() {
 
 export async function ethData() {
     // force read env
-    delete process.env.ZKSYNC_ENV;
-    env.load();
+    env.reload();
 
     const body = {
         jsonrpc: '2.0',

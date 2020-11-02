@@ -39,7 +39,7 @@ export function set(env: string) {
 
 // we have to manually override the environment
 // because dotenv won't override variables that are already set
-function override() {
+export function reload() {
     const envFile = process.env.ENV_FILE as string;
     const env = dotenv.parse(fs.readFileSync(envFile));
     for (const envVar in env) {
@@ -61,7 +61,7 @@ export function load() {
     }
     process.env.ZKSYNC_ENV = zksyncEnv;
     process.env.ENV_FILE = envFile;
-    override();
+    dotenv.config({ path: envFile });
 }
 
 // replaces an env variable in current .env file
@@ -70,7 +70,7 @@ export function load() {
 export function modify(variable: string, assignedVariable: string) {
     const envFile = process.env.ENV_FILE as string;
     utils.replaceInFile(envFile, `${variable}=.*`, assignedVariable.trim());
-    override();
+    reload();
 }
 
 export const command = new Command('env')

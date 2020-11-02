@@ -1,5 +1,5 @@
-//! Run external commands from `$ZKSYNC_HOME/bin`
-//!`$ZKSYNC_HOME/bin` should be in path.
+//! Run external commands from the zk toolkit
+//! `zk` script should be in path.
 //!
 use std::collections::HashMap;
 use std::process::Command;
@@ -76,21 +76,24 @@ fn run_external_command(command: &str, args: &[&str]) -> String {
 
 pub fn js_revert_reason(tx_hash: &H256) -> String {
     run_external_command(
-        "revert-reason",
-        &[&format!("0x{:x}", tx_hash), "http://localhost:7545"],
+        "zk",
+        &[
+            "run",
+            "revert-reason",
+            &format!("0x{:x}", tx_hash),
+            "http://localhost:7545",
+        ],
     )
 }
 
 pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts {
-    let mut args = Vec::new();
-    args.push("--genesisRoot");
+    let mut args = vec!["run", "deploy-testkit", "--genesisRoot"];
     let genesis_root = format!("0x{}", genesis_root.to_hex());
     args.push(genesis_root.as_str());
-    // args.push(genesis_root)
     if use_prod_contracts {
         args.push("--prodContracts");
     }
-    let stdout = run_external_command("deploy-testkit.sh", &args);
+    let stdout = run_external_command("zk", &args);
 
     let mut contracts = HashMap::new();
     for std_out_line in stdout.split_whitespace().collect::<Vec<_>>() {
@@ -118,8 +121,10 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
 
 pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_address: Address) {
     run_external_command(
-        "test-upgrade-franklin.sh",
+        "zk",
         &[
+            "run",
+            "test-upgrade",
             &format!("0x{:x}", franklin_address),
             &format!("0x{:x}", upgrade_gatekeeper_address),
         ],
@@ -135,7 +140,7 @@ pub struct ETHAccountInfo {
 
 /// First is vec of test acccounts, second is commit account
 pub fn get_test_accounts() -> (Vec<ETHAccountInfo>, ETHAccountInfo) {
-    let stdout = run_external_command("print-test-accounts.sh", &[]);
+    let stdout = run_external_command("zk", &["run", "test-accounts"]);
 
     if let Ok(mut parsed) = serde_json::from_str::<Vec<ETHAccountInfo>>(&stdout) {
         let commit_account = parsed.remove(0);

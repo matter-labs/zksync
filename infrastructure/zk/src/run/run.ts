@@ -19,6 +19,15 @@ export async function yarn() {
     await utils.spawn('yarn --cwd infrastructure/analytics');
 }
 
+export async function deployTestkit(genesisRoot: string, prodContracts: boolean = false) {
+    const option = prodContracts ? '--prodContracts' : '';
+    await utils.spawn(`yarn --cwd contracts deploy-testkit --genesisRoot ${genesisRoot} ${option}`);
+}
+
+export async function testUpgrade(contract: string, gatekeeper: string) {
+    await utils.spawn(`yarn --cwd contracts ts-node scripts/test-upgrade-franklin.ts ${contract} ${gatekeeper}`);
+}
+
 export async function plonkSetup(powers?: number[]) {
     if (!powers) {
         powers = [20, 21, 22, 23, 24, 25, 26];
@@ -85,6 +94,7 @@ command.command('test-accounts').description('print ethereum test accounts').act
 command.command('explorer').description('run zksync explorer locally').action(explorer);
 command.command('cat-logs').description('print server and prover logs').action(catLogs);
 command.command('yarn').description('install all JS dependencies').action(yarn);
+command.command('test-upgrade <main_contract> <gatekeeper_contract>').action(testUpgrade);
 
 command
     .command('plonk-setup [powers]')
@@ -92,9 +102,18 @@ command
     .action(async (powers?: string) => {
         const powersArray = powers
             ?.split(' ')
-            .map(x => parseInt(x))
-            .filter(x => !Number.isNaN(x));
+            .map((x) => parseInt(x))
+            .filter((x) => !Number.isNaN(x));
         await plonkSetup(powersArray);
+    });
+
+command
+    .command('deploy-testkit')
+    .description('deploy testkit contracts')
+    .requiredOption('--genesisRoot <hash>')
+    .option('--prodContracts')
+    .action(async (cmd: Command) => {
+        await deployTestkit(cmd.genesisRoot, cmd.prodContracts);
     });
 
 command

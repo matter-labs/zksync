@@ -34,8 +34,7 @@ export async function migrate() {
 
 export async function setup() {
     // force read env
-    delete process.env.ZKSYNC_ENV;
-    env.load();
+    env.reload();
 
     process.chdir('core/lib/storage');
     console.log(`DATABASE_URL = ${process.env.DATABASE_URL}`);
