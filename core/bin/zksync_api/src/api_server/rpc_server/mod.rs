@@ -482,7 +482,7 @@ pub fn start_rpc_server(
 
         let server = ServerBuilder::new(io)
             .request_middleware(super::loggers::http_rpc::request_middleware)
-            .threads(64)
+            .threads(super::THREADS_PER_SERVER)
             .start_http(&addr)
             .unwrap();
         server.wait();
