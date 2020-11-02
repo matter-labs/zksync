@@ -162,7 +162,7 @@ impl RpcApp {
 impl RpcApp {
     async fn access_storage(&self) -> Result<StorageProcessor<'_>> {
         self.connection_pool
-            .access_storage_fragile()
+            .access_storage()
             .await
             .map_err(|_| Error::internal_error())
     }
