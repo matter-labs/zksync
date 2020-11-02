@@ -28,7 +28,7 @@ export async function init() {
 
 async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: string, decimals?: string) {
     if (command == 'dev') {
-        await utils.exec(`yarn --silent --cwd contracts deploy-erc20 add-multi '
+        await utils.spawn(`yarn --silent --cwd contracts deploy-erc20 add-multi '
             [
                 { "name": "DAI",  "symbol": "DAI",  "decimals": 18 },
                 { "name": "wBTC", "symbol": "wBTC", "decimals":  8 },
@@ -36,7 +36,7 @@ async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: strin
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
     } else if (command == 'new') {
-        await utils.exec(
+        await utils.spawn(
             `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
         );
     }
