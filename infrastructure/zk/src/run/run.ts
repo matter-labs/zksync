@@ -92,9 +92,9 @@ export const command = new Command('run')
 
 command.command('test-accounts').description('print ethereum test accounts').action(testAccounts);
 command.command('explorer').description('run zksync explorer locally').action(explorer);
-command.command('cat-logs').description('print server and prover logs').action(catLogs);
 command.command('yarn').description('install all JS dependencies').action(yarn);
 command.command('test-upgrade <main_contract> <gatekeeper_contract>').action(testUpgrade);
+command.command('cat-logs [exit_code]').description('print server and prover logs').action(catLogs);
 
 command
     .command('plonk-setup [powers]')

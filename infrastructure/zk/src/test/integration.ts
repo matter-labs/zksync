@@ -87,7 +87,7 @@ export async function inDocker(command: string, timeout: number) {
     const volume = `${process.env.ZKSYNC_HOME}:/usr/src/zksync`;
     const image = `matterlabs/ci-integration-test:zk-latest`;
     await utils.spawn(
-        `docker run -v ${volume} ${image} bash -c "/usr/local/bin/entrypoint.sh && ${command} || zk run cat-logs"`
+        `docker run -v ${volume} ${image} bash -c "/usr/local/bin/entrypoint.sh && ${command} || zk run cat-logs 1"`
     );
 }
 
