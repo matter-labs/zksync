@@ -1951,7 +1951,5 @@ yn@3.1.1:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.1.tgz#1e87401a09d767c1d5eab26a6e4c185182d2eb50"
   integrity sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==
 
-zksync-crypto@^0.3.1:
+"zksync-crypto@file:../zksync-crypto":
   version "0.3.2"
-  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.3.2.tgz#2e073d1c42a09f65efe41119e3e065edff87fb95"
-  integrity sha512-fLNZ82wddyevNe9O6WEB0Ls3DnttkJH5s7E1tXXq9mGHMVSn/oMHFn35BD6ZRBhALdLexKbalWoJ89Ua93yzFg==
