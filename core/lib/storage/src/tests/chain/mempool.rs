@@ -162,14 +162,17 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     let alone_txs_2 = &txs[6..8];
     let batch_3 = &txs[8..10];
 
+    let batch_1_signature = Some(get_eth_sing_data("test message".to_owned()).signature);
+
     let elements_count = alone_txs_1.len() + alone_txs_2.len() + 3; // Amount of alone txs + amount of batches.
 
     for tx in alone_txs_1 {
         MempoolSchema(&mut storage).insert_tx(tx).await?;
     }
 
+    // Store the first batch with a signature.
     MempoolSchema(&mut storage)
-        .insert_batch(batch_1, None)
+        .insert_batch(batch_1, batch_1_signature.clone())
         .await?;
 
     MempoolSchema(&mut storage)
@@ -190,7 +193,11 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     assert!(matches!(txs_from_db[0], SignedTxVariant::Tx(_)));
     assert!(matches!(txs_from_db[1], SignedTxVariant::Tx(_)));
-    assert!(matches!(txs_from_db[2], SignedTxVariant::Batch(_)));
+    // Try to load the batch with the signature.
+    match &txs_from_db[2] {
+        SignedTxVariant::Batch(batch) => assert_eq!(batch.eth_signature, batch_1_signature),
+        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions"),
+    };
     assert!(matches!(txs_from_db[3], SignedTxVariant::Batch(_)));
     assert!(matches!(txs_from_db[4], SignedTxVariant::Tx(_)));
     assert!(matches!(txs_from_db[5], SignedTxVariant::Tx(_)));

@@ -1,8 +1,10 @@
 CREATE TABLE mempool_batches_signatures (
-    batch_id bigserial PRIMARY KEY,
+    batch_id BIGINT PRIMARY KEY,
     eth_signature JSONB NOT NULL
 );
 
+-- Delete the Ethereum signature once any transaction from
+-- the batch is removed from the mempool.
 CREATE OR REPLACE FUNCTION delete_signatures() RETURNS TRIGGER AS $$
 BEGIN
     DELETE FROM mempool_batches_signatures
