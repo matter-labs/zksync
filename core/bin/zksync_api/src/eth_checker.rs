@@ -2,7 +2,6 @@
 //! onchain `ChangePubKey` authorization or EIP1271 signature
 //! verification.
 
-use crypto::{digest::Digest, sha2::Sha256};
 use web3::{
     contract::{Contract, Options},
     types::{Address, H160},
@@ -49,11 +48,7 @@ impl<T: Transport> EthereumChecker<T> {
         message: Vec<u8>,
         signature: EIP1271Signature,
     ) -> Result<bool, anyhow::Error> {
-        let mut hash = [0u8; 32];
-
-        let mut hasher = Sha256::new();
-        hasher.input(&message);
-        hasher.result(&mut hash);
+        let hash = tiny_keccak::keccak256(&message);
 
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
