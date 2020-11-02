@@ -10,7 +10,7 @@ use std::str::FromStr;
 use num::BigUint;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
-use zksync_storage::{chain::state::StateSchema, ConnectionPool, StorageProcessor};
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Operation,
@@ -127,14 +127,17 @@ impl Database {
             let mut transaction = connection.start_transaction().await?;
 
             transaction.ethereum_schema().confirm_eth_tx(hash).await?;
-            StateSchema(&mut transaction)
+            transaction
+                .chain()
+                .state_schema()
                 .apply_state_update(op.op.as_ref().unwrap().block.block_number)
                 .await?;
 
-            Ok(transaction.commit().await?)
+            transaction.commit().await?;
         } else {
-            Ok(connection.ethereum_schema().confirm_eth_tx(hash).await?)
+            connection.ethereum_schema().confirm_eth_tx(hash).await?;
         }
+        Ok(())
     }
 
     pub async fn load_stats(

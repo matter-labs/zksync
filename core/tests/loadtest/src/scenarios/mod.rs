@@ -9,7 +9,10 @@ pub use self::{
 };
 
 // Built-in uses
-use std::fmt::{Debug, Display};
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Display},
+};
 // External uses
 use async_trait::async_trait;
 use num::BigUint;
@@ -17,7 +20,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 // Local uses
 use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::WithdrawScenario};
-use crate::{monitor::Monitor, test_wallet::TestWallet};
+use crate::{monitor::Monitor, test_wallet::TestWallet, FiveSummaryStats};
 
 mod full_exit;
 mod transfers;
@@ -32,18 +35,27 @@ pub struct ScenarioResources {
     pub balance_per_wallet: BigUint,
 }
 
+/// Sufficient fee for the related type of transaction.
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct Fees {
+    /// Fee for the Ethereum transactions.
+    pub eth: BigUint,
+    /// Fee for the zkSync transactions.
+    pub zksync: BigUint,
+}
+
 /// Describes the general steps of a load test scenario.
 #[async_trait]
 pub trait Scenario: Debug + Display {
     /// Returns resources that should be provided by the scenario executor.
-    fn requested_resources(&self, sufficient_fee: &BigUint) -> ScenarioResources;
+    fn requested_resources(&self, fees: &Fees) -> ScenarioResources;
 
     /// Performs actions before running the main scenario, for example, it can
     /// fill the queue of transactions for execution.
     async fn prepare(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 
@@ -51,7 +63,7 @@ pub trait Scenario: Debug + Display {
     async fn run(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 
@@ -60,7 +72,7 @@ pub trait Scenario: Debug + Display {
     async fn finalize(
         &mut self,
         monitor: &Monitor,
-        sufficient_fee: &BigUint,
+        fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()>;
 }
@@ -88,8 +100,13 @@ impl ScenarioConfig {
     }
 }
 
-impl From<TransferScenarioConfig> for ScenarioConfig {
-    fn from(cfg: TransferScenarioConfig) -> Self {
-        Self::Transfer(cfg)
-    }
+/// Load test report for the transactions scenarios.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScenariosTestsReport {
+    /// A five numbers summary statistic for each transaction lifecycle step.
+    pub summary: BTreeMap<String, FiveSummaryStats>,
+    /// Total amount of sent requests.
+    pub total_txs_count: usize,
+    /// Amount of failed requests regardless of the cause of the failure.
+    pub failed_txs_count: usize,
 }
