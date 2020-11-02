@@ -14,8 +14,8 @@ use zksync_types::{
 };
 
 /// isValidSignature return value according to EIP1271 standard
-/// bytes4(keccak256("isValidSignature(bytes,bytes)")
-pub const EIP1271_SUCCESS_RETURN_VALUE: [u8; 4] = [0x20, 0xc1, 0x3b, 0x0b];
+/// bytes4(keccak256("isValidSignature(bytes32,bytes)")
+pub const EIP1271_SUCCESS_RETURN_VALUE: [u8; 4] = [0x16, 0x26, 0xba, 0x7e];
 
 #[derive(Clone)]
 pub struct EthereumChecker<T: Transport> {
@@ -48,11 +48,13 @@ impl<T: Transport> EthereumChecker<T> {
         message: Vec<u8>,
         signature: EIP1271Signature,
     ) -> Result<bool, anyhow::Error> {
+        let hash = tiny_keccak::keccak256(&message);
+
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
                 "isValidSignature",
-                (message, signature.0),
+                (hash, signature.0),
                 None,
                 Options::default(),
                 None,
