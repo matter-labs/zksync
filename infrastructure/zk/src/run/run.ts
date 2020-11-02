@@ -33,7 +33,9 @@ export async function plonkSetup(powers?: number[]) {
         powers = [20, 21, 22, 23, 24, 25, 26];
     }
     const URL = 'https://universal-setup.ams3.digitaloceanspaces.com';
-    fs.mkdirSync('keys/setup', { recursive: true });
+    if (!fs.existsSync('keys/setup')) {
+        fs.mkdirSync('keys/setup', { recursive: true });
+    }
     process.chdir('keys/setup');
     for (let power = 20; power <= 26; power++) {
         if (!fs.existsSync(`setup_2^${power}.key`)) {
