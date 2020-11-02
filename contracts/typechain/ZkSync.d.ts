@@ -47,7 +47,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     "numberOfPendingWithdrawals()": FunctionFragment;
     "pendingWithdrawals(uint32)": FunctionFragment;
     "priorityRequests(uint64)": FunctionFragment;
-    "revertBlocks(uint32)": FunctionFragment;
+    "revertBlocks(tuple[])": FunctionFragment;
     "setAuthPubkeyHash(bytes,uint32)": FunctionFragment;
     "totalBlocksCommitted()": FunctionFragment;
     "totalBlocksVerified()": FunctionFragment;
@@ -92,6 +92,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
     values: [
       {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -119,6 +120,7 @@ interface ZkSyncInterface extends ethers.utils.Interface {
       {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -191,7 +193,15 @@ interface ZkSyncInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "revertBlocks",
-    values: [BigNumberish]
+    values: [
+      {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[]
+    ]
   ): string;
   encodeFunctionData(
     functionFragment: "setAuthPubkeyHash",
@@ -541,6 +551,7 @@ export class ZkSync extends Contract {
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -561,6 +572,7 @@ export class ZkSync extends Contract {
     "commitBlocks(tuple,tuple[])"(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -606,6 +618,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -621,6 +634,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -847,12 +861,24 @@ export class ZkSync extends Contract {
     }>;
 
     revertBlocks(
-      _maxBlocksToRevert: BigNumberish,
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "revertBlocks(uint32)"(
-      _maxBlocksToRevert: BigNumberish,
+    "revertBlocks(tuple[])"(
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -1116,6 +1142,7 @@ export class ZkSync extends Contract {
   commitBlocks(
     _lastCommittedBlockData: {
       blockNumber: BigNumberish;
+      priorityOperations: BigNumberish;
       processableOnchainOperationsHash: BytesLike;
       stateHash: BytesLike;
       commitment: BytesLike;
@@ -1136,6 +1163,7 @@ export class ZkSync extends Contract {
   "commitBlocks(tuple,tuple[])"(
     _lastCommittedBlockData: {
       blockNumber: BigNumberish;
+      priorityOperations: BigNumberish;
       processableOnchainOperationsHash: BytesLike;
       stateHash: BytesLike;
       commitment: BytesLike;
@@ -1181,6 +1209,7 @@ export class ZkSync extends Contract {
     _blocksData: {
       storedBlock: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -1196,6 +1225,7 @@ export class ZkSync extends Contract {
     _blocksData: {
       storedBlock: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -1355,12 +1385,24 @@ export class ZkSync extends Contract {
   }>;
 
   revertBlocks(
-    _maxBlocksToRevert: BigNumberish,
+    _blocksToRevert: {
+      blockNumber: BigNumberish;
+      priorityOperations: BigNumberish;
+      processableOnchainOperationsHash: BytesLike;
+      stateHash: BytesLike;
+      commitment: BytesLike;
+    }[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "revertBlocks(uint32)"(
-    _maxBlocksToRevert: BigNumberish,
+  "revertBlocks(tuple[])"(
+    _blocksToRevert: {
+      blockNumber: BigNumberish;
+      priorityOperations: BigNumberish;
+      processableOnchainOperationsHash: BytesLike;
+      stateHash: BytesLike;
+      commitment: BytesLike;
+    }[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1582,6 +1624,7 @@ export class ZkSync extends Contract {
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -1602,6 +1645,7 @@ export class ZkSync extends Contract {
     "commitBlocks(tuple,tuple[])"(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -1644,6 +1688,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -1659,6 +1704,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -1821,12 +1867,24 @@ export class ZkSync extends Contract {
     }>;
 
     revertBlocks(
-      _maxBlocksToRevert: BigNumberish,
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "revertBlocks(uint32)"(
-      _maxBlocksToRevert: BigNumberish,
+    "revertBlocks(tuple[])"(
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -2066,6 +2124,7 @@ export class ZkSync extends Contract {
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2086,6 +2145,7 @@ export class ZkSync extends Contract {
     "commitBlocks(tuple,tuple[])"(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2131,6 +2191,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -2146,6 +2207,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -2288,12 +2350,24 @@ export class ZkSync extends Contract {
     ): Promise<BigNumber>;
 
     revertBlocks(
-      _maxBlocksToRevert: BigNumberish,
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "revertBlocks(uint32)"(
-      _maxBlocksToRevert: BigNumberish,
+    "revertBlocks(tuple[])"(
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -2478,6 +2552,7 @@ export class ZkSync extends Contract {
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2498,6 +2573,7 @@ export class ZkSync extends Contract {
     "commitBlocks(tuple,tuple[])"(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
         processableOnchainOperationsHash: BytesLike;
         stateHash: BytesLike;
         commitment: BytesLike;
@@ -2543,6 +2619,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -2558,6 +2635,7 @@ export class ZkSync extends Contract {
       _blocksData: {
         storedBlock: {
           blockNumber: BigNumberish;
+          priorityOperations: BigNumberish;
           processableOnchainOperationsHash: BytesLike;
           stateHash: BytesLike;
           commitment: BytesLike;
@@ -2712,12 +2790,24 @@ export class ZkSync extends Contract {
     ): Promise<PopulatedTransaction>;
 
     revertBlocks(
-      _maxBlocksToRevert: BigNumberish,
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "revertBlocks(uint32)"(
-      _maxBlocksToRevert: BigNumberish,
+    "revertBlocks(tuple[])"(
+      _blocksToRevert: {
+        blockNumber: BigNumberish;
+        priorityOperations: BigNumberish;
+        processableOnchainOperationsHash: BytesLike;
+        stateHash: BytesLike;
+        commitment: BytesLike;
+      }[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

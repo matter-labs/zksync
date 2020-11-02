@@ -87,7 +87,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external {}
+    function upgrade(bytes calldata upgradeParameters) external {
+        // rehash last verified block to support new schema
+        require(totalBlocksCommitted == totalBlocksVerified, "upg1"); // all blocks should be verified
+
+        Block memory lastBlock = blocks[totalBlocksVerified];
+        require(lastBlock.priorityOperations == 0, "upg2"); // last block should not contain priority operations
+
+        StoredBlockInfo memory rehashedLastBlock = StoredBlockInfo(totalBlocksVerified, lastBlock.priorityOperations, EMPTY_STRING_KECCAK, lastBlock.stateRoot, lastBlock.commitment);
+        hashedBlocks[totalBlocksVerified] = hashStoredBlockInfo(rehashedLastBlock);
+    }
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
@@ -203,6 +212,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     struct StoredBlockInfo {
         uint32 blockNumber;
+        uint64 priorityOperations;
         bytes32 processableOnchainOperationsHash;
         bytes32 stateHash;
         bytes32 commitment;
@@ -226,15 +236,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo memory _newBlock)
-        internal returns (StoredBlockInfo memory storedNewBlock) {
+      internal returns (StoredBlockInfo memory storedNewBlock) {
+
         require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "fck11"); // only commit next block
 
-        bytes32 processedOnchainOpsHash = collectOnchainOps(_newBlock);
+        (bytes32 processedOnchainOpsHash, uint64 priorityReqests) = collectOnchainOps(_newBlock);
 
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(_previousBlock.stateHash, _newBlock);
 
-        storedNewBlock = StoredBlockInfo(_newBlock.blockNumber, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
+        storedNewBlock = StoredBlockInfo(_newBlock.blockNumber, priorityReqests, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
 
         hashedBlocks[storedNewBlock.blockNumber] = hashStoredBlockInfo(storedNewBlock);
         emit BlockCommit(_newBlock.blockNumber);
@@ -246,9 +257,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         CommitBlockInfo[] memory _newBlocksData
     ) external nonReentrant {
         requireActive();
-//        require(hashedBlocks[_lastCommittedBlockData.blockNumber] == hashStoredBlockInfo(_lastCommittedBlockData), "fck10"); // incorrect previous block data
-        require(_lastCommittedBlockData.blockNumber == totalBlocksCommitted, "fck11"); // not last comitted block
         governance.requireActiveValidator(msg.sender);
+        require(hashedBlocks[_lastCommittedBlockData.blockNumber] == hashStoredBlockInfo(_lastCommittedBlockData), "fck10"); // incorrect previous block data
 
         StoredBlockInfo memory lastCommittedBlock = _lastCommittedBlockData;
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
@@ -296,9 +306,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         ExecuteBlockInfo memory _blockExecuteData,
         uint32 executedBlockIdx
     ) internal returns (uint32 priorityRequestsExecuted) {
-//        require(hashStoredBlockInfo(_blockData) == hashedBlocks[totalBlocksVerified + 1 + executedBlockIdx], "exe10"); // incorrect previous block data
-//        require(hashedVerifiedCommitments[keccak256(abi.encode(_blockExecuteData.commitmentsInSlot))], "exe11"); // commitments verified
-//        require(_blockExecuteData.commitmentsInSlot[_blockExecuteData.commitmentsIndex] == _blockData.commitment, "exe12"); // block commitment incorrect
+        // ensure block was committed
+        require(hashStoredBlockInfo(_blockExecuteData.storedBlock) == hashedBlocks[totalBlocksVerified + 1 + executedBlockIdx], "exe10"); // incorrect previous block data
+        // ensure block was verified
+        require(hashedVerifiedCommitments[keccak256(abi.encode(_blockExecuteData.commitmentsInSlot))], "exe11"); // commitments verified
+        require(_blockExecuteData.commitmentsInSlot[_blockExecuteData.commitmentIndex] == _blockExecuteData.storedBlock.commitment, "exe12"); // block commitment incorrect
 
         priorityRequestsExecuted = 0;
         bytes32 processableOnchainOpsHash = EMPTY_STRING_KECCAK;
@@ -356,33 +368,30 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function verifyCommitments(uint256[] calldata _commitments, uint256[] calldata _proof)
         external nonReentrant
     {
-        // todo actually verify
-//        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
+        // todo recursive verifier
         hashedVerifiedCommitments[keccak256(abi.encode(_commitments))] = true;
     }
 
 
     /// @notice Reverts unverified blocks
-    /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
-    function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-//        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+    function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external nonReentrant {
         governance.requireActiveValidator(msg.sender);
 
         uint32 blocksCommited = totalBlocksCommitted;
-        uint32 blocksToRevert = Utils.minU32(_maxBlocksToRevert, blocksCommited - totalBlocksVerified);
+        uint32 blocksToRevert = Utils.minU32(uint32(_blocksToRevert.length), blocksCommited - totalBlocksVerified);
         uint64 revertedPriorityRequests = 0;
 
-        for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= blocksCommited; i++) {
-            Block memory revertedBlock = blocks[i];
-            require(revertedBlock.committedAtBlock > 0, "frk11"); // block not found
+        for (uint32 i = 0; i < blocksToRevert; ++i) {
+            StoredBlockInfo memory storedBlockInfo  = _blocksToRevert[i];
+            require(hashedBlocks[blocksCommited] == hashStoredBlockInfo(storedBlockInfo), "frk10"); // incorrect stored block info
 
-            revertedPriorityRequests += revertedBlock.priorityOperations;
+            delete hashedBlocks[blocksCommited];
 
-            delete blocks[i];
+            --blocksCommited;
+            revertedPriorityRequests += storedBlockInfo.priorityOperations;
         }
 
-        blocksCommited -= blocksToRevert;
-        totalBlocksCommitted -= blocksToRevert;
+        totalBlocksCommitted = blocksCommited;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
         emit BlocksRevert(totalBlocksVerified, blocksCommited);
@@ -484,7 +493,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
     /// Priority operations must be committed in the same order as they are in the priority queue.
     function collectOnchainOps(CommitBlockInfo memory _newBlockData)
-        internal returns (bytes32 processableOperationsData) {
+        internal returns (bytes32 processableOperationsData, uint64 priorityOperationsProcessed) {
         bytes memory pubData = _newBlockData.publicData;
 
         require(pubData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
@@ -550,7 +559,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
 
         require(currentPriorityRequestId <= firstPriorityRequestId + totalOpenPriorityRequests, "fcs16"); // fcs16 - excess priority requests in pubdata
+        priorityOperationsProcessed = totalCommittedPriorityRequests;
         totalCommittedPriorityRequests = currentPriorityRequestId - firstPriorityRequestId;
+        priorityOperationsProcessed = totalCommittedPriorityRequests - priorityOperationsProcessed;
     }
 
     /// @notice Checks that signature is valid for pubkey change message
