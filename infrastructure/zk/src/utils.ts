@@ -1,6 +1,7 @@
 import { exec as _exec, spawn as _spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import path from 'path';
 import readline from 'readline';
 
 export type { ChildProcess } from 'child_process';
@@ -91,4 +92,12 @@ export function replaceInFile(filename: string, before: string | RegExp, after: 
 export function modifyFile(filename: string, modifier: (s: string) => string) {
     const source = fs.readFileSync(filename).toString();
     fs.writeFileSync(filename, modifier(source));
+}
+
+// same as bash's mkdir -p, hopefully more reliably than { recursive: true }
+export function mkdirp(dir: string) {
+    if (fs.existsSync(dir)) return;
+    const dirname = path.dirname(dir);
+    mkdirp(dirname);
+    fs.mkdirSync(dir);
 }

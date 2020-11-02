@@ -32,7 +32,7 @@ async function prepareTestContracts() {
     if (fs.existsSync(outDir)) {
         fs.rmdirSync(outDir, { recursive: true });
     }
-    fs.mkdirSync(outDir, { recursive: true });
+    utils.mkdirp(outDir);
 
     await Promise.all([
         fs.promises.copyFile(`${inDir}/Governance.sol`, `${outDir}/GovernanceTest.sol`),
