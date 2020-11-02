@@ -4,6 +4,7 @@ use jsonrpc_core::{Error, Result};
 use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
 use zksync_types::{
+    helpers::closest_packable_fee_amount,
     tx::{TxEthSignature, TxHash},
     Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
@@ -392,6 +393,8 @@ impl RpcApp {
             .await?
             .total_fee;
         }
+        // Sum of transactions can be unpackable
+        total_fee = closest_packable_fee_amount(&total_fee);
 
         Ok(BatchFee { total_fee })
     }
