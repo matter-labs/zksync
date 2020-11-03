@@ -1,4 +1,4 @@
-export type Network = "localhost" | "rinkeby" | "ropsten" | "mainnet";
+export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet';
 
 export interface Config {
     network: Network;
