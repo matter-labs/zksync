@@ -7,8 +7,9 @@
     "printWidth": 120,
     "parser": "typescript",
     "singleQuote": true,
-    "trailingComma": "none"
-  },
+    "trailingComma": "none",
+    "bracketSpacing": true
+},
   "mocha": {
     "timeout": 240000,
     "exit": true,
