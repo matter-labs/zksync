@@ -39,6 +39,6 @@
     "fee-seller" : "yarn workspace fee-seller",
     "zcli" : "yarn workspace zcli",
     "ts-tests" : "yarn workspace ts-tests",
-    "explorer" : "yarn workspace explorer"
+    "explorer" : "yarn workspace sync-explorer"
   }
 }
