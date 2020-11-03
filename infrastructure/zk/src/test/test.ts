@@ -19,7 +19,7 @@ export async function db(reset: boolean) {
 
 export async function contracts() {
     await contract.build();
-    await utils.spawn('yarn --cwd contracts unit-test');
+    await utils.spawn('yarn contracts unit-test');
 }
 
 export async function circuit(threads: number = 1, testName?: string, ...args: string[]) {
@@ -34,8 +34,8 @@ export async function prover() {
 }
 
 export async function js() {
-    await utils.spawn('yarn --cwd sdk/zksync.js tests');
-    await utils.spawn('yarn --cwd infrastructure/fee-seller tests');
+    await utils.spawn('yarn zksync tests');
+    await utils.spawn('yarn fee-seller tests');
 }
 
 export async function rust() {

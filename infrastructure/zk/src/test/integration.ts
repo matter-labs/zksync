@@ -102,15 +102,15 @@ export async function all() {
 }
 
 export async function api() {
-    await utils.spawn('yarn --cwd core/tests/ts-tests api-test');
+    await utils.spawn('yarn ts-tests api-test');
 }
 
 export async function zcli() {
-    await utils.spawn('yarn --cwd infrastructure/zcli test');
+    await utils.spawn('yarn zcli test');
 }
 
 export async function server() {
-    await utils.spawn('yarn --cwd core/tests/ts-tests test');
+    await utils.spawn('yarn ts-tests test');
 }
 
 export async function testkit(command: string) {

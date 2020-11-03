@@ -9,7 +9,7 @@ export { verifyKeys, dataRestore };
 
 export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: string, decimals?: string) {
     if (command == 'dev') {
-        await utils.spawn(`yarn --silent --cwd contracts deploy-erc20 add-multi '
+        await utils.spawn(`yarn --silent contracts deploy-erc20 add-multi '
             [
                 { "name": "DAI",  "symbol": "DAI",  "decimals": 18 },
                 { "name": "wBTC", "symbol": "wBTC", "decimals":  8 },
@@ -17,31 +17,23 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
     } else if (command == 'new') {
-        await utils.spawn(
-            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
-        );
+        await utils.spawn(`yarn contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`);
     }
 }
 
 // installs all dependencies and builds our js packages
 export async function yarn() {
-    await utils.spawn('yarn --cwd sdk/zksync.js');
-    await utils.spawn('yarn --cwd sdk/zksync.js build');
-    await utils.spawn('yarn --cwd contracts');
-    await utils.spawn('yarn --cwd core/tests/ts-tests');
-    await utils.spawn('yarn --cwd infrastructure/explorer');
-    await utils.spawn('yarn --cwd infrastructure/fee-seller');
-    await utils.spawn('yarn --cwd infrastructure/zcli');
-    await utils.spawn('yarn --cwd infrastructure/analytics');
+    await utils.spawn('yarn');
+    await utils.spawn('yarn zksync build');
 }
 
 export async function deployTestkit(genesisRoot: string, prodContracts: boolean = false) {
     const option = prodContracts ? '--prodContracts' : '';
-    await utils.spawn(`yarn --cwd contracts deploy-testkit --genesisRoot ${genesisRoot} ${option}`);
+    await utils.spawn(`yarn contracts deploy-testkit --genesisRoot ${genesisRoot} ${option}`);
 }
 
 export async function testUpgrade(contract: string, gatekeeper: string) {
-    await utils.spawn(`yarn --cwd contracts ts-node scripts/test-upgrade-franklin.ts ${contract} ${gatekeeper}`);
+    await utils.spawn(`yarn contracts ts-node scripts/test-upgrade-franklin.ts ${contract} ${gatekeeper}`);
 }
 
 export async function plonkSetup(powers?: number[]) {
@@ -65,7 +57,7 @@ export async function revertReason(txHash: string, web3url?: string) {
 }
 
 export async function explorer() {
-    await utils.spawn('yarn --cwd infrastructure/explorer serve');
+    await utils.spawn('yarn explorer serve');
 }
 
 export async function exitProof(...args: string[]) {

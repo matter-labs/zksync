@@ -9,7 +9,8 @@
         "printWidth": 120,
         "parser": "typescript",
         "singleQuote": true,
-        "trailingComma": "none"
+        "trailingComma": "none",
+        "bracketSpacing": true
     },
     "scripts": {
         "build": "tsc",

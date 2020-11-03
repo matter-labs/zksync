@@ -23,7 +23,7 @@ export async function build() {
     await utils.confirmAction();
     prepareVerify();
     await utils.spawn('cargo run --release --bin gen_token_add_contract');
-    await utils.spawn('yarn --cwd contracts build');
+    await utils.spawn('yarn contracts build');
 }
 
 async function prepareTestContracts() {
@@ -95,17 +95,17 @@ export async function buildDev() {
     await utils.confirmAction();
     prepareVerify();
     await prepareTestContracts();
-    await utils.spawn('yarn --cwd contracts build-dev');
+    await utils.spawn('yarn contracts build-dev');
 }
 
 export async function publish() {
-    await utils.spawn('yarn --cwd contracts publish-sources');
+    await utils.spawn('yarn contracts publish-sources');
 }
 
 export async function deploy() {
     await utils.confirmAction();
     console.log('Deploying contracts, results will be inserted into the db');
-    await utils.spawn('yarn --cwd contracts deploy-no-build | tee deploy.log');
+    await utils.spawn('yarn contracts deploy-no-build | tee deploy.log');
     const deployLog = fs.readFileSync('deploy.log').toString();
     const envVars = [
         'GOVERNANCE_TARGET_ADDR',

@@ -26,20 +26,15 @@ export async function init() {
 }
 
 async function checkEnv() {
-    await utils.exec('which node');
+    const tools = ['node', 'yarn', 'docker', 'docker-compose', 'cargo', 'psql', 'pg_isready', 'diesel', 'solc'];
+    for (const tool of tools) {
+        await utils.exec(`which ${tool}`);
+    }
+    await utils.exec('cargo sqlx --version');
     const { stdout: version } = await utils.exec('node --version');
     if ('v14' >= version) {
         throw new Error('Error, node.js version 14 or higher is required');
     }
-    await utils.exec('which yarn');
-    await utils.exec('which docker');
-    await utils.exec('which docker-compose');
-    await utils.exec('which cargo');
-    await utils.exec('cargo sqlx --version');
-    await utils.exec('which psql');
-    await utils.exec('which pg_isready');
-    await utils.exec('which diesel');
-    await utils.exec('which solc');
 }
 
 export const command = new Command('init')

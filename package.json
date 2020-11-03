@@ -6,14 +6,12 @@
   "workspaces": {
     "packages": [
       "sdk/zksync.js",
-
       "contracts",
-  
       "infrastructure/analytics",
       "infrastructure/fee-seller",
       "infrastructure/zcli",
       "infrastructure/explorer",
-  
+      "infrastructure/zk",
       "core/tests/ts-tests"
     ],
     "nohoist": [
@@ -23,7 +21,6 @@
       "**/eslint-plugin-vue/**",
       "**/vue-template-compiler/**",
       "**/bootstrap-vue/**",
-  
       "**/@vue",
       "**/babel-eslint",
       "**/eslint",
@@ -33,12 +30,13 @@
     ]
   },
   "scripts": {
-    "zksync" : "yarn workspace zksync",
-    "contracts" : "yarn workspace franklin-contracts",
-    "analytics" : "yarn workspace analytics",
-    "fee-seller" : "yarn workspace fee-seller",
-    "zcli" : "yarn workspace zcli",
-    "ts-tests" : "yarn workspace ts-tests",
-    "explorer" : "yarn workspace sync-explorer"
+    "zksync": "yarn workspace zksync",
+    "contracts": "yarn workspace franklin-contracts",
+    "analytics": "yarn workspace analytics",
+    "fee-seller": "yarn workspace fee-seller",
+    "zcli": "yarn workspace zcli",
+    "ts-tests": "yarn workspace ts-tests",
+    "explorer": "yarn workspace sync-explorer",
+    "zk": "yarn workspace zk"
   }
 }
