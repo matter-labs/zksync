@@ -4,6 +4,14 @@
     "license": "MIT",
     "main": "build/index.js",
     "types": "build/index.d.ts",
+    "prettier": {
+        "tabWidth": 4,
+        "printWidth": 120,
+        "parser": "typescript",
+        "singleQuote": true,
+        "trailingComma": "none",
+        "bracketSpacing": true
+    },
     "dependencies": {
         "axios": "^0.21.0",
         "websocket": "^1.0.30",
@@ -36,7 +44,7 @@
         "lint:ts": "tslint -c tslint.json {examples,test,src}/**/*.ts",
         "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
         "tests": "mocha -r ts-node/register tests/**/*.test.ts",
-        "fmt": "prettier --tab-width 4 --print-width 120 --parser typescript --write \"{src,tests,examples}/*.ts\"",
+        "fmt": "prettier --write \"{src,tests,examples}/*.ts\"",
         "build": "tsc",
         "watch": "tsc --watch",
         "prepublish": "yarn build && rollup -c"
