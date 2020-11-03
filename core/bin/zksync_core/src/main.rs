@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .expect("Error setting Ctrl+C handler");
     }
-    let connection_pool = ConnectionPool::new(None).await;
+    let connection_pool = ConnectionPool::new(None);
 
     let task_handles = run_core(connection_pool, stop_signal_sender)
         .await

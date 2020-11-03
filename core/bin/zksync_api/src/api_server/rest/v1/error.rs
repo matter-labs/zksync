@@ -69,9 +69,15 @@ impl Error {
     }
 }
 
+impl Display for ErrorBody {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.title)
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({})", self.body.title, self.http_code)
+        write!(f, "{} ({})", self.body, self.http_code)
     }
 }
 

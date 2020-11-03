@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     // It's a `ServerCommand::Launch`, perform the usual routine.
     log::info!("Running the zkSync server");
 
-    let connection_pool = ConnectionPool::new(None).await;
+    let connection_pool = ConnectionPool::new(None);
     let config_options = ConfigurationOptions::from_env();
     let prover_options = ProverOptions::from_env();
 

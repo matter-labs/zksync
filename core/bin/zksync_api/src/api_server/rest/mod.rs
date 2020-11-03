@@ -23,8 +23,7 @@ async fn start_server(api_v01: ApiV01, bind_to: SocketAddr) {
         let api_v1_scope = {
             let pool = api_v01.connection_pool.clone();
             let env_options = api_v01.config_options.clone();
-            let contract_address = api_v01.contract_address.parse().unwrap();
-            v1::api_scope(pool, contract_address, env_options)
+            v1::api_scope(pool, env_options)
         };
 
         App::new()

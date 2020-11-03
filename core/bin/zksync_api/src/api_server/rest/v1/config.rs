@@ -12,6 +12,7 @@ use zksync_config::ConfigurationOptions;
 use zksync_types::Address;
 
 // Local uses
+use super::client::{self, Client};
 
 /// Readonly data between `api/v1/config` endpoints.
 #[derive(Debug, Clone)]
@@ -24,9 +25,9 @@ struct ApiConfigData {
 }
 
 impl ApiConfigData {
-    fn new(contract_address: Address, env_options: &ConfigurationOptions) -> Self {
+    fn new(env_options: &ConfigurationOptions) -> Self {
         let mut contracts = BTreeMap::new();
-        contracts.insert("contract".to_owned(), contract_address);
+        contracts.insert("contract".to_owned(), env_options.contract_eth_addr);
 
         Self {
             contracts: Rc::from(contracts),
@@ -35,6 +36,24 @@ impl ApiConfigData {
         }
     }
 }
+
+// Client implementation
+
+impl Client {
+    pub async fn contracts(&self) -> client::Result<BTreeMap<String, Address>> {
+        self.get("config/contracts").await
+    }
+
+    pub async fn deposit_confirmations(&self) -> client::Result<u64> {
+        self.get("config/deposit_confirmations").await
+    }
+
+    pub async fn network(&self) -> client::Result<String> {
+        self.get("config/network").await
+    }
+}
+
+// Server implementation
 
 async fn contracts<'a>(data: web::Data<ApiConfigData>) -> Json<Rc<BTreeMap<String, Address>>> {
     Json(data.contracts.clone())
@@ -48,8 +67,8 @@ async fn network(data: web::Data<ApiConfigData>) -> Json<String> {
     Json(data.network.clone())
 }
 
-pub fn api_scope(contract_address: Address, env_options: &ConfigurationOptions) -> Scope {
-    let data = ApiConfigData::new(contract_address, env_options);
+pub fn api_scope(env_options: &ConfigurationOptions) -> Scope {
+    let data = ApiConfigData::new(env_options);
 
     web::scope("config")
         .data(data)
@@ -59,4 +78,28 @@ pub fn api_scope(contract_address: Address, env_options: &ConfigurationOptions) 
             "deposit_confirmations",
             web::get().to(deposit_confirmations),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{super::test::TestServerConfig, *};
+
+    #[actix_rt::test]
+    async fn test_config_scope() {
+        let cfg = TestServerConfig::default();
+        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.env_options));
+
+        assert_eq!(
+            client.deposit_confirmations().await.unwrap(),
+            cfg.env_options.confirmations_for_eth_event
+        );
+
+        assert_eq!(client.network().await.unwrap(), cfg.env_options.eth_network);
+        assert_eq!(
+            client.contracts().await.unwrap().get("contract"),
+            Some(&cfg.env_options.contract_eth_addr),
+        );
+
+        server.stop().await;
+    }
 }

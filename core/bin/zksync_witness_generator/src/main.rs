@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         .expect("Error setting Ctrl-C handler");
     }
 
-    let connection_pool = ConnectionPool::new(Some(WITNESS_GENERATOR_CONNECTION_POOL_SIZE)).await;
+    let connection_pool = ConnectionPool::new(Some(WITNESS_GENERATOR_CONNECTION_POOL_SIZE));
     let config_options = ConfigurationOptions::from_env();
     let prover_options = ProverOptions::from_env();
 

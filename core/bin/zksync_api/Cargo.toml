@@ -10,6 +10,10 @@ keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
+[features]
+default = []
+api_test = []
+
 [dependencies]
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
@@ -57,4 +61,3 @@ async-trait = "0.1.31"
 jsonwebtoken = "7"
 
 lru-cache = "0.1.2"
-
