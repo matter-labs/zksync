@@ -1042,20 +1042,6 @@
       "nullable": []
     }
   },
-  "3ef4df054f65bf580df68d9e538215eb76baacaae2793f21fff54a2e95aafb94": {
-    "query": "UPDATE operations\n            SET confirmed = $1\n            WHERE id = $2 OR id = $3",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bool",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "41a4d1c9fa9953cd94714a408afd892962f9eea9a9f1674b8dddfa72e2eb9ec2": {
     "query": "INSERT INTO eth_tx_hashes (eth_op_id, tx_hash) VALUES ($1, $2)",
     "describe": {

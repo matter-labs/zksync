@@ -1,5 +1,5 @@
-import "isomorphic-fetch";
-import * as ethers from "ethers";
+import 'isomorphic-fetch';
+import * as ethers from 'ethers';
 
 type BaseProvider = ethers.ethers.providers.BaseProvider;
 

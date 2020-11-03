@@ -5,6 +5,14 @@
   "main": "build/index.js",
   "author": "Vladyslav-Bochok",
   "license": "MIT",
+  "prettier": {
+    "tabWidth": 4,
+    "printWidth": 120,
+    "parser": "typescript",
+    "singleQuote": true,
+    "trailingComma": "none",
+    "bracketSpacing": true
+  },
   "dependencies": {
     "commander": "^6.1.0",
     "ethers": "^5.0.12",
@@ -17,7 +25,7 @@
     "watch": "tsc --watch",
     "start": "node build/index.js",
     "test": "zk f mocha -t 1000000 -r ts-node/register tests/**/*.test.ts",
-    "fmt": "prettier --tab-width 4 --print-width 120 --parser typescript --write \"{src,tests}/*.ts\""
+    "fmt": "prettier --write {src,tests}/*.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.12",

@@ -2522,6 +2522,7 @@ dependencies = [
  "hex",
  "log 0.4.11",
  "num",
+ "once_cell",
  "rand 0.4.6",
  "reqwest",
  "serde",
