@@ -312,7 +312,7 @@ impl Mempool {
         let batch_id = transaction
             .chain()
             .mempool_schema()
-            .insert_batch(&batch.txs, eth_signature.as_ref())
+            .insert_batch(&batch.txs, eth_signature)
             .await
             .map_err(|err| {
                 log::warn!("Mempool storage access error: {}", err);

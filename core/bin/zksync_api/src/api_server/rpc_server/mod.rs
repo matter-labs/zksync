@@ -586,23 +586,13 @@ async fn veryfy_txs_batch_signature(
             eth_sign_data,
         });
     }
-    // User is expected to sign concatenated hashes of batch
-    // transactions.
-    //
-    // We do not require this to be valid UTF-8, this message
-    // is supposed to be used as a sequence of bytes for
-    // signature verification and to be discarded afterwards.
-    let message = unsafe {
-        String::from_utf8_unchecked(
-            tiny_keccak::keccak256(
-                txs.iter()
-                    .flat_map(|tx| tx.tx.get_bytes())
-                    .collect::<Vec<u8>>()
-                    .as_slice(),
-            )
-            .to_vec(),
-        )
-    };
+    // User is expected to sign hash of the data of all transactions in the batch.
+    let message = hex::encode(tiny_keccak::keccak256(
+        txs.iter()
+            .flat_map(|tx| tx.tx.get_bytes())
+            .collect::<Vec<u8>>()
+            .as_slice(),
+    ));
     let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiever) = oneshot::channel();

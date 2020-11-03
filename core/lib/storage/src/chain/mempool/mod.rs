@@ -129,7 +129,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn insert_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
-        eth_signature: Option<&TxEthSignature>,
+        eth_signature: Option<TxEthSignature>,
     ) -> QueryResult<i64> {
         if txs.is_empty() {
             anyhow::bail!("Cannot insert an empty batch");
