@@ -12,7 +12,7 @@ zk dummy-prover enable --no-redeploy
 # Initialize the stack
 zk run verify-keys unpack
 zk run yarn || true # It can fail
-zk run db setup
+zk db setup
 zk contract build-dev
 zk run deploy-erc20 dev
 zk contract build
