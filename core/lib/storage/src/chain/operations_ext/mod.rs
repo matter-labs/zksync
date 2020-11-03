@@ -1,4 +1,5 @@
 // Built-in deps
+use std::time::Instant;
 // External imports
 use chrono::{DateTime, Utc};
 // Workspace imports
@@ -37,11 +38,12 @@ pub struct OperationsExtSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     pub async fn tx_receipt(&mut self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
+        let start = Instant::now();
         let tx = OperationsSchema(self.0)
             .get_executed_operation(hash)
             .await?;
 
-        if let Some(tx) = tx {
+        let result = if let Some(tx) = tx {
             // Check whether transaction was verified.
             let verified = OperationsSchema(self.0)
                 .get_operation(tx.block_number as u32, ActionType::VERIFY)
@@ -64,19 +66,23 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }))
         } else {
             Ok(None)
-        }
+        };
+
+        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "tx_receipt");
+        result
     }
 
     pub async fn get_priority_op_receipt(
         &mut self,
         op_id: u32,
     ) -> QueryResult<PriorityOpReceiptResponse> {
+        let start = Instant::now();
         // TODO: jazzandrock maybe use one db query(?).
         let stored_executed_prior_op = OperationsSchema(self.0)
             .get_executed_priority_operation(op_id)
             .await?;
 
-        match stored_executed_prior_op {
+        let result = match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
                 let prover_run: Option<ProverRun> = ProverSchema(self.0)
                     .get_existing_prover_run(stored_executed_prior_op.block_number as u32)
@@ -100,7 +106,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 verified: false,
                 prover_run: None,
             }),
-        }
+        };
+
+        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_priority_op_receipt");
+        result
     }
 
     pub async fn get_tx_by_hash(&mut self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
@@ -121,12 +130,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     /// Helper method for `get_tx_by_hash` which attempts to find a transaction
     /// in the list of executed operations.
     async fn find_tx_by_hash(&mut self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+        let start = Instant::now();
         // TODO: Maybe move the transformations to api_server?
         let query_result = OperationsSchema(self.0)
             .get_executed_operation(hash)
             .await?;
 
-        if let Some(tx) = query_result {
+        let result = if let Some(tx) = query_result {
             let block_number = tx.block_number;
             let fail_reason = tx.fail_reason.clone();
             let created_at = tx.created_at.format("%Y-%m-%dT%H:%M:%S%.6f").to_string();
@@ -193,7 +203,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 tx_type
             };
 
-            return Ok(Some(TxByHashResponse {
+            Some(TxByHashResponse {
                 tx_type: tx_type_user.to_string(),
                 from: tx_from,
                 to: tx_to,
@@ -205,10 +215,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at,
                 fail_reason,
                 tx: tx.tx,
-            }));
+            })
+        } else {
+            None
         };
 
-        Ok(None)
+        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "find_tx_by_hash");
+        Ok(result)
     }
 
     /// Helper method for `get_tx_by_hash` which attempts to find a transaction
@@ -217,12 +230,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         &mut self,
         hash: &[u8],
     ) -> QueryResult<Option<TxByHashResponse>> {
+        let start = Instant::now();
         // TODO: Maybe move the transformations to api_server?
         let tx: Option<StoredExecutedPriorityOperation> = OperationsSchema(self.0)
             .get_executed_priority_operation_by_hash(hash)
             .await?;
 
-        if let Some(tx) = tx {
+        let result = if let Some(tx) = tx {
             let operation = tx.operation;
             let block_number = tx.block_number;
             let created_at = tx.created_at.format("%Y-%m-%dT%H:%M:%S%.6f").to_string();
@@ -269,7 +283,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 ),
             };
 
-            return Ok(Some(TxByHashResponse {
+            Some(TxByHashResponse {
                 tx_type: tx_type.to_string(),
                 from: tx_from,
                 to: tx_to,
@@ -281,10 +295,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 created_at,
                 fail_reason: None,
                 tx: operation,
-            }));
+            })
+        } else {
+            None
         };
 
-        Ok(None)
+        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "find_priority_op_by_hash");
+        Ok(result)
     }
 
     /// Loads the date and time of the moment when the first transaction for the account was executed.
@@ -293,6 +310,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         &mut self,
         address: &Address,
     ) -> QueryResult<Option<DateTime<Utc>>> {
+        let start = Instant::now();
         // This query loads the `committed_at` field from both `executed_transactions` and
         // `executed_priority_operations` tables and returns the oldest result.
         let first_history_entry = sqlx::query_as!(
@@ -331,6 +349,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "account_created_on");
         Ok(first_history_entry.map(|entry| entry.created_at))
     }
 
@@ -342,6 +361,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         offset: u64,
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+        let start = Instant::now();
         // This query does the following:
         // - creates a union of `executed_transactions` and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
@@ -468,6 +488,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 };
             }
         }
+
+        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_account_transactions_history");
         Ok(tx_history)
     }
 
@@ -487,6 +509,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         direction: SearchDirection,
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+        let start = Instant::now();
         // Filter for txs that older/newer than provided tx ID.
         // For older blocks, block number should be between 0 and block number - 1,
         // or for the same block number, transaction in block should be between 0 and tx in block number - 1.
@@ -634,6 +657,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 };
             }
         }
+
+        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_account_transactions_history_from");
         Ok(tx_history)
     }
 }

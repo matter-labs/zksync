@@ -1,6 +1,5 @@
 // Built-in deps
-use std::env;
-use std::fmt;
+use std::{env, fmt, time::Instant};
 // External imports
 use async_trait::async_trait;
 use deadpool::managed::{Manager, PoolConfig, RecycleResult, Timeouts};
@@ -79,7 +78,9 @@ impl ConnectionPool {
     /// This method is intended to be used in crucial contexts, where the
     /// database access is must-have (e.g. block committer).
     pub async fn access_storage(&self) -> Result<StorageProcessor<'_>, SqlxError> {
+        let start = Instant::now();
         let connection = self.pool.get().await.unwrap();
+        metrics::histogram!("sql.connection_acquire", start.elapsed());
 
         Ok(StorageProcessor::from_pool(connection))
     }

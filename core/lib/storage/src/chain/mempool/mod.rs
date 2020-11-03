@@ -1,5 +1,5 @@
 // Built-in deps
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
@@ -22,6 +22,7 @@ pub struct MempoolSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// Loads all the transactions stored in the mempool schema.
     pub async fn load_txs(&mut self) -> QueryResult<VecDeque<SignedTxVariant>> {
+        let start = Instant::now();
         // Load the transactions from mempool along with corresponding batch IDs.
         let txs: Vec<MempoolTx> = sqlx::query_as!(
             MempoolTx,
@@ -97,12 +98,14 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 .nonce(),
         });
 
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "load_txs");
         Ok(txs.into())
     }
 
     /// Adds a new transactions batch to the mempool schema.
     /// Returns id of the inserted batch
     pub async fn insert_batch(&mut self, txs: &[SignedZkSyncTx]) -> QueryResult<i64> {
+        let start = Instant::now();
         if txs.is_empty() {
             anyhow::bail!("Cannot insert an empty batch");
         }
@@ -167,11 +170,13 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "insert_batch");
         Ok(batch_id)
     }
 
     /// Adds a new transaction to the mempool schema.
     pub async fn insert_tx(&mut self, tx_data: &SignedZkSyncTx) -> QueryResult<()> {
+        let start = Instant::now();
         let tx_hash = hex::encode(tx_data.tx.hash().as_ref());
         let tx = serde_json::to_value(&tx_data.tx)?;
         let batch_id = 0; // Special case: batch_id == 0 <==> transaction is not a part of some batch
@@ -193,10 +198,12 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "insert_tx");
         Ok(())
     }
 
     pub async fn remove_tx(&mut self, tx: &[u8]) -> QueryResult<()> {
+        let start = Instant::now();
         let tx_hash = hex::encode(tx);
 
         sqlx::query!(
@@ -207,10 +214,12 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "remove_tx");
         Ok(())
     }
 
     pub async fn remove_txs(&mut self, txs: &[TxHash]) -> QueryResult<()> {
+        let start = Instant::now();
         let tx_hashes: Vec<_> = txs.iter().map(hex::encode).collect();
 
         sqlx::query!(
@@ -220,6 +229,8 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "remove_txs");
 
         Ok(())
     }
@@ -234,6 +245,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     /// This method is expected to be initially invoked on the server start, and then
     /// invoked periodically with a big interval (to prevent possible database bloating).
     pub async fn collect_garbage(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
         let all_txs: Vec<_> = self.load_txs().await?.into_iter().collect();
         let mut tx_hashes_to_remove = Vec::new();
 
@@ -269,6 +281,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         self.remove_txs(&tx_hashes_to_remove).await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "collect_garbage");
         Ok(())
     }
 }

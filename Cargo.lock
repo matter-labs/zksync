@@ -2522,6 +2522,7 @@ dependencies = [
  "hex",
  "log 0.4.11",
  "num",
+ "once_cell",
  "rand 0.4.6",
  "reqwest",
  "serde",
@@ -2630,6 +2631,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
 dependencies = [
  "autocfg 1.0.1",
+]
+
+[[package]]
+name = "metrics"
+version = "0.13.0-alpha.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f059a62fe88c33ee501116c762d8d1da5a69b8ea33a938ac6918af9b135b56a"
+dependencies = [
+ "metrics-macros",
+ "once_cell",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "metrics-macros"
+version = "0.1.0-alpha.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64523162f5087a5268890e572caedb44c060f37252497fa144f4d91fe517e777"
+dependencies = [
+ "lazy_static",
+ "proc-macro-hack",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
 ]
 
 [[package]]
@@ -5804,6 +5830,7 @@ dependencies = [
  "hex",
  "itertools 0.8.2",
  "log 0.4.11",
+ "metrics",
  "num",
  "parity-crypto",
  "serde",

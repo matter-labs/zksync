@@ -1,4 +1,5 @@
 // Built-in deps
+use std::time::Instant;
 // External imports
 use anyhow::format_err;
 // Workspace imports
@@ -26,6 +27,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         action_type: ActionType,
         confirmed: Option<bool>,
     ) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
         let max_block = sqlx::query!(
             r#"SELECT max(block_number) FROM operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2"#,
             action_type.to_string(),
@@ -36,6 +38,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .max
         .unwrap_or(0);
 
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_last_block_by_action");
         Ok(max_block as BlockNumber)
     }
 
@@ -44,7 +47,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         block_number: BlockNumber,
         action_type: ActionType,
     ) -> Option<StoredOperation> {
-        sqlx::query_as!(
+        let start = Instant::now();
+        let result = sqlx::query_as!(
             StoredOperation,
             "SELECT * FROM operations WHERE block_number = $1 AND action_type = $2",
             i64::from(block_number),
@@ -53,13 +57,17 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await
         .ok()
-        .flatten()
+        .flatten();
+
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_operation");
+        result
     }
 
     pub async fn get_executed_operation(
         &mut self,
         op_hash: &[u8],
     ) -> QueryResult<Option<StoredExecutedTransaction>> {
+        let start = Instant::now();
         let op = sqlx::query_as!(
             StoredExecutedTransaction,
             "SELECT * FROM executed_transactions WHERE tx_hash = $1",
@@ -68,6 +76,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_executed_operation");
         Ok(op)
     }
 
@@ -75,6 +84,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         priority_op_id: u32,
     ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
+        let start = Instant::now();
         let op = sqlx::query_as!(
             StoredExecutedPriorityOperation,
             "SELECT * FROM executed_priority_operations WHERE priority_op_serialid = $1",
@@ -83,6 +93,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_executed_priority_operation");
         Ok(op)
     }
 
@@ -90,6 +101,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         eth_hash: &[u8],
     ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
+        let start = Instant::now();
         let op = sqlx::query_as!(
             StoredExecutedPriorityOperation,
             "SELECT * FROM executed_priority_operations WHERE eth_hash = $1",
@@ -98,6 +110,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_executed_priority_operation_by_hash");
         Ok(op)
     }
 
@@ -105,6 +118,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         operation: NewOperation,
     ) -> QueryResult<StoredOperation> {
+        let start = Instant::now();
         let op = sqlx::query_as!(
             StoredOperation,
             "INSERT INTO operations (block_number, action_type) VALUES ($1, $2)
@@ -114,6 +128,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .fetch_one(self.0.conn())
         .await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "store_operation");
         Ok(op)
     }
 
@@ -122,6 +137,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         block_number: BlockNumber,
         action_type: ActionType,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "UPDATE operations
                 SET confirmed = $1
@@ -132,6 +148,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "confirm_operation");
         Ok(())
     }
 
@@ -140,6 +157,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         operation: NewExecutedTransaction,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         MempoolSchema(&mut transaction)
@@ -201,6 +219,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "store_executed_tx");
         Ok(())
     }
 
@@ -208,6 +227,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         operation: NewExecutedPriorityOperation,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -226,6 +246,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "store_executed_priority_op");
         Ok(())
     }
 
@@ -235,6 +256,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         hash: &TxHash,
         id: Option<i64>,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let pending_withdrawal_id = match id {
             Some(id) => id,
             None => {
@@ -259,6 +281,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "add_pending_withdrawal");
         Ok(())
     }
 
@@ -266,6 +289,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         tx: CompleteWithdrawalsTx,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "INSERT INTO complete_withdrawals_transactions (tx_hash, pending_withdrawals_queue_start_index, pending_withdrawals_queue_end_index)
             VALUES ($1, $2, $3)
@@ -278,6 +302,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "add_complete_withdrawals_transaction");
         Ok(())
     }
 
@@ -295,6 +320,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         withdrawal_hash: &TxHash,
     ) -> QueryResult<Option<H256>> {
+        let start = Instant::now();
         let pending_withdrawal = sqlx::query_as!(
             StoredPendingWithdrawal,
             "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1
@@ -326,6 +352,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             None => None,
         };
 
+        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "eth_tx_for_withdrawal");
         Ok(res)
     }
 }
