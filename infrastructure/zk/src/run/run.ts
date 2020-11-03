@@ -7,6 +7,22 @@ import * as dataRestore from './data-restore';
 
 export { verifyKeys, dataRestore };
 
+export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: string, decimals?: string) {
+    if (command == 'dev') {
+        await utils.spawn(`yarn --silent --cwd contracts deploy-erc20 add-multi '
+            [
+                { "name": "DAI",  "symbol": "DAI",  "decimals": 18 },
+                { "name": "wBTC", "symbol": "wBTC", "decimals":  8 },
+                { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
+                { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
+            ]' > ./etc/tokens/localhost.json`);
+    } else if (command == 'new') {
+        await utils.spawn(
+            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
+        );
+    }
+}
+
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn --cwd sdk/zksync.js');
@@ -95,6 +111,16 @@ command.command('explorer').description('run zksync explorer locally').action(ex
 command.command('yarn').description('install all JS dependencies').action(yarn);
 command.command('test-upgrade <main_contract> <gatekeeper_contract>').action(testUpgrade);
 command.command('cat-logs [exit_code]').description('print server and prover logs').action(catLogs);
+
+command
+    .command('deploy-erc20 <dev|new> [name] [symbol] [decimals]')
+    .description('deploy ERC20 tokens')
+    .action(async (command: string, name?: string, symbol?: string, decimals?: string) => {
+        if (command != 'dev' && command != 'new') {
+            throw new Error('only "dev" and "new" subcommands are allowed');
+        }
+        await deployERC20(command, name, symbol, decimals);
+    });
 
 command
     .command('plonk-setup [powers]')

@@ -19,27 +19,11 @@ export async function init() {
     await run.verifyKeys.unpack();
     await db.setup();
     await contract.buildDev();
-    await deployERC20('dev');
+    await run.deployERC20('dev');
     await contract.build();
     await db.reset();
     await server.genesis();
     await contract.redeploy();
-}
-
-async function deployERC20(command: 'dev' | 'new', name?: string, symbol?: string, decimals?: string) {
-    if (command == 'dev') {
-        await utils.spawn(`yarn --silent --cwd contracts deploy-erc20 add-multi '
-            [
-                { "name": "DAI",  "symbol": "DAI",  "decimals": 18 },
-                { "name": "wBTC", "symbol": "wBTC", "decimals":  8 },
-                { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
-                { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
-            ]' > ./etc/tokens/localhost.json`);
-    } else if (command == 'new') {
-        await utils.spawn(
-            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
-        );
-    }
 }
 
 async function checkEnv() {
