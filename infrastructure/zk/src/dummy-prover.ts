@@ -9,7 +9,6 @@ const VERIFIER_FILE = 'contracts/contracts/Verifier.sol';
 
 async function performRedeployment() {
     await contract.build();
-    await db.reset();
     await server.genesis();
     await contract.redeploy();
 }

@@ -2,12 +2,14 @@ import { Command } from 'commander';
 import * as utils from './utils';
 import * as env from './env';
 import fs from 'fs';
+import * as db from './db/db';
 
 export async function server() {
     await utils.spawn('cargo run --bin zksync_server --release');
 }
 
 export async function genesis() {
+    await db.reset();
     await utils.confirmAction();
     await utils.spawn('cargo run --bin zksync_server --release -- --genesis | tee genesis.log');
     const genesisRoot = fs.readFileSync('genesis.log').toString();
