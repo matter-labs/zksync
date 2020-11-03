@@ -59,7 +59,7 @@ async fn executed_operations(mut storage: StorageProcessor<'_>) -> QueryResult<(
     };
 
     OperationsSchema(&mut storage)
-        .store_executed_operation(executed_tx.clone())
+        .store_executed_tx(executed_tx.clone())
         .await?;
 
     let stored_operation = OperationsSchema(&mut storage)
@@ -101,7 +101,7 @@ async fn executed_priority_operations(mut storage: StorageProcessor<'_>) -> Quer
         created_at: chrono::Utc::now(),
     };
     OperationsSchema(&mut storage)
-        .store_executed_priority_operation(executed_tx.clone())
+        .store_executed_priority_op(executed_tx.clone())
         .await?;
 
     let stored_operation = OperationsSchema(&mut storage)
@@ -161,16 +161,16 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
 
     // Save the same operations twice.
     OperationsSchema(&mut storage)
-        .store_executed_operation(executed_tx.clone())
+        .store_executed_tx(executed_tx.clone())
         .await?;
     OperationsSchema(&mut storage)
-        .store_executed_operation(executed_tx.clone())
+        .store_executed_tx(executed_tx.clone())
         .await?;
     OperationsSchema(&mut storage)
-        .store_executed_priority_operation(executed_priority_op.clone())
+        .store_executed_priority_op(executed_priority_op.clone())
         .await?;
     OperationsSchema(&mut storage)
-        .store_executed_priority_operation(executed_priority_op.clone())
+        .store_executed_priority_op(executed_priority_op.clone())
         .await?;
 
     // Check that we can still load it.
@@ -217,7 +217,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     // Save the failed operation.
     OperationsSchema(&mut storage)
-        .store_executed_operation(executed_tx.clone())
+        .store_executed_tx(executed_tx.clone())
         .await?;
 
     // Check that we can still load it.
@@ -230,7 +230,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
     executed_tx.success = true;
 
     OperationsSchema(&mut storage)
-        .store_executed_operation(executed_tx.clone())
+        .store_executed_tx(executed_tx.clone())
         .await?;
 
     // Obtain tx and check that it's now successful.
@@ -250,7 +250,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Now try to replace successfull transation wi`th a failed one.
     executed_tx.success = false;
     OperationsSchema(&mut storage)
-        .store_executed_operation(executed_tx.clone())
+        .store_executed_tx(executed_tx.clone())
         .await?;
 
     // ...it should not be replaced.

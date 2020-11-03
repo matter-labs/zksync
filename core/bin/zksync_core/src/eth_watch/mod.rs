@@ -25,19 +25,18 @@ use web3::{
 };
 // Workspace deps
 use zksync_config::ConfigurationOptions;
-use zksync_contracts::{eip1271_contract, zksync_contract};
+use zksync_contracts::zksync_contract;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     ethereum::CompleteWithdrawalsTx,
-    tx::EIP1271Signature,
     {Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp},
 };
 // Local deps
 use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
 
 /// isValidSignature return value according to EIP1271 standard
-/// bytes4(keccak256("isValidSignature(bytes,bytes)")
+/// bytes4(keccak256("isValidSignature(bytes32,bytes)")
 pub const EIP1271_SUCCESS_RETURN_VALUE: [u8; 4] = [0x20, 0xc1, 0x3b, 0x0b];
 
 mod eth_state;
@@ -85,12 +84,6 @@ pub enum EthWatchRequest {
     GetUnconfirmedOpByHash {
         eth_hash: Vec<u8>,
         resp: oneshot::Sender<Option<(EthBlockId, PriorityOp)>>,
-    },
-    CheckEIP1271Signature {
-        address: Address,
-        message: Vec<u8>,
-        signature: EIP1271Signature,
-        resp: oneshot::Sender<Result<bool, anyhow::Error>>,
     },
     GetPendingWithdrawalsQueueIndex {
         resp: oneshot::Sender<Result<u32, anyhow::Error>>,
@@ -142,10 +135,6 @@ impl<T: Transport> EthWatch<T> {
     /// Atomically replaces the stored Ethereum state.
     fn set_new_state(&mut self, new_state: ETHState) {
         self.eth_state = new_state;
-    }
-
-    fn get_eip1271_contract(&self, address: Address) -> Contract<T> {
-        Contract::new(self.web3.eth(), address, eip1271_contract())
     }
 
     fn get_priority_op_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
@@ -410,27 +399,6 @@ impl<T: Transport> EthWatch<T> {
         res
     }
 
-    async fn is_eip1271_signature_correct(
-        &self,
-        address: Address,
-        message: Vec<u8>,
-        signature: EIP1271Signature,
-    ) -> Result<bool, anyhow::Error> {
-        let received: [u8; 4] = self
-            .get_eip1271_contract(address)
-            .query(
-                "isValidSignature",
-                (message, signature.0),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| format_err!("Failed to query contract isValidSignature: {}", e))?;
-
-        Ok(received == EIP1271_SUCCESS_RETURN_VALUE)
-    }
-
     async fn is_new_pubkey_hash_authorized(
         &self,
         address: Address,
@@ -627,18 +595,6 @@ impl<T: Transport> EthWatch<T> {
                         .await
                         .unwrap_or(false);
                     resp.send(authorized).unwrap_or_default();
-                }
-                EthWatchRequest::CheckEIP1271Signature {
-                    address,
-                    message,
-                    signature,
-                    resp,
-                } => {
-                    let signature_correct = self
-                        .is_eip1271_signature_correct(address, message, signature)
-                        .await;
-
-                    resp.send(signature_correct).unwrap_or_default();
                 }
                 EthWatchRequest::GetPendingWithdrawalsQueueIndex { resp } => {
                     let pending_withdrawals_queue_index =

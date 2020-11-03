@@ -60,7 +60,7 @@ impl SharedNetworkStatus {
                         let last_verified = transaction
                             .chain()
                             .block_schema()
-                            .get_last_verified_block()
+                            .get_last_verified_confirmed_block()
                             .await
                             .unwrap_or(0);
 
