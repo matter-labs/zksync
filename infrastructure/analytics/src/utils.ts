@@ -1,5 +1,5 @@
-import "isomorphic-fetch";
-import * as ethers from "ethers";
+import 'isomorphic-fetch';
+import * as ethers from 'ethers';
 
 type BaseProvider = ethers.ethers.providers.BaseProvider;
 
@@ -114,5 +114,5 @@ export async function getBlockInterval(etherscanApiURL: string, etherscanApiKey:
 
     if (startBlock == null || endBlock == null) throw new Error(`Failed to get block by time from ${etherscanApiURL}`);
 
-    return {startBlock, endBlock};
+    return { startBlock, endBlock };
 }
