@@ -102,6 +102,19 @@
       ]
     }
   },
+  "0539dc6f65aaa5da2e04eed249d787332ff34c12abaa61b923f6f91433c3f5c0": {
+    "query": "INSERT INTO mempool_batches_signatures VALUES($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "05a15d67581b3f06b8e3994526d5e4394e82fe5bd6550a80bc54038637c31eac": {
     "query": "INSERT INTO operations (block_number, action_type) VALUES ($1, $2)\n            RETURNING *",
     "describe": {
@@ -443,6 +456,26 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "1788c64b5890217a94aa4db9709a74144d0a297d5dda5d431ecf822db69d698b": {
+    "query": "SELECT eth_signature FROM mempool_batches_signatures\n                    WHERE batch_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "eth_signature",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
