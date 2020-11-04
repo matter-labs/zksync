@@ -196,11 +196,18 @@ async fn verify_eth_signature_txs_batch(
             }
         }
         TxEthSignature::EIP1271Signature(signature) => {
+            // Prefix the message.
+            let message = format!(
+                "\x19Ethereum Signed Message:\n{}{}",
+                eth_sign_data.message.len(),
+                &eth_sign_data.message
+            );
+
             for tx in txs {
                 let signature_correct = eth_checker
                     .is_eip1271_signature_correct(
                         tx.tx.account(),
-                        eth_sign_data.message.as_bytes().to_vec(),
+                        message.as_bytes().to_vec(),
                         signature.clone(),
                     )
                     .await
