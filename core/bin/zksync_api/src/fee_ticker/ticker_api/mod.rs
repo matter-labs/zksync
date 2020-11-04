@@ -181,7 +181,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
 
-        // TODO: remove hardcode for Matter Labs Trial Token (issue #738)
+        // TODO: remove hardcode for Matter Labs Trial Token (#1036).
         if token.symbol == "MLTT" {
             return Ok(TokenPrice {
                 usd_price: Ratio::from_integer(1u32.into()),

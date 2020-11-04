@@ -26,7 +26,7 @@ mod data_pool;
 mod rest_api_tests;
 mod sdk_tests;
 
-// TODO Make it configurable
+// TODO: Make it configurable (#1116).
 const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_API_REQUEST_COUNT: usize = 1_000_000_000;
 

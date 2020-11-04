@@ -21,7 +21,6 @@ zksync promote-to-stage ci-build=23
 
 ## Promoting to testnet environment (target env = testnet or ropsten)
 
-// TODO: change testnet to rinkeby with issue #447.
 Process of promoting a build to testnet(rinkeby) and ropsten is the same. 
 1. Prepare env file, either `testnet.env` or `ropsten.env`
 2. Take base64 of env file (note: some base64 commands add `\n`, you should remove them with `--wrap=0` option):

@@ -37,7 +37,7 @@ mod gas_adjuster;
 mod transactions;
 mod tx_queue;
 
-// TODO: Restore tests
+// TODO: Restore tests (#1109).
 // #[cfg(test)]
 // mod tests;
 
@@ -553,7 +553,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             Some(status) => {
                 // Transaction failed, report the failure with details.
 
-                // TODO check confirmations for fail
+                // TODO: check confirmations for fail (#1110).
                 assert!(
                     status.receipt.is_some(),
                     "Receipt should exist for a failed transaction"

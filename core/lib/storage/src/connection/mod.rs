@@ -88,7 +88,7 @@ impl ConnectionPool {
     /// will not handle the database outages. This method is intended to be used in
     /// non-crucial contexts, such as API endpoint handlers.
     pub async fn access_storage_fragile(&self) -> Result<StorageProcessor<'_>, SqlxError> {
-        // TODO: Remove this method
+        // TODO: Remove this method (#1112).
         self.access_storage().await
     }
 

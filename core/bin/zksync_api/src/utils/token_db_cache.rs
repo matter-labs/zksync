@@ -8,7 +8,7 @@ use zksync_types::{Token, TokenId, TokenLike};
 #[derive(Debug, Clone)]
 pub struct TokenDBCache {
     db_pool: ConnectionPool,
-    // TODO: handle stale entries. (edge case when we rename token after adding it)
+    // TODO: handle stale entries, edge case when we rename token after adding it (#1097)
     tokens: Arc<RwLock<HashMap<TokenId, Token>>>,
 }
 

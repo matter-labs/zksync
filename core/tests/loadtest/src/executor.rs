@@ -120,7 +120,7 @@ impl LoadtestExecutor {
                 &(resource.wallets_amount * &wallet_balance + &self.sufficient_fee),
             );
 
-            // TODO Compute sufficient balance accurate.
+            // TODO: Compute sufficient balance accurate (#1116).
             amount_to_deposit += scenario_amount * BigUint::from(2_u64);
 
             let scenario_wallets = wait_all((0..resource.wallets_amount).map(|_| {
