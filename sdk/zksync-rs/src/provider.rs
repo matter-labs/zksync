@@ -2,9 +2,10 @@
 // from: https://github.com/matter-labs/zksync-dev/blob/dev/core/loadtest/src/rpc_client.rs
 
 // Built-in imports
+use std::time::Duration;
 
 // External uses
-use jsonrpc_core::types::response::Output;
+use jsonrpc_core::{types::response::Output, ErrorCode};
 
 // Workspace uses
 use zksync_types::{
@@ -171,14 +172,38 @@ impl Provider {
     /// the `Err` variant is returned (including the failed RPC method
     /// execution response).
     async fn post(&self, message: impl serde::Serialize) -> Result<serde_json::Value, ClientError> {
-        let reply: Output = self.post_raw(message).await?;
+        // Repeat requests with exponential backoff until an ok response is received to avoid
+        // network and internal errors impact.
+        const MAX_DURATION: Duration = Duration::from_secs(30);
+        let mut delay = Duration::from_millis(50);
+        loop {
+            let result = self.post_raw(&message).await;
 
-        let ret = match reply {
-            Output::Success(success) => success.result,
-            Output::Failure(failure) => return Err(ClientError::RpcError(failure)),
-        };
+            /// Determines if the error code is recoverable or not.
+            fn is_recoverable(code: &ErrorCode) -> bool {
+                code == &ErrorCode::InternalError
+                // This is a communication error code, so we can make attempt to retry request.
+                || code == &ErrorCode::ServerError(300)
+            }
 
-        Ok(ret)
+            let should_retry = match result.as_ref() {
+                Err(ClientError::NetworkError(..)) => true,
+                Err(ClientError::RpcError(fail)) if is_recoverable(&fail.error.code) => true,
+                Ok(Output::Failure(fail)) if is_recoverable(&fail.error.code) => true,
+                _ => false,
+            };
+
+            if should_retry && delay < MAX_DURATION {
+                delay += delay;
+                tokio::time::delay_for(delay).await;
+                continue;
+            }
+
+            match result? {
+                Output::Success(success) => return Ok(success.result),
+                Output::Failure(failure) => return Err(ClientError::RpcError(failure)),
+            };
+        }
     }
 
     /// Performs a POST query to the JSON RPC endpoint,

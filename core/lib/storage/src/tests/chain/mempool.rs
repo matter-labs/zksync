@@ -269,7 +269,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         batch_id: None,
     };
     OperationsSchema(&mut storage)
-        .store_executed_operation(executed_tx)
+        .store_executed_tx(executed_tx)
         .await?;
 
     // Collect the garbage. Execution transaction (very first one from the list)

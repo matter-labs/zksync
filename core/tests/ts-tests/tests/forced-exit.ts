@@ -73,7 +73,10 @@ Tester.prototype.testForcedExit = async function (initiatorWallet: Wallet, targe
     const targetBalance = await targetWallet.getBalance(token);
     const initiatorBalanceAfter = await initiatorWallet.getBalance(token);
     expect(targetBalance.isZero(), 'Wrong amount in target wallet after ForcedExit').to.be.true;
-    expect(initiatorBalanceBefore.sub(initiatorBalanceAfter).eq(fee), 'Wrong amount in initiator wallet after ForcedExit').to.be.true;
+    expect(
+        initiatorBalanceBefore.sub(initiatorBalanceAfter).eq(fee),
+        'Wrong amount in initiator wallet after ForcedExit'
+    ).to.be.true;
     this.runningFee = this.runningFee.add(fee);
     return handle;
 };

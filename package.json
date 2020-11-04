@@ -1,0 +1,44 @@
+{
+  "name": "zksync-root",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "sdk/zksync.js",
+
+      "contracts",
+  
+      "infrastructure/analytics",
+      "infrastructure/fee-seller",
+      "infrastructure/zcli",
+      "infrastructure/explorer",
+  
+      "core/tests/ts-tests"
+    ],
+    "nohoist": [
+      "**/@vue/**",
+      "**/babel-eslint/**",
+      "**/eslint/**",
+      "**/eslint-plugin-vue/**",
+      "**/vue-template-compiler/**",
+      "**/bootstrap-vue/**",
+  
+      "**/@vue",
+      "**/babel-eslint",
+      "**/eslint",
+      "**/eslint-plugin-vue",
+      "**/vue-template-compiler",
+      "**/bootstrap-vue"
+    ]
+  },
+  "scripts": {
+    "zksync" : "yarn workspace zksync",
+    "contracts" : "yarn workspace franklin-contracts",
+    "analytics" : "yarn workspace analytics",
+    "fee-seller" : "yarn workspace fee-seller",
+    "zcli" : "yarn workspace zcli",
+    "ts-tests" : "yarn workspace ts-tests",
+    "explorer" : "yarn workspace sync-explorer"
+  }
+}
