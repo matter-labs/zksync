@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish } from "ethers";
+import { BigNumber, BigNumberish } from 'ethers';
 
 // 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
@@ -12,7 +12,7 @@ export type TokenSymbol = string;
 // Token address (e.g. 0xde..ad for ERC20, or 0x00.00 for "ETH")
 export type TokenAddress = string;
 
-export type Nonce = number | "committed";
+export type Nonce = number | 'committed';
 
 export interface AccountState {
     address: Address;
@@ -48,14 +48,14 @@ export interface AccountState {
 }
 
 export type EthSignerType = {
-    verificationMethod: "ECDSA" | "ERC-1271";
+    verificationMethod: 'ECDSA' | 'ERC-1271';
     // Indicates if signer adds `\x19Ethereum Signed Message\n${msg.length}` prefix before signing message.
     // i.e. if false, we should add this prefix manually before asking to sign message
     isSignedMsgPrefixed: boolean;
 };
 
 export interface TxEthSignature {
-    type: "EthereumSignature" | "EIP1271Signature";
+    type: 'EthereumSignature' | 'EIP1271Signature';
     signature: string;
 }
 
@@ -65,7 +65,7 @@ export interface Signature {
 }
 
 export interface Transfer {
-    type: "Transfer";
+    type: 'Transfer';
     accountId: number;
     from: Address;
     to: Address;
@@ -77,7 +77,7 @@ export interface Transfer {
 }
 
 export interface Withdraw {
-    type: "Withdraw";
+    type: 'Withdraw';
     accountId: number;
     from: Address;
     to: Address;
@@ -89,7 +89,7 @@ export interface Withdraw {
 }
 
 export interface ForcedExit {
-    type: "ForcedExit";
+    type: 'ForcedExit';
     initiatorAccountId: number;
     target: Address;
     token: number;
@@ -99,7 +99,7 @@ export interface ForcedExit {
 }
 
 export interface ChangePubKey {
-    type: "ChangePubKey";
+    type: 'ChangePubKey';
     accountId: number;
     account: Address;
     newPkHash: PubKeyHash;
@@ -111,7 +111,7 @@ export interface ChangePubKey {
 }
 
 export interface CloseAccount {
-    type: "Close";
+    type: 'Close';
     account: Address;
     nonce: number;
     signature: Signature;
@@ -168,7 +168,7 @@ export interface ChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: "Withdraw" | "Transfer" | "TransferToNew" | "FastWithdraw" | ChangePubKeyFee;
+    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)
