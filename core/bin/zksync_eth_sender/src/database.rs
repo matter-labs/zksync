@@ -121,8 +121,23 @@ impl Database {
         &self,
         connection: &mut StorageProcessor<'_>,
         hash: &H256,
+        op: &ETHOperation,
     ) -> Result<(), anyhow::Error> {
-        Ok(connection.ethereum_schema().confirm_eth_tx(hash).await?)
+        if let OperationType::Verify = op.op_type {
+            let mut transaction = connection.start_transaction().await?;
+
+            transaction.ethereum_schema().confirm_eth_tx(hash).await?;
+            transaction
+                .chain()
+                .state_schema()
+                .apply_state_update(op.op.as_ref().unwrap().block.block_number)
+                .await?;
+
+            transaction.commit().await?;
+        } else {
+            connection.ethereum_schema().confirm_eth_tx(hash).await?;
+        }
+        Ok(())
     }
 
     pub async fn load_stats(

@@ -44,6 +44,14 @@ function dummy_prover_status {
     exit 0
 }
 
+function enable_dummy_prover_no_redeploy {
+    # Set the `DUMMY_VERIFIER` constant value in the contract to `true`.
+    ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
+    echo "Enabled the Dummy Prover in the contract..."
+
+    exit 0
+}
+
 function enable_dummy_prover {
     # Set the `DUMMY_VERIFIER` constant value in the contract to `true`.
     ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
@@ -97,6 +105,9 @@ case $COMMAND in
     ;;
   enable)
       enable_dummy_prover
+    ;;
+  enable-no-redeploy)
+      enable_dummy_prover_no_redeploy
     ;;
   disable)
       disable_dummy_prover

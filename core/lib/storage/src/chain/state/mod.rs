@@ -164,6 +164,9 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     }
 
     /// Applies the previously stored list of account changes to the stored state.
+    ///
+    /// This method is invoked from the `zksync_eth_sender` after corresponding `Verify` transaction
+    /// is confirmed on Ethereum blockchain.
     pub async fn apply_state_update(&mut self, block_number: u32) -> QueryResult<()> {
         log::info!("Applying state update for block: {}", block_number);
 
@@ -352,7 +355,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let last_block = BlockSchema(&mut transaction)
-            .get_last_verified_block()
+            .get_last_verified_confirmed_block()
             .await?;
 
         let accounts = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")
@@ -391,34 +394,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         transaction.commit().await?;
         Ok((last_block, account_map))
     }
-
-    // pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
-    //     self.0.conn().transaction(|| {
-    //         let last_block = BlockSchema(self.0).get_last_verified_block()?;
-
-    //         let accounts: Vec<StorageAccount> = accounts::table.load(self.0.conn())?;
-    //         let mut balances = Vec::new();
-    //         // Postgres can't execute `belonging_to` for account size >= 2^16
-    //         for account_chunk in accounts.chunks(2usize.pow(15)) {
-    //             let chunk_balances: Vec<Vec<StorageBalance>> =
-    //                 StorageBalance::belonging_to(account_chunk)
-    //                     .load(self.0.conn())?
-    //                     .grouped_by(account_chunk);
-    //             balances.extend(chunk_balances.into_iter());
-    //         }
-
-    //         let account_map: AccountMap = accounts
-    //             .into_iter()
-    //             .zip(balances.into_iter())
-    //             .map(|(stored_account, balances)| {
-    //                 let (id, account) = restore_account(stored_account, balances);
-    //                 (id, account)
-    //             })
-    //             .collect();
-
-    //         Ok((last_block, account_map))
-    //     })
-    // }
 
     /// Returns the list of updates, and the block number such that if we apply
     /// these updates to the state of the block #(from_block), we will obtain state of the block

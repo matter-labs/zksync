@@ -1,7 +1,7 @@
 // Built-in import
 use std::{
     cmp::{max, min},
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     time::{Duration, Instant},
 };
 // External uses
@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_types::tx::TxHash;
 // Local uses
+use crate::{scenarios::ScenariosTestsReport, session::save_error};
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct TxLifecycle {
@@ -34,46 +35,61 @@ impl TxLifecycle {
 
 #[derive(Debug, Clone, Default)]
 pub struct Journal {
-    txs: HashMap<TxHash, Result<TxLifecycle, String>>,
+    txs: HashMap<TxHash, TxLifecycle>,
+    total_count: usize,
+    errored_count: usize,
 }
 
 impl Journal {
     pub fn record_tx(&mut self, tx_hash: TxHash, tx_result: Result<TxLifecycle, anyhow::Error>) {
-        self.txs
-            .insert(tx_hash, tx_result.map_err(|e| e.to_string()));
+        self.total_count += 1;
+
+        match tx_result {
+            Ok(tx_lifecycle) => {
+                self.txs.insert(tx_hash, tx_lifecycle);
+            }
+            Err(err) => {
+                self.errored_count += 1;
+                save_error("scenarios", err);
+            }
+        }
     }
 
     pub fn clear(&mut self) {
         self.txs.clear()
     }
 
-    pub fn five_stats_summary(&self) -> anyhow::Result<BTreeMap<String, FiveSummaryStats>> {
+    pub fn report(&self) -> ScenariosTestsReport {
         let mut sending = Vec::new();
         let mut committing = Vec::new();
         let mut verifying = Vec::new();
 
-        for (tx_hash, tx_result) in &self.txs {
-            let tx_lifecycle = tx_result.as_ref().map_err(|err| {
-                anyhow::anyhow!(
-                    "An error occured while processing a transaction {}: {}",
-                    tx_hash.to_string(),
-                    err
-                )
-            })?;
-
+        for tx_lifecycle in self.txs.values() {
             sending.push(tx_lifecycle.send_duration().as_micros());
             committing.push(tx_lifecycle.commit_duration().as_micros());
             verifying.push(tx_lifecycle.verify_duration().as_micros());
         }
 
-        Ok([
+        let summary = [
             ("sending", sending),
             ("committing", committing),
             ("verifying", verifying),
         ]
         .iter()
-        .map(|(category, data)| (category.to_string(), FiveSummaryStats::from_data(data)))
-        .collect())
+        .map(|(category, data)| {
+            (
+                category.to_string(),
+                FiveSummaryStats::from_data(data)
+                    .expect("Not enough data to compute summary stats"),
+            )
+        })
+        .collect();
+
+        ScenariosTestsReport {
+            summary,
+            total_txs_count: self.total_count,
+            failed_txs_count: self.errored_count,
+        }
     }
 }
 
@@ -89,7 +105,7 @@ impl Sample {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub struct FiveSummaryStats {
     pub min: u128,
     pub lower_quartile: u128,
@@ -100,14 +116,17 @@ pub struct FiveSummaryStats {
 }
 
 impl FiveSummaryStats {
-    pub fn from_data<'a, I>(data: I) -> Self
+    pub const MIN_SAMPLES_COUNT: usize = 10;
+
+    pub fn from_data<'a, I>(data: I) -> Option<Self>
     where
         I: IntoIterator<Item = &'a u128>,
     {
         let mut data = data.into_iter().copied().collect::<Vec<_>>();
-        data.sort_unstable();
 
-        assert!(data.len() >= 4);
+        if data.len() < Self::MIN_SAMPLES_COUNT {
+            return None;
+        }
 
         // Compute std dev.
         let n = data.len() as u128;
@@ -120,18 +139,19 @@ impl FiveSummaryStats {
         let std_dev = (square_sum as f64 / n as f64).sqrt();
 
         // Compute five summary stats
+        data.sort_unstable();
         let idx = data.len() - 1;
-        Self {
+        Some(Self {
             min: data[0],
             lower_quartile: data[idx / 4],
             median: data[idx / 2],
             upper_quartile: data[idx * 3 / 4],
             max: data[idx],
             std_dev,
-        }
+        })
     }
 
-    pub fn from_samples<'a, I>(samples: I) -> Self
+    pub fn from_samples<'a, I>(samples: I) -> Option<Self>
     where
         I: IntoIterator<Item = &'a Sample>,
     {

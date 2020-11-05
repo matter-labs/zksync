@@ -13,15 +13,12 @@ use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
 };
 use crate::{
-    chain::{
-        operations::{
-            records::{
-                NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-                StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
-            },
-            OperationsSchema,
+    chain::operations::{
+        records::{
+            NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
+            StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
         },
-        state::StateSchema,
+        OperationsSchema,
     },
     prover::ProverSchema,
     QueryResult, StorageProcessor,
@@ -40,7 +37,7 @@ pub struct BlockSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Executes an operation:
     /// 1. Stores the operation.
-    /// 2. Applies account updates for the verify operation.
+    /// 2. Stores the proof (if it isn't stored already) for the verify operation.
     pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
         let mut transaction = self.0.start_transaction().await?;
 
@@ -62,9 +59,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     }
                     Some(_) => {}
                 };
-                StateSchema(&mut transaction)
-                    .apply_state_update(block_number)
-                    .await?
             }
         };
 
@@ -92,9 +86,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 ExecutedOperations::Tx(tx) => {
                     // Store the executed operation in the corresponding schema.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
-                    OperationsSchema(self.0)
-                        .store_executed_operation(new_tx)
-                        .await?;
+                    OperationsSchema(self.0).store_executed_tx(new_tx).await?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     // For priority operation we should only store it in the Operations schema.
@@ -103,7 +95,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         block_number,
                     );
                     OperationsSchema(self.0)
-                        .store_executed_priority_operation(new_priority_op)
+                        .store_executed_priority_op(new_priority_op)
                         .await?;
                 }
             }
@@ -452,15 +444,29 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         self.load_commit_op(block_number).await.map(|r| r.block)
     }
 
+    /// Returns the number of last block
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::COMMIT)
+            .get_last_block_by_action(ActionType::COMMIT, None)
             .await
     }
 
+    /// Returns the number of last block for which proof has been created.
+    ///
+    /// Note: having a proof for the block doesn't mean that state was updated. Chain state
+    /// is updated only after corresponding transaction is confirmed on the Ethereum blockchain.
+    /// In order to see the last block with updated state, use `get_last_verified_confirmed_block` method.
     pub async fn get_last_verified_block(&mut self) -> QueryResult<BlockNumber> {
         OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::VERIFY)
+            .get_last_block_by_action(ActionType::VERIFY, None)
+            .await
+    }
+
+    /// Returns the number of last block for which proof has been confirmed on Ethereum.
+    /// Essentially, it's number of last block for which updates were applied to the chain state.
+    pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        OperationsSchema(self.0)
+            .get_last_block_by_action(ActionType::VERIFY, Some(true))
             .await
     }
 

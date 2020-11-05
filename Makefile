@@ -11,6 +11,7 @@ export KEYBASE_DOCKER_IMAGE ?= matterlabs/keybase-secret:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 export FEE_SELLER_IMAGE ?=matterlabs/fee-seller:latest
 export EXIT_TOOL_IMAGE ?=matterlabs/exit-tool:latest
+export CI_INTEGRATION_TEST_IMAGE ?=matterlabs/ci-integration-test:latest
 
 # Getting started
 
@@ -26,14 +27,7 @@ init:
 	@bin/init
 
 yarn:
-	@cd sdk/zksync-crypto
-	@cd sdk/zksync.js && yarn && yarn build
-	@cd contracts && yarn
-	@cd core/tests/ts-tests && yarn
-	@cd infrastructure/explorer && yarn
-	@cd infrastructure/fee-seller && yarn
-	@cd infrastructure/zcli && yarn
-	@cd infrastructure/analytics && yarn
+	@yarn && yarn zksync build
 
 
 # Helpers
@@ -87,10 +81,10 @@ genesis: confirm_action db-reset
 # Frontend clients
 
 explorer:
-	@cd infrastructure/explorer && yarn serve
+	@yarn explorer serve
 
 dist-explorer: yarn build-contracts
-	@cd infrastructure/explorer && yarn build
+	@yarn explorer build
 
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -t "${NGINX_DOCKER_IMAGE_LATEST}" -f ./docker/nginx/Dockerfile .
@@ -156,7 +150,7 @@ prepare-verify-contracts:
 
 build-contracts: confirm_action prepare-verify-contracts
 	@cargo run --release --bin gen_token_add_contract
-	@cd contracts && yarn build
+	@yarn contracts build
 	
 # testing
 
@@ -167,7 +161,7 @@ integration-testkit:
 	@bin/integration-testkit.sh $(filter-out $@,$(MAKECMDGOALS))
 
 integration-test:
-	@cd core/tests/ts-tests && yarn && yarn test
+	@yarn ts-tests test
 
 price:
 	@node contracts/scripts/check-price.js
@@ -176,8 +170,8 @@ prover-tests:
 	f cargo test -p zksync_prover --release -- --ignored
 
 js-tests:
-	@cd sdk/zksync.js && yarn tests
-	@cd infrastructure/fee-seller && yarn tests
+	@yarn zksync tests
+	@yarn fee-seller tests
 
 rust-sdk-tests:
 	@bin/rust-sdk-tests.sh
@@ -287,10 +281,16 @@ push-image-dev-ticker: image-dev-ticker
 	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
 api-test:
-	@cd core/tests/ts-tests && yarn && yarn api-test
+	@yarn ts-tests api-test
 
 image-exit-tool:
 	@docker build -t "${EXIT_TOOL_IMAGE}" -f ./docker/exit-tool/Dockerfile .
 
 push-image-exit-tool: image-exit-tool
 	@docker push "${EXIT_TOOL_IMAGE}"
+
+image-ci-integration:
+	@docker build -t "${CI_INTEGRATION_TEST_IMAGE}" ./docker/integration-test/
+
+push-image-ci-integration: image-ci-integration
+	@docker push "${CI_INTEGRATION_TEST_IMAGE}"

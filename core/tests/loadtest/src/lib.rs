@@ -1,4 +1,9 @@
-pub use self::{config::Config, executor::LoadtestExecutor, journal::FiveSummaryStats};
+pub use self::{
+    config::Config,
+    executor::LoadtestExecutor,
+    journal::FiveSummaryStats,
+    session::{finish_session, init_session},
+};
 
 pub mod api;
 
@@ -11,4 +16,5 @@ mod config;
 mod executor;
 mod journal;
 mod scenarios;
+mod session;
 mod test_wallet;

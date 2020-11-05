@@ -3,15 +3,14 @@
 use itertools::Itertools;
 // Workspace imports
 use zksync_types::block::Block;
-use zksync_types::Operation;
-use zksync_types::{AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp};
+use zksync_types::{AccountId, AccountUpdate, ActionType, BlockNumber, Operation, Token, ZkSyncOp};
 // Local imports
 use self::records::{
     NewBlockEvent, NewStorageState, NewTokenEvent, NewZkSyncOp, StoredBlockEvent,
     StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState, StoredZkSyncOp,
 };
 use crate::{
-    chain::{block::BlockSchema, state::StateSchema},
+    chain::{block::BlockSchema, operations::OperationsSchema, state::StateSchema},
     tokens::TokensSchema,
 };
 use crate::{QueryResult, StorageProcessor};
@@ -54,16 +53,17 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         let verify_op = BlockSchema(&mut transaction)
             .execute_operation(verify_op)
             .await?;
-        sqlx::query!(
-            "UPDATE operations
-            SET confirmed = $1
-            WHERE id = $2 OR id = $3",
-            true,
-            commit_op.id.unwrap(),
-            verify_op.id.unwrap()
-        )
-        .execute(transaction.conn())
-        .await?;
+        // The state is expected to be updated, so it's necessary
+        // to do it here.
+        StateSchema(&mut transaction)
+            .apply_state_update(verify_op.block.block_number)
+            .await?;
+        OperationsSchema(&mut transaction)
+            .confirm_operation(commit_op.block.block_number, ActionType::COMMIT)
+            .await?;
+        OperationsSchema(&mut transaction)
+            .confirm_operation(verify_op.block.block_number, ActionType::VERIFY)
+            .await?;
 
         DataRestoreSchema(&mut transaction)
             .update_storage_state(new_state)

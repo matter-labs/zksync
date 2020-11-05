@@ -16,7 +16,7 @@ use zksync_types::{
     tx::PackedEthSignature, AccountId, Address, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
-use crate::{config::AccountInfo, monitor::Monitor};
+use crate::{config::AccountInfo, monitor::Monitor, session::save_wallet};
 
 /// A wrapper over `zksync::Wallet` to make testing more convenient.
 #[derive(Debug)]
@@ -30,7 +30,7 @@ pub struct TestWallet {
 }
 
 impl TestWallet {
-    const FEE_FACTOR: u64 = 2;
+    const FEE_FACTOR: u64 = 3;
 
     /// Creates a new wallet from the given account information and Ethereum configuration options.
     pub async fn from_info(
@@ -49,7 +49,11 @@ impl TestWallet {
         let inner = Wallet::new(monitor.provider.clone(), credentials)
             .await
             .unwrap();
-        Self::from_wallet(info.token_name.clone(), monitor, inner, &options.web3_url).await
+
+        let wallet =
+            Self::from_wallet(info.token_name.clone(), monitor, inner, &options.web3_url).await;
+        save_wallet(info.clone());
+        wallet
     }
 
     /// Creates a random wallet.
@@ -62,20 +66,13 @@ impl TestWallet {
         let address_from_pk =
             PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
 
-        let inner = Wallet::new(
-            monitor.provider.clone(),
-            WalletCredentials::from_eth_signer(
-                address_from_pk,
-                PrivateKeySigner::new(eth_private_key),
-                Network::Localhost,
-            )
-            .await
-            .unwrap(),
-        )
-        .await
-        .unwrap();
+        let info = AccountInfo {
+            address: address_from_pk,
+            private_key: eth_private_key,
+            token_name,
+        };
 
-        Self::from_wallet(token_name, monitor, inner, &options.web3_url).await
+        Self::from_info(monitor, &info, options).await
     }
 
     async fn from_wallet(
@@ -93,6 +90,12 @@ impl TestWallet {
             .committed
             .nonce;
 
+        monitor
+            .api_data_pool
+            .write()
+            .await
+            .store_address(inner.address());
+
         Self {
             monitor,
             inner,
@@ -100,6 +103,22 @@ impl TestWallet {
             nonce: AtomicU32::new(zk_nonce),
             token_name,
         }
+    }
+
+    /// Sets the correct nonce from the zkSync network.
+    ///
+    /// This method fixes further "nonce mismatch" errors.
+    pub async fn refresh_nonce(&self) -> Result<(), ClientError> {
+        let zk_nonce = self
+            .inner
+            .provider
+            .account_info(self.address())
+            .await?
+            .committed
+            .nonce;
+
+        self.nonce.store(zk_nonce, Ordering::SeqCst);
+        Ok(())
     }
 
     /// Returns the wallet address.

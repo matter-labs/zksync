@@ -33,7 +33,7 @@ The problem should be solved at this step.
 
 ## `Node` & `Yarn`
 
-1. Install `Node`.
+1. Install `Node` (requires version 14.13.1 or higher).
 
 2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/).
 
