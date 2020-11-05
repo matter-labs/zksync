@@ -100,13 +100,10 @@ impl ApiV01 {
     }
 
     pub(crate) async fn access_storage(&self) -> ActixResult<StorageProcessor<'_>> {
-        self.connection_pool
-            .access_storage_fragile()
-            .await
-            .map_err(|err| {
-                vlog::warn!("DB await timeout: '{}';", err);
-                HttpResponse::RequestTimeout().finish().into()
-            })
+        self.connection_pool.access_storage().await.map_err(|err| {
+            vlog::warn!("DB await timeout: '{}';", err);
+            HttpResponse::RequestTimeout().finish().into()
+        })
     }
 
     pub(crate) fn db_error(error: anyhow::Error) -> HttpResponse {

@@ -272,7 +272,7 @@ impl<T: Transport> EthWatch<T> {
     ) -> Result<(), anyhow::Error> {
         let mut storage = self
             .db_pool
-            .access_storage_fragile()
+            .access_storage()
             .await
             .map_err(|e| format_err!("Can't access storage: {}", e))?;
         let mut transaction = storage.start_transaction().await?;
