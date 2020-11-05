@@ -94,7 +94,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         for tx in &mut txs {
             if let SignedTxVariant::Batch(batch) = tx {
                 let eth_signature = sqlx::query!(
-                    "SELECT eth_signature FROM mempool_batches_signatures
+                    "SELECT eth_signature FROM txs_batches_signatures
                     WHERE batch_id = $1",
                     batch.batch_id
                 )
@@ -199,7 +199,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         if let Some(signature) = eth_signature {
             let signature = serde_json::to_value(signature)?;
             sqlx::query!(
-                "INSERT INTO mempool_batches_signatures VALUES($1, $2)",
+                "INSERT INTO txs_batches_signatures VALUES($1, $2)",
                 batch_id,
                 signature
             )
