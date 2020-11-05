@@ -41,7 +41,7 @@ impl NotifierState {
         {
             Some(tx_receipt.clone())
         } else {
-            let mut storage = self.db_pool.access_storage_fragile().await?;
+            let mut storage = self.db_pool.access_storage().await?;
             let tx_receipt = storage
                 .chain()
                 .operations_ext_schema()
@@ -67,7 +67,7 @@ impl NotifierState {
         let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
             block_info.clone()
         } else {
-            let mut storage = self.db_pool.access_storage_fragile().await?;
+            let mut storage = self.db_pool.access_storage().await?;
             let mut transaction = storage.start_transaction().await?;
             let block_info = if let Some(block_with_op) = transaction
                 .chain()
@@ -122,7 +122,7 @@ impl NotifierState {
         {
             Some(executed_op.clone())
         } else {
-            let mut storage = self.db_pool.access_storage_fragile().await?;
+            let mut storage = self.db_pool.access_storage().await?;
             let executed_op = storage
                 .chain()
                 .operations_schema()
@@ -144,7 +144,7 @@ impl NotifierState {
         address: Address,
         action: ActionType,
     ) -> anyhow::Result<(AccountId, ResponseAccountState)> {
-        let mut storage = self.db_pool.access_storage_fragile().await?;
+        let mut storage = self.db_pool.access_storage().await?;
         let account_state = storage
             .chain()
             .account_schema()
@@ -176,7 +176,7 @@ impl NotifierState {
         id: AccountId,
         action: ActionType,
     ) -> anyhow::Result<Option<ResponseAccountState>> {
-        let mut storage = self.db_pool.access_storage_fragile().await?;
+        let mut storage = self.db_pool.access_storage().await?;
 
         let stored_account = match action {
             ActionType::COMMIT => {
