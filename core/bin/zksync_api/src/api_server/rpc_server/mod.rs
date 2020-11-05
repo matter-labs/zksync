@@ -166,7 +166,7 @@ impl RpcApp {
 impl RpcApp {
     async fn access_storage(&self) -> Result<StorageProcessor<'_>> {
         self.connection_pool
-            .access_storage_fragile()
+            .access_storage()
             .await
             .map_err(|_| Error::internal_error())
     }
@@ -486,7 +486,7 @@ pub fn start_rpc_server(
 
         let server = ServerBuilder::new(io)
             .request_middleware(super::loggers::http_rpc::request_middleware)
-            .threads(8)
+            .threads(super::THREADS_PER_SERVER)
             .start_http(&addr)
             .unwrap();
         server.wait();
