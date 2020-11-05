@@ -14,7 +14,7 @@ import {
     ChangePubKey,
     EthSignerType,
     SignedTransaction,
-    Transfer,
+    Transfer
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -27,7 +27,7 @@ import {
     signMessagePersonalAPI,
     ERC20_DEPOSIT_GAS_LIMIT,
     getEthSignatureType,
-    serializeTransfer,
+    serializeTransfer
 } from './utils';
 import { keccak256 } from 'ethers/lib/utils';
 
