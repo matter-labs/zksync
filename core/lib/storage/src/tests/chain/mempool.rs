@@ -16,7 +16,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-use crate::tests::chain::utils::get_eth_sing_data;
+use crate::tests::chain::utils::get_eth_sign_data;
 
 /// Generates several different `SignedFranlinTx` objects.
 fn franklin_txs() -> Vec<SignedZkSyncTx> {
@@ -79,7 +79,7 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
 
             SignedZkSyncTx {
                 tx: tx.clone(),
-                eth_sign_data: Some(get_eth_sing_data(test_message)),
+                eth_sign_data: Some(get_eth_sign_data(test_message)),
             }
         })
         .collect()
@@ -106,7 +106,7 @@ fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
 
             SignedZkSyncTx {
                 tx: ZkSyncTx::Transfer(Box::new(transfer)),
-                eth_sign_data: Some(get_eth_sing_data(test_message)),
+                eth_sign_data: Some(get_eth_sign_data(test_message)),
             }
         })
         .collect()
@@ -162,7 +162,7 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     let alone_txs_2 = &txs[6..8];
     let batch_3 = &txs[8..10];
 
-    let batch_1_signature = Some(get_eth_sing_data("test message".to_owned()).signature);
+    let batch_1_signature = Some(get_eth_sign_data("test message".to_owned()).signature);
 
     let elements_count = alone_txs_1.len() + alone_txs_2.len() + 3; // Amount of alone txs + amount of batches.
 

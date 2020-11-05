@@ -493,7 +493,7 @@ pub fn start_rpc_server(
     });
 }
 
-fn rpc_message(error: TxAddError) -> Error {
+fn rpc_error(error: TxAddError) -> Error {
     Error {
         code: RpcErrorCodes::from(error).into(),
         message: error.to_string(),
@@ -531,9 +531,11 @@ async fn send_verify_request_and_recv(
             );
             Error::internal_error()
         })?
-        .map_err(rpc_message)
+        .map_err(rpc_error)
 }
 
+/// Send a request for Ethereum signature verification and wait for the response.
+/// If `msg_to_sign` is not `None`, then the signature must be present.
 async fn verify_tx_info_message_signature(
     tx: &ZkSyncTx,
     signature: Option<TxEthSignature>,
@@ -542,8 +544,7 @@ async fn verify_tx_info_message_signature(
 ) -> Result<VerifiedTx> {
     let eth_sign_data = match msg_to_sign {
         Some(message_to_sign) => {
-            let signature =
-                signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
+            let signature = signature.ok_or_else(|| rpc_error(TxAddError::MissingEthSignature))?;
 
             Some(EthSignData {
                 signature,
@@ -566,7 +567,11 @@ async fn verify_tx_info_message_signature(
     send_verify_request_and_recv(request, req_channel, receiever).await
 }
 
-async fn veryfy_txs_batch_signature(
+/// Send a request for Ethereum signature verification and wait for the response.
+/// Unlike in case of `verify_tx_info_message_signature`, we do not require
+/// every transaction from the batch to be signed. The signature must be obtained
+/// through signing hash of concatenated transactions bytes.
+async fn verify_txs_batch_signature(
     batch: Vec<TxWithSignature>,
     signature: TxEthSignature,
     msgs_to_sign: Vec<Option<String>>,

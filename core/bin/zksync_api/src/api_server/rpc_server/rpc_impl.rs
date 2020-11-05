@@ -17,7 +17,7 @@ use crate::{
 use bigdecimal::BigDecimal;
 
 use super::{
-    error::*, types::*, verify_tx_info_message_signature, veryfy_txs_batch_signature, RpcApp,
+    error::*, types::*, verify_tx_info_message_signature, verify_txs_batch_signature, RpcApp,
 };
 
 impl RpcApp {
@@ -283,7 +283,7 @@ impl RpcApp {
 
         if let Some(signature) = eth_signature {
             // User provided the signature for the whole batch.
-            let (verified_batch, signature) = veryfy_txs_batch_signature(
+            let (verified_batch, signature) = verify_txs_batch_signature(
                 txs,
                 signature,
                 messages_to_sign,
