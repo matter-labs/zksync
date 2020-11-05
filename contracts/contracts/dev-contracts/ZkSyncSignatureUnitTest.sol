@@ -2,10 +2,12 @@
 
 pragma solidity ^0.7.0;
 
-import "generated/ZkSyncTest.sol";
+pragma experimental ABIEncoderV2;
+
+import "../ZkSync.sol";
 
 
-contract ZKSyncSignatureUnitTest is ZkSyncTest {
+contract ZKSyncSignatureUnitTest is ZkSync {
 
     function changePubkeySignatureCheck(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) external pure returns (bool) {
         return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress, _accountId);

@@ -2,8 +2,8 @@
 
 pragma solidity ^0.7.0;
 
-import "../contracts/Upgradeable.sol";
-import "../contracts/UpgradeableMaster.sol";
+import "../Upgradeable.sol";
+import "../UpgradeableMaster.sol";
 
 
 interface DummyTarget {

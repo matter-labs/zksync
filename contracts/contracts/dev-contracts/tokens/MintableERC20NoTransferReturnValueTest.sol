@@ -4,7 +4,7 @@ pragma solidity ^0.7.0;
 
 import "./ContextTest.sol";
 import "./MintableIERC20NoTransferReturnValueTest.sol";
-import "./SafeMath.sol";
+import "../../SafeMath.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.

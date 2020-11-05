@@ -16,6 +16,9 @@ export default {
   contractSizer: {
     runOnCompile: true,
   },
+  paths: {
+      sources: "./contracts"
+  },
   solpp: {
       defs: {
         UPGRADE_NOTICE_PERIOD: 0,

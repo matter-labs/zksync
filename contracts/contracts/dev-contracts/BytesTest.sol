@@ -2,7 +2,7 @@
 
 pragma solidity ^0.7.0;
 
-import "../contracts/Bytes.sol";
+import "../Bytes.sol";
 
 
 contract BytesTest {

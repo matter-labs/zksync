@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
-
 pragma solidity ^0.7.0;
 
-import "generated/ZkSyncTest.sol";
+pragma experimental ABIEncoderV2;
+
+import "../ZkSync.sol";
 
 
-contract ZkSyncWithdrawalUnitTest is ZkSyncTest {
+contract ZkSyncWithdrawalUnitTest is ZkSync {
 
     function setBalanceToWithdraw(address _owner, uint16 _token, uint128 _amount) external {
         balancesToWithdraw[packAddressAndTokenId(_owner, _token)].balanceToWithdraw = _amount;

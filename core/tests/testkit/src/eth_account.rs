@@ -12,6 +12,7 @@ use web3::types::{
 };
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
+use zksync_crypto::convert::FeConvert;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
@@ -362,19 +363,32 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, anyhow::Error> {
+        // todo: abi encoding don't work
+        let stored_block_info = EthToken::Tuple(vec![
+            EthToken::Uint(U256::from(block.block_number - 1)),
+            EthToken::Uint(U256::from(0)),
+            EthToken::Uint(U256::from(0)),
+            EthToken::FixedBytes([0u8; 32].to_vec()),
+            EthToken::FixedBytes([0u8; 32].to_vec()),
+        ]);
+        use ethabi::Token as EthToken;
+        let new_block_info = EthToken::Tuple(vec![
+            EthToken::Uint(U256::from(block.block_number)),
+            EthToken::Uint(U256::from(block.fee_account)),
+            EthToken::FixedBytes(block.get_eth_encoded_root().as_bytes().to_vec()),
+            EthToken::Bytes(block.get_eth_public_data()),
+            EthToken::Array(vec![EthToken::Tuple(vec![
+                EthToken::Uint(U256::from(0)),
+                EthToken::Bytes(Vec::new()),
+            ])]),
+        ]);
+
         let witness_data = block.get_eth_witness_data();
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "commitBlock",
-                (
-                    u64::from(block.block_number),
-                    u64::from(block.fee_account),
-                    vec![block.get_eth_encoded_root()],
-                    block.get_eth_public_data(),
-                    witness_data.0,
-                    witness_data.1,
-                ),
+                "commitBlocks",
+                EthToken::Tuple(vec![stored_block_info, new_block_info]),
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await

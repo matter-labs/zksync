@@ -2,7 +2,7 @@
 
 pragma solidity ^0.7.0;
 
-import "IEIP1271.sol";
+import "../IEIP1271.sol";
 
 contract EIP1271 is IEIP1271 {
 

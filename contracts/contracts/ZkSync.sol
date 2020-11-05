@@ -245,10 +245,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(_previousBlock.stateHash, _newBlock);
 
-        storedNewBlock = StoredBlockInfo(_newBlock.blockNumber, priorityReqests, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
-
-        hashedBlocks[storedNewBlock.blockNumber] = hashStoredBlockInfo(storedNewBlock);
-        emit BlockCommit(_newBlock.blockNumber);
+        return StoredBlockInfo(_newBlock.blockNumber, priorityReqests, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
     }
 
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
@@ -263,6 +260,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         StoredBlockInfo memory lastCommittedBlock = _lastCommittedBlockData;
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
             lastCommittedBlock = commitOneBlock(lastCommittedBlock, _newBlocksData[i]);
+
+            // try moving all state modifications here?
+            hashedBlocks[lastCommittedBlock.blockNumber] = hashStoredBlockInfo(lastCommittedBlock);
+            emit BlockCommit(lastCommittedBlock.blockNumber);
         }
 
         totalBlocksCommitted += uint32(_newBlocksData.length);
@@ -506,45 +507,45 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             Operations.OpType opType = Operations.OpType(uint8(pubData[pubdataOffset]));
 
             if (opType == Operations.OpType.Deposit) {
-                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, DEPOSIT_BYTES);
+                bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, DEPOSIT_BYTES);
 
-                Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
+                Operations.Deposit memory depositData = Operations.readDepositPubdata(opPubData);
                 emitDepositCommitEvent(_newBlockData.blockNumber, depositData);
 
                 OnchainOperation memory onchainOp = OnchainOperation(
                     Operations.OpType.Deposit,
-                    pubData
+                    opPubData
                 );
                 commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
                 currentPriorityRequestId++;
 
-                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, opPubData));
             } else if (opType == Operations.OpType.PartialExit) {
-                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, PARTIAL_EXIT_BYTES);
+                bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, PARTIAL_EXIT_BYTES);
 
-                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, opPubData));
             } else if (opType == Operations.OpType.ForcedExit) {
-                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, FORCED_EXIT_BYTES);
+                bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, FORCED_EXIT_BYTES);
 
-                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, opPubData));
             } else if (opType == Operations.OpType.FullExit) {
-                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, FULL_EXIT_BYTES);
+                bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, FULL_EXIT_BYTES);
 
-                Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
+                Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(opPubData);
                 emitFullExitCommitEvent(_newBlockData.blockNumber, fullExitData);
 
                 OnchainOperation memory onchainOp = OnchainOperation(
                     Operations.OpType.FullExit,
-                    pubData
+                    opPubData
                 );
                 commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
                 currentPriorityRequestId++;
 
-                processableOperationsData = keccak256(abi.encode(processableOperationsData, pubData));
+                processableOperationsData = keccak256(abi.encode(processableOperationsData, opPubData));
             } else if (opType == Operations.OpType.ChangePubKey) {
-                bytes memory pubData = Bytes.slice(pubData, pubdataOffset, CHANGE_PUBKEY_BYTES);
+                bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, CHANGE_PUBKEY_BYTES);
 
-                Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(pubData, 1);
+                Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(opPubData, 1);
 
                 if (onchainOpData.ethWitness.length > 0) {
                     bool valid = verifyChangePubkeySignature(onchainOpData.ethWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);

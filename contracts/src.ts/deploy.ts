@@ -36,7 +36,8 @@ export interface DeployerConfig {
 }
 
 export function readContractCode(name: string) {
-        return JSON.parse(fs.readFileSync(`build/${name}.json`, {encoding: "utf-8"}));
+        const fileName = name.split("/").pop();
+        return JSON.parse(fs.readFileSync(`artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, {encoding: "utf-8"}));
 }
 
 export function readProductionContracts(): Contracts {

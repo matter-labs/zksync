@@ -30,8 +30,7 @@
     "zksync": "link:../sdk/zksync.js"
   },
   "scripts": {
-    "build-dev": "waffle .waffle-dev.json",
-    "build": "waffle .waffle.json",
+    "build": "hardhat compile",
     "test": "yarn build && f mocha -r ts-node/register test/**/*.ts",
     "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
     "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",

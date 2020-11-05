@@ -447,6 +447,8 @@ pub async fn perform_basic_operations(
         test_setup.execute_commit_block().await.0.expect_success();
     }
 
+    return;
+
     // test two deposits
     test_setup.start_block();
     test_setup

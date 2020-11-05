@@ -122,10 +122,10 @@ push-image-fee-seller: image-fee-seller
 server:
 	@cargo run --bin zksync_server --release
 
-image-server: build-contracts build-dev-contracts
+image-server: build-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${SERVER_DOCKER_IMAGE}" -t "${SERVER_DOCKER_IMAGE_LATEST}" -f ./docker/server/Dockerfile .
 
-image-prover: build-contracts build-dev-contracts
+image-prover: build-contracts
 	@DOCKER_BUILDKIT=1 docker build -t "${PROVER_DOCKER_IMAGE}" -t "${PROVER_DOCKER_IMAGE_LATEST}"  -f ./docker/prover/Dockerfile .
 
 image-rust: image-server image-prover
@@ -150,10 +150,6 @@ publish-contracts:
 
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
-
-build-dev-contracts: confirm_action prepare-verify-contracts
-	@bin/prepare-test-contracts.sh
-	@cd contracts && yarn build-dev
 
 prepare-verify-contracts:
 	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)

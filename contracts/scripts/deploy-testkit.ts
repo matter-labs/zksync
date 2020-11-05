@@ -27,7 +27,8 @@ import { ArgumentParser } from "argparse";
     provider.pollingInterval = 10;
 
     const deployWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
-    const contracts = args.prodContracts ? readProductionContracts() : readTestContracts();
+    // todo: should be decided when building
+    const contracts = readProductionContracts();
     const deployer = new Deployer({ deployWallet, contracts, verbose: true });
     await deployer.deployAll();
     const governance = deployer.governanceContract(deployWallet);
@@ -35,7 +36,7 @@ import { ArgumentParser } from "argparse";
 
     const erc20 = await deployContract(
         deployWallet,
-        readContractCode("TestnetERC20Token"),
+        readContractCode("dev-contracts/TestnetERC20Token"),
         ["Matter Labs Trial Token", "MLTT", 18],
         { gasLimit: 5000000 }
     );

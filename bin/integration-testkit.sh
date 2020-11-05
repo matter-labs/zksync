@@ -47,10 +47,11 @@ case $COMMAND in
         ;;
     fast)
         cargo run --bin zksync_testkit --release
-        cargo run --bin gas_price_test --release
-        cargo run --bin migration_test --release
-        cargo run --bin revert_blocks_test --release
-        cargo run --bin exodus_test --release
+
+#        cargo run --bin gas_price_test --release
+#        cargo run --bin migration_test --release
+#        cargo run --bin revert_blocks_test --release
+#        cargo run --bin exodus_test --release
         ;;
     -h|--h)
         echo "$USAGE" && exit 0

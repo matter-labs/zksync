@@ -4,4 +4,4 @@
 /contracts/TokenInit.sol
 /artifacts
 /cache
-/dev-contracts/generated
+/contracts/dev-contracts/generated
