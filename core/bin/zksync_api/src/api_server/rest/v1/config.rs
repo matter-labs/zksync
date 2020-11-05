@@ -7,14 +7,16 @@ use std::{collections::BTreeMap, rc::Rc};
 use actix_web::{web, Scope};
 
 // Workspace uses
-use web::Json;
 use zksync_config::ConfigurationOptions;
 use zksync_types::Address;
 
 // Local uses
-use super::client::{self, Client};
+use super::{
+    client::{self, Client},
+    Json,
+};
 
-/// Readonly data between `api/v1/config` endpoints.
+/// Shared data between `api/v1/config` endpoints.
 #[derive(Debug, Clone)]
 struct ApiConfigData {
     // TODO Find the way to avoid unnecessary reference counting here.
@@ -41,21 +43,21 @@ impl ApiConfigData {
 
 impl Client {
     pub async fn contracts(&self) -> client::Result<BTreeMap<String, Address>> {
-        self.get("config/contracts").await
+        self.get("config/contracts").send().await
     }
 
     pub async fn deposit_confirmations(&self) -> client::Result<u64> {
-        self.get("config/deposit_confirmations").await
+        self.get("config/deposit_confirmations").send().await
     }
 
     pub async fn network(&self) -> client::Result<String> {
-        self.get("config/network").await
+        self.get("config/network").send().await
     }
 }
 
 // Server implementation
 
-async fn contracts<'a>(data: web::Data<ApiConfigData>) -> Json<Rc<BTreeMap<String, Address>>> {
+async fn contracts(data: web::Data<ApiConfigData>) -> Json<Rc<BTreeMap<String, Address>>> {
     Json(data.contracts.clone())
 }
 

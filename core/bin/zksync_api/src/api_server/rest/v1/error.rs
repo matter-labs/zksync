@@ -101,17 +101,14 @@ impl ResponseError for Error {
     }
 }
 
-impl<T> From<T> for Error
-where
-    T: std::error::Error,
-{
-    fn from(inner: T) -> Self {
+impl From<anyhow::Error> for Error {
+    fn from(inner: anyhow::Error) -> Self {
         Self {
             body: ErrorBody {
                 title: inner.to_string(),
                 ..ErrorBody::default()
             },
-            http_code: StatusCode::BAD_REQUEST,
+            http_code: StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

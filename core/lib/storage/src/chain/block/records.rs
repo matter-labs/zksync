@@ -62,3 +62,14 @@ pub struct AccountTreeCache {
     pub block: i64,
     pub tree_cache: String,
 }
+
+impl BlockDetails {
+    /// Checks if block is finalized, meaning that
+    /// both Verify operation is performed for it, and this
+    /// operation is anchored on the Ethereum blockchain.
+    pub fn is_verified(&self) -> bool {
+        // We assume that it's not possible to have block that is
+        // verified and not committed.
+        self.verified_at.is_some() && self.verify_tx_hash.is_some()
+    }
+}

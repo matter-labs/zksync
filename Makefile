@@ -294,6 +294,9 @@ push-image-dev-ticker: image-dev-ticker
 api-test:
 	@cd core/tests/ts-tests && yarn && yarn api-test
 
+api-unit-test:
+	@bin/api-unit-test.sh reset
+
 image-exit-tool:
 	@docker build -t "${EXIT_TOOL_IMAGE}" -f ./docker/exit-tool/Dockerfile .
 

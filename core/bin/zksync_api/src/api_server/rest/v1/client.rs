@@ -6,7 +6,7 @@
 
 // External uses
 use reqwest::StatusCode;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, ser::Serialize};
 use thiserror::Error;
 
 // Workspace uses
@@ -53,19 +53,47 @@ impl Client {
         [&self.url, "/api/v1/", method].concat()
     }
 
-    pub async fn get<T>(&self, method: impl AsRef<str>) -> self::Result<T>
-    where
-        T: DeserializeOwned,
-    {
+    pub fn get(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
         let url = self.endpoint(method.as_ref());
-        let response = self.inner.get(&url).send().await?;
+        ClientRequestBuilder {
+            inner: self.inner.get(&url),
+            url,
+        }
+    }
+}
+
+/// API specific wrapper over the `reqwest::RequestBuilder`.
+#[derive(Debug)]
+pub struct ClientRequestBuilder {
+    inner: reqwest::RequestBuilder,
+    url: String,
+}
+
+impl ClientRequestBuilder {
+    /// Modify the query string of the URL.
+    ///
+    /// See [reqwest] documentation for details
+    ///
+    /// [reqwest]: https://docs.rs/reqwest/latest/reqwest/struct.RequestBuilder.html#method.query
+    pub fn query<Q: Serialize + ?Sized>(self, query: &Q) -> Self {
+        Self {
+            inner: self.inner.query(query),
+            url: self.url,
+        }
+    }
+
+    /// Constructs the Request and sends it to the target URL, returning a future Response.
+    ///
+    /// This method takes account of the responses structure and the error handling specific.
+    pub async fn send<T: DeserializeOwned>(self) -> self::Result<T> {
+        let response = self.inner.send().await?;
 
         let status = response.status();
         if status.is_success() {
             Ok(response.json().await.map_err(ClientError::Parse)?)
         } else {
             if status == StatusCode::NOT_FOUND {
-                return Err(ClientError::NotFound(url));
+                return Err(ClientError::NotFound(self.url));
             }
 
             Err(ClientError::BadRequest(super::Error {
