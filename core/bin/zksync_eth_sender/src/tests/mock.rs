@@ -220,11 +220,11 @@ impl DatabaseAccess for MockDatabase {
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug)]
-pub(in crate::eth_sender) struct MockEthereum {
+pub(in crate) struct MockEthereum {
     pub block_number: u64,
     pub gas_price: U256,
-    pub tx_statuses: RefCell<HashMap<H256, ExecutedTxStatus>>,
-    pub sent_txs: RefCell<HashMap<H256, SignedCallResult>>,
+    pub tx_statuses: RwLock<HashMap<H256, ExecutedTxStatus>>,
+    pub sent_txs: RwLock<HashMap<H256, SignedCallResult>>,
 }
 
 impl Default for MockEthereum {
@@ -254,21 +254,21 @@ impl MockEthereum {
     }
 
     /// Checks that there was a request to send the provided transaction.
-    pub fn assert_sent(&self, hash: &H256) {
+    pub async fn assert_sent(&self, hash: &H256) {
         assert!(
-            self.sent_txs.borrow().get(hash).is_some(),
+            self.sent_txs.read().await.get(hash).is_some(),
             format!("Transaction with hash {:?} was not sent", hash),
         );
     }
 
     /// Adds an response for the sent transaction for `ETHSender` to receive.
-    pub fn add_execution(&mut self, hash: &H256, status: &ExecutedTxStatus) {
-        self.tx_statuses.borrow_mut().insert(*hash, status.clone());
+    pub async fn add_execution(&mut self, hash: &H256, status: &ExecutedTxStatus) {
+        self.tx_statuses.write().await.insert(*hash, status.clone());
     }
 
     /// Increments the blocks by a provided `confirmations` and marks the sent transaction
     /// as a success.
-    pub fn add_successfull_execution(&mut self, tx_hash: H256, confirmations: u64) {
+    pub async fn add_successfull_execution(&mut self, tx_hash: H256, confirmations: u64) {
         self.block_number += confirmations;
 
         let status = ExecutedTxStatus {
@@ -276,11 +276,11 @@ impl MockEthereum {
             success: true,
             receipt: None,
         };
-        self.tx_statuses.borrow_mut().insert(tx_hash, status);
+        self.tx_statuses.write().await.insert(tx_hash, status);
     }
 
     /// Same as `add_successfull_execution`, but marks the transaction as a failure.
-    pub fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
+    pub async fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
         self.block_number += confirmations;
 
         let status = ExecutedTxStatus {
@@ -288,26 +288,28 @@ impl MockEthereum {
             success: false,
             receipt: Some(Default::default()),
         };
-        self.tx_statuses.borrow_mut().insert(*hash, status);
+        self.tx_statuses.write().await.insert(*hash, status);
     }
 }
 
+#[async_trait::async_trait]
 impl EthereumInterface for MockEthereum {
-    fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
-        Ok(self.tx_statuses.borrow().get(hash).cloned())
+    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
+        Ok(self.tx_statuses.read().await.get(hash).cloned())
     }
 
-    fn block_number(&self) -> Result<u64, anyhow::Error> {
+    async fn block_number(&self) -> Result<u64, anyhow::Error> {
         Ok(self.block_number)
     }
 
-    fn gas_price(&self) -> Result<U256, anyhow::Error> {
+    async fn gas_price(&self) -> Result<U256, anyhow::Error> {
         Ok(self.gas_price)
     }
 
-    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error> {
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error> {
         self.sent_txs
-            .borrow_mut()
+            .write()
+            .await
             .insert(signed_tx.hash, signed_tx.clone());
 
         Ok(())
@@ -317,7 +319,7 @@ impl EthereumInterface for MockEthereum {
         ethabi::encode(params.into_tokens().as_ref())
     }
 
-    fn sign_prepared_tx(
+    async fn sign_prepared_tx(
         &self,
         raw_tx: Vec<u8>,
         options: Options,
@@ -338,6 +340,10 @@ impl EthereumInterface for MockEthereum {
             nonce,
             hash,
         })
+    }
+
+    async fn failure_reason(&self, tx_hash: H256) -> Option<FailureInfo> {
+        None
     }
 }
 
