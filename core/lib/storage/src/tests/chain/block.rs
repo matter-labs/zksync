@@ -1,13 +1,12 @@
 // External imports
-use zksync_basic_types::H256;
+
 // Workspace imports
-use zksync_crypto::{convert::FeConvert, Fr};
-use zksync_crypto::{ff::PrimeField, rand::XorShiftRng};
-use zksync_types::{block::Block, helpers::apply_updates, AccountMap, AccountUpdate, BlockNumber};
-use zksync_types::{ethereum::OperationType, Action, Operation};
+use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
+use zksync_types::{
+    ethereum::OperationType, helpers::apply_updates, AccountMap, AccountUpdate, Action, BlockNumber,
+};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
-use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{
         block::{records::BlockDetails, BlockSchema},
@@ -15,11 +14,10 @@ use crate::{
     },
     ethereum::EthereumSchema,
     prover::ProverSchema,
+    test_data::{dummy_ethereum_tx_hash, gen_unique_operation, BLOCK_SIZE_CHUNKS},
+    tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
-
-/// block size used for this tests
-const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Creates several random updates for the provided account map,
 /// and returns the resulting account map together with the list
@@ -141,34 +139,6 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     Ok(())
 }
 
-/// Creates an unique new root hash for the block based on its number.
-fn root_hash_for_block(block_number: BlockNumber) -> Fr {
-    Fr::from_str(&block_number.to_string()).unwrap()
-}
-
-/// Creates an unique ethereum operation hash based on its number.
-fn ethereum_tx_hash(ethereum_op_id: i64) -> H256 {
-    H256::from_low_u64_ne(ethereum_op_id as u64)
-}
-
-/// Creates an operation with an unique hash.
-fn get_unique_operation(block_number: BlockNumber, action: Action) -> Operation {
-    Operation {
-        id: None,
-        action,
-        block: Block::new(
-            block_number,
-            root_hash_for_block(block_number),
-            0,
-            Vec::new(),
-            (0, 0),
-            100,
-            1_000_000.into(),
-            1_500_000.into(),
-        ),
-    }
-}
-
 /// Checks that `find_block_by_height_or_hash` method allows
 /// to load the block details by either its height, hash of the included
 /// transaction, or the root hash of the block.
@@ -257,7 +227,11 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
-            .execute_operation(get_unique_operation(block_number, Action::Commit))
+            .execute_operation(gen_unique_operation(
+                block_number,
+                Action::Commit,
+                BLOCK_SIZE_CHUNKS,
+            ))
             .await?;
         StateSchema(&mut storage)
             .commit_state_update(block_number, &updates, 0)
@@ -266,7 +240,7 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
         // Store & confirm the operation in the ethereum schema, as it's used for obtaining
         // commit/verify hashes.
         let ethereum_op_id = operation.id.unwrap() as i64;
-        let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+        let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
         let response = EthereumSchema(&mut storage)
             .save_new_eth_tx(
                 OperationType::Commit,
@@ -295,16 +269,17 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
                 .store_proof(block_number, &Default::default())
                 .await?;
             let verify_operation = BlockSchema(&mut storage)
-                .execute_operation(get_unique_operation(
+                .execute_operation(gen_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),
                     },
+                    BLOCK_SIZE_CHUNKS,
                 ))
                 .await?;
 
             let ethereum_op_id = verify_operation.id.unwrap() as i64;
-            let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+            let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
 
             // Do not add an ethereum confirmation for the last operation.
             if block_number != n_verified {
@@ -400,7 +375,11 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
-            .execute_operation(get_unique_operation(block_number, Action::Commit))
+            .execute_operation(gen_unique_operation(
+                block_number,
+                Action::Commit,
+                BLOCK_SIZE_CHUNKS,
+            ))
             .await?;
         StateSchema(&mut storage)
             .commit_state_update(block_number, &updates, 0)
@@ -409,7 +388,7 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         // Store & confirm the operation in the ethereum schema, as it's used for obtaining
         // commit/verify hashes.
         let ethereum_op_id = operation.id.unwrap() as i64;
-        let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+        let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
         let response = EthereumSchema(&mut storage)
             .save_new_eth_tx(
                 OperationType::Commit,
@@ -432,15 +411,16 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 .store_proof(block_number, &Default::default())
                 .await?;
             let operation = BlockSchema(&mut storage)
-                .execute_operation(get_unique_operation(
+                .execute_operation(gen_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),
                     },
+                    BLOCK_SIZE_CHUNKS,
                 ))
                 .await?;
             let ethereum_op_id = operation.id.unwrap() as i64;
-            let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+            let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
             let response = EthereumSchema(&mut storage)
                 .save_new_eth_tx(
                     OperationType::Verify,
@@ -500,7 +480,11 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
-            .execute_operation(get_unique_operation(block_number, Action::Commit))
+            .execute_operation(gen_unique_operation(
+                block_number,
+                Action::Commit,
+                BLOCK_SIZE_CHUNKS,
+            ))
             .await?;
         StateSchema(&mut storage)
             .commit_state_update(block_number, &updates, 0)
@@ -509,7 +493,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
         // Store & confirm the operation in the ethereum schema, as it's used for obtaining
         // commit/verify hashes.
         let ethereum_op_id = operation.id.unwrap() as i64;
-        let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+        let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
         let response = EthereumSchema(&mut storage)
             .save_new_eth_tx(
                 OperationType::Commit,
@@ -535,15 +519,16 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
                 .store_proof(block_number, &Default::default())
                 .await?;
             let operation = BlockSchema(&mut storage)
-                .execute_operation(get_unique_operation(
+                .execute_operation(gen_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),
                     },
+                    BLOCK_SIZE_CHUNKS,
                 ))
                 .await?;
             let ethereum_op_id = operation.id.unwrap() as i64;
-            let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
+            let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
             let response = EthereumSchema(&mut storage)
                 .save_new_eth_tx(
                     OperationType::Verify,

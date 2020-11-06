@@ -16,7 +16,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-use crate::tests::chain::utils::get_eth_sing_data;
+use crate::test_data::gen_eth_sing_data;
 
 /// Generates several different `SignedFranlinTx` objects.
 fn franklin_txs() -> Vec<SignedZkSyncTx> {
@@ -79,7 +79,7 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
 
             SignedZkSyncTx {
                 tx: tx.clone(),
-                eth_sign_data: Some(get_eth_sing_data(test_message)),
+                eth_sign_data: Some(gen_eth_sing_data(test_message)),
             }
         })
         .collect()
@@ -106,7 +106,7 @@ fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
 
             SignedZkSyncTx {
                 tx: ZkSyncTx::Transfer(Box::new(transfer)),
-                eth_sign_data: Some(get_eth_sing_data(test_message)),
+                eth_sign_data: Some(gen_eth_sing_data(test_message)),
             }
         })
         .collect()
