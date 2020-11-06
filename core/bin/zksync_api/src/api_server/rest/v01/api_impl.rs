@@ -29,7 +29,7 @@ impl ApiV01 {
     }
 
     pub async fn status(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
-        ok_json!(self_.network_status.read())
+        ok_json!(self_.network_status.read().await)
     }
 
     pub async fn tokens(self_: web::Data<Self>) -> ActixResult<HttpResponse> {

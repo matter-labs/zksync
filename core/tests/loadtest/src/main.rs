@@ -20,6 +20,7 @@
 // Built-in import
 use std::path::PathBuf;
 // External uses
+use chrono::{SecondsFormat, Utc};
 use colored::*;
 use structopt::StructOpt;
 // Workspace uses
@@ -37,6 +38,9 @@ struct LoadtestOpts {
     /// Print the results as json file.
     #[structopt(long)]
     json_output: bool,
+    /// The path to the load test results
+    #[structopt(short = "o", long)]
+    out_dir: Option<PathBuf>,
 }
 
 macro_rules! pretty_fmt {
@@ -64,7 +68,7 @@ fn print_stats_summary(name: impl AsRef<str>, summary: Option<&FiveSummaryStats>
     }
 }
 
-fn print_api_counters(failed: usize, total: usize) {
+fn print_counters(failed: usize, total: usize) {
     if failed > 0 {
         println!(
             "          {} of {} requests have been {}.",
@@ -93,9 +97,21 @@ async fn main() -> Result<(), anyhow::Error> {
         .map(Config::from_toml)
         .transpose()?
         .unwrap_or_default();
+    let out_dir = opts.out_dir.unwrap_or_else(|| {
+        std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("loadtest")
+            .join(Utc::now().to_rfc3339_opts(SecondsFormat::Secs, false))
+    });
+    std::fs::create_dir_all(&out_dir)?;
+
+    loadtest::init_session(out_dir).await?;
 
     let executor = LoadtestExecutor::new(config, env_config).await?;
     let report = executor.run().await?;
+
+    loadtest::finish_session(&report).await?;
 
     if opts.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
@@ -103,14 +119,18 @@ async fn main() -> Result<(), anyhow::Error> {
         println!("Loadtest finished.");
 
         println!("Statistics for scenarios:");
-        for (category, stats) in &report.scenarios {
+        for (category, stats) in &report.scenarios.summary {
             print_stats_summary(category, Some(stats));
         }
+        print_counters(
+            report.scenarios.failed_txs_count,
+            report.scenarios.total_txs_count,
+        );
 
         println!("Statistics for API tests:");
         for (category, stats) in &report.api {
             print_stats_summary(category, stats.summary.as_ref());
-            print_api_counters(stats.failed_requests_count, stats.total_requests_count);
+            print_counters(stats.failed_requests_count, stats.total_requests_count);
         }
     }
 

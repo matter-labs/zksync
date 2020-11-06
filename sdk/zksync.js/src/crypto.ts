@@ -1,8 +1,8 @@
-import { Signature } from "./types";
+import { Signature } from './types';
 
-import { private_key_to_pubkey_hash, sign_musig } from "zksync-crypto";
-import * as zks from "zksync-crypto";
-import { utils } from "ethers";
+import { private_key_to_pubkey_hash, sign_musig } from 'zksync-crypto';
+import * as zks from 'zksync-crypto';
+import { utils } from 'ethers';
 
 export async function privateKeyFromSeed(seed: Uint8Array): Promise<Uint8Array> {
   await loadZkSyncCrypto();

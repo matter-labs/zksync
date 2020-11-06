@@ -1,5 +1,5 @@
-import { privateKeyFromSeed, signTransactionBytes, privateKeyToPubKeyHash } from "./crypto";
-import { BigNumber, BigNumberish, ethers } from "ethers";
+import { privateKeyFromSeed, signTransactionBytes, privateKeyToPubKeyHash } from './crypto';
+import { BigNumber, BigNumberish, ethers } from 'ethers';
 import {
     getEthSignatureType,
     signMessagePersonalAPI,
@@ -10,9 +10,9 @@ import {
     serializeAmountPacked,
     serializeFeePacked,
     serializeNonce,
-    serializeAmountFull,
-} from "./utils";
-import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from "./types";
+    serializeAmountFull
+} from './utils';
+import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from './types';
 
 export class Signer {
     readonly privateKey: Uint8Array;
@@ -47,7 +47,7 @@ export class Signer {
         const signature = await signTransactionBytes(this.privateKey, msgBytes);
 
         return {
-            type: "Transfer",
+            type: 'Transfer',
             accountId: transfer.accountId,
             from: transfer.from,
             to: transfer.to,
@@ -55,7 +55,7 @@ export class Signer {
             amount: BigNumber.from(transfer.amount).toString(),
             fee: BigNumber.from(transfer.fee).toString(),
             nonce: transfer.nonce,
-            signature,
+            signature
         };
     }
 
@@ -84,12 +84,12 @@ export class Signer {
             tokenIdBytes,
             amountBytes,
             feeBytes,
-            nonceBytes,
+            nonceBytes
         ]);
         const signature = await signTransactionBytes(this.privateKey, msgBytes);
 
         return {
-            type: "Withdraw",
+            type: 'Withdraw',
             accountId: withdraw.accountId,
             from: withdraw.from,
             to: withdraw.ethAddress,
@@ -97,7 +97,7 @@ export class Signer {
             amount: BigNumber.from(withdraw.amount).toString(),
             fee: BigNumber.from(withdraw.fee).toString(),
             nonce: withdraw.nonce,
-            signature,
+            signature
         };
     }
 
@@ -120,17 +120,17 @@ export class Signer {
             targetBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes,
+            nonceBytes
         ]);
         const signature = await signTransactionBytes(this.privateKey, msgBytes);
         return {
-            type: "ForcedExit",
+            type: 'ForcedExit',
             initiatorAccountId: forcedExit.initiatorAccountId,
             target: forcedExit.target,
             token: forcedExit.tokenId,
             fee: BigNumber.from(forcedExit.fee).toString(),
             nonce: forcedExit.nonce,
-            signature,
+            signature
         };
     }
 
@@ -156,11 +156,11 @@ export class Signer {
             pubKeyHashBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes,
+            nonceBytes
         ]);
         const signature = await signTransactionBytes(this.privateKey, msgBytes);
         return {
-            type: "ChangePubKey",
+            type: 'ChangePubKey',
             accountId: changePubKey.accountId,
             account: changePubKey.account,
             newPkHash: changePubKey.newPkHash,
@@ -168,7 +168,7 @@ export class Signer {
             fee: BigNumber.from(changePubKey.fee).toString(),
             nonce: changePubKey.nonce,
             signature,
-            ethSignature: null,
+            ethSignature: null
         };
     }
 
@@ -191,7 +191,7 @@ export class Signer {
             const network = await ethSigner.provider.getNetwork();
             chainID = network.chainId;
         }
-        let message = "Access zkSync account.\n\nOnly sign this message for a trusted client!";
+        let message = 'Access zkSync account.\n\nOnly sign this message for a trusted client!';
         if (chainID !== 1) {
             message += `\nChain ID: ${chainID}.`;
         }

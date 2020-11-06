@@ -9,13 +9,14 @@
         "printWidth": 120,
         "parser": "typescript",
         "singleQuote": true,
-        "trailingComma": "none"
+        "trailingComma": "none",
+        "bracketSpacing": true
     },
     "scripts": {
         "build": "tsc",
         "watch": "tsc --watch",
         "start": "node build/index.js",
-        "test": "f mocha --no-timeout -r ts-node/register test/*.test.ts",
+        "test": "zk f mocha --no-timeout -r ts-node/register test/*.test.ts",
         "fmt": "prettier --write {src,test}/*.ts"
     },
     "dependencies": {

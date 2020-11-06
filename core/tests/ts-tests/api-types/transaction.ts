@@ -14,6 +14,10 @@ type ChangePubKey = {
         feeToken?: number;
         account: string;
         accountId: number;
+        signature: {
+            pubKey: string;
+            signature: string;
+        };
         ethSignature: string | null;
         newPkHash: string;
         nonce: number;

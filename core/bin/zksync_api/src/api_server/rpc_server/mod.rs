@@ -1,6 +1,9 @@
 // External uses
 use futures::{
-    channel::{mpsc, oneshot},
+    channel::{
+        mpsc,
+        oneshot::{self, Receiver},
+    },
     SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
@@ -22,7 +25,8 @@ use zksync_types::{
 use crate::{
     core_api_client::{CoreApiClient, EthBlockId},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
-    signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
+    signature_checker::TxWithSignData,
+    signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
     tx_error::TxAddError,
     utils::{shared_lru_cache::SharedLruCache, token_db_cache::TokenDBCache},
 };
@@ -162,7 +166,7 @@ impl RpcApp {
 impl RpcApp {
     async fn access_storage(&self) -> Result<StorageProcessor<'_>> {
         self.connection_pool
-            .access_storage_fragile()
+            .access_storage()
             .await
             .map_err(|_| Error::internal_error())
     }
@@ -482,48 +486,26 @@ pub fn start_rpc_server(
 
         let server = ServerBuilder::new(io)
             .request_middleware(super::loggers::http_rpc::request_middleware)
-            .threads(8)
+            .threads(super::THREADS_PER_SERVER)
             .start_http(&addr)
             .unwrap();
         server.wait();
     });
 }
 
-async fn verify_tx_info_message_signature(
-    tx: &ZkSyncTx,
-    signature: Option<TxEthSignature>,
-    msg_to_sign: Option<String>,
-    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
-) -> Result<VerifiedTx> {
-    fn rpc_message(error: TxAddError) -> Error {
-        Error {
-            code: RpcErrorCodes::from(error).into(),
-            message: error.to_string(),
-            data: None,
-        }
+fn rpc_error(error: TxAddError) -> Error {
+    Error {
+        code: RpcErrorCodes::from(error).into(),
+        message: error.to_string(),
+        data: None,
     }
+}
 
-    let eth_sign_data = match msg_to_sign {
-        Some(message_to_sign) => {
-            let signature =
-                signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
-
-            Some(EthSignData {
-                signature,
-                message: message_to_sign,
-            })
-        }
-        None => None,
-    };
-
-    let resp = oneshot::channel();
-
-    let request = VerifyTxSignatureRequest {
-        tx: tx.clone(),
-        eth_sign_data,
-        response: resp.0,
-    };
-
+async fn send_verify_request_and_recv(
+    request: VerifyTxSignatureRequest,
+    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+    receiver: Receiver<std::result::Result<VerifiedTx, TxAddError>>,
+) -> Result<VerifiedTx> {
     // Send the check request.
     req_channel.send(request).await.map_err(|err| {
         log::warn!(
@@ -537,7 +519,7 @@ async fn verify_tx_info_message_signature(
     })?;
 
     // Wait for the check result.
-    resp.1
+    receiver
         .await
         .map_err(|err| {
             log::warn!(
@@ -549,7 +531,83 @@ async fn verify_tx_info_message_signature(
             );
             Error::internal_error()
         })?
-        .map_err(rpc_message)
+        .map_err(rpc_error)
+}
+
+/// Send a request for Ethereum signature verification and wait for the response.
+/// If `msg_to_sign` is not `None`, then the signature must be present.
+async fn verify_tx_info_message_signature(
+    tx: &ZkSyncTx,
+    signature: Option<TxEthSignature>,
+    msg_to_sign: Option<String>,
+    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+) -> Result<VerifiedTx> {
+    let eth_sign_data = match msg_to_sign {
+        Some(message_to_sign) => {
+            let signature = signature.ok_or_else(|| rpc_error(TxAddError::MissingEthSignature))?;
+
+            Some(EthSignData {
+                signature,
+                message: message_to_sign,
+            })
+        }
+        None => None,
+    };
+
+    let (sender, receiever) = oneshot::channel();
+
+    let request = VerifyTxSignatureRequest {
+        tx: TxVariant::Tx(TxWithSignData {
+            tx: tx.clone(),
+            eth_sign_data,
+        }),
+        response: sender,
+    };
+
+    send_verify_request_and_recv(request, req_channel, receiever).await
+}
+
+/// Send a request for Ethereum signature verification and wait for the response.
+/// Unlike in case of `verify_tx_info_message_signature`, we do not require
+/// every transaction from the batch to be signed. The signature must be obtained
+/// through signing hash of concatenated transactions bytes.
+async fn verify_txs_batch_signature(
+    batch: Vec<TxWithSignature>,
+    signature: TxEthSignature,
+    msgs_to_sign: Vec<Option<String>>,
+    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+) -> Result<VerifiedTx> {
+    let mut txs = Vec::with_capacity(batch.len());
+    for (tx, message) in batch.into_iter().zip(msgs_to_sign.into_iter()) {
+        // If we have more signatures provided than required,
+        // we will verify those too.
+        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
+            Some(EthSignData { signature, message })
+        } else {
+            None
+        };
+        txs.push(TxWithSignData {
+            tx: tx.tx,
+            eth_sign_data,
+        });
+    }
+    // User is expected to sign hash of the data of all transactions in the batch.
+    let message = hex::encode(tiny_keccak::keccak256(
+        txs.iter()
+            .flat_map(|tx| tx.tx.get_bytes())
+            .collect::<Vec<u8>>()
+            .as_slice(),
+    ));
+    let eth_sign_data = EthSignData { signature, message };
+
+    let (sender, receiever) = oneshot::channel();
+
+    let request = VerifyTxSignatureRequest {
+        tx: TxVariant::Batch(txs, eth_sign_data),
+        response: sender,
+    };
+
+    send_verify_request_and_recv(request, req_channel, receiever).await
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
-import Axios from "axios";
-import WebSocketAsPromised = require("websocket-as-promised");
-import * as websocket from "websocket";
+import Axios from 'axios';
+import WebSocketAsPromised = require('websocket-as-promised');
+import * as websocket from 'websocket';
 const W3CWebSocket = websocket.w3cwebsocket;
 
 export abstract class AbstractJSONRPCTransport {
@@ -9,7 +9,7 @@ export abstract class AbstractJSONRPCTransport {
         return false;
     }
     async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
-        throw new Error("subscription are not supported for this transport");
+        throw new Error('subscription are not supported for this transport');
     }
     abstract async disconnect();
 }
@@ -40,24 +40,24 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
     async request(method: string, params = null): Promise<any> {
         const request = {
             id: 1,
-            jsonrpc: "2.0",
+            jsonrpc: '2.0',
             method,
-            params,
+            params
         };
 
         const response = await Axios.post(this.address, request).then((resp) => {
             return resp.data;
         });
 
-        if ("result" in response) {
+        if ('result' in response) {
             return response.result;
-        } else if ("error" in response) {
+        } else if ('error' in response) {
             throw new JRPCError(
                 `zkSync API response error: code ${response.error.code}; message: ${response.error.message}`,
                 response.error
             );
         } else {
-            throw new Error("Unknown JRPC Error");
+            throw new Error('Unknown JRPC Error');
         }
     }
 
@@ -75,7 +75,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
             packMessage: (data) => JSON.stringify(data),
             unpackMessage: (data) => JSON.parse(data as string),
             attachRequestId: (data, requestId) => Object.assign({ id: requestId }, data), // attach requestId to message as `id` field
-            extractRequestId: (data) => data && data.id,
+            extractRequestId: (data) => data && data.id
         });
 
         this.subscriptionCallback = new Map();
@@ -91,7 +91,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
         });
     }
 
-    static async connect(address = "ws://127.0.0.1:3031"): Promise<WSTransport> {
+    static async connect(address = 'ws://127.0.0.1:3031'): Promise<WSTransport> {
         const transport = new WSTransport(address);
         await transport.ws.open();
         return transport;
@@ -102,11 +102,11 @@ export class WSTransport extends AbstractJSONRPCTransport {
     }
 
     async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
-        const req = { jsonrpc: "2.0", method: subMethod, params: subParams };
+        const req = { jsonrpc: '2.0', method: subMethod, params: subParams };
         const sub = await this.ws.sendRequest(req);
 
         if (sub.error) {
-            throw new JRPCError("Subscription failed", sub.error);
+            throw new JRPCError('Subscription failed', sub.error);
         }
 
         const subId = sub.result;
@@ -114,9 +114,9 @@ export class WSTransport extends AbstractJSONRPCTransport {
 
         const unsubscribe = async () => {
             const unsubRep = await this.ws.sendRequest({
-                jsonrpc: "2.0",
+                jsonrpc: '2.0',
                 method: unsubMethod,
-                params: [subId],
+                params: [subId]
             });
             if (unsubRep.error) {
                 throw new JRPCError(`Unsubscribe failed: ${subId}, ${JSON.stringify(unsubRep.error)}`, unsubRep.error);
@@ -133,22 +133,22 @@ export class WSTransport extends AbstractJSONRPCTransport {
     // JSON RPC request
     async request(method: string, params = null): Promise<any> {
         const request = {
-            jsonrpc: "2.0",
+            jsonrpc: '2.0',
             method,
-            params,
+            params
         };
 
-        const response = await this.ws.sendRequest(request, {requestId: 1});
+        const response = await this.ws.sendRequest(request, { requestId: 1 });
 
-        if ("result" in response) {
+        if ('result' in response) {
             return response.result;
-        } else if ("error" in response) {
+        } else if ('error' in response) {
             throw new JRPCError(
                 `zkSync API response error: code ${response.error.code}; message: ${response.error.message}`,
                 response.error
             );
         } else {
-            throw new Error("Unknown JRPC Error");
+            throw new Error('Unknown JRPC Error');
         }
     }
 

@@ -4,10 +4,22 @@ This document covers development-related actions in zkSync.
 
 ## Initializing the project
 
+To setup the main toolkit, `zk`, simply run:
+
+```
+zk
+```
+
+You may also configure autocompletion for your shell via:
+
+```
+zk completion install
+```
+
 Once all the dependencies were installed, project can be initialized:
 
 ```sh
-zksync init
+zk init
 ```
 
 This command will do the following:
@@ -25,17 +37,17 @@ This command will do the following:
 Initializing may take pretty long, but many steps (such as downloading & unpacking keys and initializing containers) are
 required to be done only once.
 
-Usually, it is a good idea to do `zksync init` once after each merge to the `dev` branch (as application setup may change).
+Usually, it is a good idea to do `zk init` once after each merge to the `dev` branch (as application setup may change).
 
-**Note:** If after getting new functionality from the `dev` branch your code stopped working and `zksync init` doesn't help,
-you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zksync init` once again. This may help if the application
+**Note:** If after getting new functionality from the `dev` branch your code stopped working and `zk init` doesn't help,
+you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zk init` once again. This may help if the application
 configuration has changed.
 
-If you don't need all of the `zksync init` functionality, but just need to start/stop containers, use the following commands:
+If you don't need all of the `zk init` functionality, but just need to start/stop containers, use the following commands:
 
 ```sh
-zksync dev-up # Set up `geth` and `postgres` containers
-zksync dev-down # Shut down `geth` and `postgres` containers
+zk up   # Set up `geth` and `postgres` containers
+zk down # Shut down `geth` and `postgres` containers
 ```
 
 ## Committing changes
@@ -53,28 +65,28 @@ Currently the following criteria are checked:
 
 Using the real prover for the development can be not really handy, since it's pretty slow and resource consuming.
 
-Instead, one may want to use the Dummy Prover: lightweight version of prover, which does not actually proves anything,
+Instead, one may want to use the Dummy Prover: lightweight version of the prover, which does not actually prove anything,
 but acts like it does.
 
 To enable the dummy prover, run:
 
 ```sh
-zksync dummy-prover enable
+zk dummy-prover enable
 ```
 
 And after that you will be able to use the dummy prover instead of actual prover:
 
 ```sh
-zksync dummy-prover # Instead of `zksync prover`
+zk dummy-prover run # Instead of `zk prover`
 ```
 
-**Warning:** `setup-dummy-prover` subcommand changes the `Verifier.sol` contract, which is a part of `git` repository.
+**Warning:** `dummy-prover enable` subcommand changes the `Verifier.sol` contract, which is a part of `git` repository.
 Be sure not to commit these changes when using the dummy prover!
 
 If one will need to switch back to the real prover, a following command is required:
 
 ```sh
-zksync dummy-prover disable
+zk dummy-prover disable
 ```
 
 This command will revert changes in the contract and redeploy it, so the actual prover will be usable again.
@@ -82,8 +94,8 @@ This command will revert changes in the contract and redeploy it, so the actual 
 Also you can always check the current status of the dummy verifier:
 
 ```sh
-$ zksync dummy-prover status
-Dummy Verifier status: disabled
+$ zk dummy-prover status
+Dummy Prover status: disabled
 ```
 
 ## Database migrations
@@ -103,13 +115,13 @@ Adding a new migration requires the following actions:
   diesel migration generate name-of-your-migration
   ```
 3. Implement migration: `up.sql` must contain new changes for the DB, and `down.sql`
-  must revert the migration and return the database into previous state.
-4. Run `zksync db-init` to apply migration.
+    must revert the migration and return the database into previous state.
+4. Run `zk db migrate` to apply migration.
 5. Implement corresponding changes in the `storage` crate.
 6. Implement tests for new functionality.
 7. Run database tests:
   ```sh
-  zksync db-tests
+  zk test db
   ```
 
 ## Testing
@@ -121,40 +133,32 @@ Adding a new migration requires the following actions:
   ```
 
 - Running the database tests:
-  
-  ```sh
-  zksync db-tests
+
+  ```
+  zk test db
   ```
 - Running the integration test:
-  
-  ```sh
-  zksync server # Has to be run in the 1st terminal
-  zksync prover # Has to be run in the 2nd terminal
-  zksync integration-simple # Has to be run in the 3rd terminal
-  ```
 
-- Running the integration tests for Full Exit operations
-  
   ```sh
-  zksync server # Has to be run in the 1st terminal
-  zksync prover # Has to be run in the 2nd terminal
-  zksync integration-full-exit # Has to be run in the 3rd terminal
+  zk server           # Has to be run in the 1st terminal
+  zk dummy-prover run # Has to be run in the 2nd terminal
+  zk test i server    # Has to be run in the 3rd terminal
   ```
 
 - Running the circuit tests:
-  
+
   ```sh
-  zksync circuit-tests
+  zk test circuit
   ```
 
 - Running the prover tests:
-  
+
   ```sh
-  zksync prover-tests
+  zk test prover
   ```
 
 - Running the benchmarks:
-  
+
   ```sh
   f cargo bench
   ```
@@ -162,9 +166,9 @@ Adding a new migration requires the following actions:
 - Running  the loadtest:
 
   ```sh
-  zksync server # Has to be run in the 1st terminal
-  zksync prover # Has to be run in the 2nd terminal
-  zksync loadtest # Has to be run in the 3rd terminal
+  zk server # Has to be run in the 1st terminal
+  zk prover # Has to be run in the 2nd terminal
+  zk run loadtest # Has to be run in the 3rd terminal
   ```
 
 ## Developing circuit
@@ -175,13 +179,13 @@ Adding a new migration requires the following actions:
 Steps to do after updating circuit:
 1. Update circuit version by updating `KEY_DIR` in your env file (don't forget to place it to `dev.env.example`)
 (last parts of this variable usually means last commit where you updated circuit).
-2. Regenerate verification keys and Verifier contract using `zksync verify-keys gen` command.
-3. Pack generated verification keys using `zksync verify-keys pack` command and commit resulting file to repo.
+2. Regenerate verification keys and Verifier contract using `zk run verify-keys gen` command.
+3. Pack generated verification keys using `zk run verify-keys pack` command and commit resulting file to repo.
 
 ## Build and push Docker images to dockerhub:
 
 ```sh
-zksync dockerhub-push
+zk docker push <IMAGE>
 ```
 
 ## Contracts
@@ -189,11 +193,11 @@ zksync dockerhub-push
 ### Re-build contracts:
 
 ```sh
-zksync build-contracts
+zk contract build
 ```
 
 ### Publish source code on etherscan
 
 ```sh
-zksync publish-source
+zk contract publish
 ```

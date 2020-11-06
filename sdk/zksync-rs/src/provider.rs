@@ -1,10 +1,11 @@
-// Provider API. TODO: Describe what's here.
+// Provider API. TODO: Describe what's here (#1128).
 // from: https://github.com/matter-labs/zksync-dev/blob/dev/core/loadtest/src/rpc_client.rs
 
 // Built-in imports
+use std::time::Duration;
 
 // External uses
-use jsonrpc_core::types::response::Output;
+use jsonrpc_core::{types::response::Output, ErrorCode};
 
 // Workspace uses
 use zksync_types::{
@@ -92,8 +93,9 @@ impl Provider {
     pub async fn send_txs_batch(
         &self,
         txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
+        eth_signature: Option<PackedEthSignature>,
     ) -> Result<Vec<TxHash>, ClientError> {
-        let msg = JsonRpcRequest::submit_tx_batch(txs_signed);
+        let msg = JsonRpcRequest::submit_tx_batch(txs_signed, eth_signature);
 
         let ret = self.post(&msg).await?;
         let tx_hashes = serde_json::from_value(ret)
@@ -170,14 +172,38 @@ impl Provider {
     /// the `Err` variant is returned (including the failed RPC method
     /// execution response).
     async fn post(&self, message: impl serde::Serialize) -> Result<serde_json::Value, ClientError> {
-        let reply: Output = self.post_raw(message).await?;
+        // Repeat requests with exponential backoff until an ok response is received to avoid
+        // network and internal errors impact.
+        const MAX_DURATION: Duration = Duration::from_secs(30);
+        let mut delay = Duration::from_millis(50);
+        loop {
+            let result = self.post_raw(&message).await;
 
-        let ret = match reply {
-            Output::Success(success) => success.result,
-            Output::Failure(failure) => return Err(ClientError::RpcError(failure)),
-        };
+            /// Determines if the error code is recoverable or not.
+            fn is_recoverable(code: &ErrorCode) -> bool {
+                code == &ErrorCode::InternalError
+                // This is a communication error code, so we can make attempt to retry request.
+                || code == &ErrorCode::ServerError(300)
+            }
 
-        Ok(ret)
+            let should_retry = match result.as_ref() {
+                Err(ClientError::NetworkError(..)) => true,
+                Err(ClientError::RpcError(fail)) if is_recoverable(&fail.error.code) => true,
+                Ok(Output::Failure(fail)) if is_recoverable(&fail.error.code) => true,
+                _ => false,
+            };
+
+            if should_retry && delay < MAX_DURATION {
+                delay += delay;
+                tokio::time::delay_for(delay).await;
+                continue;
+            }
+
+            match result? {
+                Output::Success(success) => return Ok(success.result),
+                Output::Failure(failure) => return Err(ClientError::RpcError(failure)),
+            };
+        }
     }
 
     /// Performs a POST query to the JSON RPC endpoint,
@@ -250,8 +276,11 @@ mod messages {
             Self::create("tx_submit", params)
         }
 
-        pub fn submit_tx_batch(txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>) -> Self {
-            let mut params = Vec::with_capacity(1);
+        pub fn submit_tx_batch(
+            txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
+            eth_signature: Option<PackedEthSignature>,
+        ) -> Self {
+            let mut params = Vec::with_capacity(2);
 
             let txs_signed = txs_signed.into_iter().map(|(tx, eth_signature)| {
                 serde_json::json!({
@@ -261,6 +290,10 @@ mod messages {
                 })
             }).collect();
             params.push(serde_json::Value::Array(txs_signed));
+            params.push(
+                serde_json::to_value(eth_signature.map(TxEthSignature::EthereumSignature))
+                    .expect("serialization fail"),
+            );
 
             Self::create("submit_txs_batch", params)
         }

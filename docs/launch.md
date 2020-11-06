@@ -11,30 +11,31 @@ Prepare dev environment prerequisites: see [setup-dev.md](setup-dev.md).
 Setup:
 
 ```sh
-zksync init
+zk   # installs and builds zk itself
+zk init
 ```
 
 During the first initialization you have to download around 8 GB of setup files, this should be done once.
-If you have a problem on this step of the initialization, see help for the `zksync plonk-setup` command.
+If you have a problem on this step of the initialization, see help for the `zk run plonk-setup` command.
 
 To completely reset the dev environment:
 
 - Stop services:
   ```sh
-  zksync dev-down
+  zk down
   ```
 - Repeat the setup procedure above
 
-If `zksync init` has already been executed, and now you only need to start docker containers (e.g. after reboot), simply launch:
+If `zk init` has already been executed, and now you only need to start docker containers (e.g. after reboot), simply launch:
 
 ```sh
-zksync dev-up
+zk up
 ```
 
 ## (Re)deploy db and contraсts:
 
 ```sh
-zksync redeploy
+zk contract redeploy
 ```
 
 ## Environment configurations
@@ -44,23 +45,23 @@ Env config files are held in `etc/env/`
 List configurations:
 
 ```sh
-zksync env
+zk env
 ```
 
 Switch between configurations:
 
 ```sh
-zksync env <ENV_NAME>
+zk env <ENV_NAME>
 ```
 
-Default confiruration is `dev.env`, which is generated automatically from `dev.env.example` during `zksync init` command execution.
+Default confiruration is `dev.env`, which is generated automatically from `dev.env.example` during `zk init` command execution.
 
 ## Build and run server + prover locally for development:
 
 Run server:
 
 ```sh
-zksync server
+zk server
 ```
 
 Server is configured using env files in `./etc/env` directory. 
@@ -76,8 +77,8 @@ for details).
 Run prover:
 
 ```sh
-zksync prover
+zk prover
 ```
 
 Make sure you have environment variables set right, you can check it by running:
-`zksync env`. You should see `* dev` in output.
+`zk env`. You should see ` * dev` in output.

@@ -51,7 +51,7 @@ where
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature = pk.verify_musig_sha256(&message_bytes, &signature, p_g, params);
 
-    // TODO: handle the case where it is not valid
+    // TODO: handle the case where it is not valid (#1113)
     // if !is_valid_signature {
     //     return None;
     // }
@@ -88,7 +88,7 @@ where
         jubjub_params,
     );
 
-    // TODO: handle the case where it is not valid
+    // TODO: handle the case where it is not valid (#1113)
     // if !is_valid_signature {
     //     return None;
     // }
@@ -166,7 +166,7 @@ where
         let mut byte = 0u8;
         for (i, bit) in byte_chunk.iter().enumerate() {
             if *bit {
-                byte |= 1 << (7 - i); //TODO: ask shamatar why do we need rev here, but not in pedersen
+                byte |= 1 << (7 - i);
             }
         }
         message_bytes.push(byte);

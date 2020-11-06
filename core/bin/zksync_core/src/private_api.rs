@@ -15,7 +15,7 @@ use futures::{
 };
 use std::thread;
 use zksync_config::ConfigurationOptions;
-use zksync_types::{Address, SignedZkSyncTx, H256};
+use zksync_types::{tx::TxEthSignature, Address, SignedZkSyncTx, H256};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
@@ -53,10 +53,10 @@ async fn new_tx(
 #[actix_web::post("/new_txs_batch")]
 async fn new_txs_batch(
     data: web::Data<AppState>,
-    web::Json(txs): web::Json<Vec<SignedZkSyncTx>>,
+    web::Json((txs, eth_signature)): web::Json<(Vec<SignedZkSyncTx>, Option<TxEthSignature>)>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = MempoolRequest::NewTxsBatch(txs, sender);
+    let item = MempoolRequest::NewTxsBatch(txs, eth_signature, sender);
     let mut mempool_sender = data.mempool_tx_sender.clone();
     mempool_sender
         .send(item)

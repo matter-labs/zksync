@@ -61,18 +61,7 @@ impl RestApiClient {
                 Ok(Some(json))
             }
         } else {
-            log::warn!(
-                "For {}: a HTTP error occurred {} with body: {}",
-                url,
-                status,
-                text
-            );
-            Err(anyhow::anyhow!(
-                "For {}: a HTTP error occurred {} with body: {}",
-                url,
-                status,
-                text
-            ))
+            Err(anyhow::anyhow!("{} ({}) {}", url, status, text))
         }
     }
 }
@@ -114,7 +103,7 @@ impl RestApiClient {
 
     pub async fn tx_history_older_than(&self) -> anyhow::Result<()> {
         let address = self.pool.read().await.random_address().0;
-        // TODO Implement queries.
+        // TODO: Implement queries (#1116).
         let url = format!(
             "/account/{}/history/older_than?limit={}",
             address.to_hex_id(),
@@ -126,7 +115,7 @@ impl RestApiClient {
 
     pub async fn tx_history_newer_than(&self) -> anyhow::Result<()> {
         let address = self.pool.read().await.random_address().0;
-        // TODO Implement queries.
+        // TODO: Implement queries (#1116).
         let url = format!(
             "/account/{}/history/newer_than?limit={}",
             address.to_hex_id(),
@@ -228,7 +217,7 @@ macro_rules! declare_tests {
 }
 
 pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> ApiTestsBuilder<'a> {
-    // TODO add this field to the ConfigurationOptions.
+    // TODO: add this field to the ConfigurationOptions (#1116).
     let rest_api_url = parse_env::<String>("REST_API_ADDR");
 
     let client = RestApiClient::new(rest_api_url, monitor.api_data_pool.clone());

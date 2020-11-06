@@ -24,6 +24,7 @@ use zksync_types::{
 use crate::{
     api::ApiDataPool,
     journal::{Journal, TxLifecycle},
+    utils::{wait_all_chunks, CHUNK_SIZES},
 };
 
 type SerialId = u64;
@@ -209,8 +210,7 @@ impl Monitor {
                 .monitor_tx(created_at, sent_at, tx_hash)
                 .await;
 
-            if let Err(e) = tx_result.as_ref() {
-                log::warn!("Monitored transaction execution failed. {}", e);
+            if tx_result.is_err() {
                 monitor.log_event(Event::TxErrored(tx_hash)).await;
             }
 
@@ -239,7 +239,11 @@ impl Monitor {
                     Some(true) => true,
                     None => false,
                     Some(false) => {
-                        anyhow::bail!("Transaction failed with a reason: {:?}", info.fail_reason);
+                        anyhow::bail!(
+                            "Transaction `{}` failed with a reason: {:?}",
+                            tx_hash.to_string(),
+                            info.fail_reason
+                        );
                     }
                 },
 
@@ -280,7 +284,9 @@ impl Monitor {
             .drain(..)
             .collect::<Vec<_>>();
 
-        futures::future::join_all(tasks).await;
+        log::trace!("Awaiting for verification, pending tasks {}", tasks.len());
+
+        wait_all_chunks(CHUNK_SIZES, tasks).await;
     }
 
     /// Enables a collecting metrics process.
@@ -304,8 +310,6 @@ impl Monitor {
         eth_provider: &EthereumProvider<S>,
         eth_tx_hash: H256,
     ) -> anyhow::Result<PriorityOp> {
-        // TODO Make this task completely async.
-
         // Wait for the corresponing priority operation ID.
         let priority_op = eth_provider
             .wait_for_tx(eth_tx_hash)

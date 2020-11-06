@@ -1042,20 +1042,6 @@
       "nullable": []
     }
   },
-  "3ef4df054f65bf580df68d9e538215eb76baacaae2793f21fff54a2e95aafb94": {
-    "query": "UPDATE operations\n            SET confirmed = $1\n            WHERE id = $2 OR id = $3",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bool",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "41a4d1c9fa9953cd94714a408afd892962f9eea9a9f1674b8dddfa72e2eb9ec2": {
     "query": "INSERT INTO eth_tx_hashes (eth_op_id, tx_hash) VALUES ($1, $2)",
     "describe": {
@@ -1874,6 +1860,26 @@
       ]
     }
   },
+  "7c897b16e4a3ae8c80c3d165d010c0698d0256ebadcfac6ca1a173bf820a1c5e": {
+    "query": "SELECT eth_signature FROM txs_batches_signatures\n                    WHERE batch_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "eth_signature",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "80c2eb3abd0f05fb464113ca06dc2a7f1fe860bc4fcac0da805f13e980ca75a5": {
     "query": "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1\n            LIMIT 1",
     "describe": {
@@ -1989,6 +1995,31 @@
       ]
     }
   },
+  "8a3e948a644c7d8bc415209c16dc4f2d4a5fdc06318c94391d5150d83b9ef52c": {
+    "query": "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)\n                ON CONFLICT (tx_hash)\n                DO UPDATE\n                SET block_number = $1, block_index = $2, tx = $3, operation = $4, tx_hash = $5, from_account = $6, to_account = $7, success = $8, fail_reason = $9, primary_account_address = $10, nonce = $11, created_at = $12, eth_sign_data = $13, batch_id = $14",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Jsonb",
+          "Jsonb",
+          "Bytea",
+          "Bytea",
+          "Bytea",
+          "Bool",
+          "Text",
+          "Bytea",
+          "Int8",
+          "Timestamptz",
+          "Jsonb",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8aa384bd2d145e1b7a8a6e18b560af991da3ef0d41ee5cae8f0c0573287acf04": {
     "query": "\n                    SELECT * FROM balances\n                    WHERE account_id = $1\n                ",
     "describe": {
@@ -2019,30 +2050,6 @@
         false,
         false
       ]
-    }
-  },
-  "8b15b3403c5dc54e132e65cb3c88ccf5920f9026908821f5b7a8921fca3d576f": {
-    "query": "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)\n                ON CONFLICT (tx_hash)\n                DO NOTHING",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Jsonb",
-          "Jsonb",
-          "Bytea",
-          "Bytea",
-          "Bytea",
-          "Bool",
-          "Text",
-          "Bytea",
-          "Int8",
-          "Timestamptz",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
     }
   },
   "8f703c1371cfad6b11cb022ef8edcd1e3068ce3d7c82251a92a4dd1797fe299f": {
@@ -2117,6 +2124,19 @@
       "columns": [],
       "parameters": {
         "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "98f87793202531586603307eab53987f75f4e07614af8706e6180413f808a1b4": {
+    "query": "INSERT INTO txs_batches_signatures VALUES($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb"
+        ]
       },
       "nullable": []
     }
@@ -2360,6 +2380,31 @@
           "Bool",
           "Int8",
           "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a4969ac155106f1d8dd9b305e71ce36b3ee39adf75574d40e123a617a502ffe4": {
+    "query": "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)\n                ON CONFLICT (tx_hash)\n                DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Jsonb",
+          "Jsonb",
+          "Bytea",
+          "Bytea",
+          "Bytea",
+          "Bool",
+          "Text",
+          "Bytea",
+          "Int8",
+          "Timestamptz",
+          "Jsonb",
+          "Int8"
         ]
       },
       "nullable": []
@@ -3202,30 +3247,6 @@
       "columns": [],
       "parameters": {
         "Left": []
-      },
-      "nullable": []
-    }
-  },
-  "eb5cf431ccbfe25f4cb4cb1618c4b0bc9ee94dc4f23e62ff6a469ffa9e13fc95": {
-    "query": "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)\n                ON CONFLICT (tx_hash)\n                DO UPDATE\n                SET block_number = $1, block_index = $2, tx = $3, operation = $4, tx_hash = $5, from_account = $6, to_account = $7, success = $8, fail_reason = $9, primary_account_address = $10, nonce = $11, created_at = $12, eth_sign_data = $13",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Jsonb",
-          "Jsonb",
-          "Bytea",
-          "Bytea",
-          "Bytea",
-          "Bool",
-          "Text",
-          "Bytea",
-          "Int8",
-          "Timestamptz",
-          "Jsonb"
-        ]
       },
       "nullable": []
     }

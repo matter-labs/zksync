@@ -10,7 +10,7 @@ use std::str::FromStr;
 use num::BigUint;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
-use zksync_storage::{chain::state::StateSchema, ConnectionPool, StorageProcessor};
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Operation,
@@ -33,7 +33,7 @@ impl Database {
 }
 
 impl Database {
-    pub async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error> {
+    pub async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>> {
         let connection = self.db_pool.access_storage().await?;
 
         Ok(connection)
@@ -42,7 +42,7 @@ impl Database {
     pub async fn restore_state(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error> {
+    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<Operation>)> {
         let unconfirmed_ops = connection
             .ethereum_schema()
             .load_unconfirmed_operations()
@@ -57,7 +57,7 @@ impl Database {
     pub async fn load_new_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<Vec<Operation>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<Operation>> {
         let unprocessed_ops = connection
             .ethereum_schema()
             .load_unprocessed_operations()
@@ -73,7 +73,7 @@ impl Database {
         deadline_block: i64,
         used_gas_price: U256,
         raw_tx: Vec<u8>,
-    ) -> Result<InsertedOperationResponse, anyhow::Error> {
+    ) -> anyhow::Result<InsertedOperationResponse> {
         let result = connection
             .ethereum_schema()
             .save_new_eth_tx(
@@ -93,7 +93,7 @@ impl Database {
         connection: &mut StorageProcessor<'_>,
         eth_op_id: i64,
         hash: &H256,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         Ok(connection
             .ethereum_schema()
             .add_hash_entry(eth_op_id, hash)
@@ -106,7 +106,7 @@ impl Database {
         eth_op_id: EthOpId,
         new_deadline_block: i64,
         new_gas_value: U256,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         Ok(connection
             .ethereum_schema()
             .update_eth_tx(
@@ -117,30 +117,68 @@ impl Database {
             .await?)
     }
 
+    pub async fn is_previous_operation_confirmed(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+        op: &ETHOperation,
+    ) -> anyhow::Result<bool> {
+        let confirmed = match op.op_type {
+            OperationType::Commit | OperationType::Verify => {
+                let op = op.op.as_ref().unwrap();
+                // We're checking previous block, so for the edge case of first block we can say that it was confirmed.
+                let block_to_check = if op.block.block_number > 1 {
+                    op.block.block_number - 1
+                } else {
+                    return Ok(true);
+                };
+
+                let maybe_operation = connection
+                    .chain()
+                    .operations_schema()
+                    .get_operation(block_to_check, op.action.get_type())
+                    .await;
+                let operation = match maybe_operation {
+                    Some(op) => op,
+                    None => return Ok(false),
+                };
+                operation.confirmed
+            }
+            OperationType::Withdraw => {
+                // Withdrawals aren't actually sequential, so we don't really care.
+                true
+            }
+        };
+
+        Ok(confirmed)
+    }
+
     pub async fn confirm_operation(
         &self,
         connection: &mut StorageProcessor<'_>,
         hash: &H256,
         op: &ETHOperation,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         if let OperationType::Verify = op.op_type {
             let mut transaction = connection.start_transaction().await?;
 
             transaction.ethereum_schema().confirm_eth_tx(hash).await?;
-            StateSchema(&mut transaction)
+            transaction
+                .chain()
+                .state_schema()
                 .apply_state_update(op.op.as_ref().unwrap().block.block_number)
                 .await?;
 
-            Ok(transaction.commit().await?)
+            transaction.commit().await?;
         } else {
-            Ok(connection.ethereum_schema().confirm_eth_tx(hash).await?)
+            connection.ethereum_schema().confirm_eth_tx(hash).await?;
         }
+        Ok(())
     }
 
     pub async fn load_stats(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<ETHStats, anyhow::Error> {
+    ) -> anyhow::Result<ETHStats> {
         let stats = connection.ethereum_schema().load_stats().await?;
         Ok(stats.into())
     }
@@ -148,7 +186,7 @@ impl Database {
     pub async fn load_gas_price_limit(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<U256, anyhow::Error> {
+    ) -> anyhow::Result<U256> {
         let limit = connection.ethereum_schema().load_gas_price_limit().await?;
         Ok(limit)
     }
@@ -158,7 +196,7 @@ impl Database {
         connection: &mut StorageProcessor<'_>,
         gas_price_limit: U256,
         average_gas_price: U256,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         connection
             .ethereum_schema()
             .update_gas_price(gas_price_limit, average_gas_price)

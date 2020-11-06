@@ -1,24 +1,24 @@
-import { utils, constants, ethers, BigNumber, BigNumberish } from "ethers";
-import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address } from "./types";
+import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
+import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address, Transfer } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
 // Max number of accounts for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
-export const IERC20_INTERFACE = new utils.Interface(require("../abi/IERC20.json").abi);
-export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require("../abi/SyncMain.json").abi);
+export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
+export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
 
-export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require("../abi/SyncGov.json").abi);
+export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncGov.json').abi);
 
-export const IEIP1271_INTERFACE = new utils.Interface(require("../abi/IEIP1271.json").abi);
+export const IEIP1271_INTERFACE = new utils.Interface(require('../abi/IEIP1271.json').abi);
 
 export const MAX_ERC20_APPROVE_AMOUNT =
-    "115792089237316195423570985008687907853269984665640564039457584007913129639935"; // 2^256 - 1
+    '115792089237316195423570985008687907853269984665640564039457584007913129639935'; // 2^256 - 1
 
-export const ERC20_APPROVE_TRESHOLD = "57896044618658097711785492504343953926634992332820282019728792003956564819968"; // 2^255
+export const ERC20_APPROVE_TRESHOLD = '57896044618658097711785492504343953926634992332820282019728792003956564819968'; // 2^255
 
-export const ERC20_DEPOSIT_GAS_LIMIT = BigNumber.from("300000"); // 300k
+export const ERC20_DEPOSIT_GAS_LIMIT = BigNumber.from('300000'); // 300k
 
 const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
@@ -32,7 +32,7 @@ export function floatToInteger(
     expBaseNumber: number
 ): BigNumber {
     if (floatBytes.length * 8 !== mantissaBits + expBits) {
-        throw new Error("Float unpacking, incorrect input length");
+        throw new Error('Float unpacking, incorrect input length');
     }
 
     const bits = buffer2bitsBE(floatBytes).reverse();
@@ -59,7 +59,7 @@ export function floatToInteger(
 
 export function bitsIntoBytesInBEOrder(bits: number[]): Uint8Array {
     if (bits.length % 8 !== 0) {
-        throw new Error("wrong number of bits to pack");
+        throw new Error('wrong number of bits to pack');
     }
     const nBytes = bits.length / 8;
     const resultBytes = new Uint8Array(nBytes);
@@ -113,12 +113,10 @@ export function integerToFloat(
     exp_base: number
 ): Uint8Array {
     const max_exponent = BigNumber.from(10).pow(Math.pow(2, exp_bits) - 1);
-    const max_mantissa = BigNumber.from(2)
-        .pow(mantissa_bits)
-        .sub(1);
+    const max_mantissa = BigNumber.from(2).pow(mantissa_bits).sub(1);
 
     if (integer.gt(max_mantissa.mul(max_exponent))) {
-        throw new Error("Integer is too big");
+        throw new Error('Integer is too big');
     }
 
     let exponent = 0;
@@ -140,7 +138,7 @@ export function integerToFloat(
 
 export function reverseBits(buffer: Uint8Array): Uint8Array {
     const reversed = buffer.reverse();
-    reversed.map(b => {
+    reversed.map((b) => {
         // reverse bits in byte
         b = ((b & 0xf0) >> 4) | ((b & 0x0f) << 4);
         b = ((b & 0xcc) >> 2) | ((b & 0x33) << 2);
@@ -160,14 +158,14 @@ function packFee(amount: BigNumber): Uint8Array {
 
 export function packAmountChecked(amount: BigNumber): Uint8Array {
     if (closestPackableTransactionAmount(amount.toString()).toString() !== amount.toString()) {
-        throw new Error("Transaction Amount is not packable");
+        throw new Error('Transaction Amount is not packable');
     }
     return packAmount(amount);
 }
 
 export function packFeeChecked(amount: BigNumber): Uint8Array {
     if (closestPackableTransactionFee(amount.toString()).toString() !== amount.toString()) {
-        throw new Error("Fee Amount is not packable");
+        throw new Error('Fee Amount is not packable');
     }
     return packFee(amount);
 }
@@ -217,16 +215,15 @@ export function buffer2bitsBE(buff) {
 }
 
 export function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function isTokenETH(token: TokenLike): boolean {
-    return token === "ETH" || token === constants.AddressZero;
+    return token === 'ETH' || token === constants.AddressZero;
 }
 
 export class TokenSet {
-    // TODO: Replace with hardcoded list of tokens for final version this is temporary solution
-    //  so that we can get list of the supported from zksync node,
+    // TODO: handle stale entries, edge case when we rename token after adding it (#1132).
     constructor(private tokensBySymbol: Tokens) {}
 
     private resolveTokenObject(tokenLike: TokenLike) {
@@ -282,7 +279,7 @@ export class TokenSet {
 export function getChangePubkeyMessage(pubKeyHash: PubKeyHash, nonce: number, accountId: number): string {
     const msgNonce = utils.hexlify(serializeNonce(nonce));
     const msgAccId = utils.hexlify(serializeAccountId(accountId));
-    const pubKeyHashHex = pubKeyHash.replace("sync:", "").toLowerCase();
+    const pubKeyHashHex = pubKeyHash.replace('sync:', '').toLowerCase();
     const message =
         `Register zkSync pubkey:\n\n` +
         `${pubKeyHashHex}\n` +
@@ -293,7 +290,7 @@ export function getChangePubkeyMessage(pubKeyHash: PubKeyHash, nonce: number, ac
 }
 
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
-    let messageBytes = typeof message === "string" ? utils.toUtf8Bytes(message) : utils.arrayify(message);
+    let messageBytes = typeof message === 'string' ? utils.toUtf8Bytes(message) : utils.arrayify(message);
     if (addPrefix) {
         messageBytes = utils.concat([
             utils.toUtf8Bytes(`\x19Ethereum Signed Message:\n${messageBytes.length}`),
@@ -305,12 +302,12 @@ export function getSignedBytesFromMessage(message: utils.BytesLike | string, add
 
 export async function signMessagePersonalAPI(signer: ethers.Signer, message: Uint8Array): Promise<string> {
     if (signer instanceof ethers.providers.JsonRpcSigner) {
-        return signer.provider.send("personal_sign", [utils.hexlify(message), await signer.getAddress()]).then(
-            sign => sign,
-            err => {
+        return signer.provider.send('personal_sign', [utils.hexlify(message), await signer.getAddress()]).then(
+            (sign) => sign,
+            (err) => {
                 // We check for method name in the error string because error messages about invalid method name
                 // often contain method name.
-                if (err.message.includes("personal_sign")) {
+                if (err.message.includes('personal_sign')) {
                     // If no "personal_sign", use "eth_sign"
                     return signer.signMessage(message);
                 }
@@ -328,9 +325,10 @@ export async function verifyERC1271Signature(
     signature: string,
     signerOrProvider: ethers.Signer | ethers.providers.Provider
 ): Promise<boolean> {
-    const EIP1271_SUCCESS_VALUE = "0x20c13b0b";
+    const EIP1271_SUCCESS_VALUE = '0x1626ba7e';
+    const hash = utils.keccak256(message);
     const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
-    const eipRetVal = await eip1271.isValidSignature(utils.hexlify(message), signature);
+    const eipRetVal = await eip1271.isValidSignature(utils.hexlify(hash), signature);
     return eipRetVal === EIP1271_SUCCESS_VALUE;
 }
 
@@ -346,7 +344,7 @@ export async function getEthSignatureType(
     const prefixedECDSASigner = utils.recoverAddress(utils.keccak256(messageWithPrefix), signature);
     if (prefixedECDSASigner.toLowerCase() === address.toLowerCase()) {
         return {
-            verificationMethod: "ECDSA",
+            verificationMethod: 'ECDSA',
             isSignedMsgPrefixed: true
         };
     }
@@ -354,21 +352,21 @@ export async function getEthSignatureType(
     const notPrefixedMsgECDSASigner = utils.recoverAddress(utils.keccak256(messageNoPrefix), signature);
     if (notPrefixedMsgECDSASigner.toLowerCase() === address.toLowerCase()) {
         return {
-            verificationMethod: "ECDSA",
+            verificationMethod: 'ECDSA',
             isSignedMsgPrefixed: false
         };
     }
 
     return {
-        verificationMethod: "ERC-1271",
+        verificationMethod: 'ERC-1271',
         isSignedMsgPrefixed: true
     };
 }
 
 function removeAddressPrefix(address: Address | PubKeyHash): string {
-    if (address.startsWith("0x")) return address.substr(2);
+    if (address.startsWith('0x')) return address.substr(2);
 
-    if (address.startsWith("sync:")) return address.substr(5);
+    if (address.startsWith('sync:')) return address.substr(5);
 
     throw new Error("ETH address must start with '0x' and PubKeyHash must start with 'sync:'");
 }
@@ -379,7 +377,7 @@ export function serializeAddress(address: Address | PubKeyHash): Uint8Array {
 
     const addressBytes = utils.arrayify(`0x${prefixlessAddress}`);
     if (addressBytes.length !== 20) {
-        throw new Error("Address must be 20 bytes long");
+        throw new Error('Address must be 20 bytes long');
     }
 
     return addressBytes;
@@ -387,20 +385,20 @@ export function serializeAddress(address: Address | PubKeyHash): Uint8Array {
 
 export function serializeAccountId(accountId: number): Uint8Array {
     if (accountId < 0) {
-        throw new Error("Negative account id");
+        throw new Error('Negative account id');
     }
     if (accountId >= MAX_NUMBER_OF_ACCOUNTS) {
-        throw new Error("AccountId is too big");
+        throw new Error('AccountId is too big');
     }
     return numberToBytesBE(accountId, 4);
 }
 
 export function serializeTokenId(tokenId: number): Uint8Array {
     if (tokenId < 0) {
-        throw new Error("Negative tokenId");
+        throw new Error('Negative tokenId');
     }
     if (tokenId >= MAX_NUMBER_OF_TOKENS) {
-        throw new Error("TokenId is too big");
+        throw new Error('TokenId is too big');
     }
     return numberToBytesBE(tokenId, 2);
 }
@@ -420,9 +418,21 @@ export function serializeFeePacked(fee: BigNumberish): Uint8Array {
 
 export function serializeNonce(nonce: number): Uint8Array {
     if (nonce < 0) {
-        throw new Error("Negative nonce");
+        throw new Error('Negative nonce');
     }
     return numberToBytesBE(nonce, 4);
+}
+
+export function serializeTransfer(transfer: Transfer): Uint8Array {
+    const type = new Uint8Array([5]); // tx type
+    const accountId = serializeAccountId(transfer.accountId);
+    const from = serializeAddress(transfer.from);
+    const to = serializeAddress(transfer.to);
+    const token = serializeTokenId(transfer.token);
+    const amount = serializeAmountPacked(transfer.amount);
+    const fee = serializeFeePacked(transfer.fee);
+    const nonce = serializeNonce(transfer.nonce);
+    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
 }
 
 function numberToBytesBE(number: number, bytes: number): Uint8Array {

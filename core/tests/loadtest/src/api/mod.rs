@@ -20,13 +20,14 @@ use tokio::time::timeout;
 use crate::{
     journal::{FiveSummaryStats, Sample},
     monitor::Monitor,
+    session::save_error,
 };
 
 mod data_pool;
 mod rest_api_tests;
 mod sdk_tests;
 
-// TODO Make it configurable
+// TODO: Make it configurable (#1116).
 const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_API_REQUEST_COUNT: usize = 1_000_000_000;
 
@@ -55,22 +56,27 @@ impl Default for CancellationToken {
 
 #[derive(Debug, Default)]
 struct MeasureOutput {
+    category: String,
     samples: Vec<Sample>,
     total_requests_count: usize,
     failed_requests_count: usize,
 }
 
-impl From<MeasureOutput> for ApiTestsReport {
+impl From<MeasureOutput> for (String, ApiTestsReport) {
     fn from(output: MeasureOutput) -> Self {
-        Self {
-            total_requests_count: output.total_requests_count,
-            failed_requests_count: output.failed_requests_count,
-            summary: FiveSummaryStats::from_samples(&output.samples),
-        }
+        (
+            output.category,
+            ApiTestsReport {
+                total_requests_count: output.total_requests_count,
+                failed_requests_count: output.failed_requests_count,
+                summary: FiveSummaryStats::from_samples(&output.samples),
+            },
+        )
     }
 }
 
 async fn measure_future<F, Fut, R>(
+    category: String,
     cancellation: CancellationToken,
     limit: usize,
     factory: F,
@@ -79,7 +85,10 @@ where
     F: Fn() -> Fut,
     Fut: Future<Output = anyhow::Result<R>>,
 {
-    let mut output = MeasureOutput::default();
+    let mut output = MeasureOutput {
+        category,
+        ..MeasureOutput::default()
+    };
 
     loop {
         output.total_requests_count += 1;
@@ -88,16 +97,22 @@ where
         let started_at = Instant::now();
 
         match future.await {
+            // Store successful sample.
             Ok(Ok(..)) => {
-                // Store successful sample.
                 let finished_at = Instant::now();
                 output.samples.push(Sample {
                     started_at,
                     finished_at,
                 });
             }
-            _ => {
-                // Just increment amount of failed requests.
+
+            // Just save error message and increment amount of failed requests.
+            Err(timeout) => {
+                save_error(&output.category, &timeout);
+                output.failed_requests_count += 1;
+            }
+            Ok(Err(err)) => {
+                save_error(&output.category, &err);
                 output.failed_requests_count += 1;
             }
         }
@@ -116,7 +131,6 @@ where
 
 pub struct ApiTestsBuilder<'a> {
     cancellation: CancellationToken,
-    categories: Vec<String>,
     tests: Vec<BoxFuture<'a, MeasureOutput>>,
 }
 
@@ -125,7 +139,6 @@ impl<'a> ApiTestsBuilder<'a> {
         Self {
             cancellation,
             tests: Vec::new(),
-            categories: Vec::new(),
         }
     }
 
@@ -135,10 +148,10 @@ impl<'a> ApiTestsBuilder<'a> {
         Fut: Future<Output = anyhow::Result<()>> + Send + 'a,
     {
         let token = self.cancellation.clone();
-        let future = measure_future(token, MAX_API_REQUEST_COUNT, factory).boxed();
+        let future =
+            measure_future(category.to_string(), token, MAX_API_REQUEST_COUNT, factory).boxed();
 
         self.tests.push(future);
-        self.categories.push(category.to_owned());
 
         self
     }
@@ -147,11 +160,7 @@ impl<'a> ApiTestsBuilder<'a> {
         // Unlike other places, we have to progress all futures simultaneously.
         let results = futures::future::join_all(self.tests.into_iter()).await;
 
-        self.categories
-            .into_iter()
-            .zip(results)
-            .map(|(category, data)| (category, ApiTestsReport::from(data)))
-            .collect()
+        results.into_iter().map(|output| output.into()).collect()
     }
 }
 
