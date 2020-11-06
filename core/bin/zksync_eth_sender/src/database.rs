@@ -20,7 +20,7 @@ use super::transactions::ETHStats;
 
 /// Abstract database access trait, optimized for the needs of `ETHSender`.
 #[async_trait::async_trait]
-pub(super) trait DatabaseAccess {
+pub(super) trait DatabaseInterface {
     async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error>;
 
     /// Loads the unconfirmed and unprocessed operations from the database.
@@ -108,7 +108,7 @@ impl Database {
 }
 
 #[async_trait::async_trait]
-impl DatabaseAccess for Database {
+impl DatabaseInterface for Database {
     async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error> {
         let connection = self.db_pool.access_storage().await?;
 

@@ -24,7 +24,7 @@ use zksync_types::{
 };
 // Local uses
 use self::{
-    database::{Database, DatabaseAccess},
+    database::{Database, DatabaseInterface},
     ethereum_interface::{EthereumHttpClient, EthereumInterface},
     gas_adjuster::GasAdjuster,
     transactions::*,
@@ -111,7 +111,7 @@ enum TxCheckMode {
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
-struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
+struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
     /// Ongoing operations queue.
     ongoing_ops: VecDeque<ETHOperation>,
     /// Connection to the database.
@@ -126,7 +126,7 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     options: EthSenderOptions,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
+impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     pub async fn new(options: EthSenderOptions, db: DB, ethereum: ETH) -> Self {
         let mut connection = db
             .acquire_connection()
