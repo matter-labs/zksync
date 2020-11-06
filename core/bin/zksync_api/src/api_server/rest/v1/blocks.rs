@@ -71,7 +71,7 @@ impl ApiBlocksData {
     ) -> QueryResult<Vec<BlockDetails>> {
         let max_block = max_block.unwrap_or(BlockNumber::MAX);
 
-        let mut storage = self.pool.access_storage_fragile().await?;
+        let mut storage = self.pool.access_storage().await?;
         storage
             .chain()
             .block_schema()
@@ -86,7 +86,7 @@ impl Client {
     pub async fn block_by_id(
         &self,
         block_number: BlockNumber,
-    ) -> client::Result<Option<BlockNumber>> {
+    ) -> client::Result<Option<BlockDetails>> {
         self.get(&format!("blocks/{}", block_number)).send().await
     }
 
@@ -129,4 +129,86 @@ pub fn api_scope(env_options: &ConfigurationOptions, pool: ConnectionPool) -> Sc
         .data(data)
         .route("", web::get().to(blocks_range))
         .route("{id}", web::get().to(block_by_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use zksync_crypto::{ff::PrimeField, Fr};
+    use zksync_types::{block::Block, Action, Operation};
+
+    use super::{super::test::TestServerConfig, *};
+
+    fn block_commit_op(block_number: BlockNumber, action: Action) -> Operation {
+        Operation {
+            action,
+            id: None,
+            block: Block {
+                block_number,
+                new_root_hash: Fr::from_str(&block_number.to_string()).unwrap(),
+                fee_account: 0,
+                block_transactions: vec![],
+                processed_priority_ops: (0, 0),
+                block_chunks_size: 100,
+                commit_gas_limit: 1_000_000.into(),
+                verify_gas_limit: 1_500_000.into(),
+            },
+        }
+    }
+
+    async fn fill_database(pool: &ConnectionPool) -> anyhow::Result<Vec<BlockDetails>> {
+        let mut storage = pool.access_storage().await.unwrap();
+
+        for i in 1..=5 {
+            storage
+                .chain()
+                .block_schema()
+                .execute_operation(block_commit_op(i, Action::Commit))
+                .await?;
+            storage
+                .prover_schema()
+                .store_proof(i, &Default::default())
+                .await?;
+            storage
+                .chain()
+                .block_schema()
+                .execute_operation(block_commit_op(
+                    i,
+                    Action::Verify {
+                        proof: Default::default(),
+                    },
+                ))
+                .await?;
+
+            storage
+                .chain()
+                .state_schema()
+                .commit_state_update(i, &[], 0)
+                .await?;
+        }
+
+        let mut block_schema = storage.chain().block_schema();
+        dbg!(block_schema.load_block_range(2, 2).await?);
+        dbg!(block_schema.load_pending_block().await?);
+
+        block_schema
+            .load_block_range(100, 100)
+            .await
+            .map_err(anyhow::Error::from)
+    }
+
+    #[actix_rt::test]
+    async fn test_blocks_scope() {
+        let cfg = TestServerConfig::default();
+        let blocks = fill_database(&cfg.pool).await.unwrap();
+
+        let (client, server) =
+            cfg.start_server(|cfg| api_scope(&cfg.env_options, cfg.pool.clone()));
+
+        dbg!(&blocks);
+        dbg!(client.blocks_range(Pagination::Before(10), 10).await);
+
+        assert_eq!(client.block_by_id(1).await.unwrap().unwrap(), blocks[0]);
+
+        server.stop().await;
+    }
 }
