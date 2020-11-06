@@ -49,7 +49,7 @@ impl AddressData {
     }
 }
 
-// TODO In theory, we can use a simpler, fixed size deque instead of the standard one.
+// TODO: In theory, we can use a simpler, fixed size deque instead of the standard one (#1116).
 
 /// API data pool contents.
 #[derive(Debug, Default)]
@@ -111,7 +111,7 @@ impl ApiDataPoolInner {
         *self.blocks.entry(number).or_default() += 1;
 
         if self.blocks.len() > MAX_QUEUE_LEN {
-            // TODO: replace by the pop_first then the `map_first_last` becomes stable.
+            // TODO: replace by the pop_first then the `map_first_last` becomes stable (#1116).
             let key = *self.blocks.keys().next().unwrap();
             self.blocks.remove(&key);
         }

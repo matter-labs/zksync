@@ -246,7 +246,6 @@ impl ZkSyncState {
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
-        // TODO check for collisions.
         self.balance_tree.items.len() as u32
     }
 

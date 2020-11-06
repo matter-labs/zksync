@@ -223,8 +223,7 @@ export function isTokenETH(token: TokenLike): boolean {
 }
 
 export class TokenSet {
-    // TODO: Replace with hardcoded list of tokens for final version this is temporary solution
-    //  so that we can get list of the supported from zksync node,
+    // TODO: handle stale entries, edge case when we rename token after adding it (#1132).
     constructor(private tokensBySymbol: Tokens) {}
 
     private resolveTokenObject(tokenLike: TokenLike) {

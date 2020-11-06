@@ -55,8 +55,8 @@ This commitment ensures that in some block with `block_number` we made operation
 
 ## Pub data 
 ### Overview
-Spec for the exact bytes of `pub_data` for each operation is given in another document (TODO: actually create one)
-Spec for the exact bytes of `signatures` for each is given in another document (TODO: actually create one)
+Spec for the exact bytes of `pub_data` for each operation is given in another document (TODO: actually create one (#1131))
+Spec for the exact bytes of `signatures` for each is given in another document (TODO: actually create one (#1131))
 
 Pub data is chosen in the way that you have all information needed to reconstruct state.
 

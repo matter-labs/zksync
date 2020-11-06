@@ -7,7 +7,7 @@ use crate::{database::Database, ethereum_interface::EthereumInterface};
 
 mod parameters;
 
-// TODO: Tests are commented for now as DB traits aren't implemented yet.
+// TODO: Restore tests (#1109).
 // #[cfg(test)]
 // mod tests;
 
@@ -77,8 +77,8 @@ impl<ETH: EthereumInterface> GasAdjuster<ETH> {
             log::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
-        // FIXME: Currently instead of using sent txs as samples, we use the gas prices suggested by
-        // the Ethereum node.
+        // TODO: Currently instead of using sent txs as samples, we use the gas prices suggested by
+        // the Ethereum node (#1130).
         // // Report used price to be gathered by the statistics module.
         // self.statistics.add_sample(price);
 
