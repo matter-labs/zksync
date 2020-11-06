@@ -31,7 +31,7 @@ pub const MAX_LIMIT: u32 = 100;
 
 type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
-pub(crate) fn api_scope(pool: ConnectionPool, env_options: ConfigurationOptions) -> Scope {
+pub fn api_scope(pool: ConnectionPool, env_options: ConfigurationOptions) -> Scope {
     web::scope("/api/v1")
         .service(config::api_scope(&env_options))
         .service(blocks::api_scope(&env_options, pool))

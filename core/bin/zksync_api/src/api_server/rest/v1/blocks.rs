@@ -8,7 +8,10 @@ use actix_web::{web, Scope};
 // Workspace uses
 use web::Json;
 use zksync_config::ConfigurationOptions;
-use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
+use zksync_storage::{
+    chain::block::records::BlockDetails, chain::block::records::BlockTransactionItem,
+    ConnectionPool, QueryResult,
+};
 use zksync_types::BlockNumber;
 
 // Local uses
@@ -78,6 +81,19 @@ impl ApiBlocksData {
             .load_block_range(max_block, limit)
             .await
     }
+
+    /// Return transactions stored in the block with the specified number.
+    async fn block_transactions(
+        &self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Vec<BlockTransactionItem>> {
+        let mut storage = self.pool.access_storage().await?;
+        storage
+            .chain()
+            .block_schema()
+            .get_block_transactions(block_number)
+            .await
+    }
 }
 
 // Client implementation
@@ -88,6 +104,15 @@ impl Client {
         block_number: BlockNumber,
     ) -> client::Result<Option<BlockDetails>> {
         self.get(&format!("blocks/{}", block_number)).send().await
+    }
+
+    pub async fn block_transactions(
+        &self,
+        block_number: BlockNumber,
+    ) -> client::Result<Vec<BlockTransactionItem>> {
+        self.get(&format!("blocks/{}/transactions", block_number))
+            .send()
+            .await
     }
 
     pub async fn blocks_range(
@@ -112,6 +137,14 @@ async fn block_by_id(
     Ok(Json(info))
 }
 
+async fn block_transactions(
+    data: web::Data<ApiBlocksData>,
+    web::Path(block_number): web::Path<BlockNumber>,
+) -> JsonResult<Vec<BlockTransactionItem>> {
+    let transactions = data.block_transactions(block_number).await?;
+    Ok(Json(transactions))
+}
+
 async fn blocks_range(
     data: web::Data<ApiBlocksData>,
     web::Query(pagination): web::Query<PaginationQuery>,
@@ -129,71 +162,133 @@ pub fn api_scope(env_options: &ConfigurationOptions, pool: ConnectionPool) -> Sc
         .data(data)
         .route("", web::get().to(blocks_range))
         .route("{id}", web::get().to(block_by_id))
+        .route("{id}/transactions", web::get().to(block_transactions))
 }
 
 #[cfg(test)]
 mod tests {
-    use zksync_crypto::{ff::PrimeField, Fr};
-    use zksync_types::{block::Block, Action, Operation};
+    use zksync_crypto::{
+        ff::PrimeField,
+        rand::{SeedableRng, XorShiftRng},
+        Fr,
+    };
+    use zksync_storage::test_data::{
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation, BLOCK_SIZE_CHUNKS,
+    };
+    use zksync_types::{
+        block::Block, ethereum::OperationType, helpers::apply_updates, AccountMap, Action,
+        Operation,
+    };
 
     use super::{super::test::TestServerConfig, *};
-
-    fn block_commit_op(block_number: BlockNumber, action: Action) -> Operation {
-        Operation {
-            action,
-            id: None,
-            block: Block {
-                block_number,
-                new_root_hash: Fr::from_str(&block_number.to_string()).unwrap(),
-                fee_account: 0,
-                block_transactions: vec![],
-                processed_priority_ops: (0, 0),
-                block_chunks_size: 100,
-                commit_gas_limit: 1_000_000.into(),
-                verify_gas_limit: 1_500_000.into(),
-            },
-        }
-    }
 
     async fn fill_database(pool: &ConnectionPool) -> anyhow::Result<Vec<BlockDetails>> {
         let mut storage = pool.access_storage().await.unwrap();
 
-        for i in 1..=5 {
-            storage
+        // Below lies the initialization of the data for the test.
+        let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
+
+        // Required since we use `EthereumSchema` in this test.
+        storage.ethereum_schema().initialize_eth_data().await?;
+
+        let mut accounts = AccountMap::default();
+        let n_committed = 5;
+        let n_verified = n_committed - 2;
+
+        // Create and apply several blocks to work with.
+        for block_number in 1..=n_committed {
+            let updates = (0..3)
+                .map(|_| gen_acc_random_updates(&mut rng))
+                .flatten()
+                .collect::<Vec<_>>();
+            apply_updates(&mut accounts, updates.clone());
+
+            // Store the operation in the block schema.
+            let operation = storage
                 .chain()
                 .block_schema()
-                .execute_operation(block_commit_op(i, Action::Commit))
-                .await?;
-            storage
-                .prover_schema()
-                .store_proof(i, &Default::default())
-                .await?;
-            storage
-                .chain()
-                .block_schema()
-                .execute_operation(block_commit_op(
-                    i,
-                    Action::Verify {
-                        proof: Default::default(),
-                    },
+                .execute_operation(gen_unique_operation(
+                    block_number,
+                    Action::Commit,
+                    BLOCK_SIZE_CHUNKS,
                 ))
                 .await?;
-
             storage
                 .chain()
                 .state_schema()
-                .commit_state_update(i, &[], 0)
+                .commit_state_update(block_number, &updates, 0)
                 .await?;
+
+            // Store & confirm the operation in the ethereum schema, as it's used for obtaining
+            // commit/verify hashes.
+            let ethereum_op_id = operation.id.unwrap() as i64;
+            let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
+            let response = storage
+                .ethereum_schema()
+                .save_new_eth_tx(
+                    OperationType::Commit,
+                    Some(ethereum_op_id),
+                    100,
+                    100u32.into(),
+                    Default::default(),
+                )
+                .await?;
+            storage
+                .ethereum_schema()
+                .add_hash_entry(response.id, &eth_tx_hash)
+                .await?;
+            storage
+                .ethereum_schema()
+                .confirm_eth_tx(&eth_tx_hash)
+                .await?;
+
+            // Add verification for the block if required.
+            if block_number <= n_verified {
+                storage
+                    .prover_schema()
+                    .store_proof(block_number, &Default::default())
+                    .await?;
+                let operation = storage
+                    .chain()
+                    .block_schema()
+                    .execute_operation(gen_unique_operation(
+                        block_number,
+                        Action::Verify {
+                            proof: Default::default(),
+                        },
+                        BLOCK_SIZE_CHUNKS,
+                    ))
+                    .await?;
+
+                let ethereum_op_id = operation.id.unwrap() as i64;
+                let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
+                let response = storage
+                    .ethereum_schema()
+                    .save_new_eth_tx(
+                        OperationType::Verify,
+                        Some(ethereum_op_id),
+                        100,
+                        100u32.into(),
+                        Default::default(),
+                    )
+                    .await?;
+                storage
+                    .ethereum_schema()
+                    .add_hash_entry(response.id, &eth_tx_hash)
+                    .await?;
+                storage
+                    .ethereum_schema()
+                    .confirm_eth_tx(&eth_tx_hash)
+                    .await?;
+            }
         }
 
-        let mut block_schema = storage.chain().block_schema();
-        dbg!(block_schema.load_block_range(2, 2).await?);
-        dbg!(block_schema.load_pending_block().await?);
-
-        block_schema
-            .load_block_range(100, 100)
+        storage
+            .chain()
+            .block_schema()
+            .load_block_range(10, 10)
             .await
-            .map_err(anyhow::Error::from)
+            .map_err(From::from)
     }
 
     #[actix_rt::test]
@@ -204,10 +299,19 @@ mod tests {
         let (client, server) =
             cfg.start_server(|cfg| api_scope(&cfg.env_options, cfg.pool.clone()));
 
-        dbg!(&blocks);
-        dbg!(client.blocks_range(Pagination::Before(10), 10).await);
-
-        assert_eq!(client.block_by_id(1).await.unwrap().unwrap(), blocks[0]);
+        assert_eq!(client.block_by_id(1).await.unwrap().unwrap(), blocks[4]);
+        assert_eq!(
+            client.blocks_range(Pagination::Last, 5).await.unwrap(),
+            blocks
+        );
+        assert_eq!(
+            client.blocks_range(Pagination::Before(2), 5).await.unwrap(),
+            blocks[4..5]
+        );
+        // assert_eq!(
+        //     client.blocks_range(Pagination::After(4), 5).await.unwrap(),
+        //     blocks[0..1]
+        // );
 
         server.stop().await;
     }

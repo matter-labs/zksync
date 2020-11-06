@@ -14,7 +14,9 @@ use crate::{
     },
     ethereum::EthereumSchema,
     prover::ProverSchema,
-    test_data::{dummy_ethereum_tx_hash, gen_unique_operation, BLOCK_SIZE_CHUNKS},
+    test_data::{
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation, BLOCK_SIZE_CHUNKS,
+    },
     tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
@@ -26,13 +28,10 @@ pub fn apply_random_updates(
     mut accounts: AccountMap,
     rng: &mut XorShiftRng,
 ) -> (AccountMap, Vec<(u32, AccountUpdate)>) {
-    let updates = {
-        let mut updates = Vec::new();
-        updates.extend(acc_create_random_updates(rng));
-        updates.extend(acc_create_random_updates(rng));
-        updates.extend(acc_create_random_updates(rng));
-        updates
-    };
+    let updates = (0..3)
+        .map(|_| gen_acc_random_updates(rng))
+        .flatten()
+        .collect();
     apply_updates(&mut accounts, updates.clone());
     (accounts, updates)
 }
