@@ -1,5 +1,5 @@
 use crate::tx_error::TxAddError;
-use zksync_types::{Address, PriorityOp, SignedZkSyncTx, H256};
+use zksync_types::{tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx, H256};
 
 /// `CoreApiClient` is capable of interacting with a private zkSync Core API.
 #[derive(Debug, Clone)]
@@ -28,9 +28,10 @@ impl CoreApiClient {
     pub async fn send_txs_batch(
         &self,
         txs: Vec<SignedZkSyncTx>,
+        eth_signature: Option<TxEthSignature>,
     ) -> anyhow::Result<Result<(), TxAddError>> {
         let endpoint = format!("{}/new_txs_batch", self.addr);
-        self.post(&endpoint, txs).await
+        self.post(&endpoint, (txs, eth_signature)).await
     }
 
     /// Queries information about unconfirmed deposit operations for a certain address from a Core.

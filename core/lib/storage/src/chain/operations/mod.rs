@@ -154,11 +154,11 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             // sent the same transfer again.
 
             sqlx::query!(
-                "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 ON CONFLICT (tx_hash)
                 DO UPDATE
-                SET block_number = $1, block_index = $2, tx = $3, operation = $4, tx_hash = $5, from_account = $6, to_account = $7, success = $8, fail_reason = $9, primary_account_address = $10, nonce = $11, created_at = $12, eth_sign_data = $13",
+                SET block_number = $1, block_index = $2, tx = $3, operation = $4, tx_hash = $5, from_account = $6, to_account = $7, success = $8, fail_reason = $9, primary_account_address = $10, nonce = $11, created_at = $12, eth_sign_data = $13, batch_id = $14",
                 operation.block_number,
                 operation.block_index,
                 operation.tx,
@@ -172,14 +172,15 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 operation.nonce,
                 operation.created_at,
                 operation.eth_sign_data,
+                operation.batch_id,
             )
             .execute(transaction.conn())
             .await?;
         } else {
             // If transaction failed, we do nothing on conflict.
             sqlx::query!(
-                "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                "INSERT INTO executed_transactions (block_number, block_index, tx, operation, tx_hash, from_account, to_account, success, fail_reason, primary_account_address, nonce, created_at, eth_sign_data, batch_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 ON CONFLICT (tx_hash)
                 DO NOTHING",
                 operation.block_number,
@@ -195,6 +196,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 operation.nonce,
                 operation.created_at,
                 operation.eth_sign_data,
+                operation.batch_id,
             )
             .execute(transaction.conn())
             .await?;

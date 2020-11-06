@@ -1,5 +1,5 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
-import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address } from './types';
+import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address, Transfer } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -421,6 +421,18 @@ export function serializeNonce(nonce: number): Uint8Array {
         throw new Error('Negative nonce');
     }
     return numberToBytesBE(nonce, 4);
+}
+
+export function serializeTransfer(transfer: Transfer): Uint8Array {
+    const type = new Uint8Array([5]); // tx type
+    const accountId = serializeAccountId(transfer.accountId);
+    const from = serializeAddress(transfer.from);
+    const to = serializeAddress(transfer.to);
+    const token = serializeTokenId(transfer.token);
+    const amount = serializeAmountPacked(transfer.amount);
+    const fee = serializeFeePacked(transfer.fee);
+    const nonce = serializeNonce(transfer.nonce);
+    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
 }
 
 function numberToBytesBE(number: number, bytes: number): Uint8Array {
