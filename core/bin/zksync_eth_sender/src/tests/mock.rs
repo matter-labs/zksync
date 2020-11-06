@@ -343,57 +343,38 @@ impl EthereumInterface for MockEthereum {
 
 /// Creates a default `ETHSender` with mock Ethereum connection/database and no operations in DB.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate::eth_sender) fn default_eth_sender() -> (
-    ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<ETHSenderRequest>,
-    mpsc::Receiver<Operation>,
-) {
-    build_eth_sender(1, Vec::new(), Default::default())
+pub(in crate) async fn default_eth_sender() -> ETHSender<MockEthereum, MockDatabase> {
+    build_eth_sender(1, Vec::new(), Default::default()).await
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and no operations in DB
 /// which supports multiple transactions in flight.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate::eth_sender) fn concurrent_eth_sender(
+pub(in crate) async fn concurrent_eth_sender(
     max_txs_in_flight: u64,
-) -> (
-    ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<ETHSenderRequest>,
-    mpsc::Receiver<Operation>,
-) {
-    build_eth_sender(max_txs_in_flight, Vec::new(), Default::default())
+) -> ETHSender<MockEthereum, MockDatabase> {
+    build_eth_sender(max_txs_in_flight, Vec::new(), Default::default()).await
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate::eth_sender) fn restored_eth_sender(
+pub(in crate) async fn restored_eth_sender(
     restore_state: impl IntoIterator<Item = ETHOperation>,
     stats: ETHStats,
-) -> (
-    ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<ETHSenderRequest>,
-    mpsc::Receiver<Operation>,
-) {
+) -> ETHSender<MockEthereum, MockDatabase> {
     const MAX_TXS_IN_FLIGHT: u64 = 1;
 
-    build_eth_sender(MAX_TXS_IN_FLIGHT, restore_state, stats)
+    build_eth_sender(MAX_TXS_IN_FLIGHT, restore_state, stats).await
 }
 
 /// Helper method for configurable creation of `ETHSender`.
-fn build_eth_sender(
+async fn build_eth_sender(
     max_txs_in_flight: u64,
     restore_state: impl IntoIterator<Item = ETHOperation>,
     stats: ETHStats,
-) -> (
-    ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<ETHSenderRequest>,
-    mpsc::Receiver<Operation>,
-) {
+) -> ETHSender<MockEthereum, MockDatabase> {
     let ethereum = MockEthereum::default();
     let db = MockDatabase::with_restorable_state(restore_state, stats);
-
-    let (operation_sender, operation_receiver) = mpsc::channel(CHANNEL_CAPACITY);
-    let (notify_sender, notify_receiver) = mpsc::channel(CHANNEL_CAPACITY);
 
     let options = EthSenderOptions {
         max_txs_in_flight,
@@ -403,23 +384,15 @@ fn build_eth_sender(
         is_enabled: true,
     };
 
-    let current_zksync_info = CurrentZkSyncInfo::with_block_number(0);
-    let eth_sender = ETHSender::new(
-        options,
-        db,
-        ethereum,
-        operation_receiver,
-        notify_sender,
-        current_zksync_info,
-    );
+    let eth_sender = ETHSender::new(options, db, ethereum).await;
 
-    (eth_sender, operation_sender, notify_receiver)
+    eth_sender
 }
 
 /// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
 /// This method should be used to create expected tx copies which won't affect
 /// the internal `ETHSender` state.
-pub(in crate::eth_sender) fn create_signed_tx(
+pub(in crate) async fn create_signed_tx(
     id: i64,
     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
     operation: &Operation,
@@ -433,6 +406,7 @@ pub(in crate::eth_sender) fn create_signed_tx(
     let signed_tx = eth_sender
         .ethereum
         .sign_prepared_tx(raw_tx.clone(), options)
+        .await
         .unwrap();
 
     let op_type = match operation.action {
@@ -455,7 +429,7 @@ pub(in crate::eth_sender) fn create_signed_tx(
 }
 
 /// Creates an `ETHOperation` object for a withdraw operation.
-pub(in crate::eth_sender) fn create_signed_withdraw_tx(
+pub(in crate) async fn create_signed_withdraw_tx(
     id: i64,
     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
     deadline_block: u64,
@@ -471,6 +445,7 @@ pub(in crate::eth_sender) fn create_signed_withdraw_tx(
     let signed_tx = eth_sender
         .ethereum
         .sign_prepared_tx(raw_tx.clone(), options)
+        .await
         .unwrap();
 
     let op_type = OperationType::Withdraw;
