@@ -2473,6 +2473,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
         params,
     )?;
 
+    // this is safe and just allows the convention.
     account_data.extend(state_tree_root.into_padded_le_bits(params::FR_BIT_WIDTH_PADDED)); // !!!!!
 
     Ok((account_data, is_account_empty, balance_subtree_root))
