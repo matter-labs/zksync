@@ -120,7 +120,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         // - Either there is no ongoing job for the block, or the job exceeded the timeout.
         // Return the index of such a block.
 
-        // TODO: Prover gone interval is hard-coded. Is it critical?
+        // TODO: Prover gone interval is hard-coded (#1115).
+        // Is it critical?
         let job = sqlx::query!(
             r#"
                 WITH unsized_blocks AS (
@@ -223,9 +224,9 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
     /// Marks the prover as stopped.
     pub async fn record_prover_stop(&mut self, prover_id: i32) -> QueryResult<()> {
-        // FIXME(popzxc): It seems that it isn't actually checked if the prover has been stopped
+        // TODO: It seems that it isn't actually checked if the prover has been stopped
         // anywhere. And also it doesn't seem that prover can be restored from the stopped
-        // state.
+        // state (#1129).
         sqlx::query!(
             "UPDATE active_provers 
             SET stopped_at = now()
