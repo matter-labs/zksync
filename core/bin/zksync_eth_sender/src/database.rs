@@ -70,7 +70,7 @@ pub(super) trait DatabaseAccess {
         connection: &mut StorageProcessor<'_>,
         hash: &H256,
         op: &ETHOperation,
-    ) -> Result<(), anyhow::Error> ;
+    ) -> Result<(), anyhow::Error>;
 
     /// Loads the stored Ethereum operations stats.
     async fn load_stats(
