@@ -102,7 +102,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
     ) -> Result<(), anyhow::Error> {
         let mut storage = self
             .db_pool
-            .access_storage_fragile()
+            .access_storage()
             .await
             .map_err(|e| format_err!("Can't access storage: {}", e))?;
 
@@ -159,7 +159,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
     ) -> Result<Option<TokenPrice>, anyhow::Error> {
         let mut storage = self
             .db_pool
-            .access_storage_fragile()
+            .access_storage()
             .await
             .map_err(|e| format_err!("Can't access storage: {}", e))?;
 
@@ -181,7 +181,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
 
-        // TODO: remove hardcode for Matter Labs Trial Token (issue #738)
+        // TODO: remove hardcode for Matter Labs Trial Token (#1036).
         if token.symbol == "MLTT" {
             return Ok(TokenPrice {
                 usd_price: Ratio::from_integer(1u32.into()),
@@ -231,7 +231,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
 
         let mut storage = self
             .db_pool
-            .access_storage_fragile()
+            .access_storage()
             .await
             .map_err(|e| format_err!("Can't access storage: {}", e))?;
         let average_gas_price = storage

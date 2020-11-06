@@ -77,7 +77,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         op_id: u32,
     ) -> QueryResult<PriorityOpReceiptResponse> {
         let start = Instant::now();
-        // TODO: jazzandrock maybe use one db query(?).
         let stored_executed_prior_op = OperationsSchema(self.0)
             .get_executed_priority_operation(op_id)
             .await?;
@@ -131,7 +130,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     /// in the list of executed operations.
     async fn find_tx_by_hash(&mut self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         let start = Instant::now();
-        // TODO: Maybe move the transformations to api_server?
+        // TODO: Maybe move the transformations to api_server (#1126)?
         let query_result = OperationsSchema(self.0)
             .get_executed_operation(hash)
             .await?;
@@ -231,7 +230,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         hash: &[u8],
     ) -> QueryResult<Option<TxByHashResponse>> {
         let start = Instant::now();
-        // TODO: Maybe move the transformations to api_server?
+        // TODO: Maybe move the transformations to api_server (#1126)?
         let tx: Option<StoredExecutedPriorityOperation> = OperationsSchema(self.0)
             .get_executed_priority_operation_by_hash(hash)
             .await?;

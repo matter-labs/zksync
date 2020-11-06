@@ -225,19 +225,8 @@ impl RpcApp {
         let mut required_total_usd_fee = BigDecimal::from(0);
         let mut provided_total_usd_fee = BigDecimal::from(0);
         for tx in &txs {
-            let tx_fee_info = match &tx.tx {
-                // Cause `ChangePubKey` will have fee we must add this check
-                // TODO: should be removed after merging with a branch that contains a fee on ChangePubKey
-                ZkSyncTx::ChangePubKey(_) => {
-                    // Now `ChangePubKey` operations are not allowed in batches
-                    return Err(Error {
-                        code: RpcErrorCodes::from(TxAddError::Other).into(),
-                        message: "ChangePubKey operations are not allowed in batches".to_string(),
-                        data: None,
-                    });
-                }
-                _ => tx.tx.get_fee_info(),
-            };
+            let tx_fee_info = tx.tx.get_fee_info();
+
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
                 let required_fee = Self::ticker_request(
                     self.ticker_request_sender.clone(),

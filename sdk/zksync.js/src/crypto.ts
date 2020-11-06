@@ -1,10 +1,10 @@
-import { Signature } from "./types";
+import { Signature } from './types';
 
-import { private_key_to_pubkey_hash, sign_musig } from "zksync-crypto";
-import * as zks from "zksync-crypto";
-import { utils } from "ethers";
+import { private_key_to_pubkey_hash, sign_musig } from 'zksync-crypto';
+import * as zks from 'zksync-crypto';
+import { utils } from 'ethers';
 
-export { privateKeyFromSeed } from "zksync-crypto";
+export { privateKeyFromSeed } from 'zksync-crypto';
 
 export function signTransactionBytes(privKey: Uint8Array, bytes: Uint8Array): Signature {
     const signaturePacked = sign_musig(privKey, bytes);

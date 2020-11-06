@@ -175,7 +175,7 @@ fn gas_price_limit_scaling() {
 /// Checks that if the price suggested by the Ethereum client is below the price limit,
 /// the limit is calculated as (average of samples) * scale_factor.
 #[test]
-#[ignore] // TODO: Disabled as currently the limit is calculated based on the network price rather than used txs samples.
+#[ignore] // TODO: Disabled as currently the limit is calculated based on the network price rather than used txs samples (#1109).
 fn gas_price_limit_average_basis() {
     // Increases the gas price value by 15%.
     fn increase_gas_price(value: u64) -> u64 {

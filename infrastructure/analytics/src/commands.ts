@@ -1,21 +1,21 @@
-import "isomorphic-fetch";
-import { Network, TokensInfo } from "./types";
-import * as zksync from "zksync";
-import * as ethers from "ethers";
-import * as utils from "./utils";
+import 'isomorphic-fetch';
+import { Network, TokensInfo } from './types';
+import * as zksync from 'zksync';
+import * as ethers from 'ethers';
+import * as utils from './utils';
 
 export async function currentBalances(network: Network, operator_address: string) {
-    const zksProvider = await zksync.getDefaultProvider(network, "HTTP");
+    const zksProvider = await zksync.getDefaultProvider(network, 'HTTP');
     const ethProvider =
-        network == "localhost" ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
+        network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
 
     const balances: TokensInfo = { total: { eth: 0, usd: 0 } };
 
-    const eth_price = await zksProvider.getTokenPrice("ETH");
+    const eth_price = await zksProvider.getTokenPrice('ETH');
     const tokens = await zksProvider.getTokens();
 
     for (const token in tokens) {
-        if (zksProvider.tokenSet.resolveTokenSymbol(token) === "MLTT" || zksync.utils.isTokenETH(token)) continue;
+        if (zksProvider.tokenSet.resolveTokenSymbol(token) === 'MLTT' || zksync.utils.isTokenETH(token)) continue;
 
         const tokenAddress = tokens[token].address;
 
@@ -38,7 +38,7 @@ export async function currentBalances(network: Network, operator_address: string
         balances[token] = {
             amount: tokenAmount,
             eth: eth_cost,
-            usd: usd_cost,
+            usd: usd_cost
         };
     }
     return balances;
@@ -53,9 +53,9 @@ export async function collectedFees(network: Network, providerAddress: string, t
 
     const zksProvider = await zksync.getDefaultProvider(network);
     const ethProvider =
-        network == "localhost" ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
+        network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
 
-    const eth_price = await zksProvider.getTokenPrice("ETH");
+    const eth_price = await zksProvider.getTokenPrice('ETH');
     const tokens = await zksProvider.getTokens();
 
     const senderAccountStat = { eth: 0, usd: 0 };
@@ -123,8 +123,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
             for (const transaction of transactions) {
                 const transactionTime = new Date(transaction.created_at);
 
-                // TODO: handle fee for `CompleteWithdrawals` operation in L1
-                // wait for update API
+                // TODO: handle fee for `CompleteWithdrawals` operation in L1 (#1123).
 
                 // some transactions that are included in the block do not contain fee
                 if (utils.correctTransactionWithFee(transaction) && timePeriod.contains(transactionTime)) {
@@ -147,7 +146,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
         }
     }
 
-    return Object.assign({ "spent by SENDER ACCOUNT": senderAccountStat }, { "collected fees": tokensStat });
+    return Object.assign({ 'spent by SENDER ACCOUNT': senderAccountStat }, { 'collected fees': tokensStat });
 }
 
 export async function collectedTokenLiquidations(
@@ -190,5 +189,5 @@ export async function collectedTokenLiquidations(
         }
     } while (history.length > 0 && timePeriod.isValid());
 
-    return { "Total amount of ETH": liquidationAmount };
+    return { 'Total amount of ETH': liquidationAmount };
 }

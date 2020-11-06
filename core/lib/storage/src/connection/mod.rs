@@ -85,14 +85,6 @@ impl ConnectionPool {
         Ok(StorageProcessor::from_pool(connection))
     }
 
-    /// Creates a `StorageProcessor` entity using non-recoverable connection, which
-    /// will not handle the database outages. This method is intended to be used in
-    /// non-crucial contexts, such as API endpoint handlers.
-    pub async fn access_storage_fragile(&self) -> Result<StorageProcessor<'_>, SqlxError> {
-        // TODO: Remove this method
-        self.access_storage().await
-    }
-
     /// Obtains the database URL from the environment variable.
     fn get_database_url() -> String {
         env::var("DATABASE_URL").expect("DATABASE_URL must be set")

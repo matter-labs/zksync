@@ -137,8 +137,7 @@ export default {
             const txs = await client.getBlockTransactions(this.blockNumber);
             const tokens = await client.tokensPromise;
 
-            // TODO: Remove the hack to get the amount field in ForceExit operations
-            // API needs to be updated
+            // TODO: Remove the hack to get the amount field in ForcedExit operations (#1124).
             
             const transactions = await Promise.all(txs.map(async (tx) => {
                 const type = tx.op.type;

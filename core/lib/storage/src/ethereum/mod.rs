@@ -38,8 +38,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         // TODO: Currently `sqlx` doesn't work well with joins, thus we will perform one additional query
         // for each loaded operation. This is not crucial, as this operation is done once per node launch,
-        // but not effective and must be fixed as soon as `sqlx` 0.5 is released.
-        // Details on issue: https://github.com/launchbadge/sqlx/issues/367
+        // but not effective and must be fixed as soon as `sqlx` 0.5 is released (#1114).
         let eth_ops = sqlx::query_as!(
             StorageETHOperation,
             "SELECT * FROM eth_operations
