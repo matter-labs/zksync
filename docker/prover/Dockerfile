@@ -34,10 +34,9 @@ RUN apt-get update && apt-get install -y axel ca-certificates && rm -rf /var/lib
 COPY --from=builder /usr/src/zksync/target/release/plonk_step_by_step_prover /bin/
 COPY --from=builder /usr/src/zksync/target/release/dummy_prover /bin/
 COPY docker/prover/prover-entry.sh /bin/
-COPY bin/plonk-setup /bin/
-COPY bin/verify-keys /bin/
-COPY bin/utils.sh /bin/
 COPY keys/packed /keys/packed
 COPY contracts/build/ /contracts/build/
+COPY infrastructure/zk/ infrastructure/zk/
+COPY bin/zk /bin/
 
 CMD ["prover-entry.sh"]
