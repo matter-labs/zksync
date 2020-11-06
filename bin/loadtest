@@ -1,4 +1,0 @@
-#!/bin/bash
-
-cd $ZKSYNC_HOME
-cargo run --release --bin loadtest -- "${@}"

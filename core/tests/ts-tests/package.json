@@ -21,10 +21,9 @@
     ]
   },
   "scripts": {
-    "test": "f mocha tests/main.test.ts",
-    "api-test": "f mocha tests/api.test.ts",
-    "print-test-accounts": "f ts-node print-accounts.ts",
-    "fmt": "prettier --write {.,tests,api-types}/*.ts"
+    "test": "zk f mocha tests/main.test.ts",
+    "api-test": "zk f mocha tests/api.test.ts",
+    "fmt": "prettier --write {tests,api-types}/*.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.14",

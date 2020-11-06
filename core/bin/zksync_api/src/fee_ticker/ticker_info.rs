@@ -31,7 +31,7 @@ impl FeeTickerInfo for TickerInfo {
     async fn is_account_new(&mut self, address: Address) -> bool {
         let mut storage = self
             .db
-            .access_storage_fragile()
+            .access_storage()
             .await
             .expect("Unable to establish connection to db");
 

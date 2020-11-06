@@ -43,7 +43,7 @@ impl TokenDBCache {
         } else {
             let mut storage = self
                 .db_pool
-                .access_storage_fragile()
+                .access_storage()
                 .await
                 .map_err(|e| anyhow::format_err!("Failed to access storage: {}", e))?;
 

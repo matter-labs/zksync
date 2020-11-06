@@ -1,7 +1,0 @@
-#!/bin/bash
-if which gsed &> /dev/null
-then
-  gsed "$@"
-else
-  sed "$@"
-fi
