@@ -366,13 +366,13 @@ impl<T: Transport> EthereumAccount<T> {
         // todo: abi encoding don't work
         let stored_block_info = EthToken::Tuple(vec![
             EthToken::Uint(U256::from(block.block_number - 1)),
-            EthToken::Uint(U256::from(0)),
-            EthToken::Uint(U256::from(0)),
+            EthToken::Uint(U256::from(1)),
+            EthToken::FixedBytes([0u8; 32].to_vec()),
             EthToken::FixedBytes([0u8; 32].to_vec()),
             EthToken::FixedBytes([0u8; 32].to_vec()),
         ]);
         use ethabi::Token as EthToken;
-        let new_block_info = EthToken::Tuple(vec![
+        let new_block_info = EthToken::Array(vec![EthToken::Tuple(vec![
             EthToken::Uint(U256::from(block.block_number)),
             EthToken::Uint(U256::from(block.fee_account)),
             EthToken::FixedBytes(block.get_eth_encoded_root().as_bytes().to_vec()),
@@ -381,14 +381,14 @@ impl<T: Transport> EthereumAccount<T> {
                 EthToken::Uint(U256::from(0)),
                 EthToken::Bytes(Vec::new()),
             ])]),
-        ]);
+        ])]);
 
         let witness_data = block.get_eth_witness_data();
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "commitBlocks",
-                EthToken::Tuple(vec![stored_block_info, new_block_info]),
+                (stored_block_info, new_block_info),
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await

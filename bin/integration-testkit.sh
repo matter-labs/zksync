@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# todo uncomment file contents
+
 USAGE='Usage: zksync integration-testkit [ fast | block-sizes-test ]
 
 Used to run testkit tests with geth configured for fast block execution.
@@ -39,7 +41,7 @@ elif [[ $ZKSYNC_ENV == dev ]]; then
 fi
 
 export ETH_NETWORK="test"
-make build-contracts
+#make build-contracts
 
 case $COMMAND in
     block-sizes-test)
