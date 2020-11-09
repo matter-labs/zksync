@@ -1,4 +1,7 @@
-use super::{tx::TxHash, SignedZkSyncTx};
+use super::{
+    tx::{TxEthSignature, TxHash},
+    SignedZkSyncTx,
+};
 
 /// A collection of transactions that must be executed together.
 /// All the transactions in the batch must be included into the same block,
@@ -7,6 +10,7 @@ use super::{tx::TxHash, SignedZkSyncTx};
 pub struct SignedTxsBatch {
     pub txs: Vec<SignedZkSyncTx>,
     pub batch_id: i64,
+    pub eth_signature: Option<TxEthSignature>,
 }
 
 /// A wrapper around possible atomic block elements: it can be either
@@ -24,8 +28,16 @@ impl From<SignedZkSyncTx> for SignedTxVariant {
 }
 
 impl SignedTxVariant {
-    pub fn batch(txs: Vec<SignedZkSyncTx>, batch_id: i64) -> Self {
-        Self::Batch(SignedTxsBatch { txs, batch_id })
+    pub fn batch(
+        txs: Vec<SignedZkSyncTx>,
+        batch_id: i64,
+        eth_signature: Option<TxEthSignature>,
+    ) -> Self {
+        Self::Batch(SignedTxsBatch {
+            txs,
+            batch_id,
+            eth_signature,
+        })
     }
 
     pub fn hashes(&self) -> Vec<TxHash> {

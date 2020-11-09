@@ -306,7 +306,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
     /// Waits until the transaction is confirmed by the Ethereum blockchain.
     pub async fn wait_for_tx(&self, tx_hash: H256) -> Result<TransactionReceipt, ClientError> {
-        // TODO Make timeouts configurable, or use high level solution like tokio::retry.
+        // TODO: Make timeouts configurable, or use high level solution like tokio::retry (#1127).
         let timeout = Duration::from_secs(10);
         let mut poller = tokio::time::interval(Duration::from_millis(100));
 

@@ -53,7 +53,7 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"
 thiserror = "1.0"
-# TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
+# TODO: should be removed after json rpc deps are updated is updated, current version (14.0) (#1107).
 futures01 = { package = "futures", version = "0.1" }
 reqwest = { version = "0.10", features = ["blocking", "json"] }
 tiny-keccak = "1.4.2"

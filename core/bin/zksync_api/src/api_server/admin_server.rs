@@ -33,13 +33,10 @@ struct AppState {
 
 impl AppState {
     async fn access_storage(&self) -> actix_web::Result<zksync_storage::StorageProcessor<'_>> {
-        self.connection_pool
-            .access_storage_fragile()
-            .await
-            .map_err(|e| {
-                vlog::warn!("Failed to access storage: {}", e);
-                actix_web::error::ErrorInternalServerError(e)
-            })
+        self.connection_pool.access_storage().await.map_err(|e| {
+            vlog::warn!("Failed to access storage: {}", e);
+            actix_web::error::ErrorInternalServerError(e)
+        })
     }
 }
 

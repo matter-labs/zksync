@@ -55,7 +55,7 @@ async fn executed_operations(mut storage: StorageProcessor<'_>) -> QueryResult<(
         nonce: Default::default(),
         created_at: chrono::Utc::now(),
         eth_sign_data: None,
-        batch_id: None,
+        batch_id: Some(10),
     };
 
     OperationsSchema(&mut storage)
@@ -81,6 +81,7 @@ async fn executed_operations(mut storage: StorageProcessor<'_>) -> QueryResult<(
         stored_operation.primary_account_address,
         executed_tx.primary_account_address
     );
+    assert_eq!(stored_operation.batch_id, executed_tx.batch_id);
 
     Ok(())
 }

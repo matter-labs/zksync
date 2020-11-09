@@ -12,7 +12,7 @@ use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxWithSignature {
     pub tx: ZkSyncTx,

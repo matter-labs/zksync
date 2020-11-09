@@ -16,7 +16,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-use crate::test_data::gen_eth_sing_data;
+use crate::tests::chain::utils::get_eth_sign_data;
 
 /// Generates several different `SignedFranlinTx` objects.
 fn franklin_txs() -> Vec<SignedZkSyncTx> {
@@ -79,7 +79,7 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
 
             SignedZkSyncTx {
                 tx: tx.clone(),
-                eth_sign_data: Some(gen_eth_sing_data(test_message)),
+                eth_sign_data: Some(get_eth_sign_data(test_message)),
             }
         })
         .collect()
@@ -106,7 +106,7 @@ fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
 
             SignedZkSyncTx {
                 tx: ZkSyncTx::Transfer(Box::new(transfer)),
-                eth_sign_data: Some(gen_eth_sing_data(test_message)),
+                eth_sign_data: Some(get_eth_sign_data(test_message)),
             }
         })
         .collect()
@@ -162,21 +162,30 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     let alone_txs_2 = &txs[6..8];
     let batch_3 = &txs[8..10];
 
+    let batch_1_signature = Some(get_eth_sign_data("test message".to_owned()).signature);
+
     let elements_count = alone_txs_1.len() + alone_txs_2.len() + 3; // Amount of alone txs + amount of batches.
 
     for tx in alone_txs_1 {
         MempoolSchema(&mut storage).insert_tx(tx).await?;
     }
 
-    MempoolSchema(&mut storage).insert_batch(batch_1).await?;
+    // Store the first batch with a signature.
+    MempoolSchema(&mut storage)
+        .insert_batch(batch_1, batch_1_signature.clone())
+        .await?;
 
-    MempoolSchema(&mut storage).insert_batch(batch_2).await?;
+    MempoolSchema(&mut storage)
+        .insert_batch(batch_2, None)
+        .await?;
 
     for tx in alone_txs_2 {
         MempoolSchema(&mut storage).insert_tx(tx).await?;
     }
 
-    MempoolSchema(&mut storage).insert_batch(batch_3).await?;
+    MempoolSchema(&mut storage)
+        .insert_batch(batch_3, None)
+        .await?;
 
     // Load the txs and check that they match the expected list.
     let txs_from_db = MempoolSchema(&mut storage).load_txs().await?;
@@ -184,7 +193,11 @@ async fn store_load_batch(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     assert!(matches!(txs_from_db[0], SignedTxVariant::Tx(_)));
     assert!(matches!(txs_from_db[1], SignedTxVariant::Tx(_)));
-    assert!(matches!(txs_from_db[2], SignedTxVariant::Batch(_)));
+    // Try to load the batch with the signature.
+    match &txs_from_db[2] {
+        SignedTxVariant::Batch(batch) => assert_eq!(batch.eth_signature, batch_1_signature),
+        SignedTxVariant::Tx(_) => panic!("expected to load batch of transactions"),
+    };
     assert!(matches!(txs_from_db[3], SignedTxVariant::Batch(_)));
     assert!(matches!(txs_from_db[4], SignedTxVariant::Tx(_)));
     assert!(matches!(txs_from_db[5], SignedTxVariant::Tx(_)));

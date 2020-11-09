@@ -19,7 +19,7 @@ async fn connect_to_db() -> zksync_storage::ConnectionPool {
 }
 
 async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
-    // TODO: make single server spawn for all tests
+    // TODO: make single server spawn for all tests (#1108).
     let bind_to = "127.0.0.1:8088";
     let mut config_opt = ConfigurationOptions::from_env();
     config_opt.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();

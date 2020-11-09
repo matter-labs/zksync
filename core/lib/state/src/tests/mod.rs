@@ -130,3 +130,33 @@ impl PlasmaTestBuilder {
         );
     }
 }
+
+#[test]
+fn test_tree_state() {
+    let mut state = ZkSyncState::empty();
+    let empty_root = state.root_hash();
+    state.insert_account(0, Default::default());
+    let empty_acc_root = state.root_hash();
+
+    // Tree contains "empty" accounts by default, inserting an empty account shouldn't change state.
+    assert_eq!(empty_root, empty_acc_root);
+
+    let mut balance_account = Account::default();
+    balance_account.set_balance(0, 100u64.into());
+    state.insert_account(1, balance_account.clone());
+    let balance_root = state.root_hash();
+
+    balance_account.set_balance(0, 0u64.into());
+    state.insert_account(1, balance_account.clone());
+    let no_balance_root = state.root_hash();
+
+    // Account with manually set 0 token amount should be considered empty as well.
+    assert_eq!(no_balance_root, empty_acc_root);
+
+    balance_account.set_balance(0, 100u64.into());
+    state.insert_account(1, balance_account);
+    let restored_balance_root = state.root_hash();
+
+    // After we restored previously observed balance, root should be identical.
+    assert_eq!(balance_root, restored_balance_root);
+}

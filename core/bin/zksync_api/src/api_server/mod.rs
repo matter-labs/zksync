@@ -23,6 +23,9 @@ mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;
 
+/// Amount of threads used by each server to serve requests.
+const THREADS_PER_SERVER: usize = 128;
+
 #[allow(clippy::too_many_arguments)]
 pub fn start_api_server(
     connection_pool: ConnectionPool,

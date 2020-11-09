@@ -37,6 +37,7 @@ async fn start_server(api_v01: ApiV01, bind_to: SocketAddr) {
                 web::get().to(|| HttpResponse::Ok().finish()),
             )
     })
+    .workers(super::THREADS_PER_SERVER)
     .bind(bind_to)
     .unwrap()
     .shutdown_timeout(1)
