@@ -16,7 +16,7 @@
         "axios": "^0.21.0",
         "websocket": "^1.0.30",
         "websocket-as-promised": "^1.1.0",
-        "zksync-crypto": "file:../zksync-crypto"
+        "zksync-crypto": "link:./sdk/zksync-crypto"
     },
     "peerDependencies": {
         "@ethersproject/logger": "^5.0.0",

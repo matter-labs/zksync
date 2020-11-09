@@ -13646,10 +13646,9 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
-zksync-crypto@^0.3.1:
-  version "0.3.2"
-  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.3.2.tgz#2e073d1c42a09f65efe41119e3e065edff87fb95"
-  integrity sha512-fLNZ82wddyevNe9O6WEB0Ls3DnttkJH5s7E1tXXq9mGHMVSn/oMHFn35BD6ZRBhALdLexKbalWoJ89Ua93yzFg==
+"zksync-crypto@link:./sdk/zksync-crypto":
+  version "0.0.0"
+  uid ""
 
 "zksync@link:sdk/zksync.js":
   version "0.7.5"
@@ -13657,4 +13656,3 @@ zksync-crypto@^0.3.1:
     axios "^0.21.0"
     websocket "^1.0.30"
     websocket-as-promised "^1.1.0"
-    zksync-crypto "^0.3.1"
