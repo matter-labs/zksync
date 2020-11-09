@@ -29,7 +29,6 @@ import {
     getEthSignatureType,
     serializeTransfer
 } from './utils';
-import { keccak256 } from 'ethers/lib/utils';
 
 const EthersErrorCode = ErrorCode;
 
@@ -253,7 +252,7 @@ export class Wallet {
             batch.push({ tx, signature: null });
         }
 
-        const ethSignature = await this.getEthMessageSignature(keccak256(bytes).slice(2));
+        const ethSignature = await this.getEthMessageSignature(ethers.utils.keccak256(bytes).slice(2));
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignature);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
