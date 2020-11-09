@@ -34,7 +34,8 @@ function get_required_plonk_setup_powers() {
 # we download only keys used in node (defined by $BLOCK_CHUNK_SIZES)
 REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`
 # install zk
-zk
+echo installing zk
+cd /infrastructure/zk && yarn install && yarn build
 
 if [ "$PROVER_DOWNLOAD_SETUP" == "false" ]; then
   echo Downloading setup powers $REQUIRED_SETUP_POWS

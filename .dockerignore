@@ -9,6 +9,8 @@
 !docker/nginx/nginx.conf
 !bin/
 !core/
+!yarn.lock
+!package.json
 !Cargo.lock
 !Cargo.toml
 !contracts/build
@@ -16,4 +18,5 @@
 !infrastructure/explorer/dist
 !infrastructure/fee-seller
 !infrastructure/tok_cli
+!infrastructure/zk
 !sdk/zksync-rs

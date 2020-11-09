@@ -30,6 +30,9 @@ jobs:
     - name: zk
       run: zk
 
+    - name: check-docker-images
+      run: zk docker build rust
+
     - name: lints
       run: |
         zk db setup # So database will be created for compilation.
