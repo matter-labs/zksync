@@ -13650,9 +13650,14 @@ yorkie@^2.0.0:
   version "0.0.0"
   uid ""
 
+"zksync-crypto@link:./sdk/zksync.js/sdk/zksync-crypto":
+  version "0.0.0"
+  uid ""
+
 "zksync@link:sdk/zksync.js":
   version "0.7.5"
   dependencies:
     axios "^0.21.0"
     websocket "^1.0.30"
     websocket-as-promised "^1.1.0"
+    zksync-crypto "link:./sdk/zksync.js/sdk/zksync-crypto"

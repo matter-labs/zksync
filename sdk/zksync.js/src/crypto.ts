@@ -35,6 +35,10 @@ export async function loadZkSyncCrypto(wasmFileUrl?: string) {
     }
     // Only runs in the browser
     if ((zks as any).loadZkSyncCrypto) {
+        // It is ok if wasmFileUrl is not specified.
+        // Actually, typically it should not be specified,
+        // since the content of the `.wasm` file is read 
+        // from the `.js` file itself.
         await (zks as any).loadZkSyncCrypto(wasmFileUrl);
         zksyncCryptoLoaded = true;
     }
