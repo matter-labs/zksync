@@ -24,7 +24,7 @@ pub mod client;
 mod config;
 mod error;
 #[cfg(test)]
-mod test;
+mod test_utils;
 
 /// Maximum limit value in the requests.
 pub const MAX_LIMIT: u32 = 100;
@@ -90,12 +90,6 @@ impl PaginationQuery {
         }
 
         Ok((pagination, limit))
-    }
-
-    fn max_limit(self) -> Result<(Option<BlockNumber>, BlockNumber), Error> {
-        let (pagination, limit) = self.into_inner()?;
-        let max = pagination.into_max(limit)?;
-        Ok((max, limit))
     }
 }
 

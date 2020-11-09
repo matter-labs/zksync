@@ -84,7 +84,7 @@ pub fn api_scope(env_options: &ConfigurationOptions) -> Scope {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::test::TestServerConfig, *};
+    use super::{super::test_utils::TestServerConfig, *};
 
     #[actix_rt::test]
     async fn test_config_scope() {

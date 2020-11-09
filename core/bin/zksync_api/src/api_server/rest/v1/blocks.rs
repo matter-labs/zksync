@@ -149,9 +149,19 @@ async fn blocks_range(
     data: web::Data<ApiBlocksData>,
     web::Query(pagination): web::Query<PaginationQuery>,
 ) -> JsonResult<Vec<BlockDetails>> {
-    let (max, limit) = pagination.max_limit()?;
+    let (pagination, limit) = pagination.into_inner()?;
+    let max = pagination.into_max(limit)?;
 
-    let range = data.blocks_range(max, limit).await?;
+    let mut range = data.blocks_range(max, limit).await?;
+    // Handle edge case when "after + limit" greater than the total blocks count.
+    // TODO Handle this case directly in the `storage` crate. (Task number ???)
+    if let Pagination::After(after) = pagination {
+        range = range
+            .into_iter()
+            .filter(|block| block.block_number > after as i64)
+            .collect();
+    }
+
     Ok(Json(range))
 }
 
@@ -167,152 +177,38 @@ pub fn api_scope(env_options: &ConfigurationOptions, pool: ConnectionPool) -> Sc
 
 #[cfg(test)]
 mod tests {
-    use zksync_crypto::{
-        ff::PrimeField,
-        rand::{SeedableRng, XorShiftRng},
-        Fr,
-    };
-    use zksync_storage::test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation, BLOCK_SIZE_CHUNKS,
-    };
-    use zksync_types::{
-        block::Block, ethereum::OperationType, helpers::apply_updates, AccountMap, Action,
-        Operation,
-    };
+    use super::{super::test_utils::TestServerConfig, *};
 
-    use super::{super::test::TestServerConfig, *};
+    #[actix_rt::test]
+    async fn test_blocks_scope() -> anyhow::Result<()> {
+        let cfg = TestServerConfig::default();
+        cfg.fill_database().await?;
 
-    async fn fill_database(pool: &ConnectionPool) -> anyhow::Result<Vec<BlockDetails>> {
-        let mut storage = pool.access_storage().await.unwrap();
-
-        // Below lies the initialization of the data for the test.
-        let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
-
-        // Required since we use `EthereumSchema` in this test.
-        storage.ethereum_schema().initialize_eth_data().await?;
-
-        let mut accounts = AccountMap::default();
-        let n_committed = 5;
-        let n_verified = n_committed - 2;
-
-        // Create and apply several blocks to work with.
-        for block_number in 1..=n_committed {
-            let updates = (0..3)
-                .map(|_| gen_acc_random_updates(&mut rng))
-                .flatten()
-                .collect::<Vec<_>>();
-            apply_updates(&mut accounts, updates.clone());
-
-            // Store the operation in the block schema.
-            let operation = storage
-                .chain()
-                .block_schema()
-                .execute_operation(gen_unique_operation(
-                    block_number,
-                    Action::Commit,
-                    BLOCK_SIZE_CHUNKS,
-                ))
-                .await?;
-            storage
-                .chain()
-                .state_schema()
-                .commit_state_update(block_number, &updates, 0)
-                .await?;
-
-            // Store & confirm the operation in the ethereum schema, as it's used for obtaining
-            // commit/verify hashes.
-            let ethereum_op_id = operation.id.unwrap() as i64;
-            let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
-            let response = storage
-                .ethereum_schema()
-                .save_new_eth_tx(
-                    OperationType::Commit,
-                    Some(ethereum_op_id),
-                    100,
-                    100u32.into(),
-                    Default::default(),
-                )
-                .await?;
-            storage
-                .ethereum_schema()
-                .add_hash_entry(response.id, &eth_tx_hash)
-                .await?;
-            storage
-                .ethereum_schema()
-                .confirm_eth_tx(&eth_tx_hash)
-                .await?;
-
-            // Add verification for the block if required.
-            if block_number <= n_verified {
-                storage
-                    .prover_schema()
-                    .store_proof(block_number, &Default::default())
-                    .await?;
-                let operation = storage
-                    .chain()
-                    .block_schema()
-                    .execute_operation(gen_unique_operation(
-                        block_number,
-                        Action::Verify {
-                            proof: Default::default(),
-                        },
-                        BLOCK_SIZE_CHUNKS,
-                    ))
-                    .await?;
-
-                let ethereum_op_id = operation.id.unwrap() as i64;
-                let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
-                let response = storage
-                    .ethereum_schema()
-                    .save_new_eth_tx(
-                        OperationType::Verify,
-                        Some(ethereum_op_id),
-                        100,
-                        100u32.into(),
-                        Default::default(),
-                    )
-                    .await?;
-                storage
-                    .ethereum_schema()
-                    .add_hash_entry(response.id, &eth_tx_hash)
-                    .await?;
-                storage
-                    .ethereum_schema()
-                    .confirm_eth_tx(&eth_tx_hash)
-                    .await?;
-            }
-        }
-
-        storage
+        let blocks = cfg
+            .pool
+            .access_storage()
+            .await?
             .chain()
             .block_schema()
             .load_block_range(10, 10)
-            .await
-            .map_err(From::from)
-    }
-
-    #[actix_rt::test]
-    async fn test_blocks_scope() {
-        let cfg = TestServerConfig::default();
-        let blocks = fill_database(&cfg.pool).await.unwrap();
+            .await?;
 
         let (client, server) =
             cfg.start_server(|cfg| api_scope(&cfg.env_options, cfg.pool.clone()));
 
-        assert_eq!(client.block_by_id(1).await.unwrap().unwrap(), blocks[4]);
+        assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[4]);
+        assert_eq!(client.blocks_range(Pagination::Last, 5).await?, blocks);
         assert_eq!(
-            client.blocks_range(Pagination::Last, 5).await.unwrap(),
-            blocks
+            client.blocks_range(Pagination::Before(2), 5).await?,
+            &blocks[4..5]
         );
         assert_eq!(
-            client.blocks_range(Pagination::Before(2), 5).await.unwrap(),
-            blocks[4..5]
+            client.blocks_range(Pagination::After(4), 5).await?,
+            &blocks[0..1]
         );
-        // assert_eq!(
-        //     client.blocks_range(Pagination::After(4), 5).await.unwrap(),
-        //     blocks[0..1]
-        // );
 
         server.stop().await;
+
+        Ok(())
     }
 }
