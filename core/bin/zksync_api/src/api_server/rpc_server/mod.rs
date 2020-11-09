@@ -572,11 +572,13 @@ async fn verify_tx_info_message_signature(
 /// Send a request for Ethereum signature verification and wait for the response.
 /// Unlike in case of `verify_tx_info_message_signature`, we do not require
 /// every transaction from the batch to be signed. The signature must be obtained
-/// through signing hash of concatenated transactions bytes.
+/// through signing hash of concatenated transactions bytes possibly prefixed
+/// with `ChangePubKey` message, if such operation is present.
 async fn verify_txs_batch_signature(
     batch: Vec<TxWithSignature>,
     signature: TxEthSignature,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
+    prefix_bytes: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
     let mut txs = Vec::with_capacity(batch.len());
@@ -593,14 +595,21 @@ async fn verify_txs_batch_signature(
             eth_sign_data,
         });
     }
-    // User is expected to sign hash of the data of all transactions in the batch.
-    let message = tiny_keccak::keccak256(
+    // First, compute the hash of the data of all transactions in the batch.
+    let batch_hash = tiny_keccak::keccak256(
         txs.iter()
             .flat_map(|tx| tx.tx.get_bytes())
             .collect::<Vec<u8>>()
             .as_slice(),
-    )
-    .to_vec();
+    );
+    // Optionally, prefix it and compute the hash again to get the final message user is supposed to sign.
+    let message = match prefix_bytes {
+        Some(mut prefix) => {
+            prefix.extend_from_slice(&batch_hash);
+            tiny_keccak::keccak256(prefix.as_slice())
+        }
+        None => batch_hash,
+    }.to_vec();
     let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiever) = oneshot::channel();
