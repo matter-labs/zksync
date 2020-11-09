@@ -7,7 +7,7 @@ use crate::account::PubKeyHash;
 use anyhow::ensure;
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::{Address, TokenId};
+use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
     params::{max_account_id, max_token_id},
     PrivateKey,
@@ -46,6 +46,11 @@ pub struct ChangePubKey {
     /// onchain, otherwise the message must be signed by the Ethereum private key corresponding
     /// to the account address.
     pub eth_signature: Option<PackedEthSignature>,
+    /// If `ChangePubKey` is a part of a batch of transactions, then this field is used for
+    /// Ethereum signature verification and represents hash of concatenated batch transactions bytes.
+    /// Otherwise, should be filled with zeros.
+    #[serde(default)]
+    pub batch_hash: H256,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
 }
@@ -69,6 +74,9 @@ impl ChangePubKey {
         signature: Option<TxSignature>,
         eth_signature: Option<PackedEthSignature>,
     ) -> Self {
+        // Assume it's not part of a batch.
+        let batch_hash = H256::zero();
+
         let mut tx = Self {
             account_id,
             account,
@@ -78,6 +86,7 @@ impl ChangePubKey {
             nonce,
             signature: signature.clone().unwrap_or_default(),
             eth_signature,
+            batch_hash,
             cached_signer: VerifiedSignatureCache::NotCached,
         };
         if signature.is_some() {
