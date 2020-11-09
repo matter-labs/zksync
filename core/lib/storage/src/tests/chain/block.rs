@@ -3,10 +3,11 @@
 // Workspace imports
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
-    ethereum::OperationType, helpers::apply_updates, AccountMap, AccountUpdate, Action, BlockNumber,
+    ethereum::OperationType, helpers::apply_updates, AccountMap, AccountUpdate, AccountUpdates,
+    Action, BlockNumber,
 };
 // Local imports
-use super::utils::{acc_create_random_updates, get_operation, get_operation_with_txs};
+use super::utils::{get_operation, get_operation_with_txs};
 use crate::{
     chain::{
         block::{records::BlockDetails, BlockSchema},
@@ -31,7 +32,7 @@ pub fn apply_random_updates(
     let updates = (0..3)
         .map(|_| gen_acc_random_updates(rng))
         .flatten()
-        .collect();
+        .collect::<AccountUpdates>();
     apply_updates(&mut accounts, updates.clone());
     (accounts, updates)
 }

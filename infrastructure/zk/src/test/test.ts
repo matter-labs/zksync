@@ -5,7 +5,7 @@ import * as contract from '../contract';
 import * as integration from './integration';
 export { integration };
 
-export async function db(reset: boolean) {
+async function run_on_test_db(reset: boolean, dir: string, command: string) {
     const databaseUrl = process.env.DATABASE_URL as string;
     process.env.DATABASE_URL = databaseUrl.replace(/plasma/g, 'plasma_test');
     process.chdir('core/lib/storage');
@@ -13,8 +13,19 @@ export async function db(reset: boolean) {
         await utils.exec('diesel database reset');
         await utils.exec('diesel migration run');
     }
-    await utils.spawn('cargo test --release -p zksync_storage --features db_test -- --nocapture');
     process.chdir(process.env.ZKSYNC_HOME as string);
+
+    process.chdir(dir);
+    await utils.spawn(command);
+    process.chdir(process.env.ZKSYNC_HOME as string);
+}
+
+export async function db(reset: boolean) {
+    await run_on_test_db(reset, 'core/lib/storage', 'cargo test --release -p zksync_storage --features db_test -- --nocapture');
+}
+
+export async function rust_api(reset: boolean) {
+    await run_on_test_db(reset, 'core/bin/zksync_api', 'cargo test --release -p zksync_api --features api_test -- --nocapture');
 }
 
 export async function contracts() {
@@ -60,6 +71,15 @@ command
     .action(async (cmd: Command) => {
         await db(cmd.reset);
     });
+
+command
+    .command('rust-api')
+    .description('run unit-tests for the REST API')
+    .option('--reset')
+    .action(async (cmd: Command) => {
+        await rust_api(cmd.reset);
+    });
+
 
 command
     .command('circuit [threads] [test_name] [options...]')
