@@ -1,39 +1,39 @@
 //! Mocking utilities for tests.
 
 // Built-in deps
-use std::cell::{Cell, RefCell};
+use crate::database::DatabaseInterface;
+use crate::ethereum_interface::FailureInfo;
+use crate::EthSenderOptions;
 use std::collections::{HashMap, VecDeque};
+use tokio::sync::RwLock;
 // External uses
-use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
 use zksync_basic_types::{H256, U256};
 // Workspace uses
 use zksync_eth_client::SignedCallResult;
+use zksync_storage::StorageProcessor;
 use zksync_types::{
-    config_options::EthSenderOptions,
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Action, Operation,
 };
 // Local uses
 use super::ETHSender;
-// use crate::eth_sender::database::DatabaseAccess;
-use crate::eth_sender::ethereum_interface::EthereumInterface;
-use crate::eth_sender::transactions::{ETHStats, ExecutedTxStatus};
-use crate::eth_sender::ETHSenderRequest;
-use crate::utils::current_zksync_info::CurrentZkSyncInfo;
+// use crate::eth_sender::database::DatabaseInterface;
+use crate::ethereum_interface::EthereumInterface;
+use crate::transactions::{ETHStats, ExecutedTxStatus};
 
 const CHANNEL_CAPACITY: usize = 16;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
-pub(in crate::eth_sender) struct MockDatabase {
+pub(in crate) struct MockDatabase {
     restore_state: VecDeque<ETHOperation>,
-    unconfirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
-    confirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
-    nonce: Cell<i64>,
-    gas_price_limit: Cell<U256>,
-    pending_op_id: Cell<EthOpId>,
-    stats: RefCell<ETHStats>,
+    unconfirmed_operations: RwLock<HashMap<i64, ETHOperation>>,
+    confirmed_operations: RwLock<HashMap<i64, ETHOperation>>,
+    nonce: RwLock<i64>,
+    gas_price_limit: RwLock<U256>,
+    pending_op_id: RwLock<EthOpId>,
+    stats: RwLock<ETHStats>,
 }
 
 impl MockDatabase {
@@ -51,61 +51,89 @@ impl MockDatabase {
         let unconfirmed_operations: HashMap<i64, ETHOperation> =
             restore_state.iter().map(|op| (op.id, op.clone())).collect();
 
-        let gas_price_limit: u64 =
-            zksync_types::config_options::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
+        let gas_price_limit: u64 = zksync_utils::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
 
         Self {
             restore_state,
-            nonce: Cell::new(nonce as i64),
-            gas_price_limit: Cell::new(gas_price_limit.into()),
-            pending_op_id: Cell::new(pending_op_id as EthOpId),
-            stats: RefCell::new(stats),
-            unconfirmed_operations: RefCell::new(unconfirmed_operations),
+            nonce: RwLock::new(nonce as i64),
+            gas_price_limit: RwLock::new(gas_price_limit.into()),
+            pending_op_id: RwLock::new(pending_op_id as EthOpId),
+            stats: RwLock::new(stats),
+            unconfirmed_operations: RwLock::new(unconfirmed_operations),
             ..Default::default()
         }
     }
 
-    /// Ensures that the provided transaction is stored in the database and not confirmed yet.
-    pub fn assert_stored(&self, tx: &ETHOperation) {
-        assert_eq!(self.unconfirmed_operations.borrow().get(&tx.id), Some(tx));
-
-        assert!(self.confirmed_operations.borrow().get(&tx.id).is_none());
-    }
-
     /// Ensures that the provided transaction is stored as confirmed.
-    pub fn assert_confirmed(&self, tx: &ETHOperation) {
-        assert_eq!(self.confirmed_operations.borrow().get(&tx.id), Some(tx));
+    pub async fn assert_confirmed(&self, tx: &ETHOperation) {
+        assert_eq!(self.confirmed_operations.read().await.get(&tx.id), Some(tx));
 
-        assert!(self.unconfirmed_operations.borrow().get(&tx.id).is_none());
+        assert!(self
+            .unconfirmed_operations
+            .read()
+            .await
+            .get(&tx.id)
+            .is_none());
     }
 
-    fn next_nonce(&self) -> Result<i64, anyhow::Error> {
-        let old_value = self.nonce.get();
-        let new_value = old_value + 1;
-        self.nonce.set(new_value);
+    async fn next_nonce(&self) -> Result<i64, anyhow::Error> {
+        let mut value = self.nonce.write().await;
+        *value += 1;
 
-        Ok(old_value)
+        Ok(self.nonce.read().await.clone())
     }
 }
 
-impl DatabaseAccess for MockDatabase {
-    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error> {
+#[async_trait::async_trait]
+impl DatabaseInterface for MockDatabase {
+    async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error> {
+        StorageProcessor::establish_connection().await
+    }
+
+    async fn load_new_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+    ) -> Result<Vec<Operation>, anyhow::Error> {
+        let unprocessed_ops = connection
+            .ethereum_schema()
+            .load_unprocessed_operations()
+            .await?;
+        Ok(unprocessed_ops)
+    }
+
+    async fn update_gas_price_params(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+        gas_price_limit: U256,
+        average_gas_price: U256,
+    ) -> Result<(), anyhow::Error> {
+        let mut new_gas_price_limit = self.gas_price_limit.write().await;
+        *new_gas_price_limit = gas_price_limit;
+
+        Ok(())
+    }
+
+    async fn restore_state(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+    ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error> {
         Ok((self.restore_state.clone(), Vec::new()))
     }
 
-    fn save_new_eth_tx(
+    async fn save_new_eth_tx(
         &self,
+        _connection: &mut StorageProcessor<'_>,
         op_type: OperationType,
         op: Option<Operation>,
         deadline_block: i64,
         used_gas_price: U256,
         encoded_tx_data: Vec<u8>,
     ) -> Result<InsertedOperationResponse, anyhow::Error> {
-        let id = self.pending_op_id.get();
-        let new_id = id + 1;
-        self.pending_op_id.set(new_id);
+        let id = self.pending_op_id.read().await.clone();
+        let mut pending_op_id = self.pending_op_id.write().await;
+        *pending_op_id = id + 1;
 
-        let nonce = self.next_nonce()?;
+        let nonce = self.next_nonce().await?;
 
         // Store with the assigned ID.
         let state = ETHOperation {
@@ -121,7 +149,7 @@ impl DatabaseAccess for MockDatabase {
             final_hash: None,
         };
 
-        self.unconfirmed_operations.borrow_mut().insert(id, state);
+        self.unconfirmed_operations.write().await.insert(id, state);
 
         let response = InsertedOperationResponse {
             id,
@@ -132,15 +160,21 @@ impl DatabaseAccess for MockDatabase {
     }
 
     /// Adds a tx hash entry associated with some Ethereum operation to the database.
-    fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> Result<(), anyhow::Error> {
+    async fn add_hash_entry(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+        eth_op_id: i64,
+        hash: &H256,
+    ) -> Result<(), anyhow::Error> {
         assert!(
             self.unconfirmed_operations
-                .borrow()
+                .read()
+                .await
                 .contains_key(&eth_op_id),
             "Attempt to update tx that is not unconfirmed"
         );
 
-        let mut ops = self.unconfirmed_operations.borrow_mut();
+        let mut ops = self.unconfirmed_operations.write().await;
         let mut op = ops[&eth_op_id].clone();
         op.used_tx_hashes.push(*hash);
         ops.insert(eth_op_id, op);
@@ -148,20 +182,22 @@ impl DatabaseAccess for MockDatabase {
         Ok(())
     }
 
-    fn update_eth_tx(
+    async fn update_eth_tx(
         &self,
+        _connection: &mut StorageProcessor<'_>,
         eth_op_id: EthOpId,
         new_deadline_block: i64,
         new_gas_value: U256,
     ) -> Result<(), anyhow::Error> {
         assert!(
             self.unconfirmed_operations
-                .borrow()
+                .read()
+                .await
                 .contains_key(&eth_op_id),
             "Attempt to update tx that is not unconfirmed"
         );
 
-        let mut ops = self.unconfirmed_operations.borrow_mut();
+        let mut ops = self.unconfirmed_operations.write().await;
         let mut op = ops[&eth_op_id].clone();
         op.last_deadline_block = new_deadline_block as u64;
         op.last_used_gas_price = new_gas_value;
@@ -170,8 +206,14 @@ impl DatabaseAccess for MockDatabase {
         Ok(())
     }
 
-    fn confirm_operation(&self, hash: &H256) -> Result<(), anyhow::Error> {
-        let mut unconfirmed_operations = self.unconfirmed_operations.borrow_mut();
+    async fn confirm_operation(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+        hash: &H256,
+        op: &ETHOperation,
+    ) -> Result<(), anyhow::Error> {
+        // TODO: Sosnin change this func
+        let mut unconfirmed_operations = self.unconfirmed_operations.write().await;
         let mut op_idx: Option<i64> = None;
         for operation in unconfirmed_operations.values_mut() {
             if operation.used_tx_hashes.contains(hash) {
@@ -190,31 +232,25 @@ impl DatabaseAccess for MockDatabase {
 
         let operation = unconfirmed_operations.remove(&op_idx).unwrap();
         self.confirmed_operations
-            .borrow_mut()
+            .write()
+            .await
             .insert(op_idx, operation);
 
         Ok(())
     }
 
-    fn load_gas_price_limit(&self) -> Result<U256, anyhow::Error> {
-        Ok(self.gas_price_limit.get())
+    async fn load_gas_price_limit(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+    ) -> Result<U256, anyhow::Error> {
+        Ok(self.gas_price_limit.read().await.clone())
     }
 
-    fn update_gas_price_limit(&self, value: U256) -> Result<(), anyhow::Error> {
-        self.gas_price_limit.set(value);
-
-        Ok(())
-    }
-
-    fn load_stats(&self) -> Result<ETHStats, anyhow::Error> {
-        Ok(self.stats.borrow().clone())
-    }
-
-    fn transaction<F, T>(&self, f: F) -> Result<T, anyhow::Error>
-    where
-        F: FnOnce() -> Result<T, anyhow::Error>,
-    {
-        f()
+    async fn load_stats(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+    ) -> Result<ETHStats, anyhow::Error> {
+        Ok(self.stats.read().await.clone())
     }
 }
 

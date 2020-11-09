@@ -3,7 +3,7 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 // External deps
 use zksync_basic_types::U256;
 // Local deps
-use crate::{database::DatabaseAccess, ethereum_interface::EthereumInterface};
+use crate::{database::DatabaseInterface, ethereum_interface::EthereumInterface};
 
 mod parameters;
 
@@ -21,7 +21,7 @@ mod parameters;
 /// gas price for transactions that were not mined by the network
 /// within a reasonable time.
 #[derive(Debug)]
-pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
+pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseInterface> {
     /// Collected statistics about recently used gas prices.
     statistics: GasStatistics,
     /// Timestamp of the last maximum gas price update.
@@ -33,7 +33,7 @@ pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
     _db: PhantomData<DB>,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
+impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
     pub async fn new(db: &DB) -> Self {
         let mut connection = db
             .acquire_connection()
