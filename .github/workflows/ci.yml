@@ -31,7 +31,12 @@ jobs:
       run: zk
 
     - name: check-docker-images
-      run: zk docker build rust
+      run: |
+        zk run yarn
+        cp etc/tokens/{test,localhost}.json
+        zk run verify-keys unpack
+        zk db setup
+        zk docker build rust
 
     - name: lints
       run: |
