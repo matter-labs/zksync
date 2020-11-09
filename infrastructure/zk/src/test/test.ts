@@ -52,6 +52,7 @@ export async function js() {
 export async function rust() {
     await utils.spawn('cargo test --release');
     await db(true);
+    await rust_api(true)
     await prover();
     const { stdout: threads } = await utils.exec('nproc');
     await circuit(parseInt(threads));
