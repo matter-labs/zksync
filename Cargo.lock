@@ -5810,6 +5810,7 @@ dependencies = [
  "anyhow",
  "criterion",
  "log 0.4.11",
+ "metrics",
  "num",
  "web3 0.13.0",
  "zksync_crypto",
