@@ -490,7 +490,7 @@ mod test {
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
-            BigUint::from(20u32),
+            BigUint::from(40u32),
             BigUint::from(1u32),
             3,
             None,
