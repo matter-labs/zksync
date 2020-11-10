@@ -25,9 +25,6 @@ structopt = "0.3.20"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 tokio = { version = "0.2", features = ["full"] }
 
-[dev-dependencies]
-jsonrpc-core = "14.0.0"
-
 zksync_state = { path = "../../lib/state", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
@@ -35,3 +32,6 @@ zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+
+[dev-dependencies]
+jsonrpc-core = "14.0.0"
