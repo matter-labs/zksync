@@ -362,3 +362,109 @@ impl EventsState {
         self.committed_events[0..count_to_get].to_vec()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::EventsState;
+    use jsonrpc_core;
+    use std::future::Future;
+    use web3::types::{Bytes, Log};
+    use web3::{
+        api::{Eth, Namespace},
+        contract::Contract,
+        types::H256,
+        RequestId, Transport,
+    };
+    use zksync_contracts::zksync_contract;
+
+    // This transport is necessary for generating contract
+    #[derive(Debug, Clone)]
+    struct FakeTransport;
+
+    impl Transport for FakeTransport {
+        type Out =
+            Box<dyn Future<Output = Result<jsonrpc_core::Value, web3::Error>> + Send + Unpin>;
+
+        fn prepare(
+            &self,
+            _method: &str,
+            _params: Vec<jsonrpc_core::Value>,
+        ) -> (RequestId, jsonrpc_core::Call) {
+            unimplemented!()
+        }
+
+        fn send(&self, _id: RequestId, _request: jsonrpc_core::Call) -> Self::Out {
+            unimplemented!()
+        }
+    }
+
+    fn u32_to_32bytes(value: u32) -> [u8; 32] {
+        let mut bytes = [0u8; 32];
+        let a = value.to_be_bytes();
+        for i in 0..4 {
+            bytes[28 + i] = a[i]
+        }
+        bytes
+    }
+
+    fn create_log(topic: H256, data: Bytes, block_number: u32) -> Log {
+        Log {
+            address: [1u8; 20].into(),
+            topics: vec![topic, u32_to_32bytes(block_number).into()],
+            data,
+            block_hash: None,
+            block_number: Some(block_number.into()),
+            transaction_hash: Some(u32_to_32bytes(1).into()),
+            transaction_index: Some(0.into()),
+            log_index: Some(0.into()),
+            transaction_log_index: Some(0.into()),
+            log_type: Some("mined".into()),
+            removed: None,
+        }
+    }
+    #[test]
+    fn event_state() {
+        let mut events_state = EventsState::default();
+        let abi_contract = zksync_contract();
+
+        let contract = (
+            abi_contract.clone(),
+            Contract::new(Eth::new(FakeTransport), [1u8; 20].into(), abi_contract),
+        );
+        let block_verified_topic = contract
+            .0
+            .event("BlockVerification")
+            .expect("Main contract abi error")
+            .signature();
+        let block_committed_topic = contract
+            .0
+            .event("BlockCommit")
+            .expect("Main contract abi error")
+            .signature();
+        let reverted_topic = contract
+            .0
+            .event("BlocksRevert")
+            .expect("Main contract abi error")
+            .signature();
+
+        let mut logs = vec![];
+        for i in 0..32 {
+            logs.push(create_log(block_committed_topic.clone(), Bytes(vec![]), i));
+            logs.push(create_log(block_verified_topic.clone(), Bytes(vec![]), i));
+        }
+
+        events_state.update_blocks_state(&contract, &logs);
+        assert_eq!(events_state.committed_events.len(), 32);
+        assert_eq!(events_state.verified_events.len(), 32);
+
+        let last_block_ver = u32_to_32bytes(15);
+        let last_block_com = u32_to_32bytes(10);
+        let mut data = vec![];
+        data.extend(&last_block_com);
+        data.extend(&last_block_ver);
+        let log = create_log(reverted_topic.clone(), Bytes(data), 3);
+        events_state.update_blocks_state(&contract, &[log]);
+        assert_eq!(events_state.committed_events.len(), 16);
+        assert_eq!(events_state.verified_events.len(), 11);
+    }
+}
