@@ -3,7 +3,11 @@ use std::{collections::VecDeque, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use zksync_types::{mempool::SignedTxVariant, tx::TxHash, SignedZkSyncTx};
+use zksync_types::{
+    mempool::SignedTxVariant,
+    tx::{TxEthSignature, TxHash},
+    SignedZkSyncTx,
+};
 // Local imports
 use self::records::MempoolTx;
 use crate::{QueryResult, StorageProcessor};
@@ -72,7 +76,8 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             match batch_id {
                 Some(batch_id) => {
                     // Group of batched transactions.
-                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id);
+                    // Signatures will be loaded afterwards.
+                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id, None);
                     txs.push(variant);
                 }
                 None => {
@@ -83,6 +88,25 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                         .collect();
                     txs.append(&mut variants);
                 }
+            }
+        }
+
+        // Load signatures for batches.
+        for tx in &mut txs {
+            if let SignedTxVariant::Batch(batch) = tx {
+                let eth_signature = sqlx::query!(
+                    "SELECT eth_signature FROM txs_batches_signatures
+                    WHERE batch_id = $1",
+                    batch.batch_id
+                )
+                .fetch_optional(self.0.conn())
+                .await?
+                .map(|value| {
+                    serde_json::from_value(value.eth_signature)
+                        .expect("failed to decode TxEthSignature")
+                });
+
+                batch.eth_signature = eth_signature;
             }
         }
 
@@ -104,7 +128,11 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
     /// Adds a new transactions batch to the mempool schema.
     /// Returns id of the inserted batch
-    pub async fn insert_batch(&mut self, txs: &[SignedZkSyncTx]) -> QueryResult<i64> {
+    pub async fn insert_batch(
+        &mut self,
+        txs: &[SignedZkSyncTx],
+        eth_signature: Option<TxEthSignature>,
+    ) -> QueryResult<i64> {
         let start = Instant::now();
         if txs.is_empty() {
             anyhow::bail!("Cannot insert an empty batch");
@@ -165,6 +193,18 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 chrono::Utc::now(),
                 eth_sign_data,
                 batch_id,
+            )
+            .execute(self.0.conn())
+            .await?;
+        }
+
+        // If there's a signature for the whole batch, store it too.
+        if let Some(signature) = eth_signature {
+            let signature = serde_json::to_value(signature)?;
+            sqlx::query!(
+                "INSERT INTO txs_batches_signatures VALUES($1, $2)",
+                batch_id,
+                signature
             )
             .execute(self.0.conn())
             .await?;
@@ -231,7 +271,6 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "remove_txs");
-
         Ok(())
     }
 
