@@ -9,12 +9,13 @@ use actix_web::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
-use zksync_types::{tx::TxHash, BlockNumber, ZkSyncTx};
+use zksync_types::{tx::TxHash, BlockNumber};
 
 // Local uses
 use super::{
@@ -101,7 +102,7 @@ impl ApiBlocksData {
     }
 }
 
-// Data transfer types.
+// Data transfer objects.
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BlockInfo {
@@ -115,12 +116,12 @@ pub struct BlockInfo {
     pub verified_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct TransactionInfo {
     pub tx_hash: TxHash,
     pub block_number: i64,
-    // TODO ask if there might be a ZkSyncOp
-    pub op: ZkSyncTx,
+    // TODO Implement helper method to decode this op as ExecutedOperations (task number ????)
+    pub op: Value,
     pub success: Option<bool>,
     pub fail_reason: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -157,20 +158,11 @@ impl From<records::BlockTransactionItem> for TransactionInfo {
                 TxHash::from_slice(&slice).unwrap()
             },
             block_number: inner.block_number,
-            op: serde_json::from_value(inner.op).expect("Unable to decode `op` field"),
+            op: inner.op,
             success: inner.success,
             fail_reason: inner.fail_reason,
             created_at: inner.created_at,
         }
-    }
-}
-
-// TODO implement PartialEq for the ZkSyncOp (task number ????)
-impl PartialEq for TransactionInfo {
-    fn eq(&self, other: &Self) -> bool {
-        serde_json::to_string(self)
-            .unwrap()
-            .eq(&serde_json::to_string(other).unwrap())
     }
 }
 

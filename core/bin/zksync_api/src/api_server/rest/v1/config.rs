@@ -1,10 +1,10 @@
 //! Config part of API implementation.
 
 // Built-in uses
-use std::{collections::BTreeMap, rc::Rc};
 
 // External uses
 use actix_web::{web, Scope};
+use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
@@ -19,8 +19,7 @@ use super::{
 /// Shared data between `api/v1/config` endpoints.
 #[derive(Debug, Clone)]
 struct ApiConfigData {
-    // TODO Find the way to avoid unnecessary reference counting here.
-    contracts: Rc<BTreeMap<String, Address>>,
+    contract_address: Address,
     deposit_confirmations: u64,
     // TODO Move Network constant from the zksync-rs to zksync-types crate. (Task number ????)
     network: String,
@@ -28,22 +27,26 @@ struct ApiConfigData {
 
 impl ApiConfigData {
     fn new(env_options: &ConfigurationOptions) -> Self {
-        let mut contracts = BTreeMap::new();
-        contracts.insert("contract".to_owned(), env_options.contract_eth_addr);
-
         Self {
-            contracts: Rc::from(contracts),
+            contract_address: env_options.contract_eth_addr,
             deposit_confirmations: env_options.confirmations_for_eth_event,
             network: env_options.eth_network.clone(),
         }
     }
 }
 
+// Data transfer objects.
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct Contracts {
+    pub contract: Address,
+}
+
 // Client implementation
 
 /// Configuration API part.
 impl Client {
-    pub async fn contracts(&self) -> client::Result<BTreeMap<String, Address>> {
+    pub async fn contracts(&self) -> client::Result<Contracts> {
         self.get("config/contracts").send().await
     }
 
@@ -58,8 +61,10 @@ impl Client {
 
 // Server implementation
 
-async fn contracts(data: web::Data<ApiConfigData>) -> Json<Rc<BTreeMap<String, Address>>> {
-    Json(data.contracts.clone())
+async fn contracts(data: web::Data<ApiConfigData>) -> Json<Contracts> {
+    Json(Contracts {
+        contract: data.contract_address,
+    })
 }
 
 async fn deposit_confirmations(data: web::Data<ApiConfigData>) -> Json<u64> {
@@ -88,21 +93,25 @@ mod tests {
     use super::{super::test_utils::TestServerConfig, *};
 
     #[actix_rt::test]
-    async fn test_config_scope() {
+    async fn test_config_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.env_options));
 
         assert_eq!(
-            client.deposit_confirmations().await.unwrap(),
+            client.deposit_confirmations().await?,
             cfg.env_options.confirmations_for_eth_event
         );
 
-        assert_eq!(client.network().await.unwrap(), cfg.env_options.eth_network);
+        assert_eq!(client.network().await?, cfg.env_options.eth_network);
         assert_eq!(
-            client.contracts().await.unwrap().get("contract"),
-            Some(&cfg.env_options.contract_eth_addr),
+            client.contracts().await?,
+            Contracts {
+                contract: cfg.env_options.contract_eth_addr
+            },
         );
 
         server.stop().await;
+
+        Ok(())
     }
 }
