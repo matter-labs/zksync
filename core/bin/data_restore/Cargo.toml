@@ -24,6 +24,8 @@ anyhow = "1.0"
 structopt = "0.3.20"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 tokio = { version = "0.2", features = ["full"] }
+
+[dev-dependencies]
 jsonrpc-core = "14.0.0"
 
 zksync_state = { path = "../../lib/state", version = "1.0" }
