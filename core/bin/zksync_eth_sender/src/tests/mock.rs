@@ -18,7 +18,7 @@ use zksync_types::{
 };
 // Local uses
 use super::ETHSender;
-// use crate::eth_sender::database::DatabaseInterface;
+
 use crate::ethereum_interface::EthereumInterface;
 use crate::transactions::{ETHStats, ExecutedTxStatus};
 
@@ -102,7 +102,7 @@ impl MockDatabase {
     }
 
     async fn next_nonce(&self) -> anyhow::Result<i64> {
-        let old_value = self.nonce.read().await.clone();
+        let old_value = *(self.nonce.read().await);
         let mut new_value = self.nonce.write().await;
         *new_value = old_value + 1;
 
@@ -167,7 +167,7 @@ impl DatabaseInterface for MockDatabase {
         used_gas_price: U256,
         encoded_tx_data: Vec<u8>,
     ) -> anyhow::Result<InsertedOperationResponse> {
-        let id = self.pending_op_id.read().await.clone();
+        let id = *(self.pending_op_id.read().await);
         let mut pending_op_id = self.pending_op_id.write().await;
         *pending_op_id = id + 1;
 
@@ -248,7 +248,7 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _connection: &mut StorageProcessor<'_>,
         hash: &H256,
-        op: &ETHOperation,
+        _op: &ETHOperation,
     ) -> anyhow::Result<()> {
         let mut unconfirmed_operations = self.unconfirmed_operations.write().await;
         let mut op_idx: Option<i64> = None;
@@ -280,7 +280,7 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<U256> {
-        Ok(self.gas_price_limit.read().await.clone())
+        Ok(*self.gas_price_limit.read().await)
     }
 
     async fn load_stats(&self, _connection: &mut StorageProcessor<'_>) -> anyhow::Result<ETHStats> {
@@ -290,11 +290,35 @@ impl DatabaseInterface for MockDatabase {
     async fn is_previous_operation_confirmed(
         &self,
         _connection: &mut StorageProcessor<'_>,
-        _op: &ETHOperation,
+        op: &ETHOperation,
     ) -> anyhow::Result<bool> {
-        Err(anyhow::format_err!(
-            "is_previous_operation_confirmed not implemented for MockDatabase"
-        ))
+        let confirmed = match op.op_type {
+            OperationType::Commit | OperationType::Verify => {
+                let op = op.op.as_ref().unwrap();
+                // We're checking previous block, so for the edge case of first block we can say that it was confirmed.
+                let block_to_check = if op.block.block_number > 1 {
+                    op.block.block_number - 1
+                } else {
+                    return Ok(true);
+                };
+
+                let confirmed_operations = self.confirmed_operations.read().await.clone();
+                let maybe_operation = confirmed_operations.get(&(block_to_check as i64));
+
+                let operation = match maybe_operation {
+                    Some(op) => op,
+                    None => return Ok(false),
+                };
+
+                operation.confirmed
+            }
+            OperationType::Withdraw => {
+                // Withdrawals aren't actually sequential, so we don't really care.
+                true
+            }
+        };
+
+        Ok(confirmed)
     }
 }
 
@@ -470,9 +494,7 @@ async fn build_eth_sender(
         is_enabled: true,
     };
 
-    let eth_sender = ETHSender::new(options, db, ethereum).await;
-
-    eth_sender
+    ETHSender::new(options, db, ethereum).await
 }
 
 /// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
