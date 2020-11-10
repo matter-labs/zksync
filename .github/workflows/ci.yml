@@ -30,14 +30,6 @@ jobs:
     - name: zk
       run: zk
 
-    - name: check-docker-images
-      run: |
-        zk run yarn
-        cp etc/tokens/{test,localhost}.json
-        zk run verify-keys unpack
-        zk db setup
-        zk docker build rust
-
     - name: lints
       run: |
         zk db setup # So database will be created for compilation.
