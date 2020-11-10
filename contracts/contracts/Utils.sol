@@ -64,16 +64,18 @@ library Utils {
     /// @param _message signed message.
     /// @return address of the signer
     function recoverAddressFromEthSignature(bytes memory _signature, bytes memory _message) internal pure returns (address) {
-        require(_signature.length == 65, "ves10"); // incorrect signature length
+        require(_signature.length == 65 + 32, "ves10"); // incorrect signature length
 
         bytes32 signR;
         bytes32 signS;
+        bytes32 additionalHash;
         uint offset = 0;
 
         (offset, signR) = Bytes.readBytes32(_signature, offset);
         (offset, signS) = Bytes.readBytes32(_signature, offset);
+        (offset, additionalHash) = Bytes.readBytes32(_signature, offset + 1);
         uint8 signV = uint8(_signature[offset]);
 
-        return ecrecover(keccak256(_message), signV, signR, signS);
+        return ecrecover(keccak256(abi.encodePacked(_message, additionalHash)), signV, signR, signS);
     }
 }
