@@ -37,9 +37,8 @@ mod gas_adjuster;
 mod transactions;
 mod tx_queue;
 
-// TODO: Restore tests
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 /// Wait this amount of time if we hit rate limit on infura https://infura.io/docs/ethereum/json-rpc/ratelimits
 const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);

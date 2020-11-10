@@ -7,9 +7,8 @@ use crate::{database::DatabaseInterface, ethereum_interface::EthereumInterface};
 
 mod parameters;
 
-// TODO: Tests are commented for now as DB traits aren't implemented yet.
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 /// Gas adjuster is an entity capable of scaling the gas price for
 /// all the Ethereum transactions.
@@ -163,7 +162,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
 /// Helper structure responsible for collecting the data about recent transactions,
 /// calculating the average gas price, and providing the gas price limit.
 #[derive(Debug)]
-struct GasStatistics {
+pub(super) struct GasStatistics {
     samples: VecDeque<U256>,
     current_sum: U256,
     current_max_price: U256,
