@@ -37,7 +37,11 @@ pub trait Rpc {
     ) -> FutureResp<TxHash>;
 
     #[rpc(name = "submit_txs_batch", returns = "Vec<TxHash>")]
-    fn submit_txs_batch(&self, txs: Vec<TxWithSignature>) -> FutureResp<Vec<TxHash>>;
+    fn submit_txs_batch(
+        &self,
+        txs: Vec<TxWithSignature>,
+        eth_signature: Option<TxEthSignature>,
+    ) -> FutureResp<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
     fn contract_address(&self) -> FutureResp<ContractAddressResp>;
@@ -116,12 +120,16 @@ impl Rpc for RpcApp {
         Box::new(resp.boxed().compat())
     }
 
-    fn submit_txs_batch(&self, txs: Vec<TxWithSignature>) -> FutureResp<Vec<TxHash>> {
+    fn submit_txs_batch(
+        &self,
+        txs: Vec<TxWithSignature>,
+        eth_signature: Option<TxEthSignature>,
+    ) -> FutureResp<Vec<TxHash>> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
             handle
-                .spawn(self_._impl_submit_txs_batch(txs))
+                .spawn(self_._impl_submit_txs_batch(txs, eth_signature))
                 .await
                 .unwrap()
         };
