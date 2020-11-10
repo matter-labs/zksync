@@ -1,5 +1,6 @@
 // Built-in deps
 use std::collections::HashMap;
+use std::time::Instant;
 // External imports
 // Workspace imports
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
@@ -23,6 +24,7 @@ pub struct TokensSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Persists the token in the database.
     pub async fn store_token(&mut self, token: Token) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             r#"
             INSERT INTO tokens ( id, address, symbol, decimals )
@@ -39,6 +41,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "token" => "store_token");
         Ok(())
     }
 
@@ -46,6 +49,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
     pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
+        let start = Instant::now();
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
@@ -56,17 +60,21 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        Ok(tokens
+        let result = Ok(tokens
             .into_iter()
             .map(|t| {
                 let token: Token = t.into();
                 (token.id, token)
             })
-            .collect())
+            .collect());
+
+        metrics::histogram!("sql", start.elapsed(), "token" => "load_tokens");
+        result
     }
 
     /// Get the number of tokens from Database
     pub async fn get_count(&mut self) -> QueryResult<i64> {
+        let start = Instant::now();
         let tokens_count = sqlx::query!(
             r#"
             SELECT count(*) as "count!" FROM tokens
@@ -76,11 +84,13 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?
         .count;
 
+        metrics::histogram!("sql", start.elapsed(), "token" => "get_count");
         Ok(tokens_count)
     }
 
     /// Given the numeric token ID, symbol or address, returns token.
     pub async fn get_token(&mut self, token_like: TokenLike) -> QueryResult<Option<Token>> {
+        let start = Instant::now();
         let db_token = match token_like {
             TokenLike::Id(token_id) => {
                 sqlx::query_as!(
@@ -123,6 +133,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             }
         };
 
+        metrics::histogram!("sql", start.elapsed(), "token" => "get_token");
         Ok(db_token.map(|t| t.into()))
     }
 
@@ -130,6 +141,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         token_id: TokenId,
     ) -> QueryResult<Option<TokenPrice>> {
+        let start = Instant::now();
         let db_price = sqlx::query_as!(
             DbTickerPrice,
             r#"
@@ -142,6 +154,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "token" => "get_historical_ticker_price");
         Ok(db_price.map(|p| p.into()))
     }
 
@@ -150,6 +163,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         token_id: TokenId,
         price: TokenPrice,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let usd_price_rounded = ratio_to_big_decimal(&price.usd_price, STORED_USD_PRICE_PRECISION);
         sqlx::query!(
             r#"
@@ -166,6 +180,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "token" => "update_historical_ticker_price");
         Ok(())
     }
 }
