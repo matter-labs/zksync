@@ -7,8 +7,6 @@
 
 USAGE="exit_tool_entry.sh init|restart|run|continue network account_id token web3_url"
 
-. .setup_env
-
 cd $ZKSYNC_HOME
 
 if [ -z $ZKSYNC_ENV ];
