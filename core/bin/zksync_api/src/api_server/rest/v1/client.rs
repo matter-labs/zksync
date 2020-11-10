@@ -1,6 +1,7 @@
 //! Built-in API client.
 
 // Public uses
+pub use super::blocks::{BlockInfo, TransactionInfo};
 
 // Built-in uses
 
@@ -34,6 +35,7 @@ impl From<reqwest::Error> for ClientError {
     }
 }
 
+/// Client reference implementation for interacting with zkSync REST API v1.
 #[derive(Debug, Clone)]
 pub struct Client {
     inner: reqwest::Client,
@@ -42,6 +44,7 @@ pub struct Client {
 
 impl Client {
     // TODO Use Network constant
+    /// Creates a new REST API client with the specified Url.
     pub fn new(url: String) -> Self {
         Self {
             inner: reqwest::Client::new(),
@@ -53,7 +56,8 @@ impl Client {
         [&self.url, "/api/v1/", method].concat()
     }
 
-    pub fn get(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
+    /// Constructs get request for the specified method.
+    pub(crate) fn get(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
         let url = self.endpoint(method.as_ref());
         ClientRequestBuilder {
             inner: self.inner.get(&url),

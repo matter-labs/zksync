@@ -41,6 +41,7 @@ impl ApiConfigData {
 
 // Client implementation
 
+/// Configuration API part.
 impl Client {
     pub async fn contracts(&self) -> client::Result<BTreeMap<String, Address>> {
         self.get("config/contracts").send().await

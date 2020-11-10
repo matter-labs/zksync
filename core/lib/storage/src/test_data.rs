@@ -123,11 +123,22 @@ pub fn dummy_ethereum_tx_hash(ethereum_op_id: i64) -> H256 {
     H256::from_low_u64_ne(ethereum_op_id as u64)
 }
 
-/// Generates dummy operation with the default `unique` in the block.
+/// Generates dummy operation with the unique `new_root_hash` in the block.
 pub fn gen_unique_operation(
     block_number: BlockNumber,
     action: Action,
     block_chunks_size: usize,
+) -> Operation {
+    gen_unique_operation_with_txs(block_number, action, block_chunks_size, vec![])
+}
+
+/// Generates dummy operation with the unique `new_root_hash` in the block and
+/// given set of transactions..
+pub fn gen_unique_operation_with_txs(
+    block_number: BlockNumber,
+    action: Action,
+    block_chunks_size: usize,
+    txs: Vec<ExecutedOperations>,
 ) -> Operation {
     Operation {
         id: None,
@@ -136,7 +147,7 @@ pub fn gen_unique_operation(
             block_number,
             new_root_hash: dummy_root_hash_for_block(block_number),
             fee_account: 0,
-            block_transactions: vec![],
+            block_transactions: txs,
             processed_priority_ops: (0, 0),
             block_chunks_size,
             commit_gas_limit: 1_000_000.into(),

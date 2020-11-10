@@ -4,12 +4,16 @@
 
 // External uses
 use actix_web::{web, Scope};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 // Workspace uses
 use web::Json;
 use zksync_config::ConfigurationOptions;
 use zksync_storage::{
-    chain::block::records::BlockDetails, chain::block::records::BlockTransactionItem,
+    chain::block::records,
+    utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix},
     ConnectionPool, QueryResult,
 };
 use zksync_types::BlockNumber;
@@ -26,7 +30,7 @@ use crate::utils::shared_lru_cache::AsyncLruCache;
 struct ApiBlocksData {
     pool: ConnectionPool,
     /// Verified blocks cache.
-    verified_blocks: AsyncLruCache<BlockNumber, BlockDetails>,
+    verified_blocks: AsyncLruCache<BlockNumber, records::BlockDetails>,
 }
 
 impl ApiBlocksData {
@@ -40,7 +44,10 @@ impl ApiBlocksData {
     /// Returns information about block with the specified number.
     ///
     /// This method caches some of the verified blocks.
-    async fn block_info(&self, block_number: BlockNumber) -> QueryResult<Option<BlockDetails>> {
+    async fn block_info(
+        &self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<records::BlockDetails>> {
         if let Some(block) = self.verified_blocks.get(&block_number).await {
             return Ok(Some(block));
         }
@@ -71,7 +78,7 @@ impl ApiBlocksData {
         &self,
         max_block: Option<BlockNumber>,
         limit: BlockNumber,
-    ) -> QueryResult<Vec<BlockDetails>> {
+    ) -> QueryResult<Vec<records::BlockDetails>> {
         let max_block = max_block.unwrap_or(BlockNumber::MAX);
 
         let mut storage = self.pool.access_storage().await?;
@@ -86,7 +93,7 @@ impl ApiBlocksData {
     async fn block_transactions(
         &self,
         block_number: BlockNumber,
-    ) -> QueryResult<Vec<BlockTransactionItem>> {
+    ) -> QueryResult<Vec<records::BlockTransactionItem>> {
         let mut storage = self.pool.access_storage().await?;
         storage
             .chain()
@@ -96,20 +103,76 @@ impl ApiBlocksData {
     }
 }
 
+// Data transfer types.
+
+// TODO Use wrappers.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct BlockInfo {
+    pub block_number: BlockNumber,
+    #[serde(with = "BytesToHexSerde::<SyncBlockPrefix>")]
+    pub new_state_root: Vec<u8>,
+    pub block_size: u64,
+    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
+    pub commit_tx_hash: Option<Vec<u8>>,
+    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
+    pub verify_tx_hash: Option<Vec<u8>>,
+    pub committed_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verified_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct TransactionInfo {
+    pub tx_hash: String,
+    pub block_number: i64,
+    pub op: Value,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<records::BlockDetails> for BlockInfo {
+    fn from(inner: records::BlockDetails) -> Self {
+        Self {
+            block_number: inner.block_number as BlockNumber,
+            new_state_root: inner.new_state_root,
+            block_size: inner.block_size as u64,
+            commit_tx_hash: inner.commit_tx_hash,
+            verify_tx_hash: inner.verify_tx_hash,
+            committed_at: inner.committed_at,
+            verified_at: inner.verified_at,
+        }
+    }
+}
+
+impl From<records::BlockTransactionItem> for TransactionInfo {
+    fn from(inner: records::BlockTransactionItem) -> Self {
+        Self {
+            tx_hash: inner.tx_hash,
+            block_number: inner.block_number,
+            op: inner.op,
+            success: inner.success,
+            fail_reason: inner.fail_reason,
+            created_at: inner.created_at,
+        }
+    }
+}
+
 // Client implementation
 
+/// Blocks API part.
 impl Client {
     pub async fn block_by_id(
         &self,
         block_number: BlockNumber,
-    ) -> client::Result<Option<BlockDetails>> {
+    ) -> client::Result<Option<BlockInfo>> {
         self.get(&format!("blocks/{}", block_number)).send().await
     }
 
     pub async fn block_transactions(
         &self,
         block_number: BlockNumber,
-    ) -> client::Result<Vec<BlockTransactionItem>> {
+    ) -> client::Result<Vec<TransactionInfo>> {
         self.get(&format!("blocks/{}/transactions", block_number))
             .send()
             .await
@@ -119,7 +182,7 @@ impl Client {
         &self,
         from: Pagination,
         limit: BlockNumber,
-    ) -> client::Result<Vec<BlockDetails>> {
+    ) -> client::Result<Vec<BlockInfo>> {
         self.get("blocks")
             .query(&from.into_query(limit))
             .send()
@@ -132,35 +195,44 @@ impl Client {
 async fn block_by_id(
     data: web::Data<ApiBlocksData>,
     web::Path(block_number): web::Path<BlockNumber>,
-) -> JsonResult<Option<BlockDetails>> {
-    let info = data.block_info(block_number).await?;
-    Ok(Json(info))
+) -> JsonResult<Option<BlockInfo>> {
+    Ok(Json(
+        data.block_info(block_number).await?.map(BlockInfo::from),
+    ))
 }
 
 async fn block_transactions(
     data: web::Data<ApiBlocksData>,
     web::Path(block_number): web::Path<BlockNumber>,
-) -> JsonResult<Vec<BlockTransactionItem>> {
-    let transactions = data.block_transactions(block_number).await?;
+) -> JsonResult<Vec<TransactionInfo>> {
+    let transactions = data
+        .block_transactions(block_number)
+        .await?
+        .into_iter()
+        .map(TransactionInfo::from)
+        .collect();
     Ok(Json(transactions))
 }
 
 async fn blocks_range(
     data: web::Data<ApiBlocksData>,
     web::Query(pagination): web::Query<PaginationQuery>,
-) -> JsonResult<Vec<BlockDetails>> {
+) -> JsonResult<Vec<BlockInfo>> {
     let (pagination, limit) = pagination.into_inner()?;
     let max = pagination.into_max(limit)?;
 
-    let mut range = data.blocks_range(max, limit).await?;
+    let range = data.blocks_range(max, limit).await?;
     // Handle edge case when "after + limit" greater than the total blocks count.
     // TODO Handle this case directly in the `storage` crate. (Task number ???)
-    if let Pagination::After(after) = pagination {
-        range = range
+    let range = if let Pagination::After(after) = pagination {
+        range
             .into_iter()
             .filter(|block| block.block_number > after as i64)
-            .collect();
-    }
+            .map(BlockInfo::from)
+            .collect()
+    } else {
+        range.into_iter().map(BlockInfo::from).collect()
+    };
 
     Ok(Json(range))
 }
@@ -184,17 +256,21 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let blocks = cfg
-            .pool
-            .access_storage()
-            .await?
-            .chain()
-            .block_schema()
-            .load_block_range(10, 10)
-            .await?;
-
         let (client, server) =
             cfg.start_server(|cfg| api_scope(&cfg.env_options, cfg.pool.clone()));
+
+        // Block requests part
+        let blocks: Vec<BlockInfo> = {
+            let mut storage = cfg.pool.access_storage().await?;
+
+            let blocks = storage
+                .chain()
+                .block_schema()
+                .load_block_range(10, 10)
+                .await?;
+
+            blocks.into_iter().map(From::from).collect()
+        };
 
         assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[4]);
         assert_eq!(client.blocks_range(Pagination::Last, 5).await?, blocks);
@@ -207,8 +283,22 @@ mod tests {
             &blocks[0..1]
         );
 
-        server.stop().await;
+        // Transaction requests part.
+        let expected_txs: Vec<TransactionInfo> = {
+            let mut storage = cfg.pool.access_storage().await?;
 
+            let transactions = storage
+                .chain()
+                .block_schema()
+                .get_block_transactions(1)
+                .await?;
+
+            transactions.into_iter().map(From::from).collect()
+        };
+        assert_eq!(client.block_transactions(1).await?, expected_txs);
+        assert_eq!(client.block_transactions(2).await?, vec![]);
+
+        server.stop().await;
         Ok(())
     }
 }

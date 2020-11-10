@@ -47,7 +47,7 @@ pub struct BlockDetails {
     pub verified_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
 pub struct BlockTransactionItem {
     pub tx_hash: String,
     pub block_number: i64,

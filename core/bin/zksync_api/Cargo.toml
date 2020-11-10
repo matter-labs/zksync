@@ -61,3 +61,6 @@ async-trait = "0.1"
 jsonwebtoken = "7"
 
 lru-cache = "0.1.2"
+
+[dev-dependencies]
+zksync_test_account = { path = "../../tests/test_account" }
