@@ -18,7 +18,7 @@ use zksync_storage::{
     ConnectionPool, StorageProcessor,
 };
 use zksync_types::{
-    tx::{TxEthSignature, TxHash},
+    tx::{BatchSignData, TxEthSignature, TxHash},
     Address, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
@@ -576,9 +576,8 @@ async fn verify_tx_info_message_signature(
 /// with `ChangePubKey` message, if such operation is present.
 async fn verify_txs_batch_signature(
     batch: Vec<TxWithSignature>,
-    signature: TxEthSignature,
+    batch_sign_data: BatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
-    prefix_bytes: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
     let mut txs = Vec::with_capacity(batch.len());
@@ -595,27 +594,11 @@ async fn verify_txs_batch_signature(
             eth_sign_data,
         });
     }
-    // First, compute the hash of the data of all transactions in the batch.
-    let batch_hash = tiny_keccak::keccak256(
-        txs.iter()
-            .flat_map(|tx| tx.tx.get_bytes())
-            .collect::<Vec<u8>>()
-            .as_slice(),
-    );
-    // Optionally, prefix it and compute the hash again to get the final message user is supposed to sign.
-    let message = match prefix_bytes {
-        Some(mut prefix) => {
-            prefix.extend_from_slice(&batch_hash);
-            tiny_keccak::keccak256(prefix.as_slice())
-        }
-        None => batch_hash,
-    }.to_vec();
-    let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs, eth_sign_data),
+        tx: TxVariant::Batch(txs, batch_sign_data),
         response: sender,
     };
 

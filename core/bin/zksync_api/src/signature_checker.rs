@@ -11,7 +11,10 @@ use futures::{
 };
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
-use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
+use zksync_types::{
+    tx::{BatchSignData, TxEthSignature},
+    SignedZkSyncTx, ZkSyncTx,
+};
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
 use zksync_config::ConfigurationOptions;
@@ -34,7 +37,7 @@ pub struct TxWithSignData {
 #[derive(Debug, Clone)]
 pub enum TxVariant {
     Tx(TxWithSignData),
-    Batch(Vec<TxWithSignData>, EthSignData),
+    Batch(Vec<TxWithSignData>, BatchSignData),
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +70,7 @@ impl VerifiedTx {
                     tx: tx.tx.clone(),
                     eth_sign_data: tx.eth_sign_data.clone(),
                 })),
-                TxVariant::Batch(txs, eth_sign_data) => {
+                TxVariant::Batch(txs, batch_sign_data) => {
                     let txs = txs
                         .iter()
                         .map(|tx| SignedZkSyncTx {
@@ -75,7 +78,10 @@ impl VerifiedTx {
                             eth_sign_data: tx.eth_sign_data.clone(),
                         })
                         .collect::<Vec<_>>();
-                    Self(SignedTxVariant::Batch(txs, eth_sign_data.signature.clone()))
+                    Self(SignedTxVariant::Batch(
+                        txs,
+                        batch_sign_data.0.signature.clone(),
+                    ))
                 }
             })
     }
@@ -106,8 +112,8 @@ async fn verify_eth_signature(
         TxVariant::Tx(tx) => {
             verify_eth_signature_single_tx(tx, eth_checker).await?;
         }
-        TxVariant::Batch(txs, eth_sign_data) => {
-            verify_eth_signature_txs_batch(txs, eth_sign_data, eth_checker).await?;
+        TxVariant::Batch(txs, batch_sign_data) => {
+            verify_eth_signature_txs_batch(txs, batch_sign_data, eth_checker).await?;
             // In case there're signatures provided for some of transactions
             // we still verify them.
             for tx in txs {
@@ -176,13 +182,13 @@ async fn verify_eth_signature_single_tx(
 
 async fn verify_eth_signature_txs_batch(
     txs: &[TxWithSignData],
-    eth_sign_data: &EthSignData,
+    batch_sign_data: &BatchSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
-    match &eth_sign_data.signature {
+    match &batch_sign_data.0.signature {
         TxEthSignature::EthereumSignature(packed_signature) => {
             let signer_account = packed_signature
-                .signature_recover_signer(&eth_sign_data.message)
+                .signature_recover_signer(&batch_sign_data.0.message)
                 .or(Err(TxAddError::IncorrectEthSignature))?;
 
             if txs.iter().any(|tx| tx.tx.account() != signer_account) {
@@ -194,7 +200,7 @@ async fn verify_eth_signature_txs_batch(
                 let signature_correct = eth_checker
                     .is_eip1271_signature_correct(
                         tx.tx.account(),
-                        &eth_sign_data.message,
+                        &batch_sign_data.0.message,
                         signature.clone(),
                     )
                     .await

@@ -5,7 +5,7 @@ use num::{bigint::ToBigInt, BigUint};
 // Workspace uses
 use zksync_types::{
     helpers::closest_packable_fee_amount,
-    tx::{TxEthSignature, TxHash},
+    tx::{BatchSignData, TxEthSignature, TxHash},
     Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -270,43 +270,24 @@ impl RpcApp {
             messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
         }
 
-        // Check if user provided the signature for the whole batch.
         if let Some(signature) = eth_signature {
-            // First, check, if `ChangePubKey` is present in the batch. If it is,
-            // we expect its signature to be always present and the following message to be signed:
-            // keccak256(change_pub_key_message, keccak256(batch_bytes))
-            // This message is supposed to be used for both batch and `ChangePubKey'.
-            // However, since `ChangePubKey` only stores Ethereum signature without the message itself,
-            // it is also necessary to store batch hash when signing transactions.
-            let mut iter = txs.iter().filter_map(|tx| match &tx.tx {
-                ZkSyncTx::ChangePubKey(tx) => Some(tx),
-                _ => None,
-            });
-            let change_pub_key = iter.next();
-            // Multiple `ChangePubKeys` are not allowed in a single batch.
-            if iter.next().is_some() {
-                return Err(Error {
-                    code: RpcErrorCodes::Other.into(),
-                    message: "ChangePubKey operation must be unique within a batch".to_string(),
-                    data: None,
-                });
-            }
-            // If it's not `None`, try to get change_pub_key_message and use it as a prefix
-            // for hash of batch transactions bytes.
-            let prefix_bytes = change_pub_key
-                .map(|tx| tx.get_eth_signed_data())
-                .transpose()
-                .map_err(|e| Error {
-                    code: RpcErrorCodes::Other.into(),
-                    message: e.to_string(),
-                    data: None,
-                })?;
+            // User provided the signature for the whole batch.
+            let _txs = txs
+                .iter()
+                .map(|tx| tx.tx.clone())
+                .collect::<Vec<ZkSyncTx>>();
+            // Create batch signature data.
+            let batch_sign_data = BatchSignData::new(&_txs, signature).map_err(|e| Error {
+                code: RpcErrorCodes::Other.into(),
+                message: e.to_string(),
+                data: None,
+            })?;
+
             // Send batch and provided signature for verification.
             let (verified_batch, signature) = verify_txs_batch_signature(
                 txs,
-                signature,
+                batch_sign_data,
                 messages_to_sign,
-                prefix_bytes,
                 self.sign_verify_request_sender.clone(),
             )
             .await?
