@@ -55,6 +55,7 @@ impl TestServerConfig {
         (client, server)
     }
 
+    /// Creates several transactions and the corresponding executed operations.
     fn gen_zk_txs() -> Vec<(ZkSyncTx, ExecutedOperations)> {
         let from = ZkSyncAccount::rand();
         from.set_account_id(Some(0xdead));

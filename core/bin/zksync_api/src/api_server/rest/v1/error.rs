@@ -41,18 +41,24 @@ pub struct Error {
 
 impl Error {
     /// Creates a new Error with the BAD_REQUEST (400) status code.
-    pub fn bad_request() -> Self {
+    pub fn bad_request(title: impl Display) -> Self {
         Self {
             http_code: StatusCode::BAD_REQUEST,
-            body: ErrorBody::default(),
+            body: ErrorBody {
+                title: title.to_string(),
+                ..ErrorBody::default()
+            },
         }
     }
 
     /// Creates a new Error with the INTERNAL_SERVER_ERROR (500) status code.
-    pub fn internal() -> Self {
+    pub fn internal(title: impl Display) -> Self {
         Self {
             http_code: StatusCode::INTERNAL_SERVER_ERROR,
-            body: ErrorBody::default(),
+            body: ErrorBody {
+                title: title.to_string(),
+                ..ErrorBody::default()
+            },
         }
     }
 
@@ -97,18 +103,6 @@ impl ResponseError for Error {
             }
 
             Err(err) => err.error_response(),
-        }
-    }
-}
-
-impl From<anyhow::Error> for Error {
-    fn from(inner: anyhow::Error) -> Self {
-        Self {
-            body: ErrorBody {
-                title: inner.to_string(),
-                ..ErrorBody::default()
-            },
-            http_code: StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

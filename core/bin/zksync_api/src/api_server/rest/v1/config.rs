@@ -22,7 +22,7 @@ struct ApiConfigData {
     // TODO Find the way to avoid unnecessary reference counting here.
     contracts: Rc<BTreeMap<String, Address>>,
     deposit_confirmations: u64,
-    // TODO Move Network constant from the zksync-rs to zksync-types crate.
+    // TODO Move Network constant from the zksync-rs to zksync-types crate. (Task number ????)
     network: String,
 }
 

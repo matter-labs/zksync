@@ -31,12 +31,20 @@ pub const MAX_LIMIT: u32 = 100;
 
 type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
-pub fn api_scope(pool: ConnectionPool, env_options: ConfigurationOptions) -> Scope {
+pub(crate) fn api_scope(pool: ConnectionPool, env_options: ConfigurationOptions) -> Scope {
     web::scope("/api/v1")
         .service(config::api_scope(&env_options))
         .service(blocks::api_scope(&env_options, pool))
 }
 
+/// Internal pagination query representation in according to spec:
+///
+/// `?limit=..&[before={id}|after={id}]` where:
+///
+/// - `limit` parameter is required
+/// - if `before=#id` is set; returns `limit` objects before object with `id` (not including `id`)
+/// - if `after=#id` is set; returns `limit` objects after object with `id` (not including `id`)
+/// - if neither is set; returns last `limit` objects
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Default)]
 struct PaginationQuery {
     before: Option<BlockNumber>,
@@ -44,14 +52,21 @@ struct PaginationQuery {
     limit: BlockNumber,
 }
 
+/// Pagination request parameter.
+///
+/// Used together with the limit parameter to perform  pagination.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 pub enum Pagination {
+    /// Request to return some items before specified (not including itself).
     Before(BlockNumber),
+    /// Request to return some items after specified (not including itself)
     After(BlockNumber),
+    /// Request to return some last items.
     Last,
 }
 
 impl PaginationQuery {
+    /// Parses the original query into a pair `(pagination, limit)`.
     fn into_inner(self) -> Result<(Pagination, BlockNumber), Error> {
         let (pagination, limit) = match self {
             Self {
@@ -72,20 +87,17 @@ impl PaginationQuery {
                 limit,
             } => Ok((Pagination::Last, limit)),
 
-            _ => Err(Error::bad_request()
-                .title("Incorrect pagination query")
+            _ => Err(Error::bad_request("Incorrect pagination query")
                 .detail("Pagination query contains both `before` and `after` values.")),
         }?;
 
         if limit == 0 {
-            return Err(Error::bad_request()
-                .title("Incorrect pagination query")
+            return Err(Error::bad_request("Incorrect pagination query")
                 .detail("Limit should be greater than zero"));
         }
 
         if limit > MAX_LIMIT {
-            return Err(Error::bad_request()
-                .title("Incorrect pagination query")
+            return Err(Error::bad_request("Incorrect pagination query")
                 .detail(format!("Limit should be lower than {}", MAX_LIMIT)));
         }
 
@@ -94,14 +106,18 @@ impl PaginationQuery {
 }
 
 impl Pagination {
+    /// Converts `(pagination, limit)` pair into the `(max, limit)` pair to perform database queries.
+    ///
+    /// # Panics
+    ///
+    /// - if limit is zero.
     fn into_max(self, limit: BlockNumber) -> Result<Option<BlockNumber>, Error> {
         assert!(limit > 0, "Limit should be greater than zero");
 
         match self {
             Pagination::Before(before) => {
                 if before < 1 {
-                    return Err(Error::bad_request()
-                        .title("Incorrect pagination query")
+                    return Err(Error::bad_request("Incorrect pagination query")
                         .detail("Before should be greater than zero"));
                 }
 
@@ -112,6 +128,7 @@ impl Pagination {
         }
     }
 
+    /// Converts `(pagination, limit)` pair into the query.
     fn into_query(self, limit: BlockNumber) -> PaginationQuery {
         match self {
             Pagination::Before(before) => PaginationQuery {

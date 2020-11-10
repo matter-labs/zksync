@@ -16,7 +16,7 @@ use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, ClientError>;
 
-// TODO Make error handling as correct as possible.
+// TODO Make error handling as correct as possible. (Task number ????)
 #[derive(Debug, Error)]
 pub enum ClientError {
     #[error("Bad request: {0}")]
@@ -43,7 +43,6 @@ pub struct Client {
 }
 
 impl Client {
-    // TODO Use Network constant
     /// Creates a new REST API client with the specified Url.
     pub fn new(url: String) -> Self {
         Self {

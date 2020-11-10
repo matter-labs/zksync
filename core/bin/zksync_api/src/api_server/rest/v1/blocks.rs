@@ -3,27 +3,25 @@
 // Built-in uses
 
 // External uses
-use actix_web::{web, Scope};
+use actix_web::{
+    web::{self, Json},
+    Scope,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 // Workspace uses
-use web::Json;
 use zksync_config::ConfigurationOptions;
-use zksync_storage::{
-    chain::block::records,
-    utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix},
-    ConnectionPool, QueryResult,
-};
-use zksync_types::BlockNumber;
+use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
+use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
+use zksync_types::{tx::TxHash, BlockNumber, ZkSyncTx};
 
 // Local uses
 use super::{
     client::{self, Client},
-    JsonResult, Pagination, PaginationQuery,
+    Error as ApiError, JsonResult, Pagination, PaginationQuery,
 };
-use crate::utils::shared_lru_cache::AsyncLruCache;
+use crate::{api_server::rest::helpers::remove_prefix, utils::shared_lru_cache::AsyncLruCache};
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]
@@ -105,27 +103,24 @@ impl ApiBlocksData {
 
 // Data transfer types.
 
-// TODO Use wrappers.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BlockInfo {
     pub block_number: BlockNumber,
-    #[serde(with = "BytesToHexSerde::<SyncBlockPrefix>")]
-    pub new_state_root: Vec<u8>,
+    #[serde(with = "FrSerde")]
+    pub new_state_root: Fr,
     pub block_size: u64,
-    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
-    pub commit_tx_hash: Option<Vec<u8>>,
-    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
-    pub verify_tx_hash: Option<Vec<u8>>,
+    pub commit_tx_hash: Option<TxHash>,
+    pub verify_tx_hash: Option<TxHash>,
     pub committed_at: DateTime<Utc>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verified_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TransactionInfo {
-    pub tx_hash: String,
+    pub tx_hash: TxHash,
     pub block_number: i64,
-    pub op: Value,
+    // TODO ask if there might be a ZkSyncOp
+    pub op: ZkSyncTx,
     pub success: Option<bool>,
     pub fail_reason: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -135,10 +130,15 @@ impl From<records::BlockDetails> for BlockInfo {
     fn from(inner: records::BlockDetails) -> Self {
         Self {
             block_number: inner.block_number as BlockNumber,
-            new_state_root: inner.new_state_root,
+            new_state_root: Fr::from_bytes(&inner.new_state_root)
+                .expect("Unable to decode `new_state_root` field"),
             block_size: inner.block_size as u64,
-            commit_tx_hash: inner.commit_tx_hash,
-            verify_tx_hash: inner.verify_tx_hash,
+            commit_tx_hash: inner.commit_tx_hash.map(|bytes| {
+                TxHash::from_slice(&bytes).expect("Unable to decode `commit_tx_hash` field")
+            }),
+            verify_tx_hash: inner.verify_tx_hash.map(|bytes| {
+                TxHash::from_slice(&bytes).expect("Unable to decode `verify_tx_hash` field")
+            }),
             committed_at: inner.committed_at,
             verified_at: inner.verified_at,
         }
@@ -148,9 +148,16 @@ impl From<records::BlockDetails> for BlockInfo {
 impl From<records::BlockTransactionItem> for TransactionInfo {
     fn from(inner: records::BlockTransactionItem) -> Self {
         Self {
-            tx_hash: inner.tx_hash,
+            tx_hash: {
+                let mut slice = [0_u8; 32];
+
+                let tx_hex = remove_prefix(&inner.tx_hash);
+                hex::decode_to_slice(&tx_hex, &mut slice)
+                    .expect("Unable to decode `tx_hash` field");
+                TxHash::from_slice(&slice).unwrap()
+            },
             block_number: inner.block_number,
-            op: inner.op,
+            op: serde_json::from_value(inner.op).expect("Unable to decode `op` field"),
             success: inner.success,
             fail_reason: inner.fail_reason,
             created_at: inner.created_at,
@@ -158,10 +165,20 @@ impl From<records::BlockTransactionItem> for TransactionInfo {
     }
 }
 
+// TODO implement PartialEq for the ZkSyncOp
+impl PartialEq for TransactionInfo {
+    fn eq(&self, other: &Self) -> bool {
+        serde_json::to_string(self)
+            .unwrap()
+            .eq(&serde_json::to_string(other).unwrap())
+    }
+}
+
 // Client implementation
 
 /// Blocks API part.
 impl Client {
+    /// Returns information about block with the specified number or null if block doesn't exist.
     pub async fn block_by_id(
         &self,
         block_number: BlockNumber,
@@ -169,6 +186,7 @@ impl Client {
         self.get(&format!("blocks/{}", block_number)).send().await
     }
 
+    /// Returns information about transactions of the block with the specified number.
     pub async fn block_transactions(
         &self,
         block_number: BlockNumber,
@@ -178,6 +196,7 @@ impl Client {
             .await
     }
 
+    /// Returns information about several blocks in a range.
     pub async fn blocks_range(
         &self,
         from: Pagination,
@@ -197,7 +216,10 @@ async fn block_by_id(
     web::Path(block_number): web::Path<BlockNumber>,
 ) -> JsonResult<Option<BlockInfo>> {
     Ok(Json(
-        data.block_info(block_number).await?.map(BlockInfo::from),
+        data.block_info(block_number)
+            .await
+            .map_err(ApiError::internal)?
+            .map(BlockInfo::from),
     ))
 }
 
@@ -207,11 +229,15 @@ async fn block_transactions(
 ) -> JsonResult<Vec<TransactionInfo>> {
     let transactions = data
         .block_transactions(block_number)
-        .await?
-        .into_iter()
-        .map(TransactionInfo::from)
-        .collect();
-    Ok(Json(transactions))
+        .await
+        .map_err(ApiError::internal)?;
+
+    Ok(Json(
+        transactions
+            .into_iter()
+            .map(TransactionInfo::from)
+            .collect(),
+    ))
 }
 
 async fn blocks_range(
@@ -221,9 +247,12 @@ async fn blocks_range(
     let (pagination, limit) = pagination.into_inner()?;
     let max = pagination.into_max(limit)?;
 
-    let range = data.blocks_range(max, limit).await?;
+    let range = data
+        .blocks_range(max, limit)
+        .await
+        .map_err(ApiError::internal)?;
     // Handle edge case when "after + limit" greater than the total blocks count.
-    // TODO Handle this case directly in the `storage` crate. (Task number ???)
+    // TODO Handle this case directly in the `storage` crate. (Task number ????)
     let range = if let Pagination::After(after) = pagination {
         range
             .into_iter()
