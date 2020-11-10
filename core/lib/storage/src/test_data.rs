@@ -1,4 +1,4 @@
-//! Utils used to generate test data for storage.
+//! Utilities used to generate test data for tests that involve database interaction.
 
 // Built-in uses
 use std::ops::Deref;
@@ -20,7 +20,7 @@ use zksync_types::{
 };
 // Local imports
 
-/// block size used for this tests
+/// Block size used for tests
 pub const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Generates a random account with a set of changes.
