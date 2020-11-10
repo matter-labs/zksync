@@ -21,6 +21,7 @@ use super::transactions::ETHStats;
 /// Abstract database access trait, optimized for the needs of `ETHSender`.
 #[async_trait::async_trait]
 pub(super) trait DatabaseInterface {
+    /// Returns connection to the database.
     async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error>;
 
     /// Loads the unconfirmed and unprocessed operations from the database.
@@ -31,6 +32,8 @@ pub(super) trait DatabaseInterface {
         connection: &mut StorageProcessor<'_>,
     ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error>;
 
+    /// Loads the unprocessed operations from the database.
+    /// Unprocessed operations are zkSync operations that were not started at all.
     async fn load_new_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
