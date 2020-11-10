@@ -433,11 +433,13 @@ mod test {
     use crate::tree_state::TreeState;
     use num::BigUint;
     use zksync_types::{
-        Deposit, DepositOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
+        Deposit, DepositOp, ForcedExit, ForcedExitOp, FullExit, FullExitOp, Transfer, TransferOp,
+        TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
     };
 
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
+        // Deposit 1000 to 7
         let tx1 = Deposit {
             from: [1u8; 20].into(),
             token: 1,
@@ -457,10 +459,11 @@ mod test {
             fee_account: 0,
         };
 
+        // Withdraw 20 with 1 fee from 7 to 10
         let tx2 = Withdraw::new(
             0,
             [7u8; 20].into(),
-            [7u8; 20].into(),
+            [8u8; 20].into(),
             1,
             BigUint::from(20u32),
             BigUint::from(1u32),
@@ -480,12 +483,13 @@ mod test {
             fee_account: 0,
         };
 
+        // Transfer 40 with 1 fee from 7 to 8
         let tx3 = Transfer::new(
             0,
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
-            BigUint::from(20u32),
+            BigUint::from(40u32),
             BigUint::from(1u32),
             3,
             None,
@@ -504,6 +508,7 @@ mod test {
             fee_account: 0,
         };
 
+        // Transfer 19 with 1 fee from 8 to 7
         let tx4 = Transfer::new(
             1,
             [8u8; 20].into(),
@@ -528,45 +533,102 @@ mod test {
             fee_account: 0,
         };
 
-        // let tx5 = Close {
-        //     account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-        //         .unwrap(),
+        // Forced exit for 7
+        let tx5 = ForcedExit::new(0, [7u8; 20].into(), 1, BigUint::from(1u32), 1, None);
+        let op5 = ZkSyncOp::ForcedExit(Box::new(ForcedExitOp {
+            tx: tx5,
+            target_account_id: 0,
+            withdraw_amount: Some(BigUint::from(960u32).into()),
+        }));
+        let pub_data5 = op5.public_data();
+        let ops5 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
+        let block5 = RollupOpsBlock {
+            block_num: 5,
+            ops: ops5,
+            fee_account: 1,
+        };
+
+        // Full exit for 8
+        let tx6 = FullExit {
+            account_id: 1,
+            eth_address: [8u8; 20].into(),
+            token: 1,
+        };
+        let op6 = ZkSyncOp::FullExit(Box::new(FullExitOp {
+            priority_op: tx6,
+            withdraw_amount: Some(BigUint::from(980u32).into()),
+        }));
+        let pub_data6 = op6.public_data();
+        let ops6 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data6).expect("cant get ops from data 5");
+        let block6 = RollupOpsBlock {
+            block_num: 5,
+            ops: ops6,
+            fee_account: 0,
+        };
+
+        // This transaction have to be deleted, do not uncomment. Delete it after removing the corresponding code        // let tx6 = Close {
+        //     account: Address::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
         //     nonce: 2,
         //     signature: TxSignature::default(),
         // };
-        // let op5 = ZkSyncOp::Close(Box::new(CloseOp {
-        //     tx: tx5,
+        // let op6 = ZkSyncOp::Close(Box::new(CloseOp {
+        //     tx: tx6,
         //     account_id: 1,
         // }));
-        // let pub_data5 = op5.public_data();
-        // let ops5 =
+        // let pub_data6 = op6.public_data();
+        // let ops6 =
         //     RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
         // let block5 = RollupOpsBlock {
-        //     block_num: 5,
-        //     ops: ops5,
+        //     block_num: 6,
+        //     ops: ops6,
         //     fee_account: 0,
         // };
-
+        //
         let mut tree = TreeState::new(vec![50]);
         tree.update_tree_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        assert_eq!(zero_acc.address, [7u8; 20].into());
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(1000u32));
+
         tree.update_tree_states_from_ops_block(&block2)
             .expect("Cant update state from block 2");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(980u32));
+
         tree.update_tree_states_from_ops_block(&block3)
             .expect("Cant update state from block 3");
-        tree.update_tree_states_from_ops_block(&block4)
-            .expect("Cant update state from block 4");
-        // tree.update_tree_states_from_ops_block(&block5)
-        //     .expect("Cant update state from block 5");
-
+        // Verify creating accounts
         assert_eq!(tree.get_accounts().len(), 2);
 
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
-        assert_eq!(zero_acc.address, [7u8; 20].into());
-        assert_eq!(zero_acc.get_balance(1), BigUint::from(980u32));
-
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(first_acc.address, [8u8; 20].into());
+
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(940u32));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(40u32));
+
+        tree.update_tree_states_from_ops_block(&block4)
+            .expect("Cant update state from block 4");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(960u32));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(20u32));
+
+        tree.update_tree_states_from_ops_block(&block5)
+            .expect("Cant update state from block 5");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(0u32));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(21u32));
+
+        tree.update_tree_states_from_ops_block(&block6)
+            .expect("Cant update state from block 6");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(0u32));
         assert_eq!(first_acc.get_balance(1), BigUint::from(0u32));
     }
 
