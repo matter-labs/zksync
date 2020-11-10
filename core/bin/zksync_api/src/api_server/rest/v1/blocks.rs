@@ -165,7 +165,7 @@ impl From<records::BlockTransactionItem> for TransactionInfo {
     }
 }
 
-// TODO implement PartialEq for the ZkSyncOp
+// TODO implement PartialEq for the ZkSyncOp (task number ????)
 impl PartialEq for TransactionInfo {
     fn eq(&self, other: &Self) -> bool {
         serde_json::to_string(self)
