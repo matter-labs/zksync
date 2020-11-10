@@ -4,7 +4,7 @@
 use crate::database::DatabaseInterface;
 use crate::ethereum_interface::FailureInfo;
 use crate::EthSenderOptions;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use tokio::sync::RwLock;
 // External uses
 use web3::contract::{tokens::Tokenize, Options};
@@ -22,14 +22,13 @@ use super::ETHSender;
 use crate::ethereum_interface::EthereumInterface;
 use crate::transactions::{ETHStats, ExecutedTxStatus};
 
-const CHANNEL_CAPACITY: usize = 16;
-
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
 pub(in crate) struct MockDatabase {
     restore_state: VecDeque<ETHOperation>,
-    unconfirmed_operations: RwLock<HashMap<i64, ETHOperation>>,
-    confirmed_operations: RwLock<HashMap<i64, ETHOperation>>,
+    unconfirmed_operations: RwLock<BTreeMap<i64, ETHOperation>>,
+    unprocessed_operations: RwLock<BTreeMap<i64, Operation>>,
+    confirmed_operations: RwLock<BTreeMap<i64, ETHOperation>>,
     nonce: RwLock<i64>,
     gas_price_limit: RwLock<U256>,
     pending_op_id: RwLock<EthOpId>,
@@ -48,7 +47,7 @@ impl MockDatabase {
             .fold(0, |acc, op| acc + op.used_tx_hashes.len());
         let pending_op_id = restore_state.len();
 
-        let unconfirmed_operations: HashMap<i64, ETHOperation> =
+        let unconfirmed_operations: BTreeMap<i64, ETHOperation> =
             restore_state.iter().map(|op| (op.id, op.clone())).collect();
 
         let gas_price_limit: u64 = zksync_utils::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
@@ -64,6 +63,32 @@ impl MockDatabase {
         }
     }
 
+    pub async fn update_gas_price_limit(&self, value: U256) -> Result<(), anyhow::Error> {
+        let mut gat_price_limit = self.gas_price_limit.write().await;
+        (*gat_price_limit) = value;
+
+        Ok(())
+    }
+
+    /// Simulates the operation of OperationsSchema, creates a new operation in the database.
+    pub async fn send_operation(&mut self, op: Operation) -> Result<(), anyhow::Error> {
+        let nonce = op.id.expect("Nonce must be set for every tx");
+
+        self.unprocessed_operations.write().await.insert(nonce, op);
+
+        Ok(())
+    }
+
+    /// Ensures that the provided transaction is stored in the database and not confirmed yet.
+    pub async fn assert_stored(&self, tx: &ETHOperation) {
+        assert_eq!(
+            self.unconfirmed_operations.read().await.get(&tx.id),
+            Some(tx)
+        );
+
+        assert!(self.confirmed_operations.read().await.get(&tx.id).is_none());
+    }
+
     /// Ensures that the provided transaction is stored as confirmed.
     pub async fn assert_confirmed(&self, tx: &ETHOperation) {
         assert_eq!(self.confirmed_operations.read().await.get(&tx.id), Some(tx));
@@ -77,35 +102,45 @@ impl MockDatabase {
     }
 
     async fn next_nonce(&self) -> Result<i64, anyhow::Error> {
-        let mut value = self.nonce.write().await;
-        *value += 1;
+        let old_value = self.nonce.read().await.clone();
+        let mut new_value = self.nonce.write().await;
+        *new_value = old_value + 1;
 
-        Ok(self.nonce.read().await.clone())
+        Ok(old_value)
     }
 }
 
 #[async_trait::async_trait]
 impl DatabaseInterface for MockDatabase {
+    /// Creates a new database connection, used as a stub
+    /// and nothing will be sent through this connection.
     async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error> {
         StorageProcessor::establish_connection().await
     }
 
+    /// Returns all unprocessed operations and then deletes them.
     async fn load_new_operations(
         &self,
-        connection: &mut StorageProcessor<'_>,
+        _connection: &mut StorageProcessor<'_>,
     ) -> Result<Vec<Operation>, anyhow::Error> {
-        let unprocessed_ops = connection
-            .ethereum_schema()
-            .load_unprocessed_operations()
-            .await?;
-        Ok(unprocessed_ops)
+        let unprocessed_operations = self
+            .unprocessed_operations
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        self.unprocessed_operations.write().await.clear();
+
+        Ok(unprocessed_operations)
     }
 
     async fn update_gas_price_params(
         &self,
         _connection: &mut StorageProcessor<'_>,
         gas_price_limit: U256,
-        average_gas_price: U256,
+        _average_gas_price: U256,
     ) -> Result<(), anyhow::Error> {
         let mut new_gas_price_limit = self.gas_price_limit.write().await;
         *new_gas_price_limit = gas_price_limit;
@@ -115,9 +150,12 @@ impl DatabaseInterface for MockDatabase {
 
     async fn restore_state(
         &self,
-        _connection: &mut StorageProcessor<'_>,
+        connection: &mut StorageProcessor<'_>,
     ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error> {
-        Ok((self.restore_state.clone(), Vec::new()))
+        Ok((
+            self.restore_state.clone(),
+            self.load_new_operations(connection).await?,
+        ))
     }
 
     async fn save_new_eth_tx(
@@ -210,7 +248,7 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _connection: &mut StorageProcessor<'_>,
         hash: &H256,
-        op: &ETHOperation,
+        _op: &ETHOperation,
     ) -> Result<(), anyhow::Error> {
         // TODO: Sosnin change this func
         let mut unconfirmed_operations = self.unconfirmed_operations.write().await;
@@ -378,7 +416,7 @@ impl EthereumInterface for MockEthereum {
         })
     }
 
-    async fn failure_reason(&self, tx_hash: H256) -> Option<FailureInfo> {
+    async fn failure_reason(&self, _tx_hash: H256) -> Option<FailureInfo> {
         None
     }
 }
