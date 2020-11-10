@@ -55,7 +55,7 @@ library Operations {
     }
 
     uint public constant PACKED_DEPOSIT_PUBDATA_BYTES = 
-        ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES;
+        ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES + 1;
 
     /// Deserialize deposit pubdata
     function readDepositPubdata(bytes memory _data) internal pure
@@ -74,6 +74,7 @@ library Operations {
     /// Serialize deposit pubdata
     function writeDepositPubdata(Deposit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
+            uint8(OpType.Deposit),
             bytes4(0),   // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
             op.tokenId,  // tokenId
             op.amount,   // amount
@@ -84,8 +85,8 @@ library Operations {
     /// @notice Check that deposit pubdata from request and block matches
     function depositPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
         // We must ignore `accountId` because it is present in block pubdata but not in priority queue
-        bytes memory lhs_trimmed = Bytes.slice(_lhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
-        bytes memory rhs_trimmed = Bytes.slice(_rhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
+        bytes memory lhs_trimmed = Bytes.slice(_lhs, ACCOUNT_ID_BYTES + 1, PACKED_DEPOSIT_PUBDATA_BYTES - 1 - ACCOUNT_ID_BYTES);
+        bytes memory rhs_trimmed = Bytes.slice(_rhs, ACCOUNT_ID_BYTES + 1, PACKED_DEPOSIT_PUBDATA_BYTES - 1 - ACCOUNT_ID_BYTES);
         return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
     }
 
@@ -98,7 +99,7 @@ library Operations {
         uint128 amount;
     }
 
-    uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
+    uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 1 +
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
     function readFullExitPubdata(bytes memory _data) internal pure
@@ -116,6 +117,7 @@ library Operations {
 
     function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
+            uint8(OpType.FullExit),
             op.accountId,  // accountId
             op.owner,      // owner
             op.tokenId,    // tokenId

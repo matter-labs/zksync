@@ -76,7 +76,13 @@ async fn main() {
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        Default::default(),
+    );
 
     let account_state = test_setup.get_accounts_state().await;
     let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());

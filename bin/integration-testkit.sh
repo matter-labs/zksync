@@ -41,7 +41,7 @@ elif [[ $ZKSYNC_ENV == dev ]]; then
 fi
 
 export ETH_NETWORK="test"
-#make build-contracts
+make build-contracts
 
 case $COMMAND in
     block-sizes-test)

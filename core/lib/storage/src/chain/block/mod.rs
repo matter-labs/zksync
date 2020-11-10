@@ -1,6 +1,6 @@
 // Built-in deps
 // External imports
-use zksync_basic_types::U256;
+use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{block::PendingBlock, Action, ActionType, Operation};
@@ -132,6 +132,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let new_root_hash =
             FeConvert::from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
+        let commitment = H256::from_slice(&stored_block.commitment);
         // Return the obtained block in the expected format.
         Ok(Some(Block::new(
             block,
@@ -145,6 +146,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             stored_block.block_size as usize,
             U256::from(stored_block.commit_gas_limit as u64),
             U256::from(stored_block.verify_gas_limit as u64),
+            commitment,
         )))
     }
 
@@ -508,6 +510,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             }
         }
 
+        let previous_block_root_hash = H256::from_slice(&block.previous_root_hash);
+
         let result = PendingBlock {
             number: block.number as u32,
             chunks_left: block.chunks_left as usize,
@@ -515,6 +519,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             pending_block_iteration: block.pending_block_iteration as usize,
             success_operations,
             failed_txs,
+            previous_block_root_hash,
         };
 
         transaction.commit().await?;
@@ -537,17 +542,18 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
+            previous_root_hash: pending_block.previous_block_root_hash.as_bytes().to_vec(),
         };
 
         // Store the pending block header.
         sqlx::query!("
-            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (number)
             DO UPDATE
-              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4
+              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5
             ",
-            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration,
+            storage_block.number, storage_block.chunks_left, storage_block.unprocessed_priority_op_before, storage_block.pending_block_iteration, storage_block.previous_root_hash
         ).execute(transaction.conn())
         .await?;
 
@@ -599,6 +605,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let block_size = block.block_chunks_size as i64;
         let commit_gas_limit = block.commit_gas_limit.as_u64() as i64;
         let verify_gas_limit = block.verify_gas_limit.as_u64() as i64;
+        let commitment = block.block_commitment.as_bytes().to_vec();
 
         BlockSchema(&mut transaction)
             .save_block_transactions(block.block_number, block.block_transactions)
@@ -613,6 +620,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             block_size,
             commit_gas_limit,
             verify_gas_limit,
+            commitment,
         };
 
         // Remove pending block (as it's now completed).
@@ -627,11 +635,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         // Save new completed block.
         sqlx::query!("
-            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit, commitment)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ",
             new_block.number, new_block.root_hash, new_block.fee_account_id, new_block.unprocessed_prior_op_before,
             new_block.unprocessed_prior_op_after, new_block.block_size, new_block.commit_gas_limit, new_block.verify_gas_limit,
+            new_block.commitment,
         ).execute(transaction.conn())
         .await?;
 

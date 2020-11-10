@@ -1,5 +1,4 @@
 import "@nomiclabs/hardhat-waffle";
-import "hardhat-contract-sizer";
 import "@nomiclabs/hardhat-solpp";
 import "hardhat-typechain"
 

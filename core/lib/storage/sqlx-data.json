@@ -513,21 +513,6 @@
       "nullable": []
     }
   },
-  "18e1fb0e869a02a0e47540f08713acd8ef0609c964ccc9227051abe81704a8dd": {
-    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "1c67bdf00f343a60fbce85d80f0b707ca2a0b15ea83eb7f86a95aad9a028e70e": {
     "query": "SELECT COUNT(*) as integer_value FROM operations o WHERE action_type = 'COMMIT' AND block_number > (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') AND EXISTS (SELECT * FROM block_witness WHERE block = o.block_number) AND NOT EXISTS (SELECT * FROM proofs WHERE block_number = o.block_number);",
     "describe": {
@@ -822,6 +807,11 @@
           "ordinal": 7,
           "name": "verify_gas_limit",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 8,
+          "name": "commitment",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -830,6 +820,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -1048,6 +1039,22 @@
       "columns": [],
       "parameters": {
         "Left": [
+          "Int8",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "41b65a6ef02cd2b5ab7f33ecdeb24a90dd787e0e862bded560510375cf172e73": {
+    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash)\n            VALUES ($1, $2, $3, $4, $5)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
           "Int8",
           "Bytea"
         ]
@@ -2151,12 +2158,18 @@
           "ordinal": 3,
           "name": "pending_block_iteration",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "previous_root_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
         "Left": []
       },
       "nullable": [
+        false,
         false,
         false,
         false,

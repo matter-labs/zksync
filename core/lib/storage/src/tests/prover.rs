@@ -6,6 +6,7 @@ use zksync_types::{block::PendingBlock, Action};
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
+use zksync_basic_types::H256;
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::proof::EncodedProofPlonk;
 
@@ -241,6 +242,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
             pending_block_iteration: 1,
             success_operations: vec![],
             failed_txs: Vec::new(),
+            previous_block_root_hash: H256::default(),
         })
         .await?;
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;

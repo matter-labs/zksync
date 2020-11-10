@@ -411,7 +411,13 @@ async fn exit_test() {
         fee_account_id: ZKSyncAccountId(fee_account_id),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        Default::default(),
+    );
 
     let deposit_amount = parse_ether("0.1").unwrap();
     let tokens = test_setup.get_tokens();

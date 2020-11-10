@@ -30,6 +30,7 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
+use zksync_types::block::{ExecuteBlockInfo, StoredBlockInfo};
 
 mod database;
 mod ethereum_interface;
@@ -709,29 +710,87 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                     &witness_data.1
                 );
 
-                self.ethereum.encode_tx_data(
-                    "commitBlock",
-                    (
-                        u64::from(op.block.block_number),
-                        u64::from(op.block.fee_account),
-                        vec![root],
-                        public_data,
-                        witness_data.0,
-                        witness_data.1,
-                    ),
-                )
+                let tx_args = {
+                    let old_block_stored_info =
+                        StoredBlockInfo::genesis_block_stored_info(Default::default());
+                    let (_, commit_info) =
+                        op.block.commit_block_info(old_block_stored_info.clone());
+                    use ethabi::Token as EthToken;
+                    let stored_block_info = EthToken::Tuple(vec![
+                        EthToken::Uint(U256::from(old_block_stored_info.block_number)),
+                        EthToken::Uint(U256::from(old_block_stored_info.priority_ops)),
+                        EthToken::FixedBytes(
+                            old_block_stored_info
+                                .processable_onchain_ops_hash
+                                .as_bytes()
+                                .to_vec(),
+                        ),
+                        EthToken::FixedBytes(old_block_stored_info.state_hash.as_bytes().to_vec()),
+                        EthToken::FixedBytes(old_block_stored_info.commitment.as_bytes().to_vec()),
+                    ]);
+                    let onchain_ops = commit_info
+                        .onchain_operations
+                        .into_iter()
+                        .map(|op| {
+                            EthToken::Tuple(vec![
+                                EthToken::Uint(U256::from(op.public_data_offset)),
+                                EthToken::Bytes(op.eth_witness),
+                            ])
+                        })
+                        .collect::<Vec<_>>();
+                    let new_block_info = EthToken::Array(vec![EthToken::Tuple(vec![
+                        EthToken::Uint(U256::from(commit_info.block_number)),
+                        EthToken::Uint(U256::from(commit_info.fee_account)),
+                        EthToken::FixedBytes(commit_info.state_hash.as_bytes().to_vec()),
+                        EthToken::Bytes(commit_info.public_data),
+                        EthToken::Array(onchain_ops),
+                    ])]);
+                    (stored_block_info, new_block_info)
+                };
+                self.ethereum.encode_tx_data("commitBlocks", tx_args)
             }
             Action::Verify { proof } => {
-                let block_number = op.block.block_number;
-                let withdrawals_data = op.block.get_withdrawals_data();
-                self.ethereum.encode_tx_data(
-                    "verifyBlock",
-                    (
-                        u64::from(block_number),
-                        proof.proof.clone(),
-                        withdrawals_data,
+                let block_info = ExecuteBlockInfo::new(
+                    &StoredBlockInfo::genesis_block_stored_info(Default::default()),
+                    &op.block,
+                    op.block.block_commitment,
+                );
+                use ethabi::Token as EthToken;
+                let execute_info = EthToken::Array(vec![EthToken::Tuple(vec![
+                    EthToken::Tuple(vec![
+                        EthToken::Uint(U256::from(block_info.stored_block_info.block_number)),
+                        EthToken::Uint(U256::from(block_info.stored_block_info.priority_ops)),
+                        EthToken::FixedBytes(
+                            block_info
+                                .stored_block_info
+                                .processable_onchain_ops_hash
+                                .as_bytes()
+                                .to_vec(),
+                        ),
+                        EthToken::FixedBytes(
+                            block_info.stored_block_info.state_hash.as_bytes().to_vec(),
+                        ),
+                        EthToken::FixedBytes(
+                            block_info.stored_block_info.commitment.as_bytes().to_vec(),
+                        ),
+                    ]),
+                    EthToken::Array(
+                        block_info
+                            .processable_ops_pubdata
+                            .iter()
+                            .map(|pubdata| EthToken::Bytes(pubdata.clone()))
+                            .collect(),
                     ),
-                )
+                    EthToken::Array(
+                        block_info
+                            .commitments_in_slot
+                            .iter()
+                            .map(|commitment| EthToken::FixedBytes(commitment.as_bytes().to_vec()))
+                            .collect(),
+                    ),
+                    EthToken::Uint(block_info.commitment_index),
+                ])]);
+                self.ethereum.encode_tx_data("executeBlocks", execute_info)
             }
         }
     }
@@ -777,16 +836,16 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
 
     /// The same as `add_operation_to_queue`, but for the withdraw operation.
     fn add_complete_withdrawals_to_queue(&mut self) {
-        // function completeWithdrawals(uint32 _n) external {
-        let raw_tx = self.ethereum.encode_tx_data(
-            "completeWithdrawals",
-            config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-        );
-
-        log::info!("Adding withdraw operation to queue");
-
-        self.tx_queue
-            .add_withdraw_operation(TxData::from_raw(OperationType::Withdraw, raw_tx));
+        // // function completeWithdrawals(uint32 _n) external {
+        // let raw_tx = self.ethereum.encode_tx_data(
+        //     "completeWithdrawals",
+        //     config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+        // );
+        //
+        // log::info!("Adding withdraw operation to queue");
+        //
+        // self.tx_queue
+        //     .add_withdraw_operation(TxData::from_raw(OperationType::Withdraw, raw_tx));
     }
 }
 

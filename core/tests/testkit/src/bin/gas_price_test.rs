@@ -237,7 +237,13 @@ async fn gas_price_test() {
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        Default::default(),
+    );
 
     let rng = &mut XorShiftRng::from_seed([0, 1, 2, 3]);
 

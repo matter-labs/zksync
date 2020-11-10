@@ -1,7 +1,7 @@
 // External imports
 
 use parity_crypto::publickey::{Generator, Random};
-use zksync_basic_types::Address;
+use zksync_basic_types::{Address, H256};
 // Workspace imports
 use num::BigUint;
 use std::ops::Deref;
@@ -76,6 +76,7 @@ pub fn get_operation(block_number: BlockNumber, action: Action, block_size: usiz
             block_size,
             1_000_000.into(),
             1_500_000.into(),
+            H256::default(),
         ),
     }
 }
@@ -98,6 +99,7 @@ pub fn get_operation_with_txs(
             block_size,
             1_000_000.into(),
             1_500_000.into(),
+            H256::default(),
         ),
     }
 }

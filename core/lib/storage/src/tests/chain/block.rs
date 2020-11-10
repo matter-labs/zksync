@@ -165,6 +165,7 @@ fn get_unique_operation(block_number: BlockNumber, action: Action) -> Operation 
             100,
             1_000_000.into(),
             1_500_000.into(),
+            H256::default(),
         ),
     }
 }
@@ -677,6 +678,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 1,
         success_operations: txs_1,
         failed_txs: Vec::new(),
+        previous_block_root_hash: H256::default(),
     };
     let pending_block_2 = PendingBlock {
         number: 2,
@@ -685,6 +687,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         pending_block_iteration: 2,
         success_operations: txs_2,
         failed_txs: Vec::new(),
+        previous_block_root_hash: H256::default(),
     };
 
     // Save pending block

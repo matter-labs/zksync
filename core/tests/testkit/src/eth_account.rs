@@ -16,7 +16,7 @@ use zksync_crypto::convert::FeConvert;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::block::Block;
+use zksync_types::block::{Block, CommitBlockInfo, ExecuteBlockInfo, StoredBlockInfo};
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 
 pub fn parse_ether(eth_value: &str) -> Result<BigUint, anyhow::Error> {
@@ -362,28 +362,43 @@ impl<T: Transport> EthereumAccount<T> {
         Ok((vec![approve_receipt, receipt], priority_op))
     }
 
-    pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, anyhow::Error> {
-        // todo: abi encoding don't work
-        let stored_block_info = EthToken::Tuple(vec![
-            EthToken::Uint(U256::from(block.block_number - 1)),
-            EthToken::Uint(U256::from(1)),
-            EthToken::FixedBytes([0u8; 32].to_vec()),
-            EthToken::FixedBytes([0u8; 32].to_vec()),
-            EthToken::FixedBytes([0u8; 32].to_vec()),
-        ]);
+    pub async fn commit_block(
+        &self,
+        old_block_stored_info: StoredBlockInfo,
+        commit_info: CommitBlockInfo,
+    ) -> Result<ETHExecResult, anyhow::Error> {
+        // todo: move elsewhere
         use ethabi::Token as EthToken;
+        let stored_block_info = EthToken::Tuple(vec![
+            EthToken::Uint(U256::from(old_block_stored_info.block_number)),
+            EthToken::Uint(U256::from(old_block_stored_info.priority_ops)),
+            EthToken::FixedBytes(
+                old_block_stored_info
+                    .processable_onchain_ops_hash
+                    .as_bytes()
+                    .to_vec(),
+            ),
+            EthToken::FixedBytes(old_block_stored_info.state_hash.as_bytes().to_vec()),
+            EthToken::FixedBytes(old_block_stored_info.commitment.as_bytes().to_vec()),
+        ]);
+        let onchain_ops = commit_info
+            .onchain_operations
+            .into_iter()
+            .map(|op| {
+                EthToken::Tuple(vec![
+                    EthToken::Uint(U256::from(op.public_data_offset)),
+                    EthToken::Bytes(op.eth_witness),
+                ])
+            })
+            .collect::<Vec<_>>();
         let new_block_info = EthToken::Array(vec![EthToken::Tuple(vec![
-            EthToken::Uint(U256::from(block.block_number)),
-            EthToken::Uint(U256::from(block.fee_account)),
-            EthToken::FixedBytes(block.get_eth_encoded_root().as_bytes().to_vec()),
-            EthToken::Bytes(block.get_eth_public_data()),
-            EthToken::Array(vec![EthToken::Tuple(vec![
-                EthToken::Uint(U256::from(0)),
-                EthToken::Bytes(Vec::new()),
-            ])]),
+            EthToken::Uint(U256::from(commit_info.block_number)),
+            EthToken::Uint(U256::from(commit_info.fee_account)),
+            EthToken::FixedBytes(commit_info.state_hash.as_bytes().to_vec()),
+            EthToken::Bytes(commit_info.public_data),
+            EthToken::Array(onchain_ops),
         ])]);
 
-        let witness_data = block.get_eth_witness_data();
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -403,18 +418,14 @@ impl<T: Transport> EthereumAccount<T> {
     // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
     pub async fn verify_block(
         &self,
-        block: &Block,
+        commitment: H256,
         proof: Option<EncodedProofPlonk>,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "verifyBlock",
-                (
-                    u64::from(block.block_number),
-                    proof.unwrap_or_default().proof,
-                    block.get_withdrawals_data(),
-                ),
+                "verifyCommitments",
+                (vec![commitment], proof.unwrap_or_default().proof),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
             .await
@@ -425,13 +436,46 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     // Completes pending withdrawals.
-    pub async fn complete_withdrawals(&self) -> Result<ETHExecResult, anyhow::Error> {
-        let max_withdrawals_to_complete: u64 = 999;
+    pub async fn execute_block(
+        &self,
+        block_info: &ExecuteBlockInfo,
+    ) -> Result<ETHExecResult, anyhow::Error> {
+        use ethabi::Token as EthToken;
+        let execute_info = EthToken::Array(vec![EthToken::Tuple(vec![
+            EthToken::Tuple(vec![
+                EthToken::Uint(U256::from(block_info.stored_block_info.block_number)),
+                EthToken::Uint(U256::from(block_info.stored_block_info.priority_ops)),
+                EthToken::FixedBytes(
+                    block_info
+                        .stored_block_info
+                        .processable_onchain_ops_hash
+                        .as_bytes()
+                        .to_vec(),
+                ),
+                EthToken::FixedBytes(block_info.stored_block_info.state_hash.as_bytes().to_vec()),
+                EthToken::FixedBytes(block_info.stored_block_info.commitment.as_bytes().to_vec()),
+            ]),
+            EthToken::Array(
+                block_info
+                    .processable_ops_pubdata
+                    .iter()
+                    .map(|pubdata| EthToken::Bytes(pubdata.clone()))
+                    .collect(),
+            ),
+            EthToken::Array(
+                block_info
+                    .commitments_in_slot
+                    .iter()
+                    .map(|commitment| EthToken::FixedBytes(commitment.as_bytes().to_vec()))
+                    .collect(),
+            ),
+            EthToken::Uint(block_info.commitment_index),
+        ])]);
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "completeWithdrawals",
-                max_withdrawals_to_complete,
+                "executeBlocks",
+                execute_info,
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await

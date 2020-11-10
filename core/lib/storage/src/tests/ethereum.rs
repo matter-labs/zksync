@@ -30,6 +30,7 @@ pub fn get_commit_operation(block_number: BlockNumber) -> Operation {
             100,
             1_000_000.into(),
             1_500_000.into(),
+            H256::default(),
         ),
     }
 }
@@ -51,6 +52,7 @@ pub fn get_verify_operation(block_number: BlockNumber) -> Operation {
             100,
             1_000_000.into(),
             1_500_000.into(),
+            H256::default(),
         ),
     }
 }

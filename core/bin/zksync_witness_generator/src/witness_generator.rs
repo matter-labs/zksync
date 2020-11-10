@@ -266,7 +266,7 @@ impl WitnessGenerator {
 mod tests {
     use super::*;
     use zksync_crypto::Fr;
-    use zksync_types::U256;
+    use zksync_types::{H256, U256};
 
     #[test]
     fn test_next_witness_block() {
@@ -287,6 +287,7 @@ mod tests {
             0,
             U256::default(),
             U256::default(),
+            H256::default(),
         );
         assert_eq!(
             WitnessGenerator::next_witness_block(3, 4, &BlockInfo::NoWitness(empty_block)),

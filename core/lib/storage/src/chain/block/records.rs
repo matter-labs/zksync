@@ -17,6 +17,7 @@ pub struct StorageBlock {
     pub block_size: i64,
     pub commit_gas_limit: i64,
     pub verify_gas_limit: i64,
+    pub commitment: Vec<u8>,
 }
 
 #[derive(Debug, FromRow)]
@@ -25,6 +26,7 @@ pub struct StoragePendingBlock {
     pub chunks_left: i64,
     pub unprocessed_priority_op_before: i64,
     pub pending_block_iteration: i64,
+    pub previous_root_hash: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Clone)]

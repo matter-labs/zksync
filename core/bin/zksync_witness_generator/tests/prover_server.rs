@@ -9,7 +9,7 @@ use zksync_circuit::witness::{deposit::DepositWitness, Witness};
 use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 use zksync_prover::{client, ApiClient};
-use zksync_types::{block::Block, Address};
+use zksync_types::{block::Block, Address, H256};
 // Local deps
 use zksync_circuit::witness::utils::get_used_subtree_root_hash;
 use zksync_witness_generator::run_prover_server;
@@ -265,6 +265,7 @@ pub async fn test_operation_and_wanted_prover_data(
         &ConfigurationOptions::from_env().available_block_chunk_sizes,
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
     );
 
     let mut pub_data = vec![];

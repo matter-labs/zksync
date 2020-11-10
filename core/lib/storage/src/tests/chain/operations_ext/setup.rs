@@ -3,6 +3,7 @@
 use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
+use zksync_basic_types::H256;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
 use zksync_crypto::Fr;
 use zksync_test_account::ZkSyncAccount;
@@ -88,6 +89,7 @@ impl TransactionsHistoryTestSetup {
             100,
             1_000_000.into(), // Not important
             1_500_000.into(), // Not important
+            H256::default(),
         );
 
         self.blocks.push(block);

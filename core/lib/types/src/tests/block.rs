@@ -18,6 +18,7 @@ fn no_supported_block_size() {
         &[0],
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
     );
 }
 
@@ -33,6 +34,7 @@ fn test_get_eth_encoded_root() {
         1,
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
     );
 
     let mut bytes = [0u8; 32];
@@ -57,6 +59,7 @@ fn test_get_eth_public_data() {
         100,
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
     );
 
     let expected = {
@@ -96,6 +99,7 @@ fn test_get_eth_witness_data() {
         100,
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
     );
 
     let witness = change_pubkey_tx
@@ -137,6 +141,7 @@ fn test_get_withdrawals_data() {
         100,
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
     );
 
     let expected = {

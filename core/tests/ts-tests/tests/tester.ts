@@ -1,7 +1,7 @@
 import * as ethers from 'ethers';
 import * as zksync from 'zksync';
 
-const franklin_abi = require('../../../../contracts/build/ZkSync.json').abi;
+const franklin_abi = require('../../../../contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json').abi;
 type Network = 'localhost' | 'rinkeby' | 'ropsten';
 
 export class Tester {

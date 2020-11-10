@@ -26,46 +26,7 @@ pub fn zksync_contract() -> Contract {
         .get("abi")
         .expect("couldn't get abi from ZKSYNC_CONTRACT_FILE")
         .to_string();
-    let mut contract = Contract::load(abi_string.as_bytes()).expect("zksync contract abi");
-    let mut commit_blocks_func = contract
-        .functions
-        .remove("commitBlocks")
-        .into_iter()
-        .flatten()
-        .next()
-        .expect("ZkSync.sol commitBlocks(..) not found.");
-
-    commit_blocks_func.inputs = vec![
-        Param {
-            name: "_lastCommittedBlockData".to_string(),
-            kind: ParamType::Tuple(vec![
-                Box::new(ParamType::Uint(32)),
-                Box::new(ParamType::Uint(64)),
-                Box::new(ParamType::FixedBytes(32)),
-                Box::new(ParamType::FixedBytes(32)),
-                Box::new(ParamType::FixedBytes(32)),
-            ]),
-        },
-        Param {
-            name: "_newBlocksData".to_string(),
-            kind: ParamType::Array(Box::new(ParamType::Tuple(vec![
-                Box::new(ParamType::Uint(32)),
-                Box::new(ParamType::Uint(32)),
-                Box::new(ParamType::FixedBytes(32)),
-                Box::new(ParamType::Bytes),
-                Box::new(ParamType::Array(Box::new(ParamType::Tuple(vec![
-                    Box::new(ParamType::Uint(32)),
-                    Box::new(ParamType::Bytes),
-                ])))),
-            ]))),
-        },
-    ];
-
-    contract
-        .functions
-        .insert("commitBlocks".to_string(), vec![commit_blocks_func]);
-
-    contract
+    Contract::load(abi_string.as_bytes()).expect("zksync contract abi")
 }
 
 pub fn governance_contract() -> Contract {

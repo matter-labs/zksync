@@ -8,6 +8,7 @@ import {
     publishAbiToTesseracts,
     publishSourceCodeToEtherscan,
 } from "./publish-utils";
+import {Governance, GovernanceFactory} from "../typechain";
 
 export interface Contracts {
     governance;
@@ -230,8 +231,8 @@ export class Deployer {
         await this.deployProxiesAndGatekeeper(ethTxOptions);
     }
 
-    public governanceContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(this.addresses.Governance, this.contracts.governance.abi, signerOrProvider);
+    public governanceContract(signerOrProvider: Signer | providers.Provider): Governance {
+        return GovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
     }
 
     public zkSyncContract(signerOrProvider: Signer | providers.Provider): Contract {

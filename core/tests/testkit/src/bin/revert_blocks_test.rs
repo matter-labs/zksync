@@ -61,7 +61,13 @@ async fn execute_blocks_with_new_state_keeper(
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        Default::default(),
+    );
 
     let deposit_amount = parse_ether("1.0").unwrap();
 

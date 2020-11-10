@@ -1,7 +1,7 @@
 //use log::*;
 
 use crate::eth_account::{get_executed_tx_fee, parse_ether, ETHExecResult, EthereumAccount};
-use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
+use crate::external_commands::{deploy_contracts, get_test_accounts, js_revert_reason, Contracts};
 use crate::zksync_account::ZkSyncAccount;
 use anyhow::bail;
 use futures::{
@@ -23,8 +23,8 @@ use zksync_core::state_keeper::{
 };
 use zksync_types::{
     mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address,
-    DepositOp, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
-    ZkSyncTx,
+    BlockNumber, DepositOp, FullExitOp, Nonce, PriorityOp, TokenId, TransferOp, TransferToNewOp,
+    WithdrawOp, ZkSyncTx, H256,
 };
 
 pub use zksync_test_account as zksync_account;
@@ -32,10 +32,13 @@ pub use zksync_test_account as zksync_account;
 pub mod eth_account;
 pub mod external_commands;
 use itertools::Itertools;
+use web3::signing::keccak256;
 use web3::types::{TransactionReceipt, U64};
+use zksync_crypto::circuit::utils::append_be_fixed_width;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::rand::Rng;
-use zksync_types::block::Block;
+use zksync_crypto::Fr;
+use zksync_types::block::{Block, CommitBlockInfo, ExecuteBlockInfo, StoredBlockInfo};
 
 /// Constant for testkit
 /// Real value is in `dev.env`
@@ -54,6 +57,7 @@ pub struct BlockExecutionResult {
     pub verify_result: TransactionReceipt,
     pub withdrawals_result: TransactionReceipt,
     pub block_size_chunks: usize,
+    pub new_block_stored_info: StoredBlockInfo,
 }
 
 impl BlockExecutionResult {
@@ -62,12 +66,14 @@ impl BlockExecutionResult {
         verify_result: TransactionReceipt,
         withdrawals_result: TransactionReceipt,
         block_size_chunks: usize,
+        new_block_stored_info: StoredBlockInfo,
     ) -> Self {
         Self {
             commit_result,
             verify_result,
             withdrawals_result,
             block_size_chunks,
+            new_block_stored_info,
         }
     }
 }
@@ -447,8 +453,6 @@ pub async fn perform_basic_operations(
         test_setup.execute_commit_block().await.0.expect_success();
     }
 
-    return;
-
     // test two deposits
     test_setup.start_block();
     test_setup
@@ -600,10 +604,11 @@ pub async fn perform_basic_tests() {
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
+    let genesis_root = genesis_state(&fee_account.address).tree.root_hash();
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_contracts(false, Default::default());
+    let contracts = deploy_contracts(false, genesis_root);
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -655,7 +660,13 @@ pub async fn perform_basic_tests() {
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        genesis_root,
+    );
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
@@ -701,6 +712,8 @@ pub struct TestSetup {
     pub expected_changes_for_current_block: ExpectedAccountState,
 
     pub commit_account: EthereumAccount<Http>,
+
+    pub stored_block_info: StoredBlockInfo,
 }
 
 impl TestSetup {
@@ -709,6 +722,7 @@ impl TestSetup {
         accounts: AccountSet<Http>,
         deployed_contracts: &Contracts,
         commit_account: EthereumAccount<Http>,
+        genesis_root: Fr,
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address);
@@ -720,6 +734,7 @@ impl TestSetup {
             tokens,
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
+            stored_block_info: StoredBlockInfo::genesis_block_stored_info(genesis_root),
         }
     }
 
@@ -1287,7 +1302,7 @@ impl TestSetup {
 
         (
             self.commit_account
-                .commit_block(&new_block.block)
+                .commit_block(todo!(), todo!())
                 .await
                 .expect("block commit fail"),
             new_block.block,
@@ -1300,7 +1315,7 @@ impl TestSetup {
         proof: EncodedProofPlonk,
     ) -> ETHExecResult {
         self.commit_account
-            .verify_block(block, Some(proof))
+            .verify_block(todo!(), Some(proof))
             .await
             .expect("block verify fail")
     }
@@ -1308,6 +1323,8 @@ impl TestSetup {
     pub async fn execute_commit_and_verify_block(
         &mut self,
     ) -> Result<BlockExecutionResult, anyhow::Error> {
+        let old_block_stored_info = self.stored_block_info.clone();
+
         self.state_keeper_request_sender
             .clone()
             .send(StateKeeperRequest::SealBlock)
@@ -1316,21 +1333,31 @@ impl TestSetup {
 
         let new_block = self.await_for_block_commit_request().await;
 
+        let (new_block_stored_info, commit_block_info) = new_block
+            .block
+            .commit_block_info(old_block_stored_info.clone());
+
         let commit_result = self
             .commit_account
-            .commit_block(&new_block.block)
+            .commit_block(old_block_stored_info.clone(), commit_block_info)
             .await
             .expect("block commit send tx")
             .expect_success();
         let verify_result = self
             .commit_account
-            .verify_block(&new_block.block, None)
+            .verify_block(new_block_stored_info.commitment.clone(), None)
             .await
             .expect("block verify send tx")
             .expect_success();
+
+        let execute_block_info = ExecuteBlockInfo::new(
+            &new_block_stored_info,
+            &new_block.block,
+            new_block_stored_info.commitment.clone(),
+        );
         let withdrawals_result = self
             .commit_account
-            .complete_withdrawals()
+            .execute_block(&execute_block_info)
             .await
             .expect("complete withdrawal send tx")
             .expect_success();
@@ -1378,11 +1405,13 @@ impl TestSetup {
                 .set_account_id(self.get_zksync_account_id(ZKSyncAccountId(zk_id)).await);
         }
 
+        self.stored_block_info = new_block_stored_info.clone();
         Ok(BlockExecutionResult::new(
             commit_result,
             verify_result,
             withdrawals_result,
             block_chunks,
+            new_block_stored_info,
         ))
     }
 
