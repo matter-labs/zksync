@@ -100,9 +100,9 @@ async fn initial_upper_gas_limit() {
     const PRICE_LIMIT: u64 = 1000;
 
     let (mut ethereum, db) = eth_and_db_clients().await;
-    let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
     db.update_gas_price_limit(PRICE_LIMIT.into()).await.unwrap();
+    let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the gas price in Ethereum, which is greater than the current limit.
     ethereum.gas_price = U256::from(PRICE_LIMIT) + 1;
@@ -137,10 +137,11 @@ async fn gas_price_limit_scaling() {
     const PRICE_LIMIT: u64 = 1000;
 
     let (mut ethereum, db) = eth_and_db_clients().await;
-    let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
     let mut connection = db.acquire_connection().await.unwrap();
 
     db.update_gas_price_limit(PRICE_LIMIT.into()).await.unwrap();
+
+    let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the client price way beyond the limit.
     ethereum.gas_price = U256::from(PRICE_LIMIT * 2);

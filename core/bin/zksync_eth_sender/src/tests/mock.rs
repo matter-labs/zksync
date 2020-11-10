@@ -64,8 +64,8 @@ impl MockDatabase {
     }
 
     pub async fn update_gas_price_limit(&self, value: U256) -> Result<(), anyhow::Error> {
-        let mut gat_price_limit = self.gas_price_limit.write().await;
-        (*gat_price_limit) = value;
+        let mut gas_price_limit = self.gas_price_limit.write().await;
+        (*gas_price_limit) = value;
 
         Ok(())
     }
