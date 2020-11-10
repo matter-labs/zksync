@@ -22,7 +22,7 @@ use super::transactions::ETHStats;
 #[async_trait::async_trait]
 pub(super) trait DatabaseInterface {
     /// Returns connection to the database.
-    async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error>;
+    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>>;
 
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
@@ -30,14 +30,14 @@ pub(super) trait DatabaseInterface {
     async fn restore_state(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error>;
+    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<Operation>)>;
 
     /// Loads the unprocessed operations from the database.
     /// Unprocessed operations are zkSync operations that were not started at all.
     async fn load_new_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<Vec<Operation>, anyhow::Error>;
+    ) -> anyhow::Result<Vec<Operation>>;
 
     /// Saves a new unconfirmed operation to the database.
     async fn save_new_eth_tx(
@@ -48,7 +48,7 @@ pub(super) trait DatabaseInterface {
         deadline_block: i64,
         used_gas_price: U256,
         raw_tx: Vec<u8>,
-    ) -> Result<InsertedOperationResponse, anyhow::Error>;
+    ) -> anyhow::Result<InsertedOperationResponse>;
 
     /// Adds a tx hash entry associated with some Ethereum operation to the database.
     async fn add_hash_entry(
@@ -56,7 +56,7 @@ pub(super) trait DatabaseInterface {
         connection: &mut StorageProcessor<'_>,
         eth_op_id: i64,
         hash: &H256,
-    ) -> Result<(), anyhow::Error>;
+    ) -> anyhow::Result<()>;
 
     /// Adds a new tx info to the previously started Ethereum operation.
     async fn update_eth_tx(
@@ -65,7 +65,7 @@ pub(super) trait DatabaseInterface {
         eth_op_id: EthOpId,
         new_deadline_block: i64,
         new_gas_value: U256,
-    ) -> Result<(), anyhow::Error>;
+    ) -> anyhow::Result<()>;
 
     /// Marks an operation as completed in the database.
     async fn confirm_operation(
@@ -73,19 +73,16 @@ pub(super) trait DatabaseInterface {
         connection: &mut StorageProcessor<'_>,
         hash: &H256,
         op: &ETHOperation,
-    ) -> Result<(), anyhow::Error>;
+    ) -> anyhow::Result<()>;
 
     /// Loads the stored Ethereum operations stats.
-    async fn load_stats(
-        &self,
-        connection: &mut StorageProcessor<'_>,
-    ) -> Result<ETHStats, anyhow::Error>;
+    async fn load_stats(&self, connection: &mut StorageProcessor<'_>) -> anyhow::Result<ETHStats>;
 
     /// Loads the stored gas price limit.
     async fn load_gas_price_limit(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<U256, anyhow::Error>;
+    ) -> anyhow::Result<U256>;
 
     /// Updates the stored gas price limit.
     async fn update_gas_price_params(
@@ -93,7 +90,7 @@ pub(super) trait DatabaseInterface {
         connection: &mut StorageProcessor<'_>,
         gas_price_limit: U256,
         average_gas_price: U256,
-    ) -> Result<(), anyhow::Error>;
+    ) -> anyhow::Result<()>;
 
     async fn is_previous_operation_confirmed(
         &self,
@@ -118,7 +115,7 @@ impl Database {
 
 #[async_trait::async_trait]
 impl DatabaseInterface for Database {
-    async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error> {
+    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>> {
         let connection = self.db_pool.access_storage().await?;
 
         Ok(connection)

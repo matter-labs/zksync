@@ -304,7 +304,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), anyhow::Error> {
+    async fn initialize_operation(&mut self, tx: TxData) -> anyhow::Result<()> {
         let current_block = self.ethereum.block_number().await?;
         let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self
@@ -413,7 +413,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
-    ) -> Result<OperationCommitment, anyhow::Error> {
+    ) -> anyhow::Result<OperationCommitment> {
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
@@ -557,7 +557,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         op: &ETHOperation,
         tx_hash: &H256,
         current_block: u64,
-    ) -> Result<TxCheckOutcome, anyhow::Error> {
+    ) -> anyhow::Result<TxCheckOutcome> {
         let status = self.ethereum.get_tx_status(tx_hash).await?;
 
         let outcome = match status {
@@ -595,10 +595,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     /// Creates a new Ethereum operation.
-    async fn sign_new_tx(
-        ethereum: &ETH,
-        op: &ETHOperation,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    async fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> anyhow::Result<SignedCallResult> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -659,7 +656,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         &mut self,
         deadline_block: u64,
         stuck_tx: &mut ETHOperation,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    ) -> anyhow::Result<SignedCallResult> {
         let tx_options = self.tx_options_from_stuck_tx(stuck_tx).await?;
 
         let raw_tx = stuck_tx.encoded_tx_data.clone();
@@ -677,7 +674,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     async fn tx_options_from_stuck_tx(
         &mut self,
         stuck_tx: &ETHOperation,
-    ) -> Result<Options, anyhow::Error> {
+    ) -> anyhow::Result<Options> {
         let old_tx_gas_price = stuck_tx.last_used_gas_price;
 
         let new_gas_price = self

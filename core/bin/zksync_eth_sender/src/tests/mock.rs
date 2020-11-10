@@ -63,7 +63,7 @@ impl MockDatabase {
         }
     }
 
-    pub async fn update_gas_price_limit(&self, value: U256) -> Result<(), anyhow::Error> {
+    pub async fn update_gas_price_limit(&self, value: U256) -> anyhow::Result<()> {
         let mut gas_price_limit = self.gas_price_limit.write().await;
         (*gas_price_limit) = value;
 
@@ -71,7 +71,7 @@ impl MockDatabase {
     }
 
     /// Simulates the operation of OperationsSchema, creates a new operation in the database.
-    pub async fn send_operation(&mut self, op: Operation) -> Result<(), anyhow::Error> {
+    pub async fn send_operation(&mut self, op: Operation) -> anyhow::Result<()> {
         let nonce = op.id.expect("Nonce must be set for every tx");
 
         self.unprocessed_operations.write().await.insert(nonce, op);
@@ -101,7 +101,7 @@ impl MockDatabase {
             .is_none());
     }
 
-    async fn next_nonce(&self) -> Result<i64, anyhow::Error> {
+    async fn next_nonce(&self) -> anyhow::Result<i64> {
         let old_value = self.nonce.read().await.clone();
         let mut new_value = self.nonce.write().await;
         *new_value = old_value + 1;
@@ -114,7 +114,7 @@ impl MockDatabase {
 impl DatabaseInterface for MockDatabase {
     /// Creates a new database connection, used as a stub
     /// and nothing will be sent through this connection.
-    async fn acquire_connection(&self) -> Result<StorageProcessor<'_>, anyhow::Error> {
+    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>> {
         StorageProcessor::establish_connection().await
     }
 
@@ -122,7 +122,7 @@ impl DatabaseInterface for MockDatabase {
     async fn load_new_operations(
         &self,
         _connection: &mut StorageProcessor<'_>,
-    ) -> Result<Vec<Operation>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<Operation>> {
         let unprocessed_operations = self
             .unprocessed_operations
             .read()
@@ -141,7 +141,7 @@ impl DatabaseInterface for MockDatabase {
         _connection: &mut StorageProcessor<'_>,
         gas_price_limit: U256,
         _average_gas_price: U256,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         let mut new_gas_price_limit = self.gas_price_limit.write().await;
         *new_gas_price_limit = gas_price_limit;
 
@@ -151,7 +151,7 @@ impl DatabaseInterface for MockDatabase {
     async fn restore_state(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), anyhow::Error> {
+    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<Operation>)> {
         Ok((
             self.restore_state.clone(),
             self.load_new_operations(connection).await?,
@@ -166,7 +166,7 @@ impl DatabaseInterface for MockDatabase {
         deadline_block: i64,
         used_gas_price: U256,
         encoded_tx_data: Vec<u8>,
-    ) -> Result<InsertedOperationResponse, anyhow::Error> {
+    ) -> anyhow::Result<InsertedOperationResponse> {
         let id = self.pending_op_id.read().await.clone();
         let mut pending_op_id = self.pending_op_id.write().await;
         *pending_op_id = id + 1;
@@ -203,7 +203,7 @@ impl DatabaseInterface for MockDatabase {
         _connection: &mut StorageProcessor<'_>,
         eth_op_id: i64,
         hash: &H256,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         assert!(
             self.unconfirmed_operations
                 .read()
@@ -226,7 +226,7 @@ impl DatabaseInterface for MockDatabase {
         eth_op_id: EthOpId,
         new_deadline_block: i64,
         new_gas_value: U256,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         assert!(
             self.unconfirmed_operations
                 .read()
@@ -248,9 +248,8 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _connection: &mut StorageProcessor<'_>,
         hash: &H256,
-        _op: &ETHOperation,
-    ) -> Result<(), anyhow::Error> {
-        // TODO: Sosnin change this func
+        op: &ETHOperation,
+    ) -> anyhow::Result<()> {
         let mut unconfirmed_operations = self.unconfirmed_operations.write().await;
         let mut op_idx: Option<i64> = None;
         for operation in unconfirmed_operations.values_mut() {
@@ -280,14 +279,11 @@ impl DatabaseInterface for MockDatabase {
     async fn load_gas_price_limit(
         &self,
         _connection: &mut StorageProcessor<'_>,
-    ) -> Result<U256, anyhow::Error> {
+    ) -> anyhow::Result<U256> {
         Ok(self.gas_price_limit.read().await.clone())
     }
 
-    async fn load_stats(
-        &self,
-        _connection: &mut StorageProcessor<'_>,
-    ) -> Result<ETHStats, anyhow::Error> {
+    async fn load_stats(&self, _connection: &mut StorageProcessor<'_>) -> anyhow::Result<ETHStats> {
         Ok(self.stats.read().await.clone())
     }
 
@@ -296,7 +292,9 @@ impl DatabaseInterface for MockDatabase {
         _connection: &mut StorageProcessor<'_>,
         _op: &ETHOperation,
     ) -> anyhow::Result<bool> {
-        unimplemented!();
+        Err(anyhow::format_err!(
+            "is_previous_operation_confirmed not implemented for MockDatabase"
+        ))
     }
 }
 
@@ -376,19 +374,19 @@ impl MockEthereum {
 
 #[async_trait::async_trait]
 impl EthereumInterface for MockEthereum {
-    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
+    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         Ok(self.tx_statuses.read().await.get(hash).cloned())
     }
 
-    async fn block_number(&self) -> Result<u64, anyhow::Error> {
+    async fn block_number(&self) -> anyhow::Result<u64> {
         Ok(self.block_number)
     }
 
-    async fn gas_price(&self) -> Result<U256, anyhow::Error> {
+    async fn gas_price(&self) -> anyhow::Result<U256> {
         Ok(self.gas_price)
     }
 
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error> {
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> anyhow::Result<()> {
         self.sent_txs
             .write()
             .await
@@ -405,7 +403,7 @@ impl EthereumInterface for MockEthereum {
         &self,
         raw_tx: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    ) -> anyhow::Result<SignedCallResult> {
         let gas_price = options.gas_price.unwrap_or(self.gas_price);
         let nonce = options.nonce.expect("Nonce must be set for every tx");
 
