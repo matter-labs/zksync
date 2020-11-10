@@ -13,23 +13,25 @@ jobs:
 
     - name: setup-env
       run: |
-        echo "::set-env name=ZKSYNC_HOME::$(pwd)"
-        echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
-        echo "::set-env name=CI::1"
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
 
     - name: init
       run: |
         cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
-        zksync yarn
+        zk
+        zk run yarn
         cp etc/tokens/{test,localhost}.json
-        zksync verify-keys unpack
-        zksync db-setup
+        zk run verify-keys unpack
+        zk db setup
 
     - name: update-images
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
-        zksync update-images
-        echo "::set-env name=IMAGE_TAG::$(git rev-parse --short HEAD)"
+        zk docker push rust
+        zk docker push nginx
+        echo IMAGE_TAG=$(git rev-parse --short HEAD) >> $GITHUB_ENV
 
     - name: promote-to-gitlab
       run: |

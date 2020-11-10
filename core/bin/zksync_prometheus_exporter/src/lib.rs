@@ -23,7 +23,7 @@ pub fn run_prometheus_exporter(
     let addr = ([0, 0, 0, 0], config.prometheus_export_port).into();
 
     tokio::spawn(render_prometheus(addr, (), |_, _| async move {
-        let mut storage = connection_pool.access_storage_fragile().await?;
+        let mut storage = connection_pool.access_storage().await?;
         let mut transaction = storage.start_transaction().await.map_err(convert_err)?;
         let mut block_schema = transaction.chain().block_schema();
 

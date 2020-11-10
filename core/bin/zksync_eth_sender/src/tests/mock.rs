@@ -290,6 +290,14 @@ impl DatabaseInterface for MockDatabase {
     ) -> Result<ETHStats, anyhow::Error> {
         Ok(self.stats.read().await.clone())
     }
+
+    async fn is_previous_operation_confirmed(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+        _op: &ETHOperation,
+    ) -> anyhow::Result<bool> {
+        unimplemented!();
+    }
 }
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.

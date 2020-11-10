@@ -1,7 +1,8 @@
 use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
 use tokio::{runtime::Runtime, time};
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
@@ -20,8 +21,8 @@ pub struct NetworkStatus {
 pub struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
 impl SharedNetworkStatus {
-    pub fn read(&self) -> NetworkStatus {
-        (*self.0.as_ref().read().unwrap()).clone()
+    pub async fn read(&self) -> NetworkStatus {
+        (*self.0.as_ref().read().await).clone()
     }
 
     pub fn start_updater_detached(
@@ -96,7 +97,7 @@ impl SharedNetworkStatus {
                         transaction.commit().await.unwrap_or_default();
 
                         // save status to state
-                        *self.0.as_ref().write().unwrap() = status;
+                        *self.0.as_ref().write().await = status;
                     }
                 };
                 runtime.block_on(state_update_task);

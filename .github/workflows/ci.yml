@@ -17,48 +17,47 @@ jobs:
 
     - name: setup-env
       run: |
-        echo "::set-env name=ZKSYNC_HOME::$(pwd)"
-        echo "::set-env name=PATH::$(echo `pwd`/bin:$PATH)"
-        echo "::set-env name=CI::1"
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
 
     - name: update-deps
       run: |
         rustup update stable
         cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
-        docker pull matterlabs/ci-integration-test:latest
+        docker pull matterlabs/ci-integration-test:zk-latest
+
+    - name: zk
+      run: zk
 
     - name: lints
       run: |
-        zksync db-setup # So database will be created for compilation.
-        zksync dummy-prover ensure-disabled
+        zk db setup # So database will be created for compilation.
+        zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
-        f cargo clippy --tests --benches -- -D warnings
+        zk f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
 
     - name: integration-tests
-      run: ci_docker_container.sh "all_integration_tests.sh || cat_logs.sh"
+      run: zk test integration all --in-docker
 
     - name: integration-testkit
-      run: zksync integration-testkit
+      run: zk test integration testkit
 
     - name: contracts-unit-tests
-      run: zksync test-contracts
+      run: zk test contracts
 
     - name: js-unit-tests
-      run: zksync js-tests
+      run: zk test js
 
     - name: rust-unit-tests
-      run: |
-        f cargo test --release
-        zksync db-test
-        zksync prover-tests
-        zksync circuit-tests "" `nproc`
+      run: zk test rust
 
     - name: zksync-crypto-tests
-      run: pushd sdk/zksync-crypto && f cargo test --release
+      run: pushd sdk/zksync-crypto && zk f cargo test --release
 
     services:
       geth:

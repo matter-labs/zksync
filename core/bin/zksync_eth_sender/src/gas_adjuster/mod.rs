@@ -78,8 +78,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             log::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
-        // FIXME: Currently instead of using sent txs as samples, we use the gas prices suggested by
-        // the Ethereum node.
+        // TODO: Currently instead of using sent txs as samples, we use the gas prices suggested by
+        // the Ethereum node (#1130).
         // // Report used price to be gathered by the statistics module.
         // self.statistics.add_sample(price);
 

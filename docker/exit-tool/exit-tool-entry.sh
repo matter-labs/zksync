@@ -7,8 +7,6 @@
 
 USAGE="exit_tool_entry.sh init|restart|run|continue network account_id token web3_url"
 
-. .setup_env
-
 cd $ZKSYNC_HOME
 
 if [ -z $ZKSYNC_ENV ];
@@ -17,15 +15,16 @@ then
   exit 1
 fi
 
-zksync plonk-setup check || zksync plonk-setup download
-zksync verify-keys unpack
-f db-wait
+zk
+zk run plonk-setup
+zk run verify-keys unpack
+zk db wait
 
 COMMAND=$1
 
 case $COMMAND in
   init)
-    f db-setup
+    zk db setup
     echo "Database set up"
     exit 0
     ;;
