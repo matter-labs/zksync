@@ -86,7 +86,7 @@ export class Wallet {
         return wallet;
     }
 
-    async getEthMessageSignature(message: string): Promise<TxEthSignature> {
+    async getEthMessageSignature(message: ethers.utils.BytesLike): Promise<TxEthSignature> {
         if (this.ethSignerType == null) {
             throw new Error('ethSignerType is unknown');
         }
@@ -251,8 +251,9 @@ export class Wallet {
             bytes = ethers.utils.concat([bytes, serializeTransfer(tx)]);
             batch.push({ tx, signature: null });
         }
-
-        const ethSignature = await this.getEthMessageSignature(ethers.utils.keccak256(bytes).slice(2));
+        const hash = ethers.utils.keccak256(bytes).slice(2);
+        const message = Uint8Array.from(Buffer.from(hash, 'hex'));
+        const ethSignature = await this.getEthMessageSignature(message);
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignature);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
