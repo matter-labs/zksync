@@ -120,7 +120,6 @@ pub struct BlockInfo {
 pub struct TransactionInfo {
     pub tx_hash: TxHash,
     pub block_number: i64,
-    // TODO Implement helper method to decode this op as ExecutedOperations (task number ????)
     pub op: Value,
     pub success: Option<bool>,
     pub fail_reason: Option<String>,
@@ -244,7 +243,7 @@ async fn blocks_range(
         .await
         .map_err(ApiError::internal)?;
     // Handle edge case when "after + limit" greater than the total blocks count.
-    // TODO Handle this case directly in the `storage` crate. (Task number ????)
+    // TODO Handle this case directly in the `storage` crate. (#1151)
     let range = if let Pagination::After(after) = pagination {
         range
             .into_iter()
