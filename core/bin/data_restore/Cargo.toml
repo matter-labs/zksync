@@ -10,6 +10,9 @@ keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
+[features]
+db_test = []
+
 [dependencies]
 num = { version = "0.2", features = ["serde"] }
 tiny-keccak = "1.4.2"
@@ -35,3 +38,5 @@ zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 
 [dev-dependencies]
 jsonrpc-core = "14.0.0"
+db_test_macro = { path = "../../lib/storage/db_test_macro" }
+

@@ -366,45 +366,15 @@ impl EventsState {
 #[cfg(test)]
 mod test {
     use super::EventsState;
-    use std::future::Future;
     use web3::types::{Bytes, Log};
     use web3::{
         api::{Eth, Namespace},
         contract::Contract,
         types::H256,
-        RequestId, Transport,
     };
     use zksync_contracts::zksync_contract;
 
-    // This transport is necessary for generating contract
-    #[derive(Debug, Clone)]
-    struct FakeTransport;
-
-    impl Transport for FakeTransport {
-        type Out =
-            Box<dyn Future<Output = Result<jsonrpc_core::Value, web3::Error>> + Send + Unpin>;
-
-        fn prepare(
-            &self,
-            _method: &str,
-            _params: Vec<jsonrpc_core::Value>,
-        ) -> (RequestId, jsonrpc_core::Call) {
-            unimplemented!()
-        }
-
-        fn send(&self, _id: RequestId, _request: jsonrpc_core::Call) -> Self::Out {
-            unimplemented!()
-        }
-    }
-
-    fn u32_to_32bytes(value: u32) -> [u8; 32] {
-        let mut bytes = [0u8; 32];
-        let a = value.to_be_bytes();
-        for i in 0..4 {
-            bytes[28 + i] = a[i]
-        }
-        bytes
-    }
+    use crate::tests::utils::{u32_to_32bytes, FakeTransport};
 
     fn create_log(topic: H256, data: Bytes, block_number: u32) -> Log {
         Log {

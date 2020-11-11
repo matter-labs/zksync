@@ -240,8 +240,6 @@ impl<T: Transport> DataRestoreDriver<T> {
     pub async fn run_state_update(&mut self, storage: &mut StorageProcessor<'_>) {
         let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
-        // Connection pool is just ARC to Pool, so this clone is cheap.
-        // Thanks to this, we are able to get the connection from this pool only once, instead of getting it in each function
         loop {
             log::debug!("Last watched ethereum block: {:?}", last_wached_block);
 
