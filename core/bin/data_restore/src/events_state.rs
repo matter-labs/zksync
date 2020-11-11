@@ -366,7 +366,6 @@ impl EventsState {
 #[cfg(test)]
 mod test {
     use super::EventsState;
-    use jsonrpc_core;
     use std::future::Future;
     use web3::types::{Bytes, Log};
     use web3::{
