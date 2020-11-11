@@ -21,11 +21,11 @@ export class Signer {
         this.privateKey = privKey;
     }
 
-    pubKeyHash(): PubKeyHash {
-        return privateKeyToPubKeyHash(this.privateKey);
+    async pubKeyHash(): Promise<PubKeyHash> {
+        return await privateKeyToPubKeyHash(this.privateKey);
     }
 
-    signSyncTransfer(transfer: {
+    async signSyncTransfer(transfer: {
         accountId: number;
         from: Address;
         to: Address;
@@ -33,7 +33,7 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
-    }): Transfer {
+    }): Promise<Transfer> {
         const type = new Uint8Array([5]); // tx type
         const accountId = serializeAccountId(transfer.accountId);
         const from = serializeAddress(transfer.from);
@@ -44,7 +44,7 @@ export class Signer {
         const nonce = serializeNonce(transfer.nonce);
         const msgBytes = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
 
-        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.privateKey, msgBytes);
 
         return {
             type: 'Transfer',
@@ -59,7 +59,7 @@ export class Signer {
         };
     }
 
-    signSyncWithdraw(withdraw: {
+    async signSyncWithdraw(withdraw: {
         accountId: number;
         from: Address;
         ethAddress: string;
@@ -67,7 +67,7 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
-    }): Withdraw {
+    }): Promise<Withdraw> {
         const typeBytes = new Uint8Array([3]);
         const accountId = serializeAccountId(withdraw.accountId);
         const accountBytes = serializeAddress(withdraw.from);
@@ -86,7 +86,8 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+
         return {
             type: 'Withdraw',
             accountId: withdraw.accountId,
@@ -100,13 +101,13 @@ export class Signer {
         };
     }
 
-    signSyncForcedExit(forcedExit: {
+    async signSyncForcedExit(forcedExit: {
         initiatorAccountId: number;
         target: Address;
         tokenId: number;
         fee: BigNumberish;
         nonce: number;
-    }): ForcedExit {
+    }): Promise<ForcedExit> {
         const typeBytes = new Uint8Array([8]);
         const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
         const targetBytes = serializeAddress(forcedExit.target);
@@ -121,7 +122,7 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: 'ForcedExit',
             initiatorAccountId: forcedExit.initiatorAccountId,
@@ -133,14 +134,14 @@ export class Signer {
         };
     }
 
-    signSyncChangePubKey(changePubKey: {
+    async signSyncChangePubKey(changePubKey: {
         accountId: number;
         account: Address;
         newPkHash: PubKeyHash;
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
-    }): ChangePubKey {
+    }): Promise<ChangePubKey> {
         const typeBytes = new Uint8Array([7]); // Tx type (1 byte)
         const accountIdBytes = serializeAccountId(changePubKey.accountId);
         const accountBytes = serializeAddress(changePubKey.account);
@@ -157,7 +158,7 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: 'ChangePubKey',
             accountId: changePubKey.accountId,
@@ -175,8 +176,8 @@ export class Signer {
         return new Signer(pk);
     }
 
-    static fromSeed(seed: Uint8Array): Signer {
-        return new Signer(privateKeyFromSeed(seed));
+    static async fromSeed(seed: Uint8Array): Promise<Signer> {
+        return new Signer(await privateKeyFromSeed(seed));
     }
 
     static async fromETHSignature(
@@ -199,7 +200,7 @@ export class Signer {
         const address = await ethSigner.getAddress();
         const ethSignatureType = await getEthSignatureType(ethSigner.provider, message, signature, address);
         const seed = ethers.utils.arrayify(signature);
-        const signer = Signer.fromSeed(seed);
+        const signer = await Signer.fromSeed(seed);
         return { signer, ethSignatureType };
     }
 }
