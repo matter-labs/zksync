@@ -24,7 +24,7 @@ use zksync_types::{
 };
 // Local uses
 use self::{
-    database::Database,
+    database::{Database, DatabaseInterface},
     ethereum_interface::{EthereumHttpClient, EthereumInterface},
     gas_adjuster::GasAdjuster,
     transactions::*,
@@ -37,9 +37,8 @@ mod gas_adjuster;
 mod transactions;
 mod tx_queue;
 
-// TODO: Restore tests (#1109).
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 /// Wait this amount of time if we hit rate limit on infura https://infura.io/docs/ethereum/json-rpc/ratelimits
 const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);
@@ -111,23 +110,23 @@ enum TxCheckMode {
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
-struct ETHSender<ETH: EthereumInterface> {
+struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
     /// Ongoing operations queue.
     ongoing_ops: VecDeque<ETHOperation>,
     /// Connection to the database.
-    db: Database,
+    db: DB,
     /// Ethereum intermediator.
     ethereum: ETH,
     /// Queue for ordered transaction processing.
     tx_queue: TxQueue,
     /// Utility for managing the gas price for transactions.
-    gas_adjuster: GasAdjuster<ETH>,
+    gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
 }
 
-impl<ETH: EthereumInterface> ETHSender<ETH> {
-    pub async fn new(options: EthSenderOptions, db: Database, ethereum: ETH) -> Self {
+impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
+    pub async fn new(options: EthSenderOptions, db: DB, ethereum: ETH) -> Self {
         let mut connection = db
             .acquire_connection()
             .await
@@ -305,7 +304,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), anyhow::Error> {
+    async fn initialize_operation(&mut self, tx: TxData) -> anyhow::Result<()> {
         let current_block = self.ethereum.block_number().await?;
         let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self
@@ -414,7 +413,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
-    ) -> Result<OperationCommitment, anyhow::Error> {
+    ) -> anyhow::Result<OperationCommitment> {
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
@@ -558,7 +557,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         op: &ETHOperation,
         tx_hash: &H256,
         current_block: u64,
-    ) -> Result<TxCheckOutcome, anyhow::Error> {
+    ) -> anyhow::Result<TxCheckOutcome> {
         let status = self.ethereum.get_tx_status(tx_hash).await?;
 
         let outcome = match status {
@@ -596,10 +595,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     }
 
     /// Creates a new Ethereum operation.
-    async fn sign_new_tx(
-        ethereum: &ETH,
-        op: &ETHOperation,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    async fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> anyhow::Result<SignedCallResult> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -660,7 +656,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         &mut self,
         deadline_block: u64,
         stuck_tx: &mut ETHOperation,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    ) -> anyhow::Result<SignedCallResult> {
         let tx_options = self.tx_options_from_stuck_tx(stuck_tx).await?;
 
         let raw_tx = stuck_tx.encoded_tx_data.clone();
@@ -678,7 +674,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn tx_options_from_stuck_tx(
         &mut self,
         stuck_tx: &ETHOperation,
-    ) -> Result<Options, anyhow::Error> {
+    ) -> anyhow::Result<Options> {
         let old_tx_gas_price = stuck_tx.last_used_gas_price;
 
         let new_gas_price = self
