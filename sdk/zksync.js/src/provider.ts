@@ -86,8 +86,11 @@ export class Provider {
 
     // Requests `zkSync` server to execute several transactions together.
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTxsBatch(transactions: { tx: any; signature?: TxEthSignature }[]): Promise<string[]> {
-        return await this.transport.request('submit_txs_batch', [transactions]);
+    async submitTxsBatch(
+        transactions: { tx: any; signature?: TxEthSignature }[],
+        ethSignature?: TxEthSignature
+    ): Promise<string[]> {
+        return await this.transport.request('submit_txs_batch', [transactions, ethSignature]);
     }
 
     async getContractAddress(): Promise<ContractAddress> {

@@ -451,7 +451,7 @@ impl ZkSyncStateKeeper {
             .load_committed_state(None)
             .await
             .expect("db failed");
-        // TODO: move genesis block creation to separate routine.
+
         assert!(
             last_committed == 0 && accounts.is_empty(),
             "db should be empty"

@@ -8,7 +8,7 @@ use zksync_types::{Token, TokenId, TokenLike};
 #[derive(Debug, Clone)]
 pub struct TokenDBCache {
     db_pool: ConnectionPool,
-    // TODO: handle stale entries. (edge case when we rename token after adding it)
+    // TODO: handle stale entries, edge case when we rename token after adding it (#1097)
     tokens: Arc<RwLock<HashMap<TokenId, Token>>>,
 }
 
@@ -43,7 +43,7 @@ impl TokenDBCache {
         } else {
             let mut storage = self
                 .db_pool
-                .access_storage_fragile()
+                .access_storage()
                 .await
                 .map_err(|e| anyhow::format_err!("Failed to access storage: {}", e))?;
 

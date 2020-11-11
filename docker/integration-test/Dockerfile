@@ -7,7 +7,7 @@ WORKDIR /usr/src/zksync
 RUN apt-get update; apt-get install -y make bash git postgresql openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
 
 # Install node and yarn
-RUN curl -sL https://deb.nodesource.com/setup_12.x | bash -
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
 RUN apt-get install -y nodejs
 RUN npm install -g yarn
 
@@ -44,3 +44,4 @@ COPY entrypoint.sh /usr/local/bin/
 # Setup the environment
 ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
+ENV CI=1

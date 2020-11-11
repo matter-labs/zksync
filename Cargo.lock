@@ -5656,6 +5656,7 @@ dependencies = [
  "ethabi 12.0.0",
  "futures 0.3.6",
  "hex",
+ "lazy_static",
  "log 0.4.11",
  "num",
  "serde",

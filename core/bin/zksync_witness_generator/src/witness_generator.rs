@@ -74,7 +74,7 @@ impl WitnessGenerator {
         &self,
         block_number: BlockNumber,
     ) -> Result<BlockInfo, anyhow::Error> {
-        let mut storage = self.conn_pool.access_storage_fragile().await?;
+        let mut storage = self.conn_pool.access_storage().await?;
         let mut transaction = storage.start_transaction().await?;
         let block = transaction
             .chain()
@@ -187,7 +187,7 @@ impl WitnessGenerator {
 
     async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), anyhow::Error> {
         let timer = Instant::now();
-        let mut storage = self.conn_pool.access_storage_fragile().await?;
+        let mut storage = self.conn_pool.access_storage().await?;
 
         let mut circuit_account_tree = self
             .load_account_tree(block.block_number - 1, &mut storage)

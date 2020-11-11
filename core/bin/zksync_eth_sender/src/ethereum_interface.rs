@@ -43,16 +43,16 @@ pub(super) trait EthereumInterface {
     /// - If transaction was not executed, returned value is `None`.
     /// - If transaction was executed, the information about its success and amount
     ///   of confirmations is returned.
-    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error>;
+    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>>;
 
     /// Gets the actual block number.
-    async fn block_number(&self) -> Result<u64, anyhow::Error>;
+    async fn block_number(&self) -> anyhow::Result<u64>;
 
     /// Gets the current gas price.
-    async fn gas_price(&self) -> Result<U256, anyhow::Error>;
+    async fn gas_price(&self) -> anyhow::Result<U256>;
 
     /// Sends a signed transaction to the Ethereum blockchain.
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error>;
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> anyhow::Result<()>;
 
     /// Encodes the transaction data (smart contract method and its input) to the bytes
     /// without creating an actual transaction.
@@ -64,7 +64,7 @@ pub(super) trait EthereumInterface {
         &self,
         data: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, anyhow::Error>;
+    ) -> anyhow::Result<SignedCallResult>;
 
     /// Returns the information about transaction failure reason.
     async fn failure_reason(&self, tx_hash: H256) -> Option<FailureInfo>;
@@ -78,7 +78,7 @@ pub struct EthereumHttpClient {
 }
 
 impl EthereumHttpClient {
-    pub fn new(options: &ConfigurationOptions) -> Result<Self, anyhow::Error> {
+    pub fn new(options: &ConfigurationOptions) -> anyhow::Result<Self> {
         let transport = Http::new(&options.web3_url)?;
         let ethereum_signer = PrivateKeySigner::new(
             options
@@ -107,7 +107,7 @@ impl EthereumHttpClient {
 
 #[async_trait::async_trait]
 impl EthereumInterface for EthereumHttpClient {
-    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
+    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         self.sleep();
         let receipt = self
             .eth_client
@@ -145,13 +145,13 @@ impl EthereumInterface for EthereumHttpClient {
         }
     }
 
-    async fn block_number(&self) -> Result<u64, anyhow::Error> {
+    async fn block_number(&self) -> anyhow::Result<u64> {
         self.sleep();
         let block_number = self.eth_client.web3.eth().block_number().await?;
         Ok(block_number.as_u64())
     }
 
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), anyhow::Error> {
+    async fn send_tx(&self, signed_tx: &SignedCallResult) -> anyhow::Result<()> {
         self.sleep();
         let hash = self
             .eth_client
@@ -164,7 +164,7 @@ impl EthereumInterface for EthereumHttpClient {
         Ok(())
     }
 
-    async fn gas_price(&self) -> Result<U256, anyhow::Error> {
+    async fn gas_price(&self) -> anyhow::Result<U256> {
         self.sleep();
         self.eth_client.get_gas_price().await
     }
@@ -177,7 +177,7 @@ impl EthereumInterface for EthereumHttpClient {
         &self,
         data: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    ) -> anyhow::Result<SignedCallResult> {
         self.sleep();
         self.eth_client.sign_prepared_tx(data, options).await
     }

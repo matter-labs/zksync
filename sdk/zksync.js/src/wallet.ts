@@ -13,7 +13,8 @@ import {
     TxEthSignature,
     ChangePubKey,
     EthSignerType,
-    SignedTransaction
+    SignedTransaction,
+    Transfer
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -25,7 +26,8 @@ import {
     getSignedBytesFromMessage,
     signMessagePersonalAPI,
     ERC20_DEPOSIT_GAS_LIMIT,
-    getEthSignatureType
+    getEthSignatureType,
+    serializeTransfer
 } from './utils';
 
 const EthersErrorCode = ErrorCode;
@@ -99,13 +101,13 @@ export class Wallet {
         };
     }
 
-    async signSyncTransfer(transfer: {
+    async getTransfer(transfer: {
         to: Address;
         token: TokenLike;
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
-    }): Promise<SignedTransaction> {
+    }): Promise<Transfer> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
         }
@@ -124,6 +126,18 @@ export class Wallet {
             nonce: transfer.nonce
         };
 
+        return this.signer.signSyncTransfer(transactionData);
+    }
+
+    async signSyncTransfer(transfer: {
+        to: Address;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<SignedTransaction> {
+        const signedTransferTransaction = await this.getTransfer(transfer);
+
         const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
         const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
@@ -135,7 +149,6 @@ export class Wallet {
             `Account Id: ${this.accountId}`;
 
         const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
-        const signedTransferTransaction = this.signer.signSyncTransfer(transactionData);
         return {
             tx: signedTransferTransaction,
             ethereumSignature: txMessageEthSignature
@@ -163,7 +176,7 @@ export class Wallet {
             nonce: forcedExit.nonce
         };
 
-        const signedForcedExitTransaction = this.signer.signSyncForcedExit(transactionData);
+        const signedForcedExitTransaction = await this.signer.signSyncForcedExit(transactionData);
 
         return {
             tx: signedForcedExitTransaction
@@ -217,7 +230,8 @@ export class Wallet {
 
         await this.setRequiredAccountIdFromServer('Transfer funds');
 
-        let signedTransfers = [];
+        let batch = [];
+        let bytes = new Uint8Array([]);
 
         let nextNonce = transfers[0].nonce != null ? await this.getNonce(transfers[0].nonce) : await this.getNonce();
 
@@ -226,7 +240,7 @@ export class Wallet {
             const nonce = nextNonce;
             nextNonce += 1;
 
-            const { tx, ethereumSignature } = await this.signSyncTransfer({
+            const tx: Transfer = await this.getTransfer({
                 to: transfer.to,
                 token: transfer.token,
                 amount: transfer.amount,
@@ -234,11 +248,14 @@ export class Wallet {
                 nonce
             });
 
-            signedTransfers.push({ tx, signature: ethereumSignature });
+            bytes = ethers.utils.concat([bytes, serializeTransfer(tx)]);
+            batch.push({ tx, signature: null });
         }
 
-        const transactionHashes = await this.provider.submitTxsBatch(signedTransfers);
-        return transactionHashes.map((txHash, idx) => new Transaction(signedTransfers[idx], txHash, this.provider));
+        const ethSignature = await this.getEthMessageSignature(ethers.utils.keccak256(bytes).slice(2));
+
+        const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignature);
+        return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
     }
 
     async syncTransfer(transfer: {
@@ -293,7 +310,7 @@ export class Wallet {
 
         const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
 
-        const signedWithdrawTransaction = this.signer.signSyncWithdraw(transactionData);
+        const signedWithdrawTransaction = await this.signer.signSyncWithdraw(transactionData);
 
         return {
             tx: signedWithdrawTransaction,
@@ -328,7 +345,7 @@ export class Wallet {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
         }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const signerPubKeyHash = this.signer.pubKeyHash();
+        const signerPubKeyHash = await this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
     }
 
@@ -343,7 +360,7 @@ export class Wallet {
         }
 
         const feeTokenId = await this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
-        const newPubKeyHash = this.signer.pubKeyHash();
+        const newPubKeyHash = await this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
@@ -352,10 +369,10 @@ export class Wallet {
             ? null
             : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
-        const changePubKeyTx: ChangePubKey = this.signer.signSyncChangePubKey({
+        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
             accountId: this.accountId,
             account: this.address(),
-            newPkHash: this.signer.pubKeyHash(),
+            newPkHash: await this.signer.pubKeyHash(),
             nonce: changePubKey.nonce,
             feeTokenId,
             fee: BigNumber.from(changePubKey.fee).toString()
@@ -428,7 +445,7 @@ export class Wallet {
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const newPubKeyHash = this.signer.pubKeyHash();
+        const newPubKeyHash = await this.signer.pubKeyHash();
 
         if (currentPubKeyHash === newPubKeyHash) {
             throw new Error('Current PubKeyHash is the same as new');

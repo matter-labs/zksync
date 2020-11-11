@@ -310,8 +310,6 @@ impl Monitor {
         eth_provider: &EthereumProvider<S>,
         eth_tx_hash: H256,
     ) -> anyhow::Result<PriorityOp> {
-        // TODO Make this task completely async.
-
         // Wait for the corresponing priority operation ID.
         let priority_op = eth_provider
             .wait_for_tx(eth_tx_hash)

@@ -105,7 +105,7 @@ impl Witness for TransferWitness<Bn256> {
             &mut pubdata_bits,
             TransferOp::CHUNKS * CHUNK_BIT_WIDTH,
             false,
-        ); //TODO verify if right padding is okay
+        );
         pubdata_bits
     }
 

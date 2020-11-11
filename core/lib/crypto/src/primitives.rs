@@ -14,15 +14,12 @@ use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, rescue_hasher::BabyRescueHasher};
 use crate::params;
 
-// TODO: replace Vec with Iterator?
-
 pub trait GetBits {
     fn get_bits_le(&self) -> Vec<bool>;
 }
 
 impl GetBits for u64 {
     fn get_bits_le(&self) -> Vec<bool> {
-        // TODO: - Check function because it may be wrong
         let mut acc = Vec::new();
         let mut i = *self + 1;
         for _ in 0..16 {

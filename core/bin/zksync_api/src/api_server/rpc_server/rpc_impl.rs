@@ -16,7 +16,9 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 
-use super::{error::*, types::*, verify_tx_info_message_signature, RpcApp};
+use super::{
+    error::*, types::*, verify_tx_info_message_signature, verify_txs_batch_signature, RpcApp,
+};
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
@@ -175,7 +177,7 @@ impl RpcApp {
             sign_verify_channel,
         )
         .await?
-        .into_inner();
+        .unwrap_tx();
 
         let hash = tx.hash();
 
@@ -198,7 +200,11 @@ impl RpcApp {
         })
     }
 
-    pub async fn _impl_submit_txs_batch(self, txs: Vec<TxWithSignature>) -> Result<Vec<TxHash>> {
+    pub async fn _impl_submit_txs_batch(
+        self,
+        txs: Vec<TxWithSignature>,
+        eth_signature: Option<TxEthSignature>,
+    ) -> Result<Vec<TxHash>> {
         if txs.is_empty() {
             return Err(Error {
                 code: RpcErrorCodes::from(TxAddError::EmptyBatch).into(),
@@ -216,28 +222,13 @@ impl RpcApp {
                 });
             }
         }
-        let mut messages_to_sign = vec![];
-        for tx in &txs {
-            messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
-        }
 
         // Checking fees data
         let mut required_total_usd_fee = BigDecimal::from(0);
         let mut provided_total_usd_fee = BigDecimal::from(0);
         for tx in &txs {
-            let tx_fee_info = match &tx.tx {
-                // Cause `ChangePubKey` will have fee we must add this check
-                // TODO: should be removed after merging with a branch that contains a fee on ChangePubKey
-                ZkSyncTx::ChangePubKey(_) => {
-                    // Now `ChangePubKey` operations are not allowed in batches
-                    return Err(Error {
-                        code: RpcErrorCodes::from(TxAddError::Other).into(),
-                        message: "ChangePubKey operations are not allowed in batches".to_string(),
-                        data: None,
-                    });
-                }
-                _ => tx.tx.get_fee_info(),
-            };
+            let tx_fee_info = tx.tx.get_fee_info();
+
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
                 let required_fee = Self::ticker_request(
                     self.ticker_request_sender.clone(),
@@ -272,24 +263,48 @@ impl RpcApp {
         }
 
         let mut verified_txs = Vec::new();
-        for (tx, msg_to_sign) in txs.iter().zip(messages_to_sign.iter()) {
-            let verified_tx = verify_tx_info_message_signature(
-                &tx.tx,
-                tx.signature.clone(),
-                msg_to_sign.clone(),
-                self.sign_verify_request_sender.clone(),
-            )
-            .await?;
+        let mut verified_signature = None;
 
-            verified_txs.push(verified_tx.into_inner());
+        let mut messages_to_sign = vec![];
+        for tx in &txs {
+            messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
         }
 
-        let tx_hashes: Vec<TxHash> = txs.iter().map(|tx| tx.tx.hash()).collect();
+        if let Some(signature) = eth_signature {
+            // User provided the signature for the whole batch.
+            let (verified_batch, signature) = verify_txs_batch_signature(
+                txs,
+                signature,
+                messages_to_sign,
+                self.sign_verify_request_sender.clone(),
+            )
+            .await?
+            .unwrap_batch();
+
+            verified_signature = Some(signature);
+            verified_txs.extend(verified_batch.into_iter());
+        } else {
+            // Otherwise, we process every transaction in turn.
+            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
+                let verified_tx = verify_tx_info_message_signature(
+                    &tx.tx,
+                    tx.signature.clone(),
+                    msg_to_sign,
+                    self.sign_verify_request_sender.clone(),
+                )
+                .await?
+                .unwrap_tx();
+
+                verified_txs.push(verified_tx);
+            }
+        }
+
+        let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
 
         // Send verified transactions to the mempool.
         let tx_add_result = self
             .api_client
-            .send_txs_batch(verified_txs)
+            .send_txs_batch(verified_txs, verified_signature)
             .await
             .map_err(|_| Error {
                 code: RpcErrorCodes::Other.into(),

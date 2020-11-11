@@ -1910,7 +1910,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &rhs_valid,
         )?;
         cur.balance
-            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?; // TODO: this is actually redundant, cause they are both enforced to be of appropriate length
+            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?; // TODO: this is actually redundant, cause they are both enforced to be of appropriate length (#1118).
 
         cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
@@ -2473,7 +2473,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
         params,
     )?;
 
-    // this is safe and just allows the convention. TODO: may be cut to Fr width only?
+    // this is safe and just allows the convention.
     account_data.extend(state_tree_root.into_padded_le_bits(params::FR_BIT_WIDTH_PADDED)); // !!!!!
 
     Ok((account_data, is_account_empty, balance_subtree_root))

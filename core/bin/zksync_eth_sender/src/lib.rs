@@ -24,7 +24,7 @@ use zksync_types::{
 };
 // Local uses
 use self::{
-    database::Database,
+    database::{Database, DatabaseInterface},
     ethereum_interface::{EthereumHttpClient, EthereumInterface},
     gas_adjuster::GasAdjuster,
     transactions::*,
@@ -38,9 +38,8 @@ mod gas_adjuster;
 mod transactions;
 mod tx_queue;
 
-// TODO: Restore tests
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 /// Wait this amount of time if we hit rate limit on infura https://infura.io/docs/ethereum/json-rpc/ratelimits
 const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);
@@ -112,23 +111,23 @@ enum TxCheckMode {
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
-struct ETHSender<ETH: EthereumInterface> {
+struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
     /// Ongoing operations queue.
     ongoing_ops: VecDeque<ETHOperation>,
     /// Connection to the database.
-    db: Database,
+    db: DB,
     /// Ethereum intermediator.
     ethereum: ETH,
     /// Queue for ordered transaction processing.
     tx_queue: TxQueue,
     /// Utility for managing the gas price for transactions.
-    gas_adjuster: GasAdjuster<ETH>,
+    gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
 }
 
-impl<ETH: EthereumInterface> ETHSender<ETH> {
-    pub async fn new(options: EthSenderOptions, db: Database, ethereum: ETH) -> Self {
+impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
+    pub async fn new(options: EthSenderOptions, db: DB, ethereum: ETH) -> Self {
         let mut connection = db
             .acquire_connection()
             .await
@@ -262,13 +261,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             let commitment = match self.perform_commitment_step(&mut current_op).await {
                 Ok(commitment) => commitment,
                 Err(e) => {
-                    log::warn!(
-                        "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
-                        file!(),
-                        line!(),
-                        column!(),
-                        e
-                    );
+                    log::warn!("Error while trying to complete uncommitted op: {}", e);
                     if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
                         log::warn!(
                             "Received rate limit response, waiting for {}s",
@@ -312,7 +305,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
-    async fn initialize_operation(&mut self, tx: TxData) -> Result<(), anyhow::Error> {
+    async fn initialize_operation(&mut self, tx: TxData) -> anyhow::Result<()> {
         let current_block = self.ethereum.block_number().await?;
         let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self
@@ -421,7 +414,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
-    ) -> Result<OperationCommitment, anyhow::Error> {
+    ) -> anyhow::Result<OperationCommitment> {
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
@@ -448,14 +441,42 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
                     return Ok(OperationCommitment::Pending);
                 }
                 TxCheckOutcome::Committed => {
+                    let mut connection = self.db.acquire_connection().await?;
+                    let mut transaction = connection.start_transaction().await?;
+
+                    // While transactions are sent in order, has to be processed in order due to nonce,
+                    // and checked for commitment also in the same order, we still must check that previous
+                    // operation was confirmed.
+                    //
+                    // Consider the following scenario:
+                    // 1. Two Verify operations are sent to the Ethereum and included into one block.
+                    // 2. We start checking sent operations in a loop.
+                    // 3. First operation is considered pending, due to not having enough confirmations.
+                    // 4. After check, a new Ethereum block is created.
+                    // 5. Later in the loop we check the second Verify operation, and it's considered committed.
+                    // 6. State is updated according to operation Verify#2.
+                    // 7. On the next round, Verify#1 is also considered confirmed.
+                    // 8. State is updated according to operation Verify#1, and likely some data is overwritten.
+                    //
+                    // For commit operations consequences aren't that drastic, but still it's not correct to confirm
+                    // operations out of order.
+                    if !self
+                        .db
+                        .is_previous_operation_confirmed(&mut transaction, &op)
+                        .await?
+                    {
+                        log::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);
+                        return Ok(OperationCommitment::Pending);
+                    }
+
                     log::info!(
                         "Confirmed: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
                         op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
-                    let mut connection = self.db.acquire_connection().await?;
                     self.db
-                        .confirm_operation(&mut connection, tx_hash, op)
+                        .confirm_operation(&mut transaction, tx_hash, op)
                         .await?;
+                    transaction.commit().await?;
                     return Ok(OperationCommitment::Committed);
                 }
                 TxCheckOutcome::Stuck => {
@@ -537,7 +558,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         op: &ETHOperation,
         tx_hash: &H256,
         current_block: u64,
-    ) -> Result<TxCheckOutcome, anyhow::Error> {
+    ) -> anyhow::Result<TxCheckOutcome> {
         let status = self.ethereum.get_tx_status(tx_hash).await?;
 
         let outcome = match status {
@@ -554,7 +575,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
             Some(status) => {
                 // Transaction failed, report the failure with details.
 
-                // TODO check confirmations for fail
+                // TODO: check confirmations for fail (#1110).
                 assert!(
                     status.receipt.is_some(),
                     "Receipt should exist for a failed transaction"
@@ -575,10 +596,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     }
 
     /// Creates a new Ethereum operation.
-    async fn sign_new_tx(
-        ethereum: &ETH,
-        op: &ETHOperation,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    async fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> anyhow::Result<SignedCallResult> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -639,7 +657,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
         &mut self,
         deadline_block: u64,
         stuck_tx: &mut ETHOperation,
-    ) -> Result<SignedCallResult, anyhow::Error> {
+    ) -> anyhow::Result<SignedCallResult> {
         let tx_options = self.tx_options_from_stuck_tx(stuck_tx).await?;
 
         let raw_tx = stuck_tx.encoded_tx_data.clone();
@@ -657,7 +675,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     async fn tx_options_from_stuck_tx(
         &mut self,
         stuck_tx: &ETHOperation,
-    ) -> Result<Options, anyhow::Error> {
+    ) -> anyhow::Result<Options> {
         let old_tx_gas_price = stuck_tx.last_used_gas_price;
 
         let new_gas_price = self
