@@ -5,6 +5,9 @@ pub mod events;
 pub mod events_state;
 pub mod rollup_ops;
 pub mod storage_interactor;
+
+#[cfg(test)]
+mod tests;
 pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
@@ -137,9 +140,9 @@ async fn main() {
     } else {
         None
     };
+    let mut storage = connection_pool.access_storage().await.unwrap();
 
     let mut driver = DataRestoreDriver::new(
-        connection_pool,
         transport,
         config.governance_addr,
         config.contract_addr,
@@ -154,14 +157,16 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_db(&driver.connection_pool, &config.eth_network).await;
+        add_tokens_to_db(&connection_pool, &config.eth_network).await;
 
-        driver.set_genesis_state(config.genesis_tx_hash).await;
+        driver
+            .set_genesis_state(&mut storage, config.genesis_tx_hash)
+            .await;
     }
 
     if opt.continue_mode {
-        driver.load_state_from_storage().await;
+        driver.load_state_from_storage(&mut storage).await;
     }
 
-    driver.run_state_update().await;
+    driver.run_state_update(&mut storage).await;
 }

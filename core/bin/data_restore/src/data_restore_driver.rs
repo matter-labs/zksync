@@ -7,7 +7,7 @@ use web3::{
 // Workspace deps
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;
-use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_storage::StorageProcessor;
 use zksync_types::{AccountMap, AccountUpdate};
 // Local deps
 use crate::{
@@ -45,8 +45,6 @@ pub enum StorageUpdateState {
 /// - Tree
 /// - Storage
 pub struct DataRestoreDriver<T: Transport> {
-    /// Database connection pool
-    pub connection_pool: ConnectionPool,
     /// Web3 provider endpoint
     pub web3: Web3<T>,
     /// Provides Ethereum Governance contract unterface
@@ -86,7 +84,6 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        connection_pool: ConnectionPool,
         web3_transport: T,
         governance_contract_eth_addr: H160,
         zksync_contract_eth_addr: H160,
@@ -119,7 +116,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         let tree_state = TreeState::new(available_block_chunk_sizes.clone());
 
         Self {
-            connection_pool,
             web3,
             governance_contract,
             zksync_contract,
@@ -141,7 +137,11 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     ///
-    pub async fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
+    pub async fn set_genesis_state(
+        &mut self,
+        storage: &mut StorageProcessor<'_>,
+        genesis_tx_hash: H256,
+    ) {
         let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
             .await
             .expect("Cant get zkSync genesis transaction");
@@ -153,10 +153,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             .expect("Cant set genesis block number for events state");
         log::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        let conn_pool = self.connection_pool.clone();
-        let mut storage = conn_pool.access_storage().await.expect("DB Error");
-        storage_interactor::save_events_state(&mut storage, &[], &[], genesis_eth_block_number)
-            .await;
+        storage_interactor::save_events_state(storage, &[], &[], genesis_eth_block_number).await;
 
         let genesis_fee_account =
             get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
@@ -189,7 +186,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         log::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         log::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        storage_interactor::save_genesis_tree_state(&mut storage, account_update).await;
+        storage_interactor::save_genesis_tree_state(storage, account_update).await;
 
         log::info!("Saved genesis tree state\n");
 
@@ -197,14 +194,11 @@ impl<T: Transport> DataRestoreDriver<T> {
     }
 
     /// Stops states from storage
-    pub async fn load_state_from_storage(&mut self) {
+    pub async fn load_state_from_storage(&mut self, storage: &mut StorageProcessor<'_>) {
         log::info!("Loading state from storage");
-        let conn_pool = self.connection_pool.clone();
-        let mut storage = conn_pool.access_storage().await.expect("Db error");
-        let state = storage_interactor::get_storage_state(&mut storage).await;
-        self.events_state =
-            storage_interactor::get_block_events_state_from_storage(&mut storage).await;
-        let tree_state = storage_interactor::get_tree_state(&mut storage).await;
+        let state = storage_interactor::get_storage_state(storage).await;
+        self.events_state = storage_interactor::get_block_events_state_from_storage(storage).await;
+        let tree_state = storage_interactor::get_tree_state(storage).await;
         self.tree_state = TreeState::load(
             tree_state.0, // current block
             tree_state.1, // account map
@@ -215,16 +209,15 @@ impl<T: Transport> DataRestoreDriver<T> {
         match state {
             StorageUpdateState::Events => {
                 // Update operations
-                let new_ops_blocks = self.update_operations_state(&mut storage).await;
+                let new_ops_blocks = self.update_operations_state(storage).await;
                 // Update tree
-                self.update_tree_state(&mut storage, new_ops_blocks).await;
+                self.update_tree_state(storage, new_ops_blocks).await;
             }
             StorageUpdateState::Operations => {
                 // Update operations
-                let new_ops_blocks =
-                    storage_interactor::get_ops_blocks_from_storage(&mut storage).await;
+                let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(storage).await;
                 // Update tree
-                self.update_tree_state(&mut storage, new_ops_blocks).await;
+                self.update_tree_state(storage, new_ops_blocks).await;
             }
             StorageUpdateState::None => {}
         }
@@ -244,24 +237,22 @@ impl<T: Transport> DataRestoreDriver<T> {
     }
 
     /// Activates states updates
-    pub async fn run_state_update(&mut self) {
+    pub async fn run_state_update(&mut self, storage: &mut StorageProcessor<'_>) {
         let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         // Connection pool is just ARC to Pool, so this clone is cheap.
         // Thanks to this, we are able to get the connection from this pool only once, instead of getting it in each function
-        let conn_pool = self.connection_pool.clone();
-        let mut storage = conn_pool.access_storage().await.expect("DB error");
         loop {
             log::debug!("Last watched ethereum block: {:?}", last_wached_block);
 
             // Update events
-            if self.update_events_state(&mut storage).await {
+            if self.update_events_state(storage).await {
                 // Update operations
-                let new_ops_blocks = self.update_operations_state(&mut storage).await;
+                let new_ops_blocks = self.update_operations_state(storage).await;
 
                 if !new_ops_blocks.is_empty() {
                     // Update tree
-                    self.update_tree_state(&mut storage, new_ops_blocks).await;
+                    self.update_tree_state(storage, new_ops_blocks).await;
 
                     let total_verified_blocks =
                         get_total_verified_blocks(&self.zksync_contract).await;
@@ -269,7 +260,7 @@ impl<T: Transport> DataRestoreDriver<T> {
 
                     // We must update the Ethereum stats table to match the actual stored state
                     // to keep the `state_keeper` consistent with the `eth_sender`.
-                    storage_interactor::update_eth_stats(&mut storage).await;
+                    storage_interactor::update_eth_stats(storage).await;
 
                     log::info!(
                         "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
