@@ -60,7 +60,7 @@ impl<T: Transport> EthereumChecker<T> {
                 None,
             )
             .await
-            .map_err(|e| anyhow::format_err!("Failed to query contract isValidSignature: {}", e))?;
+            .unwrap_or_default();
 
         Ok(received == EIP1271_SUCCESS_RETURN_VALUE)
     }

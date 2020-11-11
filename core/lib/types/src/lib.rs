@@ -71,7 +71,7 @@ pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 
 use crate::block::Block;
-use zksync_crypto::{
+pub use zksync_crypto::{
     merkle_tree::{RescueHasher, SparseMerkleTree},
     proof::EncodedProofPlonk,
     Engine, Fr,
