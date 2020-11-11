@@ -14,23 +14,10 @@ use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, PriorityOp, TokenLike};
 
 use crate::{
-    error::ClientError, provider::Provider, tokens_cache::TokensCache, types::network::Network,
-    utils::u256_to_biguint,
+    error::ClientError, provider::Provider, tokens_cache::TokensCache, utils::u256_to_biguint,
 };
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
-
-impl Network {
-    pub fn chain_id(self) -> u8 {
-        match self {
-            Network::Mainnet => 1,
-            Network::Ropsten => 3,
-            Network::Rinkeby => 4,
-            Network::Localhost => 9,
-            Network::Unknown => panic!("Attempt to connect to an unknown network"),
-        }
-    }
-}
 
 /// `EthereumProvider` gains access to on-chain operations, such as deposits and full exits.
 /// Methods to interact with Ethereum return corresponding Ethereum transaction hash.

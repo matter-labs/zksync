@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
-use zksync_types::Address;
+use zksync_types::{network::Network, Address};
 
 // Local uses
 use super::{
@@ -21,8 +21,7 @@ use super::{
 struct ApiConfigData {
     contract_address: Address,
     deposit_confirmations: u64,
-    // TODO Move Network constant from the zksync-rs to zksync-types crate. (Task number ????)
-    network: String,
+    network: Network,
 }
 
 impl ApiConfigData {
@@ -30,7 +29,7 @@ impl ApiConfigData {
         Self {
             contract_address: env_options.contract_eth_addr,
             deposit_confirmations: env_options.confirmations_for_eth_event,
-            network: env_options.eth_network.clone(),
+            network: env_options.eth_network.parse().unwrap(),
         }
     }
 }
@@ -71,8 +70,8 @@ async fn deposit_confirmations(data: web::Data<ApiConfigData>) -> Json<u64> {
     Json(data.deposit_confirmations)
 }
 
-async fn network(data: web::Data<ApiConfigData>) -> Json<String> {
-    Json(data.network.clone())
+async fn network(data: web::Data<ApiConfigData>) -> Json<Network> {
+    Json(data.network)
 }
 
 pub fn api_scope(env_options: &ConfigurationOptions) -> Scope {
