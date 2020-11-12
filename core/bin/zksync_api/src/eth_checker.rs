@@ -56,7 +56,7 @@ impl<T: Transport> EthereumChecker<T> {
             bytes.extend_from_slice(prefix.as_bytes());
             bytes.extend_from_slice(&hash);
 
-            bytes
+            tiny_keccak::keccak256(&bytes)
         };
 
         let received: [u8; 4] = self
