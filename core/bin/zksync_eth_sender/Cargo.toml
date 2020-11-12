@@ -39,3 +39,4 @@ async-trait = "0.1.31"
 
 [dev-dependencies]
 chrono = { version = "0.4", features = ["serde"] }
+lazy_static = "1.4.0"

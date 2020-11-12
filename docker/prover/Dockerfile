@@ -35,8 +35,6 @@ COPY --from=builder /usr/src/zksync/target/release/plonk_step_by_step_prover /bi
 COPY --from=builder /usr/src/zksync/target/release/dummy_prover /bin/
 COPY docker/prover/prover-entry.sh /bin/
 COPY keys/packed /keys/packed
-COPY contracts/build/ /contracts/build/
-COPY infrastructure/zk/ infrastructure/zk/
-COPY bin/zk /bin/
+COPY contracts/build /contracts/build
 
 CMD ["prover-entry.sh"]

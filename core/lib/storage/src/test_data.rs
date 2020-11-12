@@ -108,8 +108,8 @@ pub fn gen_eth_sing_data(message: String) -> EthSignData {
     let signature = PackedEthSignature::sign(private_key.deref(), &message.as_bytes()).unwrap();
 
     EthSignData {
-        message,
         signature: TxEthSignature::EthereumSignature(signature),
+        message: message.into_bytes(),
     }
 }
 

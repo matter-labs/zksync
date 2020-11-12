@@ -1,7 +1,7 @@
 {
 	"name": "zksync-crypto",
-	"version": "0.3.2",
-	"browser": "dist/zksync-crypto-bundler.js",
+	"version": "0.4.1",
+	"browser": "dist/zksync-crypto-web.js",
 	"main": "dist/zksync-crypto-node.js",
 	"files": [
 		"dist/*.ts",
@@ -9,7 +9,7 @@
 		"dist/*.js"
 	],
 	"scripts": {
-		"build": "./build.sh",
+		"build": "./build.sh && node web-wasm.js",
 		"test": "f cargo test"
 	}
 }
