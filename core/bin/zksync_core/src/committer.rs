@@ -8,7 +8,11 @@ use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::mempool::MempoolRequest;
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::aggregated_operations::{
+    AggregatedActionType, AggregatedOperation, BlockExecuteOperationArg, BlocksCommitOperation,
+    BlocksExecuteOperation, BlocksProofOperation,
+};
 use zksync_types::{
     block::{Block, ExecutedOperations, PendingBlock},
     AccountUpdates, Action, BlockNumber, Operation,
@@ -191,19 +195,6 @@ async fn commit_block(
 }
 
 async fn poll_for_new_proofs_task(pool: ConnectionPool) {
-    let mut last_verified_block = {
-        let mut storage = pool
-            .access_storage()
-            .await
-            .expect("db connection failed for committer");
-        storage
-            .chain()
-            .block_schema()
-            .get_last_verified_block()
-            .await
-            .expect("db failed")
-    };
-
     let mut timer = time::interval(PROOF_POLL_INTERVAL);
     loop {
         timer.tick().await;
@@ -213,47 +204,188 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
             .await
             .expect("db connection failed for committer");
 
-        loop {
-            let block_number = last_verified_block + 1;
-            let proof = storage.prover_schema().load_proof(block_number).await;
-            if let Ok(Some(proof)) = proof {
-                let mut transaction = storage
-                    .start_transaction()
-                    .await
-                    .expect("Unable to start DB transaction");
-
-                log::info!("New proof for block: {}", block_number);
-                let block = transaction
-                    .chain()
-                    .block_schema()
-                    .load_committed_block(block_number)
-                    .await
-                    .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
-
-                let op = Operation {
-                    action: Action::Verify {
-                        proof: Box::new(proof),
-                    },
-                    block,
-                    id: None,
-                };
-                transaction
-                    .chain()
-                    .block_schema()
-                    .execute_operation(op.clone())
-                    .await
-                    .expect("committer must commit the op into db");
-                last_verified_block += 1;
-
-                transaction
-                    .commit()
-                    .await
-                    .expect("Failed to commit transaction");
-            } else {
-                break;
-            }
-        }
+        create_aggregated_operations(&mut storage)
+            .await
+            .map_err(|e| log::error!("Failed to create aggregated operation: {}", e))
+            .unwrap_or_default();
     }
+}
+
+async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> anyhow::Result<()> {
+    let last_committed_block = storage
+        .chain()
+        .block_schema()
+        .get_last_committed_block()
+        .await?;
+
+    let last_aggregate_committed_block = storage
+        .chain()
+        .operations_schema()
+        .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
+        .await?;
+
+    let last_aggregate_create_proof_block = storage
+        .chain()
+        .operations_schema()
+        .get_last_affected_block_by_aggregated_action(AggregatedActionType::CreateProofBlocks)
+        .await?;
+
+    let last_aggregate_publish_proof_block = storage
+        .chain()
+        .operations_schema()
+        .get_last_affected_block_by_aggregated_action(
+            AggregatedActionType::PublishProofBlocksOnchain,
+        )
+        .await?;
+
+    let last_aggregate_executed_block = storage
+        .chain()
+        .operations_schema()
+        .get_last_affected_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks)
+        .await?;
+
+    if last_committed_block > last_aggregate_committed_block {
+        let old_committed_block = storage
+            .chain()
+            .block_schema()
+            .get_block(last_committed_block)
+            .await?
+            .expect("Failed to get last committed block from db");
+        let mut blocks_to_commit = Vec::new();
+        for block_number in last_aggregate_committed_block + 1..=last_committed_block {
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await?
+                .expect("Failed to get last committed block from db");
+            blocks_to_commit.push(block);
+        }
+
+        let aggregated_commit_block = AggregatedOperation::CommitBlocks(BlocksCommitOperation {
+            last_committed_block: old_committed_block,
+            blocks: blocks_to_commit,
+        });
+
+        storage
+            .chain()
+            .operations_schema()
+            .store_aggregated_action(aggregated_commit_block)
+            .await?;
+        log::info!(
+            "Created aggregated commit op: {} - {}",
+            last_aggregate_committed_block + 1,
+            last_committed_block
+        );
+    }
+
+    if last_committed_block > last_aggregate_create_proof_block {
+        let mut commitments = Vec::new();
+        let mut block_numbers = Vec::new();
+        for block_number in last_aggregate_create_proof_block + 1..=last_committed_block {
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await?
+                .expect("Failed to get last committed block from db");
+            block_numbers.push(block_number);
+            commitments.push((block.block_commitment, block.block_number))
+        }
+
+        let aggregated_op_create = AggregatedOperation::CreateProofBlocks(block_numbers);
+        // TODO: should execute after proof is produced
+        let aggregated_op_publish =
+            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation { commitments });
+
+        storage
+            .chain()
+            .operations_schema()
+            .store_aggregated_action(aggregated_op_create)
+            .await?;
+        storage
+            .chain()
+            .operations_schema()
+            .store_aggregated_action(aggregated_op_publish)
+            .await?;
+
+        log::info!(
+            "Created aggregated create proof / publish proof op: {} - {}",
+            last_aggregate_create_proof_block + 1,
+            last_committed_block
+        );
+    }
+
+    // TODO: should execute after proof is produced
+    // if last_aggregate_create_proof_block > last_aggregate_publish_proof_block {
+    //
+    // }
+
+    if last_aggregate_publish_proof_block > last_aggregate_executed_block {
+        let mut blocks = Vec::new();
+        for block_number in last_aggregate_executed_block + 1..=last_aggregate_publish_proof_block {
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await?
+                .expect("Failed to get last committed block from db");
+            let publish_proof_op = storage
+                .chain()
+                .operations_schema()
+                .get_aggregated_op_that_affects_block(
+                    AggregatedActionType::PublishProofBlocksOnchain,
+                    block_number,
+                )
+                .await?
+                .expect("Aggregated op should exist");
+            let block_execution_op_arg =
+                if let AggregatedOperation::PublishProofBlocksOnchain(publish_arguments) =
+                    publish_proof_op
+                {
+                    let commitment_idx = publish_arguments
+                        .commitments
+                        .iter()
+                        .enumerate()
+                        .find_map(|(idx, (_, commitment_block))| {
+                            if *commitment_block == block_number {
+                                Some(idx)
+                            } else {
+                                None
+                            }
+                        })
+                        .expect("should be present");
+                    let commitments = publish_arguments
+                        .commitments
+                        .into_iter()
+                        .map(|(c, _)| c)
+                        .collect();
+
+                    BlockExecuteOperationArg {
+                        block,
+                        commitments,
+                        commitment_idx,
+                    }
+                } else {
+                    panic!("should be publish proof blocks onchain data");
+                };
+            blocks.push(block_execution_op_arg);
+        }
+        let aggregated_op = AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation { blocks });
+        storage
+            .chain()
+            .operations_schema()
+            .store_aggregated_action(aggregated_op)
+            .await?;
+
+        log::info!(
+            "Created aggregated execute op: {} - {}",
+            last_aggregate_executed_block + 1,
+            last_aggregate_publish_proof_block
+        );
+    }
+
+    Ok(())
 }
 
 #[must_use]

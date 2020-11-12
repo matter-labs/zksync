@@ -1,24 +1,5 @@
 {
   "db": "PostgreSQL",
-  "03c6a58e4fe6290daec5434feed4af91579ba50aa2302edb00566f14af088a59": {
-    "query": "\n            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "03d9e5cb04328e5a5e238727311406d19ffb924f06f34c04f67fbd9354442996": {
     "query": "SELECT * FROM operations WHERE block_number = $1 AND action_type = $2",
     "describe": {
@@ -560,6 +541,57 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "24598bf98e47b8a2bee59bbd777dd5e0b32ee74e21e110e9e73c52cf72b7f56c": {
+    "query": "SELECT * FROM aggregate_operations WHERE action_type = $1 and from_block <= $2 and $2 <= to_block",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "24870d60d50ce4eb1bc6b76a2e1fc94d39d3f5025a4bf80d5a0c2916945fc6f8": {
@@ -1727,6 +1759,26 @@
       "nullable": []
     }
   },
+  "6ae0a5cf002fd0ff37907a62712846dfc49511b34e8ee044d472e0a9371eba0f": {
+    "query": "\n            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit, commitment)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
     "query": "SELECT max(number) FROM blocks",
     "describe": {
@@ -2465,6 +2517,21 @@
         false,
         false
       ]
+    }
+  },
+  "a70d2d4dd84c5a4bed92793d0a409a9b2858a39ff485e9b1d0f1bf42e89645b6": {
+    "query": "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (id)\n            DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Jsonb",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "aaaf2bcea738151db11f6152772516a46ef7d23ae885936094226b837369ee3c": {
@@ -3574,6 +3641,26 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "f5a24f01f525ede5d8e61b97e452a82d372c2bececacf693ab654eef0e453d94": {
+    "query": "SELECT max(to_block) from aggregate_operations where action_type = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },

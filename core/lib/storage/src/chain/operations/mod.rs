@@ -5,12 +5,13 @@ use anyhow::format_err;
 use zksync_types::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
 // Local imports
 use self::records::{
-    NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
+    NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation, StoredAggregatedOperation,
     StoredCompleteWithdrawalsTransaction, StoredExecutedPriorityOperation,
     StoredExecutedTransaction, StoredOperation, StoredPendingWithdrawal,
 };
 use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};
 use zksync_basic_types::H256;
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 
 pub mod records;
 
@@ -329,5 +330,60 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         };
 
         Ok(res)
+    }
+
+    pub async fn store_aggregated_action(
+        &mut self,
+        operation: AggregatedOperation,
+    ) -> QueryResult<()> {
+        let aggregated_action_type = operation.get_action_type();
+        let (from_block, to_block) = operation.get_block_range();
+        sqlx::query!(
+            "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (id)
+            DO NOTHING",
+            aggregated_action_type.to_string(),
+            serde_json::to_value(operation.clone()).expect("aggregated op serialize fail"),
+            i64::from(from_block),
+            i64::from(to_block)
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_last_affected_block_by_aggregated_action(
+        &mut self,
+        aggregated_action: AggregatedActionType,
+    ) -> QueryResult<BlockNumber> {
+        let block_number = sqlx::query!(
+            "SELECT max(to_block) from aggregate_operations where action_type = $1",
+            aggregated_action.to_string(),
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .map(|b| b as BlockNumber)
+        .unwrap_or_default();
+        Ok(block_number)
+    }
+
+    pub async fn get_aggregated_op_that_affects_block(
+        &mut self,
+        aggregated_action: AggregatedActionType,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<AggregatedOperation>> {
+        let aggregated_op = sqlx::query_as!(
+            StoredAggregatedOperation,
+            "SELECT * FROM aggregate_operations \
+            WHERE action_type = $1 and from_block <= $2 and $2 <= to_block",
+            aggregated_action.to_string(),
+            i64::from(block_number)
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|op| serde_json::from_value(op.arguments).expect("unparsable aggregated op"));
+        Ok(aggregated_op)
     }
 }

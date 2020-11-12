@@ -3,7 +3,7 @@
 use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_crypto::convert::FeConvert;
-use zksync_types::{block::PendingBlock, Action, ActionType, Operation};
+use zksync_types::{block::PendingBlock, Action, ActionType, Fr, Operation};
 use zksync_types::{
     block::{Block, ExecutedOperations},
     AccountId, BlockNumber, ZkSyncOp,
@@ -718,5 +718,21 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(account_tree_cache.map(|w| {
             serde_json::from_str(&w.tree_cache).expect("Failed to deserialize Account Tree Cache")
         }))
+    }
+
+    pub async fn save_genesis_block(&mut self, root_hash: Fr) -> QueryResult<()> {
+        let block = Block {
+            block_number: 0,
+            new_root_hash: root_hash,
+            fee_account: 0,
+            block_transactions: Vec::new(),
+            processed_priority_ops: (0, 0),
+            block_chunks_size: 0,
+            commit_gas_limit: 0u32.into(),
+            verify_gas_limit: 0u32.into(),
+            block_commitment: H256::zero(),
+        };
+
+        self.save_block(block).await
     }
 }

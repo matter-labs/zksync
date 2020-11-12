@@ -37,6 +37,7 @@
 //! [`Account`]: ./account/struct.Account.html
 
 pub mod account;
+pub mod aggregated_operations;
 pub mod block;
 pub mod config;
 pub mod ethereum;

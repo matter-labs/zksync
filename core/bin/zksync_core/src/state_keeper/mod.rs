@@ -476,12 +476,17 @@ impl ZkSyncStateKeeper {
             .await
             .expect("db fail");
 
+        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
+        let root_hash = state.root_hash();
+        transaction
+            .chain()
+            .block_schema()
+            .save_genesis_block(root_hash);
+
         transaction
             .commit()
             .await
             .expect("Unable to commit transaction in statekeeper");
-        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
-        let root_hash = state.root_hash();
         log::info!("Genesis block created, state: {}", state.root_hash());
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }

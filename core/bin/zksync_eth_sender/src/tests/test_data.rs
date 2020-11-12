@@ -5,6 +5,7 @@ use std::time::SystemTime;
 use chrono::DateTime;
 use lazy_static::lazy_static;
 // Workspace uses
+use zksync_basic_types::H256;
 use zksync_types::{
     block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FullExit, FullExitOp,
     PriorityOp, ZkSyncOp, ZkSyncPriorityOp,
@@ -48,6 +49,7 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
             50,
             1_000_000.into(),
             1_500_000.into(),
+            H256::default(),
         ),
     }
 }
