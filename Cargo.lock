@@ -5464,7 +5464,6 @@ dependencies = [
  "thiserror",
  "tokio 0.2.22",
  "web3 0.13.0",
- "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
