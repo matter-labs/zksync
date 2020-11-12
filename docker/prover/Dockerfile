@@ -10,9 +10,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release
 
 FROM debian:buster-slim
-RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
-RUN apt-get update && apt-get install -y axel ca-certificates nodejs npm \
-    && npm install -g yarn && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y axel ca-certificates && rm -rf /var/lib/apt/lists/*
 # Docs of env variables used for this image
 # to test this locally just run
 # docker build -t tmp_prover -f =(f envsubst < ./docker/prover/Dockerfile) .; docker run --rm  tmp_prover:latest
@@ -38,7 +36,5 @@ COPY --from=builder /usr/src/zksync/target/release/dummy_prover /bin/
 COPY docker/prover/prover-entry.sh /bin/
 COPY keys/packed /keys/packed
 COPY contracts/build /contracts/build
-COPY infrastructure/zk /infrastructure/zk
-COPY bin/zk /bin/
 
 CMD ["prover-entry.sh"]
