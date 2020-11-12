@@ -5,7 +5,7 @@ import * as contract from '../contract';
 import * as integration from './integration';
 export { integration };
 
-async function run_on_test_db(reset: boolean, dir: string, command: string) {
+async function runOnTestDb(reset: boolean, dir: string, command: string) {
     const databaseUrl = process.env.DATABASE_URL as string;
     process.env.DATABASE_URL = databaseUrl.replace(/plasma/g, 'plasma_test');
     process.chdir('core/lib/storage');
@@ -22,7 +22,7 @@ async function run_on_test_db(reset: boolean, dir: string, command: string) {
 }
 
 export async function db(reset: boolean, ...args: string[]) {
-    await run_on_test_db(
+    await runOnTestDb(
         reset, 
         'core/lib/storage', 
         `cargo test --release -p zksync_storage --features db_test -- --nocapture
@@ -30,8 +30,8 @@ export async function db(reset: boolean, ...args: string[]) {
     );
 }
 
-export async function rust_api(reset: boolean, ...args: string[]) {
-    await run_on_test_db(
+export async function rustApi(reset: boolean, ...args: string[]) {
+    await runOnTestDb(
         reset, 
         'core/bin/zksync_api', 
         `cargo test --release -p zksync_api --features api_test -- --nocapture
@@ -63,7 +63,7 @@ export async function js() {
 export async function rust() {
     await utils.spawn('cargo test --release');
     await db(true);
-    await rust_api(true)
+    await rustApi(true)
     await prover();
     const { stdout: threads } = await utils.exec('nproc');
     await circuit(parseInt(threads));
@@ -91,7 +91,7 @@ command
     .option('--no-reset', "do not reset the database before test starting")
     .allowUnknownOption()
     .action(async (cmd: Command, options: string[] | undefined) => {
-        await rust_api(cmd.reset, ...options || []);
+        await rustApi(cmd.reset, ...options || []);
     });
 
 
