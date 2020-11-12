@@ -55,6 +55,6 @@ reqwest = { version = "0.10", features = ["blocking", "json"] }
 tiny-keccak = "1.4.2"
 async-trait = "0.1.31"
 jsonwebtoken = "7"
-
+metrics = "0.13.0-alpha.8"
 lru-cache = "0.1.2"
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 // External uses
 use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
@@ -78,13 +79,16 @@ pub trait Rpc {
 
 impl Rpc for RpcApp {
     fn account_info(&self, addr: Address) -> FutureResp<AccountInfoResp> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_account_info(addr)).await.unwrap() };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "account_info");
         Box::new(resp.boxed().compat())
     }
 
     fn ethop_info(&self, serial_id: u32) -> FutureResp<ETHOpInfoResp> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -93,13 +97,16 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "ethop_info");
         Box::new(resp.boxed().compat())
     }
 
     fn tx_info(&self, hash: TxHash) -> FutureResp<TransactionInfoResp> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_tx_info(hash)).await.unwrap() };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "tx_info");
         Box::new(resp.boxed().compat())
     }
 
@@ -109,6 +116,7 @@ impl Rpc for RpcApp {
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> FutureResp<TxHash> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -117,6 +125,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "tx_submit");
         Box::new(resp.boxed().compat())
     }
 
@@ -125,6 +134,7 @@ impl Rpc for RpcApp {
         txs: Vec<TxWithSignature>,
         eth_signature: Option<TxEthSignature>,
     ) -> FutureResp<Vec<TxHash>> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -133,20 +143,25 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "submit_txs_batch");
         Box::new(resp.boxed().compat())
     }
 
     fn contract_address(&self) -> FutureResp<ContractAddressResp> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_contract_address()).await.unwrap() };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "contract_address");
         Box::new(resp.boxed().compat())
     }
 
     fn tokens(&self) -> FutureResp<HashMap<String, Token>> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_tokens()).await.unwrap() };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "tokens");
         Box::new(resp.boxed().compat())
     }
 
@@ -156,6 +171,7 @@ impl Rpc for RpcApp {
         address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -164,6 +180,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "get_tx_fee");
         Box::new(resp.boxed().compat())
     }
 
@@ -173,6 +190,7 @@ impl Rpc for RpcApp {
         addresses: Vec<Address>,
         token_like: TokenLike,
     ) -> FutureResp<BatchFee> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -181,10 +199,12 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "get_txs_batch_fee_in_wei");
         Box::new(resp.boxed().compat())
     }
 
     fn get_token_price(&self, token_like: TokenLike) -> FutureResp<BigDecimal> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -193,10 +213,12 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "get_token_price");
         Box::new(resp.boxed().compat())
     }
 
     fn get_confirmations_for_eth_op_amount(&self) -> FutureResp<u64> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -205,10 +227,12 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "get_confirmations_for_eth_op_amount");
         Box::new(resp.boxed().compat())
     }
 
     fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>> {
+        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
@@ -217,6 +241,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
+        metrics::histogram!("api", start.elapsed(), "rpc" => "get_eth_tx_for_withdrawal");
         Box::new(resp.boxed().compat())
     }
 }

@@ -5525,6 +5525,7 @@ dependencies = [
  "jsonwebtoken",
  "log 0.4.11",
  "lru-cache",
+ "metrics",
  "num",
  "reqwest",
  "serde",
