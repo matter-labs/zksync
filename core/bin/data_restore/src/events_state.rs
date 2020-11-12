@@ -366,31 +366,16 @@ impl EventsState {
 #[cfg(test)]
 mod test {
     use super::EventsState;
-    use web3::types::{Bytes, Log};
     use web3::{
         api::{Eth, Namespace},
         contract::Contract,
         types::H256,
+        types::{Bytes, Log},
     };
     use zksync_contracts::zksync_contract;
 
-    use crate::tests::utils::{u32_to_32bytes, FakeTransport};
+    use crate::tests::utils::{create_log, u32_to_32bytes, FakeTransport};
 
-    fn create_log(topic: H256, data: Bytes, block_number: u32) -> Log {
-        Log {
-            address: [1u8; 20].into(),
-            topics: vec![topic, u32_to_32bytes(block_number).into()],
-            data,
-            block_hash: None,
-            block_number: Some(block_number.into()),
-            transaction_hash: Some(u32_to_32bytes(1).into()),
-            transaction_index: Some(0.into()),
-            log_index: Some(0.into()),
-            transaction_log_index: Some(0.into()),
-            log_type: Some("mined".into()),
-            removed: None,
-        }
-    }
     #[test]
     fn event_state() {
         let mut events_state = EventsState::default();
@@ -418,8 +403,18 @@ mod test {
 
         let mut logs = vec![];
         for i in 0..32 {
-            logs.push(create_log(block_committed_topic.clone(), Bytes(vec![]), i));
-            logs.push(create_log(block_verified_topic.clone(), Bytes(vec![]), i));
+            logs.push(create_log(
+                block_committed_topic.clone(),
+                vec![],
+                Bytes(vec![]),
+                i,
+            ));
+            logs.push(create_log(
+                block_verified_topic.clone(),
+                vec![],
+                Bytes(vec![]),
+                i,
+            ));
         }
 
         events_state.update_blocks_state(&contract, &logs);
@@ -431,7 +426,7 @@ mod test {
         let mut data = vec![];
         data.extend(&last_block_com);
         data.extend(&last_block_ver);
-        let log = create_log(reverted_topic.clone(), Bytes(data), 3);
+        let log = create_log(reverted_topic.clone(), vec![], Bytes(data), 3);
         events_state.update_blocks_state(&contract, &[log]);
         assert_eq!(events_state.committed_events.len(), 16);
         assert_eq!(events_state.verified_events.len(), 11);

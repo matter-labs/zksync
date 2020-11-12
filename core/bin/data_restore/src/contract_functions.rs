@@ -1,6 +1,6 @@
 use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
 use web3::contract::{Contract, Options};
-use web3::types::{Address, BlockId, Transaction, U256};
+use web3::types::{Address, BlockId, Transaction, U128, U256, U64};
 use web3::Transport;
 use zksync_crypto::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
 use zksync_types::account::Account;

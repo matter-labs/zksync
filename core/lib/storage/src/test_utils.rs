@@ -185,3 +185,18 @@ pub async fn create_data_restore_data(storage: &mut StorageProcessor<'_>) {
             .unwrap();
     }
 }
+
+pub async fn create_eth(storage: &mut StorageProcessor<'_>) {
+    sqlx::query!(
+        "
+        INSERT INTO tokens
+        VALUES (0,
+                '0x0000000000000000000000000000000000000000',
+                'ETH',
+                18)
+        "
+    )
+    .execute(storage.conn())
+    .await
+    .unwrap();
+}

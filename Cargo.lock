@@ -5615,6 +5615,7 @@ dependencies = [
  "db_test_macro",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
+ "futures 0.3.6",
  "hex",
  "jsonrpc-core",
  "log 0.4.11",
