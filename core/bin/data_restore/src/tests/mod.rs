@@ -1,110 +1,166 @@
 pub(crate) mod utils;
 
+use chrono::Utc;
 use futures::future;
 use jsonrpc_core::Params;
 use serde_json::{json, Value};
-use std::future::Future;
-use web3::{RequestId, Transport};
+use std::{collections::HashMap, future::Future};
+use web3::{contract::tokens::Tokenize, types::Transaction, RequestId, Transport};
 
 use db_test_macro::test as db_test;
-use zksync_storage::StorageProcessor;
+use zksync_contracts::{governance_contract, zksync_contract};
+use zksync_crypto::Fr;
+use zksync_storage::{
+    chain::account::AccountSchema, data_restore::DataRestoreSchema, test_utils::create_eth,
+    StorageProcessor,
+};
 use zksync_types::{
-    Deposit, DepositOp, ExecutedOperations, ExecutedPriorityOp, Log, PriorityOp, Withdraw,
-    WithdrawOp, ZkSyncOp, H256,
+    block::Block, Address, Deposit, DepositOp, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
+    Log, PriorityOp, Withdraw, WithdrawOp, ZkSyncOp, H256,
 };
 
 use crate::data_restore_driver::DataRestoreDriver;
 use crate::tests::utils::{create_log, u32_to_32bytes};
 use crate::{END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP};
-use chrono::Utc;
+use num::BigUint;
+use web3::types::Bytes;
 
-use std::collections::HashMap;
-use web3::contract::tokens::Tokenize;
-use web3::types::{Filter, Transaction};
-use zksync_contracts::{governance_contract, zksync_contract};
+fn create_withdraw_operations(
+    account_id: u32,
+    from: Address,
+    to: Address,
+    amount: u32,
+) -> ExecutedOperations {
+    let withdraw_op = ZkSyncOp::Withdraw(Box::new(WithdrawOp {
+        tx: Withdraw::new(account_id, from, to, 0, amount.into(), 0u32.into(), 0, None),
+        account_id,
+    }));
+    let executed_tx = ExecutedTx {
+        signed_tx: withdraw_op.try_get_tx().unwrap().into(),
+        success: false,
+        op: Some(withdraw_op),
+        fail_reason: None,
+        block_index: None,
+        created_at: Utc::now(),
+        batch_id: None,
+    };
+    ExecutedOperations::Tx(Box::new(executed_tx))
+}
 
-use zksync_crypto::Fr;
-use zksync_storage::chain::account::AccountSchema;
-use zksync_storage::data_restore::DataRestoreSchema;
-use zksync_storage::test_utils::create_eth;
-use zksync_types::block::Block;
+fn create_deposit(from: Address, to: Address, amount: u32) -> ExecutedOperations {
+    let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
+        priority_op: Deposit {
+            from,
+            token: 0,
+            amount: amount.into(),
+            to,
+        },
+        account_id: 0,
+    }));
+    let priority_operation = PriorityOp {
+        serial_id: 0,
+        data: deposit_op.try_get_priority_op().unwrap(),
+        deadline_block: 0,
+        eth_hash: vec![],
+        eth_block: 0,
+    };
+    let executed_deposit_op = ExecutedPriorityOp {
+        priority_op: priority_operation,
+        op: deposit_op,
+        block_index: 0,
+        created_at: Utc::now(),
+    };
+    ExecutedOperations::PriorityOp(Box::new(executed_deposit_op))
+}
+
+fn create_block(block_number: u32, transactions: Vec<ExecutedOperations>) -> Block {
+    Block::new(
+        block_number,
+        Fr::default(),
+        0,
+        transactions,
+        (0, 0),
+        100,
+        1_000_000.into(),
+        1_500_000.into(),
+    )
+}
+
+fn create_transaction(number: u32, block: Block) -> Transaction {
+    let hash: H256 = u32_to_32bytes(number).into();
+    let root = block.get_eth_encoded_root();
+    let public_data = block.get_eth_public_data();
+    let witness_data = block.get_eth_witness_data();
+    let fake_data = [0u8; 4];
+    let params = (
+        u64::from(block.block_number),
+        u64::from(block.fee_account),
+        vec![root],
+        public_data,
+        witness_data.0,
+        witness_data.1,
+    );
+    let mut input_data = vec![];
+    input_data.extend_from_slice(&fake_data);
+    input_data.extend_from_slice(&ethabi::encode(params.into_tokens().as_ref()));
+
+    Transaction {
+        hash: hash.into(),
+        nonce: u32_to_32bytes(1).into(),
+        block_hash: Some(u32_to_32bytes(100).into()),
+        block_number: Some(block.block_number.into()),
+        transaction_index: Some(block.block_number.into()),
+        from: [5u8; 20].into(),
+        to: Some([7u8; 20].into()),
+        value: u32_to_32bytes(10).into(),
+        gas_price: u32_to_32bytes(1).into(),
+        gas: u32_to_32bytes(1).into(),
+        input: Bytes(input_data),
+        raw: None,
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct Web3Transport {
     transactions: HashMap<String, Transaction>,
+    logs: HashMap<String, Vec<Log>>,
 }
+
 impl Web3Transport {
     fn new() -> Self {
-        let mut transactions = HashMap::default();
-        let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
-            priority_op: Deposit {
-                from: Default::default(),
-                token: 0,
-                amount: 100u32.into(),
-                to: Default::default(),
-            },
-            account_id: 0,
-        }));
-        let priority_operation = PriorityOp {
-            serial_id: 0,
-            data: deposit_op.try_get_priority_op().unwrap(),
-            deadline_block: 0,
-            eth_hash: vec![],
-            eth_block: 0,
+        Self {
+            transactions: HashMap::default(),
+            logs: HashMap::default(),
+        }
+    }
+    fn push_transactions(&mut self, transactions: Vec<Transaction>) {
+        for transaction in transactions {
+            self.transactions
+                .insert(format!("{:?}", &transaction.hash), transaction);
+        }
+    }
+
+    fn insert_logs(&mut self, topic: String, logs: Vec<Log>) {
+        self.logs.insert(topic, logs);
+    }
+
+    fn get_logs(&self, filter: Value) -> Vec<Log> {
+        let topics = if let Ok(topics) =
+            serde_json::from_value::<Vec<Vec<String>>>(filter.get("topics").unwrap().clone())
+        {
+            topics.first().unwrap().clone()
+        } else {
+            serde_json::from_value::<Vec<String>>(filter.get("topics").unwrap().clone()).unwrap()
         };
-        let executed_deposit_op = ExecutedPriorityOp {
-            priority_op: priority_operation,
-            op: deposit_op,
-            block_index: 0,
-            created_at: Utc::now(),
-        };
+        let mut logs = vec![];
 
-        let operation = ExecutedOperations::PriorityOp(Box::new(executed_deposit_op));
+        for topic in &topics {
+            if let Some(topic_logs) = self.logs.get(topic) {
+                logs.extend_from_slice(topic_logs)
+            }
+        }
 
-        let block = Block::new(
-            88,
-            Fr::default(),
-            0,
-            vec![operation],
-            (0, 0),
-            100,
-            1_000_000.into(),
-            1_500_000.into(),
-        );
-
-        let hash: H256 = u32_to_32bytes(1).into();
-        let root = block.get_eth_encoded_root();
-        let public_data = block.get_eth_public_data();
-        let witness_data = block.get_eth_witness_data();
-        let fake_data = [0u8; 4];
-        let params = (
-            u64::from(block.block_number),
-            u64::from(block.fee_account),
-            vec![root],
-            public_data,
-            witness_data.0,
-            witness_data.1,
-        );
-        let mut input_data = vec![];
-        input_data.extend_from_slice(&fake_data);
-        input_data.extend_from_slice(&ethabi::encode(params.into_tokens().as_ref()));
-
-        let tr = Transaction {
-            hash: hash.into(),
-            nonce: u32_to_32bytes(1).into(),
-            block_hash: Some(u32_to_32bytes(100).into()),
-            block_number: Some(88.into()),
-            transaction_index: Some(block.block_number.into()),
-            from: [5u8; 20].into(),
-            to: Some([7u8; 20].into()),
-            value: u32_to_32bytes(10).into(),
-            gas_price: u32_to_32bytes(1).into(),
-            gas: u32_to_32bytes(1).into(),
-            input: Bytes(input_data),
-            raw: None,
-        };
-        transactions.insert(json!(hash).to_string(), tr);
-        Self { transactions }
+        logs
     }
 }
 
@@ -139,18 +195,18 @@ impl Transport for Web3Transport {
                     "eth_blockNumber" => Ok(json!("0x80")),
                     "eth_getLogs" => {
                         let filter = params.pop().unwrap();
-                        Ok(json!(get_logs(filter)))
+                        Ok(json!(self.get_logs(filter)))
                     }
                     "eth_getTransactionByHash" => {
-                        let hash = params.pop().unwrap().to_string();
-                        if let Some(transaction) = self.transactions.get(&hash) {
+                        let hash = &format!("{}", params.pop().unwrap())[1..67]; // TODO Cut `"` from start and end of the string
+                        if let Some(transaction) = self.transactions.get(hash) {
                             Ok(json!(transaction))
                         } else {
                             unreachable!()
                         }
                     }
                     "eth_call" => Ok(json!(
-                        "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        "0x0000000000000000000000000000000000000000000000000000000000000002"
                     )),
                     _ => Err(web3::Error::Unreachable),
                 }
@@ -161,77 +217,108 @@ impl Transport for Web3Transport {
     }
 }
 
-fn get_logs(filter: Value) -> Vec<Log> {
+#[db_test]
+async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
+    create_eth(&mut storage).await;
+    let mut transport = Web3Transport::new();
+
     let contract = zksync_contract();
     let gov_contract = governance_contract();
+
     let block_verified_topic = contract
         .event("BlockVerification")
         .expect("Main contract abi error")
         .signature();
-    let block_verified_topic_string = &json!(block_verified_topic).to_string()[1..67].to_string();
+    let block_verified_topic_string = format!("{:?}", block_verified_topic);
+    transport.insert_logs(
+        block_verified_topic_string,
+        vec![
+            create_log(
+                block_verified_topic.clone(),
+                vec![u32_to_32bytes(1).into()],
+                Bytes(vec![]),
+                1,
+                u32_to_32bytes(1).into(),
+            ),
+            create_log(
+                block_verified_topic.clone(),
+                vec![u32_to_32bytes(2).into()],
+                Bytes(vec![]),
+                2,
+                u32_to_32bytes(2).into(),
+            ),
+        ],
+    );
 
     let block_committed_topic = contract
         .event("BlockCommit")
         .expect("Main contract abi error")
         .signature();
-    let block_commit_topic_string = &json!(block_committed_topic).to_string()[1..67].to_string();
+    let block_commit_topic_string = format!("{:?}", block_committed_topic);
+    transport.insert_logs(
+        block_commit_topic_string,
+        vec![
+            create_log(
+                block_committed_topic.clone(),
+                vec![u32_to_32bytes(1).into()],
+                Bytes(vec![]),
+                1,
+                u32_to_32bytes(1).into(),
+            ),
+            create_log(
+                block_committed_topic.clone(),
+                vec![u32_to_32bytes(2).into()],
+                Bytes(vec![]),
+                2,
+                u32_to_32bytes(2).into(),
+            ),
+        ],
+    );
 
     let reverted_topic = contract
         .event("BlocksRevert")
         .expect("Main contract abi error")
         .signature();
-
-    let _reverted_topic_string = &json!(reverted_topic).to_string()[1..67].to_string();
+    let _reverted_topic_string = format!("{:?}", reverted_topic);
 
     let new_token_topic = gov_contract
         .event("NewToken")
         .expect("Main contract abi error")
         .signature();
-    let new_token_topic_string = &json!(new_token_topic).to_string()[1..67].to_string();
-
-    let _from_block = filter.get("fromBlock").unwrap().as_str().unwrap();
-    let _to_block = filter.get("toBlock").unwrap().as_str().unwrap();
-
-    let topics = if let Ok(topics) =
-        serde_json::from_value::<Vec<Vec<String>>>(filter.get("topics").unwrap().clone())
-    {
-        topics.first().unwrap().clone()
-    } else {
-        serde_json::from_value::<Vec<String>>(filter.get("topics").unwrap().clone()).unwrap()
-    };
-    let mut logs = vec![];
-
-    if topics.contains(block_commit_topic_string) {
-        logs.push(create_log(
-            block_committed_topic.clone(),
-            vec![u32_to_32bytes(10).into()],
-            Bytes(vec![]),
-            10,
-        ))
-    }
-    if topics.contains(block_verified_topic_string) {
-        logs.push(create_log(
-            block_verified_topic.clone(),
-            vec![u32_to_32bytes(10).into()],
-            Bytes(vec![]),
-            10,
-        ))
-    }
-    if topics.contains(new_token_topic_string) {
-        logs.push(create_log(
+    let new_token_topic_string = format!("{:?}", new_token_topic);
+    transport.insert_logs(
+        new_token_topic_string,
+        vec![create_log(
             new_token_topic.clone(),
-            vec![[0; 32].into(), u32_to_32bytes(10).into()],
+            vec![[0; 32].into(), u32_to_32bytes(3).into()],
             Bytes(vec![]),
-            10,
-        ))
-    }
-    logs
-}
+            3,
+            u32_to_32bytes(1).into(),
+        )],
+    );
 
-#[db_test]
-async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
-    create_eth(&mut storage).await;
-    let transport = Web3Transport::new();
+    transport.push_transactions(vec![
+        create_transaction(
+            1,
+            create_block(
+                1,
+                vec![create_deposit(Default::default(), Default::default(), 50)],
+            ),
+        ),
+        create_transaction(
+            2,
+            create_block(
+                2,
+                vec![create_withdraw_operations(
+                    0,
+                    Default::default(),
+                    Default::default(),
+                    10,
+                )],
+            ),
+        ),
+    ]);
+
     let mut driver = DataRestoreDriver::new(
         transport,
         [1u8; 20].into(),
@@ -243,18 +330,22 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         None,
     );
     driver.run_state_update(&mut storage).await;
+
     // Check that it's stores some account, created by deposit
-    AccountSchema(&mut storage)
+    let (_, account) = AccountSchema(&mut storage)
         .account_state_by_address(&Default::default())
         .await
         .unwrap()
         .verified
         .unwrap();
+    let balance = account.get_balance(0);
 
-    assert_eq!(driver.events_state.committed_events.len(), 1);
+    assert_eq!(BigUint::from(40u32), balance);
+    assert_eq!(driver.events_state.committed_events.len(), 2);
     let events = DataRestoreSchema(&mut storage)
         .load_committed_events_state()
         .await
         .unwrap();
+
     assert_eq!(driver.events_state.committed_events.len(), events.len());
 }

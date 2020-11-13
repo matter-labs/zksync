@@ -39,6 +39,7 @@ pub(crate) fn create_log(
     additional_topics: Vec<H256>,
     data: Bytes,
     block_number: u32,
+    transaction_hash: H256,
 ) -> Log {
     let mut topics = vec![topic];
     topics.extend(additional_topics);
@@ -48,7 +49,7 @@ pub(crate) fn create_log(
         data,
         block_hash: None,
         block_number: Some(block_number.into()),
-        transaction_hash: Some(u32_to_32bytes(1).into()),
+        transaction_hash: Some(transaction_hash),
         transaction_index: Some(0.into()),
         log_index: Some(0.into()),
         transaction_log_index: Some(0.into()),

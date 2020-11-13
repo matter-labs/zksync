@@ -407,12 +407,14 @@ mod test {
                 vec![],
                 Bytes(vec![]),
                 i,
+                u32_to_32bytes(i).into(),
             ));
             logs.push(create_log(
                 block_verified_topic.clone(),
                 vec![],
                 Bytes(vec![]),
                 i,
+                u32_to_32bytes(i).into(),
             ));
         }
 
@@ -425,7 +427,13 @@ mod test {
         let mut data = vec![];
         data.extend(&last_block_com);
         data.extend(&last_block_ver);
-        let log = create_log(reverted_topic.clone(), vec![], Bytes(data), 3);
+        let log = create_log(
+            reverted_topic.clone(),
+            vec![],
+            Bytes(data),
+            3,
+            u32_to_32bytes(1).into(),
+        );
         events_state.update_blocks_state(&contract, &[log]);
         assert_eq!(events_state.committed_events.len(), 16);
         assert_eq!(events_state.verified_events.len(), 11);
