@@ -276,7 +276,9 @@ impl Block {
         withdrawals_data
     }
 
-    fn get_onchain_operations_block_info(&self) -> (Vec<OnchainOperationsBlockInfo>, H256, u64) {
+    pub fn get_onchain_operations_block_info(
+        &self,
+    ) -> (Vec<OnchainOperationsBlockInfo>, H256, u64) {
         let mut onchain_ops = Vec::new();
         let mut processable_ops_hash = Vec::new().keccak256();
         let mut public_data_offset = 0;
@@ -364,7 +366,7 @@ impl Block {
         (new_stored_block_info, commit_block_info)
     }
 
-    fn procesable_ops_pubdata(&self) -> Vec<Vec<u8>> {
+    pub fn processable_ops_pubdata(&self) -> Vec<Vec<u8>> {
         self.block_transactions
             .iter()
             .filter_map(|tx| tx.get_executed_op())
@@ -451,7 +453,7 @@ impl ExecuteBlockInfo {
     pub fn new(stored_block_info: &StoredBlockInfo, block: &Block, commitment: H256) -> Self {
         Self {
             stored_block_info: stored_block_info.clone(),
-            processable_ops_pubdata: block.procesable_ops_pubdata(),
+            processable_ops_pubdata: block.processable_ops_pubdata(),
             commitments_in_slot: vec![commitment],
             commitment_index: U256::from(0),
         }

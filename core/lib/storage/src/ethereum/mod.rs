@@ -11,8 +11,9 @@ use zksync_types::{
 };
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
-use crate::chain::operations::records::StoredOperation;
+use crate::chain::operations::records::StoredAggregatedOperation;
 use crate::{QueryResult, StorageProcessor};
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 
 pub mod records;
 
@@ -54,9 +55,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
         for eth_op in eth_ops {
             let raw_op = sqlx::query_as!(
-                StoredOperation,
-                "SELECT operations.* FROM eth_ops_binding
-                LEFT JOIN operations ON operations.id = op_id
+                StoredAggregatedOperation,
+                "SELECT aggregate_operations.* FROM eth_aggregated_ops_binding
+                LEFT JOIN aggregate_operations ON aggregate_operations.id = op_id
                 WHERE eth_op_id = $1",
                 eth_op.id
             )
@@ -81,13 +82,13 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
             // If there is an operation, convert it to the `Operation` type.
             let op = if let Some(raw_op) = raw_op {
-                Some(raw_op.into_op(&mut transaction).await?)
+                Some(raw_op.into_aggregated_op())
             } else {
                 None
             };
 
             // Convert the fields into expected format.
-            let op_type = OperationType::from_str(eth_op.op_type.as_ref())
+            let op_type = AggregatedActionType::from_str(eth_op.op_type.as_ref())
                 .expect("Stored operation type must have a valid value");
             let last_used_gas_price =
                 U256::from_str(&eth_op.last_used_gas_price.to_string()).unwrap();
@@ -122,28 +123,32 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// in the `eth_operations`. This method is intended to be used after relaunch
     /// to synchronize `eth_sender` state, as operations are sent to the `eth_sender`
     /// only once.
-    pub async fn load_unprocessed_operations(&mut self) -> QueryResult<Vec<Operation>> {
+    pub async fn load_unprocessed_operations(
+        &mut self,
+    ) -> QueryResult<Vec<(i64, AggregatedOperation)>> {
         let mut transaction = self.0.start_transaction().await?;
 
         let raw_ops = sqlx::query_as!(
-            StoredOperation,
-            "SELECT * FROM operations
-            WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)
+            StoredAggregatedOperation,
+            "SELECT * FROM aggregate_operations
+            WHERE NOT EXISTS (SELECT * FROM eth_aggregated_ops_binding WHERE op_id = aggregate_operations.id)
             ORDER BY id ASC",
         )
         .fetch_all(transaction.conn())
         .await?;
 
-        let mut operations: Vec<Operation> = Vec::new();
+        let mut operations = Vec::new();
 
         for raw_op in raw_ops {
             // We filtered operations that don't have Ethereum binding right in the SQL query,
             // so now we only have to convert stored operations into `Operation`.
-            let op = raw_op
-                .into_op(&mut transaction)
-                .await
-                .expect("Can't convert the operation");
-            operations.push(op);
+            let op = raw_op.into_aggregated_op();
+            if !matches!(
+                op.1.get_action_type(),
+                AggregatedActionType::CreateProofBlocks
+            ) {
+                operations.push(op);
+            }
         }
 
         transaction.commit().await?;
@@ -155,7 +160,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Returns the `ETHOperation` object containing the assigned nonce and operation ID.
     pub async fn save_new_eth_tx(
         &mut self,
-        op_type: OperationType,
+        op_type: AggregatedActionType,
         op_id: Option<i64>,
         last_deadline_block: i64,
         last_used_gas_price: BigUint,
@@ -199,7 +204,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         // If the operation ID was provided, we should also insert a binding entry.
         if let Some(op_id) = op_id {
             sqlx::query!(
-                "INSERT INTO eth_ops_binding (op_id, eth_op_id) VALUES ($1, $2)",
+                "INSERT INTO eth_aggregated_ops_binding (op_id, eth_op_id) VALUES ($1, $2)",
                 op_id,
                 eth_op_id
             )
@@ -281,23 +286,14 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// This method expects the database to be initially prepared with inserting the actual
     /// stats values. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    async fn report_created_operation(&mut self, operation_type: OperationType) -> QueryResult<()> {
+    async fn report_created_operation(
+        &mut self,
+        _operation_type: AggregatedActionType,
+    ) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
 
         let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
-
-        // Increase the only one type of operations.
-        match operation_type {
-            OperationType::Commit => {
-                current_stats.commit_ops += 1;
-            }
-            OperationType::Verify => {
-                current_stats.verify_ops += 1;
-            }
-            OperationType::Withdraw => {
-                current_stats.withdraw_ops += 1;
-            }
-        };
+        current_stats.commit_ops += 1;
 
         // Update the stored stats.
         sqlx::query!(
@@ -400,16 +396,16 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .id;
 
         // If there is a ZKSync operation, mark it as confirmed as well.
-        sqlx::query!(
-            "
-            UPDATE operations
-                SET confirmed = $1
-                WHERE id = (SELECT op_id FROM eth_ops_binding WHERE eth_op_id = $2)",
-            true,
-            eth_op_id,
-        )
-        .execute(transaction.conn())
-        .await?;
+        // sqlx::query!(
+        //     "
+        //     UPDATE operations
+        //         SET processed = $1
+        //         WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $2)",
+        //     true,
+        //     eth_op_id,
+        // )
+        // .execute(transaction.conn())
+        // .await?;
 
         transaction.commit().await?;
 
@@ -483,5 +479,21 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         }
 
         Ok(())
+    }
+
+    pub async fn is_aggregated_op_confirmed(&mut self, op_id: i64) -> QueryResult<bool> {
+        let confirmed_ops = sqlx::query!(
+            "SELECT COUNT(*) FROM aggregate_operations
+                  LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id
+                  LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id
+            WHERE
+                  eth_operations.confirmed = true AND aggregate_operations.id = $1",
+            op_id
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count
+        .unwrap_or(0);
+        Ok(confirmed_ops > 0)
     }
 }

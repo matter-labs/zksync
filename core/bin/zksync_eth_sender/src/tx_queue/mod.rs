@@ -2,6 +2,7 @@
 use zksync_types::{ethereum::OperationType, BlockNumber, Operation};
 // Local imports
 use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 
 mod counter_queue;
 mod sparse_queue;
@@ -14,11 +15,11 @@ pub type RawTxData = Vec<u8>;
 #[derive(Debug, Clone)]
 pub struct TxData {
     /// Type of the operation.
-    pub op_type: OperationType,
+    pub op_type: AggregatedActionType,
     /// Not signed raw tx payload.
     pub raw: RawTxData,
     /// Optional zkSync operation.
-    pub operation: Option<Operation>,
+    pub operation: Option<(i64, AggregatedOperation)>,
 }
 
 impl PartialEq for TxData {
@@ -29,30 +30,21 @@ impl PartialEq for TxData {
 
 impl TxData {
     /// Creates a new `TxData` object with the associated zkSync operation.
-    pub fn from_operation(op_type: OperationType, operation: Operation, raw: RawTxData) -> Self {
+    pub fn from_operation(operation: (i64, AggregatedOperation), raw: RawTxData) -> Self {
         Self {
-            op_type,
+            op_type: operation.1.get_action_type(),
             raw,
             operation: Some(operation),
         }
     }
 
     /// Creates a new `TxData` object without associated zkSync operation.
-    pub fn from_raw(op_type: OperationType, raw: RawTxData) -> Self {
+    pub fn from_raw(op_type: AggregatedActionType, raw: RawTxData) -> Self {
         Self {
             op_type,
             raw,
             operation: None,
         }
-    }
-
-    /// Obtains the corresponding block number from the transaction data.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `TxData` object has no `operation` field set.
-    pub fn block(&self) -> BlockNumber {
-        self.operation.as_ref().unwrap().block.block_number
     }
 }
 
@@ -65,9 +57,7 @@ pub struct TxQueueBuilder {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
-    commit_operations_count: usize,
-    verify_operations_count: usize,
-    withdraw_operations_count: usize,
+    aggregated_ops_count: usize,
 }
 
 impl TxQueueBuilder {
@@ -76,9 +66,7 @@ impl TxQueueBuilder {
         Self {
             max_pending_txs,
             sent_pending_txs: 0,
-            commit_operations_count: 0,
-            verify_operations_count: 0,
-            withdraw_operations_count: 0,
+            aggregated_ops_count: 0,
         }
     }
 
@@ -91,41 +79,20 @@ impl TxQueueBuilder {
     }
 
     /// Sets the amount of operations sent for the `commit` queue.
-    pub fn with_commit_operations_count(self, commit_operations_count: usize) -> Self {
+    pub fn with_aggregated_ops_count(self, aggregated_ops_count: usize) -> Self {
         Self {
-            commit_operations_count,
-            ..self
-        }
-    }
-
-    /// Sets the amount of operations sent for the `pending` queue.
-    pub fn with_verify_operations_count(self, verify_operations_count: usize) -> Self {
-        Self {
-            verify_operations_count,
-            ..self
-        }
-    }
-
-    /// Sets the amount of operations sent for the `withdraw` queue.
-    pub fn with_withdraw_operations_count(self, withdraw_operations_count: usize) -> Self {
-        Self {
-            withdraw_operations_count,
+            aggregated_ops_count,
             ..self
         }
     }
 
     /// Finishes the queue building process.
     pub fn build(self) -> TxQueue {
-        // Block numbers are indexed starting from 1, so we have to increment.
-        let verify_operations_next_block = self.verify_operations_count + 1;
-
         TxQueue {
             max_pending_txs: self.max_pending_txs,
             sent_pending_txs: self.sent_pending_txs,
 
-            commit_operations: CounterQueue::new(self.commit_operations_count),
-            verify_operations: SparseQueue::new(verify_operations_next_block),
-            withdraw_operations: CounterQueue::new(self.withdraw_operations_count),
+            aggregated_operations: CounterQueue::new(self.aggregated_ops_count),
         }
     }
 }
@@ -149,69 +116,21 @@ pub struct TxQueue {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
-    commit_operations: CounterQueue<TxData>,
-    verify_operations: SparseQueue<TxData>,
-    withdraw_operations: CounterQueue<TxData>,
+    aggregated_operations: CounterQueue<TxData>,
 }
 
 impl TxQueue {
-    /// Checks whether `commit` operation for a certain block is already in the queue.
-    pub fn commit_operation_exists(&self, block_idx: BlockNumber) -> bool {
-        self.commit_operations
-            .elements
-            .iter()
-            .any(|item| item.block() == block_idx)
-    }
-
-    /// Checks whether `verify` operation for a certain block is already in the queue.
-    pub fn verify_operation_exists(&self, block_idx: BlockNumber) -> bool {
-        self.verify_operations
-            .elements
-            .contains_key(&(block_idx as usize))
-    }
-
-    /// Adds the `commit` operation to the queue.
-    pub fn add_commit_operation(&mut self, commit_operation: TxData) {
-        self.commit_operations.push_back(commit_operation);
+    pub fn add_aggregate_operation(&mut self, aggregate_operation: TxData) {
+        self.aggregated_operations.push_back(aggregate_operation);
 
         log::info!(
-            "Adding commit operation to the queue. \
+            "Adding operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
-            size of commit queue: {}",
+            size of op queue: {}",
             self.sent_pending_txs,
             self.max_pending_txs,
-            self.commit_operations.len()
-        );
-    }
-
-    /// Adds the `verify` operation to the queue.
-    pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: TxData) {
-        self.verify_operations.insert(block_idx, verify_operation);
-
-        log::info!(
-            "Adding verify operation to the queue. \
-            Sent pending txs count: {}, \
-            max pending txs count: {}, \
-            size of verify queue: {}",
-            self.sent_pending_txs,
-            self.max_pending_txs,
-            self.verify_operations.len()
-        );
-    }
-
-    /// Adds the `withdraw` operation to the queue.
-    pub fn add_withdraw_operation(&mut self, withdraw_operation: TxData) {
-        self.withdraw_operations.push_back(withdraw_operation);
-
-        log::info!(
-            "Adding withdraw operation to the queue. \
-            Sent pending txs count: {}, \
-            max pending txs count: {}, \
-            size of withdraw queue: {}",
-            self.sent_pending_txs,
-            self.max_pending_txs,
-            self.withdraw_operations.len()
+            self.aggregated_operations.len()
         );
     }
 
@@ -222,17 +141,7 @@ impl TxQueue {
             "No transactions are expected to be returned"
         );
 
-        match &element.op_type {
-            OperationType::Commit => {
-                self.commit_operations.return_popped(element);
-            }
-            OperationType::Verify => {
-                self.verify_operations.return_popped(element);
-            }
-            OperationType::Withdraw => {
-                self.withdraw_operations.return_popped(element);
-            }
-        }
+        self.aggregated_operations.return_popped(element);
 
         // We've incremented the counter when transaction was popped.
         // Now it's returned and counter should be decremented back.
@@ -260,34 +169,7 @@ impl TxQueue {
     /// This method does not use/affect `sent_pending_tx` counter.
     fn get_next_operation(&mut self) -> Option<TxData> {
         // 1. Highest priority: verify operations.
-
-        // If we've committed a corresponding `Commit` operation, and
-        // there is a pending `verify` operation, chose it.
-        let next_verify_op_id = self.verify_operations.next_id();
-        let next_commit_op_id = self.commit_operations.get_count() + 1;
-        if next_verify_op_id < next_commit_op_id && self.verify_operations.has_next() {
-            return Some(self.verify_operations.pop_front().unwrap());
-        }
-
-        // 2. After verify operations we should process withdraw operation.
-
-        // We don't want to be ahead of the last verify operation.
-        let next_withdraw_op_id = self.withdraw_operations.get_count() + 1;
-        if next_withdraw_op_id < next_verify_op_id {
-            if let Some(withdraw_operation) = self.withdraw_operations.pop_front() {
-                return Some(withdraw_operation);
-            }
-        }
-
-        // 3. Finally, check the commit queue.
-
-        if let Some(commit_operation) = self.commit_operations.pop_front() {
-            return Some(commit_operation);
-        }
-
-        // 4. There are no operations to process, return `None`.
-
-        None
+        self.aggregated_operations.pop_front()
     }
 
     /// Notifies the queue about the transaction being confirmed on the Ethereum blockchain.

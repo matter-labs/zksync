@@ -752,50 +752,6 @@
       "nullable": []
     }
   },
-  "2a64cf1b6a9b36c4dcb9ef0510c69792a0f3e67ce5f09d30497315368268afb8": {
-    "query": "SELECT operations.* FROM eth_ops_binding\n                LEFT JOIN operations ON operations.id = op_id\n                WHERE eth_op_id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "2e92926816053cda2de6d571867a625fab5bb9668840db94bd18c411f96dc39b": {
     "query": "SELECT * FROM blocks WHERE number = $1",
     "describe": {
@@ -1560,6 +1516,26 @@
       ]
     }
   },
+  "573449897918b9e5129ff09921de257aa889cdb1f6095d54e4eb769ae5027ee6": {
+    "query": "SELECT COUNT(*) FROM aggregate_operations\n                  LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                  LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                  eth_operations.confirmed = true AND aggregate_operations.id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "5de811d61e00fd7b93311aa825d17e2b2f0ee46ee762f5064e842f5d0f2b5ad7": {
     "query": "UPDATE eth_parameters\n            SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3\n            WHERE id = true",
     "describe": {
@@ -1939,6 +1915,19 @@
       ]
     }
   },
+  "7ff98a4fddc441ea83f72a4a75a7caf53b9661c37f26a90984a349bfa5aeab70": {
+    "query": "INSERT INTO eth_aggregated_ops_binding (op_id, eth_op_id) VALUES ($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "80c2eb3abd0f05fb464113ca06dc2a7f1fe860bc4fcac0da805f13e980ca75a5": {
     "query": "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1\n            LIMIT 1",
     "describe": {
@@ -2278,19 +2267,6 @@
       "nullable": []
     }
   },
-  "9d8df28d6b13300487bd4bea02d8f18a3f66c201b56bbed75014adb3176ededc": {
-    "query": "INSERT INTO eth_ops_binding (op_id, eth_op_id) VALUES ($1, $2)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "9fbf3d0ae8610fb464ac74ff989860eb913f4bfb14790373021ef456b671ed96": {
     "query": "SELECT * FROM eth_tx_hashes\n                WHERE eth_op_id = $1\n                ORDER BY id ASC",
     "describe": {
@@ -2560,6 +2536,54 @@
       "nullable": []
     }
   },
+  "ab8774812664b1c1d4207e7fcd5e04a078293d295c469f043e5bc4933c0c2944": {
+    "query": "SELECT * FROM aggregate_operations\n            WHERE NOT EXISTS (SELECT * FROM eth_aggregated_ops_binding WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "abcb1ba77db438ed57266435357e92992da4efd7a2b254f95b58a68a4ea30df0": {
     "query": "\n                WITH unsized_blocks AS (\n                    SELECT * FROM operations o\n                    WHERE action_type = 'COMMIT'\n                        AND block_number >\n                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')\n                        AND NOT EXISTS\n                            (SELECT * FROM proofs WHERE block_number = o.block_number)\n                        AND NOT EXISTS\n                            (SELECT * FROM prover_runs\n                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '120 seconds')\n                )\n                SELECT min(block_number) FROM unsized_blocks\n                INNER JOIN blocks\n                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $1\n            ",
     "describe": {
@@ -2695,19 +2719,6 @@
         true,
         false
       ]
-    }
-  },
-  "b698cbf7f99896de0628ea4cfe27c3edf99b996e255ad779fe3d008b15fe9cf8": {
-    "query": "\n            UPDATE operations\n                SET confirmed = $1\n                WHERE id = (SELECT op_id FROM eth_ops_binding WHERE eth_op_id = $2)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bool",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "baaaff359564c5d1094fcf2650d53cf9dcac5d50fc3a549c6cff53dd472350f7": {
@@ -2867,6 +2878,56 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "c0930a699f3e45803249b9ea98311abf503ff9790bbb95f976ccebcbb5c2c4c4": {
+    "query": "SELECT aggregate_operations.* FROM eth_aggregated_ops_binding\n                LEFT JOIN aggregate_operations ON aggregate_operations.id = op_id\n                WHERE eth_op_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -3661,48 +3722,6 @@
       },
       "nullable": [
         null
-      ]
-    }
-  },
-  "f5be7cf851842a40bdb41b2ef914dd9120f868be7cdf995953eb5c365d2fea7f": {
-    "query": "SELECT * FROM operations\n            WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)\n            ORDER BY id ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
       ]
     }
   },
