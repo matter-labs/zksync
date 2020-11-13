@@ -14,7 +14,7 @@ use zksync_basic_types::Address;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
     pub signature: TxEthSignature,
-    pub message: String,
+    pub message: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

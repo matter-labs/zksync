@@ -9,13 +9,14 @@ use jsonrpc_core::{types::response::Output, ErrorCode};
 
 // Workspace uses
 use zksync_types::{
+    network::Network,
     tx::{PackedEthSignature, TxHash, ZkSyncTx},
     Address, TokenLike, TxFeeTypes,
 };
 
 // Local uses
 use self::messages::JsonRpcRequest;
-use crate::{error::ClientError, types::network::Network, types::*};
+use crate::{error::ClientError, types::*};
 
 /// Returns a corresponding address for a provided network name.
 pub fn get_rpc_addr(network: Network) -> &'static str {

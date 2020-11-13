@@ -86,7 +86,7 @@ export class Wallet {
         return wallet;
     }
 
-    async getEthMessageSignature(message: string): Promise<TxEthSignature> {
+    async getEthMessageSignature(message: ethers.utils.BytesLike): Promise<TxEthSignature> {
         if (this.ethSignerType == null) {
             throw new Error('ethSignerType is unknown');
         }
@@ -176,7 +176,7 @@ export class Wallet {
             nonce: forcedExit.nonce
         };
 
-        const signedForcedExitTransaction = this.signer.signSyncForcedExit(transactionData);
+        const signedForcedExitTransaction = await this.signer.signSyncForcedExit(transactionData);
 
         return {
             tx: signedForcedExitTransaction
@@ -251,8 +251,9 @@ export class Wallet {
             bytes = ethers.utils.concat([bytes, serializeTransfer(tx)]);
             batch.push({ tx, signature: null });
         }
-
-        const ethSignature = await this.getEthMessageSignature(ethers.utils.keccak256(bytes).slice(2));
+        const hash = ethers.utils.keccak256(bytes).slice(2);
+        const message = Uint8Array.from(Buffer.from(hash, 'hex'));
+        const ethSignature = await this.getEthMessageSignature(message);
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignature);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
@@ -310,7 +311,7 @@ export class Wallet {
 
         const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
 
-        const signedWithdrawTransaction = this.signer.signSyncWithdraw(transactionData);
+        const signedWithdrawTransaction = await this.signer.signSyncWithdraw(transactionData);
 
         return {
             tx: signedWithdrawTransaction,
@@ -345,7 +346,7 @@ export class Wallet {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
         }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const signerPubKeyHash = this.signer.pubKeyHash();
+        const signerPubKeyHash = await this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
     }
 
@@ -360,7 +361,7 @@ export class Wallet {
         }
 
         const feeTokenId = await this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
-        const newPubKeyHash = this.signer.pubKeyHash();
+        const newPubKeyHash = await this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
@@ -369,10 +370,10 @@ export class Wallet {
             ? null
             : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
-        const changePubKeyTx: ChangePubKey = this.signer.signSyncChangePubKey({
+        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
             accountId: this.accountId,
             account: this.address(),
-            newPkHash: this.signer.pubKeyHash(),
+            newPkHash: await this.signer.pubKeyHash(),
             nonce: changePubKey.nonce,
             feeTokenId,
             fee: BigNumber.from(changePubKey.fee).toString()
@@ -445,7 +446,7 @@ export class Wallet {
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const newPubKeyHash = this.signer.pubKeyHash();
+        const newPubKeyHash = await this.signer.pubKeyHash();
 
         if (currentPubKeyHash === newPubKeyHash) {
             throw new Error('Current PubKeyHash is the same as new');

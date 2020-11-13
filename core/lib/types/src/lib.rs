@@ -43,6 +43,7 @@ pub mod ethereum;
 pub mod gas_counter;
 pub mod helpers;
 pub mod mempool;
+pub mod network;
 pub mod operations;
 pub mod priority_ops;
 pub mod tokens;
@@ -71,7 +72,7 @@ pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 
 use crate::block::Block;
-use zksync_crypto::{
+pub use zksync_crypto::{
     merkle_tree::{RescueHasher, SparseMerkleTree},
     proof::EncodedProofPlonk,
     Engine, Fr,
