@@ -109,7 +109,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         &self,
         token: impl Into<TokenLike>,
     ) -> Result<bool, ClientError> {
-        self.is_limited_erc20_deposit_approved(token, U256::max_value())
+        self.is_limited_erc20_deposit_approved(token, U256::from(2).pow(255.into()))
     }
 
     /// Checks whether ERC20 of a certain token deposit with limit is approved for account.

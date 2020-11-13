@@ -5514,6 +5514,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_crypto",
  "zksync_storage",
+ "zksync_test_account",
  "zksync_types",
  "zksync_utils",
 ]
