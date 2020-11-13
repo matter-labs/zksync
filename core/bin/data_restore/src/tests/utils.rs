@@ -1,8 +1,6 @@
 use std::future::Future;
 
 use web3::{
-    api::{Eth, Namespace},
-    contract::Contract,
     types::H256,
     types::{Bytes, Log},
     RequestId, Transport,

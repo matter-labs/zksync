@@ -1,29 +1,31 @@
 pub(crate) mod utils;
 
 use futures::future;
-use jsonrpc_core::{Params, Version};
+use jsonrpc_core::Params;
 use serde_json::{json, Value};
 use std::future::Future;
 use web3::{RequestId, Transport};
 
 use db_test_macro::test as db_test;
-use zksync_storage::{test_utils::create_data_restore_data, ConnectionPool, StorageProcessor};
+use zksync_storage::StorageProcessor;
 use zksync_types::{
-    Deposit, DepositOp, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, Log, PriorityOp,
-    Withdraw, WithdrawOp, ZkSyncOp, H256,
+    Deposit, DepositOp, ExecutedOperations, ExecutedPriorityOp, Log, PriorityOp, Withdraw,
+    WithdrawOp, ZkSyncOp, H256,
 };
 
 use crate::data_restore_driver::DataRestoreDriver;
 use crate::tests::utils::{create_log, u32_to_32bytes};
 use crate::{END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP};
 use chrono::Utc;
-use ethabi::{ParamType, Token};
+
 use std::collections::HashMap;
-use web3::contract::tokens::{Tokenizable, Tokenize};
-use web3::types::{Bytes, Filter, Transaction, U256};
+use web3::contract::tokens::Tokenize;
+use web3::types::{Filter, Transaction};
 use zksync_contracts::{governance_contract, zksync_contract};
-use zksync_crypto::convert::FeConvert;
-use zksync_crypto::{Engine, Fr};
+
+use zksync_crypto::Fr;
+use zksync_storage::chain::account::AccountSchema;
+use zksync_storage::data_restore::DataRestoreSchema;
 use zksync_storage::test_utils::create_eth;
 use zksync_types::block::Block;
 
@@ -128,7 +130,7 @@ impl Transport for Web3Transport {
     fn send(&self, _id: RequestId, request: jsonrpc_core::Call) -> Self::Out {
         Box::new(future::ready({
             if let jsonrpc_core::Call::MethodCall(req) = request {
-                let mut params = if let Params::Array(mut params) = req.params {
+                let mut params = if let Params::Array(params) = req.params {
                     params
                 } else {
                     unreachable!()
@@ -179,7 +181,7 @@ fn get_logs(filter: Value) -> Vec<Log> {
         .expect("Main contract abi error")
         .signature();
 
-    let reverted_topic_string = &json!(reverted_topic).to_string()[1..67].to_string();
+    let _reverted_topic_string = &json!(reverted_topic).to_string()[1..67].to_string();
 
     let new_token_topic = gov_contract
         .event("NewToken")
@@ -187,8 +189,8 @@ fn get_logs(filter: Value) -> Vec<Log> {
         .signature();
     let new_token_topic_string = &json!(new_token_topic).to_string()[1..67].to_string();
 
-    let from_block = filter.get("fromBlock").unwrap().as_str().unwrap();
-    let to_block = filter.get("toBlock").unwrap().as_str().unwrap();
+    let _from_block = filter.get("fromBlock").unwrap().as_str().unwrap();
+    let _to_block = filter.get("toBlock").unwrap().as_str().unwrap();
 
     let topics = if let Ok(topics) =
         serde_json::from_value::<Vec<Vec<String>>>(filter.get("topics").unwrap().clone())
@@ -241,4 +243,18 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         None,
     );
     driver.run_state_update(&mut storage).await;
+    // Check that it's stores some account, created by deposit
+    AccountSchema(&mut storage)
+        .account_state_by_address(&Default::default())
+        .await
+        .unwrap()
+        .verified
+        .unwrap();
+
+    assert_eq!(driver.events_state.committed_events.len(), 1);
+    let events = DataRestoreSchema(&mut storage)
+        .load_committed_events_state()
+        .await
+        .unwrap();
+    assert_eq!(driver.events_state.committed_events.len(), events.len());
 }

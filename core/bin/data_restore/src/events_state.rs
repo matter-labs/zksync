@@ -369,8 +369,7 @@ mod test {
     use web3::{
         api::{Eth, Namespace},
         contract::Contract,
-        types::H256,
-        types::{Bytes, Log},
+        types::Bytes,
     };
     use zksync_contracts::zksync_contract;
 
