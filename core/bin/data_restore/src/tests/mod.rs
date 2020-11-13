@@ -105,7 +105,7 @@ fn create_transaction(number: u32, block: Block) -> Transaction {
     input_data.extend_from_slice(&ethabi::encode(params.into_tokens().as_ref()));
 
     Transaction {
-        hash: hash.into(),
+        hash,
         nonce: u32_to_32bytes(1).into(),
         block_hash: Some(u32_to_32bytes(100).into()),
         block_number: Some(block.block_number.into()),
@@ -239,14 +239,14 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         block_verified_topic_string,
         vec![
             create_log(
-                block_verified_topic.clone(),
+                block_verified_topic,
                 vec![u32_to_32bytes(1).into()],
                 Bytes(vec![]),
                 1,
                 u32_to_32bytes(1).into(),
             ),
             create_log(
-                block_verified_topic.clone(),
+                block_verified_topic,
                 vec![u32_to_32bytes(2).into()],
                 Bytes(vec![]),
                 2,
@@ -264,14 +264,14 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         block_commit_topic_string,
         vec![
             create_log(
-                block_committed_topic.clone(),
+                block_committed_topic,
                 vec![u32_to_32bytes(1).into()],
                 Bytes(vec![]),
                 1,
                 u32_to_32bytes(1).into(),
             ),
             create_log(
-                block_committed_topic.clone(),
+                block_committed_topic,
                 vec![u32_to_32bytes(2).into()],
                 Bytes(vec![]),
                 2,
@@ -294,7 +294,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     transport.insert_logs(
         new_token_topic_string,
         vec![create_log(
-            new_token_topic.clone(),
+            new_token_topic,
             vec![[0; 32].into(), u32_to_32bytes(3).into()],
             Bytes(vec![]),
             3,

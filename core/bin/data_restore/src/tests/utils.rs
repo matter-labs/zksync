@@ -29,9 +29,7 @@ pub(crate) fn u32_to_32bytes(value: u32) -> [u8; 32] {
     let mut bytes = [0u8; 32];
     let bytes_value = value.to_be_bytes();
     // Change only the last 4 bytes, which are represent u32
-    for i in 0..4 {
-        bytes[28 + i] = bytes_value[i]
-    }
+    bytes[28..32].clone_from_slice(&bytes_value);
     bytes
 }
 

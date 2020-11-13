@@ -403,14 +403,14 @@ mod test {
         let mut logs = vec![];
         for i in 0..32 {
             logs.push(create_log(
-                block_committed_topic.clone(),
+                block_committed_topic,
                 vec![],
                 Bytes(vec![]),
                 i,
                 u32_to_32bytes(i).into(),
             ));
             logs.push(create_log(
-                block_verified_topic.clone(),
+                block_verified_topic,
                 vec![],
                 Bytes(vec![]),
                 i,
@@ -428,7 +428,7 @@ mod test {
         data.extend(&last_block_com);
         data.extend(&last_block_ver);
         let log = create_log(
-            reverted_topic.clone(),
+            reverted_topic,
             vec![],
             Bytes(data),
             3,
