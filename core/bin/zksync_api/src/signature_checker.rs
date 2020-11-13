@@ -155,13 +155,12 @@ async fn verify_eth_signature_single_tx(
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
-                let mut message =
-                    format!("\x19Ethereum Signed Message:\n{}", sign_data.message.len())
-                        .into_bytes();
-                message.extend(sign_data.message.iter());
-
                 let signature_correct = eth_checker
-                    .is_eip1271_signature_correct(tx.tx.account(), message, signature.clone())
+                    .is_eip1271_signature_correct(
+                        tx.tx.account(),
+                        &sign_data.message,
+                        signature.clone(),
+                    )
                     .await
                     .expect("Unable to check EIP1271 signature");
 
@@ -191,19 +190,11 @@ async fn verify_eth_signature_txs_batch(
             }
         }
         TxEthSignature::EIP1271Signature(signature) => {
-            // Prefix the message.
-            let mut message = format!(
-                "\x19Ethereum Signed Message:\n{}",
-                eth_sign_data.message.len(),
-            )
-            .into_bytes();
-            message.extend(eth_sign_data.message.clone());
-
             for tx in txs {
                 let signature_correct = eth_checker
                     .is_eip1271_signature_correct(
                         tx.tx.account(),
-                        message.clone(),
+                        &eth_sign_data.message,
                         signature.clone(),
                     )
                     .await
