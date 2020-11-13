@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         .expect("Error setting Ctrl-C handler");
     }
 
-    let pool = ConnectionPool::new(Some(ETH_SENDER_CONNECTION_POOL_SIZE)).await;
+    let pool = ConnectionPool::new(Some(ETH_SENDER_CONNECTION_POOL_SIZE));
     let config_options = ConfigurationOptions::from_env();
 
     let task_handle = run_eth_sender(pool, config_options);

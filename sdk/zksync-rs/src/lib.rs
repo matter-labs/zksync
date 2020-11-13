@@ -10,9 +10,9 @@ pub mod utils;
 pub mod wallet;
 
 pub use crate::{
-    credentials::WalletCredentials, ethereum::EthereumProvider, provider::Provider,
-    types::network::Network, wallet::Wallet,
+    credentials::WalletCredentials, ethereum::EthereumProvider, provider::Provider, wallet::Wallet,
 };
+pub use zksync_types::network::Network;
 
 pub use web3;
 pub use zksync_types;

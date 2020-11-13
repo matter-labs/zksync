@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         .expect("Error setting Ctrl-C handler");
     }
 
-    let connection_pool = ConnectionPool::new(Some(PROMETHEUS_EXPORTER_CONNECTION_POOL_SIZE)).await;
+    let connection_pool = ConnectionPool::new(Some(PROMETHEUS_EXPORTER_CONNECTION_POOL_SIZE));
     let config_options = ConfigurationOptions::from_env();
 
     let task_handle = run_prometheus_exporter(connection_pool, &config_options);
