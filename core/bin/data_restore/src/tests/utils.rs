@@ -17,19 +17,20 @@ impl Transport for FakeTransport {
         _method: &str,
         _params: Vec<jsonrpc_core::Value>,
     ) -> (RequestId, jsonrpc_core::Call) {
-        unimplemented!()
+        unreachable!()
     }
 
     fn send(&self, _id: RequestId, _request: jsonrpc_core::Call) -> Self::Out {
-        unimplemented!()
+        unreachable!()
     }
 }
 
 pub(crate) fn u32_to_32bytes(value: u32) -> [u8; 32] {
     let mut bytes = [0u8; 32];
-    let a = value.to_be_bytes();
+    let bytes_value = value.to_be_bytes();
+    // Change only the last 4 bytes, which are represent u32
     for i in 0..4 {
-        bytes[28 + i] = a[i]
+        bytes[28 + i] = bytes_value[i]
     }
     bytes
 }

@@ -22,7 +22,8 @@ use crate::data_restore_driver::DataRestoreDriver;
 use crate::tests::utils::{create_log, u32_to_32bytes};
 use crate::{END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP};
 use num::BigUint;
-use web3::types::{Bytes, U256};
+use std::cmp::max;
+use web3::types::Bytes;
 
 fn create_withdraw_operations(
     account_id: u32,
@@ -123,6 +124,7 @@ fn create_transaction(number: u32, block: Block) -> Transaction {
 pub(crate) struct Web3Transport {
     transactions: HashMap<String, Transaction>,
     logs: HashMap<String, Vec<Log>>,
+    last_block: u32,
 }
 
 impl Web3Transport {
@@ -130,10 +132,12 @@ impl Web3Transport {
         Self {
             transactions: HashMap::default(),
             logs: HashMap::default(),
+            last_block: 0,
         }
     }
     fn push_transactions(&mut self, transactions: Vec<Transaction>) {
         for transaction in transactions {
+            self.last_block = max(transaction.block_number.unwrap().as_u32(), self.last_block);
             self.transactions
                 .insert(format!("{:?}", &transaction.hash), transaction);
         }
@@ -205,9 +209,11 @@ impl Transport for Web3Transport {
                             unreachable!()
                         }
                     }
-                    "eth_call" => Ok(json!(
-                        "0x0000000000000000000000000000000000000000000000000000000000000002"
-                    )),
+                    "eth_call" => {
+                        // Now it's call only for one function totalVerifiedBlocks later,
+                        // if it's necessary, add more complex logic for routing
+                        Ok(json!(format!("{:#066x}", self.last_block)))
+                    }
                     _ => Err(web3::Error::Unreachable),
                 }
             } else {
