@@ -109,8 +109,16 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         &self,
         token: impl Into<TokenLike>,
     ) -> Result<bool, ClientError> {
+        self.is_limited_erc20_deposit_approved(token, U256::max_value())
+    }
+
+    /// Checks whether ERC20 of a certain token deposit with limit is approved for account.
+    pub async fn is_limited_erc20_deposit_approved(
+        &self,
+        token: impl Into<TokenLike>,
+        erc20_approve_threshold: U256,
+    ) -> Result<bool, ClientError> {
         let token = token.into();
-        let erc20_approve_threshold: U256 = U256::from(2).pow(255.into());
         let token = self
             .tokens_cache
             .resolve(token)
@@ -141,8 +149,16 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         &self,
         token: impl Into<TokenLike>,
     ) -> Result<H256, ClientError> {
+        self.approve_limited_erc20_token_deposits(token, U256::max_value())
+    }
+
+    /// Sends a transaction to ERC20 token contract to approve the limited ERC20 deposit.
+    pub async fn approve_limited_erc20_token_deposits(
+        &self,
+        token: impl Into<TokenLike>,
+        max_erc20_approve_amount: U256,
+    ) -> Result<H256, ClientError> {
         let token = token.into();
-        let max_erc20_approve_amount: U256 = U256::max_value();
 
         let token = self
             .tokens_cache
