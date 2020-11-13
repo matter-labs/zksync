@@ -11,8 +11,7 @@ use db_test_macro::test as db_test;
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;
 use zksync_storage::{
-    chain::account::AccountSchema, data_restore::DataRestoreSchema, test_utils::create_eth,
-    StorageProcessor,
+    chain::account::AccountSchema, data_restore::DataRestoreSchema, StorageProcessor,
 };
 use zksync_types::{
     block::Block, Address, Deposit, DepositOp, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
@@ -23,7 +22,7 @@ use crate::data_restore_driver::DataRestoreDriver;
 use crate::tests::utils::{create_log, u32_to_32bytes};
 use crate::{END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP};
 use num::BigUint;
-use web3::types::Bytes;
+use web3::types::{Bytes, U256};
 
 fn create_withdraw_operations(
     account_id: u32,
@@ -198,7 +197,8 @@ impl Transport for Web3Transport {
                         Ok(json!(self.get_logs(filter)))
                     }
                     "eth_getTransactionByHash" => {
-                        let hash = &format!("{}", params.pop().unwrap())[1..67]; // TODO Cut `"` from start and end of the string
+                        // TODO Cut `"` from start and end of the string
+                        let hash = &format!("{}", params.pop().unwrap())[1..67];
                         if let Some(transaction) = self.transactions.get(hash) {
                             Ok(json!(transaction))
                         } else {
@@ -219,7 +219,6 @@ impl Transport for Web3Transport {
 
 #[db_test]
 async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
-    create_eth(&mut storage).await;
     let mut transport = Web3Transport::new();
 
     let contract = zksync_contract();
@@ -320,7 +319,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     ]);
 
     let mut driver = DataRestoreDriver::new(
-        transport,
+        transport.clone(),
         [1u8; 20].into(),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
@@ -348,4 +347,20 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         .unwrap();
 
     assert_eq!(driver.events_state.committed_events.len(), events.len());
+
+    // Nullify the state of driver
+    let mut driver = DataRestoreDriver::new(
+        transport.clone(),
+        [1u8; 20].into(),
+        [1u8; 20].into(),
+        ETH_BLOCKS_STEP,
+        END_ETH_BLOCKS_OFFSET,
+        vec![6, 30],
+        true,
+        None,
+    );
+    // Load state from db and check it
+    assert!(driver.load_state_from_storage(&mut storage).await);
+    assert_eq!(driver.events_state.committed_events.len(), events.len());
+    assert_eq!(driver.tree_state.state.block_number, 2)
 }

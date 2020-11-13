@@ -91,7 +91,6 @@ pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
 pub mod prover;
-pub mod test_utils;
 pub mod tokens;
 pub mod utils;
 

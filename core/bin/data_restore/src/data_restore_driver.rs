@@ -194,7 +194,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     }
 
     /// Stops states from storage
-    pub async fn load_state_from_storage(&mut self, storage: &mut StorageProcessor<'_>) {
+    pub async fn load_state_from_storage(&mut self, storage: &mut StorageProcessor<'_>) -> bool {
         log::info!("Loading state from storage");
         let state = storage_interactor::get_storage_state(storage).await;
         self.events_state = storage_interactor::get_block_events_state_from_storage(storage).await;
@@ -230,10 +230,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             self.tree_state.root_hash()
         );
 
-        if self.finite_mode && (total_verified_blocks == last_verified_block) {
-            // We've already completed finalizing the state, so exit immediately.
-            std::process::exit(0);
-        }
+        self.finite_mode && (total_verified_blocks == last_verified_block)
     }
 
     /// Activates states updates

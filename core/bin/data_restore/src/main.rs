@@ -165,7 +165,9 @@ async fn main() {
     }
 
     if opt.continue_mode {
-        driver.load_state_from_storage(&mut storage).await;
+        if driver.load_state_from_storage(&mut storage).await {
+            std::process::exit(0);
+        }
     }
 
     driver.run_state_update(&mut storage).await;
