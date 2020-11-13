@@ -2,7 +2,6 @@ use std::ops::Deref;
 // External uses
 use anyhow::Result;
 use parity_crypto::publickey::{Generator, Random};
-use tiny_keccak::keccak256;
 // Workspace uses
 use zksync_basic_types::Address;
 // Local uses
@@ -96,11 +95,13 @@ fn test_batch_message() -> Result<()> {
     }
     let batch_hash = tiny_keccak::keccak256(&batch_hash).to_vec();
     // Final message in bytes.
-    let hash = keccak256([change_pub_key_message, batch_hash].concat().as_slice());
+    let mut message = Vec::<u8>::with_capacity(change_pub_key_message.len() + batch_hash.len());
+    message.extend(change_pub_key_message.iter());
+    message.extend(batch_hash.iter());
     // Shouldn't fail.
     let batch_sign_data = BatchSignData::new(&txs, signature.clone())?;
 
-    assert_eq!(batch_sign_data.0.message, hash);
+    assert_eq!(batch_sign_data.0.message, message);
 
     // Now remove `ChangePubKey` from the batch and expect the hash of bytes without the prefix.
     txs.pop();

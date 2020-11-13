@@ -366,9 +366,9 @@ export class Wallet {
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
         const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
-        const ethSignature = changePubKey.onchainAuth
-            ? null
-            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+        const batch_hash = new Uint8Array(32).fill(0);
+        const bytes = ethers.utils.concat([ethers.utils.toUtf8Bytes(changePubKeyMessage), batch_hash]);
+        const ethSignature = changePubKey.onchainAuth ? null : (await this.getEthMessageSignature(bytes)).signature;
 
         const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
             accountId: this.accountId,

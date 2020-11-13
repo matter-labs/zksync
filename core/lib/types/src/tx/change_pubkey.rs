@@ -190,8 +190,7 @@ impl ChangePubKey {
             self.get_eth_signed_data().ok().and_then(|mut msg| {
                 // In case this transaction is not a part of any batch, we simply append zeros.
                 msg.extend_from_slice(self.batch_hash.as_bytes());
-                sign.signature_recover_signer(&tiny_keccak::keccak256(&msg))
-                    .ok()
+                sign.signature_recover_signer(&msg).ok()
             })
         })
     }

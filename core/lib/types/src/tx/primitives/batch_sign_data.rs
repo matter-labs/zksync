@@ -17,10 +17,11 @@ impl BatchSignData {
         ensure!(!txs.is_empty(), "Transaction batch cannot be empty");
         // First, check, if `ChangePubKey` is present in the batch. If it is,
         // we expect its signature to be always present and the following message to be signed:
-        // keccak256(change_pub_key_message, keccak256(batch_bytes))
+        // change_pub_key_message + keccak256(batch_bytes)
         // This message is supposed to be used for both batch and `ChangePubKey'.
         // However, since `ChangePubKey` only stores Ethereum signature without the message itself,
-        // it is also necessary to store batch hash when signing transactions.
+        // it is also necessary to store batch hash when signing transactions, so we can
+        // send it to the smart contract.
         let mut iter = txs.iter().filter_map(|tx| match tx {
             ZkSyncTx::ChangePubKey(tx) => Some(tx),
             _ => None,
@@ -43,9 +44,9 @@ impl BatchSignData {
                 .as_slice(),
         )
         .to_vec();
-        // Optionally, prefix it and compute the hash again to get the final message user is supposed to sign.
+
         let message = match change_pub_key_message {
-            Some(prefix) => keccak256(&[prefix, batch_hash].concat()).to_vec(),
+            Some(prefix) => [prefix, batch_hash].concat(),
             None => batch_hash,
         };
 
