@@ -25,6 +25,7 @@ mod config;
 mod error;
 #[cfg(test)]
 mod test_utils;
+mod transactions;
 
 /// Maximum limit value in the requests.
 pub const MAX_LIMIT: u32 = 100;
