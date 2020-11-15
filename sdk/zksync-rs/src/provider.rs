@@ -237,7 +237,7 @@ impl Provider {
 }
 
 mod messages {
-    use serde_derive::Serialize;
+    use serde::Serialize;
     use zksync_types::{
         tx::{PackedEthSignature, TxEthSignature, TxHash, ZkSyncTx},
         Address, TokenLike, TxFeeTypes,
