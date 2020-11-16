@@ -162,6 +162,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(address(_token));
+        require(!governance.pausedTokens(tokenId), "fd011"); // token deposits are paused
 
         uint256 balance_before = _token.balanceOf(address(this));
         require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit

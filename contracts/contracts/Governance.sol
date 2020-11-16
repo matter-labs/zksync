@@ -26,6 +26,11 @@ contract Governance is Config {
         bool isActive
     );
 
+    event TokenPausedUpdate(
+        address indexed token,
+        bool paused
+    );
+
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
@@ -40,6 +45,9 @@ contract Governance is Config {
 
     /// @notice List of permitted validators
     mapping(address => bool) public validators;
+
+    /// @notice Paused tokens list, deposits are impossible to create for paused tokens
+    mapping(uint16 => bool) public pausedTokens;
 
     constructor() {}
 
@@ -81,6 +89,19 @@ contract Governance is Config {
         emit NewToken(_token, newTokenId);
     }
 
+    /// @notice Pause token deposits for the given token
+    /// @param _tokenAddr Token address
+    /// @param _tokenPaused Token paused status
+    function setTokenPaused(address _tokenAddr, bool _tokenPaused) external {
+        requireGovernor(msg.sender);
+
+        uint16 tokenId = this.validateTokenAddress(_tokenAddr);
+        if (pausedTokens[tokenId] != _tokenPaused) {
+            pausedTokens[tokenId] = _tokenPaused;
+            emit TokenPausedUpdate(_tokenAddr, _tokenPaused);
+        }
+    }
+
     /// @notice Change validator status (active or not active)
     /// @param _validator Validator address
     /// @param _active Active flag
@@ -119,5 +140,4 @@ contract Governance is Config {
         require(tokenId != 0, "gvs11"); // 0 is not a valid token
         return tokenId;
     }
-
 }
