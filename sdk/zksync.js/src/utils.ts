@@ -276,7 +276,13 @@ export class TokenSet {
     }
 }
 
-export function getChangePubkeyMessage(pubKeyHash: PubKeyHash, nonce: number, accountId: number): string {
+export function getChangePubkeyMessage(
+    pubKeyHash: PubKeyHash,
+    nonce: number,
+    accountId: number,
+    batchHash?: string
+): Uint8Array {
+    const bytes = batchHash == undefined ? new Uint8Array(32).fill(0) : Uint8Array.from(Buffer.from(batchHash, 'hex'));
     const msgNonce = utils.hexlify(serializeNonce(nonce));
     const msgAccId = utils.hexlify(serializeAccountId(accountId));
     const pubKeyHashHex = pubKeyHash.replace('sync:', '').toLowerCase();
@@ -286,7 +292,7 @@ export function getChangePubkeyMessage(pubKeyHash: PubKeyHash, nonce: number, ac
         `nonce: ${msgNonce}\n` +
         `account id: ${msgAccId}\n\n` +
         `Only sign this message for a trusted client!`;
-    return message;
+    return ethers.utils.concat([ethers.utils.toUtf8Bytes(message), bytes]);
 }
 
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {

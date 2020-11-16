@@ -68,7 +68,6 @@ library Utils {
 
         bytes32 signR;
         bytes32 signS;
-        bytes32 additionalHash;
         uint offset = 0;
 
         (offset, signR) = Bytes.readBytes32(_signature, offset);
