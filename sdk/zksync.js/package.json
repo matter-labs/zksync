@@ -23,7 +23,6 @@
         "ethers": "^5.0.0"
     },
     "devDependencies": {
-        "@argent/smartwallet-utils": "^0.0.11",
         "@rollup/plugin-commonjs": "^16.0.0",
         "@rollup/plugin-json": "^4.1.0",
         "@rollup/plugin-node-resolve": "^10.0.0",
