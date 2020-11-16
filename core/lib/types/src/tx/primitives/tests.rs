@@ -83,11 +83,10 @@ fn test_batch_message() -> Result<()> {
     let mut txs = get_batch();
     let signature = get_eth_signature();
 
-    // For the initial batch we should have hash of the prefixed batch data.
-    let change_pub_key_message = if let ZkSyncTx::ChangePubKey(tx) = txs.last().unwrap() {
-        tx.get_eth_signed_data()?
-    } else {
-        panic!("ChangePubKey is supposed to be the last element in Vec of test transactions")
+    // For the initial batch we expect prefixed hash of transactions data.
+    let change_pub_key_message = match txs.last().unwrap() {
+        ZkSyncTx::ChangePubKey(tx) => tx.get_eth_signed_data()?,
+        _ => panic!("ChangePubKey is supposed to be the last element in Vec of test transactions"),
     };
     let mut batch_hash = Vec::new();
     for tx in &txs {
