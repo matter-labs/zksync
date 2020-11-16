@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
     error::ClientError,
+    ethereum::{ierc20_contract, zksync_contract},
     types::BlockStatus,
     web3::{
         contract::{Contract, Options},
@@ -33,7 +34,6 @@ use zksync::{
     zksync_types::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes, ZkSyncTx},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
-use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
@@ -75,7 +75,7 @@ async fn get_ethereum_balance<S: EthereumSigner + Clone>(
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
     }
 
-    let contract = Contract::new(eth_provider.web3().eth(), token.address, erc20_contract());
+    let contract = Contract::new(eth_provider.web3().eth(), token.address, ierc20_contract());
     contract
         .query("balanceOf", address, None, Options::default(), None)
         .await
