@@ -148,7 +148,7 @@ mod tests {
     fn actual_data_check() {
         // Signature data obtained from the actual EIP-1271 signature made via Argent.
         const SIG_DATA: &str = "ebbb656a980792465a98aff29ecfd43f3cd94b4ef9490535565d5242fb55208c67c3006cc166ef66b1064282ed26ee0bc54d6b2c28cb779a642b8e9e2aad5e361c";
-        // // Smart wallet contract address.
+        // Smart wallet contract address.
         // const ACCOUNT_ADDR: &str = "730094414795264fD9579c4aC816Cb1C0F4A545E";
         // Actual account owner address.
         const ACCOUNT_OWNER_ADDR: &str = "b6c3dd5a0e5f10f82f2a07fad0aef8cd5ce8c670";
