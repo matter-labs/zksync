@@ -4,6 +4,9 @@
 //! which is used to spawn concurrent tasks to efficiently check the
 //! transactions signatures.
 
+// Built-in uses
+use std::time::Instant;
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -123,6 +126,7 @@ async fn verify_eth_signature_single_tx(
     tx: &TxWithSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
+    let start = Instant::now();
     // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
     if let ZkSyncTx::ChangePubKey(change_pk) = &tx.tx {
         if change_pk.eth_signature.is_none() {
@@ -177,6 +181,10 @@ async fn verify_eth_signature_single_tx(
         };
     }
 
+    metrics::histogram!(
+        "signature_checker.verify_eth_signature_single_tx",
+        start.elapsed()
+    );
     Ok(())
 }
 
@@ -185,6 +193,7 @@ async fn verify_eth_signature_txs_batch(
     eth_sign_data: &EthSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
+    let start = Instant::now();
     match &eth_sign_data.signature {
         TxEthSignature::EthereumSignature(packed_signature) => {
             let signer_account = packed_signature
@@ -220,6 +229,10 @@ async fn verify_eth_signature_txs_batch(
         }
     };
 
+    metrics::histogram!(
+        "signature_checker.verify_eth_signature_txs_batch",
+        start.elapsed()
+    );
     Ok(())
 }
 

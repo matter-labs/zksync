@@ -5687,6 +5687,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "log 0.4.11",
+ "metrics",
  "num",
  "serde",
  "serde_json",

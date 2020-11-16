@@ -453,8 +453,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .flatten();
 
         metrics::histogram!(
-            "sql.chain.block.find_block_by_height_or_hash",
-            start.elapsed()
+            "sql.chain",
+            start.elapsed(),
+            "block" => "find_block_by_height_or_hash"
         );
         result
     }
@@ -637,6 +638,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub(crate) async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let number = i64::from(block.block_number);
@@ -685,6 +687,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "save_block");
         Ok(())
     }
 
@@ -694,6 +697,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         block: BlockNumber,
         tree_cache: serde_json::Value,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         if block == 0 {
             return Ok(());
         }
@@ -711,6 +715,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "store_account_tree_cache");
         Ok(())
     }
 
