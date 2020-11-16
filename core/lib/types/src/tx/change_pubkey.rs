@@ -159,7 +159,7 @@ impl ChangePubKey {
         // operation. Instead, fee data is signed via zkSync signature, which is essentially
         // free. This signature will be verified in the circuit.
 
-        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 152;
+        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 184;
         let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
         eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");
         eth_signed_msg.extend_from_slice(
@@ -175,6 +175,8 @@ impl ChangePubKey {
             .as_bytes(),
         );
         eth_signed_msg.extend_from_slice(b"Only sign this message for a trusted client!");
+        // In case this transaction is not part of a batch, we simply append zeros.
+        eth_signed_msg.extend_from_slice(self.batch_hash.as_bytes());
         ensure!(
             eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
             "Change pubkey signed message len is too big: {}, expected: {}",
@@ -187,11 +189,9 @@ impl ChangePubKey {
     /// Decodes the Ethereum address from the provided Ethereum signature.
     pub fn verify_eth_signature(&self) -> Option<Address> {
         self.eth_signature.as_ref().and_then(|sign| {
-            self.get_eth_signed_data().ok().and_then(|mut msg| {
-                // In case this transaction is not a part of any batch, we simply append zeros.
-                msg.extend_from_slice(self.batch_hash.as_bytes());
-                sign.signature_recover_signer(&msg).ok()
-            })
+            self.get_eth_signed_data()
+                .ok()
+                .and_then(|msg| sign.signature_recover_signer(&msg).ok())
         })
     }
 
