@@ -44,7 +44,7 @@ jobs:
     - name: generic-init
       run: |
         # Unpack keys to build dev contracts
-        zk verify-keys unpack
+        zk run verify-keys unpack
         # EIP1271 contract is used in Rust & JS unit tests.
         zk contract build-dev
         zk run deploy-eip1271
