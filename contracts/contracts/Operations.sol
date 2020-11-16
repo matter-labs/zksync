@@ -2,6 +2,8 @@
 
 pragma solidity ^0.7.0;
 
+pragma experimental ABIEncoderV2;
+
 import "./Bytes.sol";
 
 
@@ -182,6 +184,11 @@ library Operations {
         (offset, parsed.target) = Bytes.readAddress(_data, offset); // target
     }
     // ChangePubKey
+
+    enum ChangePubkeyType {
+        ECSDA,
+        Create2
+    }
 
     struct ChangePubKey {
         // uint8 opType; -- present in pubdata, ignored at serialization

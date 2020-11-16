@@ -545,7 +545,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(opPubData);
 
                 if (onchainOpData.ethWitness.length > 0) {
-                    bool valid = verifyChangePubkeySignature(onchainOpData.ethWitness, op);
+                    bool valid = verifyChangePubkey(onchainOpData.ethWitness, op);
                     require(valid, "fpp15"); // failed to verify change pubkey hash signature
                 } else {
                     bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
@@ -557,16 +557,43 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
     }
 
+    function verifyChangePubkey(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk) internal pure returns (bool) {
+        Operations.ChangePubkeyType changePkType = Operations.ChangePubkeyType(uint8(_ethWitness[0]));
+        if (changePkType == Operations.ChangePubkeyType.ECSDA) {
+            return verifyChangePubkeyECSDA(_ethWitness, _changePk);
+        } else if (changePkType == Operations.ChangePubkeyType.Create2) {
+            return verifyChangePubkeyCREATE2(_ethWitness, _changePk);
+        } else {
+            revert("chp13"); // Incorrect ChangePubKey type
+        }
+    }
+
     /// @notice Checks that signature is valid for pubkey change message
     /// @param _ethWitness Signature (65 bytes) + 32bytes of the arbitrary signed data
     /// @param _changePk Parsed change pubkey operation
-    function verifyChangePubkeySignature(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk) internal pure returns (bool) {
+    function verifyChangePubkeyECSDA(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk) internal pure returns (bool) {
         bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n28", _changePk.pubKeyHash, _changePk.nonce, _changePk.accountId);
-        (uint offset, bytes memory signature) = Bytes.read(_ethWitness, 0, 65);
+        (uint offset, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
         (,bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
         bytes32 messageHash = keccak256(abi.encodePacked(signedMessage, additionalData));
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
         return recoveredAddress == _changePk.owner;
+    }
+
+    /// @notice Checks that signature is valid for pubkey change message
+    /// @param _ethWitness Create2 deployer address, saltArg, codeHash
+    /// @param _changePk Parsed change pubkey operation
+    function verifyChangePubkeyCREATE2(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk) internal pure returns (bool) {
+        address creatorAddress;
+        bytes32 saltArg;
+        bytes32 codeHash;
+        uint offset  = 1; // offset is 1 because we skip type of ChangePubkey
+        (offset, creatorAddress) = Bytes.readAddress(_ethWitness, offset);
+        (offset, saltArg) = Bytes.readBytes32(_ethWitness, offset);
+        (offset, codeHash) = Bytes.readBytes32(_ethWitness, offset);
+        bytes32 salt = keccak256(abi.encodePacked(_changePk.pubKeyHash, saltArg));
+        address recoveredAddress = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), creatorAddress, salt, codeHash)))));
+        return recoveredAddress == _changePk.owner && _changePk.nonce == 0;
     }
 
     /// @dev Creates block commitment from its data
