@@ -125,14 +125,10 @@ mod tests {
         let config = TestConfig::load();
         let message = "hello-world";
 
-        // let manual_signature =
-        //     PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
-        //         .unwrap();
-        // let signature = EIP1271Signature(manual_signature.serialize_packed().to_vec());
-        // Signature data obtained from the actual EIP-1271 signature made via Argent.
-        const SIG_DATA: &str = "ebbb656a980792465a98aff29ecfd43f3cd94b4ef9490535565d5242fb55208c67c3006cc166ef66b1064282ed26ee0bc54d6b2c28cb779a642b8e9e2aad5e361c";
-        let signature_data = hex::decode(SIG_DATA).unwrap();
-        let signature = EIP1271Signature(signature_data.clone());
+        let manual_signature =
+            PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
+                .unwrap();
+        let signature = EIP1271Signature(manual_signature.serialize_packed().to_vec());
 
         let transport = web3::transports::Http::new(&config.eth.web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
