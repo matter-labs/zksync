@@ -134,6 +134,7 @@ contract Storage {
         uint32 blockNumber;
         uint64 priorityOperations;
         bytes32 processableOnchainOperationsHash;
+        uint256 timestamp;
         bytes32 stateHash;
         bytes32 commitment;
     }

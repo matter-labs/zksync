@@ -23,6 +23,7 @@ impl BlocksCommitOperation {
                     .as_bytes()
                     .to_vec(),
             ),
+            Token::Uint(U256::from(self.last_committed_block.timestamp)),
             Token::FixedBytes(
                 self.last_committed_block
                     .get_eth_encoded_root()
@@ -56,6 +57,7 @@ impl BlocksCommitOperation {
                     Token::Uint(U256::from(block.fee_account)),
                     Token::FixedBytes(block.get_eth_encoded_root().as_bytes().to_vec()),
                     Token::Bytes(block.get_eth_public_data()),
+                    Token::Uint(U256::from(block.timestamp)),
                     Token::Array(onchain_ops),
                 ])
             })
@@ -102,6 +104,7 @@ impl BlockExecuteOperationArg {
                     .as_bytes()
                     .to_vec(),
             ),
+            Token::Uint(U256::from(self.block.timestamp)),
             Token::FixedBytes(self.block.get_eth_encoded_root().as_bytes().to_vec()),
             Token::FixedBytes(self.block.block_commitment.as_bytes().to_vec()),
         ]);

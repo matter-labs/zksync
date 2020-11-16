@@ -36,6 +36,8 @@ pub struct PendingBlock {
     pub failed_txs: Vec<ExecutedTx>,
     /// Previous block root hash
     pub previous_block_root_hash: H256,
+    /// Timestamp
+    pub timestamp: u64,
 }
 
 /// Executed L2 transaction.
@@ -132,6 +134,8 @@ pub struct Block {
     pub verify_gas_limit: U256,
     /// Commitment
     pub block_commitment: H256,
+    /// Timestamp
+    pub timestamp: u64,
 }
 
 impl Block {
@@ -147,6 +151,7 @@ impl Block {
         commit_gas_limit: U256,
         verify_gas_limit: U256,
         block_commitment: H256,
+        timestamp: u64,
     ) -> Self {
         Self {
             block_number,
@@ -158,6 +163,7 @@ impl Block {
             commit_gas_limit,
             verify_gas_limit,
             block_commitment,
+            timestamp,
         }
     }
 
@@ -178,6 +184,7 @@ impl Block {
         commit_gas_limit: U256,
         verify_gas_limit: U256,
         previous_block_root_hash: H256,
+        timestamp: u64,
     ) -> Self {
         let mut block = Self {
             block_number,
@@ -189,6 +196,7 @@ impl Block {
             commit_gas_limit,
             verify_gas_limit,
             block_commitment: H256::default(),
+            timestamp,
         };
         block.block_chunks_size = block.smallest_block_size(available_block_chunks_sizes);
         block.block_commitment = Block::get_commitment(

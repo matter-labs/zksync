@@ -27,6 +27,7 @@ use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
 mod tests;
@@ -61,6 +62,7 @@ struct PendingBlock {
     /// Number of stored account updates in the db (from `account_updates` field)
     stored_account_updates: usize,
     previous_block_root_hash: H256,
+    timestamp: u64,
 }
 
 impl PendingBlock {
@@ -68,6 +70,7 @@ impl PendingBlock {
         unprocessed_priority_op_before: u64,
         chunks_left: usize,
         previous_block_root_hash: H256,
+        timestamp: u64,
     ) -> Self {
         Self {
             success_operations: Vec::new(),
@@ -83,6 +86,7 @@ impl PendingBlock {
             collected_fees: Vec::new(),
             stored_account_updates: 0,
             previous_block_root_hash,
+            timestamp,
         }
     }
 }
@@ -382,6 +386,10 @@ impl ZkSyncStateKeeper {
                 initial_state.unprocessed_priority_op,
                 max_block_size,
                 previous_root_hash,
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("failed to get system time")
+                    .as_secs(),
             ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
@@ -844,6 +852,10 @@ impl ZkSyncStateKeeper {
                     .last()
                     .expect("failed to get max block size"),
                 H256::default(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("failed to get system time")
+                    .as_secs(),
             ),
         );
 
@@ -879,6 +891,7 @@ impl ZkSyncStateKeeper {
             commit_gas_limit,
             verify_gas_limit,
             pending_block.previous_block_root_hash,
+            pending_block.timestamp,
         );
 
         self.pending_block.previous_block_root_hash = block.get_eth_encoded_root();
@@ -925,6 +938,7 @@ impl ZkSyncStateKeeper {
             success_operations: self.pending_block.success_operations.clone(),
             failed_txs: self.pending_block.failed_txs.clone(),
             previous_block_root_hash: self.pending_block.previous_block_root_hash,
+            timestamp: self.pending_block.timestamp,
         };
         let first_update_order_id = self.pending_block.stored_account_updates;
         let account_updates = self.pending_block.account_updates[first_update_order_id..].to_vec();

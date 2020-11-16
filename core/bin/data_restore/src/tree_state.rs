@@ -312,6 +312,7 @@ impl TreeState {
             gas_limit,
             gas_limit,
             H256::default(),
+            0,
         );
 
         self.state.block_number += 1;

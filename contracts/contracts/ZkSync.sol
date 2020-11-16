@@ -81,7 +81,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
 
-        StoredBlockInfo memory storedBlockZero = StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, _blockRootHash, bytes32(0));
+        StoredBlockInfo memory storedBlockZero = StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _blockRootHash, bytes32(0));
 
         hashedBlocks[0] = hashStoredBlockInfo(storedBlockZero);
     }
@@ -96,7 +96,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         Block memory lastBlock = blocks[totalBlocksVerified];
         require(lastBlock.priorityOperations == 0, "upg2"); // last block should not contain priority operations
 
-        StoredBlockInfo memory rehashedLastBlock = StoredBlockInfo(totalBlocksVerified, lastBlock.priorityOperations, EMPTY_STRING_KECCAK, lastBlock.stateRoot, lastBlock.commitment);
+        StoredBlockInfo memory rehashedLastBlock = StoredBlockInfo(totalBlocksVerified, lastBlock.priorityOperations, EMPTY_STRING_KECCAK, 0, lastBlock.stateRoot, lastBlock.commitment);
         hashedBlocks[totalBlocksVerified] = hashStoredBlockInfo(rehashedLastBlock);
     }
 
@@ -224,6 +224,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 feeAccount;
         bytes32 newStateRoot;
         bytes publicData;
+        uint256 timestamp;
         OnchainOperationData[] onchainOperations;
     }
 
@@ -232,12 +233,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
       internal returns (StoredBlockInfo memory storedNewBlock) {
         require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "fck11"); // only commit next block
 
+        require(_newBlock.timestamp >= _previousBlock.timestamp, "tms11"); // Block should be after previous block
+        require((block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER) <= _newBlock.timestamp
+            && _newBlock.timestamp <= (block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA), "tms12"); // tms12 - _blockTimestamp is not valid
+
         (bytes32 processedOnchainOpsHash, uint64 priorityRequests) = collectOnchainOps(_newBlock);
 
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(_previousBlock, _newBlock);
 
-        return StoredBlockInfo(_newBlock.blockNumber, priorityRequests, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
+        return StoredBlockInfo(_newBlock.blockNumber, priorityRequests, processedOnchainOpsHash, _newBlock.timestamp, _newBlock.newStateRoot, commitment);
     }
 
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
@@ -580,6 +585,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             abi.encodePacked(uint256(_newBlockData.blockNumber), uint256(_newBlockData.feeAccount))
         );
         // TODO: add _newBlockData.onchainOperations.length
+        // TODO: add _newBlockData.timestamp.length
         hash = sha256(abi.encodePacked(hash, uint256(_previousBlock.stateHash)));
         hash = sha256(abi.encodePacked(hash, uint256(_newBlockData.newStateRoot)));
 

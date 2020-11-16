@@ -800,6 +800,11 @@
           "ordinal": 8,
           "name": "commitment",
           "type_info": "Bytea"
+        },
+        {
+          "ordinal": 9,
+          "name": "timestamp",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -816,7 +821,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -1027,22 +1033,6 @@
       "columns": [],
       "parameters": {
         "Left": [
-          "Int8",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "41b65a6ef02cd2b5ab7f33ecdeb24a90dd787e0e862bded560510375cf172e73": {
-    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash)\n            VALUES ($1, $2, $3, $4, $5)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
           "Int8",
           "Bytea"
         ]
@@ -1536,6 +1526,23 @@
       ]
     }
   },
+  "5ab853a2edb8a8e2ac1c95f30aa209cb4e06f41fb55872e2d1f28e3a59e38517": {
+    "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "5de811d61e00fd7b93311aa825d17e2b2f0ee46ee762f5064e842f5d0f2b5ad7": {
     "query": "UPDATE eth_parameters\n            SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3\n            WHERE id = true",
     "describe": {
@@ -1731,26 +1738,6 @@
       "columns": [],
       "parameters": {
         "Left": []
-      },
-      "nullable": []
-    }
-  },
-  "6ae0a5cf002fd0ff37907a62712846dfc49511b34e8ee044d472e0a9371eba0f": {
-    "query": "\n            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit, commitment)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Bytea"
-        ]
       },
       "nullable": []
     }
@@ -2238,6 +2225,11 @@
           "ordinal": 4,
           "name": "previous_root_hash",
           "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "timestamp",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -2248,7 +2240,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -3270,6 +3263,27 @@
         "Left": [
           "Bytea",
           "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "db91278dbc648e1c7ebf4775d7927104e887c0bb338ed51c9aff21cfdecb2f27": {
+    "query": "\n            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit, commitment, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Bytea",
           "Int8"
         ]
       },
