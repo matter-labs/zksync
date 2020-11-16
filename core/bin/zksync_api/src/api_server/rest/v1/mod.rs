@@ -19,7 +19,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
 
 // Local uses
-use crate::fee_ticker::TickerRequest;
+use crate::{fee_ticker::TickerRequest, utils::token_db_cache::TokenDBCache};
 
 mod blocks;
 pub mod client;
@@ -36,13 +36,14 @@ type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
 pub(crate) fn api_scope(
     pool: ConnectionPool,
-    env_options: ConfigurationOptions,
     fee_ticker: mpsc::Sender<TickerRequest>,
+    tokens_db: TokenDBCache,
+    env_options: ConfigurationOptions,
 ) -> Scope {
     web::scope("/api/v1")
         .service(config::api_scope(&env_options))
-        .service(blocks::api_scope(&env_options, pool.clone()))
-        .service(tokens::api_scope(pool, fee_ticker))
+        .service(blocks::api_scope(&env_options, pool))
+        .service(tokens::api_scope(tokens_db, fee_ticker))
 }
 
 /// Internal pagination query representation in according to spec:

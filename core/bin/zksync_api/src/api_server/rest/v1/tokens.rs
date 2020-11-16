@@ -15,7 +15,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-use zksync_storage::{ConnectionPool, QueryResult};
+use zksync_storage::QueryResult;
 use zksync_types::{Token, TokenLike};
 
 // Local uses
@@ -23,32 +23,32 @@ use super::{
     client::{self, Client},
     Error as ApiError, JsonResult,
 };
-use crate::fee_ticker::{TickerRequest, TokenPriceRequestType};
+use crate::{
+    fee_ticker::{TickerRequest, TokenPriceRequestType},
+    utils::token_db_cache::TokenDBCache,
+};
 
 /// Shared data between `api/v1/tokens` endpoints.
 #[derive(Clone)]
 struct ApiTokensData {
-    pool: ConnectionPool,
     fee_ticker: mpsc::Sender<TickerRequest>,
-    // TODO reimplement tokens cache.
+    tokens: TokenDBCache,
 }
 
 impl ApiTokensData {
-    fn new(pool: ConnectionPool, fee_ticker: mpsc::Sender<TickerRequest>) -> Self {
-        Self { pool, fee_ticker }
+    fn new(tokens: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Self {
+        Self { tokens, fee_ticker }
     }
 
     async fn tokens(&self) -> QueryResult<Vec<Token>> {
-        let mut storage = self.pool.access_storage().await?;
+        let mut storage = self.tokens.db.access_storage().await?;
 
         let tokens = storage.tokens_schema().load_tokens().await?;
         Ok(tokens.into_iter().map(|(_k, v)| v).collect())
     }
 
     async fn token(&self, token_like: TokenLike) -> QueryResult<Option<Token>> {
-        let mut storage = self.pool.access_storage().await?;
-
-        storage.tokens_schema().get_token(token_like).await
+        self.tokens.get_token(token_like).await
     }
 
     async fn token_price_usd(&self, token: TokenLike) -> QueryResult<Option<BigDecimal>> {
@@ -157,8 +157,8 @@ async fn token_price(
     Ok(Json(price))
 }
 
-pub fn api_scope(pool: ConnectionPool, fee_ticker: mpsc::Sender<TickerRequest>) -> Scope {
-    let data = ApiTokensData::new(pool, fee_ticker);
+pub fn api_scope(tokens_db: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Scope {
+    let data = ApiTokensData::new(tokens_db, fee_ticker);
 
     web::scope("tokens")
         .data(data)
@@ -223,8 +223,9 @@ mod tests {
         ];
         let fee_ticker = dummy_fee_ticker(&prices);
 
-        let (client, server) =
-            cfg.start_server(move |cfg| api_scope(cfg.pool.clone(), fee_ticker.clone()));
+        let (client, server) = cfg.start_server(move |cfg| {
+            api_scope(TokenDBCache::new(cfg.pool.clone()), fee_ticker.clone())
+        });
 
         // Fee requests
         for (token, expected_price) in &prices {

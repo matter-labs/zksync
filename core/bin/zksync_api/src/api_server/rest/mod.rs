@@ -9,7 +9,7 @@ use zksync_types::H160;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 use self::v01::api_decl::ApiV01;
-use crate::fee_ticker::TickerRequest;
+use crate::{fee_ticker::TickerRequest, utils::token_db_cache::TokenDBCache};
 
 mod helpers;
 mod v01;
@@ -27,8 +27,10 @@ async fn start_server(
 
         let api_v1_scope = {
             let pool = api_v01.connection_pool.clone();
+            let token_db = TokenDBCache::new(pool.clone());
+
             let env_options = api_v01.config_options.clone();
-            v1::api_scope(pool, env_options, fee_ticker.clone())
+            v1::api_scope(pool, fee_ticker.clone(), token_db, env_options)
         };
 
         App::new()
