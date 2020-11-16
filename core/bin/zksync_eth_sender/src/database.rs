@@ -13,7 +13,7 @@ use zksync_basic_types::{H256, U256};
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
-    Operation,
+    Action, Operation,
 };
 // Local uses
 use super::transactions::ETHStats;
@@ -235,6 +235,17 @@ impl DatabaseInterface for Database {
                     .chain()
                     .state_schema()
                     .apply_state_update(block_number)
+                    .await?;
+                transaction
+                    .chain()
+                    .block_schema()
+                    .execute_operation(Operation {
+                        id: None,
+                        action: Action::Verify {
+                            proof: Default::default(),
+                        },
+                        block: block.block.clone(),
+                    })
                     .await?;
             }
 

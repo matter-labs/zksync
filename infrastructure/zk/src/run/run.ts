@@ -53,7 +53,7 @@ export async function plonkSetup(powers?: number[]) {
 }
 
 export async function revertReason(txHash: string, web3url?: string) {
-    await utils.spawn(`cd contracts && npx ts-node revert-reason.ts ${txHash} ${web3url || ''}`);
+    await utils.spawn(`cd contracts && yarn run ts-node scripts/revert-reason.ts ${txHash} ${web3url || ''}`);
 }
 
 export async function explorer() {

@@ -78,4 +78,9 @@ library Utils {
 
         return ecrecover(keccak256(_message), signV, signR, signS);
     }
+
+    /// @notice Returns new_hash = hash(old_hash + bytes)
+    function addBytesToHash(bytes32 _hash, bytes memory _bytes) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_hash, _bytes));
+    }
 }

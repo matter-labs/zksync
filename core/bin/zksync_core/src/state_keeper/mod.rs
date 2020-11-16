@@ -481,7 +481,9 @@ impl ZkSyncStateKeeper {
         transaction
             .chain()
             .block_schema()
-            .save_genesis_block(root_hash);
+            .save_genesis_block(root_hash)
+            .await
+            .expect("db fail");
 
         transaction
             .commit()

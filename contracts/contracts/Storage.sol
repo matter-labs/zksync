@@ -2,6 +2,8 @@
 
 pragma solidity ^0.7.0;
 
+pragma experimental ABIEncoderV2;
+
 import "./IERC20.sol";
 
 import "./Governance.sol";
@@ -127,7 +129,23 @@ contract Storage {
         return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
 
+    /// @notice Block info stored hashed in contract storage
+    struct StoredBlockInfo {
+        uint32 blockNumber;
+        uint64 priorityOperations;
+        bytes32 processableOnchainOperationsHash;
+        bytes32 stateHash;
+        bytes32 commitment;
+    }
+
+    /// @notice Hash StoredBlockInfo
+    function hashStoredBlockInfo(StoredBlockInfo memory _storedBlockInfo) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_storedBlockInfo));
+    }
+
+    /// @notice Stored hashed StoredBlockInfo for some block number
     mapping(uint32 => bytes32) public hashedBlocks;
 
+    /// @notice Stores verified commitments hashed in one slot.
     mapping(bytes32 => bool) public hashedVerifiedCommitments;
 }

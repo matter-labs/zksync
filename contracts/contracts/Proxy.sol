@@ -71,7 +71,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @notice Performs a delegatecall to the contract implementation
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation
     /// This function will return whatever the implementation call returns
-    fallback () external payable {
+    function _fallback () internal {
         address _target = getTarget();
         assembly {
             // The pointer to the free memory slot
@@ -102,6 +102,16 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
                 return(ptr, size)
             }
         }
+    }
+
+    /// @notice Will run when no functions matches call data
+    fallback () external payable {
+        _fallback();
+    }
+
+    /// @notice Same as fallback but called when calldata is empty
+    receive () external payable {
+        _fallback();
     }
 
     /// UpgradeableMaster functions

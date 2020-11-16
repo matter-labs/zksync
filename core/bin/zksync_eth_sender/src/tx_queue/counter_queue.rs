@@ -61,6 +61,10 @@ impl<T: fmt::Debug> CounterQueue<T> {
     pub fn len(&self) -> usize {
         self.elements.len()
     }
+
+    pub fn back(&self) -> Option<&T> {
+        self.elements.back()
+    }
 }
 
 #[cfg(test)]

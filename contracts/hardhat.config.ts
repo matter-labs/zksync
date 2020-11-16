@@ -1,6 +1,7 @@
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-solpp";
 import "hardhat-typechain"
+import "hardhat-contract-sizer"
 
 export default {
   solidity: {
@@ -13,7 +14,7 @@ export default {
     },
   },
   contractSizer: {
-    runOnCompile: true,
+    runOnCompile: false,
   },
   paths: {
       sources: "./contracts"

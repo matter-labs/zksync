@@ -68,7 +68,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param initializationParameters Encoded representation of initialization parameters:
     /// _governanceAddress The address of Governance contract
     /// _verifierAddress The address of Verifier contract
-    /// _ // FIXME: remove _genesisAccAddress
     /// _genesisRoot Genesis blocks (first block) root
     function initialize(bytes calldata initializationParameters) external {
         initializeReentrancyGuard();
@@ -92,6 +91,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function upgrade(bytes calldata upgradeParameters) external {
         // rehash last verified block to support new schema
         require(totalBlocksCommitted == totalBlocksVerified, "upg1"); // all blocks should be verified
+        require(upgradeParameters.length == 0, "upg3"); // upgrade parameters should be empty
 
         Block memory lastBlock = blocks[totalBlocksVerified];
         require(lastBlock.priorityOperations == 0, "upg2"); // last block should not contain priority operations
@@ -212,19 +212,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         balancesToWithdraw[packedBalanceKey].gasReserveValue = 0xff;
     }
 
-    struct StoredBlockInfo {
-        uint32 blockNumber;
-        uint64 priorityOperations;
-        bytes32 processableOnchainOperationsHash;
-        bytes32 stateHash;
-        bytes32 commitment;
-    }
-
+    /// @notice Data needed to process onchain operation from block public data
     struct OnchainOperationData {
         uint32 publicDataOffset;
         bytes ethWitness;
     }
 
+    /// @notice Data needed to commit new block
     struct CommitBlockInfo {
         uint32 blockNumber;
         uint32 feeAccount;
@@ -233,25 +227,19 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         OnchainOperationData[] onchainOperations;
     }
 
-    function hashStoredBlockInfo(StoredBlockInfo memory _storedBlockInfo) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_storedBlockInfo));
-    }
-
+    /// @dev Process one block commit using previous block StoredBlockInfo, returns new block StoredBlockInfo
     function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo memory _newBlock)
       internal returns (StoredBlockInfo memory storedNewBlock) {
+        require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "fck11"); // only commit next block
 
-        // todo: works
-//        require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "fck11"); // only commit next block
-
-        (bytes32 processedOnchainOpsHash, uint64 priorityReqests) = collectOnchainOps(_newBlock);
+        (bytes32 processedOnchainOpsHash, uint64 priorityRequests) = collectOnchainOps(_newBlock);
 
         // Create block commitment for verification proof
-        bytes32 commitment = createBlockCommitment(_previousBlock.stateHash, _newBlock);
+        bytes32 commitment = createBlockCommitment(_previousBlock, _newBlock);
 
-        return StoredBlockInfo(_newBlock.blockNumber, priorityReqests, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
+        return StoredBlockInfo(_newBlock.blockNumber, priorityRequests, processedOnchainOpsHash, _newBlock.newStateRoot, commitment);
     }
 
-    event PrioriReq(uint64, uint64,uint64);
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
     function commitBlocks(
         StoredBlockInfo memory _lastCommittedBlockData,
@@ -259,29 +247,30 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     ) external nonReentrant {
         requireActive();
         governance.requireActiveValidator(msg.sender);
-        // todo: works
-//        require(hashedBlocks[_lastCommittedBlockData.blockNumber] == hashStoredBlockInfo(_lastCommittedBlockData), "fck10"); // incorrect previous block data
+        require(hashedBlocks[_lastCommittedBlockData.blockNumber] == hashStoredBlockInfo(_lastCommittedBlockData), "fck10"); // incorrect previous block data
 
         StoredBlockInfo memory lastCommittedBlock = _lastCommittedBlockData;
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
             lastCommittedBlock = commitOneBlock(lastCommittedBlock, _newBlocksData[i]);
 
-            emit PrioriReq(firstPriorityRequestId, totalOpenPriorityRequests, totalCommittedPriorityRequests);
-            // try moving all state modifications here?
+            totalCommittedPriorityRequests += lastCommittedBlock.priorityOperations;
             hashedBlocks[lastCommittedBlock.blockNumber] = hashStoredBlockInfo(lastCommittedBlock);
+
             emit BlockCommit(lastCommittedBlock.blockNumber);
         }
 
         totalBlocksCommitted += uint32(_newBlocksData.length);
     }
 
+    /// @notice Data needed to execute committed and verified block
     struct ExecuteBlockInfo {
         StoredBlockInfo storedBlock;
         bytes[] onchainOpsPubdata;
         bytes32[] commitmentsInSlot;
-        uint256 commitmentIndex;
+        uint256 commitmentIdx;
     }
 
+    /// @dev Try withdrawing token and if failure - add to the onchain balance.
     function withdrawOrStore(uint16 _tokenId, address _recipient, uint128 _amount) internal {
         bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
 
@@ -299,28 +288,20 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             }
         }
         if (!sent) {
-            incrementBalanceToWithdraw(_tokenId, _recipient, _amount);
+            incBalanceToWithdraw(packedBalanceKey, _amount);
         }
     }
 
-    function incrementBalanceToWithdraw(uint16 _tokenId, address _recipient, uint128 _amount) internal {
-        bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
-        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        balancesToWithdraw[packedBalanceKey] = BalanceToWithdraw(balance.add(_amount), 0xff);
-    }
-
+    /// @notice Executes one block
     function executeOneBlock(
         ExecuteBlockInfo memory _blockExecuteData,
         uint32 executedBlockIdx
     ) internal returns (uint32 priorityRequestsExecuted) {
         // ensure block was committed
-        // todo: works
-//        require(hashStoredBlockInfo(_blockExecuteData.storedBlock) == hashedBlocks[_blockExecuteData.storedBlock.blockNumber], "exe10"); // incorrect previous block data
+        require(hashStoredBlockInfo(_blockExecuteData.storedBlock) == hashedBlocks[_blockExecuteData.storedBlock.blockNumber], "exe10"); // incorrect previous block data
+        require(_blockExecuteData.storedBlock.blockNumber == totalBlocksVerified + executedBlockIdx + 1, "exe11"); // Execute blocks in order
         // ensure block was verified
-        // todo: works
-//        require(hashedVerifiedCommitments[keccak256(abi.encode(_blockExecuteData.commitmentsInSlot))], "exe11"); // commitments verified
-        // todo: works
-//        require(_blockExecuteData.commitmentsInSlot[_blockExecuteData.commitmentIndex] == _blockExecuteData.storedBlock.commitment, "exe12"); // block commitment incorrect
+        require(openAndCheckCommitmentInSlot(_blockExecuteData.storedBlock.commitment, _blockExecuteData.commitmentsInSlot, _blockExecuteData.commitmentIdx), "exe12"); // block is verified
 
         priorityRequestsExecuted = 0;
         bytes32 processableOnchainOpsHash = EMPTY_STRING_KECCAK;
@@ -332,29 +313,28 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             if (opType == Operations.OpType.Deposit) {
                 ++priorityRequestsExecuted;
             } else if (opType == Operations.OpType.PartialExit) {
-                Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData, 0);
+                Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
                 withdrawOrStore(op.tokenId, op.owner, op.amount);
 
             } else if (opType == Operations.OpType.ForcedExit) {
-                Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData, 0);
+                Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
                 withdrawOrStore(op.tokenId, op.target, op.amount);
 
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
-                incrementBalanceToWithdraw(fullExitData.tokenId, fullExitData.owner, fullExitData.amount);
+                incBalanceToWithdraw(packAddressAndTokenId(fullExitData.owner, fullExitData.tokenId), fullExitData.amount);
 
                 ++priorityRequestsExecuted;
             } else {
                 revert("exe13"); // unsupported op in block execution
             }
 
-            processableOnchainOpsHash = keccak256(abi.encodePacked(processableOnchainOpsHash, pubData));
+            processableOnchainOpsHash = Utils.addBytesToHash(processableOnchainOpsHash, pubData);
         }
-        // todo: works
-//        require(processableOnchainOpsHash == _blockExecuteData.storedBlock.processableOnchainOperationsHash, "exe13"); // incorrect onchain ops executed
+        require(processableOnchainOpsHash == _blockExecuteData.storedBlock.processableOnchainOperationsHash, "exe13"); // incorrect onchain ops executed
     }
 
-    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
+    /// @notice Execute blocks, completing priority operations and processing withdrawals.
     function executeBlocks(
         ExecuteBlockInfo[] memory _blocksData
     ) external nonReentrant {
@@ -372,15 +352,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalCommittedPriorityRequests -= priorityRequestsExecuted;
         totalOpenPriorityRequests -= priorityRequestsExecuted;
 
-        totalBlocksCommitted -= nBlocks;
         totalBlocksVerified += nBlocks;
-
-        emit PrioriReq(firstPriorityRequestId, totalOpenPriorityRequests, totalCommittedPriorityRequests);
     }
 
     /// @notice Block verification.
     /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
-    function verifyCommitments(bytes32[] calldata _commitments, uint256[] calldata _proof) external {
+    function verifyCommitments(bytes32[] calldata _commitments, uint256[] calldata) external {
         // todo recursive verifier
         hashedVerifiedCommitments[keccak256(abi.encode(_commitments))] = true;
     }
@@ -390,24 +367,24 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function revertBlocks(StoredBlockInfo[] memory _blocksToRevert) external nonReentrant {
         governance.requireActiveValidator(msg.sender);
 
-        uint32 blocksCommited = totalBlocksCommitted;
-        uint32 blocksToRevert = Utils.minU32(uint32(_blocksToRevert.length), blocksCommited - totalBlocksVerified);
+        uint32 blocksCommitted = totalBlocksCommitted;
+        uint32 blocksToRevert = Utils.minU32(uint32(_blocksToRevert.length), blocksCommitted - totalBlocksVerified);
         uint64 revertedPriorityRequests = 0;
 
         for (uint32 i = 0; i < blocksToRevert; ++i) {
             StoredBlockInfo memory storedBlockInfo  = _blocksToRevert[i];
-            require(hashedBlocks[blocksCommited] == hashStoredBlockInfo(storedBlockInfo), "frk10"); // incorrect stored block info
+            require(hashedBlocks[blocksCommitted] == hashStoredBlockInfo(storedBlockInfo), "frk10"); // incorrect stored block info
 
-            delete hashedBlocks[blocksCommited];
+            delete hashedBlocks[blocksCommitted];
 
-            --blocksCommited;
+            --blocksCommitted;
             revertedPriorityRequests += storedBlockInfo.priorityOperations;
         }
 
-        totalBlocksCommitted = blocksCommited;
+        totalBlocksCommitted = blocksCommitted;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
-        emit BlocksRevert(totalBlocksVerified, blocksCommited);
+        emit BlocksRevert(totalBlocksVerified, blocksCommitted);
     }
 
     /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
@@ -439,8 +416,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(!exited[_accountId][_tokenId], "fet12"); // already exited
         require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, _accountId, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
 
-        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
+        incBalanceToWithdraw(packedBalanceKey, _amount);
         exited[_accountId][_tokenId] = true;
     }
 
@@ -503,16 +479,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit FullExitCommit(_blockNumber, fullExitData.accountId, fullExitData.owner, fullExitData.tokenId, fullExitData.amount);
     }
 
-    event Logb(bytes);
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
     /// Priority operations must be committed in the same order as they are in the priority queue.
     function collectOnchainOps(CommitBlockInfo memory _newBlockData)
-        internal returns (bytes32 processableOperationsData, uint64 priorityOperationsProcessed) {
+        internal returns (bytes32 processableOperationsHash, uint64 priorityOperationsProcessed) {
         bytes memory pubData = _newBlockData.publicData;
 
         require(pubData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
-        uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
-        processableOperationsData = EMPTY_STRING_KECCAK;
+
+        uint64 uncommittedPriorityRequestsOffset = firstPriorityRequestId + totalCommittedPriorityRequests;
+        priorityOperationsProcessed = 0;
+        processableOperationsHash = EMPTY_STRING_KECCAK;
+
         for (uint32 i = 0; i < _newBlockData.onchainOperations.length; ++i) {
             OnchainOperationData memory onchainOpData = _newBlockData.onchainOperations[i];
             uint pubdataOffset = onchainOpData.publicDataOffset;
@@ -529,18 +507,18 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     Operations.OpType.Deposit,
                     opPubData
                 );
-                commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
-                currentPriorityRequestId++;
+                commitNextPriorityOperation(onchainOp, uncommittedPriorityRequestsOffset + priorityOperationsProcessed);
+                priorityOperationsProcessed++;
 
-                processableOperationsData = keccak256(abi.encodePacked(processableOperationsData, opPubData));
+                processableOperationsHash = Utils.addBytesToHash(processableOperationsHash, opPubData);
             } else if (opType == Operations.OpType.PartialExit) {
                 bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, PARTIAL_EXIT_BYTES);
 
-                processableOperationsData = keccak256(abi.encodePacked(processableOperationsData, opPubData));
+                processableOperationsHash = Utils.addBytesToHash(processableOperationsHash, opPubData);
             } else if (opType == Operations.OpType.ForcedExit) {
                 bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, FORCED_EXIT_BYTES);
 
-                processableOperationsData = keccak256(abi.encodePacked(processableOperationsData, opPubData));
+                processableOperationsHash = Utils.addBytesToHash(processableOperationsHash, opPubData);
             } else if (opType == Operations.OpType.FullExit) {
                 bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, FULL_EXIT_BYTES);
 
@@ -551,14 +529,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     Operations.OpType.FullExit,
                     opPubData
                 );
-                commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
-                currentPriorityRequestId++;
+                commitNextPriorityOperation(onchainOp, uncommittedPriorityRequestsOffset + priorityOperationsProcessed);
+                priorityOperationsProcessed++;
 
-                processableOperationsData = keccak256(abi.encodePacked(processableOperationsData, opPubData));
+                processableOperationsHash = Utils.addBytesToHash(processableOperationsHash, opPubData);
             } else if (opType == Operations.OpType.ChangePubKey) {
                 bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, CHANGE_PUBKEY_BYTES);
 
-                Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(opPubData, 1);
+                Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(opPubData);
 
                 if (onchainOpData.ethWitness.length > 0) {
                     bool valid = verifyChangePubkeySignature(onchainOpData.ethWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
@@ -571,11 +549,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 revert("fpp14"); // unsupported op
             }
         }
-
-        require(currentPriorityRequestId <= firstPriorityRequestId + totalOpenPriorityRequests, "fcs16"); // fcs16 - excess priority requests in pubdata
-        priorityOperationsProcessed = totalCommittedPriorityRequests;
-        totalCommittedPriorityRequests = currentPriorityRequestId - firstPriorityRequestId;
-        priorityOperationsProcessed = totalCommittedPriorityRequests - priorityOperationsProcessed;
     }
 
     /// @notice Checks that signature is valid for pubkey change message
@@ -600,13 +573,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev Creates block commitment from its data
     function createBlockCommitment(
-        bytes32 _oldRoot,
+        StoredBlockInfo memory _previousBlock,
         CommitBlockInfo memory _newBlockData
     ) internal view returns (bytes32 commitment) {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_newBlockData.blockNumber), uint256(_newBlockData.feeAccount))
         );
-        hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
+        // TODO: add _newBlockData.onchainOperations.length
+        hash = sha256(abi.encodePacked(hash, uint256(_previousBlock.stateHash)));
         hash = sha256(abi.encodePacked(hash, uint256(_newBlockData.newStateRoot)));
 
         bytes memory pubdata = _newBlockData.publicData;
@@ -710,6 +684,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= _number;
         firstPriorityRequestId += _number;
         totalCommittedPriorityRequests -= _number;
+    }
+
+    function incBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
+        uint128 balance = balancesToWithdraw[_packedBalanceKey].balanceToWithdraw;
+        balancesToWithdraw[_packedBalanceKey] = BalanceToWithdraw(balance.add(_amount), 0xff);
+    }
+
+    function openAndCheckCommitmentInSlot(bytes32 _commitment, bytes32[] memory _commitments, uint256 _idx) internal view returns (bool){
+        return hashedVerifiedCommitments[keccak256(abi.encode(_commitments))] && _commitments[_idx] == _commitment;
     }
 
 }

@@ -10,7 +10,7 @@ pub struct BlocksCommitOperation {
 }
 
 impl BlocksCommitOperation {
-    pub fn get_eth_tx_args(&self) -> Token {
+    pub fn get_eth_tx_args(&self) -> Vec<Token> {
         let stored_block_info = Token::Tuple(vec![
             Token::Uint(U256::from(self.last_committed_block.block_number)),
             Token::Uint(U256::from(
@@ -61,7 +61,7 @@ impl BlocksCommitOperation {
             })
             .collect();
 
-        Token::Tuple(vec![stored_block_info, Token::Array(blocks_to_commit)])
+        vec![stored_block_info, Token::Array(blocks_to_commit)]
     }
 }
 
@@ -71,7 +71,7 @@ pub struct BlocksProofOperation {
 }
 
 impl BlocksProofOperation {
-    pub fn get_eth_tx_args(&self) -> Token {
+    pub fn get_eth_tx_args(&self) -> Vec<Token> {
         let commitments = Token::Array(
             self.commitments
                 .iter()
@@ -79,7 +79,7 @@ impl BlocksProofOperation {
                 .collect(),
         );
         let proof = Token::Array(vec![Token::Uint(U256::from(0)); 33]);
-        Token::Tuple(vec![commitments, proof])
+        vec![commitments, proof]
     }
 }
 
@@ -138,13 +138,13 @@ pub struct BlocksExecuteOperation {
 }
 
 impl BlocksExecuteOperation {
-    pub fn get_eth_tx_args(&self) -> Token {
-        Token::Array(
+    pub fn get_eth_tx_args(&self) -> Vec<Token> {
+        vec![Token::Array(
             self.blocks
                 .iter()
                 .map(|arg| arg.get_eth_tx_args())
                 .collect(),
-        )
+        )]
     }
 }
 

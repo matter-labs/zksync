@@ -315,7 +315,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 .save_new_eth_tx(
                     &mut transaction,
                     tx.op_type,
-                    tx.operation.clone(),
+                    Some(tx.operation.clone()),
                     deadline_block as i64,
                     gas_price,
                     tx.raw.clone(),
@@ -325,7 +325,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             let mut new_op = ETHOperation {
                 id: assigned_data.id,
                 op_type: tx.op_type,
-                op: tx.operation,
+                op: Some(tx.operation),
                 nonce: assigned_data.nonce,
                 last_deadline_block: deadline_block,
                 last_used_gas_price: gas_price,
@@ -705,18 +705,21 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         match op {
             AggregatedOperation::CommitBlocks(operation) => {
                 let args = operation.get_eth_tx_args();
-                self.ethereum.encode_tx_data("commitBlocks", args)
+                self.ethereum
+                    .encode_tx_data("commitBlocks", args.as_slice())
             }
             AggregatedOperation::CreateProofBlocks(..) => {
                 panic!("Eth sender should ignore CreateProofBlocks");
             } // not for eth sender
             AggregatedOperation::PublishProofBlocksOnchain(operation) => {
                 let args = operation.get_eth_tx_args();
-                self.ethereum.encode_tx_data("verifyCommitments", args)
+                self.ethereum
+                    .encode_tx_data("verifyCommitments", args.as_slice())
             }
             AggregatedOperation::ExecuteBlocks(operation) => {
                 let args = operation.get_eth_tx_args();
-                self.ethereum.encode_tx_data("executeBlocks", args)
+                self.ethereum
+                    .encode_tx_data("executeBlocks", args.as_slice())
             }
         }
     }
@@ -725,15 +728,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     fn add_operation_to_queue(&mut self, op: (i64, AggregatedOperation)) {
         let raw_tx = self.operation_to_raw_tx(&op.1);
 
-        log::info!(
-            "Added ZKSync operation <id {}; action: {}; blocks: {}-{}> to queue",
-            op.0,
-            op.1.get_action_type().to_string(),
-            op.1.get_block_range().0,
-            op.1.get_block_range().1
-        );
         self.tx_queue
-            .add_aggregate_operation(TxData::from_operation(op, raw_tx));
+            .add_aggregate_operation(TxData::from_operation(op.clone(), raw_tx));
     }
 }
 

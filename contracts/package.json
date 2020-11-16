@@ -21,6 +21,7 @@
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "hardhat": "^2.0.2",
+    "hardhat-contract-sizer": "^2.0.2",
     "hardhat-typechain": "^0.3.3",
     "mocha": "^6.2.0",
     "openzeppelin-solidity": "^2.3.0",

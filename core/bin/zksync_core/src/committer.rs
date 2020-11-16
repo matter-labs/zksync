@@ -248,7 +248,7 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
         let old_committed_block = storage
             .chain()
             .block_schema()
-            .get_block(last_committed_block)
+            .get_block(last_aggregate_committed_block)
             .await?
             .expect("Failed to get last committed block from db");
         let mut blocks_to_commit = Vec::new();

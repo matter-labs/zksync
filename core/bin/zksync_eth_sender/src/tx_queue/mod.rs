@@ -19,7 +19,7 @@ pub struct TxData {
     /// Not signed raw tx payload.
     pub raw: RawTxData,
     /// Optional zkSync operation.
-    pub operation: Option<(i64, AggregatedOperation)>,
+    pub operation: (i64, AggregatedOperation),
 }
 
 impl PartialEq for TxData {
@@ -34,16 +34,7 @@ impl TxData {
         Self {
             op_type: operation.1.get_action_type(),
             raw,
-            operation: Some(operation),
-        }
-    }
-
-    /// Creates a new `TxData` object without associated zkSync operation.
-    pub fn from_raw(op_type: AggregatedActionType, raw: RawTxData) -> Self {
-        Self {
-            op_type,
-            raw,
-            operation: None,
+            operation,
         }
     }
 }
@@ -121,6 +112,15 @@ pub struct TxQueue {
 
 impl TxQueue {
     pub fn add_aggregate_operation(&mut self, aggregate_operation: TxData) {
+        if let Some(TxData {
+            operation: (id, _), ..
+        }) = self.aggregated_operations.back()
+        {
+            if *id >= aggregate_operation.operation.0 {
+                return;
+            }
+        }
+
         self.aggregated_operations.push_back(aggregate_operation);
 
         log::info!(
