@@ -16,7 +16,7 @@ use structopt::StructOpt;
 use web3::transports::Http;
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::convert::FeConvert;
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{get_genesis_token_list, Token},
     Address, TokenId, H256,
@@ -26,7 +26,7 @@ use zksync_types::{
 const ETH_BLOCKS_STEP: u64 = 10_000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
-async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
+async fn add_tokens_to_db(storage: &mut StorageProcessor<'_>, eth_network: &str) {
     let genesis_tokens =
         get_genesis_token_list(&eth_network).expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
@@ -37,9 +37,7 @@ async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
             token.address,
             token.decimals
         );
-        pool.access_storage()
-            .await
-            .expect("failed to access db")
+        storage
             .tokens_schema()
             .store_token(Token {
                 id: id as TokenId,
@@ -157,7 +155,7 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_db(&connection_pool, &config.eth_network).await;
+        add_tokens_to_db(&mut storage, &config.eth_network).await;
 
         driver
             .set_genesis_state(&mut storage, config.genesis_tx_hash)
