@@ -525,7 +525,7 @@ export class Wallet {
         return balance;
     }
 
-    async isERC20DepositsApproved(token: TokenLike): Promise<boolean> {
+    async isERC20DepositsApproved(token: TokenLike, erc20ApproveThreshold: BigNumber=ERC20_APPROVE_TRESHOLD): Promise<boolean> {
         if (isTokenETH(token)) {
             throw Error('ETH token does not need approval.');
         }
@@ -536,13 +536,13 @@ export class Wallet {
                 this.address(),
                 this.provider.contractAddress.mainContract
             );
-            return BigNumber.from(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
+            return BigNumber.from(currentAllowance).gte(erc20ApproveThreshold);
         } catch (e) {
             this.modifyEthersError(e);
         }
     }
 
-    async approveERC20TokenDeposits(token: TokenLike): Promise<ContractTransaction> {
+    async approveERC20TokenDeposits(token: TokenLike, max_erc20_approve_amount: BigNumber=MAX_ERC20_APPROVE_AMOUNT): Promise<ContractTransaction> {
         if (isTokenETH(token)) {
             throw Error('ETH token does not need approval.');
         }
@@ -550,7 +550,7 @@ export class Wallet {
         const erc20contract = new Contract(tokenAddress, IERC20_INTERFACE, this.ethSigner);
 
         try {
-            return erc20contract.approve(this.provider.contractAddress.mainContract, MAX_ERC20_APPROVE_AMOUNT);
+            return erc20contract.approve(this.provider.contractAddress.mainContract, max_erc20_approve_amount);
         } catch (e) {
             this.modifyEthersError(e);
         }
