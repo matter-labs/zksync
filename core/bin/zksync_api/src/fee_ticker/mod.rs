@@ -132,6 +132,7 @@ pub struct TickerConfig {
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum TokenPriceRequestType {
     USDForOneWei,
     USDForOneToken,
