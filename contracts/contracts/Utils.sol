@@ -73,9 +73,8 @@ library Utils {
 
         (offset, signR) = Bytes.readBytes32(_signature, offset);
         (offset, signS) = Bytes.readBytes32(_signature, offset);
-        (offset, additionalHash) = Bytes.readBytes32(_signature, offset + 1);
         uint8 signV = uint8(_signature[offset]);
 
-        return ecrecover(keccak256(abi.encodePacked(_message, additionalHash)), signV, signR, signS);
+        return ecrecover(keccak256(_message), signV, signR, signS);
     }
 }

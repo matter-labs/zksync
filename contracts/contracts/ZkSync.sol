@@ -581,13 +581,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _accountId Id of zkSync account
     function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) internal pure returns (bool) {
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n152",
+            "\x19Ethereum Signed Message:\n184",
             "Register zkSync pubkey:\n\n",
             Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)), "\n",
             "nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n",
             "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
             "\n\n",
-            "Only sign this message for a trusted client!"
+            "Only sign this message for a trusted client!",
+            Bytes.slice(_signature, 65, 32)
         );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;
