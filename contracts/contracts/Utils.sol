@@ -63,9 +63,9 @@ library Utils {
 
     /// @notice Recovers signer's address from ethereum signature for given message
     /// @param _signature 65 bytes concatenated. R (32) + S (32) + V (1)
-    /// @param _message signed message.
+    /// @param _message signed message hash.
     /// @return address of the signer
-    function recoverAddressFromEthSignature(bytes memory _signature, bytes memory _message) internal pure returns (address) {
+    function recoverAddressFromEthSignature(bytes memory _signature, bytes32 _message) internal pure returns (address) {
         require(_signature.length == 65, "ves10"); // incorrect signature length
 
         bytes32 signR;
@@ -76,7 +76,7 @@ library Utils {
         (offset, signS) = Bytes.readBytes32(_signature, offset);
         uint8 signV = uint8(_signature[offset]);
 
-        return ecrecover(keccak256(_message), signV, signR, signS);
+        return ecrecover(_message, signV, signR, signS);
     }
 
     /// @notice Returns new_hash = hash(old_hash + bytes)

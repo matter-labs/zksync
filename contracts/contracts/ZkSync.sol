@@ -544,7 +544,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(opPubData);
 
                 if (onchainOpData.ethWitness.length > 0) {
-                    bool valid = verifyChangePubkeySignature(onchainOpData.ethWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
+                    bool valid = verifyChangePubkeySignature(onchainOpData.ethWitness, op);
                     require(valid, "fpp15"); // failed to verify change pubkey hash signature
                 } else {
                     bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
@@ -557,23 +557,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Checks that signature is valid for pubkey change message
-    /// @param _signature Signature
-    /// @param _newPkHash New pubkey hash
-    /// @param _nonce Nonce used for message
-    /// @param _ethAddress Account's ethereum address
-    /// @param _accountId Id of zkSync account
-    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint32 _accountId) internal pure returns (bool) {
-        bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n152",
-            "Register zkSync pubkey:\n\n",
-            Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)), "\n",
-            "nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n",
-            "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
-            "\n\n",
-            "Only sign this message for a trusted client!"
-        );
-        address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, signedMessage);
-        return recoveredAddress == _ethAddress;
+    /// @param _ethWitness Signature (65 bytes) + 32bytes of the arbitrary signed data
+    /// @param _changePk Parsed change pubkey operation
+    function verifyChangePubkeySignature(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk) internal pure returns (bool) {
+        bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n28", _changePk.pubKeyHash, _changePk.nonce, _changePk.accountId);
+        (uint offset, bytes memory signature) = Bytes.read(_ethWitness, 0, 65);
+        (,bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
+        bytes32 messageHash = keccak256(abi.encodePacked(signedMessage, additionalData));
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
+        return recoveredAddress == _changePk.owner;
     }
 
     /// @dev Creates block commitment from its data
