@@ -37,7 +37,6 @@ import * as path from "path";
             contract_address: smartWallet.address,
         };
         const outConfigPath = path.join(process.env.ZKSYNC_HOME, "etc/test_config/volatile/eip1271.json");
-        console.log(`ZKSYNC_HOME is '${process.env.ZKSYNC_HOME}'; outConfigPath is '${outConfigPath}'`);
         fs.writeFileSync(outConfigPath, JSON.stringify(outConfig), { encoding: "utf-8" });
         process.exit(0);
     } catch (err) {
