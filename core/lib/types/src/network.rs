@@ -1,14 +1,16 @@
-//!
 //! The network where the zkSync resides.
 //!
 
-use std::fmt;
-use std::str::FromStr;
+// Built-in uses
+use std::{fmt, str::FromStr};
 
-use serde::Deserialize;
-use serde::Serialize;
+// External uses
+use serde::{Deserialize, Serialize};
 
-///
+// Workspace uses
+
+// Local uses
+
 /// Network to be used for a zkSync client.
 ///
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +50,19 @@ impl fmt::Display for Network {
             Self::Ropsten => write!(f, "ropsten"),
             Self::Localhost => write!(f, "localhost"),
             Self::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+impl Network {
+    /// Returns the network chain ID on the Ethereum side.
+    pub fn chain_id(self) -> u8 {
+        match self {
+            Network::Mainnet => 1,
+            Network::Ropsten => 3,
+            Network::Rinkeby => 4,
+            Network::Localhost => 9,
+            Network::Unknown => panic!("Unknown chain ID"),
         }
     }
 }

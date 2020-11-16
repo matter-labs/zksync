@@ -19,7 +19,7 @@ fn main() {
 
     let (eth_req_sender, eth_req_receiver) = mpsc::channel(256);
 
-    let db_pool = main_runtime.block_on(async { ConnectionPool::new(None).await });
+    let db_pool = ConnectionPool::new(None);
 
     let watcher = EthWatch::new(web3, contract_address, 0, eth_req_receiver, db_pool);
 

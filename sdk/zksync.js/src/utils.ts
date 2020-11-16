@@ -326,9 +326,13 @@ export async function verifyERC1271Signature(
     signerOrProvider: ethers.Signer | ethers.providers.Provider
 ): Promise<boolean> {
     const EIP1271_SUCCESS_VALUE = '0x1626ba7e';
+    
+    // sign_message = keccak256("\x19Ethereum Signed Message:\n32" + keccak256(message))
     const hash = utils.keccak256(message);
+    const sign_message = utils.hashMessage(hash);
+    
     const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
-    const eipRetVal = await eip1271.isValidSignature(utils.hexlify(hash), signature);
+    const eipRetVal = await eip1271.isValidSignature(sign_message, signature);
     return eipRetVal === EIP1271_SUCCESS_VALUE;
 }
 

@@ -61,7 +61,7 @@ impl ConnectionPool {
     /// Establishes a pool of the connections to the database and
     /// creates a new `ConnectionPool` object.
     /// pool_max_size - number of connections in pool, if not set env variable "DB_POOL_SIZE" is going to be used.
-    pub async fn new(pool_max_size: Option<u32>) -> Self {
+    pub fn new(pool_max_size: Option<u32>) -> Self {
         let database_url = Self::get_database_url();
         let max_size = pool_max_size.unwrap_or_else(|| parse_env("DB_POOL_SIZE"));
 

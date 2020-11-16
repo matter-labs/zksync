@@ -4,6 +4,9 @@
 //! `mod rpc_server` - JSON rpc via HTTP (for request reply functions)
 //! `mod rpc_subscriptions` - JSON rpc via WebSocket (for request reply functions and subscriptions)
 
+// Public uses
+pub use rest::v1;
+
 // External uses
 use futures::channel::mpsc;
 // Workspace uses

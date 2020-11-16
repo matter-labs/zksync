@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 export ZKSYNC_HOME="/"
 
 PROVER_NAME=`hostname`
@@ -33,16 +35,27 @@ function get_required_plonk_setup_powers() {
 
 # we download only keys used in node (defined by $BLOCK_CHUNK_SIZES)
 REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`
-# install zk
-zk
 
 if [ "$PROVER_DOWNLOAD_SETUP" == "false" ]; then
   echo Downloading setup powers $REQUIRED_SETUP_POWS
-  /bin/zk run plonk-setup $REQUIRED_SETUP_POWS
+
+  SETUP_DO_SPACE_DIR=https://universal-setup.ams3.digitaloceanspaces.com
+  mkdir -p keys/setup && pushd keys/setup
+
+  for i in ${REQUIRED_SETUP_POWS//,/ }; do
+      axel -c $SETUP_DO_SPACE_DIR/setup_2%5E$i.key || true # don't download file if it is already there
+      sleep 1 # to not receive "503 Slow Down"
+  done
+
+  popd
+  echo Setup is downloaded
 fi
 
-/bin/zk run verify-keys unpack
+VERIFY_KEYS_TARBAL="verify-keys-`basename $KEY_DIR`-account-"$ACCOUNT_TREE_DEPTH"_-balance-$BALANCE_TREE_DEPTH.tar.gz"
 
-echo key download complete, starting prover
+# checks if keys are present and if so, unpacks them
+[ -f keys/packed/$VERIFY_KEYS_TARBAL ] || (echo Keys file $VERIFY_KEYS_TARBAL not found && exit 1)
+tar xf keys/packed/$VERIFY_KEYS_TARBAL
+echo Keys unpacked, starting prover
 
 exec plonk_step_by_step_prover "$PROVER_NAME" 2>&1

@@ -119,7 +119,7 @@ impl ContractsConfig {
 async fn main() {
     log::info!("Restoring zkSync state from the contract");
     env_logger::init();
-    let connection_pool = ConnectionPool::new(Some(1)).await;
+    let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ConfigurationOptions::from_env();
 
     let opt = Opt::from_args();
