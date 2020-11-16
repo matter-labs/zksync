@@ -6,7 +6,7 @@ use web3::types::H256;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_storage::{
     data_restore::records::{NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock},
-    ConnectionPool,
+    StorageProcessor,
 };
 use zksync_types::{
     Action, Operation,
@@ -37,10 +37,9 @@ impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEve
 /// * `genesis_acc_update` - Genesis account update
 ///
 pub async fn save_genesis_tree_state(
-    connection_pool: &ConnectionPool,
+    storage: &mut StorageProcessor<'_>,
     genesis_acc_update: AccountUpdate,
 ) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
     let (_last_committed, mut _accounts) = storage
         .chain()
         .state_schema()
@@ -67,12 +66,10 @@ pub async fn save_genesis_tree_state(
 /// * `accounts_updated` - accounts updates
 ///
 pub async fn update_tree_state(
-    connection_pool: &ConnectionPool,
+    storage: &mut StorageProcessor<'_>,
     block: Block,
     accounts_updated: AccountUpdates,
 ) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
     let mut transaction = storage
         .start_transaction()
         .await
@@ -121,13 +118,11 @@ pub async fn update_tree_state(
 /// * `last_watched_eth_block_number` - Last watched ethereum block
 ///
 pub async fn save_events_state(
-    connection_pool: &ConnectionPool,
+    storage: &mut StorageProcessor<'_>,
     block_events: &[BlockEvent],
     tokens: &[NewTokenEvent],
     last_watched_eth_block_number: u64,
 ) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
     let mut new_events: Vec<NewBlockEvent> = vec![];
     for event in block_events {
         new_events.push(block_event_into_stored_block_event(event));
@@ -167,8 +162,7 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
 /// * `connection_pool` - Database Connection Pool
 /// * `blocks` - Rollup operations blocks
 ///
-pub async fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBlock]) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
+pub async fn save_rollup_ops(storage: &mut StorageProcessor<'_>, blocks: &[RollupOpsBlock]) {
     let mut ops: Vec<(u32, &ZkSyncOp, u32)> = vec![];
 
     for block in blocks {
@@ -190,8 +184,9 @@ pub async fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupO
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub async fn get_ops_blocks_from_storage(connection_pool: &ConnectionPool) -> Vec<RollupOpsBlock> {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
+pub async fn get_ops_blocks_from_storage(
+    storage: &mut StorageProcessor<'_>,
+) -> Vec<RollupOpsBlock> {
     storage
         .data_restore_schema()
         .load_rollup_ops_blocks()
@@ -222,9 +217,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> Rollu
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub async fn get_storage_state(connection_pool: &ConnectionPool) -> StorageUpdateState {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
+pub async fn get_storage_state(storage: &mut StorageProcessor<'_>) -> StorageUpdateState {
     let storage_state_string = storage
         .data_restore_schema()
         .load_storage_state()
@@ -246,9 +239,7 @@ pub async fn get_storage_state(connection_pool: &ConnectionPool) -> StorageUpdat
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub async fn get_last_watched_block_number_from_storage(connection_pool: &ConnectionPool) -> u64 {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
+pub async fn get_last_watched_block_number_from_storage(storage: &mut StorageProcessor<'_>) -> u64 {
     let last_watched_block_number_string = storage
         .data_restore_schema()
         .load_last_watched_block_number()
@@ -266,11 +257,10 @@ pub async fn get_last_watched_block_number_from_storage(connection_pool: &Connec
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub async fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> EventsState {
-    let last_watched_eth_block_number =
-        get_last_watched_block_number_from_storage(&connection_pool).await;
-
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
+pub async fn get_block_events_state_from_storage(
+    storage: &mut StorageProcessor<'_>,
+) -> EventsState {
+    let last_watched_eth_block_number = get_last_watched_block_number_from_storage(storage).await;
 
     let committed = storage
         .data_restore_schema()
@@ -328,9 +318,7 @@ pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEven
 /// * `connection_pool` - Database Connection Pool
 ///
 /// connection_pool: &ConnectionPool,
-pub async fn get_tree_state(connection_pool: &ConnectionPool) -> (u32, AccountMap, u64, u32) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
+pub async fn get_tree_state(storage: &mut StorageProcessor<'_>) -> (u32, AccountMap, u64, u32) {
     let (last_block, account_map) = storage
         .chain()
         .state_schema()
@@ -352,9 +340,7 @@ pub async fn get_tree_state(connection_pool: &ConnectionPool) -> (u32, AccountMa
 
 /// Updates the `eth_stats` table with the currently last available committed/verified blocks
 /// data for `eth_sender` module to operate correctly.
-pub async fn update_eth_stats(connection_pool: &ConnectionPool) {
-    let mut storage = connection_pool.access_storage().await.expect("db failed");
-
+pub async fn update_eth_stats(storage: &mut StorageProcessor<'_>) {
     let last_committed_block = storage
         .chain()
         .block_schema()

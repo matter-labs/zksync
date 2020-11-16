@@ -5510,6 +5510,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_crypto",
  "zksync_storage",
+ "zksync_test_account",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5608,9 +5609,12 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "db_test_macro",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
+ "futures 0.3.6",
  "hex",
+ "jsonrpc-core",
  "log 0.4.11",
  "num",
  "serde",
