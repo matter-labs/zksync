@@ -108,6 +108,7 @@ export interface ChangePubKey {
     nonce: number;
     signature: Signature;
     ethSignature: string;
+    batchHash?: string;
 }
 
 export interface CloseAccount {

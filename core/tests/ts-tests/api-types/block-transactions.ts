@@ -45,6 +45,7 @@ type ChangePubKey = {
         account: string;
         accountId: number;
         ethSignature: string | null;
+        batchHash: string;
         newPkHash: string;
         feeToken: number;
         fee: string;
