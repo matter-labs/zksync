@@ -2,8 +2,7 @@ use crate::{Address, TokenId};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::{fs::read_to_string, str::FromStr};
+use std::{fmt, fs::read_to_string, path::PathBuf, str::FromStr};
 use zksync_utils::parse_env;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -38,14 +37,32 @@ impl From<&str> for TokenLike {
     }
 }
 
+impl fmt::Display for TokenLike {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenLike::Id(id) => id.fmt(f),
+            TokenLike::Address(addr) => write!(f, "{:#x}", addr),
+            TokenLike::Symbol(symbol) => symbol.fmt(f),
+        }
+    }
+}
+
 impl TokenLike {
     pub fn parse(value: &str) -> Self {
+        // Try to interpret an address as the token ID.
         if let Ok(id) = TokenId::from_str(value) {
             return Self::Id(id);
         }
-        if let Ok(address) = Address::from_str(value) {
+        // Try to interpret a token as the token address with or without a prefix.
+        let maybe_address = if value.starts_with("0x") {
+            &value[2..]
+        } else {
+            &value
+        };
+        if let Ok(address) = Address::from_str(maybe_address) {
             return Self::Address(address);
         }
+        // Otherwise interpret a string as the token symbol.
         Self::Symbol(value.to_string())
     }
 }

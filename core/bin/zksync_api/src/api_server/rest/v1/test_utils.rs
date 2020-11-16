@@ -4,6 +4,8 @@
 
 // External uses
 use actix_web::{web, App, Scope};
+use once_cell::sync::Lazy;
+use tokio::sync::Mutex;
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
@@ -129,12 +131,24 @@ impl TestServerConfig {
     }
 
     pub async fn fill_database(&self) -> anyhow::Result<()> {
+        static INITED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+
+        // Hold this guard until transaction will be committed to avoid double init.
+        let mut inited_guard = INITED.lock().await;
+        if *inited_guard {
+            return Ok(());
+        }
+        *inited_guard = true;
+
         let mut storage = self.pool.access_storage().await?;
 
         // Check if database is been already inited.
         if storage.chain().block_schema().get_block(1).await?.is_some() {
             return Ok(());
         }
+
+        // Make changes atomic.
+        let mut storage = storage.start_transaction().await?;
 
         // Below lies the initialization of the data for the test.
         let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
@@ -241,6 +255,11 @@ impl TestServerConfig {
                     .await?;
             }
         }
+
+        storage.commit().await?;
+        // Storage has been inited, so we can safely drop this guard.
+        drop(inited_guard);
+
         Ok(())
     }
 }

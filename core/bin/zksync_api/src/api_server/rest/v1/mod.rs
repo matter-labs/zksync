@@ -10,6 +10,7 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
+use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
@@ -18,6 +19,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
 
 // Local uses
+use crate::{fee_ticker::TickerRequest, utils::token_db_cache::TokenDBCache};
 
 mod blocks;
 pub mod client;
@@ -25,16 +27,23 @@ mod config;
 mod error;
 #[cfg(test)]
 mod test_utils;
+mod tokens;
 
 /// Maximum limit value in the requests.
 pub const MAX_LIMIT: u32 = 100;
 
 type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
-pub(crate) fn api_scope(pool: ConnectionPool, env_options: ConfigurationOptions) -> Scope {
+pub(crate) fn api_scope(
+    pool: ConnectionPool,
+    fee_ticker: mpsc::Sender<TickerRequest>,
+    tokens_db: TokenDBCache,
+    env_options: ConfigurationOptions,
+) -> Scope {
     web::scope("/api/v1")
         .service(config::api_scope(&env_options))
         .service(blocks::api_scope(&env_options, pool))
+        .service(tokens::api_scope(tokens_db, fee_ticker))
 }
 
 /// Internal pagination query representation in according to spec:
