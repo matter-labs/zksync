@@ -15,8 +15,8 @@ import * as path from "path";
             process.exit(1);
         }
 
-        const test_config_path = path.join(process.env.ZKSYNC_HOME, `/etc/test_config/constant/eip1271.json`);
-        const test_config = JSON.parse(fs.readFileSync(test_config_path, { encoding: "utf-8" }));
+        const testConfigPath = path.join(process.env.ZKSYNC_HOME, `etc/test_config/constant/eip1271.json`);
+        const testConfig = JSON.parse(fs.readFileSync(testConfigPath, { encoding: "utf-8" }));
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
         provider.pollingInterval = 10;
@@ -27,17 +27,18 @@ import * as path from "path";
         const smartWallet = await deployContract(
             deployWallet,
             readContractCode("AccountMock"),
-            [test_config.owner_address],
+            [testConfig.owner_address],
             {
                 gasLimit: 5000000,
             }
         );
 
-        const out_config = {
+        const outConfig = {
             contract_address: smartWallet.address,
         };
-        const out_config_path = path.join(process.env.ZKSYNC_HOME, "etc/test_config/volatile/eip1271.json");
-        fs.writeFileSync(out_config_path, JSON.stringify(out_config), { encoding: "utf-8" });
+        const outConfigPath = path.join(process.env.ZKSYNC_HOME, "etc/test_config/volatile/eip1271.json");
+        console.log(`ZKSYNC_HOME is '${process.env.ZKSYNC_HOME}'; outConfigPath is '${outConfigPath}'`);
+        fs.writeFileSync(outConfigPath, JSON.stringify(outConfig), { encoding: "utf-8" });
         process.exit(0);
     } catch (err) {
         console.log(`Error: ${err}`);
