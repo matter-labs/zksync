@@ -404,14 +404,14 @@ mod test {
         for i in 0..32 {
             logs.push(create_log(
                 block_committed_topic,
-                vec![],
+                vec![u32_to_32bytes(i).into()],
                 Bytes(vec![]),
                 i,
                 u32_to_32bytes(i).into(),
             ));
             logs.push(create_log(
                 block_verified_topic,
-                vec![],
+                vec![u32_to_32bytes(i).into()],
                 Bytes(vec![]),
                 i,
                 u32_to_32bytes(i).into(),
@@ -429,7 +429,7 @@ mod test {
         data.extend(&last_block_ver);
         let log = create_log(
             reverted_topic,
-            vec![],
+            vec![u32_to_32bytes(3).into()],
             Bytes(data),
             3,
             u32_to_32bytes(1).into(),
