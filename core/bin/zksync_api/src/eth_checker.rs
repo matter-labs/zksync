@@ -42,34 +42,48 @@ impl<T: Transport> EthereumChecker<T> {
         Contract::new(self.web3.eth(), address, eip1271_contract())
     }
 
+    /// Transforms the message into an array expected by EIP-1271 standard.
+    fn get_sign_message(message: &[u8]) -> [u8; 32] {
+        // sign_message = keccak256("\x19Ethereum Signed Message:\n{msg_len}" + message))
+        let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
+        let mut bytes = Vec::with_capacity(prefix.len() + message.len());
+        bytes.extend_from_slice(prefix.as_bytes());
+        bytes.extend_from_slice(message);
+        tiny_keccak::keccak256(&bytes)
+    }
+
     pub async fn is_eip1271_signature_correct(
         &self,
         address: Address,
         message: &[u8],
         signature: EIP1271Signature,
     ) -> Result<bool, anyhow::Error> {
-        // sign_message = keccak256("\x19Ethereum Signed Message:\n32" + keccak256(message))
-        let sign_message = {
-            let hash = tiny_keccak::keccak256(&message);
-            let prefix = format!("\x19Ethereum Signed Message:\n{}", hash.len());
-            let mut bytes = Vec::with_capacity(prefix.len() + hash.len());
-            bytes.extend_from_slice(prefix.as_bytes());
-            bytes.extend_from_slice(&hash);
+        let sign_message = Self::get_sign_message(message);
 
-            tiny_keccak::keccak256(&bytes)
-        };
-
-        let received: [u8; 4] = self
+        let call_result = self
             .get_eip1271_contract(address)
             .query(
                 "isValidSignature",
                 (sign_message, signature.0),
-                None,
+                Some(address),
                 Options::default(),
                 None,
             )
-            .await
-            .unwrap_or_default();
+            .await;
+
+        let received: [u8; 4] = match call_result {
+            Ok(val) => val,
+            Err(error) => {
+                // One error of this kind will mean that user provided incorrect signature.
+                // Many errors will likely mean that something is wrong with our implementation.
+                log::warn!("EIP1271 signature check failed: {:#?}", error);
+
+                // TODO: remove it
+                panic!("EIP1271 signature check failed: {:#?}", error);
+
+                // return Ok(false);
+            }
+        };
 
         Ok(received == EIP1271_SUCCESS_RETURN_VALUE)
     }
@@ -93,5 +107,79 @@ impl<T: Transport> EthereumChecker<T> {
             .await
             .map_err(|e| anyhow::format_err!("Failed to query contract authFacts: {}", e))?;
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EthereumChecker;
+    use std::str::FromStr;
+    use zksync_config::test_config::TestConfig;
+    use zksync_types::{
+        tx::{EIP1271Signature, PackedEthSignature},
+        Address,
+    };
+
+    #[tokio::test]
+    async fn test_eip1271() {
+        let config = TestConfig::load();
+        let message = "hello-world";
+
+        // let manual_signature =
+        //     PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
+        //         .unwrap();
+        // let signature = EIP1271Signature(manual_signature.serialize_packed().to_vec());
+        // Signature data obtained from the actual EIP-1271 signature made via Argent.
+        const SIG_DATA: &str = "ebbb656a980792465a98aff29ecfd43f3cd94b4ef9490535565d5242fb55208c67c3006cc166ef66b1064282ed26ee0bc54d6b2c28cb779a642b8e9e2aad5e361c";
+        let signature_data = hex::decode(SIG_DATA).unwrap();
+        let signature = EIP1271Signature(signature_data.clone());
+
+        let transport = web3::transports::Http::new(&config.eth.web3_url).unwrap();
+        let web3 = web3::Web3::new(transport);
+
+        let eth_checker = EthereumChecker::new(web3, Default::default());
+        let result = eth_checker
+            .is_eip1271_signature_correct(
+                config.eip1271.contract_address,
+                message.as_bytes(),
+                signature,
+            )
+            .await
+            .expect("Check failed");
+
+        assert_eq!(result, true, "Signature is incorrect");
+    }
+
+    /// This test checks that the actual signature data taken from
+    /// mainnet / Argent smart wallet is valid in our codebase.
+    #[test]
+    fn actual_data_check() {
+        // Signature data obtained from the actual EIP-1271 signature made via Argent.
+        const SIG_DATA: &str = "ebbb656a980792465a98aff29ecfd43f3cd94b4ef9490535565d5242fb55208c67c3006cc166ef66b1064282ed26ee0bc54d6b2c28cb779a642b8e9e2aad5e361c";
+        // // Smart wallet contract address.
+        // const ACCOUNT_ADDR: &str = "730094414795264fD9579c4aC816Cb1C0F4A545E";
+        // Actual account owner address.
+        const ACCOUNT_OWNER_ADDR: &str = "b6c3dd5a0e5f10f82f2a07fad0aef8cd5ce8c670";
+        // Message that was used for signing.
+        const MESSAGE: &str = "hello-world";
+
+        let signature_data = hex::decode(SIG_DATA).unwrap();
+
+        let modified_message =
+            EthereumChecker::<web3::transports::Http>::get_sign_message(MESSAGE.as_bytes());
+        // Here we use `web3::signing` module for purpose to not interfer with our own recovering implementation.
+        // Otherwise it's possible that signing / recovering will overlap with the same error.
+        let restored_address = web3::signing::recover(
+            &modified_message,
+            &signature_data[..64],
+            (signature_data[64] - 27) as i32,
+        )
+        .expect("Cannot recover");
+
+        let expected_address = Address::from_str(ACCOUNT_OWNER_ADDR).unwrap();
+        assert_eq!(
+            restored_address, expected_address,
+            "Restored address is incorrect"
+        );
     }
 }

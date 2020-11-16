@@ -5514,6 +5514,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_crypto",
  "zksync_storage",
+ "zksync_test_account",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5547,6 +5548,8 @@ name = "zksync_config"
 version = "1.0.0"
 dependencies = [
  "log 0.4.11",
+ "serde",
+ "serde_json",
  "url 2.1.1",
  "zksync_basic_types",
  "zksync_utils",

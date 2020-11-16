@@ -14,11 +14,14 @@ contract AccountMock is IEIP1271 {
   }
 
   function isValidSignature(
-    bytes32 _messageHash,
+    bytes32 _hash,
     bytes memory _signature
-  ) public view returns (bytes4 magicValue)
+  )
+  public
+  view
+  returns (bytes4)
   {
-    require(_signature.length == 64, "Signature length is incorrect");
+    require(_signature.length == 65, "Signature length is incorrect");
     uint8 v;
     bytes32 r;
     bytes32 s;
@@ -34,7 +37,7 @@ contract AccountMock is IEIP1271 {
     }
     require(v == 27 || v == 28);
 
-    address recoveredAddress = ecrecover(_messageHash, v, r, s);
+    address recoveredAddress = ecrecover(_hash, v, r, s);
     require(recoveredAddress != address(0), "ecrecover returned 0");
     require(recoveredAddress == owner, "Recovered address doesn't correspond to the owner");
 
