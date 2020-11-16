@@ -525,7 +525,7 @@ export class Wallet {
         return balance;
     }
 
-    async isERC20DepositsApproved(token: TokenLike, erc20ApproveThreshold: string=ERC20_APPROVE_TRESHOLD): Promise<boolean> {
+    async isERC20DepositsApproved(token: TokenLike, erc20ApproveThreshold: BigNumber=ERC20_APPROVE_TRESHOLD): Promise<boolean> {
         if (isTokenETH(token)) {
             throw Error('ETH token does not need approval.');
         }
@@ -542,7 +542,7 @@ export class Wallet {
         }
     }
 
-    async approveERC20TokenDeposits(token: TokenLike, max_erc20_approve_amount: string=MAX_ERC20_APPROVE_AMOUNT): Promise<ContractTransaction> {
+    async approveERC20TokenDeposits(token: TokenLike, max_erc20_approve_amount: BigNumber=MAX_ERC20_APPROVE_AMOUNT): Promise<ContractTransaction> {
         if (isTokenETH(token)) {
             throw Error('ETH token does not need approval.');
         }
