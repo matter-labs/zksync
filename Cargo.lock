@@ -5679,6 +5679,7 @@ dependencies = [
 name = "zksync_eth_signer"
 version = "1.0.0"
 dependencies = [
+ "actix-rt",
  "async-trait",
  "hex",
  "jsonrpc-core",

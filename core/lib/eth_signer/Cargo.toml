@@ -27,3 +27,6 @@ thiserror = "1.0"
 
 jsonrpc-core = "14.0.3"
 async-trait = "0.1"
+
+[dev-dependencies]
+actix-rt = "1.1.1"
