@@ -15,7 +15,7 @@ contract Storage {
 
     /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint256 public upgradePreparationActivationTime;
+    uint public upgradePreparationActivationTime;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;
@@ -95,7 +95,7 @@ contract Storage {
     struct PriorityOperation {
         Operations.OpType opType;
         bytes pubData;
-        uint256 expirationBlock;
+        uint expirationBlock;
     }
 
     /// @notice Priority Requests mapping (request id - operation)
@@ -114,22 +114,12 @@ contract Storage {
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Packs address and token id into single word to use as a key in balances mapping
-    function packAddressAndTokenId(address _address, uint16 _tokenId)
-        internal
-        pure
-        returns (bytes22)
-    {
+    function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {
         return bytes22((uint176(_address) | (uint176(_tokenId) << 160)));
     }
 
     /// @notice Gets value from balancesToWithdraw
-    function getBalanceToWithdraw(address _address, uint16 _tokenId)
-        public
-        view
-        returns (uint128)
-    {
-        return
-            balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)]
-                .balanceToWithdraw;
+    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
+        return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
 }

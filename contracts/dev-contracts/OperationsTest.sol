@@ -21,11 +21,7 @@ contract OperationsTest {
         require(x.owner == r.owner, "owner mismatch");
     }
 
-    function testDepositMatch(bytes calldata offchain)
-        external
-        pure
-        returns (bool)
-    {
+    function testDepositMatch(bytes calldata offchain) external pure returns (bool) {
         Operations.Deposit memory x =
             Operations.Deposit({
                 accountId: 0,
@@ -57,11 +53,7 @@ contract OperationsTest {
         require(x.amount == r.amount, "amount mismatch");
     }
 
-    function testFullExitMatch(bytes calldata offchain)
-        external
-        pure
-        returns (bool)
-    {
+    function testFullExitMatch(bytes calldata offchain) external pure returns (bool) {
         Operations.FullExit memory x =
             Operations.FullExit({
                 accountId: 0x01020304,
@@ -83,8 +75,7 @@ contract OperationsTest {
             });
 
         bytes memory pubdata = Operations.writePartialExitPubdata(x);
-        Operations.PartialExit memory r =
-            Operations.readPartialExitPubdata(pubdata, 0);
+        Operations.PartialExit memory r = Operations.readPartialExitPubdata(pubdata, 0);
 
         require(x.owner == r.owner, "owner mismatch");
         require(x.tokenId == r.tokenId, "tokenId mismatch");
@@ -100,8 +91,7 @@ contract OperationsTest {
             });
 
         bytes memory pubdata = Operations.writeForcedExitPubdata(x);
-        Operations.ForcedExit memory r =
-            Operations.readForcedExitPubdata(pubdata, 0);
+        Operations.ForcedExit memory r = Operations.readForcedExitPubdata(pubdata, 0);
 
         require(x.target == r.target, "target mismatch");
         require(x.tokenId == r.tokenId, "tokenId mismatch");

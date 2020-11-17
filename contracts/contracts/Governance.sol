@@ -12,10 +12,7 @@ contract Governance is Config {
     event NewGovernor(address newGovernor);
 
     /// @notice Validator's status changed
-    event ValidatorStatusUpdate(
-        address indexed validatorAddress,
-        bool isActive
-    );
+    event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
 
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
@@ -38,8 +35,7 @@ contract Governance is Config {
     /// @param initializationParameters Encoded representation of initialization parameters:
     ///     _networkGovernor The address of network governor
     function initialize(bytes calldata initializationParameters) external {
-        address _networkGovernor =
-            abi.decode(initializationParameters, (address));
+        address _networkGovernor = abi.decode(initializationParameters, (address));
 
         networkGovernor = _networkGovernor;
     }
@@ -106,11 +102,7 @@ contract Governance is Config {
     /// @notice Validate token address
     /// @param _tokenAddr Token address
     /// @return tokens id
-    function validateTokenAddress(address _tokenAddr)
-        external
-        view
-        returns (uint16)
-    {
+    function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(tokenId != 0, "gvs11"); // 0 is not a valid token
         return tokenId;

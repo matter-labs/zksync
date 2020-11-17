@@ -15,11 +15,7 @@ contract EIP1271 is IEIP1271 {
      * MUST NOT modify state (using STATICCALL for solc < 0.5, view modifier for solc > 0.5)
      * MUST allow external calls
      */
-    function isValidSignature(bytes32 _hash, bytes memory _signature)
-        public
-        view
-        returns (bytes4)
-    {
+    function isValidSignature(bytes32 _hash, bytes memory _signature) public view returns (bytes4) {
         return EIP1271_SUCCESS_RETURN_VALUE;
     }
 }

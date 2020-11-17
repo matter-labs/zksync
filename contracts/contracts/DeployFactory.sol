@@ -37,24 +37,12 @@ contract DeployFactory is TokenDeployInit {
         require(_governor != address(0));
         require(_feeAccountAddress != address(0));
 
-        deployProxyContracts(
-            _govTarget,
-            _verifierTarget,
-            _zkSyncTarget,
-            _genesisRoot,
-            _firstValidator,
-            _governor
-        );
+        deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor);
 
         selfdestruct(msg.sender);
     }
 
-    event Addresses(
-        address governance,
-        address zksync,
-        address verifier,
-        address gatekeeper
-    );
+    event Addresses(address governance, address zksync, address verifier, address gatekeeper);
 
     function deployProxyContracts(
         Governance _governanceTarget,
@@ -64,15 +52,13 @@ contract DeployFactory is TokenDeployInit {
         address _validator,
         address _governor
     ) internal {
-        Proxy governance =
-            new Proxy(address(_governanceTarget), abi.encode(this));
+        Proxy governance = new Proxy(address(_governanceTarget), abi.encode(this));
         // set this contract as governor
         Proxy verifier = new Proxy(address(_verifierTarget), abi.encode());
-        Proxy zkSync =
-            new Proxy(
-                address(_zksyncTarget),
-                abi.encode(address(governance), address(verifier), _genesisRoot)
-            );
+        Proxy zkSync = new Proxy(
+            address(_zksyncTarget),
+            abi.encode(address(governance), address(verifier), _genesisRoot)
+        );
 
         UpgradeGatekeeper upgradeGatekeeper = new UpgradeGatekeeper(zkSync);
 
@@ -87,18 +73,9 @@ contract DeployFactory is TokenDeployInit {
 
         upgradeGatekeeper.transferMastership(_governor);
 
-        emit Addresses(
-            address(governance),
-            address(zkSync),
-            address(verifier),
-            address(upgradeGatekeeper)
-        );
+        emit Addresses(address(governance), address(zkSync), address(verifier), address(upgradeGatekeeper));
 
-        finalizeGovernance(
-            Governance(address(governance)),
-            _validator,
-            _governor
-        );
+        finalizeGovernance(Governance(address(governance)), _validator, _governor);
     }
 
     function finalizeGovernance(
@@ -107,7 +84,7 @@ contract DeployFactory is TokenDeployInit {
         address _finalGovernor
     ) internal {
         address[] memory tokens = getTokens();
-        for (uint256 i = 0; i < tokens.length; ++i) {
+        for (uint i = 0; i < tokens.length; ++i) {
             _governance.addToken(tokens[i]);
         }
         _governance.setValidator(_validator, true);

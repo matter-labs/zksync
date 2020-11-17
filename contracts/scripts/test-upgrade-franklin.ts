@@ -22,7 +22,6 @@ async function main() {
         if (process.env.ETH_NETWORK !== 'test') {
             console.log('Upgrading test contract not on test network is not allowed');
             process.exit(1);
-            return;
         }
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);

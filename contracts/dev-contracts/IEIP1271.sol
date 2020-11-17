@@ -10,8 +10,5 @@ interface IEIP1271 {
      * MUST NOT modify state (using STATICCALL for solc < 0.5, view modifier for solc > 0.5)
      * MUST allow external calls
      */
-    function isValidSignature(bytes32 _hash, bytes calldata _signature)
-        external
-        view
-        returns (bytes4);
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) external view returns (bytes4);
 }

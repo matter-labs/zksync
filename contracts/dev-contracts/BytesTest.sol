@@ -11,22 +11,14 @@ contract BytesTest {
         return Bytes.read(_data, _offset, _len);
     }
 
-    function testUInt24(uint24 x)
-        external
-        pure
-        returns (uint24 r, uint256 offset)
-    {
+    function testUInt24(uint24 x) external pure returns (uint24 r, uint256 offset) {
         require(keccak256(new bytes(0)) == keccak256(new bytes(0)));
 
         bytes memory buf = Bytes.toBytesFromUInt24(x);
         (offset, r) = Bytes.readUInt24(buf, 0);
     }
 
-    function bytesToHexConvert(bytes calldata _in)
-        external
-        pure
-        returns (string memory)
-    {
+    function bytesToHexConvert(bytes calldata _in) external pure returns (string memory) {
         return string(Bytes.bytesToHexASCIIBytes(_in));
     }
 }

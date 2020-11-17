@@ -33,9 +33,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
     function upgradeFinishes() external {}
 
     function isReadyForUpgrade() external returns (bool) {
-        return
-            totalVerifiedPriorityOperations() >=
-            totalRegisteredPriorityOperations();
+        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
     uint256 private constant DUMMY_INDEX = 1;
@@ -90,9 +88,7 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
     function upgradeFinishes() external {}
 
     function isReadyForUpgrade() external returns (bool) {
-        return
-            totalVerifiedPriorityOperations() >=
-            totalRegisteredPriorityOperations();
+        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
     uint256 private constant DUMMY_INDEX = 2;

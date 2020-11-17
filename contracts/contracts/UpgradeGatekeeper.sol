@@ -10,7 +10,7 @@ import "./UpgradeableMaster.sol";
 /// @title Upgrade Gatekeeper Contract
 /// @author Matter Labs
 contract UpgradeGatekeeper is UpgradeEvents, Ownable {
-    using SafeMath for uint256;
+    using SafeMath for uint;
 
     /// @notice Array of addresses of upgradeable contracts managed by the gatekeeper
     Upgradeable[] public managedContracts;
@@ -22,14 +22,14 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
     /// @notice Notice period finish timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint256 public noticePeriodFinishTimestamp;
+    uint public noticePeriodFinishTimestamp;
 
     /// @notice Addresses of the next versions of the contracts to be upgraded (if element of this array is equal to zero address it means that appropriate upgradeable contract wouldn't be upgraded this time)
     /// @dev Will be empty in case of not active upgrade mode
     address[] public nextTargets;
 
     /// @notice Version id of contracts
-    uint256 public versionId;
+    uint public versionId;
 
     /// @notice Contract which defines notice period duration and allows finish upgrade during preparation of it
     UpgradeableMaster public mainContract;
@@ -59,7 +59,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(upgradeStatus == UpgradeStatus.Idle, "spu11"); // spu11 - unable to activate active upgrade mode
         require(newTargets.length == managedContracts.length, "spu12"); // spu12 - number of new targets must be equal to the number of managed contracts
 
-        uint256 noticePeriod = mainContract.getNoticePeriod();
+        uint noticePeriod = mainContract.getNoticePeriod();
         mainContract.upgradeNoticePeriodStarted();
         upgradeStatus = UpgradeStatus.NoticePeriod;
         noticePeriodFinishTimestamp = now.add(noticePeriod);
@@ -100,20 +100,14 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     function finishUpgrade(bytes[] calldata targetsUpgradeParameters) external {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.Preparation, "fpu11"); // fpu11 - unable to finish upgrade without preparation status active
-        require(
-            targetsUpgradeParameters.length == managedContracts.length,
-            "fpu12"
-        ); // fpu12 - number of new targets upgrade parameters must be equal to the number of managed contracts
+        require(targetsUpgradeParameters.length == managedContracts.length, "fpu12"); // fpu12 - number of new targets upgrade parameters must be equal to the number of managed contracts
         require(mainContract.isReadyForUpgrade(), "fpu13"); // fpu13 - main contract is not ready for upgrade
         mainContract.upgradeFinishes();
 
         for (uint64 i = 0; i < managedContracts.length; i++) {
             address newTarget = nextTargets[i];
             if (newTarget != address(0)) {
-                managedContracts[i].upgradeTarget(
-                    newTarget,
-                    targetsUpgradeParameters[i]
-                );
+                managedContracts[i].upgradeTarget(newTarget, targetsUpgradeParameters[i]);
             }
         }
         versionId++;

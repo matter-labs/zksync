@@ -8,8 +8,7 @@ contract ZkSyncWithdrawalUnitTest is ZkSyncTest {
         uint16 _token,
         uint128 _amount
     ) external {
-        balancesToWithdraw[packAddressAndTokenId(_owner, _token)]
-            .balanceToWithdraw = _amount;
+        balancesToWithdraw[packAddressAndTokenId(_owner, _token)].balanceToWithdraw = _amount;
     }
 
     function receiveETH() external payable {}
@@ -19,9 +18,7 @@ contract ZkSyncWithdrawalUnitTest is ZkSyncTest {
         uint16 _tokenId,
         uint128 _amount
     ) external {
-        pendingWithdrawals[
-            firstPendingWithdrawalIndex + numberOfPendingWithdrawals
-        ] = PendingWithdrawal(_to, _tokenId);
+        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
         numberOfPendingWithdrawals++;
         bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
         balancesToWithdraw[packedBalanceKey].balanceToWithdraw += _amount;
