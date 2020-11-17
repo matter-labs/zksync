@@ -42,19 +42,22 @@ pub struct Error {
 impl Error {
     /// Creates a new Error with the BAD_REQUEST (400) status code.
     pub fn bad_request(title: impl Display) -> Self {
-        Self {
-            http_code: StatusCode::BAD_REQUEST,
-            body: ErrorBody {
-                title: title.to_string(),
-                ..ErrorBody::default()
-            },
-        }
+        Self::with_code(StatusCode::BAD_REQUEST, title)
     }
 
     /// Creates a new Error with the INTERNAL_SERVER_ERROR (500) status code.
     pub fn internal(title: impl Display) -> Self {
+        Self::with_code(StatusCode::INTERNAL_SERVER_ERROR, title)
+    }
+
+    /// Creates a new Error with the NOT_IMPLEMENTED (501) status code.
+    pub fn not_implemented(title: impl Display) -> Self {
+        Self::with_code(StatusCode::NOT_IMPLEMENTED, title)
+    }
+
+    fn with_code(http_code: StatusCode, title: impl Display) -> Self {
         Self {
-            http_code: StatusCode::INTERNAL_SERVER_ERROR,
+            http_code,
             body: ErrorBody {
                 title: title.to_string(),
                 ..ErrorBody::default()

@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
     error::ClientError,
+    ethereum::{ierc20_contract, zksync_contract},
     types::BlockStatus,
     web3::{
         contract::{Contract, Options},
@@ -33,7 +34,6 @@ use zksync::{
     zksync_types::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes, ZkSyncTx},
     EthereumProvider, Network, Provider, Wallet, WalletCredentials,
 };
-use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
@@ -75,7 +75,7 @@ async fn get_ethereum_balance<S: EthereumSigner + Clone>(
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
     }
 
-    let contract = Contract::new(eth_provider.web3().eth(), token.address, erc20_contract());
+    let contract = Contract::new(eth_provider.web3().eth(), token.address, ierc20_contract());
     contract
         .query("balanceOf", address, None, Options::default(), None)
         .await
@@ -170,12 +170,16 @@ async fn test_deposit<S: EthereumSigner + Clone>(
 
     if !deposit_wallet.tokens.is_eth(token.address.into()) {
         if !ethereum.is_erc20_deposit_approved(token.address).await? {
-            let tx_approve_deposits = ethereum.approve_erc20_token_deposits(token.address).await?;
+            let tx_approve_deposits = ethereum
+                .limited_approve_erc20_token_deposits(token.address, U256::from(amount))
+                .await?;
             ethereum.wait_for_tx(tx_approve_deposits).await?;
         }
 
         assert!(
-            ethereum.is_erc20_deposit_approved(token.address).await?,
+            ethereum
+                .is_limited_erc20_deposit_approved(token.address, U256::from(amount))
+                .await?,
             "Token should be approved"
         );
     };
@@ -195,6 +199,15 @@ async fn test_deposit<S: EthereumSigner + Clone>(
     // let balance_after = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
 
     if !sync_wallet.tokens.is_eth(token.address.into()) {
+        // It should not be approved because we have approved only DEPOSIT_AMOUNT, not the maximum possible amount of deposit
+        assert!(
+            !ethereum
+                .is_limited_erc20_deposit_approved(token.address, U256::from(amount))
+                .await?
+        );
+        // Unlimited approve for deposit
+        let tx_approve_deposits = ethereum.approve_erc20_token_deposits(token.address).await?;
+        ethereum.wait_for_tx(tx_approve_deposits).await?;
         assert!(ethereum.is_erc20_deposit_approved(token.address).await?);
     }
 

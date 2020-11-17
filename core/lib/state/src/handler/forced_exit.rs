@@ -1,4 +1,5 @@
 use anyhow::{ensure, format_err};
+use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, PubKeyHash, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
@@ -67,6 +68,7 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         ensure!(
             op.tx.initiator_account_id <= params::max_account_id(),
             "Incorrect initiator account ID"
@@ -146,6 +148,7 @@ impl TxHandler<ForcedExit> for ZkSyncState {
             amount: op.tx.fee.clone(),
         };
 
+        metrics::histogram!("state.forced_exit", start.elapsed());
         Ok((Some(fee), updates))
     }
 }

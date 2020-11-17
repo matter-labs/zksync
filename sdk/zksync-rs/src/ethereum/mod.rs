@@ -8,7 +8,6 @@ use web3::contract::{Contract, Options};
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H160, H256, U256};
 use web3::Web3;
-use zksync_contracts as abi;
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, PriorityOp, TokenLike};
@@ -18,10 +17,30 @@ use crate::{
 };
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
+const ZKSYNC_INTERFACE: &str = include_str!("abi/ZkSync.json");
+
+fn load_contract(raw_abi_string: &str) -> ethabi::Contract {
+    let abi_string = serde_json::Value::from_str(raw_abi_string)
+        .expect("Malformed ZkSync contract file")
+        .get("abi")
+        .expect("Malformed ZkSync contract file")
+        .to_string();
+    ethabi::Contract::load(abi_string.as_bytes()).unwrap()
+}
+
+/// Returns `ethabi::Contract` object for zkSync smart contract.
+pub fn zksync_contract() -> ethabi::Contract {
+    load_contract(ZKSYNC_INTERFACE)
+}
+
+/// Returns `ethabi::Contract` object for ERC-20 smart contract interface.
+pub fn ierc20_contract() -> ethabi::Contract {
+    load_contract(IERC20_INTERFACE)
+}
 
 /// `EthereumProvider` gains access to on-chain operations, such as deposits and full exits.
 /// Methods to interact with Ethereum return corresponding Ethereum transaction hash.
-/// In order to monitor transaction execution, an Etherereum node `web3` API is exposed
+/// In order to monitor transaction execution, an Ethereum node `web3` API is exposed
 /// via `EthereumProvider::web3` method.
 #[derive(Debug)]
 pub struct EthereumProvider<S: EthereumSigner> {
@@ -53,7 +72,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
         let eth_client = ETHClient::new(
             transport,
-            abi::zksync_contract(),
+            zksync_contract(),
             eth_addr,
             eth_signer,
             contract_address
@@ -62,13 +81,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             network.chain_id(),
             1.5f64,
         );
-
-        let abi_string = serde_json::Value::from_str(IERC20_INTERFACE)
-            .expect("Malformed IERC20 file")
-            .get("abi")
-            .expect("Malformed IERC20 file")
-            .to_string();
-        let erc20_abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
+        let erc20_abi = ierc20_contract();
 
         Ok(Self {
             eth_client,
@@ -109,8 +122,17 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         &self,
         token: impl Into<TokenLike>,
     ) -> Result<bool, ClientError> {
+        self.is_limited_erc20_deposit_approved(token, U256::from(2).pow(255.into()))
+            .await
+    }
+
+    /// Checks whether ERC20 of a certain token deposit with limit is approved for account.
+    pub async fn is_limited_erc20_deposit_approved(
+        &self,
+        token: impl Into<TokenLike>,
+        erc20_approve_threshold: U256,
+    ) -> Result<bool, ClientError> {
         let token = token.into();
-        let erc20_approve_threshold: U256 = U256::from(2).pow(255.into());
         let token = self
             .tokens_cache
             .resolve(token)
@@ -141,8 +163,17 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         &self,
         token: impl Into<TokenLike>,
     ) -> Result<H256, ClientError> {
+        self.limited_approve_erc20_token_deposits(token, U256::max_value())
+            .await
+    }
+
+    /// Sends a transaction to ERC20 token contract to approve the limited ERC20 deposit.
+    pub async fn limited_approve_erc20_token_deposits(
+        &self,
+        token: impl Into<TokenLike>,
+        max_erc20_approve_amount: U256,
+    ) -> Result<H256, ClientError> {
         let token = token.into();
-        let max_erc20_approve_amount: U256 = U256::max_value();
 
         let token = self
             .tokens_cache

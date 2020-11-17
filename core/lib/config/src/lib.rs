@@ -1,14 +1,13 @@
 // Built-in deps
-use std::env;
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::time::Duration;
+use std::{env, net::SocketAddr, str::FromStr, time::Duration};
 // External uses
 use url::Url;
 // Workspace uses
 use zksync_basic_types::{H160, H256};
 use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
+
+pub mod test_config;
 
 /// Configuration options for `eth_sender`.
 #[derive(Debug, Clone)]

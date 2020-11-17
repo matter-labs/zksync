@@ -432,12 +432,15 @@ mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
     use num::BigUint;
+    use zksync_types::tx::ChangePubKey;
     use zksync_types::{
-        Deposit, DepositOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
+        ChangePubKeyOp, Deposit, DepositOp, ForcedExit, ForcedExitOp, FullExit, FullExitOp,
+        PubKeyHash, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp, ZkSyncOp,
     };
 
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
+        // Deposit 1000 to 7
         let tx1 = Deposit {
             from: [1u8; 20].into(),
             token: 1,
@@ -457,10 +460,11 @@ mod test {
             fee_account: 0,
         };
 
+        // Withdraw 20 with 1 fee from 7 to 10
         let tx2 = Withdraw::new(
             0,
             [7u8; 20].into(),
-            [7u8; 20].into(),
+            [9u8; 20].into(),
             1,
             BigUint::from(20u32),
             BigUint::from(1u32),
@@ -480,12 +484,13 @@ mod test {
             fee_account: 0,
         };
 
+        // Transfer 40 with 1 fee from 7 to 8
         let tx3 = Transfer::new(
             0,
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
-            BigUint::from(20u32),
+            BigUint::from(40u32),
             BigUint::from(1u32),
             3,
             None,
@@ -504,6 +509,7 @@ mod test {
             fee_account: 0,
         };
 
+        // Transfer 19 with 1 fee from 8 to 7
         let tx4 = Transfer::new(
             1,
             [8u8; 20].into(),
@@ -528,46 +534,133 @@ mod test {
             fee_account: 0,
         };
 
-        // let tx5 = Close {
-        //     account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-        //         .unwrap(),
+        let pub_key_hash_7 = PubKeyHash::from_hex("sync:8888888888888888888888888888888888888888")
+            .expect("Correct pub key hash");
+        let tx5 = ChangePubKey::new(
+            0,
+            [7u8; 20].into(),
+            pub_key_hash_7.clone(),
+            1,
+            BigUint::from(1u32),
+            2,
+            None,
+            None,
+        );
+        let op5 = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
+            tx: tx5,
+            account_id: 0,
+        }));
+        let pub_data5 = op5.public_data();
+        let ops5 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
+        let block5 = RollupOpsBlock {
+            block_num: 5,
+            ops: ops5,
+            fee_account: 0,
+        };
+
+        // Full exit for 8
+        let tx6 = FullExit {
+            account_id: 1,
+            eth_address: [8u8; 20].into(),
+            token: 1,
+        };
+        let op6 = ZkSyncOp::FullExit(Box::new(FullExitOp {
+            priority_op: tx6,
+            withdraw_amount: Some(BigUint::from(980u32).into()),
+        }));
+        let pub_data6 = op6.public_data();
+        let ops6 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data6).expect("cant get ops from data 5");
+        let block6 = RollupOpsBlock {
+            block_num: 5,
+            ops: ops6,
+            fee_account: 0,
+        };
+
+        // Forced exit for 7
+        let tx7 = ForcedExit::new(0, [7u8; 20].into(), 1, BigUint::from(1u32), 1, None);
+        let op7 = ZkSyncOp::ForcedExit(Box::new(ForcedExitOp {
+            tx: tx7,
+            target_account_id: 0,
+            withdraw_amount: Some(BigUint::from(960u32).into()),
+        }));
+        let pub_data7 = op7.public_data();
+        let ops7 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data7).expect("cant get ops from data 5");
+        let block7 = RollupOpsBlock {
+            block_num: 7,
+            ops: ops7,
+            fee_account: 1,
+        };
+        // This transaction have to be deleted, do not uncomment. Delete it after removing the corresponding code        // let tx6 = Close {
+        //     account: Address::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
         //     nonce: 2,
         //     signature: TxSignature::default(),
         // };
-        // let op5 = ZkSyncOp::Close(Box::new(CloseOp {
-        //     tx: tx5,
+        // let op6 = ZkSyncOp::Close(Box::new(CloseOp {
+        //     tx: tx6,
         //     account_id: 1,
         // }));
-        // let pub_data5 = op5.public_data();
-        // let ops5 =
+        // let pub_data6 = op6.public_data();
+        // let ops6 =
         //     RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
         // let block5 = RollupOpsBlock {
-        //     block_num: 5,
-        //     ops: ops5,
+        //     block_num: 6,
+        //     ops: ops6,
         //     fee_account: 0,
         // };
-
+        //
         let mut tree = TreeState::new(vec![50]);
         tree.update_tree_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        assert_eq!(zero_acc.address, [7u8; 20].into());
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(1000u32));
+
         tree.update_tree_states_from_ops_block(&block2)
             .expect("Cant update state from block 2");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(980u32));
+
         tree.update_tree_states_from_ops_block(&block3)
             .expect("Cant update state from block 3");
-        tree.update_tree_states_from_ops_block(&block4)
-            .expect("Cant update state from block 4");
-        // tree.update_tree_states_from_ops_block(&block5)
-        //     .expect("Cant update state from block 5");
-
+        // Verify creating accounts
         assert_eq!(tree.get_accounts().len(), 2);
 
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
-        assert_eq!(zero_acc.address, [7u8; 20].into());
-        assert_eq!(zero_acc.get_balance(1), BigUint::from(980u32));
-
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(first_acc.address, [8u8; 20].into());
+
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(940u32));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(40u32));
+
+        tree.update_tree_states_from_ops_block(&block4)
+            .expect("Cant update state from block 4");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(960u32));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(20u32));
+
+        assert_eq!(zero_acc.pub_key_hash, PubKeyHash::zero());
+        tree.update_tree_states_from_ops_block(&block5)
+            .expect("Cant update state from block 5");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        assert_eq!(zero_acc.pub_key_hash, pub_key_hash_7);
+
+        tree.update_tree_states_from_ops_block(&block6)
+            .expect("Cant update state from block 6");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(960u32));
         assert_eq!(first_acc.get_balance(1), BigUint::from(0u32));
+
+        tree.update_tree_states_from_ops_block(&block7)
+            .expect("Cant update state from block 7");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(0u32));
+        assert_eq!(first_acc.get_balance(1), BigUint::from(1u32));
     }
 
     #[test]
@@ -605,7 +698,7 @@ mod test {
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
-            BigUint::from(20u32),
+            BigUint::from(40u32),
             BigUint::from(1u32),
             3,
             None,
@@ -634,11 +727,51 @@ mod test {
         }));
         let pub_data4 = op4.public_data();
 
+        let pub_key_hash_7 = PubKeyHash::from_hex("sync:8888888888888888888888888888888888888888")
+            .expect("Correct pub key hash");
+        let tx5 = ChangePubKey::new(
+            0,
+            [7u8; 20].into(),
+            pub_key_hash_7.clone(),
+            1,
+            BigUint::from(1u32),
+            2,
+            None,
+            None,
+        );
+        let op5 = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
+            tx: tx5,
+            account_id: 0,
+        }));
+        let pub_data5 = op5.public_data();
+
+        let tx6 = FullExit {
+            account_id: 1,
+            eth_address: [8u8; 20].into(),
+            token: 1,
+        };
+        let op6 = ZkSyncOp::FullExit(Box::new(FullExitOp {
+            priority_op: tx6,
+            withdraw_amount: Some(BigUint::from(980u32).into()),
+        }));
+        let pub_data6 = op6.public_data();
+
+        let tx7 = ForcedExit::new(0, [7u8; 20].into(), 1, BigUint::from(1u32), 1, None);
+        let op7 = ZkSyncOp::ForcedExit(Box::new(ForcedExitOp {
+            tx: tx7,
+            target_account_id: 0,
+            withdraw_amount: Some(BigUint::from(956u32).into()),
+        }));
+        let pub_data7 = op7.public_data();
+
         let mut pub_data = Vec::new();
         pub_data.extend_from_slice(&pub_data1);
         pub_data.extend_from_slice(&pub_data2);
         pub_data.extend_from_slice(&pub_data3);
         pub_data.extend_from_slice(&pub_data4);
+        pub_data.extend_from_slice(&pub_data5);
+        pub_data.extend_from_slice(&pub_data6);
+        pub_data.extend_from_slice(&pub_data7);
 
         let ops = RollupOpsBlock::get_rollup_ops_from_data(pub_data.as_slice())
             .expect("cant get ops from data 1");
@@ -656,7 +789,8 @@ mod test {
 
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(zero_acc.address, [7u8; 20].into());
-        assert_eq!(zero_acc.get_balance(1), BigUint::from(980u32));
+        assert_eq!(zero_acc.get_balance(1), BigUint::from(5u32));
+        assert_eq!(zero_acc.pub_key_hash, pub_key_hash_7);
 
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(first_acc.address, [8u8; 20].into());

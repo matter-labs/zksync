@@ -177,8 +177,10 @@ impl<T: Transport> EthWatch<T> {
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<(EthBlockId, PriorityOp)>, anyhow::Error> {
+        let start = Instant::now();
         let filter = self.get_priority_op_event_filter(from, to);
-        self.web3
+        let result = self
+            .web3
             .eth()
             .logs(filter)
             .await?
@@ -197,7 +199,13 @@ impl<T: Transport> EthWatch<T> {
 
                 Ok((block_number, priority_op))
             })
-            .collect()
+            .collect();
+
+        metrics::histogram!(
+            "eth_watcher.get_priority_op_events_with_blocks",
+            start.elapsed()
+        );
+        result
     }
 
     async fn get_priority_op_events(
@@ -205,8 +213,10 @@ impl<T: Transport> EthWatch<T> {
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<PriorityOp>, anyhow::Error> {
+        let start = Instant::now();
         let filter = self.get_priority_op_event_filter(from, to);
-        self.web3
+        let result = self
+            .web3
             .eth()
             .logs(filter)
             .await?
@@ -216,7 +226,9 @@ impl<T: Transport> EthWatch<T> {
                     format_err!("Failed to parse priority queue event log from ETH: {:?}", e)
                 })
             })
-            .collect()
+            .collect();
+        metrics::histogram!("eth_watcher.get_priority_op_events", start.elapsed());
+        result
     }
 
     async fn get_complete_withdrawals_event(
@@ -224,14 +236,22 @@ impl<T: Transport> EthWatch<T> {
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<CompleteWithdrawalsTx>, anyhow::Error> {
+        let start = Instant::now();
         let filter = self.get_complete_withdrawals_event_filter(from, to);
-        self.web3
+        let result = self
+            .web3
             .eth()
             .logs(filter)
             .await?
             .into_iter()
             .map(CompleteWithdrawalsTx::try_from)
-            .collect()
+            .collect();
+
+        metrics::histogram!(
+            "eth_watcher.get_complete_withdrawals_event",
+            start.elapsed()
+        );
+        result
     }
 
     async fn get_unconfirmed_ops(
@@ -475,12 +495,14 @@ impl<T: Transport> EthWatch<T> {
     }
 
     async fn poll_eth_node(&mut self) -> Result<(), anyhow::Error> {
+        let start = Instant::now();
         let last_block_number = self.web3.eth().block_number().await?.as_u64();
 
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
         }
 
+        metrics::histogram!("eth_watcher.poll_eth_node", start.elapsed());
         Ok(())
     }
 
