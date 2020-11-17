@@ -17,7 +17,9 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
     } else if (command == 'new') {
-        await utils.spawn(`yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`);
+        await utils.spawn(
+            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
+        );
     }
 }
 

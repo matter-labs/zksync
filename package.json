@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "license": "MIT",
   "private": true,
+  "prettier": {
+    "tabWidth": 4,
+    "printWidth": 120,
+    "parser": "typescript",
+    "singleQuote": true,
+    "trailingComma": "none",
+    "bracketSpacing": true
+  },
   "workspaces": {
     "packages": [
       "sdk/zksync.js",
@@ -37,6 +45,11 @@
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
-    "zk": "yarn workspace zk"
+    "zk": "yarn workspace zk",
+    "fmt": "find . -name '*.ts' -a ! -path '*/node_modules/*' -a ! -name '*.d.ts'| xargs prettier --write",
+    "check-fmt": "find . -name '*.ts' -a ! -path '*/node_modules/*' -a ! -name '*.d.ts'| xargs prettier --check"
+  },
+  "devDependencies": {
+    "prettier": "^2.1.2"
   }
 }
