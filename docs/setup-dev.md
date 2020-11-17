@@ -2,7 +2,8 @@
 
 ## `Docker`
 
-Install `docker`. It is recommended to follow the instructions from the [official site](https://docs.docker.com/install/).
+Install `docker`. It is recommended to follow the instructions from the
+[official site](https://docs.docker.com/install/).
 
 Installing `docker` via `snap` or from the default repository can cause troubles.
 
@@ -14,8 +15,8 @@ You need to install both `docker` and `docker-compose`.
 ERROR: Couldn't connect to Docker daemon - you might need to run `docker-machine start default`.
 ```
 
-If so, you **do not need** to install `docker-machine`. Most probably, it means that your user
-is not added to the `docker` group. You can check it as follows:
+If so, you **do not need** to install `docker-machine`. Most probably, it means that your user is not added to the
+`docker` group. You can check it as follows:
 
 ```sh
 docker-compose up # Should raise the same error.
@@ -28,8 +29,8 @@ If the first command fails, but the second succeeds, then you need to add your u
 sudo usermod -a -G docker your_user_name
 ```
 
-After that, you should logout and login again (user groups are refreshed after the login).
-The problem should be solved at this step.
+After that, you should logout and login again (user groups are refreshed after the login). The problem should be solved
+at this step.
 
 ## `Node` & `Yarn`
 
@@ -71,16 +72,19 @@ rustc 1.41.0 (5e1a79984 2020-01-27)
 ### `lld`
 
 Optionally, you may want to optimize the build time with the LLVM linker, `lld`.\
-Make sure you have it installed and append `"-C", "link-arg=-fuse-ld=lld"` to the `rustflags` in your `.cargo/config` file, so it looks like this:
+Make sure you have it installed and append `"-C", "link-arg=-fuse-ld=lld"` to the `rustflags` in your `.cargo/config` file,
+so it looks like this:
+
 ```
 [target.x86_64-unknown-linux-gnu]
 rustflags = [
     "-C", "link-arg=-fuse-ld=lld",
 ]
 ```
+
 **Warning:** This is only viable for linux since `lld` doesn't work on mac.
 
-# PSQL
+## PSQL
 
 Install `psql` CLI tool to interact with postgres.
 
@@ -116,7 +120,8 @@ cargo install --version=0.1.0-beta.1 sqlx-cli
 
 ## `solc`
 
-You have to install `solc` v0.5.16. Instructions can be found at [readthedocs](https://solidity.readthedocs.io/en/v0.6.2/installing-solidity.html).
+You have to install `solc` v0.5.16. Instructions can be found at
+[readthedocs](https://solidity.readthedocs.io/en/v0.6.2/installing-solidity.html).
 
 The simplest option for linux is to use `snap`.
 
@@ -131,8 +136,7 @@ brew install solidity@5
 
 ## drone cli
 
-drone cli used to create promotion jobs [described here](docs/promote.md)
-https://docs.drone.io/cli/install/
+drone cli used to create promotion jobs [described here](docs/promote.md) <https://docs.drone.io/cli/install/>
 
 ## Environment
 

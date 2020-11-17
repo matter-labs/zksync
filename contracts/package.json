@@ -18,6 +18,7 @@
     "mocha": "^8.2.0",
     "openzeppelin-solidity": "^2.3.0",
     "path": "^0.12.7",
+    "prettier": "^2.1.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.59",
     "querystring": "^0.2.0",
     "solhint": "^3.3.1",
