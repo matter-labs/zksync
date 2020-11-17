@@ -11,7 +11,7 @@ async fn execute_blocks_with_new_state_keeper(
     contracts: Contracts,
     block_processing: BlockProcessing,
 ) {
-    let testkit_config = get_testkit_config_from_env();
+    let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
