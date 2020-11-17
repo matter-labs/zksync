@@ -45,16 +45,25 @@ impl<T: Transport> EthereumChecker<T> {
     pub async fn is_eip1271_signature_correct(
         &self,
         address: Address,
-        message: Vec<u8>,
+        message: &[u8],
         signature: EIP1271Signature,
     ) -> Result<bool, anyhow::Error> {
-        let hash = tiny_keccak::keccak256(&message);
+        // sign_message = keccak256("\x19Ethereum Signed Message:\n32" + keccak256(message))
+        let sign_message = {
+            let hash = tiny_keccak::keccak256(&message);
+            let prefix = format!("\x19Ethereum Signed Message:\n{}", hash.len());
+            let mut bytes = Vec::with_capacity(prefix.len() + hash.len());
+            bytes.extend_from_slice(prefix.as_bytes());
+            bytes.extend_from_slice(&hash);
+
+            tiny_keccak::keccak256(&bytes)
+        };
 
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
                 "isValidSignature",
-                (hash, signature.0),
+                (sign_message, signature.0),
                 None,
                 Options::default(),
                 None,

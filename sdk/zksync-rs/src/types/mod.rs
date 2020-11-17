@@ -4,8 +4,6 @@ use std::collections::HashMap;
 use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token};
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
-pub mod network;
-
 pub type Tokens = HashMap<String, Token>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

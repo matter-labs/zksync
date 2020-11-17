@@ -151,7 +151,7 @@ async fn verify_eth_signature_single_tx(
         match &sign_data.signature {
             TxEthSignature::EthereumSignature(packed_signature) => {
                 let signer_account = packed_signature
-                    .signature_recover_signer(sign_data.message.as_bytes())
+                    .signature_recover_signer(&sign_data.message)
                     .or(Err(TxAddError::IncorrectEthSignature))?;
 
                 if signer_account != tx.tx.account() {
@@ -159,16 +159,10 @@ async fn verify_eth_signature_single_tx(
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
-                let message = format!(
-                    "\x19Ethereum Signed Message:\n{}{}",
-                    sign_data.message.len(),
-                    &sign_data.message
-                );
-
                 let signature_correct = eth_checker
                     .is_eip1271_signature_correct(
                         tx.tx.account(),
-                        message.into_bytes(),
+                        &sign_data.message,
                         signature.clone(),
                     )
                     .await
@@ -197,7 +191,7 @@ async fn verify_eth_signature_txs_batch(
     match &eth_sign_data.signature {
         TxEthSignature::EthereumSignature(packed_signature) => {
             let signer_account = packed_signature
-                .signature_recover_signer(&eth_sign_data.message.as_bytes())
+                .signature_recover_signer(&eth_sign_data.message)
                 .or(Err(TxAddError::IncorrectEthSignature))?;
 
             if txs.iter().any(|tx| tx.tx.account() != signer_account) {
@@ -205,18 +199,11 @@ async fn verify_eth_signature_txs_batch(
             }
         }
         TxEthSignature::EIP1271Signature(signature) => {
-            // Prefix the message.
-            let message = format!(
-                "\x19Ethereum Signed Message:\n{}{}",
-                eth_sign_data.message.len(),
-                &eth_sign_data.message
-            );
-
             for tx in txs {
                 let signature_correct = eth_checker
                     .is_eip1271_signature_correct(
                         tx.tx.account(),
-                        message.as_bytes().to_vec(),
+                        &eth_sign_data.message,
                         signature.clone(),
                     )
                     .await

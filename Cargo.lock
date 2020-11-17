@@ -5495,23 +5495,19 @@ checksum = "05f33972566adbd2d3588b0491eb94b98b43695c4ef897903470ede4f3f5a28a"
 
 [[package]]
 name = "zksync"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
- "bellman_ce",
  "ethabi 12.0.0",
- "futures 0.3.6",
  "jsonrpc-core",
  "num",
  "reqwest",
  "serde",
- "serde_derive",
  "serde_json",
  "sha2 0.8.2",
  "thiserror",
  "tokio 0.2.22",
  "web3 0.13.0",
- "zksync_contracts",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
@@ -5562,6 +5558,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_crypto",
  "zksync_storage",
+ "zksync_test_account",
  "zksync_types",
  "zksync_utils",
 ]
@@ -5661,9 +5658,12 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "db_test_macro",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
+ "futures 0.3.6",
  "hex",
+ "jsonrpc-core",
  "log 0.4.11",
  "num",
  "serde",

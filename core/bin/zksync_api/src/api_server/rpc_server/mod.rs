@@ -144,18 +144,20 @@ impl RpcApp {
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
-    async fn get_tx_info_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<String>> {
+    async fn get_tx_info_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<Vec<u8>>> {
         match tx {
             ZkSyncTx::Transfer(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
-                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+                    tx.get_ethereum_sign_message(&token.symbol, token.decimals)
+                        .into_bytes(),
                 ))
             }
             ZkSyncTx::Withdraw(tx) => {
                 let token = self.token_info_from_id(tx.token).await?;
                 Ok(Some(
-                    tx.get_ethereum_sign_message(&token.symbol, token.decimals),
+                    tx.get_ethereum_sign_message(&token.symbol, token.decimals)
+                        .into_bytes(),
                 ))
             }
             _ => Ok(None),
@@ -539,7 +541,7 @@ async fn send_verify_request_and_recv(
 async fn verify_tx_info_message_signature(
     tx: &ZkSyncTx,
     signature: Option<TxEthSignature>,
-    msg_to_sign: Option<String>,
+    msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
     let eth_sign_data = match msg_to_sign {
@@ -574,7 +576,7 @@ async fn verify_tx_info_message_signature(
 async fn verify_txs_batch_signature(
     batch: Vec<TxWithSignature>,
     signature: TxEthSignature,
-    msgs_to_sign: Vec<Option<String>>,
+    msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx> {
     let mut txs = Vec::with_capacity(batch.len());
@@ -592,12 +594,13 @@ async fn verify_txs_batch_signature(
         });
     }
     // User is expected to sign hash of the data of all transactions in the batch.
-    let message = hex::encode(tiny_keccak::keccak256(
+    let message = tiny_keccak::keccak256(
         txs.iter()
             .flat_map(|tx| tx.tx.get_bytes())
             .collect::<Vec<u8>>()
             .as_slice(),
-    ));
+    )
+    .to_vec();
     let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiever) = oneshot::channel();

@@ -5,6 +5,9 @@ pub mod events;
 pub mod events_state;
 pub mod rollup_ops;
 pub mod storage_interactor;
+
+#[cfg(test)]
+mod tests;
 pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
@@ -13,7 +16,7 @@ use structopt::StructOpt;
 use web3::transports::Http;
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::convert::FeConvert;
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{get_genesis_token_list, Token},
     Address, TokenId, H256,
@@ -23,7 +26,7 @@ use zksync_types::{
 const ETH_BLOCKS_STEP: u64 = 10_000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
-async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
+async fn add_tokens_to_db(storage: &mut StorageProcessor<'_>, eth_network: &str) {
     let genesis_tokens =
         get_genesis_token_list(&eth_network).expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
@@ -34,9 +37,7 @@ async fn add_tokens_to_db(pool: &ConnectionPool, eth_network: &str) {
             token.address,
             token.decimals
         );
-        pool.access_storage()
-            .await
-            .expect("failed to access db")
+        storage
             .tokens_schema()
             .store_token(Token {
                 id: id as TokenId,
@@ -116,7 +117,7 @@ impl ContractsConfig {
 async fn main() {
     log::info!("Restoring zkSync state from the contract");
     env_logger::init();
-    let connection_pool = ConnectionPool::new(Some(1)).await;
+    let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ConfigurationOptions::from_env();
 
     let opt = Opt::from_args();
@@ -137,9 +138,9 @@ async fn main() {
     } else {
         None
     };
+    let mut storage = connection_pool.access_storage().await.unwrap();
 
     let mut driver = DataRestoreDriver::new(
-        connection_pool,
         transport,
         config.governance_addr,
         config.contract_addr,
@@ -154,14 +155,16 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_db(&driver.connection_pool, &config.eth_network).await;
+        add_tokens_to_db(&mut storage, &config.eth_network).await;
 
-        driver.set_genesis_state(config.genesis_tx_hash).await;
+        driver
+            .set_genesis_state(&mut storage, config.genesis_tx_hash)
+            .await;
     }
 
-    if opt.continue_mode {
-        driver.load_state_from_storage().await;
+    if opt.continue_mode && driver.load_state_from_storage(&mut storage).await {
+        std::process::exit(0);
     }
 
-    driver.run_state_update().await;
+    driver.run_state_update(&mut storage).await;
 }

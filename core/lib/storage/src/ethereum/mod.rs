@@ -468,7 +468,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Method that internally initializes the `eth_parameters` table.
     /// Since in db tests the database is empty, we must provide a possibility
     /// to initialize required db fields.
-    #[cfg(test)]
+    #[doc = "hidden"]
     pub async fn initialize_eth_data(&mut self) -> QueryResult<()> {
         let start = Instant::now();
         #[derive(Debug)]
