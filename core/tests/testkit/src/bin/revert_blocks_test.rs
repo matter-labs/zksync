@@ -2,6 +2,7 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
 use web3::transports::Http;
+use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
 use zksync_testkit::*;
 
 /// Executes blocks with some basic operations with new state keeper

@@ -3,6 +3,7 @@ use crate::external_commands::{deploy_contracts, get_test_accounts, run_upgrade_
 use crate::zksync_account::ZkSyncAccount;
 use std::time::Instant;
 use web3::transports::Http;
+use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
 use zksync_testkit::*;
 
 async fn migration_test() {
