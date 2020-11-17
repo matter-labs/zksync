@@ -1,35 +1,22 @@
 //! Transactions part of API implementation.
 
 // Built-in uses
-use std::fmt::Display;
 
 // External uses
 use actix_web::{
     web::{self, Json},
     Scope,
 };
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
-use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
-use zksync_storage::{chain::operations_ext::records, ConnectionPool, QueryResult};
-use zksync_types::{tx::TxEthSignature, tx::TxHash, BlockNumber, ZkSyncTx};
+use zksync_storage::chain::operations_ext::records;
+use zksync_types::{tx::TxEthSignature, tx::TxHash, ZkSyncTx};
 
 // Local uses
-use super::{
-    client::ClientError,
-    client::{self, Client},
-    Error as ApiError, JsonResult, Pagination, PaginationQuery,
-};
-use crate::{
-    api_server::rest::helpers::remove_prefix,
-    api_server::tx_sender::{SubmitError, TxSender},
-    core_api_client::CoreApiClient,
-    utils::shared_lru_cache::AsyncLruCache,
-};
+use super::{client::Client, client::ClientError, Error as ApiError, JsonResult};
+use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 impl From<SubmitError> for ApiError {
     fn from(inner: SubmitError) -> Self {
@@ -105,7 +92,13 @@ pub struct TxByHashResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Tx {
-    pub content: ZkSyncTx,
+    pub tx: ZkSyncTx,
+    pub signature: Option<TxEthSignature>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TxBatch {
+    pub txs: Vec<ZkSyncTx>,
     pub signature: Option<TxEthSignature>,
 }
 
@@ -115,13 +108,13 @@ pub struct Tx {
 impl Client {
     pub async fn submit_tx(
         &self,
-        content: ZkSyncTx,
+        tx: ZkSyncTx,
         signature: Option<TxEthSignature>,
         fast_processing: Option<bool>,
     ) -> Result<TxHash, ClientError> {
-        self.post("transactions")
+        self.post("transactions/submit")
             .query(&FastProcessingQuery { fast_processing })
-            .body(&Tx { content, signature })
+            .body(&Tx { tx, signature })
             .send()
             .await
     }
@@ -131,20 +124,40 @@ impl Client {
 
 async fn submit_tx(
     data: web::Data<ApiTransactionsData>,
-    Json(tx): Json<Tx>,
+    Json(body): Json<Tx>,
     web::Query(query): web::Query<FastProcessingQuery>,
 ) -> JsonResult<TxHash> {
     let tx_hash = data
         .tx_sender
-        .submit_tx(tx.content, tx.signature, query.fast_processing)
+        .submit_tx(body.tx, body.signature, query.fast_processing)
         .await
         .map_err(ApiError::from)?;
 
     Ok(Json(tx_hash))
 }
 
-pub fn api_scope() -> Scope {
-    todo!()
+async fn submit_tx_batch(
+    data: web::Data<ApiTransactionsData>,
+    Json(body): Json<TxBatch>,
+) -> JsonResult<Vec<TxHash>> {
+    let txs = body.txs.into_iter().zip(std::iter::repeat(None)).collect();
+
+    let tx_hashes = data
+        .tx_sender
+        .submit_txs_batch(txs, body.signature)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(Json(tx_hashes))
+}
+
+pub fn api_scope(tx_sender: TxSender) -> Scope {
+    let data = ApiTransactionsData::new(tx_sender);
+
+    web::scope("transactions")
+        .data(data)
+        .route("submit", web::post().to(submit_tx))
+        .route("submit/batch", web::post().to(submit_tx_batch))
 }
 
 #[cfg(test)]
