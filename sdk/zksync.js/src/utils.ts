@@ -1,4 +1,5 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
+import { keccak256 } from 'ethers/lib/utils';
 import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address, Transfer } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -326,13 +327,13 @@ export async function verifyERC1271Signature(
     signerOrProvider: ethers.Signer | ethers.providers.Provider
 ): Promise<boolean> {
     const EIP1271_SUCCESS_VALUE = '0x1626ba7e';
-    
-    // sign_message = keccak256("\x19Ethereum Signed Message:\n32" + keccak256(message))
-    const hash = utils.keccak256(message);
-    const sign_message = utils.hashMessage(hash);
-    
+
+    // sign_message = keccak256("\x19Ethereum Signed Message:\n{message_len}" + message)
+    const signMessage = getSignedBytesFromMessage(message, true);
+    const signMessageHash = keccak256(signMessage);
+
     const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
-    const eipRetVal = await eip1271.isValidSignature(sign_message, signature);
+    const eipRetVal = await eip1271.isValidSignature(signMessageHash, signature);
     return eipRetVal === EIP1271_SUCCESS_VALUE;
 }
 

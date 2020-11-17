@@ -37,6 +37,7 @@
     "unit-test-watch": "yarn build && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
+    "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "ts-node scripts/publish.ts",
