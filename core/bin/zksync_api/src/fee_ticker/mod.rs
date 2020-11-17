@@ -73,7 +73,10 @@ pub enum OutputFeeType {
     TransferToNew,
     Withdraw,
     FastWithdraw,
-    ChangePubKey { onchain_pubkey_auth: bool },
+    ChangePubKey {
+        #[serde(rename = "onchainPubkeyAuth")]
+        onchain_pubkey_auth: bool,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
