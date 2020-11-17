@@ -22,6 +22,7 @@ mod loggers;
 mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;
+mod tx_sender;
 
 /// Amount of threads used by each server to serve requests.
 const THREADS_PER_SERVER: usize = 128;
