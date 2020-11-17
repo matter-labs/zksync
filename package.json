@@ -38,14 +38,19 @@
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
-    "fmt:ts": "find . -name '*.ts' -a ! -path '*/node_modules/*' -a ! -name '*.d.ts' | xargs prettier --config prettier-ts.json --write",
-    "check:ts": "find . -name '*.ts' -a ! -path '*/node_modules/*' -a ! -name '*.d.ts' | xargs prettier --config prettier-ts.json --check",
-    "fmt:md": "find . -name '*.md' -a ! -path '*/node_modules/*' | xargs prettier --config prettier-md.json --write",
-    "check:md": "find . -name '*.md' -a ! -path '*/node_modules/*' | xargs prettier --config prettier-md.json --check",
-    "lint:md": "markdownlint $(find . -name '*.md' -a ! -path '*/node_modules/*')"
+    "fmt:ts": "find . -name '*.ts' -a ! -path '*/node_modules/*' -a ! -name '*.d.ts' | xargs prettier --config .prettier-ts.json --write",
+    "check:ts": "find . -name '*.ts' -a ! -path '*/node_modules/*' -a ! -name '*.d.ts' | xargs prettier --config .prettier-ts.json --check",
+    "fmt:md": "find . -name '*.md' -a ! -path '*/node_modules/*' | xargs prettier --config .prettier-md.json --write",
+    "check:md": "find . -name '*.md' -a ! -path '*/node_modules/*' | xargs prettier --config .prettier-md.json --check",
+    "lint:md": "markdownlint $(find . -name '*.md' -a ! -path '*/node_modules/*')",
+    "fmt:sol": "prettier --config .prettier-sol.json --write contracts/**/*.sol",
+    "check:sol": "prettier --config .prettier-sol.json --check contracts/**/*.sol",
+    "lint:sol": "solhint contracts/**/*.sol"
   },
   "devDependencies": {
     "markdownlint-cli": "^0.24.0",
-    "prettier": "^2.1.2"
+    "prettier": "^2.1.2",
+    "prettier-plugin-solidity": "^1.0.0-alpha.60",
+    "solhint": "^3.3.2"
   }
 }

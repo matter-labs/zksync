@@ -1,22 +1,15 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 import "./Config.sol";
-
 
 /// @title Governance Contract
 /// @author Matter Labs
 contract Governance is Config {
-
     /// @notice Token added to Franklin net
-    event NewToken(
-        address indexed token,
-        uint16 indexed tokenId
-    );
+    event NewToken(address indexed token, uint16 indexed tokenId);
 
     /// @notice Governor changed
-    event NewGovernor(
-        address newGovernor
-    );
+    event NewGovernor(address newGovernor);
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(
@@ -45,7 +38,8 @@ contract Governance is Config {
     /// @param initializationParameters Encoded representation of initialization parameters:
     ///     _networkGovernor The address of network governor
     function initialize(bytes calldata initializationParameters) external {
-        address _networkGovernor = abi.decode(initializationParameters, (address));
+        address _networkGovernor =
+            abi.decode(initializationParameters, (address));
 
         networkGovernor = _networkGovernor;
     }
@@ -112,10 +106,13 @@ contract Governance is Config {
     /// @notice Validate token address
     /// @param _tokenAddr Token address
     /// @return tokens id
-    function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
+    function validateTokenAddress(address _tokenAddr)
+        external
+        view
+        returns (uint16)
+    {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(tokenId != 0, "gvs11"); // 0 is not a valid token
         return tokenId;
     }
-
 }

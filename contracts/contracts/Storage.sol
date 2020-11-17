@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 import "./IERC20.sol";
 
@@ -6,18 +6,16 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./Operations.sol";
 
-
 /// @title zkSync storage contract
 /// @author Matter Labs
 contract Storage {
-
     /// @notice Flag indicates that upgrade preparation status is active
     /// @dev Will store false in case of not active upgrade mode
     bool public upgradePreparationActive;
 
     /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint public upgradePreparationActivationTime;
+    uint256 public upgradePreparationActivationTime;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;
@@ -38,7 +36,7 @@ contract Storage {
         address to;
         uint16 tokenId;
     }
-    
+
     /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index in pending withdrawals queue)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
@@ -116,12 +114,22 @@ contract Storage {
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Packs address and token id into single word to use as a key in balances mapping
-    function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {
+    function packAddressAndTokenId(address _address, uint16 _tokenId)
+        internal
+        pure
+        returns (bytes22)
+    {
         return bytes22((uint176(_address) | (uint176(_tokenId) << 160)));
     }
 
     /// @notice Gets value from balancesToWithdraw
-    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
-        return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
+    function getBalanceToWithdraw(address _address, uint16 _tokenId)
+        public
+        view
+        returns (uint128)
+    {
+        return
+            balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)]
+                .balanceToWithdraw;
     }
 }

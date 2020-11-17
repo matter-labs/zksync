@@ -1,10 +1,8 @@
-pragma solidity ^0.5.0;
-
+pragma solidity ^0.5.8;
 
 /// @title zkSync configuration constants
 /// @author Matter Labs
 contract Config {
-
     /// @notice ERC20 token withdrawal gas limit, used only for complete withdrawals
     uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 250000;
 
@@ -32,7 +30,7 @@ contract Config {
     uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = 128 - 1;
 
     /// @notice Max account id that could be registered in the network
-    uint32 constant MAX_ACCOUNT_ID = (2 ** 24) - 1;
+    uint32 constant MAX_ACCOUNT_ID = (2**24) - 1;
 
     /// @notice Expected average period of block creation
     uint256 constant BLOCK_PERIOD = 15 seconds;
@@ -63,7 +61,8 @@ contract Config {
     uint256 constant PRIORITY_EXPIRATION_PERIOD = 3 days;
 
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint256 constant PRIORITY_EXPIRATION = PRIORITY_EXPIRATION_PERIOD / BLOCK_PERIOD;
+    uint256 constant PRIORITY_EXPIRATION =
+        PRIORITY_EXPIRATION_PERIOD / BLOCK_PERIOD;
 
     /// @notice Maximum number of priority request to clear during verifying the block
     /// @dev Cause deleting storage slots cost 5k gas per each slot it's unprofitable to clear too many slots
@@ -71,13 +70,15 @@ contract Config {
     uint64 constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
 
     /// @notice Reserved time for users to send full exit priority operation in case of an upgrade (in seconds)
-    uint constant MASS_FULL_EXIT_PERIOD = 3 days;
+    uint256 constant MASS_FULL_EXIT_PERIOD = 3 days;
 
     /// @notice Reserved time for users to withdraw funds from full exit priority operation in case of an upgrade (in seconds)
-    uint constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;
+    uint256 constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;
 
     /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
     // NOTE: we must reserve for users enough time to send full exit operation, wait maximum time for processing this operation and withdraw funds from it.
-    uint constant UPGRADE_NOTICE_PERIOD = MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
-
+    uint256 constant UPGRADE_NOTICE_PERIOD =
+        MASS_FULL_EXIT_PERIOD +
+            PRIORITY_EXPIRATION_PERIOD +
+            TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
 }
