@@ -1,4 +1,5 @@
 // Built-in deps
+use std::time::Instant;
 // External imports
 use itertools::Itertools;
 // Workspace imports
@@ -86,6 +87,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     }
 
     pub async fn load_rollup_ops_blocks(&mut self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
+        let start = Instant::now();
         let stored_operations = sqlx::query_as!(
             StoredZkSyncOp,
             "SELECT * FROM data_restore_rollup_ops
@@ -120,6 +122,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 }
             })
             .collect();
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_rollup_ops_blocks");
         Ok(ops_blocks)
     }
 
@@ -128,6 +131,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         block_number: &str,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_last_watched_eth_block")
             .execute(transaction.conn())
@@ -141,6 +145,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_last_watched_block_number");
         Ok(())
     }
 
@@ -148,6 +153,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     pub async fn load_last_watched_block_number(
         &mut self,
     ) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+        let start = Instant::now();
         let stored = sqlx::query_as!(
             StoredLastWatchedEthBlockNumber,
             "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
@@ -155,6 +161,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_last_watched_block_number");
         Ok(stored)
     }
 
@@ -200,6 +207,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         ops: &[(BlockNumber, &ZkSyncOp, AccountId)],
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let new_state = self.new_storage_state("Operations");
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_rollup_ops")
@@ -219,6 +227,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .update_storage_state(new_state)
             .await?;
         transaction.commit().await?;
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "save_rollup_ops");
         Ok(())
     }
 
@@ -230,6 +239,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         last_committed_block: BlockNumber,
         last_verified_block: BlockNumber,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         // Withdraw ops counter is set equal to the `verify` ops counter
         // since we assume that we've sent a withdraw for every `verify` op.
         sqlx::query!(
@@ -243,10 +253,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "initialize_eth_stats");
         Ok(())
     }
 
     async fn load_events_state(&mut self, state: &str) -> QueryResult<Vec<StoredBlockEvent>> {
+        let start = Instant::now();
         let events = sqlx::query_as!(
             StoredBlockEvent,
             "SELECT * FROM data_restore_events_state
@@ -257,6 +269,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_events_state");
         Ok(events)
     }
 
@@ -269,6 +282,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     }
 
     pub async fn load_storage_state(&mut self) -> QueryResult<StoredStorageState> {
+        let start = Instant::now();
         let state = sqlx::query_as!(
             StoredStorageState,
             "SELECT * FROM data_restore_storage_state_update
@@ -277,10 +291,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_storage_state");
         Ok(state)
     }
 
     pub(crate) async fn update_storage_state(&mut self, state: NewStorageState) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_storage_state_update")
             .execute(transaction.conn())
@@ -294,6 +310,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_storage_state");
         Ok(())
     }
 
@@ -301,6 +318,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         events: &[NewBlockEvent],
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!("DELETE FROM data_restore_events_state")
             .execute(transaction.conn())
@@ -315,6 +333,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .await?;
         }
         transaction.commit().await?;
+        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_block_events");
         Ok(())
     }
 }

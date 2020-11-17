@@ -59,6 +59,12 @@ async fn main() -> anyhow::Result<()> {
         .expect("Error setting Ctrl+C handler");
     }
 
+    // Run prometheus data exporter.
+    let (prometheus_task_handle, counter_task_handle) = run_prometheus_exporter(
+        connection_pool.clone(),
+        config_options.prometheus_export_port,
+    );
+
     // Run core actors.
     log::info!("Starting the Core actors");
     let core_task_handles = run_core(connection_pool.clone(), stop_signal_sender.clone())
@@ -72,9 +78,6 @@ async fn main() -> anyhow::Result<()> {
     // Run Ethereum sender actors.
     log::info!("Starting the Ethereum sender actors");
     let eth_sender_task_handle = run_eth_sender(connection_pool.clone(), config_options.clone());
-
-    // Run prometheus data exporter.
-    let prometheus_task_handle = run_prometheus_exporter(connection_pool.clone(), &config_options);
 
     // Run prover server & witness generator.
     log::info!("Starting the Prover server actors");
@@ -96,7 +99,10 @@ async fn main() -> anyhow::Result<()> {
             panic!("Ethereum Sender actors aren't supposed to finish their execution")
         },
         _ = async { prometheus_task_handle.await } => {
-            panic!("Prometheus actors aren't supposed to finish their execution")
+            panic!("Prometheus exporter actors aren't supposed to finish their execution")
+        },
+        _ = async { counter_task_handle.await } => {
+            panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             log::warn!("Stop signal received, shutting down");

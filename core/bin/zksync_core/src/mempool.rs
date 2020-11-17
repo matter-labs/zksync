@@ -387,6 +387,7 @@ impl Mempool {
     }
 
     async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
+        let start = std::time::Instant::now();
         let (chunks_left, priority_ops) = self
             .select_priority_ops(current_unprocessed_priority_op)
             .await;
@@ -394,6 +395,7 @@ impl Mempool {
 
         log::trace!("Proposed priority ops for block: {:#?}", priority_ops);
         log::trace!("Proposed txs for block: {:#?}", txs);
+        metrics::histogram!("mempool.propose_new_block", start.elapsed());
         ProposedBlock { priority_ops, txs }
     }
 

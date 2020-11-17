@@ -12,6 +12,7 @@ use crate::api_server::{
     rpc_server::get_ongoing_priority_ops,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
+use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
 use zksync_types::{Address, BlockNumber};
 
@@ -24,15 +25,21 @@ macro_rules! ok_json {
 
 impl ApiV01 {
     pub async fn testnet_config(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let contract_address = self_.contract_address.clone();
+        metrics::histogram!("api", start.elapsed(), "v01" => "testnet_config");
         ok_json!(TestnetConfigResponse { contract_address })
     }
 
     pub async fn status(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
-        ok_json!(self_.network_status.read().await)
+        let start = Instant::now();
+        let result = ok_json!(self_.network_status.read().await);
+        metrics::histogram!("api", start.elapsed(), "v01" => "status");
+        result
     }
 
     pub async fn tokens(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let mut storage = self_.access_storage().await?;
         let tokens = storage
             .tokens_schema()
@@ -43,6 +50,7 @@ impl ApiV01 {
         let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
         vec_tokens.sort_by_key(|t| t.id);
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "tokens");
         ok_json!(vec_tokens)
     }
 
@@ -50,6 +58,7 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Path((address, mut offset, mut limit)): web::Path<(Address, u64, u64)>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         const MAX_LIMIT: u64 = 100;
         if limit > MAX_LIMIT {
             return Err(HttpResponse::BadRequest().finish().into());
@@ -135,6 +144,7 @@ impl ApiV01 {
         // goes from oldest tx to the newest tx.
         transactions_history.append(&mut ongoing_transactions_history);
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "tx_history");
         ok_json!(transactions_history)
     }
 
@@ -143,6 +153,7 @@ impl ApiV01 {
         web::Path(address): web::Path<Address>,
         web::Query(query): web::Query<TxHistoryQuery>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let tx_id = query.tx_id.as_ref().map(|s| s.as_ref()).unwrap_or("-");
         let limit = query.limit.unwrap_or(MAX_LIMIT);
 
@@ -174,6 +185,7 @@ impl ApiV01 {
 
         transaction.commit().await.map_err(Self::db_error)?;
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "tx_history_older_than");
         ok_json!(transactions_history)
     }
 
@@ -182,6 +194,7 @@ impl ApiV01 {
         web::Path(address): web::Path<Address>,
         web::Query(query): web::Query<TxHistoryQuery>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let tx_id = query.tx_id.as_ref().map(|s| s.as_ref()).unwrap_or("-");
         let mut limit = query.limit.unwrap_or(MAX_LIMIT);
 
@@ -264,6 +277,7 @@ impl ApiV01 {
             transactions_history.append(&mut txs);
         }
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "tx_history_newer_than");
         ok_json!(transactions_history)
     }
 
@@ -271,6 +285,7 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Path(tx_hash_hex): web::Path<String>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         if tx_hash_hex.len() < 2 {
             return Err(HttpResponse::BadRequest().finish().into());
         }
@@ -279,6 +294,7 @@ impl ApiV01 {
 
         let tx_receipt = self_.get_tx_receipt(transaction_hash).await?;
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "executed_tx_by_hash");
         ok_json!(tx_receipt)
     }
 
@@ -286,6 +302,7 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Path(hash_hex_with_prefix): web::Path<String>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let hash = try_parse_hash(&hash_hex_with_prefix)
             .ok_or_else(|| HttpResponse::BadRequest().finish())?;
 
@@ -340,6 +357,7 @@ impl ApiV01 {
             res = deposit_op_to_tx_by_hash(&tokens, &priority_op, eth_block);
         }
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "tx_by_hash");
         ok_json!(res)
     }
 
@@ -347,7 +365,9 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Path(pq_id): web::Path<u32>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let receipt = self_.get_priority_op_receipt(pq_id).await?;
+        metrics::histogram!("api", start.elapsed(), "v01" => "priority_op");
         ok_json!(receipt)
     }
 
@@ -355,13 +375,17 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Path((block_id, tx_id)): web::Path<(BlockNumber, u32)>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let exec_ops = self_.get_block_executed_ops(block_id).await?;
 
-        if let Some(exec_op) = exec_ops.get(tx_id as usize) {
+        let result = if let Some(exec_op) = exec_ops.get(tx_id as usize) {
             ok_json!(exec_op.clone())
         } else {
             Err(HttpResponse::NotFound().finish().into())
-        }
+        };
+
+        metrics::histogram!("api", start.elapsed(), "v01" => "block_tx");
+        result
     }
 
     // pub async fn block_transactions(self_: web::Data<Self>, block_id: BlockNumber) -> !;
@@ -369,6 +393,7 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Query(block_query): web::Query<HandleBlocksQuery>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let max_block = block_query.max_block.unwrap_or(999_999_999);
         let limit = block_query.limit.unwrap_or(20);
         if limit > 100 {
@@ -390,6 +415,8 @@ impl ApiV01 {
                 );
                 HttpResponse::InternalServerError().finish()
             })?;
+
+        metrics::histogram!("api", start.elapsed(), "v01" => "blocks");
         ok_json!(resp)
     }
 
@@ -397,18 +424,22 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Path(block_id): web::Path<BlockNumber>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let block = self_.get_block_info(block_id).await?;
-        if let Some(block) = block {
+        let result = if let Some(block) = block {
             ok_json!(block)
         } else {
             Err(HttpResponse::NotFound().finish().into())
-        }
+        };
+        metrics::histogram!("api", start.elapsed(), "v01" => "block_by_id");
+        result
     }
 
     pub async fn block_transactions(
         self_: web::Data<Self>,
         web::Path(block_id): web::Path<BlockNumber>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let mut storage = self_.access_storage().await?;
 
         let txs = storage
@@ -421,6 +452,7 @@ impl ApiV01 {
                 HttpResponse::InternalServerError().finish()
             })?;
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "block_transactions");
         ok_json!(txs)
     }
 
@@ -428,16 +460,21 @@ impl ApiV01 {
         self_: web::Data<Self>,
         web::Query(block_query): web::Query<BlockExplorerSearchQuery>,
     ) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let block = self_.get_block_by_height_or_hash(block_query.query).await?;
 
-        if let Some(block) = block {
+        let result = if let Some(block) = block {
             ok_json!(block)
         } else {
             Err(HttpResponse::NotFound().finish().into())
-        }
+        };
+
+        metrics::histogram!("api", start.elapsed(), "v01" => "explorer_search");
+        result
     }
 
     pub async fn withdrawal_processing_time(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
         let miniblock_timings = &self_.config_options.miniblock_timings;
         let processing_time = WithdrawalProcessingTimeResponse {
             normal: (miniblock_timings.miniblock_iteration_interval
@@ -448,6 +485,7 @@ impl ApiV01 {
                 .as_secs(),
         };
 
+        metrics::histogram!("api", start.elapsed(), "v01" => "withdrawal_processing_time");
         ok_json!(processing_time)
     }
 }
