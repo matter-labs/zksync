@@ -3,14 +3,17 @@ import * as fs from "fs";
 
 import { generateCryptoTestVectors } from "./vectors/crypto-vector";
 import { generateTxEncodingVectors } from "./vectors/tx-vector";
+import { generateUtilsVectors } from "./vectors/utils-vector";
 
-export async function generateSDKTestVectors(outputFile: string = "test_vectors.json") {
+export async function generateSDKTestVectors(outputFile: string = "test-vectors.json") {
     const cryptoVectors = await generateCryptoTestVectors();
     const txVectors = await generateTxEncodingVectors();
+    const utilsVectors = generateUtilsVectors();
 
     const resultTestVector = {
         cryptoPrimitivesTest: cryptoVectors,
         txTest: txVectors,
+        utils: utilsVectors,
     };
 
     const testVectorJSON = JSON.stringify(resultTestVector, null, 2);
