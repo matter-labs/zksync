@@ -92,7 +92,10 @@ impl ZkSyncState {
     }
 
     pub fn root_hash(&self) -> Fr {
-        self.balance_tree.root_hash()
+        let start = std::time::Instant::now();
+        let hash = self.balance_tree.root_hash();
+        metrics::histogram!("root_hash", start.elapsed());
+        hash
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {

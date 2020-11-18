@@ -2,6 +2,7 @@ use crate::api_server::rpc_server::types::{
     BlockInfo, ETHOpInfoResp, ResponseAccountState, TransactionInfoResp,
 };
 use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId};
+use std::time::Instant;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
@@ -68,6 +69,7 @@ impl OperationNotifier {
 
     /// Processes new block action (commit or verify), notifying the subscribers.
     pub async fn handle_new_block(&mut self, op: Operation) -> Result<(), anyhow::Error> {
+        let start = Instant::now();
         let action = op.action.get_type();
 
         self.handle_executed_operations(
@@ -102,6 +104,7 @@ impl OperationNotifier {
             }
         }
 
+        metrics::histogram!("api", start.elapsed(), "notifier" => "handle_new_block");
         Ok(())
     }
 
@@ -112,6 +115,7 @@ impl OperationNotifier {
         action: ActionType,
         block_number: BlockNumber,
     ) -> Result<(), anyhow::Error> {
+        let start = Instant::now();
         for tx in ops {
             match tx {
                 ExecutedOperations::Tx(tx) => {
@@ -142,6 +146,7 @@ impl OperationNotifier {
                 }
             }
         }
+        metrics::histogram!("api", start.elapsed(), "notifier" => "handle_executed_operations");
         Ok(())
     }
 
@@ -172,6 +177,7 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<ETHOpInfoResp>,
     ) -> Result<(), anyhow::Error> {
+        let start = Instant::now();
         let sub_id = self.prior_op_subs.generate_sub_id(serial_id, action);
 
         let executed_op = self
@@ -210,6 +216,7 @@ impl OperationNotifier {
 
         self.prior_op_subs
             .insert_new(sub_id, sub, serial_id, action)?;
+        metrics::histogram!("api", start.elapsed(), "notifier" => "add_priority_op_sub");
         Ok(())
     }
 
@@ -220,6 +227,7 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<TransactionInfoResp>,
     ) -> Result<(), anyhow::Error> {
+        let start = Instant::now();
         let sub_id = self.tx_subs.generate_sub_id(hash, action);
 
         let tx_receipt = self.state.get_tx_receipt(&hash).await?;
@@ -250,6 +258,7 @@ impl OperationNotifier {
         }
 
         self.tx_subs.insert_new(sub_id, sub, hash, action)?;
+        metrics::histogram!("api", start.elapsed(), "notifier" => "add_transaction_sub");
         Ok(())
     }
 
@@ -260,12 +269,14 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), anyhow::Error> {
+        let start = Instant::now();
         let (account_id, _account_state) = self.state.get_account_info(address, action).await?;
 
         let sub_id = self.account_subs.generate_sub_id(account_id, action);
 
         self.account_subs
             .insert_new(sub_id, sub, account_id, action)?;
+        metrics::histogram!("api", start.elapsed(), "notifier" => "add_account_update_sub");
         Ok(())
     }
 }

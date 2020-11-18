@@ -34,6 +34,10 @@ export async function deployTestkit(genesisRoot: string, prodContracts: boolean 
     await utils.spawn(`yarn contracts deploy-testkit --genesisRoot ${genesisRoot} ${option}`);
 }
 
+export async function deployEIP1271() {
+    await utils.spawn(`yarn contracts deploy-eip1271`);
+}
+
 export async function testUpgrade(contract: string, gatekeeper: string) {
     await utils.spawn(`yarn contracts ts-node scripts/test-upgrade-franklin.ts ${contract} ${gatekeeper}`);
 }
@@ -134,6 +138,13 @@ command
     .option('--prodContracts')
     .action(async (cmd: Command) => {
         await deployTestkit(cmd.genesisRoot, cmd.prodContracts);
+    });
+
+command
+    .command('deploy-eip1271')
+    .description('deploy test EIP-1271 "smart wallet"')
+    .action(async (cmd: Command) => {
+        await deployEIP1271();
     });
 
 command

@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{cmp, collections::HashMap};
+use std::{cmp, collections::HashMap, time::Instant};
 // External imports
 use num::BigInt;
 use sqlx::types::BigDecimal;
@@ -52,6 +52,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         accounts_updated: &[(u32, AccountUpdate)],
         first_update_order_id: usize,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         // Simply go through the every account update, and update the corresponding table.
@@ -160,6 +161,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "state" => "commit_state_update");
         Ok(())
     }
 
@@ -168,6 +170,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// This method is invoked from the `zksync_eth_sender` after corresponding `Verify` transaction
     /// is confirmed on Ethereum blockchain.
     pub async fn apply_state_update(&mut self, block_number: u32) -> QueryResult<()> {
+        let start = Instant::now();
         log::info!("Applying state update for block: {}", block_number);
 
         let mut transaction = self.0.start_transaction().await?;
@@ -309,6 +312,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "state" => "apply_state_update");
         Ok(())
     }
 
@@ -320,6 +324,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         &mut self,
         block: Option<u32>,
     ) -> QueryResult<(u32, AccountMap)> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let (verif_block, mut accounts) =
@@ -344,6 +349,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_committed_state");
         result
     }
 
@@ -352,6 +359,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// If the provided block number is `None`, then the latest committed
     /// state will be loaded.
     pub async fn load_verified_state(&mut self) -> QueryResult<(u32, AccountMap)> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let last_block = BlockSchema(&mut transaction)
@@ -392,6 +400,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         }
 
         transaction.commit().await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_verified_state");
         Ok((last_block, account_map))
     }
 
@@ -406,6 +415,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         from_block: u32,
         to_block: Option<u32>,
     ) -> QueryResult<Option<(u32, AccountUpdates)>> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         // Resolve the end of range: if it was not provided, we have to fetch
@@ -521,6 +531,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_state_diff");
 
         // We don't want to return an empty list to avoid the confusion, so return
         // `None` if there are no changes.
@@ -536,8 +547,13 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         &mut self,
         block_number: u32,
     ) -> QueryResult<AccountUpdates> {
-        self.load_state_diff(block_number - 1, Some(block_number))
+        let start = Instant::now();
+        let result = self
+            .load_state_diff(block_number - 1, Some(block_number))
             .await
-            .map(|diff| diff.unwrap_or_default().1)
+            .map(|diff| diff.unwrap_or_default().1);
+
+        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_state_diff");
+        result
     }
 }

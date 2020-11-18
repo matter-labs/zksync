@@ -8,7 +8,6 @@
 .DS_Store
 *.bak
 node_modules
-yarn-error.log
 *.log
 target
 a.out 
@@ -18,7 +17,7 @@ tags
 
 zksync_pk.key
 dist
-npm-debug.log
+todo
 
 Cargo.lock
 !/Cargo.lock
@@ -28,10 +27,6 @@ Cargo.lock
 !/etc/env/dev.env.example
 !/etc/env/ci.env
 /etc/tokens/localhost.json
-/contracts/yarn-error.log
-/deploy.log
-/test.log
-/genesis.log
 !/keys
 /keys/*
 !/keys/packed

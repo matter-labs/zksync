@@ -351,6 +351,9 @@ name = "ahash"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8fd72866655d1904d6b0997d0b07ba561047d070fbe29de039031c641b61217"
+dependencies = [
+ "const-random",
+]
 
 [[package]]
 name = "aho-corasick"
@@ -492,7 +495,7 @@ dependencies = [
  "async-io",
  "async-mutex",
  "blocking",
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "futures-channel",
  "futures-core",
  "futures-io",
@@ -533,6 +536,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0afb7287b68575f5ca0e5c7e40191cbd4be59d325781f46faa603e176eaef47"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "atomic-shim"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d20fdac7156779a1a30d970e838195558b4810dd06aa69e7c7461bdc518edf9b"
+dependencies = [
+ "crossbeam",
 ]
 
 [[package]]
@@ -989,6 +1001,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "const-random"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02dc82c12dc2ee6e1ded861cf7d582b46f66f796d1b6c93fa28b911ead95da02"
+dependencies = [
+ "const-random-macro",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "const-random-macro"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc757bbb9544aa296c2ae00c679e81f886b37e28e59097defe0cf524306f6685"
+dependencies = [
+ "getrandom 0.2.0",
+ "proc-macro-hack",
+]
+
+[[package]]
 name = "const_fn"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1093,9 +1125,9 @@ dependencies = [
  "cfg-if 0.1.10",
  "crossbeam-channel",
  "crossbeam-deque",
- "crossbeam-epoch",
+ "crossbeam-epoch 0.8.2",
  "crossbeam-queue",
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
 ]
 
 [[package]]
@@ -1104,7 +1136,7 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b153fe7cbef478c567df0f972e02e6d736db11affe43dfc9c56a9374d1adfb87"
 dependencies = [
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "maybe-uninit",
 ]
 
@@ -1114,8 +1146,8 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f02af974daeee82218205558e51ec8768b48cf524bd01d550abe5573a608285"
 dependencies = [
- "crossbeam-epoch",
- "crossbeam-utils",
+ "crossbeam-epoch 0.8.2",
+ "crossbeam-utils 0.7.2",
  "maybe-uninit",
 ]
 
@@ -1127,9 +1159,23 @@ checksum = "058ed274caafc1f60c4997b5fc07bf7dc7cca454af7c6e81edffe5f33f70dace"
 dependencies = [
  "autocfg 1.0.1",
  "cfg-if 0.1.10",
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "lazy_static",
  "maybe-uninit",
+ "memoffset",
+ "scopeguard",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0f606a85340376eef0d6d8fec399e6d4a544d648386c6645eb6d0653b27d9f"
+dependencies = [
+ "cfg-if 1.0.0",
+ "const_fn",
+ "crossbeam-utils 0.8.0",
+ "lazy_static",
  "memoffset",
  "scopeguard",
 ]
@@ -1141,7 +1187,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "774ba60a54c213d409d5353bda12d49cd68d14e45036a285234c8d6f91f92570"
 dependencies = [
  "cfg-if 0.1.10",
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "maybe-uninit",
 ]
 
@@ -1153,6 +1199,18 @@ checksum = "c3c7c73a2d1e9fc0886a08b93e98eb643461230d5f1925e4036204d5f2e261a8"
 dependencies = [
  "autocfg 1.0.1",
  "cfg-if 0.1.10",
+ "lazy_static",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec91540d98355f690a86367e566ecad2e9e579f230230eb7c21398372be73ea5"
+dependencies = [
+ "autocfg 1.0.1",
+ "cfg-if 1.0.0",
+ "const_fn",
  "lazy_static",
 ]
 
@@ -1205,15 +1263,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ct-logs"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d3686f5fa27dbc1d76c751300376e167c5a43387f44bb451fd1c24776e49113"
-dependencies = [
- "sct",
-]
-
-[[package]]
 name = "ctr"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1231,6 +1280,17 @@ checksum = "b57a92e9749e10f25a171adcebfafe72991d45e7ec2dcb853e8f83d9dafaeb08"
 dependencies = [
  "nix",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "dashmap"
+version = "3.11.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f260e2fc850179ef410018660006951c1b55b79e8087e87111a2c388994b9b5"
+dependencies = [
+ "ahash",
+ "cfg-if 0.1.10",
+ "num_cpus",
 ]
 
 [[package]]
@@ -1827,6 +1887,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "getrandom"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee8025cf36f917e6a52cce185b7c7177689b838b7ec138364e50cc2277a56cf4"
+dependencies = [
+ "cfg-if 0.1.10",
+ "libc",
+ "wasi 0.9.0+wasi-snapshot-preview1",
+]
+
+[[package]]
 name = "gimli"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1930,6 +2001,20 @@ name = "hashbrown"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
+
+[[package]]
+name = "hdrhistogram"
+version = "7.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3c22708574c44e924720c5b3a116326c688e6d532f438c77c007ec8768644f9"
+dependencies = [
+ "base64 0.12.3",
+ "byteorder",
+ "crossbeam-channel",
+ "flate2",
+ "nom",
+ "num-traits",
+]
 
 [[package]]
 name = "heck"
@@ -2122,24 +2207,6 @@ dependencies = [
  "tower-service",
  "tracing",
  "want 0.3.0",
-]
-
-[[package]]
-name = "hyper-rustls"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac965ea399ec3a25ac7d13b8affd4b8f39325cca00858ddf5eb29b79e6b14b08"
-dependencies = [
- "bytes 0.5.6",
- "ct-logs",
- "futures-util",
- "hyper 0.13.8",
- "log 0.4.11",
- "rustls",
- "rustls-native-certs",
- "tokio 0.2.22",
- "tokio-rustls",
- "webpki",
 ]
 
 [[package]]
@@ -2631,6 +2698,61 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
 dependencies = [
  "autocfg 1.0.1",
+]
+
+[[package]]
+name = "metrics"
+version = "0.13.0-alpha.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f059a62fe88c33ee501116c762d8d1da5a69b8ea33a938ac6918af9b135b56a"
+dependencies = [
+ "metrics-macros",
+ "once_cell",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "metrics-exporter-prometheus"
+version = "0.1.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c507e712df1231dea654a2cf39da902a7098d0929360a0fab218c998abc729a"
+dependencies = [
+ "hdrhistogram",
+ "hyper 0.13.8",
+ "metrics",
+ "metrics-util",
+ "parking_lot 0.11.0",
+ "thiserror",
+ "tokio 0.2.22",
+]
+
+[[package]]
+name = "metrics-macros"
+version = "0.1.0-alpha.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64523162f5087a5268890e572caedb44c060f37252497fa144f4d91fe517e777"
+dependencies = [
+ "lazy_static",
+ "proc-macro-hack",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.4.0-alpha.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "938d428ecdc2dc9a6ed8a8da2e6aefc6ee70ab7e26cfc68996a13cc560bced9c"
+dependencies = [
+ "arc-swap",
+ "atomic-shim",
+ "crossbeam-epoch 0.9.0",
+ "crossbeam-utils 0.8.0",
+ "dashmap",
+ "indexmap",
+ "metrics",
 ]
 
 [[package]]
@@ -3334,24 +3456,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prometheus_exporter_base"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d4cf32926a711d1109383887fa93b22f087aea854696c637d2826c7ff84d0be"
-dependencies = [
- "clap",
- "env_logger 0.7.1",
- "failure",
- "http 0.2.1",
- "hyper 0.13.8",
- "hyper-rustls",
- "log 0.4.11",
- "num",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3439,7 +3543,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a6b1679d49b24bbfe0c803429aa1874472f50d9b363131f0e89fc356b544d03"
 dependencies = [
- "getrandom",
+ "getrandom 0.1.15",
  "libc",
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
@@ -3487,7 +3591,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90bde5296fc891b0cef12a6d03ddccc162ce7b2aff54160af9338f8d40df6d19"
 dependencies = [
- "getrandom",
+ "getrandom 0.1.15",
 ]
 
 [[package]]
@@ -3581,7 +3685,7 @@ checksum = "e8c4fec834fb6e6d2dd5eece3c7b432a52f0ba887cf40e595190c4107edc08bf"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-deque",
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "lazy_static",
  "num_cpus",
 ]
@@ -3759,31 +3863,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustls"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0d4a31f5d68413404705d6982529b0e11a9aacd4839d1d6222ee3b8cb4015e1"
-dependencies = [
- "base64 0.11.0",
- "log 0.4.11",
- "ring",
- "sct",
- "webpki",
-]
-
-[[package]]
-name = "rustls-native-certs"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75ffeb84a6bd9d014713119542ce415db3a3e4748f0bfce1e1416cd224a23a5"
-dependencies = [
- "openssl-probe",
- "rustls",
- "schannel",
- "security-framework",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3837,16 +3916,6 @@ dependencies = [
  "hmac 0.7.1",
  "pbkdf2",
  "sha2 0.8.2",
-]
-
-[[package]]
-name = "sct"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3042af939fca8c3453b7af0f1c66e533a15a86169e39de2657310ade8f98d3c"
-dependencies = [
- "ring",
- "untrusted",
 ]
 
 [[package]]
@@ -4133,7 +4202,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "crossbeam-queue",
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "either",
  "futures-channel",
  "futures-core",
@@ -4647,7 +4716,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb2d1b8f4548dbf5e1f7818512e9c406860678f29c300cdf0ebac72d1a3a1671"
 dependencies = [
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "futures 0.1.30",
 ]
 
@@ -4700,7 +4769,7 @@ version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09bc590ec4ba8ba87652da2068d150dcada2cfa2e07faae270a5e0409aa51351"
 dependencies = [
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "futures 0.1.30",
  "lazy_static",
  "log 0.4.11",
@@ -4711,18 +4780,6 @@ dependencies = [
  "tokio-executor",
  "tokio-io",
  "tokio-sync",
-]
-
-[[package]]
-name = "tokio-rustls"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15cb62a0d2770787abc96e99c1cd98fcf17f94959f3af63ca85bdfb203f051b4"
-dependencies = [
- "futures-core",
- "rustls",
- "tokio 0.2.22",
- "webpki",
 ]
 
 [[package]]
@@ -4757,7 +4814,7 @@ checksum = "df720b6581784c118f0eb4310796b12b1d242a7eb95f716a8367855325c25f89"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-queue",
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "futures 0.1.30",
  "lazy_static",
  "log 0.4.11",
@@ -4782,7 +4839,7 @@ version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93044f2d313c95ff1cb7809ce9a7a05735b012288a888b62d4434fd58c94f296"
 dependencies = [
- "crossbeam-utils",
+ "crossbeam-utils 0.7.2",
  "futures 0.1.30",
  "slab 0.4.2",
  "tokio-executor",
@@ -5299,16 +5356,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "webpki"
-version = "0.21.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1f50e1972865d6b1adb54167d1c8ed48606004c2c9d0ea5f1eeb34d95e863ef"
-dependencies = [
- "ring",
- "untrusted",
-]
-
-[[package]]
 name = "websocket"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5496,6 +5543,7 @@ dependencies = [
  "jsonwebtoken",
  "log 0.4.11",
  "lru-cache",
+ "metrics",
  "num",
  "reqwest",
  "serde",
@@ -5544,6 +5592,8 @@ name = "zksync_config"
 version = "1.0.0"
 dependencies = [
  "log 0.4.11",
+ "serde",
+ "serde_json",
  "url 2.1.1",
  "zksync_basic_types",
  "zksync_utils",
@@ -5570,6 +5620,7 @@ dependencies = [
  "ethabi 12.0.0",
  "futures 0.3.6",
  "log 0.4.11",
+ "metrics",
  "num",
  "serde",
  "serde_json",
@@ -5660,6 +5711,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "log 0.4.11",
+ "metrics",
  "num",
  "serde",
  "serde_json",
@@ -5697,12 +5749,12 @@ name = "zksync_prometheus_exporter"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "chrono",
  "ctrlc",
  "env_logger 0.6.2",
  "futures 0.3.6",
  "log 0.4.11",
- "prometheus_exporter_base",
+ "metrics",
+ "metrics-exporter-prometheus",
  "tokio 0.2.22",
  "zksync_config",
  "zksync_storage",
@@ -5786,6 +5838,7 @@ dependencies = [
  "anyhow",
  "criterion",
  "log 0.4.11",
+ "metrics",
  "num",
  "web3 0.13.0",
  "zksync_crypto",
@@ -5806,6 +5859,7 @@ dependencies = [
  "hex",
  "itertools 0.8.2",
  "log 0.4.11",
+ "metrics",
  "num",
  "parity-crypto",
  "serde",
@@ -5902,6 +5956,7 @@ dependencies = [
  "env_logger 0.6.2",
  "futures 0.3.6",
  "log 0.4.11",
+ "metrics",
  "num",
  "reqwest",
  "serde",

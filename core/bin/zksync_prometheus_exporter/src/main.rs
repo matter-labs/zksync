@@ -25,11 +25,15 @@ async fn main() -> anyhow::Result<()> {
     let connection_pool = ConnectionPool::new(Some(PROMETHEUS_EXPORTER_CONNECTION_POOL_SIZE));
     let config_options = ConfigurationOptions::from_env();
 
-    let task_handle = run_prometheus_exporter(connection_pool, &config_options);
+    let (prometheus_handle, counter_handle) =
+        run_prometheus_exporter(connection_pool, config_options.prometheus_export_port);
 
     tokio::select! {
-        _ = async { task_handle.await } => {
+        _ = async { prometheus_handle.await } => {
             panic!("Prometheus exporter actors aren't supposed to finish their execution")
+        },
+        _ = async { counter_handle.await } => {
+            panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             log::warn!("Stop signal received, shutting down");
