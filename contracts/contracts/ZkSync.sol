@@ -26,7 +26,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeMathUInt128 for uint128;
 
-    bytes32 public constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
+    bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     // Upgrade functional
 
@@ -238,10 +238,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require((block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER) <= _newBlock.timestamp
             && _newBlock.timestamp <= (block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA), "tms12"); // tms12 - _blockTimestamp is not valid
 
-        (bytes32 processedOnchainOpsHash, uint64 priorityRequests) = collectOnchainOps(_newBlock);
+        (bytes32 processedOnchainOpsHash, uint64 priorityRequests, bytes32 offsetCommitment) = collectOnchainOps(_newBlock);
 
         // Create block commitment for verification proof
-        bytes32 commitment = createBlockCommitment(_previousBlock, _newBlock);
+        bytes32 commitment = createBlockCommitment(_previousBlock, _newBlock, offsetCommitment);
 
         return StoredBlockInfo(_newBlock.blockNumber, priorityRequests, processedOnchainOpsHash, _newBlock.timestamp, _newBlock.newStateRoot, commitment);
     }
@@ -488,7 +488,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
     /// Priority operations must be committed in the same order as they are in the priority queue.
     function collectOnchainOps(CommitBlockInfo memory _newBlockData)
-        internal returns (bytes32 processableOperationsHash, uint64 priorityOperationsProcessed) {
+        internal returns (bytes32 processableOperationsHash, uint64 priorityOperationsProcessed, bytes32 offsetsCommitment) {
         bytes memory pubData = _newBlockData.publicData;
 
         require(pubData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
@@ -497,9 +497,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         priorityOperationsProcessed = 0;
         processableOperationsHash = EMPTY_STRING_KECCAK;
 
+        bytes memory priorityChunks = new bytes(_newBlockData.publicData.length / CHUNK_BYTES);
         for (uint32 i = 0; i < _newBlockData.onchainOperations.length; ++i) {
             OnchainOperationData memory onchainOpData = _newBlockData.onchainOperations[i];
             uint pubdataOffset = onchainOpData.publicDataOffset;
+            require(pubdataOffset % CHUNK_BYTES == 0, "fcso2"); // offsets should be on chunks boundaries
+            priorityChunks[pubdataOffset / CHUNK_BYTES] = byte(0x01);
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[pubdataOffset]));
 
@@ -555,6 +558,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 revert("fpp14"); // unsupported op
             }
         }
+
+        offsetsCommitment = sha256(abi.encodePacked(priorityChunks));
     }
 
     function verifyChangePubkey(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk) internal pure returns (bool) {
@@ -599,15 +604,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Creates block commitment from its data
     function createBlockCommitment(
         StoredBlockInfo memory _previousBlock,
-        CommitBlockInfo memory _newBlockData
+        CommitBlockInfo memory _newBlockData,
+        bytes32 _offsetCommitment
     ) internal view returns (bytes32 commitment) {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_newBlockData.blockNumber), uint256(_newBlockData.feeAccount))
         );
-        // TODO: add _newBlockData.onchainOperations.length
-        // TODO: add _newBlockData.timestamp.length
-        hash = sha256(abi.encodePacked(hash, uint256(_previousBlock.stateHash)));
-        hash = sha256(abi.encodePacked(hash, uint256(_newBlockData.newStateRoot)));
+        hash = sha256(abi.encodePacked(hash, _previousBlock.stateHash));
+        hash = sha256(abi.encodePacked(hash, _newBlockData.newStateRoot));
+        hash = sha256(abi.encodePacked(hash, _offsetCommitment));
+        hash = sha256(abi.encodePacked(hash, uint256(_newBlockData.timestamp)));
 
         bytes memory pubdata = _newBlockData.publicData;
 
