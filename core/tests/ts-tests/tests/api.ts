@@ -15,7 +15,7 @@ const apiTypesFolder = './api-types';
 const ADDRESS_REGEX = /^0x([0-9a-fA-F]){40}$/;
 const DATE_REGEX = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?/;
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const contractsTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/contracts.json`, { encoding: "utf-8" }));
+const apiTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/api.json`, { encoding: "utf-8" }));
 
 // Checks that json string has the expected js type.
 // Usage: pass a path to .ts file that exports a type named `Interface` and a json string.
@@ -52,14 +52,14 @@ async function validateResponseFromUrl(typeFilePath: string, url: string): Promi
 }
 
 export async function checkStatusResponseType(): Promise<StatusInterface> {
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/status`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/status`;
     const typeFilePath = `${apiTypesFolder}/status.ts`;
     const data: StatusInterface = await validateResponseFromUrl(typeFilePath, url);
     return data;
 }
 
 export async function checkWithdrawalProcessingTimeResponseType(): Promise<StatusInterface> {
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/withdrawal_processing_time`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/withdrawal_processing_time`;
     const typeFilePath = `${apiTypesFolder}/withdrawal-processing.ts`;
     const data: StatusInterface = await validateResponseFromUrl(typeFilePath, url);
     return data;
@@ -68,7 +68,7 @@ export async function checkWithdrawalProcessingTimeResponseType(): Promise<Statu
 export async function checkTxHistoryResponseType(address: string): Promise<TxHistoryInterface> {
     const offset = 0;
     const limit = 20;
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/account/${address}/history/${offset}/${limit}`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/account/${address}/history/${offset}/${limit}`;
     const typeFilePath = `${apiTypesFolder}/tx-history.ts`;
     const data: TxHistoryInterface = await validateResponseFromUrl(typeFilePath, url);
 
@@ -80,7 +80,7 @@ export async function checkTxHistoryResponseType(address: string): Promise<TxHis
 }
 
 export async function checkBlockResponseType(blockNumber: number): Promise<BlockInterface> {
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/blocks/${blockNumber}`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/blocks/${blockNumber}`;
     const typeFilePath = `${apiTypesFolder}/block.ts`;
     const data: BlockInterface = await validateResponseFromUrl(typeFilePath, url);
     expect(data.committed_at, 'Wrong date format').to.match(DATE_REGEX);
@@ -88,14 +88,14 @@ export async function checkBlockResponseType(blockNumber: number): Promise<Block
 }
 
 export async function checkBlocksResponseType(): Promise<BlocksInterface> {
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/blocks`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/blocks`;
     const typeFilePath = `${apiTypesFolder}/blocks.ts`;
     const data: BlocksInterface = await validateResponseFromUrl(typeFilePath, url);
     return data;
 }
 
 export async function checkBlockTransactionsResponseType(blockNumber: number): Promise<BlockTransactionsInterface> {
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/blocks/${blockNumber}/transactions`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/blocks/${blockNumber}/transactions`;
     const typeFilePath = `${apiTypesFolder}/block-transactions.ts`;
     const data: BlockTransactionsInterface = await validateResponseFromUrl(typeFilePath, url);
 
@@ -107,7 +107,7 @@ export async function checkBlockTransactionsResponseType(blockNumber: number): P
 }
 
 export async function checkTestnetConfigResponseType(): Promise<TestnetConfigInterface> {
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/testnet_config`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/testnet_config`;
     const typeFilePath = `${apiTypesFolder}/config.ts`;
     const data: TestnetConfigInterface = await validateResponseFromUrl(typeFilePath, url);
     expect(data.contractAddress, 'Wrong address format').to.match(ADDRESS_REGEX);
@@ -115,7 +115,7 @@ export async function checkTestnetConfigResponseType(): Promise<TestnetConfigInt
 }
 
 export async function checkTransactionsResponseType(txHash: string): Promise<TransactionInterface> {
-    const url = `${contractsTestConfig.REST_API_ADDR}/api/v0.1/transactions_all/${txHash}`;
+    const url = `${apiTestConfig.rest_api_url}/api/v0.1/transactions_all/${txHash}`;
     const typeFilePath = `${apiTypesFolder}/transaction.ts`;
     const data: TransactionInterface = await validateResponseFromUrl(typeFilePath, url);
     expect(data.created_at, 'Wrong date format').to.match(DATE_REGEX);

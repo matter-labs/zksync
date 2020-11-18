@@ -30,7 +30,7 @@ async function main() {
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
-        const wallet = ethers.Wallet.fromMnemonic(contractsTestConfig.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+        const wallet = ethers.Wallet.fromMnemonic(contractsTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
 
         const proxyContract = new ethers.Contract(args.contractAddress, testContracts.proxy.abi, wallet);
 

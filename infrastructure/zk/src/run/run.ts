@@ -88,7 +88,7 @@ export async function testAccounts() {
     const baseWalletPath = "m/44'/60'/0'/0/";
     const walletKeys = [];
     for (let i = 0; i < NUM_TEST_WALLETS; ++i) {
-        const ethWallet = Wallet.fromMnemonic(contractsTestConfig.TEST_MNEMONIC as string, baseWalletPath + i);
+        const ethWallet = Wallet.fromMnemonic(contractsTestConfig.test_mnemonic as string, baseWalletPath + i);
         walletKeys.push({
             address: ethWallet.address,
             privateKey: ethWallet.privateKey

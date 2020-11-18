@@ -29,7 +29,7 @@ async function deployToken(token: Token): Promise<Token> {
 
     await erc20.mint(wallet.address, parseEther("3000000000"));
     for (let i = 0; i < 10; ++i) {
-        const testWallet = Wallet.fromMnemonic(contractsTestConfig.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).connect(provider);
+        const testWallet = Wallet.fromMnemonic(contractsTestConfig.test_mnemonic, "m/44'/60'/0'/0/" + i).connect(provider);
         await erc20.mint(testWallet.address, parseEther("3000000000"));
     }
     token.address = erc20.address;

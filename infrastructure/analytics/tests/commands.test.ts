@@ -27,7 +27,7 @@ describe('Tests', () => {
         const ethProvider = new ethers.providers.JsonRpcProvider();
         const zksProvider = await zksync.getDefaultProvider(network, 'HTTP');
 
-        const ethWallet = ethers.Wallet.fromMnemonic(contractsTestConfig.TEST_MNEMONIC as string, "m/44'/60'/0'/0/0").connect(
+        const ethWallet = ethers.Wallet.fromMnemonic(contractsTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0").connect(
             ethProvider
         );
 

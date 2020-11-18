@@ -33,7 +33,7 @@ export class Tester {
         }
         const syncProvider = await zksync.getDefaultProvider(network, transport);
         const ethWallet = ethers.Wallet.fromMnemonic(
-            contractsTestConfig.TEST_MNEMONIC as string, 
+            contractsTestConfig.test_mnemonic as string, 
             "m/44'/60'/0'/0/0"
         ).connect(ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
