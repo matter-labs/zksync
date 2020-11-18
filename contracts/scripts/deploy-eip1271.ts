@@ -8,26 +8,27 @@ import { deployContract } from "ethereum-waffle";
 import * as fs from "fs";
 import * as path from "path";
 
+const testConfigPath = path.join(process.env.ZKSYNC_HOME, `etc/test_config/constant`);
+const EIP1271TestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eip1271.json`, { encoding: "utf-8" }));
+const contractsTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/contracts.json`, { encoding: "utf-8" }));
+
 (async () => {
     try {
         if (!["test", "localhost"].includes(process.env.ETH_NETWORK)) {
             console.error("This deploy script is only for localhost-test network");
             process.exit(1);
         }
-
-        const testConfigPath = path.join(process.env.ZKSYNC_HOME, `etc/test_config/constant/eip1271.json`);
-        const testConfig = JSON.parse(fs.readFileSync(testConfigPath, { encoding: "utf-8" }));
-
+        
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
         provider.pollingInterval = 10;
 
-        const deployWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(
+        const deployWallet = ethers.Wallet.fromMnemonic(contractsTestConfig.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(
             provider
         );
         const smartWallet = await deployContract(
             deployWallet,
             readContractCode("AccountMock"),
-            [testConfig.owner_address],
+            [EIP1271TestConfig.owner_address],
             {
                 gasLimit: 5000000,
             }

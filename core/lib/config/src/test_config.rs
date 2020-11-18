@@ -65,10 +65,25 @@ impl EthConfig {
     }
 }
 
+/// Common Api addresses.
+#[derive(Debug, Deserialize)]
+pub struct ApiConfig {
+    /// Address of the rest api.
+    pub rest_api_url: String,
+}
+
+impl ApiConfig {
+    pub fn load() -> Self {
+        let object = load_json(&config_path("constant/api.json"));
+        serde_json::from_value(object).expect("Cannot deserialize Api test config")
+    }
+}
+
 #[derive(Debug)]
 pub struct TestConfig {
     pub eip1271: EIP1271Config,
     pub eth: EthConfig,
+    pub api: ApiConfig,
 }
 
 impl TestConfig {
@@ -76,6 +91,7 @@ impl TestConfig {
         Self {
             eip1271: EIP1271Config::load(),
             eth: EthConfig::load(),
+            api: ApiConfig::load(),
         }
     }
 }
