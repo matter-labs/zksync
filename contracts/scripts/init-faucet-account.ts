@@ -2,13 +2,13 @@ import {ethers} from "ethers";
 import * as zksync from "zksync";
 
 const DEPOSIT_AMOUNT = ethers.utils.parseEther("10000000000");
-
+const network = process.env.ETH_NETWORK;
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const deployerEthWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 const faucetEthWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
 
 async function main() {
-    const syncProvider = await zksync.Provider.newHttpProvider(process.env.HTTP_RPC_API_ADDR);
+    const syncProvider = await zksync.getDefaultProvider(network as zksync.types.Network);
     const deployerWallet = await zksync.Wallet.fromEthSigner(deployerEthWallet, syncProvider);
     const faucetWallet = await zksync.Wallet.fromEthSigner(faucetEthWallet, syncProvider);
 
