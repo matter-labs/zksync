@@ -1,3 +1,4 @@
 {
-    "web3_url": "http://127.0.0.1:8545"
+    "web3_url": "http://127.0.0.1:8545",
+    "test_mnemonic": "stuff slice staff easily soup parent arm payment cotton trade scatter struggle"
 }

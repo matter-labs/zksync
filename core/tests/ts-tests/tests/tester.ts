@@ -7,7 +7,7 @@ const franklin_abi = require('../../../../contracts/build/ZkSync.json').abi;
 type Network = 'localhost' | 'rinkeby' | 'ropsten';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const contractsTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/contracts.json`, { encoding: "utf-8" }));
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 export class Tester {
     public contract: ethers.Contract;
@@ -33,7 +33,7 @@ export class Tester {
         }
         const syncProvider = await zksync.getDefaultProvider(network, transport);
         const ethWallet = ethers.Wallet.fromMnemonic(
-            contractsTestConfig.test_mnemonic as string, 
+            ethTestConfig.test_mnemonic as string, 
             "m/44'/60'/0'/0/0"
         ).connect(ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);

@@ -83,12 +83,12 @@ export async function catLogs(exitCode?: number) {
 
 export async function testAccounts() {
     const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-    const contractsTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/contracts.json`, { encoding: "utf-8" }));
+    const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
     const NUM_TEST_WALLETS = 10;
     const baseWalletPath = "m/44'/60'/0'/0/";
     const walletKeys = [];
     for (let i = 0; i < NUM_TEST_WALLETS; ++i) {
-        const ethWallet = Wallet.fromMnemonic(contractsTestConfig.test_mnemonic as string, baseWalletPath + i);
+        const ethWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, baseWalletPath + i);
         walletKeys.push({
             address: ethWallet.address,
             privateKey: ethWallet.privateKey

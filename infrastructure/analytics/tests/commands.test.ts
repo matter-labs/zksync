@@ -20,14 +20,14 @@ describe('Tests', () => {
     before('prepare auxiliary data & create new zksync account, make transfer', async () => {
         config = loadConfig(network);
         const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-        const contractsTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/contracts.json`, { encoding: "utf-8" }));
+        const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
         const timeFrom = new Date().toISOString();
 
         const ethProvider = new ethers.providers.JsonRpcProvider();
         const zksProvider = await zksync.getDefaultProvider(network, 'HTTP');
 
-        const ethWallet = ethers.Wallet.fromMnemonic(contractsTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0").connect(
+        const ethWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0").connect(
             ethProvider
         );
 

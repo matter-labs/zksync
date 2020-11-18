@@ -44,11 +44,20 @@ pub struct EIP1271Config {
     pub contract_address: Address,
 }
 
+impl EIP1271Config {
+    pub fn load() -> Self {
+        let object = merge_configs("eip1271.json");
+        serde_json::from_value(object).expect("Cannot deserialize EIP1271 test config")
+    }
+}
+
 /// Common Ethereum parameters.
 #[derive(Debug, Deserialize)]
 pub struct EthConfig {
     /// Address of the local Ethereum node.
     pub web3_url: String,
+    /// Set of 12 words for connecting to an Ethereum wallet.
+    pub test_mnemonic: String,
 }
 
 /// Common Api addresses.
@@ -56,20 +65,6 @@ pub struct EthConfig {
 pub struct ApiConfig {
     /// Address of the rest api.
     pub rest_api_url: String,
-}
-
-/// Config for Contracts.
-#[derive(Debug, Deserialize)]
-pub struct ContractsConfig {
-    /// Address of the rest api.
-    pub test_mnemonic: String,
-}
-
-impl EIP1271Config {
-    pub fn load() -> Self {
-        let object = merge_configs("eip1271.json");
-        serde_json::from_value(object).expect("Cannot deserialize EIP1271 test config")
-    }
 }
 
 macro_rules! impl_config {
@@ -86,14 +81,12 @@ macro_rules! impl_config {
 
 impl_config!(ApiConfig, "constant/api");
 impl_config!(EthConfig, "constant/eth");
-impl_config!(ContractsConfig, "constant/contracts");
 
 #[derive(Debug)]
 pub struct TestConfig {
     pub eip1271: EIP1271Config,
     pub eth: EthConfig,
     pub api: ApiConfig,
-    pub contracts: ContractsConfig,
 }
 
 impl TestConfig {
@@ -102,7 +95,6 @@ impl TestConfig {
             eip1271: EIP1271Config::load(),
             eth: EthConfig::load(),
             api: ApiConfig::load(),
-            contracts: ContractsConfig::load(),
         }
     }
 }
