@@ -1,102 +1,69 @@
 //! This module handles metric export to the Prometheus server
 
-use std::io::{Error, ErrorKind};
-// External uses
-use prometheus_exporter_base::{render_prometheus, MetricType, PrometheusMetric};
-// Workspace uses
+use metrics_exporter_prometheus::PrometheusBuilder;
+use std::{thread, time::Duration};
 use tokio::task::JoinHandle;
-use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
-use zksync_types::ActionType;
+use zksync_types::ActionType::*;
 
-fn convert_err(err: anyhow::Error) -> std::io::Error {
-    // Prometheus required `failure::Error`, so we convert anyhow to the type
-    // which can be converted into `failure::Error`.
-    Error::new(ErrorKind::Other, err.to_string())
-}
+const QUERY_INTERVAL: Duration = Duration::from_secs(60);
 
-#[must_use]
 pub fn run_prometheus_exporter(
     connection_pool: ConnectionPool,
-    config: &ConfigurationOptions,
-) -> JoinHandle<()> {
-    let addr = ([0, 0, 0, 0], config.prometheus_export_port).into();
+    port: u16,
+) -> (JoinHandle<()>, JoinHandle<()>) {
+    let addr = ([0, 0, 0, 0], port);
+    let (recorder, exporter) = PrometheusBuilder::new()
+        .listen_address(addr)
+        .build_with_exporter()
+        .expect("failed to install Prometheus recorder");
+    metrics::set_boxed_recorder(Box::new(recorder)).expect("failed to set metrics recorder");
 
-    tokio::spawn(render_prometheus(addr, (), |_, _| async move {
-        let mut storage = connection_pool.access_storage().await?;
-        let mut transaction = storage.start_transaction().await.map_err(convert_err)?;
-        let mut block_schema = transaction.chain().block_schema();
+    let prometheus_handle = tokio::spawn(async move {
+        tokio::pin!(exporter);
+        loop {
+            tokio::select! {
+                _ = &mut exporter => {}
+            }
+        }
+    });
 
-        let pc = PrometheusMetric::new(
-            "block_commit_unconfirmed",
-            MetricType::Counter,
-            "Number of commits that are unconfirmed",
-        );
-        let mut s = pc.render_header();
-        s.push_str(
-            &pc.render_sample(
-                None,
-                block_schema
-                    .count_operations(ActionType::COMMIT, false)
-                    .await
-                    .map_err(convert_err)?,
-                None,
-            ),
-        );
+    let operation_counter_handle = tokio::spawn(async move {
+        let mut storage = connection_pool
+            .access_storage()
+            .await
+            .expect("unable to access storage");
 
-        let pc = PrometheusMetric::new(
-            "block_verify_unconfirmed",
-            MetricType::Counter,
-            "Number of verifies that are unconfirmed",
-        );
-        s.push_str(&pc.render_header());
-        s.push_str(
-            &pc.render_sample(
-                None,
-                block_schema
-                    .count_operations(ActionType::VERIFY, false)
-                    .await
-                    .map_err(convert_err)?,
-                None,
-            ),
-        );
+        loop {
+            let mut transaction = storage
+                .start_transaction()
+                .await
+                .expect("unable to start db transaction");
+            let mut block_schema = transaction.chain().block_schema();
 
-        let pc = PrometheusMetric::new(
-            "block_commit_confirmed",
-            MetricType::Counter,
-            "Number of commits that are confirmed",
-        );
-        s.push_str(&pc.render_header());
-        s.push_str(
-            &pc.render_sample(
-                None,
-                block_schema
-                    .count_operations(ActionType::COMMIT, true)
-                    .await
-                    .map_err(convert_err)?,
-                None,
-            ),
-        );
+            for &action in &[COMMIT, VERIFY] {
+                for &is_confirmed in &[false, true] {
+                    let result = block_schema
+                        .count_operations(action, is_confirmed)
+                        .await
+                        .expect("");
+                    metrics::gauge!(
+                        "count_operations",
+                        result as f64,
+                        "action" => action.to_string(),
+                        "confirmed" => is_confirmed.to_string()
+                    );
+                }
+            }
 
-        let pc = PrometheusMetric::new(
-            "block_verify_confirmed",
-            MetricType::Counter,
-            "Number of verifies that are confirmed",
-        );
-        s.push_str(&pc.render_header());
-        s.push_str(
-            &pc.render_sample(
-                None,
-                block_schema
-                    .count_operations(ActionType::VERIFY, true)
-                    .await
-                    .map_err(convert_err)?,
-                None,
-            ),
-        );
+            transaction
+                .commit()
+                .await
+                .expect("unable to commit db transaction");
 
-        transaction.commit().await.map_err(convert_err)?;
+            thread::sleep(QUERY_INTERVAL);
+        }
+    });
 
-        Ok(s)
-    }))
+    (prometheus_handle, operation_counter_handle)
 }

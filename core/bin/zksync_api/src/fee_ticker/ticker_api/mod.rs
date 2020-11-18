@@ -157,17 +157,21 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         &self,
         token_id: TokenId,
     ) -> Result<Option<TokenPrice>, anyhow::Error> {
+        let start = Instant::now();
         let mut storage = self
             .db_pool
             .access_storage()
             .await
             .map_err(|e| format_err!("Can't access storage: {}", e))?;
 
-        storage
+        let result = storage
             .tokens_schema()
             .get_historical_ticker_price(token_id)
             .await
-            .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))
+            .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e));
+
+        metrics::histogram!("ticker.get_historical_ticker_price", start.elapsed());
+        result
     }
 }
 
@@ -175,6 +179,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
 impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
     /// Get last price from ticker
     async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error> {
+        let start = Instant::now();
         let token = self
             .token_db_cache
             .get_token(token.clone())
@@ -215,11 +220,13 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(historical_price);
         }
 
+        metrics::histogram!("ticker.get_last_quote", start.elapsed());
         anyhow::bail!("Token price api is not available right now.")
     }
 
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error> {
+        let start = Instant::now();
         let mut cached_value = self.gas_price_cache.lock().await;
 
         if let Some((cached_gas_price, cache_time)) = cached_value.take() {
@@ -244,13 +251,18 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
 
         *cached_value = Some((average_gas_price.clone(), Instant::now()));
 
+        metrics::histogram!("ticker.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)
     }
 
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
-        self.token_db_cache
+        let start = Instant::now();
+        let result = self
+            .token_db_cache
             .get_token(token.clone())
             .await?
-            .ok_or_else(|| format_err!("Token not found: {:?}", token))
+            .ok_or_else(|| format_err!("Token not found: {:?}", token));
+        metrics::histogram!("ticker.get_token", start.elapsed());
+        result
     }
 }

@@ -1,4 +1,5 @@
 use anyhow::{ensure, format_err};
+use std::time::Instant;
 use zksync_crypto::params::{self, max_account_id};
 use zksync_types::{AccountUpdate, AccountUpdates, PubKeyHash, Withdraw, WithdrawOp, ZkSyncOp};
 
@@ -50,6 +51,7 @@ impl TxHandler<Withdraw> for ZkSyncState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         ensure!(
             op.account_id <= max_account_id(),
             "Withdraw account id is bigger than max supported"
@@ -89,6 +91,7 @@ impl TxHandler<Withdraw> for ZkSyncState {
             amount: op.tx.fee.clone(),
         };
 
+        metrics::histogram!("state.withdraw", start.elapsed());
         Ok((Some(fee), updates))
     }
 }

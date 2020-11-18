@@ -1,5 +1,5 @@
 // Built-in deps
-use std::time;
+use std::time::{self, Instant};
 // External imports
 use sqlx::Done;
 // Workspace imports
@@ -21,6 +21,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     /// Returns the amount of blocks which await for proof, but have
     /// no assigned prover run.
     pub async fn unstarted_jobs_count(&mut self) -> QueryResult<u64> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let mut last_committed_block = BlockSchema(&mut transaction)
@@ -58,11 +59,13 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
 
         transaction.commit().await?;
+        metrics::histogram!("sql", start.elapsed(), "prover" => "unstarted_jobs_count");
         Ok(result)
     }
 
     /// Returns the amount of blocks which await for proof (committed but not verified)
     pub async fn pending_jobs_count(&mut self) -> QueryResult<u32> {
+        let start = Instant::now();
         let block_without_proofs = sqlx::query!(
                 "\
             SELECT COUNT(*) as integer_value FROM operations o \
@@ -79,6 +82,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             .integer_value
             .unwrap_or(0) as u64;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "pending_jobs_count");
         Ok(block_without_proofs as u32)
     }
 
@@ -87,6 +91,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         &mut self,
         block_number: BlockNumber,
     ) -> QueryResult<Option<ProverRun>> {
+        let start = Instant::now();
         let prover_run = sqlx::query_as!(
             ProverRun,
             "SELECT * FROM prover_runs WHERE block_number = $1",
@@ -95,6 +100,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "get_existing_prover_run");
         Ok(prover_run)
     }
 
@@ -107,6 +113,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         _prover_timeout: time::Duration,
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
+        let start = Instant::now();
         // Select the block to prove.
         let mut transaction = self.0.start_transaction().await?;
 
@@ -176,11 +183,13 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "prover_run_for_next_commit");
         Ok(result)
     }
 
     /// Updates the state of ongoing prover job.
     pub async fn record_prover_is_working(&mut self, job_id: i32) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "UPDATE prover_runs 
             SET updated_at = now()
@@ -190,11 +199,13 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "record_prover_is_working");
         Ok(())
     }
 
     /// Adds a prover to the database.
     pub async fn register_prover(&mut self, worker_: &str, block_size_: usize) -> QueryResult<i32> {
+        let start = Instant::now();
         let inserted_id = sqlx::query!(
             "INSERT INTO active_provers (worker, block_size)
             VALUES ($1, $2)
@@ -206,11 +217,13 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .await?
         .id;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "register_prover");
         Ok(inserted_id)
     }
 
     /// Gets a prover descriptor by its numeric ID.
     pub async fn prover_by_id(&mut self, prover_id: i32) -> QueryResult<ActiveProver> {
+        let start = Instant::now();
         let prover = sqlx::query_as!(
             ActiveProver,
             "SELECT * FROM active_provers WHERE id = $1",
@@ -219,11 +232,13 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "prover_by_id");
         Ok(prover)
     }
 
     /// Marks the prover as stopped.
     pub async fn record_prover_stop(&mut self, prover_id: i32) -> QueryResult<()> {
+        let start = Instant::now();
         // TODO: It seems that it isn't actually checked if the prover has been stopped
         // anywhere. And also it doesn't seem that prover can be restored from the stopped
         // state (#1129).
@@ -236,6 +251,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "record_prover_stop");
         Ok(())
     }
 
@@ -245,6 +261,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         block_number: BlockNumber,
         proof: &EncodedProofPlonk,
     ) -> QueryResult<usize> {
+        let start = Instant::now();
         let updated_rows = sqlx::query!(
             "INSERT INTO proofs (block_number, proof)
             VALUES ($1, $2)",
@@ -255,6 +272,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .await?
         .rows_affected() as usize;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
         Ok(updated_rows)
     }
 
@@ -263,6 +281,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         &mut self,
         block_number: BlockNumber,
     ) -> QueryResult<Option<EncodedProofPlonk>> {
+        let start = Instant::now();
         let proof = sqlx::query_as!(
             StoredProof,
             "SELECT * FROM proofs WHERE block_number = $1",
@@ -272,6 +291,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .await?
         .map(|stored| serde_json::from_value(stored.proof).unwrap());
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "load_proof");
         Ok(proof)
     }
 
@@ -281,6 +301,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         block: BlockNumber,
         witness: serde_json::Value,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let witness_str = serde_json::to_string(&witness).expect("Failed to serialize witness");
         sqlx::query!(
             "INSERT INTO block_witness (block, witness)
@@ -293,6 +314,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "store_witness");
         Ok(())
     }
 
@@ -301,6 +323,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         &mut self,
         block_number: BlockNumber,
     ) -> QueryResult<Option<serde_json::Value>> {
+        let start = Instant::now();
         let block_witness = sqlx::query_as!(
             StorageBlockWitness,
             "SELECT * FROM block_witness WHERE block = $1",
@@ -309,6 +332,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "prover" => "get_witness");
         Ok(block_witness
             .map(|w| serde_json::from_str(&w.witness).expect("Failed to deserialize witness")))
     }
