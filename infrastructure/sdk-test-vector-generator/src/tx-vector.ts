@@ -1,8 +1,35 @@
 import { utils } from "ethers";
 import * as ethers from "ethers";
 import * as zksync from "zksync";
-import { TestVector, TxTestEntry } from "./types";
+import { TestVector, TestVectorEntry } from "./types";
 import { generateArray } from "./utils";
+
+/**
+ * Interface for the transactions test vector.
+ */
+export interface TxTestEntry extends TestVectorEntry {
+    inputs: {
+        // Type of transaction. Valid values are: `Transfer`, `Withdraw`, `ChangePubKey`, `ForcedExit`.
+        type: string;
+        // Ethereum private key. zkSync private key should be derived from it.
+        ethPrivateKey: string;
+        // Transaction-specific input.
+        data: any;
+        // Transactin-specific input to generate Ethereum signature.
+        // Can be `null` if Ethereum signature is not required for transaction
+        ethSignData: any | null;
+    };
+    outputs: {
+        // Encoded transaction bytes to be used for signing.
+        signBytes: string;
+        // Transaction zkSync signature.
+        signature: zksync.types.Signature;
+        // Message to be used to provie Ethereum signature. `null` if `inputs.ethSignData` is `null`.
+        ethSignMessage: string | null;
+        // Ethereum signature for a transaction. `null` if `inputs.ethSignData` is `null`.
+        ethSignature: string | null;
+    };
+}
 
 /**
  * Returns the test vector containing the transaction input data and the outputs: encoded transaction bytes,
