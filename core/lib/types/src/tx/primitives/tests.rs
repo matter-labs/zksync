@@ -3,16 +3,19 @@ use std::ops::Deref;
 use anyhow::Result;
 use parity_crypto::publickey::{Generator, Random};
 // Workspace uses
-use zksync_basic_types::Address;
+use zksync_basic_types::{Address, H256};
 // Local uses
+use super::packed_eth_signature::PackedEthSignature;
 use crate::{tx::*, Transfer, Withdraw, ZkSyncTx};
 
-pub fn get_eth_signature() -> TxEthSignature {
+fn get_packed_signature() -> PackedEthSignature {
     let keypair = Random.generate();
     let private_key = keypair.secret();
-    let signature = PackedEthSignature::sign(private_key.deref(), b"test").unwrap();
+    PackedEthSignature::sign(private_key.deref(), b"test").unwrap()
+}
 
-    TxEthSignature::EthereumSignature(signature)
+fn get_eth_signature() -> TxEthSignature {
+    TxEthSignature::EthereumSignature(get_packed_signature())
 }
 
 fn get_batch() -> Vec<ZkSyncTx> {
@@ -46,7 +49,7 @@ fn get_batch() -> Vec<ZkSyncTx> {
         Default::default(),
         13,
         None,
-        None,
+        Some(get_packed_signature()),
     );
 
     vec![
@@ -84,23 +87,23 @@ fn test_batch_message() -> Result<()> {
     let signature = get_eth_signature();
 
     // For the initial batch we expect prefixed hash of transactions data.
-    let change_pub_key_message = match txs.last().unwrap() {
-        ZkSyncTx::ChangePubKey(tx) => tx.get_eth_signed_data()?,
-        _ => panic!("ChangePubKey is supposed to be the last element in Vec of test transactions"),
-    };
     let mut batch_hash = Vec::new();
     for tx in &txs {
         batch_hash.extend(tx.get_bytes().iter());
     }
     let batch_hash = tiny_keccak::keccak256(&batch_hash).to_vec();
-    // Final message in bytes.
-    let mut message = Vec::<u8>::with_capacity(change_pub_key_message.len() + batch_hash.len());
-    message.extend(change_pub_key_message.iter());
-    message.extend(batch_hash.iter());
+    // Set the batch hash for ChangePubKey and get the message.
+    let change_pub_key = match txs.last_mut().unwrap() {
+        ZkSyncTx::ChangePubKey(tx) => tx,
+        _ => panic!("ChangePubKey is supposed to be the last element in Vec of test transactions"),
+    };
+    change_pub_key.as_mut().batch_hash = H256::from_slice(batch_hash.as_slice());
+    let change_pub_key_message = change_pub_key.as_ref().get_eth_signed_data()?;
+    assert!(change_pub_key_message.ends_with(batch_hash.as_slice()));
     // Shouldn't fail.
     let batch_sign_data = BatchSignData::new(&txs, signature.clone())?;
 
-    assert_eq!(batch_sign_data.0.message, message);
+    assert_eq!(batch_sign_data.0.message, change_pub_key_message);
 
     // Now remove `ChangePubKey` from the batch and expect the hash of bytes without the prefix.
     txs.pop();

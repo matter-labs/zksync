@@ -34,21 +34,19 @@ impl BatchSignData {
         );
 
         let change_pub_key_message = change_pub_key
+            .filter(|tx| tx.eth_signature.is_some())
             .map(|tx| tx.get_eth_signed_data())
             .transpose()?;
-        // First, compute the hash of the data of all transactions in the batch.
-        let batch_hash = keccak256(
-            txs.iter()
-                .flat_map(ZkSyncTx::get_bytes)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .to_vec();
 
-        let message = match change_pub_key_message {
-            Some(prefix) => [prefix, batch_hash].concat(),
-            None => batch_hash,
-        };
+        let message = change_pub_key_message.unwrap_or_else(|| {
+            keccak256(
+                txs.iter()
+                    .flat_map(ZkSyncTx::get_bytes)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .to_vec()
+        });
 
         Ok(BatchSignData(EthSignData { signature, message }))
     }
