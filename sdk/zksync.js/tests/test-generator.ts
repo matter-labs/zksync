@@ -3,6 +3,7 @@
 import { utils } from 'ethers';
 import * as ethers from 'ethers';
 import * as zksync from 'zksync';
+import * as fs from 'fs';
 
 export interface TestVectorEntry {
     inputs: any;
@@ -17,6 +18,15 @@ export interface TestVector {
 export async function generateSDKTestVectors(outputFile: string = 'test_vectors.json') {
     const cryptoVectors = await generateCryptoTestVectors();
     const txVectors = await generateTxEncodingVectors();
+
+    const resultTestVector = {
+        cryptoPrimitivesTest: cryptoVectors,
+        txTest: txVectors
+    };
+
+    const testVectorJSON = JSON.stringify(resultTestVector, null, 2);
+
+    fs.writeFileSync(outputFile, testVectorJSON);
 }
 
 /**
@@ -68,8 +78,8 @@ async function generateCryptoTestVectors(): Promise<TestVector> {
         },
         outputs: {
             privateKey: utils.hexlify(privateKey),
-            pubKeyhash: utils.hexlify(pubKey),
-            signature: utils.hexlify(signature)
+            pubKeyhash: pubKey,
+            signature: signature
         }
     };
 
@@ -83,7 +93,10 @@ async function generateTxEncodingVectors(): Promise<TestVector> {
     const ethPrivateKey = generateArray(32);
     const ethSigner = new ethers.Wallet(ethPrivateKey);
     const { signer } = await zksync.Signer.fromETHSignature(ethSigner);
-    const ethMessageSigner = new zksync.EthMessageSigner(ethSigner);
+    const ethMessageSigner = new zksync.EthMessageSigner(ethSigner, {
+        verificationMethod: 'ECDSA',
+        isSignedMsgPrefixed: true
+    });
 
     const transferItem = await getTransferSignVector(ethPrivateKey, signer, ethMessageSigner);
     const changePubKeyItem = await getChangePubKeySignVector(ethPrivateKey, signer, ethMessageSigner);
@@ -108,16 +121,16 @@ async function getTransferSignVector(
         from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
         to: '0x19aa2ed8712072e918632259780e587698ef58df',
         tokenId: 0,
-        amount: '0.1',
-        fee: '0.001',
+        amount: '1000000000000',
+        fee: '1000000',
         nonce: 12
     };
     const transferSignBytes = signer.transferSignBytes(transferData);
     const transferSignature = (await signer.signSyncTransfer(transferData)).signature;
     const transferEthSignInput = {
-        stringAmount: '0.1',
+        stringAmount: '1000000000000',
         stringToken: 'ETH',
-        stringFee: '0.001',
+        stringFee: '1000000',
         to: transferData.to,
         accountId: transferData.accountId,
         nonce: transferData.nonce
@@ -127,13 +140,13 @@ async function getTransferSignVector(
 
     const transferItem = {
         inputs: {
-            type: 'transfer',
+            type: 'Transfer',
             ethPrivateKey: utils.hexlify(ethPrivateKey),
             data: transferData,
             ethSignData: transferEthSignInput
         },
         outputs: {
-            signBytes: transferSignBytes,
+            signBytes: utils.hexlify(transferSignBytes),
             signature: transferSignature,
             ethSignMessage: transferEthSignMessage,
             ethSignature: transferEthSignature.signature
@@ -153,7 +166,7 @@ async function getChangePubKeySignVector(
         account: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
         newPkHash: await signer.pubKeyHash(),
         feeTokenId: 0,
-        fee: '0.01',
+        fee: '1000000000',
         nonce: 13
     };
     const changePubKeySignBytes = signer.changePubKeySignBytes(changePubKeyData);
@@ -168,13 +181,13 @@ async function getChangePubKeySignVector(
 
     const changePubKeyItem = {
         inputs: {
-            type: 'changePubKey',
+            type: 'ChangePubKey',
             ethPrivateKey: utils.hexlify(ethPrivateKey),
             data: changePubKeyData,
             ethSignData: changePubKeyEthSignInput
         },
         outputs: {
-            signBytes: changePubKeySignBytes,
+            signBytes: utils.hexlify(changePubKeySignBytes),
             signature: changePubKeySignature,
             ethSignMessage: changePubKeyEthSignMessage,
             ethSignature: changePubKeyEthSignature.signature
@@ -194,16 +207,16 @@ async function getWithdrawSignVector(
         from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
         ethAddress: '0x19aa2ed8712072e918632259780e587698ef58df',
         tokenId: 0,
-        amount: '0.1',
-        fee: '0.001',
+        amount: '1000000000000',
+        fee: '1000000',
         nonce: 12
     };
     const withdrawSignBytes = signer.withdrawSignBytes(withdrawData);
     const withdrawSignature = (await signer.signSyncWithdraw(withdrawData)).signature;
     const withdrawEthSignInput = {
-        stringAmount: '0.1',
+        stringAmount: '1000000000000',
         stringToken: 'ETH',
-        stringFee: '0.001',
+        stringFee: '1000000',
         ethAddress: withdrawData.ethAddress,
         accountId: withdrawData.accountId,
         nonce: withdrawData.nonce
@@ -213,13 +226,13 @@ async function getWithdrawSignVector(
 
     const withdrawItem = {
         inputs: {
-            type: 'withdraw',
+            type: 'Withdraw',
             ethPrivateKey: utils.hexlify(ethPrivateKey),
             data: withdrawData,
             ethSignData: withdrawEthSignInput
         },
         outputs: {
-            signBytes: withdrawSignBytes,
+            signBytes: utils.hexlify(withdrawSignBytes),
             signature: withdrawSignature,
             ethSignMessage: withdrawEthSignMessage,
             ethSignature: withdrawEthSignature.signature
@@ -235,7 +248,7 @@ async function getForcedExitSignVector(ethPrivateKey: Uint8Array, signer: zksync
         from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
         target: '0x19aa2ed8712072e918632259780e587698ef58df',
         tokenId: 0,
-        fee: '0.001',
+        fee: '1000000',
         nonce: 12
     };
     const forcedExitSignBytes = signer.forcedExitSignBytes(forcedExitData);
@@ -243,13 +256,13 @@ async function getForcedExitSignVector(ethPrivateKey: Uint8Array, signer: zksync
 
     const forcedExitItem = {
         inputs: {
-            type: 'forcedExit',
+            type: 'ForcedExit',
             ethPrivateKey: utils.hexlify(ethPrivateKey),
             data: forcedExitData,
             ethSignData: null
         },
         outputs: {
-            signBytes: forcedExitSignBytes,
+            signBytes: utils.hexlify(forcedExitSignBytes),
             signature: forcedExitSignature,
             ethSignMessage: null,
             ethSignature: null
@@ -258,3 +271,7 @@ async function getForcedExitSignVector(ethPrivateKey: Uint8Array, signer: zksync
 
     return forcedExitItem;
 }
+
+(async () => {
+    await generateSDKTestVectors();
+})();
