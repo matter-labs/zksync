@@ -45,7 +45,8 @@
     "lint:md": "markdownlint $(find . -name '*.md' -a ! -path '*/node_modules/*')",
     "fmt:sol": "prettier --config .prettier-sol.json --write contracts/{dev-,}contracts/**/*.sol",
     "check:sol": "prettier --config .prettier-sol.json --check contracts/{dev-,}contracts/**/*.sol",
-    "lint:sol": "solhint contracts/{dev-,}contracts/**/*.sol"
+    "lint:sol": "solhint contracts/{dev-,}contracts/**/*.sol",
+    "fmt": "yarn fmt:ts && yarn fmt:md && yarn fmt:sol"
   },
   "devDependencies": {
     "markdownlint-cli": "^0.24.0",

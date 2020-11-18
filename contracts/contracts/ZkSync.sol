@@ -66,10 +66,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function initialize(bytes calldata initializationParameters) external {
         initializeReentrancyGuard();
 
-        (address _governanceAddress, address _verifierAddress, bytes32 _genesisRoot) = abi.decode(
-            initializationParameters,
-            (address, address, bytes32)
-        );
+        (address _governanceAddress, address _verifierAddress, bytes32 _genesisRoot) =
+            abi.decode(initializationParameters, (address, address, bytes32));
 
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
@@ -234,12 +232,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
 
         // Priority Queue request
-        Operations.FullExit memory op = Operations.FullExit({
-            accountId: _accountId,
-            owner: msg.sender,
-            tokenId: tokenId,
-            amount: 0 // unknown at this point
-        });
+        Operations.FullExit memory op =
+            Operations.FullExit({
+                accountId: _accountId,
+                owner: msg.sender,
+                tokenId: tokenId,
+                amount: 0 // unknown at this point
+            });
         bytes memory pubData = Operations.writeFullExitPubdata(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
 
@@ -351,8 +350,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
     function triggerExodusIfNeeded() external returns (bool) {
-        bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
-            priorityRequests[firstPriorityRequestId].expirationBlock != 0;
+        bool trigger =
+            block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
+                priorityRequests[firstPriorityRequestId].expirationBlock != 0;
         if (trigger) {
             if (!exodusMode) {
                 exodusMode = true;
@@ -414,12 +414,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         address _owner
     ) internal {
         // Priority Queue request
-        Operations.Deposit memory op = Operations.Deposit({
-            accountId: 0, // unknown at this point
-            owner: _owner,
-            tokenId: _tokenId,
-            amount: _amount
-        });
+        Operations.Deposit memory op =
+            Operations.Deposit({
+                accountId: 0, // unknown at this point
+                owner: _owner,
+                tokenId: _tokenId,
+                amount: _amount
+            });
         bytes memory pubData = Operations.writeDepositPubdata(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
 
@@ -457,13 +458,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(verifier.isBlockSizeSupported(blockChunks), "ccb11");
 
         // Create block commitment for verification proof
-        bytes32 commitment = createBlockCommitment(
-            _blockNumber,
-            _feeAccount,
-            blocks[_blockNumber - 1].stateRoot,
-            _newRoot,
-            _publicData
-        );
+        bytes32 commitment =
+            createBlockCommitment(_blockNumber, _feeAccount, blocks[_blockNumber - 1].stateRoot, _newRoot, _publicData);
 
         blocks[_blockNumber] = Block(
             uint32(block.number), // committed at
@@ -558,10 +554,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
                     pubDataPtr += DEPOSIT_BYTES;
                 } else if (opType == Operations.OpType.PartialExit) {
-                    Operations.PartialExit memory data = Operations.readPartialExitPubdata(
-                        _publicData,
-                        pubdataOffset + 1
-                    );
+                    Operations.PartialExit memory data =
+                        Operations.readPartialExitPubdata(_publicData, pubdataOffset + 1);
 
                     bool addToPendingWithdrawalsQueue = true;
                     withdrawalsDataHash = keccak256(
@@ -576,10 +570,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
                     pubDataPtr += PARTIAL_EXIT_BYTES;
                 } else if (opType == Operations.OpType.ForcedExit) {
-                    Operations.ForcedExit memory data = Operations.readForcedExitPubdata(
-                        _publicData,
-                        pubdataOffset + 1
-                    );
+                    Operations.ForcedExit memory data =
+                        Operations.readForcedExitPubdata(_publicData, pubdataOffset + 1);
 
                     bool addToPendingWithdrawalsQueue = true;
                     withdrawalsDataHash = keccak256(
@@ -617,25 +609,25 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     pubDataPtr += FULL_EXIT_BYTES;
                 } else if (opType == Operations.OpType.ChangePubKey) {
                     require(processedOperationsRequiringEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
-                    Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(
-                        _publicData,
-                        pubdataOffset + 1
-                    );
+                    Operations.ChangePubKey memory op =
+                        Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
 
                     if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
-                        bytes memory currentEthWitness = Bytes.slice(
-                            _ethWitness,
-                            ethWitnessOffset,
-                            _ethWitnessSizes[processedOperationsRequiringEthWitness]
-                        );
+                        bytes memory currentEthWitness =
+                            Bytes.slice(
+                                _ethWitness,
+                                ethWitnessOffset,
+                                _ethWitnessSizes[processedOperationsRequiringEthWitness]
+                            );
 
-                        bool valid = verifyChangePubkeySignature(
-                            currentEthWitness,
-                            op.pubKeyHash,
-                            op.nonce,
-                            op.owner,
-                            op.accountId
-                        );
+                        bool valid =
+                            verifyChangePubkeySignature(
+                                currentEthWitness,
+                                op.pubKeyHash,
+                                op.nonce,
+                                op.owner,
+                                op.accountId
+                            );
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
                         bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
@@ -672,19 +664,20 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         address _ethAddress,
         uint32 _accountId
     ) internal pure returns (bool) {
-        bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n152",
-            "Register zkSync pubkey:\n\n",
-            Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
-            "\n",
-            "nonce: 0x",
-            Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
-            "\n",
-            "account id: 0x",
-            Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
-            "\n\n",
-            "Only sign this message for a trusted client!"
-        );
+        bytes memory signedMessage =
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n152",
+                "Register zkSync pubkey:\n\n",
+                Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
+                "\n",
+                "nonce: 0x",
+                Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
+                "\n",
+                "account id: 0x",
+                Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
+                "\n\n",
+                "Only sign this message for a trusted client!"
+            );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;
     }
@@ -763,8 +756,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint offset = 0;
         uint32 localNumberOfPendingWithdrawals = numberOfPendingWithdrawals;
         while (offset < withdrawalsData.length) {
-            (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations
-                .readWithdrawalData(withdrawalsData, offset);
+            (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) =
+                Operations.readWithdrawalData(withdrawalsData, offset);
             bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
 
             uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;

@@ -17,9 +17,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @param targetInitializationParameters Target initialization parameters
     constructor(address target, bytes memory targetInitializationParameters) public Ownable(msg.sender) {
         setTarget(target);
-        (bool initializationSuccess, ) = getTarget().delegatecall(
-            abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters)
-        );
+        (bool initializationSuccess, ) =
+            getTarget().delegatecall(abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters));
         require(initializationSuccess, "uin11"); // uin11 - target initialization failed
     }
 
@@ -58,9 +57,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
         requireMaster(msg.sender);
 
         setTarget(newTarget);
-        (bool upgradeSuccess, ) = getTarget().delegatecall(
-            abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters)
-        );
+        (bool upgradeSuccess, ) =
+            getTarget().delegatecall(abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters));
         require(upgradeSuccess, "ufu11"); // ufu11 - target upgrade failed
     }
 
