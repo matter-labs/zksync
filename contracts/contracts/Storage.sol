@@ -24,10 +24,10 @@ contract Storage {
     uint public upgradePreparationActivationTime;
 
     /// @dev Verifier contract. Used to verify block proof and exit proof
-    Verifier internal verifier;
+    Verifier public verifier;
 
     /// @dev Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
-    Governance internal governance;
+    Governance public governance;
 
     struct BalanceToWithdraw {
         uint128 balanceToWithdraw;
@@ -37,16 +37,14 @@ contract Storage {
     /// @notice Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
     mapping(bytes22 => BalanceToWithdraw) public balancesToWithdraw;
 
-    /// @notice verified withdrawal pending to be executed.
-    struct PendingWithdrawal {
+    // @dev Pending withdrawals are not used in this version
+    struct PendingWithdrawal_DEPRECATED {
         address to;
         uint16 tokenId;
     }
-    
-    /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index in pending withdrawals queue)
-    mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
-    uint32 public firstPendingWithdrawalIndex;
-    uint32 public numberOfPendingWithdrawals;
+    mapping(uint32 => PendingWithdrawal_DEPRECATED) public pendingWithdrawals_DEPRECATED;
+    uint32 public firstPendingWithdrawalIndex_DEPRECATED;
+    uint32 public numberOfPendingWithdrawals_DEPRECATED;
 
     /// @notice Total number of verified blocks i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;
@@ -54,7 +52,7 @@ contract Storage {
     /// @notice Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
     uint32 public totalBlocksCommitted;
 
-    /// @notice Rollup block data (once per block)
+    /// @Old rollup block stored data - not used in current version
     /// @member validator Block producer
     /// @member committedAtBlock ETH block number at which this block was committed
     /// @member cumulativeOnchainOperations Total number of operations in this and all previous blocks
@@ -63,7 +61,7 @@ contract Storage {
     /// @member stateRoot New tree root hash
     ///
     /// Consider memory alignment when changing field order: https://solidity.readthedocs.io/en/v0.4.21/miscellaneous.html
-    struct Block {
+    struct Block_DEPRECATED {
         uint32 committedAtBlock;
         uint64 priorityOperations;
         uint32 chunks;
@@ -71,9 +69,7 @@ contract Storage {
         bytes32 commitment;
         bytes32 stateRoot;
     }
-
-    /// @notice Blocks by Franklin block id
-    mapping(uint32 => Block) public blocks;
+    mapping(uint32 => Block_DEPRECATED) public blocks_DEPRECATED;
 
     /// @notice Onchain operations - operations processed inside rollup blocks
     /// @member opType Onchain operation type
@@ -129,7 +125,7 @@ contract Storage {
         return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
 
-    /// @notice Block info stored hashed in contract storage
+    /// @Rollup block stored data - not used in current version
     struct StoredBlockInfo {
         uint32 blockNumber;
         uint64 priorityOperations;

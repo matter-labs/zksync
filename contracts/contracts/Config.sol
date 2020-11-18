@@ -83,7 +83,7 @@ contract Config {
     uint constant UPGRADE_NOTICE_PERIOD = MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
 
     /// @dev Timestamp - seconds since unix epoch
-    uint constant COMMIT_TIMESTAMP_NOT_OLDER = 2 hours;
+    uint constant COMMIT_TIMESTAMP_NOT_OLDER = 8 hours;
 
     /// @dev Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
     /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)
