@@ -4,7 +4,7 @@ use std::{env, net::SocketAddr, str::FromStr, time::Duration};
 use url::Url;
 // Workspace uses
 use zksync_basic_types::{H160, H256};
-use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
+use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_port, parse_env_with};
 // Local uses
 
 pub mod test_config;
@@ -76,7 +76,7 @@ impl AdminServerOptions {
     pub fn from_env() -> Self {
         Self {
             admin_http_server_url: parse_env("ADMIN_SERVER_API_URL"),
-            admin_http_server_address: parse_env("ADMIN_SERVER_API_BIND"),
+            admin_http_server_address: parse_env_port("ADMIN_SERVER_API_PORT"),
             secret_auth: parse_env("SECRET_AUTH"),
         }
     }
@@ -187,10 +187,10 @@ impl ConfigurationOptions {
         }
 
         Self {
-            rest_api_server_address: parse_env("REST_API_BIND"),
-            json_rpc_http_server_address: parse_env("HTTP_RPC_API_BIND"),
-            json_rpc_ws_server_address: parse_env("WS_API_BIND"),
-            core_server_address: parse_env("PRIVATE_CORE_SERVER_BIND"),
+            rest_api_server_address: parse_env_port("REST_API_PORT"),
+            json_rpc_http_server_address: parse_env_port("HTTP_RPC_API_PORT"),
+            json_rpc_ws_server_address: parse_env_port("WS_API_PORT"),
+            core_server_address: parse_env_port("PRIVATE_CORE_SERVER_PORT"),
             core_server_url: parse_env("PRIVATE_CORE_SERVER_URL"),
             web3_url: get_env("WEB3_URL"),
             genesis_tx_hash: parse_env_with("GENESIS_TX_HASH", |s| &s[2..]),
@@ -201,7 +201,7 @@ impl ConfigurationOptions {
             operator_private_key: parse_env_if_exists("OPERATOR_PRIVATE_KEY"),
             chain_id: parse_env("CHAIN_ID"),
             gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
-            prover_server_address: parse_env("PROVER_SERVER_BIND"),
+            prover_server_address: parse_env_port("PROVER_SERVER_PORT"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
             available_block_chunk_sizes,

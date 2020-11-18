@@ -259,7 +259,7 @@ describe('Config Management', () => {
 });
 
 describe('Making Transactions', () => {
-    const rich = ethers.Wallet.fromMnemonic(contractsTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0");
+    const rich = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0");
     const poor1 = ethers.Wallet.createRandom();
     const poor2 = ethers.Wallet.createRandom();
 

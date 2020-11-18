@@ -47,3 +47,14 @@ where
         })
         .ok()
 }
+
+/// TODO: make comments
+pub fn parse_env_port<F>(name: &str) -> F
+where
+    F: FromStr,
+    F::Err: std::fmt::Debug,
+{
+    format!("0.0.0.0:{}", get_env(name))
+        .parse::<F>()
+        .expect("Cant get address from port")
+}
