@@ -103,5 +103,5 @@ There is three **phases of upgrade** which described in UpgradeGatekeeper:
 
 `Franklin` decides that the upgrade can be completed if the next condition satisfied: exodus mode is not activated.
 
-`UPGRADE_NOTICE_PERIOD` calculates by the next **formula**:
+`UPGRADE_NOTICE_PERIOD` calculates by the following **formula**:
 `UPGRADE_NOTICE_PERIOD = MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT`.

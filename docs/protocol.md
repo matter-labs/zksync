@@ -116,21 +116,22 @@ This includes, in particular, the following claims:
 
 ### Data types
 
-| Type               | Byte len | Encoding                      | Comment                                                                                                                                                                                                                                                                                                              |
-| ------------------ | -------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AccountId          | 4        | BE integer                    | Incremented number of accounts in Rollup. New account will have the next free id. Max value is 2^32 - 1 = 4.294967295 × 10^9                                                                                                                                                                                         |
-| TokenId            | 2        | BE integer                    | Incremented number of tokens in Rollup, max value is 65535                                                                                                                                                                                                                                                           |
-| PackedTxAmount     | 5        | [Parameters](#amount-packing) | Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa _10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368_ 10^31, providing 10 full decimal digit precision.                               |
-| PackedFee          | 2        | [Parameters](#amount-packing) | Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.                                                                                                                                                                                                                               |
-| StateAmount        | 16       | BE integer                    | State amount is represented as uint128 with a range from 0 to ~3.4 _10^38. It allows to represent up to 3.4_ 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.                                                                                                    |
-| Nonce              | 4        | BE integer                    | Nonce is the total number of executed transactions of the account. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur. |
-| RollupPubkeyHash   | 20       | LE integer                    | To make a public key hash from a Rollup public key apply [Rescue hash function](#rescue-hash) to the `[x,y]` points of the key and then take the last 20 bytes of the result.                                                                                                                                        |
-| EthAddress         | 20       | LE integer                    | To make an Ethereum address from the Etherum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.                                                                                                                                          |
-| PackedRollupPubkey | 32       | LE integer                    | A Rollup public key is the first 32 bytes of a Rollup public key                                                                                                                                                                                                                                                     |
-| TxHash             | 32       | LE integer                    | To get hash for transaction apply [SHA256 function](#sha256) to concatenated bytes of [transaction fields](#zk-sync-operations)                                                                                                                                                                                      |
-| Signature          | 64       | LE integer                    | Read [transaction signature](#transaction-signature)                                                                                                                                                                                                                                                                 |
-| BlockNumber        | 4        | BE integer                    | Incremented number of Rollup blocks, max number is 4294967295                                                                                                                                                                                                                                                        |
-| RootHash           | 32       | LE integer                    | [Merkle tree root hash](#sparse-merkle-tree)                                                                                                                                                                                                                                                                         |
+<!-- prettier-ignore -->
+|Type|Byte len|Encoding|Comment|
+|--|--|--|--|
+|AccountId|4|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 2^32 - 1 = 4.294967295 × 10^9|
+|TokenId|2|BE integer|Incremented number of tokens in Rollup, max value is 65535|
+|PackedTxAmount|5|[Parameters](#amount-packing)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa × 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 × 10^31, providing 10 full decimal digit precision.|
+|PackedFee|2|[Parameters](#amount-packing)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|
+|StateAmount|16|BE integer|State amount is represented as uint128 with a range from 0 to ~3.4 × 10^38. It allows to represent up to 3.4 × 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
+|Nonce|4|BE integer|Nonce is the total number of executed transactions of the account. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur.|
+|RollupPubkeyHash|20|LE integer|To make a public key hash from a Rollup public key apply [Rescue hash function](#rescue-hash) to the `[x,y]` points of the key and then take the last 20 bytes of the result.|
+|EthAddress|20|LE integer|To make an Ethereum address from the Etherum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
+|PackedRollupPubkey|32|LE integer|A Rollup public key is the first 32 bytes of a Rollup public key |
+|TxHash|32|LE integer|To get hash for transaction apply [SHA256 function](#sha256) to concatenated bytes of [transaction fields](#zk-sync-operations)|
+|Signature|64|LE integer|Read [transaction signature](#transaction-signature)|
+|BlockNumber|4|BE integer|Incremented number of Rollup blocks, max number is 4294967295|
+|RootHash|32|LE integer|[Merkle tree root hash](#sparse-merkle-tree)|
 
 ### Amount packing
 
@@ -1183,7 +1184,7 @@ Deposit Ether to Rollup - transfer Ether from user L1 address into Rollup addres
 depositETH(address _rollupAddr)
 ```
 
-- \_rollupAddr: The receiver Layer 2 address
+- `_rollupAddr`: The receiver Layer 2 address
 
 msg.value equals amount to deposit.
 
@@ -1195,9 +1196,9 @@ Deposit ERC-20 token to Rollup - transfer token from user L1 address into Rollup
 depositERC20(IERC20 _token, uint104 _amount, address _rollupAddr) payable
 ```
 
-- \_token: Token address in L1 chain
-- \_amount: Amount to deposit
-- \_rollupAddr: The receiver Rollup address
+- `_token`: Token address in L1 chain
+- `_amount`: Amount to deposit
+- `_rollupAddr`: The receiver Rollup address
 
 #### Withdraw Ether
 
@@ -1207,7 +1208,7 @@ Withdraw ETH to L1 - register withdrawal and transfer ether from contract to msg
 withdrawETH(uint128 _amount)
 ```
 
-- \_amount: Amount to withdraw
+- `_amount`: Amount to withdraw
 
 #### Withdraw ERC-20 token
 
@@ -1217,8 +1218,8 @@ Withdraw ERC20 token to L1 - register withdrawal and transfer token from contrac
 withdrawERC20(IERC20 _token, uint128 _amount)
 ```
 
-- \_token: Token address in L1 chain
-- \_amount: Amount to withdraw
+- `_token`: Token address in L1 chain
+- `_amount`: Amount to withdraw
 
 #### Authenticate rollup public key change
 
@@ -1228,8 +1229,8 @@ Authenticates pubkey hash change for new rollup public key.
 function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
 ```
 
-- \_pubkey_hash: `RollupPubkeyHash`
-- \_nonce: Account nonce for which this pubkey change is authorized.
+- `_pubkey_hash`: `RollupPubkeyHash`
+- `_nonce`: Account nonce for which this pubkey change is authorized.
 
 #### Censorship resistance
 
@@ -1243,8 +1244,8 @@ fullExit (
 )
 ```
 
-- \_accountId: `AccountId` of the Rollup account
-- \_token: Token address in L1 chain
+- `_accountId`: `AccountId` of the Rollup account
+- `_token`: Token address in L1 chain
 
 #### Exodus mode
 
@@ -1260,10 +1261,10 @@ exit(
     uint256[] calldata _proof)
 ```
 
-- \_accountId: `AccountId` of the owner account.
-- \_tokenId: Verified token id
-- \_amount: `StateAmount` full amount of the given token that belong to `AccountId` in the last verified block.
-- \_proof: Proof that user funds are present in the account tree
+- `_accountId`: `AccountId` of the owner account.
+- `_tokenId`: Verified token id
+- `_amount`: `StateAmount` full amount of the given token that belong to `AccountId` in the last verified block.
+- `_proof`: Proof that user funds are present in the account tree
 
 ##### Cancel outstanding deposits
 
@@ -1273,7 +1274,7 @@ Cancels open priority requests, accrues users balances from deposit priority req
 cancelOutstandingDepositsForExodusMode(uint64 _number)
 ```
 
-- \_number: Supposed number of requests to cancel (if there are less request than provided number - will be canceled
+- `_number`: Supposed number of requests to cancel (if there are less request than provided number - will be canceled
   exact number of requests)
 
 #### Rollup Operations
@@ -1294,13 +1295,13 @@ commitBlock(
 )
 ```
 
-- \_blockNumber: `BlockNumber`
-- \_feeAccount: `AccountId` to collect fees
-- \_newRoot: New tree root `RootHash`
-- \_publicData: Operations pubdata
-- \_ethWitness - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g
+- `_blockNumber`: `BlockNumber`
+- `_feeAccount`: `AccountId` to collect fees
+- `_newRoot`: New tree root `RootHash`
+- `_publicData`: Operations pubdata
+- `_ethWitness` - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g
   ETH signatures for pubkey change verification).
-- \_ethWitnessSizes - number of bytes from \_ethWitness that is used for each onchain operation that needs them.
+- `_ethWitnessSizes` - number of bytes from `_ethWitness` that is used for each onchain operation that needs them.
 
 ##### Verify block
 
@@ -1310,9 +1311,9 @@ Submit verified block proof. Only active validator can make it. This block oncha
 verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
 ```
 
-- \_blockNumber: Block number
-- \_proof Block proof
-- \_withdrawalsData Withdrawals data
+- `_blockNumber`: Block number
+- `_proof` Block proof
+- `_withdrawalsData` Withdrawals data
 
 #### Exodus mode trigger
 
@@ -1331,7 +1332,7 @@ Revert blocks that were not verified before deadline determined by `EXPECT_VERIF
 revertBlocks(uint32 _maxBlocksToRevert)
 ```
 
-- \_maxBlocksToRevert: revert up to that number of the unverified and expired blocks.
+- `_maxBlocksToRevert`: revert up to that number of the unverified and expired blocks.
 
 ### Governance contract
 
@@ -1343,7 +1344,7 @@ Change current governor. The caller must be current governor.
 changeGovernor(address _newGovernor)
 ```
 
-- \_newGovernor: Address of the new governor
+- `_newGovernor`: Address of the new governor
 
 #### Add token
 
@@ -1353,7 +1354,7 @@ Add token to the list of networks tokens. The caller must be current governor.
 addToken(address _token)
 ```
 
-- \_token: Token address
+- `_token`: Token address
 
 #### Set validator
 
@@ -1363,8 +1364,8 @@ Change validator status (active or not active). The caller must be current gover
 setValidator(address _validator, bool _active)
 ```
 
-- \_validator: Validator address
-- \_active: Active flag
+- `_validator`: Validator address
+- `_active`: Active flag
 
 #### Check for governor
 
@@ -1374,7 +1375,7 @@ Validate that specified address is the governor address
 requireGovernor(address _address)
 ```
 
-- \_address: Address to check
+- `_address`: Address to check
 
 #### Check for active validator
 
@@ -1384,7 +1385,7 @@ Validate that specified address is the active validator
 requireActiveValidator(address _address)
 ```
 
-- \_address: Address to check
+- `_address`: Address to check
 
 #### Check that token id is valid
 
@@ -1394,7 +1395,7 @@ Validate token id (must be less than total tokens amount).
 isValidTokenId(uint16 _tokenId) returns (bool)
 ```
 
-- \_tokenId: Token id
+- `_tokenId`: Token id
 
 Returns: bool flag that indicates if token id is less than total tokens amount.
 
@@ -1406,7 +1407,7 @@ Validate token address (it must be presented in tokens list).
 validateTokenAddress(address _tokenAddr) returns (uint16)
 ```
 
-- \_tokenAddr: Token address
+- `_tokenAddr`: Token address
 
 Returns: token id.
 

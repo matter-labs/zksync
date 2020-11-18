@@ -79,7 +79,9 @@ Pub data is chosen in the way that you have all information needed to reconstruc
 Public data is represented by a byte string with concatenated pub data of the transaction. Each pub data set is prefixed
 with a single byte of the type of operation.
 
+```
 |tx1_optype|tx1_pub_data|tx2_optype|tx2_pub_data|...
+```
 
 Public data of each operation is padded to the maximum pub data size of the circuit.
 
