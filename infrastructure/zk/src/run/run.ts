@@ -27,7 +27,7 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
-    await utils.spawn('yarn zksync build');
+    await utils.spawn('yarn zksync prepublish');
 }
 
 export async function deployTestkit(genesisRoot: string, prodContracts: boolean = false) {
