@@ -29,6 +29,7 @@ contract Storage {
     /// @dev Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance public governance;
 
+    uint8 constant FILLED_GAS_RESERVE_VALUE = 0xff; // we use it to set gas revert value so slot will not be emptied with 0 balance
     struct BalanceToWithdraw {
         uint128 balanceToWithdraw;
         uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
@@ -126,23 +127,29 @@ contract Storage {
     }
 
     /// @Rollup block stored data - not used in current version
+    /// @member blockNumber Rollup block number
+    /// @member priorityOperations Number of priority operations processed
+    /// @member pendingOnchainOperationsHash Hash of all operations that must be processed after verify
+    /// @member timestamp Rollup block timestamp, have the same format as Ethereum block constant
+    /// @member stateHash Root hash of the rollup state
+    /// @member commitment Verified input for the zkSync circuit
     struct StoredBlockInfo {
         uint32 blockNumber;
         uint64 priorityOperations;
-        bytes32 processableOnchainOperationsHash;
+        bytes32 pendingOnchainOperationsHash;
         uint256 timestamp;
         bytes32 stateHash;
         bytes32 commitment;
     }
 
-    /// @notice Hash StoredBlockInfo
+    /// @notice Returns the keccak hash of the ABI-encoded StoredBlockInfo
     function hashStoredBlockInfo(StoredBlockInfo memory _storedBlockInfo) internal pure returns (bytes32) {
         return keccak256(abi.encode(_storedBlockInfo));
     }
 
     /// @notice Stored hashed StoredBlockInfo for some block number
-    mapping(uint32 => bytes32) public hashedBlocks;
+    mapping(uint32 => bytes32) public storedBlockHashes;
 
     /// @notice Stores verified commitments hashed in one slot.
-    mapping(bytes32 => bool) public hashedVerifiedCommitments;
+    mapping(bytes32 => bool) public verifiedCommitmentHashes;
 }

@@ -154,7 +154,7 @@ library Operations {
         returns (PartialExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES;                   // opType + accountId (ignored)
+        uint offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES;             // opType + accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES;                                        // fee (ignored)
@@ -177,7 +177,7 @@ library Operations {
         returns (ForcedExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES * 2;               // opType + initiatorAccountId + targetAccountId (ignored)
+        uint offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES * 2;         // opType + initiatorAccountId + targetAccountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES;                                        // fee (ignored)

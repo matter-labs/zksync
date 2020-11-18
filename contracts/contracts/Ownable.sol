@@ -23,7 +23,7 @@ contract Ownable {
     }
 
     /// @notice Returns contract masters address
-    /// @return master Masters address
+    /// @return master Master's address
     function getMaster() public view returns (address master) {
         bytes32 position = masterPosition;
         assembly {
@@ -32,7 +32,7 @@ contract Ownable {
     }
 
     /// @dev Sets new masters address
-    /// @param _newMaster New masters address
+    /// @param _newMaster New master's address
     function setMaster(address _newMaster) internal {
         bytes32 position = masterPosition;
         assembly {
