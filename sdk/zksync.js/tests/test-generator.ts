@@ -10,9 +10,50 @@ export interface TestVectorEntry {
     outputs: any;
 }
 
-export interface TestVector {
+export interface CryptoPrimitivesTestEntry extends TestVectorEntry {
+    inputs: {
+        // Seed to generate private key.
+        seed: string;
+        // Message to be signed.
+        message: string;
+    };
+    outputs: {
+        // Private key to be obtained from seed.
+        privateKey: string;
+        // Hash of a public key corresponding to the generated private key.
+        pubKeyHash: string;
+        // Signature obtained using private key and message.
+        signature: string;
+    };
+}
+
+export interface TxTestEntry extends TestVectorEntry {
+    inputs: {
+        // Type of transaction. Valid values are: `Transfer`, `Withdraw`, `ChangePubKey`, `ForcedExit`.
+        type: string;
+        // Ethereum private key. zkSync private key should be derived from it.
+        ethPrivateKey: string;
+        // Transaction-specific input.
+        data: any;
+        // Transactin-specific input to generate Ethereum signature.
+        // Can be `null` if Ethereum signature is not required for transaction
+        ethSignData?: any;
+    };
+    outputs: {
+        // Encoded transaction bytes to be used for signing.
+        signBytes: string;
+        // Transaction zkSync signature.
+        signature: zksync.types.Signature;
+        // Message to be used to provie Ethereum signature. `null` if `inputs.ethSignData` is `null`.
+        ethSignMessage?: string;
+        // Ethereum signature for a transaction. `null` if `inputs.ethSignData` is `null`.
+        ethSignature?: string;
+    };
+}
+
+export interface TestVector<T> {
     description: string;
-    items: TestVectorEntry[];
+    items: T[];
 }
 
 export async function generateSDKTestVectors(outputFile: string = 'test_vectors.json') {
@@ -44,27 +85,8 @@ function generateArray(length: number): Uint8Array {
 /**
  * Returns the test vector to generate cryptographic primitives.
  * All the data fields are represented in a hexadecimal form.
- *
- * Output format:
- *
- * ```js
- * {
- *   "description": string, // Description of test vector
- *   {
- *     "inputs": {
- *       "seed": string, // Seed to generate private key.
- *       "message": string // M>essage to be signed.
- *     },
- *     "outputs": {
- *        "privateKey": string, // Private key to be obtained from seed.
- *        "pubKeyHash": string, // Hash of a public key corresponding to the generated private key.
- *        "signature": string // Signature obtained using private key and message.
- *     }
- *   }[]
- * }
- * ```
  */
-async function generateCryptoTestVectors(): Promise<TestVector> {
+async function generateCryptoTestVectors(): Promise<TestVector<CryptoPrimitivesTestEntry>> {
     const seed = generateArray(32);
     const bytesToSign = generateArray(64);
 
@@ -78,7 +100,7 @@ async function generateCryptoTestVectors(): Promise<TestVector> {
         },
         outputs: {
             privateKey: utils.hexlify(privateKey),
-            pubKeyhash: pubKey,
+            pubKeyHash: pubKey,
             signature: signature
         }
     };
@@ -89,7 +111,12 @@ async function generateCryptoTestVectors(): Promise<TestVector> {
     };
 }
 
-async function generateTxEncodingVectors(): Promise<TestVector> {
+/**
+ * Returns the test vector containing the transaction input data and the outputs: encoded transaction bytes,
+ * message for Ethereum signature, and both zkSync and Ethereum signatures.
+ * All the byte array data fields are represented in a hexadecimal form.
+ */
+async function generateTxEncodingVectors(): Promise<TestVector<TxTestEntry>> {
     const ethPrivateKey = generateArray(32);
     const ethSigner = new ethers.Wallet(ethPrivateKey);
     const { signer } = await zksync.Signer.fromETHSignature(ethSigner);
@@ -115,7 +142,7 @@ async function getTransferSignVector(
     ethPrivateKey: Uint8Array,
     signer: zksync.Signer,
     ethMessageSigner: zksync.EthMessageSigner
-): Promise<TestVectorEntry> {
+): Promise<TxTestEntry> {
     const transferData = {
         accountId: 44,
         from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
@@ -160,7 +187,7 @@ async function getChangePubKeySignVector(
     ethPrivateKey: Uint8Array,
     signer: zksync.Signer,
     ethMessageSigner: zksync.EthMessageSigner
-): Promise<TestVectorEntry> {
+): Promise<TxTestEntry> {
     const changePubKeyData = {
         accountId: 55,
         account: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
@@ -201,7 +228,7 @@ async function getWithdrawSignVector(
     ethPrivateKey: Uint8Array,
     signer: zksync.Signer,
     ethMessageSigner: zksync.EthMessageSigner
-): Promise<TestVectorEntry> {
+): Promise<TxTestEntry> {
     const withdrawData = {
         accountId: 44,
         from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
@@ -242,7 +269,7 @@ async function getWithdrawSignVector(
     return withdrawItem;
 }
 
-async function getForcedExitSignVector(ethPrivateKey: Uint8Array, signer: zksync.Signer): Promise<TestVectorEntry> {
+async function getForcedExitSignVector(ethPrivateKey: Uint8Array, signer: zksync.Signer): Promise<TxTestEntry> {
     const forcedExitData = {
         initiatorAccountId: 44,
         from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
