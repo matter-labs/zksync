@@ -8,7 +8,7 @@ import { deployContract } from "ethereum-waffle";
 import * as fs from "fs";
 import * as path from "path";
 
-const testConfigPath = path.join(process.env.ZKSYNC_HOME, `etc/test_config/constant`);
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const EIP1271TestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eip1271.json`, { encoding: "utf-8" }));
 const contractsTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/contracts.json`, { encoding: "utf-8" }));
 
@@ -22,7 +22,7 @@ const contractsTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/contra
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
         provider.pollingInterval = 10;
 
-        const deployWallet = ethers.Wallet.fromMnemonic(contractsTestConfig.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(
+        const deployWallet = ethers.Wallet.fromMnemonic(contractsTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(
             provider
         );
         const smartWallet = await deployContract(
