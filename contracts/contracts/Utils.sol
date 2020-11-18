@@ -24,7 +24,7 @@ library Utils {
     function sendERC20(
         IERC20 _token,
         address _to,
-        uint _amount
+        uint256 _amount
     ) internal returns (bool) {
         (bool callSuccess, bytes memory callReturnValueEncoded) =
             address(_token).call(abi.encodeWithSignature("transfer(address,uint256)", _to, _amount));
@@ -45,7 +45,7 @@ library Utils {
         IERC20 _token,
         address _from,
         address _to,
-        uint _amount
+        uint256 _amount
     ) internal returns (bool) {
         (bool callSuccess, bytes memory callReturnValueEncoded) =
             address(_token).call(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _amount));
@@ -58,9 +58,9 @@ library Utils {
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @return bool flag indicating that transfer is successful
-    function sendETHNoRevert(address payable _to, uint _amount) internal returns (bool) {
+    function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
         // TODO: Use constant from Config
-        uint ETH_WITHDRAWAL_GAS_LIMIT = 10000;
+        uint256 ETH_WITHDRAWAL_GAS_LIMIT = 10000;
 
         (bool callSuccess, ) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
         return callSuccess;
@@ -79,7 +79,7 @@ library Utils {
 
         bytes32 signR;
         bytes32 signS;
-        uint offset = 0;
+        uint256 offset = 0;
 
         (offset, signR) = Bytes.readBytes32(_signature, offset);
         (offset, signS) = Bytes.readBytes32(_signature, offset);

@@ -4,5 +4,5 @@
   "useTabs": false,
   "singleQuote": false,
   "bracketSpacing": false,
-  "explicitTypes": "never"
+  "explicitTypes": "always"
 }

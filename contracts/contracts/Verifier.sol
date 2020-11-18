@@ -21,21 +21,21 @@ contract Verifier is KeysWithPlonkVerifier {
     }
 
     function verifyBlockProof(
-        uint[] calldata _proof,
+        uint256[] calldata _proof,
         bytes32 _commitment,
         uint32 _chunks
     ) external view returns (bool) {
         if (DUMMY_VERIFIER) {
-            uint oldGasValue = gasleft();
-            uint tmp;
+            uint256 oldGasValue = gasleft();
+            uint256 tmp;
             while (gasleft() + 470000 > oldGasValue) {
                 tmp += 1;
             }
             return true;
         }
-        uint[] memory inputs = new uint[](1);
-        uint mask = (~uint(0)) >> 3;
-        inputs[0] = uint(_commitment) & mask;
+        uint256[] memory inputs = new uint256[](1);
+        uint256 mask = (~uint256(0)) >> 3;
+        inputs[0] = uint256(_commitment) & mask;
         Proof memory proof = deserialize_proof(inputs, _proof);
         VerificationKey memory vk = getVkBlock(_chunks);
         require(vk.num_inputs == inputs.length);
@@ -48,13 +48,13 @@ contract Verifier is KeysWithPlonkVerifier {
         address _owner,
         uint16 _tokenId,
         uint128 _amount,
-        uint[] calldata _proof
+        uint256[] calldata _proof
     ) external view returns (bool) {
         bytes32 commitment = sha256(abi.encodePacked(_rootHash, _accountId, _owner, _tokenId, _amount));
 
-        uint[] memory inputs = new uint[](1);
-        uint mask = (~uint(0)) >> 3;
-        inputs[0] = uint(commitment) & mask;
+        uint256[] memory inputs = new uint256[](1);
+        uint256 mask = (~uint256(0)) >> 3;
+        inputs[0] = uint256(commitment) & mask;
         Proof memory proof = deserialize_proof(inputs, _proof);
         VerificationKey memory vk = getVkExit();
         require(vk.num_inputs == inputs.length);

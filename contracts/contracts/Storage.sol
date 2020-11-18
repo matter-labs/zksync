@@ -15,7 +15,7 @@ contract Storage {
 
     /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint public upgradePreparationActivationTime;
+    uint256 public upgradePreparationActivationTime;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;
@@ -95,7 +95,7 @@ contract Storage {
     struct PriorityOperation {
         Operations.OpType opType;
         bytes pubData;
-        uint expirationBlock;
+        uint256 expirationBlock;
     }
 
     /// @notice Priority Requests mapping (request id - operation)

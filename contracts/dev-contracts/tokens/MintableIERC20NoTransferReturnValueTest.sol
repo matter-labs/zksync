@@ -5,17 +5,17 @@ pragma solidity ^0.5.8;
  * the optional functions; to access them see {ERC20Detailed}.
  */
 interface MintableIERC20NoTransferReturnValueTest {
-    function mint(address to, uint amount) external;
+    function mint(address to, uint256 amount) external;
 
     /**
      * @dev Returns the amount of tokens in existence.
      */
-    function totalSupply() external view returns (uint);
+    function totalSupply() external view returns (uint256);
 
     /**
      * @dev Returns the amount of tokens owned by `account`.
      */
-    function balanceOf(address account) external view returns (uint);
+    function balanceOf(address account) external view returns (uint256);
 
     /**
      * @dev Moves `amount` tokens from the caller's account to `recipient`.
@@ -24,7 +24,7 @@ interface MintableIERC20NoTransferReturnValueTest {
      *
      * Emits a {Transfer} event.
      */
-    function transfer(address recipient, uint amount) external;
+    function transfer(address recipient, uint256 amount) external;
 
     /**
      * @dev Returns the remaining number of tokens that `spender` will be
@@ -33,7 +33,7 @@ interface MintableIERC20NoTransferReturnValueTest {
      *
      * This value changes when {approve} or {transferFrom} are called.
      */
-    function allowance(address owner, address spender) external view returns (uint);
+    function allowance(address owner, address spender) external view returns (uint256);
 
     /**
      * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
@@ -49,7 +49,7 @@ interface MintableIERC20NoTransferReturnValueTest {
      *
      * Emits an {Approval} event.
      */
-    function approve(address spender, uint amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
 
     /**
      * @dev Moves `amount` tokens from `sender` to `recipient` using the
@@ -63,7 +63,7 @@ interface MintableIERC20NoTransferReturnValueTest {
     function transferFrom(
         address sender,
         address recipient,
-        uint amount
+        uint256 amount
     ) external;
 
     /**
@@ -72,11 +72,11 @@ interface MintableIERC20NoTransferReturnValueTest {
      *
      * Note that `value` may be zero.
      */
-    event Transfer(address indexed from, address indexed to, uint value);
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
     /**
      * @dev Emitted when the allowance of a `spender` for an `owner` is set by
      * a call to {approve}. `value` is the new allowance.
      */
-    event Approval(address indexed owner, address indexed spender, uint value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 }

@@ -18,7 +18,7 @@ import "./UpgradeableMaster.sol";
 /// @title zkSync main contract
 /// @author Matter Labs
 contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
-    using SafeMath for uint;
+    using SafeMath for uint256;
     using SafeMathUInt128 for uint128;
 
     bytes32 public constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
@@ -26,7 +26,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     // Upgrade functional
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function getNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -93,10 +93,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     ) external returns (uint128 withdrawnAmount) {
         require(msg.sender == address(this), "wtg10"); // wtg10 - can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
 
-        uint balance_before = _token.balanceOf(address(this));
+        uint256 balance_before = _token.balanceOf(address(this));
         require(Utils.sendERC20(_token, _to, _amount), "wtg11"); // wtg11 - ERC20 transfer fails
-        uint balance_after = _token.balanceOf(address(this));
-        uint balance_diff = balance_before.sub(balance_after);
+        uint256 balance_after = _token.balanceOf(address(this));
+        uint256 balance_diff = balance_before.sub(balance_after);
         require(balance_diff <= _maxAmount, "wtg12"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
 
         return SafeCast.toUint128(balance_diff);
@@ -198,9 +198,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(address(_token));
 
-        uint balance_before = _token.balanceOf(address(this));
+        uint256 balance_before = _token.balanceOf(address(this));
         require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "fd012"); // token transfer failed deposit
-        uint balance_after = _token.balanceOf(address(this));
+        uint256 balance_after = _token.balanceOf(address(this));
         uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 
         registerDeposit(tokenId, deposit_amount, _franklinAddr);
@@ -298,7 +298,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _withdrawalsData Block withdrawals data
     function verifyBlock(
         uint32 _blockNumber,
-        uint[] calldata _proof,
+        uint256[] calldata _proof,
         bytes calldata _withdrawalsData
     ) external nonReentrant {
         requireActive();
@@ -373,7 +373,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _accountId,
         uint16 _tokenId,
         uint128 _amount,
-        uint[] calldata _proof
+        uint256[] calldata _proof
     ) external nonReentrant {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
         require(exodusMode, "fet11"); // must be in exodus mode
@@ -507,9 +507,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
 
-        uint pubDataPtr = 0;
-        uint pubDataStartPtr = 0;
-        uint pubDataEndPtr = 0;
+        uint256 pubDataPtr = 0;
+        uint256 pubDataStartPtr = 0;
+        uint256 pubDataEndPtr = 0;
 
         assembly {
             pubDataStartPtr := add(_publicData, 0x20)
@@ -540,7 +540,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 // other operations processing
 
                 // calculation of public data offset
-                uint pubdataOffset = pubDataPtr - pubDataStartPtr;
+                uint256 pubdataOffset = pubDataPtr - pubDataStartPtr;
 
                 if (opType == Operations.OpType.Deposit) {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
@@ -696,9 +696,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes32 _newRoot,
         bytes memory _publicData
     ) internal view returns (bytes32 commitment) {
-        bytes32 hash = sha256(abi.encodePacked(uint(_blockNumber), uint(_feeAccount)));
-        hash = sha256(abi.encodePacked(hash, uint(_oldRoot)));
-        hash = sha256(abi.encodePacked(hash, uint(_newRoot)));
+        bytes32 hash = sha256(abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount)));
+        hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
+        hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
 
         /// The code below is equivalent to `commitment = sha256(abi.encodePacked(hash, _publicData))`
 
@@ -753,7 +753,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         bytes32 withdrawalsDataHash = EMPTY_STRING_KECCAK;
 
-        uint offset = 0;
+        uint256 offset = 0;
         uint32 localNumberOfPendingWithdrawals = numberOfPendingWithdrawals;
         while (offset < withdrawalsData.length) {
             (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) =
@@ -811,7 +811,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _pubData Operation pubdata
     function addPriorityRequest(Operations.OpType _opType, bytes memory _pubData) internal {
         // Expiration block is: current block number + priority expiration delta
-        uint expirationBlock = block.number + PRIORITY_EXPIRATION;
+        uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
         uint64 nextPriorityRequestId = firstPriorityRequestId + totalOpenPriorityRequests;
 

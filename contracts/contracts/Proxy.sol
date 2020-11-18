@@ -94,10 +94,10 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// UpgradeableMaster functions
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function getNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint256) {
         (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("getNoticePeriod()"));
         require(success, "unp11"); // unp11 - upgradeNoticePeriod delegatecall failed
-        return abi.decode(result, (uint));
+        return abi.decode(result, (uint256));
     }
 
     /// @notice Notifies proxy contract that notice period started

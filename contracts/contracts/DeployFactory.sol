@@ -82,7 +82,7 @@ contract DeployFactory is TokenDeployInit {
         address _finalGovernor
     ) internal {
         address[] memory tokens = getTokens();
-        for (uint i = 0; i < tokens.length; ++i) {
+        for (uint256 i = 0; i < tokens.length; ++i) {
             _governance.addToken(tokens[i]);
         }
         _governance.setValidator(_validator, true);

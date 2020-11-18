@@ -4,7 +4,7 @@ pragma solidity ^0.5.8;
 /// @author Matter Labs
 interface UpgradeableMaster {
     /// @notice Notice period before activation preparation status of upgrade mode
-    function getNoticePeriod() external returns (uint);
+    function getNoticePeriod() external returns (uint256);
 
     /// @notice Notifies contract that notice period started
     function upgradeNoticePeriodStarted() external;

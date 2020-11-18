@@ -1,20 +1,20 @@
 pragma solidity >=0.5.8 <0.7.0;
 
 library PairingsBn254 {
-    uint constant q_mod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-    uint constant r_mod = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    uint constant bn254_b_coeff = 3;
+    uint256 constant q_mod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    uint256 constant r_mod = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256 constant bn254_b_coeff = 3;
 
     struct G1Point {
-        uint X;
-        uint Y;
+        uint256 X;
+        uint256 Y;
     }
 
     struct Fr {
-        uint value;
+        uint256 value;
     }
 
-    function new_fr(uint fr) internal pure returns (Fr memory) {
+    function new_fr(uint256 fr) internal pure returns (Fr memory) {
         require(fr < r_mod);
         return Fr({value: fr});
     }
@@ -44,9 +44,9 @@ library PairingsBn254 {
         self.value = mulmod(self.value, other.value, r_mod);
     }
 
-    function pow(Fr memory self, uint power) internal view returns (Fr memory) {
-        uint[6] memory input = [32, 32, 32, self.value, power, r_mod];
-        uint[1] memory result;
+    function pow(Fr memory self, uint256 power) internal view returns (Fr memory) {
+        uint256[6] memory input = [32, 32, 32, self.value, power, r_mod];
+        uint256[1] memory result;
         bool success;
         assembly {
             success := staticcall(gas(), 0x05, input, 0xc0, result, 0x20)
@@ -57,19 +57,19 @@ library PairingsBn254 {
 
     // Encoding of field elements is: X[0] * z + X[1]
     struct G2Point {
-        uint[2] X;
-        uint[2] Y;
+        uint256[2] X;
+        uint256[2] Y;
     }
 
     function P1() internal pure returns (G1Point memory) {
         return G1Point(1, 2);
     }
 
-    function new_g1(uint x, uint y) internal pure returns (G1Point memory) {
+    function new_g1(uint256 x, uint256 y) internal pure returns (G1Point memory) {
         return G1Point(x, y);
     }
 
-    function new_g1_checked(uint x, uint y) internal pure returns (G1Point memory) {
+    function new_g1_checked(uint256 x, uint256 y) internal pure returns (G1Point memory) {
         if (x == 0 && y == 0) {
             // point of infinity is (0,0)
             return G1Point(x, y);
@@ -79,8 +79,8 @@ library PairingsBn254 {
         require(x < q_mod);
         require(y < q_mod);
         // check on curve
-        uint lhs = mulmod(y, y, q_mod); // y^2
-        uint rhs = mulmod(x, x, q_mod); // x^2
+        uint256 lhs = mulmod(y, y, q_mod); // y^2
+        uint256 rhs = mulmod(x, x, q_mod); // x^2
         rhs = mulmod(rhs, x, q_mod); // x^3
         rhs = addmod(rhs, bn254_b_coeff, q_mod); // x^3 + b
         require(lhs == rhs);
@@ -88,7 +88,7 @@ library PairingsBn254 {
         return G1Point(x, y);
     }
 
-    function new_g2(uint[2] memory x, uint[2] memory y) internal pure returns (G2Point memory) {
+    function new_g2(uint256[2] memory x, uint256[2] memory y) internal pure returns (G2Point memory) {
         return G2Point(x, y);
     }
 
@@ -148,7 +148,7 @@ library PairingsBn254 {
             dest.Y = p2.Y;
             return;
         } else {
-            uint[4] memory input;
+            uint256[4] memory input;
 
             input[0] = p1.X;
             input[1] = p1.Y;
@@ -183,7 +183,7 @@ library PairingsBn254 {
             dest.Y = q_mod - p2.Y;
             return;
         } else {
-            uint[4] memory input;
+            uint256[4] memory input;
 
             input[0] = p1.X;
             input[1] = p1.Y;
@@ -212,7 +212,7 @@ library PairingsBn254 {
         Fr memory s,
         G1Point memory dest
     ) internal view {
-        uint[3] memory input;
+        uint256[3] memory input;
         input[0] = p.X;
         input[1] = p.Y;
         input[2] = s.value;
@@ -225,10 +225,10 @@ library PairingsBn254 {
 
     function pairing(G1Point[] memory p1, G2Point[] memory p2) internal view returns (bool) {
         require(p1.length == p2.length);
-        uint elements = p1.length;
-        uint inputSize = elements * 6;
-        uint[] memory input = new uint[](inputSize);
-        for (uint i = 0; i < elements; i++) {
+        uint256 elements = p1.length;
+        uint256 inputSize = elements * 6;
+        uint256[] memory input = new uint256[](inputSize);
+        for (uint256 i = 0; i < elements; i++) {
             input[i * 6 + 0] = p1[i].X;
             input[i * 6 + 1] = p1[i].Y;
             input[i * 6 + 2] = p2[i].X[0];
@@ -236,7 +236,7 @@ library PairingsBn254 {
             input[i * 6 + 4] = p2[i].Y[0];
             input[i * 6 + 5] = p2[i].Y[1];
         }
-        uint[1] memory out;
+        uint256[1] memory out;
         bool success;
         assembly {
             success := staticcall(gas(), 8, add(input, 0x20), mul(inputSize, 0x20), out, 0x20)
@@ -264,7 +264,7 @@ library PairingsBn254 {
 
 library TranscriptLibrary {
     // flip                    0xe000000000000000000000000000000000000000000000000000000000000000;
-    uint constant FR_MASK = 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+    uint256 constant FR_MASK = 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
     uint32 constant DST_0 = 0;
     uint32 constant DST_1 = 1;
@@ -282,7 +282,7 @@ library TranscriptLibrary {
         t.challenge_counter = 0;
     }
 
-    function update_with_u256(Transcript memory self, uint value) internal pure {
+    function update_with_u256(Transcript memory self, uint256 value) internal pure {
         bytes32 old_state_0 = self.state_0;
         self.state_0 = keccak256(abi.encodePacked(DST_0, old_state_0, self.state_1, value));
         self.state_1 = keccak256(abi.encodePacked(DST_1, old_state_0, self.state_1, value));
@@ -300,7 +300,7 @@ library TranscriptLibrary {
     function get_challenge(Transcript memory self) internal pure returns (PairingsBn254.Fr memory challenge) {
         bytes32 query = keccak256(abi.encodePacked(DST_CHALLENGE, self.state_0, self.state_1, self.challenge_counter));
         self.challenge_counter += 1;
-        challenge = PairingsBn254.Fr({value: uint(query) & FR_MASK});
+        challenge = PairingsBn254.Fr({value: uint256(query) & FR_MASK});
     }
 }
 
@@ -311,12 +311,12 @@ contract Plonk4VerifierWithAccessToDNext {
 
     using TranscriptLibrary for TranscriptLibrary.Transcript;
 
-    uint constant STATE_WIDTH = 4;
-    uint constant ACCESSIBLE_STATE_POLYS_ON_NEXT_STEP = 1;
+    uint256 constant STATE_WIDTH = 4;
+    uint256 constant ACCESSIBLE_STATE_POLYS_ON_NEXT_STEP = 1;
 
     struct VerificationKey {
-        uint domain_size;
-        uint num_inputs;
+        uint256 domain_size;
+        uint256 num_inputs;
         PairingsBn254.Fr omega;
         PairingsBn254.G1Point[STATE_WIDTH + 2] selector_commitments; // STATE_WIDTH for witness + multiplication + constant
         PairingsBn254.G1Point[ACCESSIBLE_STATE_POLYS_ON_NEXT_STEP] next_step_selector_commitments;
@@ -326,7 +326,7 @@ contract Plonk4VerifierWithAccessToDNext {
     }
 
     struct Proof {
-        uint[] input_values;
+        uint256[] input_values;
         PairingsBn254.G1Point[STATE_WIDTH] wire_commitments;
         PairingsBn254.G1Point grand_product_commitment;
         PairingsBn254.G1Point[STATE_WIDTH] quotient_poly_commitments;
@@ -351,8 +351,8 @@ contract Plonk4VerifierWithAccessToDNext {
     }
 
     function evaluate_lagrange_poly_out_of_domain(
-        uint poly_num,
-        uint domain_size,
+        uint256 poly_num,
+        uint256 domain_size,
         PairingsBn254.Fr memory omega,
         PairingsBn254.Fr memory at
     ) internal view returns (PairingsBn254.Fr memory res) {
@@ -374,8 +374,8 @@ contract Plonk4VerifierWithAccessToDNext {
     }
 
     function batch_evaluate_lagrange_poly_out_of_domain(
-        uint[] memory poly_nums,
-        uint domain_size,
+        uint256[] memory poly_nums,
+        uint256 domain_size,
         PairingsBn254.Fr memory omega,
         PairingsBn254.Fr memory at
     ) internal view returns (PairingsBn254.Fr[] memory res) {
@@ -390,7 +390,7 @@ contract Plonk4VerifierWithAccessToDNext {
         PairingsBn254.Fr[] memory dens = new PairingsBn254.Fr[](poly_nums.length);
         // numerators in a form omega^i * (z^n - 1)
         // denoms in a form (z - omega^i) * N
-        for (uint i = 0; i < poly_nums.length; i++) {
+        for (uint256 i = 0; i < poly_nums.length; i++) {
             tmp_1 = omega.pow(poly_nums[i]); // power of omega
             nums[i].assign(vanishing_at_z);
             nums[i].mul_assign(tmp_1);
@@ -402,7 +402,7 @@ contract Plonk4VerifierWithAccessToDNext {
 
         PairingsBn254.Fr[] memory partial_products = new PairingsBn254.Fr[](poly_nums.length);
         partial_products[0].assign(PairingsBn254.new_fr(1));
-        for (uint i = 1; i < dens.length - 1; i++) {
+        for (uint256 i = 1; i < dens.length - 1; i++) {
             partial_products[i].assign(dens[i - 1]);
             partial_products[i].mul_assign(dens[i]);
         }
@@ -411,20 +411,20 @@ contract Plonk4VerifierWithAccessToDNext {
         tmp_2.mul_assign(dens[dens.length - 1]);
         tmp_2 = tmp_2.inverse(); // tmp_2 contains a^-1 * b^-1 (with! the last one)
 
-        for (uint i = dens.length - 1; i < dens.length; i--) {
+        for (uint256 i = dens.length - 1; i < dens.length; i--) {
             dens[i].assign(tmp_2); // all inversed
             dens[i].mul_assign(partial_products[i]); // clear lowest terms
             tmp_2.mul_assign(dens[i]);
         }
 
-        for (uint i = 0; i < nums.length; i++) {
+        for (uint256 i = 0; i < nums.length; i++) {
             nums[i].mul_assign(dens[i]);
         }
 
         return nums;
     }
 
-    function evaluate_vanishing(uint domain_size, PairingsBn254.Fr memory at)
+    function evaluate_vanishing(uint256 domain_size, PairingsBn254.Fr memory at)
         internal
         view
         returns (PairingsBn254.Fr memory res)
@@ -447,7 +447,7 @@ contract Plonk4VerifierWithAccessToDNext {
 
         // public inputs
         PairingsBn254.Fr memory tmp = PairingsBn254.new_fr(0);
-        for (uint i = 0; i < proof.input_values.length; i++) {
+        for (uint256 i = 0; i < proof.input_values.length; i++) {
             tmp.assign(state.cached_lagrange_evals[i]);
             tmp.mul_assign(PairingsBn254.new_fr(proof.input_values[i]));
             rhs.add_assign(tmp);
@@ -456,7 +456,7 @@ contract Plonk4VerifierWithAccessToDNext {
         quotient_challenge.mul_assign(state.alpha);
 
         PairingsBn254.Fr memory z_part = PairingsBn254.copy(proof.grand_product_at_z_omega);
-        for (uint i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
+        for (uint256 i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
             tmp.assign(proof.permutation_polynomials_at_z[i]);
             tmp.mul_assign(state.beta);
             tmp.add_assign(state.gamma);
@@ -504,14 +504,14 @@ contract Plonk4VerifierWithAccessToDNext {
         // ]
         //
         // we pay a little for a few arithmetic operations to not introduce another constant
-        uint power_for_z_omega_opening = 1 + 1 + STATE_WIDTH + STATE_WIDTH - 1;
+        uint256 power_for_z_omega_opening = 1 + 1 + STATE_WIDTH + STATE_WIDTH - 1;
         res = PairingsBn254.copy_g1(vk.selector_commitments[STATE_WIDTH + 1]);
 
         PairingsBn254.G1Point memory tmp_g1 = PairingsBn254.P1();
         PairingsBn254.Fr memory tmp_fr = PairingsBn254.new_fr(0);
 
         // addition gates
-        for (uint i = 0; i < STATE_WIDTH; i++) {
+        for (uint256 i = 0; i < STATE_WIDTH; i++) {
             tmp_g1 = vk.selector_commitments[i].point_mul(proof.wire_values_at_z[i]);
             res.point_add_assign(tmp_g1);
         }
@@ -531,7 +531,7 @@ contract Plonk4VerifierWithAccessToDNext {
         grand_product_part_at_z.mul_assign(state.beta);
         grand_product_part_at_z.add_assign(proof.wire_values_at_z[0]);
         grand_product_part_at_z.add_assign(state.gamma);
-        for (uint i = 0; i < vk.permutation_non_residues.length; i++) {
+        for (uint256 i = 0; i < vk.permutation_non_residues.length; i++) {
             tmp_fr.assign(state.z);
             tmp_fr.mul_assign(vk.permutation_non_residues[i]);
             tmp_fr.mul_assign(state.beta);
@@ -553,7 +553,7 @@ contract Plonk4VerifierWithAccessToDNext {
         grand_product_part_at_z_omega.mul_assign(state.u);
 
         PairingsBn254.Fr memory last_permutation_part_at_z = PairingsBn254.new_fr(1);
-        for (uint i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
+        for (uint256 i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
             tmp_fr.assign(state.beta);
             tmp_fr.mul_assign(proof.permutation_polynomials_at_z[i]);
             tmp_fr.add_assign(state.gamma);
@@ -591,7 +591,7 @@ contract Plonk4VerifierWithAccessToDNext {
 
         PairingsBn254.G1Point memory commitment_aggregation = PairingsBn254.copy_g1(proof.quotient_poly_commitments[0]);
         PairingsBn254.Fr memory tmp_fr = PairingsBn254.new_fr(1);
-        for (uint i = 1; i < proof.quotient_poly_commitments.length; i++) {
+        for (uint256 i = 1; i < proof.quotient_poly_commitments.length; i++) {
             tmp_fr.mul_assign(z_in_domain_size);
             tmp_g1 = proof.quotient_poly_commitments[i].point_mul(tmp_fr);
             commitment_aggregation.point_add_assign(tmp_g1);
@@ -600,13 +600,13 @@ contract Plonk4VerifierWithAccessToDNext {
         aggregation_challenge.mul_assign(state.v);
         commitment_aggregation.point_add_assign(d);
 
-        for (uint i = 0; i < proof.wire_commitments.length; i++) {
+        for (uint256 i = 0; i < proof.wire_commitments.length; i++) {
             aggregation_challenge.mul_assign(state.v);
             tmp_g1 = proof.wire_commitments[i].point_mul(aggregation_challenge);
             commitment_aggregation.point_add_assign(tmp_g1);
         }
 
-        for (uint i = 0; i < vk.permutation_commitments.length - 1; i++) {
+        for (uint256 i = 0; i < vk.permutation_commitments.length - 1; i++) {
             aggregation_challenge.mul_assign(state.v);
             tmp_g1 = vk.permutation_commitments[i].point_mul(aggregation_challenge);
             commitment_aggregation.point_add_assign(tmp_g1);
@@ -632,7 +632,7 @@ contract Plonk4VerifierWithAccessToDNext {
         tmp_fr.mul_assign(aggregation_challenge);
         aggregated_value.add_assign(tmp_fr);
 
-        for (uint i = 0; i < proof.wire_values_at_z.length; i++) {
+        for (uint256 i = 0; i < proof.wire_values_at_z.length; i++) {
             aggregation_challenge.mul_assign(state.v);
 
             tmp_fr.assign(proof.wire_values_at_z[i]);
@@ -640,7 +640,7 @@ contract Plonk4VerifierWithAccessToDNext {
             aggregated_value.add_assign(tmp_fr);
         }
 
-        for (uint i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
+        for (uint256 i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
             aggregation_challenge.mul_assign(state.v);
 
             tmp_fr.assign(proof.permutation_polynomials_at_z[i]);
@@ -687,11 +687,11 @@ contract Plonk4VerifierWithAccessToDNext {
         require(proof.input_values.length == vk.num_inputs);
         require(vk.num_inputs >= 1);
         TranscriptLibrary.Transcript memory transcript = TranscriptLibrary.new_transcript();
-        for (uint i = 0; i < vk.num_inputs; i++) {
+        for (uint256 i = 0; i < vk.num_inputs; i++) {
             transcript.update_with_u256(proof.input_values[i]);
         }
 
-        for (uint i = 0; i < proof.wire_commitments.length; i++) {
+        for (uint256 i = 0; i < proof.wire_commitments.length; i++) {
             transcript.update_with_g1(proof.wire_commitments[i]);
         }
 
@@ -701,14 +701,14 @@ contract Plonk4VerifierWithAccessToDNext {
         transcript.update_with_g1(proof.grand_product_commitment);
         state.alpha = transcript.get_challenge();
 
-        for (uint i = 0; i < proof.quotient_poly_commitments.length; i++) {
+        for (uint256 i = 0; i < proof.quotient_poly_commitments.length; i++) {
             transcript.update_with_g1(proof.quotient_poly_commitments[i]);
         }
 
         state.z = transcript.get_challenge();
 
-        uint[] memory lagrange_poly_numbers = new uint[](vk.num_inputs);
-        for (uint i = 0; i < lagrange_poly_numbers.length; i++) {
+        uint256[] memory lagrange_poly_numbers = new uint256[](vk.num_inputs);
+        for (uint256 i = 0; i < lagrange_poly_numbers.length; i++) {
             lagrange_poly_numbers[i] = i;
         }
 
@@ -725,15 +725,15 @@ contract Plonk4VerifierWithAccessToDNext {
             return false;
         }
 
-        for (uint i = 0; i < proof.wire_values_at_z.length; i++) {
+        for (uint256 i = 0; i < proof.wire_values_at_z.length; i++) {
             transcript.update_with_fr(proof.wire_values_at_z[i]);
         }
 
-        for (uint i = 0; i < proof.wire_values_at_z_omega.length; i++) {
+        for (uint256 i = 0; i < proof.wire_values_at_z_omega.length; i++) {
             transcript.update_with_fr(proof.wire_values_at_z_omega[i]);
         }
 
-        for (uint i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
+        for (uint256 i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
             transcript.update_with_fr(proof.permutation_polynomials_at_z[i]);
         }
 
@@ -777,21 +777,21 @@ contract Plonk4VerifierWithAccessToDNext {
 }
 
 contract VerifierWithDeserialize is Plonk4VerifierWithAccessToDNext {
-    uint constant SERIALIZED_PROOF_LENGTH = 33;
+    uint256 constant SERIALIZED_PROOF_LENGTH = 33;
 
-    function deserialize_proof(uint[] memory public_inputs, uint[] memory serialized_proof)
+    function deserialize_proof(uint256[] memory public_inputs, uint256[] memory serialized_proof)
         internal
         pure
         returns (Proof memory proof)
     {
         require(serialized_proof.length == SERIALIZED_PROOF_LENGTH);
-        proof.input_values = new uint[](public_inputs.length);
-        for (uint i = 0; i < public_inputs.length; i++) {
+        proof.input_values = new uint256[](public_inputs.length);
+        for (uint256 i = 0; i < public_inputs.length; i++) {
             proof.input_values[i] = public_inputs[i];
         }
 
-        uint j = 0;
-        for (uint i = 0; i < STATE_WIDTH; i++) {
+        uint256 j = 0;
+        for (uint256 i = 0; i < STATE_WIDTH; i++) {
             proof.wire_commitments[i] = PairingsBn254.new_g1_checked(serialized_proof[j], serialized_proof[j + 1]);
 
             j += 2;
@@ -800,7 +800,7 @@ contract VerifierWithDeserialize is Plonk4VerifierWithAccessToDNext {
         proof.grand_product_commitment = PairingsBn254.new_g1_checked(serialized_proof[j], serialized_proof[j + 1]);
         j += 2;
 
-        for (uint i = 0; i < STATE_WIDTH; i++) {
+        for (uint256 i = 0; i < STATE_WIDTH; i++) {
             proof.quotient_poly_commitments[i] = PairingsBn254.new_g1_checked(
                 serialized_proof[j],
                 serialized_proof[j + 1]
@@ -809,13 +809,13 @@ contract VerifierWithDeserialize is Plonk4VerifierWithAccessToDNext {
             j += 2;
         }
 
-        for (uint i = 0; i < STATE_WIDTH; i++) {
+        for (uint256 i = 0; i < STATE_WIDTH; i++) {
             proof.wire_values_at_z[i] = PairingsBn254.new_fr(serialized_proof[j]);
 
             j += 1;
         }
 
-        for (uint i = 0; i < proof.wire_values_at_z_omega.length; i++) {
+        for (uint256 i = 0; i < proof.wire_values_at_z_omega.length; i++) {
             proof.wire_values_at_z_omega[i] = PairingsBn254.new_fr(serialized_proof[j]);
 
             j += 1;
@@ -833,7 +833,7 @@ contract VerifierWithDeserialize is Plonk4VerifierWithAccessToDNext {
 
         j += 1;
 
-        for (uint i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
+        for (uint256 i = 0; i < proof.permutation_polynomials_at_z.length; i++) {
             proof.permutation_polynomials_at_z[i] = PairingsBn254.new_fr(serialized_proof[j]);
 
             j += 1;

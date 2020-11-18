@@ -33,7 +33,7 @@ interface Events {
         uint64 serialId,
         Operations.OpType opType,
         bytes pubData,
-        uint expirationBlock
+        uint256 expirationBlock
     );
 
     /// @notice Deposit committed event.
@@ -67,21 +67,21 @@ interface Events {
 /// @author Matter Labs
 interface UpgradeEvents {
     /// @notice Event emitted when new upgradeable contract is added to upgrade gatekeeper's list of managed contracts
-    event NewUpgradable(uint indexed versionId, address indexed upgradeable);
+    event NewUpgradable(uint256 indexed versionId, address indexed upgradeable);
 
     /// @notice Upgrade mode enter event
     event NoticePeriodStart(
-        uint indexed versionId,
+        uint256 indexed versionId,
         address[] newTargets,
-        uint noticePeriod // notice period (in seconds)
+        uint256 noticePeriod // notice period (in seconds)
     );
 
     /// @notice Upgrade mode cancel event
-    event UpgradeCancel(uint indexed versionId);
+    event UpgradeCancel(uint256 indexed versionId);
 
     /// @notice Upgrade mode preparation status event
-    event PreparationStart(uint indexed versionId);
+    event PreparationStart(uint256 indexed versionId);
 
     /// @notice Upgrade mode complete event
-    event UpgradeComplete(uint indexed versionId, address[] newTargets);
+    event UpgradeComplete(uint256 indexed versionId, address[] newTargets);
 }

@@ -29,23 +29,23 @@ import "./SafeMath.sol";
  * allowances. See {IERC20-approve}.
  */
 contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
-    using SafeMath for uint;
+    using SafeMath for uint256;
 
-    mapping(address => uint) private _balances;
+    mapping(address => uint256) private _balances;
 
-    mapping(address => mapping(address => uint)) private _allowances;
+    mapping(address => mapping(address => uint256)) private _allowances;
 
-    uint private _totalSupply;
+    uint256 private _totalSupply;
 
-    function mint(address to, uint amount) external {
+    function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
 
     bool _shouldBeFeeTransfers;
     bool _senderUnintuitiveProcess;
 
-    uint public FEE_AMOUNT_AS_VALUE = 15;
-    uint public DIVIDEND_AMOUNT_AS_VALUE = 7;
+    uint256 public FEE_AMOUNT_AS_VALUE = 15;
+    uint256 public DIVIDEND_AMOUNT_AS_VALUE = 7;
 
     /// shouldBeFeeTransfers - true if there is should be taken fee, false if there should be dividends
     /// senderUnintuitiveProcess - true if there is should be taken fee from sender (or dividends for him), false if this process works with recipient
@@ -57,14 +57,14 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     /**
      * @dev See {IERC20-totalSupply}.
      */
-    function totalSupply() public view returns (uint) {
+    function totalSupply() public view returns (uint256) {
         return _totalSupply;
     }
 
     /**
      * @dev See {IERC20-balanceOf}.
      */
-    function balanceOf(address account) public view returns (uint) {
+    function balanceOf(address account) public view returns (uint256) {
         return _balances[account];
     }
 
@@ -76,7 +76,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address recipient, uint amount) public returns (bool) {
+    function transfer(address recipient, uint256 amount) public returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -84,7 +84,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender) public view returns (uint) {
+    function allowance(address owner, address spender) public view returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -95,7 +95,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint amount) public returns (bool) {
+    function approve(address spender, uint256 amount) public returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -115,7 +115,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     function transferFrom(
         address sender,
         address recipient,
-        uint amount
+        uint256 amount
     ) public returns (bool) {
         _transfer(sender, recipient, amount);
         _approve(
@@ -138,7 +138,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint addedValue) public returns (bool) {
+    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
         _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
         return true;
     }
@@ -157,7 +157,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint subtractedValue) public returns (bool) {
+    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
         _approve(
             _msgSender(),
             spender,
@@ -183,7 +183,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     function _transfer(
         address sender,
         address recipient,
-        uint amount
+        uint256 amount
     ) internal {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
@@ -217,7 +217,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      *
      * - `to` cannot be the zero address.
      */
-    function _mint(address account, uint amount) internal {
+    function _mint(address account, uint256 amount) internal {
         require(account != address(0), "ERC20: mint to the zero address");
 
         _totalSupply = _totalSupply.add(amount);
@@ -236,7 +236,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      * - `account` cannot be the zero address.
      * - `account` must have at least `amount` tokens.
      */
-    function _burn(address account, uint amount) internal {
+    function _burn(address account, uint256 amount) internal {
         require(account != address(0), "ERC20: burn from the zero address");
 
         _balances[account] = _balances[account].sub(amount, "ERC20: burn amount exceeds balance");
@@ -260,7 +260,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
     function _approve(
         address owner,
         address spender,
-        uint amount
+        uint256 amount
     ) internal {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
@@ -275,7 +275,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      *
      * See {_burn} and {_approve}.
      */
-    function _burnFrom(address account, uint amount) internal {
+    function _burnFrom(address account, uint256 amount) internal {
         _burn(account, amount);
         _approve(
             account,
