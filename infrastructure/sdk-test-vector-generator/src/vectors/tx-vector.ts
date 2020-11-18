@@ -1,8 +1,8 @@
 import { utils } from "ethers";
 import * as ethers from "ethers";
 import * as zksync from "zksync";
-import { TestVector, TestVectorEntry } from "./types";
-import { generateArray } from "./utils";
+import { TestVector, TestVectorEntry } from "../types";
+import { generateArray } from "../utils";
 
 /**
  * Interface for the transactions test vector.

@@ -1,7 +1,7 @@
-import { TestVector, TestVectorEntry } from "./types";
+import { TestVector, TestVectorEntry } from "../types";
 import * as zksync from "zksync";
 import { utils } from "ethers";
-import { generateArray } from "./utils";
+import { generateArray } from "../utils";
 
 /**
  * Interface for the crypto primitives test vector.

@@ -1,8 +1,8 @@
 // Generator for test vectors to be used by various SDK
 import * as fs from "fs";
 
-import { generateCryptoTestVectors } from "./crypto-vector";
-import { generateTxEncodingVectors } from "./tx-vector";
+import { generateCryptoTestVectors } from "./vectors/crypto-vector";
+import { generateTxEncodingVectors } from "./vectors/tx-vector";
 
 export async function generateSDKTestVectors(outputFile: string = "test_vectors.json") {
     const cryptoVectors = await generateCryptoTestVectors();
