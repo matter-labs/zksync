@@ -5545,6 +5545,7 @@ dependencies = [
  "lru-cache",
  "metrics",
  "num",
+ "once_cell",
  "reqwest",
  "serde",
  "serde_json",
