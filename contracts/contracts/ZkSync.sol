@@ -363,8 +363,17 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Block verification.
     /// @notice Verify proof -> process onchain withdrawals (accrue balances from withdrawals) -> remove priority requests
-    function verifyCommitments(bytes32[] calldata _commitments, uint256[] calldata) external {
-        // todo recursive verifier
+    function verifyCommitments(
+        uint256[] memory _recursiveInput,
+        uint256[] memory _proof,
+        uint8[] memory _vkIndexes,
+        uint256[] memory _commitments,
+        uint256[16] memory _subproofs_limbs
+    ) external {
+        bool success = verifier.verifyAggregatedProof(_recursiveInput, _proof, _vkIndexes, _commitments, _subproofs_limbs);
+
+        require(success, "vf1"); // Aggregated proof verification fail
+
         hashedVerifiedCommitments[keccak256(abi.encode(_commitments))] = true;
     }
 
