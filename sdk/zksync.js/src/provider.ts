@@ -11,12 +11,13 @@ import {
     TokenAddress,
     TxEthSignature,
     Fee,
-    ChangePubKeyFee
+    ChangePubKeyFee,
+    Network
 } from './types';
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from './utils';
 
 export async function getDefaultProvider(
-    network: 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet',
+    network: Network,
     transport: 'WS' | 'HTTP' = 'WS'
 ): Promise<Provider> {
     if (network === 'localhost') {
