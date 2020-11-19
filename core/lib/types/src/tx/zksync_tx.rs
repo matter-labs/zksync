@@ -7,6 +7,7 @@ use crate::{
 use num::BigUint;
 use parity_crypto::digest::sha256;
 
+use super::utils::deserialize_eth_message;
 use crate::operations::ChangePubKeyOp;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
@@ -14,6 +15,7 @@ use zksync_basic_types::Address;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
     pub signature: TxEthSignature,
+    #[serde(deserialize_with = "deserialize_eth_message")]
     pub message: Vec<u8>,
 }
 
