@@ -17,9 +17,15 @@ pub struct EthSignData {
     pub message: Vec<u8>,
 }
 
+/// Represents yet unverified transaction with the corresponding
+/// Ethereum signature and the message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedZkSyncTx {
+    /// Underlying zkSync transaction.
     pub tx: ZkSyncTx,
+    /// `eth_sign_data` is a tuple of the Ethereum signature and the message
+    /// which user should have signed with their private key.
+    /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<EthSignData>,
 }
 

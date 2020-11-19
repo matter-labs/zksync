@@ -18,7 +18,7 @@ use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tx::EthSignData,
-    tx::{TxEthSignature, TxHash},
+    tx::{SignedZkSyncTx, TxEthSignature, TxHash},
     Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -26,7 +26,7 @@ use zksync_types::{
 use crate::{
     core_api_client::CoreApiClient,
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
-    signature_checker::{TxVariant, TxWithSignData, VerifiedTx, VerifyTxSignatureRequest},
+    signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
@@ -90,15 +90,31 @@ impl TxSender {
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config_options: &ConfigurationOptions,
     ) -> Self {
-        let api_client = CoreApiClient::new(config_options.core_server_url.clone());
+        let core_api_client = CoreApiClient::new(config_options.core_server_url.clone());
 
+        Self::with_client(
+            core_api_client,
+            connection_pool,
+            sign_verify_request_sender,
+            ticker_request_sender,
+            config_options,
+        )
+    }
+
+    pub(crate) fn with_client(
+        core_api_client: CoreApiClient,
+        connection_pool: ConnectionPool,
+        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        config_options: &ConfigurationOptions,
+    ) -> Self {
         let enforce_pubkey_change_fee = config_options.enforce_pubkey_change_fee;
         let forced_exit_minimum_account_age =
             chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
         Self {
-            core_api_client: api_client,
+            core_api_client,
             pool: connection_pool.clone(),
             sign_verify_requests: sign_verify_request_sender,
             ticker_requests: ticker_request_sender,
@@ -246,7 +262,7 @@ impl TxSender {
 
         if let Some(signature) = eth_signature {
             // User provided the signature for the whole batch.
-            let (verified_batch, signature) = verify_txs_batch_signature(
+            let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
                 signature,
                 messages_to_sign,
@@ -255,7 +271,7 @@ impl TxSender {
             .await?
             .unwrap_batch();
 
-            verified_signature = Some(signature);
+            verified_signature = Some(sign_data.signature);
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
@@ -438,7 +454,7 @@ async fn verify_tx_info_message_signature(
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Tx(TxWithSignData {
+        tx: TxVariant::Tx(SignedZkSyncTx {
             tx: tx.clone(),
             eth_sign_data,
         }),
@@ -467,7 +483,7 @@ async fn verify_txs_batch_signature(
         } else {
             None
         };
-        txs.push(TxWithSignData {
+        txs.push(SignedZkSyncTx {
             tx: tx.0,
             eth_sign_data,
         });
