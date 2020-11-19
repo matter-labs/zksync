@@ -40,7 +40,7 @@
     - [Check that token address is valid](#check-that-token-address-is-valid)
 - [Block state transition circuit](#block-state-transition-circuit)
 - [Appendix I: Cryptographic primitives](#appendix-i-cryptographic-primitives)
-  - [Transaction signature](#Transaction-signature)
+  - [Transaction signature](#transaction-signature)
   - [Rescue hash](#rescue-hash)
   - [SHA256](#sha256)
   - [Sparse Merkle Tree](#sparse-merkle-tree)
@@ -367,7 +367,7 @@ representation 0x0012.
 | amount     | PackedTxAmount | Amount of funds sent                                                             |
 | fee        | PackedFee      | Amount of fee paid                                                               |
 | nonce      | Nonce          | A one-time code that specifies the order of transactions                         |
-| signature  | Signanture     | [Signature](#Transaction-Singature) of previous fields, see the spec below       |
+| signature  | Signanture     | [Signature](#transaction-singature) of previous fields, see the spec below       |
 
 ##### Example
 
@@ -480,15 +480,15 @@ assigned. And then the usual funds' Transfer between Rollup accounts will occur.
 
 ##### Structure
 
-| Field         | Byte len | Value/type     | Description                                                                                |
-| ------------- | -------- | -------------- | ------------------------------------------------------------------------------------------ |
-| opcode        | 1        | `0x02`         | Operation code                                                                             |
-| from_account  | 4        | AccountId      | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
-| token         | 2        | TokenId        | Unique token identifier in the rollup                                                      |
-| packed_amount | 5        | PackedTxAmount | Packed amount of funds sent                                                                |
-| to_address    | 20       | ETHAddress     | The address that will represent the rollup account that will receive the funds (recipient) |
-| to_account    | 4        | AccountId      | Unique identifier of the rollup account that will receive the funds (recipient)            |
-| packed_fee    | 2        | PackedFee      | Packed amount of fee paid                                                                  |
+| Field         | Byte len | Value/type     | Description                                                                         |
+| ------------- | -------- | -------------- | ----------------------------------------------------------------------------------- |
+| opcode        | 1        | `0x02`         | Operation code                                                                      |
+| from_account  | 4        | AccountId      | Unique identifier of the rollup account from which funds will be withdrawn (sender) |
+| token         | 2        | TokenId        | Unique token identifier in the rollup                                               |
+| packed_amount | 5        | PackedTxAmount | Packed amount of funds sent                                                         |
+| to_address    | 20       | ETHAddress     | The address of the rollup account that will receive the funds (recipient)           |
+| to_account    | 4        | AccountId      | Unique identifier of the rollup account that will receive the funds (recipient)     |
+| packed_fee    | 2        | PackedFee      | Packed amount of fee paid                                                           |
 
 ##### Example
 
@@ -574,14 +574,14 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 
 ##### Structure
 
-| Field        | Byte len | Value/type  | Description                                                                               |
-| ------------ | -------- | ----------- | ----------------------------------------------------------------------------------------- |
-| opcode       | 1        | `0x03`      | Operation code                                                                            |
-| from_account | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)       |
-| token        | 2        | TokenId     | Unique token identifier in the rollup                                                     |
-| full_amount  | 16       | StateAmount | Full amount of funds sent                                                                 |
-| packed_fee   | 2        | PackedFee   | Packed amount of fee paid                                                                 |
-| to_address   | 20       | EthAddress  | The address of Ethereum account, to the balance of which funds will be accrued(recipient) |
+| Field        | Byte len | Value/type  | Description                                                                                |
+| ------------ | -------- | ----------- | ------------------------------------------------------------------------------------------ |
+| opcode       | 1        | `0x03`      | Operation code                                                                             |
+| from_account | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)        |
+| token        | 2        | TokenId     | Unique token identifier in the rollup                                                      |
+| full_amount  | 16       | StateAmount | Full amount of funds sent                                                                  |
+| packed_fee   | 2        | PackedFee   | Packed amount of fee paid                                                                  |
+| to_address   | 20       | EthAddress  | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
 
 ##### Example
 
@@ -596,17 +596,17 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 
 ##### Structure
 
-| Field        | Value/type  | Description                                                                                                                          |
-| ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| type         | `0x03`      | Operation code                                                                                                                       |
-| account_id   | AccountId   | Unique id of the sender rollup account in the state tree                                                                             |
-| from_address | ETHAddress  | Unique address of the rollup account from which funds will be withdrawn (sender)                                                     |
-| to_address   | EthAddress  | The address of Ethereum account, to the balance of which the funds will be accrued(recipient)                                        |
-| token        | TokenId     | Unique token identifier in the rollup                                                                                                |
-| amount       | StateAmount | Full amount of funds sent                                                                                                            |
-| fee          | PackedFee   | Packed amount of fee paid                                                                                                            |
-| nonce        | Nonce       | A one-time code that specifies the order of transactions                                                                             |
-| signature    | Signanture  | Rescue signature of previous fields that had been concatenated into a single bytes array. Before concatenation `fee` field is packed |
+| Field        | Value/type  | Description                                                                                   |
+| ------------ | ----------- | --------------------------------------------------------------------------------------------- |
+| type         | `0x03`      | Operation code                                                                                |
+| account_id   | AccountId   | Unique id of the sender rollup account in the state tree                                      |
+| from_address | ETHAddress  | Unique address of the rollup account from which funds will be withdrawn (sender)              |
+| to_address   | EthAddress  | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
+| token        | TokenId     | Unique token identifier in the rollup                                                         |
+| amount       | StateAmount | Full amount of funds sent                                                                     |
+| fee          | PackedFee   | Packed amount of fee paid                                                                     |
+| nonce        | Nonce       | A one-time code that specifies the order of transactions                                      |
+| signature    | Signanture  | [Signature](#transaction-singature) of previous fields, see the spec below                    |
 
 ##### Example
 
@@ -711,13 +711,13 @@ be created if needed.
 
 ##### Structure
 
-| Field       | Byte len | Value/type  | Description                                                                                |
-| ----------- | -------- | ----------- | ------------------------------------------------------------------------------------------ |
-| opcode      | 1        | `0x01`      | Operation code                                                                             |
-| to_account  | 4        | AccountId   | Unique identifier of the rollup account that will receive the funds (recipient)            |
-| token       | 2        | TokenId     | Unique token identifier in the rollup                                                      |
-| full_amount | 16       | StateAmount | Full amount of funds sent                                                                  |
-| to_address  | 20       | ETHAddress  | The address that will represent the rollup account that will receive the funds (recipient) |
+| Field       | Byte len | Value/type  | Description                                                                     |
+| ----------- | -------- | ----------- | ------------------------------------------------------------------------------- |
+| opcode      | 1        | `0x01`      | Operation code                                                                  |
+| to_account  | 4        | AccountId   | Unique identifier of the rollup account that will receive the funds (recipient) |
+| token       | 2        | TokenId     | Unique token identifier in the rollup                                           |
+| full_amount | 16       | StateAmount | Full amount of funds sent                                                       |
+| to_address  | 20       | ETHAddress  | The address of the rollup account that will receive the funds (recipient)       |
 
 ##### Example
 
@@ -732,11 +732,11 @@ Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb1400
 
 ##### Structure
 
-| Field       | Byte len | Value/type  | Description                                                                                |
-| ----------- | -------- | ----------- | ------------------------------------------------------------------------------------------ |
-| token       | 2        | TokenId     | Unique token identifier in the rollup                                                      |
-| full_amount | 16       | StateAmount | Full amount of funds sent                                                                  |
-| to_address  | 20       | ETHAddress  | The address that will represent the rollup account that will receive the funds (recipient) |
+| Field       | Byte len | Value/type  | Description                                                               |
+| ----------- | -------- | ----------- | ------------------------------------------------------------------------- |
+| token       | 2        | TokenId     | Unique token identifier in the rollup                                     |
+| full_amount | 16       | StateAmount | Full amount of funds sent                                                 |
+| to_address  | 20       | ETHAddress  | The address of the rollup account that will receive the funds (recipient) |
 
 #### Rollup operation
 
@@ -800,13 +800,13 @@ in a block.
 
 ##### Structure
 
-| Field       | Byte len | Value/type  | Description                                                                                                     |
-| ----------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
-| opcode      | 1        | `0x06`      | Operation code                                                                                                  |
-| account_id  | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)                             |
-| owner       | 20       | EthAddress  | The address of the fund owner account. Also to the balance of this address the funds will be accrued(recipient) |
-| token       | 2        | TokenId     | Unique token identifier in the rollup                                                                           |
-| full_amount | 16       | StateAmount | Full amount of funds that had been withdrawn                                                                    |
+| Field       | Byte len | Value/type  | Description                                                                                 |
+| ----------- | -------- | ----------- | ------------------------------------------------------------------------------------------- |
+| opcode      | 1        | `0x06`      | Operation code                                                                              |
+| account_id  | 4        | AccountId   | Unique identifier of the rollup account from which funds will be withdrawn (sender)         |
+| owner       | 20       | EthAddress  | The address of the fund owner account. Funds will be accrued to the balance of this address |
+| token       | 2        | TokenId     | Unique token identifier in the rollup                                                       |
+| full_amount | 16       | StateAmount | Full amount of funds that had been withdrawn                                                |
 
 ##### Example
 
@@ -936,17 +936,17 @@ function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
 
 ##### Structure
 
-| Field                    | Value/type    | Description                                                                                   |
-| ------------------------ | ------------- | --------------------------------------------------------------------------------------------- |
-| type                     | `0x07`        | Operation code                                                                                |
-| account_id               | AccountId     | Unique id of the rollup account                                                               |
-| account                  | ETHAddress    | Address of the rollup account                                                                 |
-| new_pubkey_hash          | 20            | RollupPubkeyHash                                                                              | Hash of the new rollup public key |
-| fee_token                | TokenId       | Unique token identifier in the rollup used to pay fee                                         |
-| fee                      | PackedFee     | Packed amount of fee paid                                                                     |
-| nonce                    | Nonce         | A one-time code that specifies the order of transactions                                      |
-| signature                | Signanture    | [Signature](#Transaction-Singature) of previous fields, see the spec below                    |
-| eth_signature (optional) | ETHSignanture | Ethereum signature of the message defined above. Null if operation was authorized on contract |
+| Field                    | Value/type       | Description                                                                                   |
+| ------------------------ | ---------------- | --------------------------------------------------------------------------------------------- |
+| type                     | `0x07`           | Operation code                                                                                |
+| account_id               | AccountId        | Unique id of the rollup account                                                               |
+| account                  | ETHAddress       | Address of the rollup account                                                                 |
+| new_pubkey_hash          | RollupPubkeyHash | Hash of the new rollup public key                                                             |
+| fee_token                | TokenId          | Unique token identifier in the rollup used to pay fee                                         |
+| fee                      | PackedFee        | Packed amount of fee paid                                                                     |
+| nonce                    | Nonce            | A one-time code that specifies the order of transactions                                      |
+| signature                | Signanture       | [Signature](#transaction-singature) of previous fields, see the spec below                    |
+| eth_signature (optional) | ETHSignanture    | Ethereum signature of the message defined above. Null if operation was authorized on contract |
 
 ##### Example
 
@@ -1077,15 +1077,15 @@ packed in representation 0x0012 for the Rollup account which has Ethereum accoun
 
 ##### Structure
 
-| Field                | Value/type | Description                                                                                                                          |
-| -------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| type                 | `0x08`     | Operation code                                                                                                                       |
-| initiator_account_id | AccountId  | Unique id of the sender rollup account in the state tree                                                                             |
-| target               | ETHAddress | Unique address of the rollup account from which funds will be withdrawn (forced exit target)                                         |
-| token                | TokenId    | Unique token identifier in the rollup                                                                                                |
-| fee                  | PackedFee  | Packed amount of fee paid                                                                                                            |
-| nonce                | Nonce      | A one-time code that specifies the order of transactions                                                                             |
-| signature            | Signanture | Rescue signature of previous fields that had been concatenated into a single bytes array. Before concatenation `fee` field is packed |
+| Field                | Value/type | Description                                                                                  |
+| -------------------- | ---------- | -------------------------------------------------------------------------------------------- |
+| type                 | `0x08`     | Operation code                                                                               |
+| initiator_account_id | AccountId  | Unique id of the sender rollup account in the state tree                                     |
+| target               | ETHAddress | Unique address of the rollup account from which funds will be withdrawn (forced exit target) |
+| token                | TokenId    | Unique token identifier in the rollup                                                        |
+| fee                  | PackedFee  | Packed amount of fee paid                                                                    |
+| nonce                | Nonce      | A one-time code that specifies the order of transactions                                     |
+| signature            | Signanture | [Signature](#transaction-singature) of previous fields, see the spec below                   |
 
 ##### Example
 
@@ -1477,17 +1477,19 @@ In test vectors we output only first element of the squeezed sponge. Such operat
 | Msg           | [0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b] |
 | Hash          | 0x1c54bc6adef0a488caa8ef6723ae30c784ddb0659effe5c4d0ea19b5e038300a   |
 
-| **Example 2** |                                                                                                                                          |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Msg length    | 2 field elements                                                                                                                         |
-| Msg           | [0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b, 0x238ba289e8783d31585aa75bba8ddc2269c0c2d8c45d0769943b16f009ff5510] |
-| Hash          | 0x1a751dc151d807fcb5269089c4d120ef318e26f2eaea983d74096f577cb45d93                                                                       |
+<!-- prettier-ignore-start -->
+| **Example 2** | |
+|-|-|
+|Msg length|2 field elements|
+|Msg|[0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b, 0x238ba289e8783d31585aa75bba8ddc2269c0c2d8c45d0769943b16f009ff5510]|
+|Hash|0x1a751dc151d807fcb5269089c4d120ef318e26f2eaea983d74096f577cb45d93|
 
-| **Example 3** |                                                                                                                                                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Msg length    | 3 field elements                                                                                                                                                                                             |
-| Msg           | [0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b, 0x238ba289e8783d31585aa75bba8ddc2269c0c2d8c45d0769943b16f009ff5510, 0x069fd7f225dd46f03e4e0059d187419eb51b5ab5a33368e4ac05e62353dda0c3] |
-| Hash          | 0x2c3045ae4008cab38d00491870f9cb3aecb63d56c7199fd922af7b92e00722b6                                                                                                                                           |
+| **Example 3** | |
+|-|-|
+|Msg length|3 field elements|
+|Msg|[0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b, 0x238ba289e8783d31585aa75bba8ddc2269c0c2d8c45d0769943b16f009ff5510, 0x069fd7f225dd46f03e4e0059d187419eb51b5ab5a33368e4ac05e62353dda0c3]|
+|Hash|0x2c3045ae4008cab38d00491870f9cb3aecb63d56c7199fd922af7b92e00722b6|
+<!-- prettier-ignore-end -->
 
 ### Bitpacking
 
