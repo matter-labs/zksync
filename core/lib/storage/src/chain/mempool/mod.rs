@@ -274,6 +274,27 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Checks if the memory pool contains transaction with the given hash.
+    pub async fn contains_tx(&mut self, tx_hash: TxHash) -> QueryResult<bool> {
+        let start = Instant::now();
+
+        let tx_hash = hex::encode(tx_hash.as_ref());
+
+        let row = sqlx::query!(
+            "SELECT count(*) from mempool_txs
+            WHERE tx_hash = $1",
+            &tx_hash
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count;
+
+        let contains = row.filter(|&counter| counter > 0).is_some();
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "contains_tx");
+        Ok(contains)
+    }
+
     /// Removes transactions that are already committed.
     /// Though it's unlikely that mempool schema will ever contain a committed
     /// transaction, it's better to ensure that we won't process the same transaction
