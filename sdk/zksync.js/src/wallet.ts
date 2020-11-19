@@ -14,7 +14,9 @@ import {
     ChangePubKey,
     EthSignerType,
     SignedTransaction,
-    Transfer
+    Transfer,
+    ForcedExit,
+    Withdraw
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -155,12 +157,12 @@ export class Wallet {
         };
     }
 
-    async signSyncForcedExit(forcedExit: {
+    async getForcedExit(forcedExit: {
         target: Address;
         token: TokenLike;
         fee: BigNumberish;
         nonce: number;
-    }): Promise<SignedTransaction> {
+    }): Promise<ForcedExit> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
         }
@@ -176,7 +178,16 @@ export class Wallet {
             nonce: forcedExit.nonce
         };
 
-        const signedForcedExitTransaction = await this.signer.signSyncForcedExit(transactionData);
+        return await this.signer.signSyncForcedExit(transactionData);
+    }
+
+    async signSyncForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<SignedTransaction> {
+        const signedForcedExitTransaction = await this.getForcedExit(forcedExit);
 
         return {
             tx: signedForcedExitTransaction
@@ -276,13 +287,13 @@ export class Wallet {
         return submitSignedTransaction(signedTransferTransaction, this.provider);
     }
 
-    async signWithdrawFromSyncToEthereum(withdraw: {
+    async getWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
-    }): Promise<SignedTransaction> {
+    }): Promise<Withdraw> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
         }
@@ -299,6 +310,18 @@ export class Wallet {
             nonce: withdraw.nonce
         };
 
+        return await this.signer.signSyncWithdraw(transactionData);
+    }
+
+    async signWithdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<SignedTransaction> {
+        const signedWithdrawTransaction = await this.getWithdrawFromSyncToEthereum(withdraw);
+
         const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
         const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
@@ -310,8 +333,6 @@ export class Wallet {
             `Account Id: ${this.accountId}`;
 
         const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
-
-        const signedWithdrawTransaction = await this.signer.signSyncWithdraw(transactionData);
 
         return {
             tx: signedWithdrawTransaction,
@@ -350,25 +371,18 @@ export class Wallet {
         return currentPubKeyHash === signerPubKeyHash;
     }
 
-    async signSetSigningKey(changePubKey: {
+    async getChangePubKey(changePubKey: {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
         onchainAuth: boolean;
-    }): Promise<SignedTransaction> {
+    }): Promise<ChangePubKey> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
         }
 
-        const feeTokenId = await this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
-        const newPubKeyHash = await this.signer.pubKeyHash();
-
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
         await this.setRequiredAccountIdFromServer('Set Signing Key');
-
-        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
-        const ethSignature = changePubKey.onchainAuth
-            ? null
-            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
         const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
             accountId: this.accountId,
@@ -378,6 +392,24 @@ export class Wallet {
             feeTokenId,
             fee: BigNumber.from(changePubKey.fee).toString()
         });
+
+        return changePubKeyTx;
+    }
+
+    async signSetSigningKey(changePubKey: {
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        onchainAuth: boolean;
+    }): Promise<SignedTransaction> {
+        const changePubKeyTx = await this.getChangePubKey(changePubKey);
+
+        const newPubKeyHash = await this.signer.pubKeyHash();
+
+        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
+        const ethSignature = changePubKey.onchainAuth
+            ? null
+            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
 
         changePubKeyTx.ethSignature = ethSignature;
 
