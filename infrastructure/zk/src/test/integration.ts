@@ -162,7 +162,7 @@ export async function testkit(command: string, timeout: number) {
     if (command == 'block-sizes') {
         await utils.spawn('cargo run --bin block_sizes_test --release');
     } else if (command == 'fast') {
-        await utils.spawn('cargo run --bin zksync_testkit --release');
+        await utils.spawn('cargo run --bin testkit_tests --release');
         await utils.spawn('cargo run --bin gas_price_test --release');
         await utils.spawn('cargo run --bin migration_test --release');
         await utils.spawn('cargo run --bin revert_blocks_test --release');
