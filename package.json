@@ -38,7 +38,7 @@
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
-    "lint:md": "markdownlint $(find . -name '*.md' -a ! -path '*/node_modules/*')",
+    "lint:md": "markdownlint $(find . -name '*.md' -print -o -path '*/node_modules' -prune)",
     "lint:sol": "solhint contracts/{,dev-}contracts{,/**}/*.sol"
   },
   "devDependencies": {

@@ -34,14 +34,8 @@ library Bytes {
         // any potential garbage bytes in there.
         uint256 data = self << ((32 - byteLength) * 8);
         assembly {
-            mstore(
-                add(
-                    bts,
-                    /*BYTES_HEADER_SIZE*/
-                    32
-                ),
-                data
-            )
+            // 32 is BYTES_HEADER_SIZE
+            mstore(add(bts, 32), data)
         }
     }
 

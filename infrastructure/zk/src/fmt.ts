@@ -5,7 +5,7 @@ const IGNORED = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git'];
 const EXTENSIONS = ['ts', 'md', 'sol'];
 
 // If you wonder why this is written so obscurely through find and not through .prettierignore and globs,
-// it's because prettier *first* expands globs and *then* applies ignore rules, which leads to an error 
+// it's because prettier *first* expands globs and *then* applies ignore rules, which leads to an error
 // because it can't expand into volumes folder with not enough access rights, even if it is ignored.
 //
 // And if we let the shell handle glob expansion instead of prettier, `shopt -s globstar` will be
