@@ -16,14 +16,48 @@ use zksync_types::{tx::TxEthSignature, tx::TxHash, ZkSyncTx};
 use super::{client::Client, client::ClientError, Error as ApiError, JsonResult};
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 
+#[derive(Debug, Clone, Copy)]
+pub enum SumbitErrorCode {
+    AccountCloseDisabled = 101,
+    InvalidParams = 102,
+    UnsupportedFastProcessing = 103,
+    IncorrectTx = 104,
+    TxAdd = 105,
+
+    Internal = 110,
+    CommunicationCoreServer = 111,
+    Other = 112,
+}
+
+impl SumbitErrorCode {
+    fn from_err(err: &SubmitError) -> Self {
+        match err {
+            SubmitError::AccountCloseDisabled => Self::AccountCloseDisabled,
+            SubmitError::InvalidParams(_) => Self::InvalidParams,
+            SubmitError::UnsupportedFastProcessing => Self::UnsupportedFastProcessing,
+            SubmitError::IncorrectTx(_) => Self::IncorrectTx,
+            SubmitError::TxAdd(_) => Self::TxAdd,
+            SubmitError::CommunicationCoreServer(_) => Self::CommunicationCoreServer,
+            SubmitError::Internal(_) => Self::Internal,
+            SubmitError::Other(_) => Self::Other,
+        }
+    }
+
+    fn as_code(self) -> u64 {
+        self as u64
+    }
+}
+
 impl From<SubmitError> for ApiError {
     fn from(inner: SubmitError) -> Self {
-        // TODO Should we use the specific error codes in this context?
+        let internal_code = SumbitErrorCode::from_err(&inner).as_code();
+
         if let SubmitError::Internal(err) = &inner {
             ApiError::internal(err)
         } else {
             ApiError::bad_request(inner)
         }
+        .code(internal_code)
     }
 }
 
@@ -49,13 +83,13 @@ pub struct FastProcessingQuery {
 /// This struct has the same layout as `SignedZkSyncTx`, expect that it used
 /// `TxEthSignature` directly instead of `EthSignData`.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Tx {
+struct IncomingTx {
     tx: ZkSyncTx,
     signature: Option<TxEthSignature>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct TxBatch {
+struct IncomingTxBatch {
     txs: Vec<ZkSyncTx>,
     signature: Option<TxEthSignature>,
 }
@@ -73,7 +107,7 @@ impl Client {
     ) -> Result<TxHash, ClientError> {
         self.post("transactions/submit")
             .query(&FastProcessingQuery { fast_processing })
-            .body(&Tx { tx, signature })
+            .body(&IncomingTx { tx, signature })
             .send()
             .await
     }
@@ -85,7 +119,7 @@ impl Client {
         signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>, ClientError> {
         self.post("transactions/submit/batch")
-            .body(&TxBatch { txs, signature })
+            .body(&IncomingTxBatch { txs, signature })
             .send()
             .await
     }
@@ -95,7 +129,7 @@ impl Client {
 
 async fn submit_tx(
     data: web::Data<ApiTransactionsData>,
-    Json(body): Json<Tx>,
+    Json(body): Json<IncomingTx>,
     web::Query(query): web::Query<FastProcessingQuery>,
 ) -> JsonResult<TxHash> {
     let tx_hash = data
@@ -109,7 +143,7 @@ async fn submit_tx(
 
 async fn submit_tx_batch(
     data: web::Data<ApiTransactionsData>,
-    Json(body): Json<TxBatch>,
+    Json(body): Json<IncomingTxBatch>,
 ) -> JsonResult<Vec<TxHash>> {
     let txs = body.txs.into_iter().zip(std::iter::repeat(None)).collect();
 

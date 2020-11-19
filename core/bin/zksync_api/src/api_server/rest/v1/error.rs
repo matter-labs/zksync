@@ -76,6 +76,12 @@ impl Error {
         self.body.detail = detail.to_string();
         self
     }
+
+    /// Sets error specific code.
+    pub fn code(mut self, code: u64) -> Self {
+        self.body.code = Some(code);
+        self
+    }
 }
 
 impl Display for ErrorBody {

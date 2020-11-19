@@ -1,4 +1,4 @@
-//!Helper module to submit transactions into the zkSync Network.
+//! Helper module to submit transactions into the zkSync Network.
 
 // Built-in uses
 use std::fmt::Display;
@@ -81,6 +81,17 @@ impl SubmitError {
     fn invalid_params(msg: impl Display) -> Self {
         Self::InvalidParams(msg.to_string())
     }
+}
+
+macro_rules! internal_error {
+    ($err:tt, $input:tt) => {{
+        vlog::warn!("Internal Server error: {}, input: {:?}", $err, $input);
+        SubmitError::internal($err)
+    }};
+
+    ($err:tt) => {{
+        internal_error!($err, "N/A")
+    }};
 }
 
 impl TxSender {
@@ -322,7 +333,7 @@ impl TxSender {
             .operations_ext_schema()
             .account_created_on(&target_account_address)
             .await
-            .map_err(SubmitError::internal)?;
+            .map_err(|err| internal_error!(err, forced_exit))?;
 
         match account_age {
             Some(age) if Utc::now() - age < self.forced_exit_minimum_account_age => {
@@ -391,7 +402,7 @@ impl TxSender {
             .map_err(SubmitError::internal)?;
 
         let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(SubmitError::internal)
+        resp.map_err(|err| internal_error!(err))
     }
 
     async fn ticker_price_request(
@@ -409,7 +420,7 @@ impl TxSender {
             .await
             .map_err(SubmitError::internal)?;
         let resp = req.1.await.map_err(SubmitError::internal)?;
-        resp.map_err(SubmitError::internal)
+        resp.map_err(|err| internal_error!(err))
     }
 }
 
@@ -426,7 +437,7 @@ async fn send_verify_request_and_recv(
     // Wait for the check result.
     receiver
         .await
-        .map_err(SubmitError::internal)?
+        .map_err(|err| internal_error!(err))?
         .map_err(SubmitError::TxAdd)
 }
 
