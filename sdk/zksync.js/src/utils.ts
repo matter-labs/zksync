@@ -1,5 +1,17 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
-import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address, Transfer } from './types';
+import {
+    PubKeyHash,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TokenSymbol,
+    EthSignerType,
+    Address,
+    Transfer,
+    ForcedExit,
+    ChangePubKey,
+    Withdraw
+} from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -332,11 +344,11 @@ export async function verifyERC1271Signature(
     signerOrProvider: ethers.Signer | ethers.providers.Provider
 ): Promise<boolean> {
     const EIP1271_SUCCESS_VALUE = '0x1626ba7e';
-    
+
     // sign_message = keccak256("\x19Ethereum Signed Message:\n32" + keccak256(message))
     const hash = utils.keccak256(message);
     const sign_message = utils.hashMessage(hash);
-    
+
     const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
     const eipRetVal = await eip1271.isValidSignature(sign_message, signature);
     return eipRetVal === EIP1271_SUCCESS_VALUE;
@@ -433,6 +445,27 @@ export function serializeNonce(nonce: number): Uint8Array {
     return numberToBytesBE(nonce, 4);
 }
 
+export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
+    const type = new Uint8Array([3]);
+    const accountId = serializeAccountId(withdraw.accountId);
+    const accountBytes = serializeAddress(withdraw.from);
+    const ethAddressBytes = serializeAddress(withdraw.to);
+    const tokenIdBytes = serializeTokenId(withdraw.token);
+    const amountBytes = serializeAmountFull(withdraw.amount);
+    const feeBytes = serializeFeePacked(withdraw.fee);
+    const nonceBytes = serializeNonce(withdraw.nonce);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        accountBytes,
+        ethAddressBytes,
+        tokenIdBytes,
+        amountBytes,
+        feeBytes,
+        nonceBytes
+    ]);
+}
+
 export function serializeTransfer(transfer: Transfer): Uint8Array {
     const type = new Uint8Array([5]); // tx type
     const accountId = serializeAccountId(transfer.accountId);
@@ -443,6 +476,35 @@ export function serializeTransfer(transfer: Transfer): Uint8Array {
     const fee = serializeFeePacked(transfer.fee);
     const nonce = serializeNonce(transfer.nonce);
     return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+}
+
+export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
+    const type = new Uint8Array([7]);
+    const accountIdBytes = serializeAccountId(changePubKey.accountId);
+    const accountBytes = serializeAddress(changePubKey.account);
+    const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
+    const tokenIdBytes = serializeTokenId(changePubKey.feeToken);
+    const feeBytes = serializeFeePacked(changePubKey.fee);
+    const nonceBytes = serializeNonce(changePubKey.nonce);
+    return ethers.utils.concat([
+        type,
+        accountIdBytes,
+        accountBytes,
+        pubKeyHashBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes
+    ]);
+}
+
+export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
+    const type = new Uint8Array([8]);
+    const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
+    const targetBytes = serializeAddress(forcedExit.target);
+    const tokenIdBytes = serializeTokenId(forcedExit.token);
+    const feeBytes = serializeFeePacked(forcedExit.fee);
+    const nonceBytes = serializeNonce(forcedExit.nonce);
+    return ethers.utils.concat([type, initiatorAccountIdBytes, targetBytes, tokenIdBytes, feeBytes, nonceBytes]);
 }
 
 function numberToBytesBE(number: number, bytes: number): Uint8Array {
