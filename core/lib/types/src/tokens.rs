@@ -54,10 +54,10 @@ impl TokenLike {
             return Self::Id(id);
         }
         // Try to interpret a token as the token address with or without a prefix.
-        let maybe_address = if value.starts_with("0x") {
-            &value[2..]
+        let maybe_address = if let Some(value) = value.strip_prefix("0x") {
+            value
         } else {
-            &value
+            value
         };
         if let Ok(address) = Address::from_str(maybe_address) {
             return Self::Address(address);
