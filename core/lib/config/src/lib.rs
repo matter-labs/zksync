@@ -4,10 +4,17 @@ use std::{env, net::SocketAddr, str::FromStr, time::Duration};
 use url::Url;
 // Workspace uses
 use zksync_basic_types::{H160, H256};
-use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_port, parse_env_with};
+use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
 
 pub mod test_config;
+
+/// Makes address for bind from port.
+fn addr_from_port(port: u16) -> SocketAddr {
+    format!("0.0.0.0:{}", port)
+        .parse::<SocketAddr>()
+        .expect("Cant get address from port")
+}
 
 /// Configuration options for `eth_sender`.
 #[derive(Debug, Clone)]
@@ -79,7 +86,7 @@ impl ProverOptions {
             heartbeat_interval: Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL")),
             cycle_wait: Duration::from_millis(parse_env("PROVER_CYCLE_WAIT")),
             gone_timeout: Duration::from_millis(parse_env("PROVER_GONE_TIMEOUT")),
-            prover_server_address: parse_env_port("PROVER_SERVER_PORT"),
+            prover_server_address: addr_from_port(parse_env("PROVER_SERVER_PORT")),
             witness_generators: parse_env("WITNESS_GENERATORS"),
             idle_provers: parse_env("IDLE_PROVERS"),
         }
@@ -100,7 +107,7 @@ impl AdminServerOptions {
     pub fn from_env() -> Self {
         Self {
             admin_http_server_url: parse_env("ADMIN_SERVER_API_URL"),
-            admin_http_server_address: parse_env_port("ADMIN_SERVER_API_PORT"),
+            admin_http_server_address: addr_from_port(parse_env("ADMIN_SERVER_API_PORT")),
             secret_auth: parse_env("SECRET_AUTH"),
         }
     }
@@ -182,10 +189,10 @@ impl ApiServerOptions {
         }
 
         Self {
-            rest_api_server_address: parse_env_port("REST_API_PORT"),
-            json_rpc_http_server_address: parse_env_port("HTTP_RPC_API_PORT"),
-            json_rpc_ws_server_address: parse_env_port("WS_API_PORT"),
-            core_server_address: parse_env_port("PRIVATE_CORE_SERVER_PORT"),
+            rest_api_server_address: addr_from_port(parse_env("REST_API_PORT")),
+            json_rpc_http_server_address: addr_from_port(parse_env("HTTP_RPC_API_PORT")),
+            json_rpc_ws_server_address: addr_from_port(parse_env("WS_API_PORT")),
+            core_server_address: addr_from_port(parse_env("PRIVATE_CORE_SERVER_PORT")),
             core_server_url: parse_env("PRIVATE_CORE_SERVER_URL"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
             token_price_source: TokenPriceSource::from_env(),
