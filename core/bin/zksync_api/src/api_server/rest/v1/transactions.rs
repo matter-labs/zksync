@@ -23,6 +23,7 @@ pub enum SumbitErrorCode {
     UnsupportedFastProcessing = 103,
     IncorrectTx = 104,
     TxAdd = 105,
+    InappropriateFeeToken = 106,
 
     Internal = 110,
     CommunicationCoreServer = 111,
@@ -37,6 +38,7 @@ impl SumbitErrorCode {
             SubmitError::UnsupportedFastProcessing => Self::UnsupportedFastProcessing,
             SubmitError::IncorrectTx(_) => Self::IncorrectTx,
             SubmitError::TxAdd(_) => Self::TxAdd,
+            SubmitError::InappropriateFeeToken => Self::InappropriateFeeToken,
             SubmitError::CommunicationCoreServer(_) => Self::CommunicationCoreServer,
             SubmitError::Internal(_) => Self::Internal,
             SubmitError::Other(_) => Self::Other,
@@ -226,6 +228,9 @@ mod tests {
                         let price = Ok(BigDecimal::from(1_u64));
 
                         response.send(price).expect("Unable to send response");
+                    }
+                    TickerRequest::IsTokenAllowed { response, .. } => {
+                        response.send(Ok(true)).unwrap_or_default();
                     }
                 }
             }

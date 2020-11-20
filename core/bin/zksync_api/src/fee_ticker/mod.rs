@@ -73,6 +73,10 @@ pub enum TickerRequest {
         response: oneshot::Sender<Result<BigDecimal, anyhow::Error>>,
         req_type: TokenPriceRequestType,
     },
+    IsTokenAllowed {
+        token: TokenLike,
+        response: oneshot::Sender<Result<bool, anyhow::Error>>,
+    },
 }
 
 struct FeeTicker<API, INFO> {
@@ -210,6 +214,10 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                 } => {
                     let price = self.get_token_price(token, req_type).await;
                     response.send(price).unwrap_or_default();
+                }
+                TickerRequest::IsTokenAllowed { token, response } => {
+                    let allowed = self.validator.token_allowed(token).await;
+                    response.send(allowed).unwrap_or_default();
                 }
             }
         }

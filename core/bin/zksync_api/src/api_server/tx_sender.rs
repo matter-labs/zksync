@@ -56,6 +56,8 @@ pub enum SubmitError {
     IncorrectTx(String),
     #[error("Transaction adding error: {0}.")]
     TxAdd(TxAddError),
+    #[error("Chosen token is not suitable for paying fees.")]
+    InappropriateFeeToken,
 
     #[error("Communication error with the core server: {0}.")]
     CommunicationCoreServer(String),
