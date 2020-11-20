@@ -174,7 +174,8 @@ mod tests {
     use bigdecimal::BigDecimal;
     use futures::{channel::mpsc, prelude::*};
     use num::BigUint;
-    use zksync_types::{tx::PackedEthSignature, SignedZkSyncTx};
+    use zksync_test_account::ZkSyncAccount;
+    use zksync_types::{tokens::TokenLike, tx::PackedEthSignature, SignedZkSyncTx};
 
     use super::{
         super::test_utils::{TestServerConfig, TestTransactions},
@@ -231,8 +232,14 @@ mod tests {
 
                         response.send(price).expect("Unable to send response");
                     }
-                    TickerRequest::IsTokenAllowed { response, .. } => {
-                        response.send(Ok(true)).unwrap_or_default();
+                    TickerRequest::IsTokenAllowed { token, response } => {
+                        // For test purposes, PHNX token is not allowed.
+                        let is_phnx = match token {
+                            TokenLike::Id(id) => id == 1,
+                            TokenLike::Symbol(sym) => sym == "PHNX",
+                            TokenLike::Address(_) => unreachable!(),
+                        };
+                        response.send(Ok(!is_phnx)).unwrap_or_default();
                     }
                 }
             }
@@ -348,6 +355,92 @@ mod tests {
                 .submit_tx_batch(txs, Some(TxEthSignature::EthereumSignature(signature)))
                 .await?,
             tx_hashes
+        );
+
+        server.stop().await;
+        Ok(())
+    }
+
+    /// This test checks the following criteria:
+    ///
+    /// - Attempt to pay fees in an inappropriate token fails for single txs.
+    /// - Attempt to pay fees in an inappropriate token fails for single batch.
+    /// - Batch with an inappropriate token still can be processed if the fee is covered with a common token.
+    #[actix_rt::test]
+    async fn test_bad_fee_token() -> anyhow::Result<()> {
+        let (client, server) = TestServer::new().await?;
+
+        let from = ZkSyncAccount::rand();
+        from.set_account_id(Some(0xdead));
+        let to = ZkSyncAccount::rand();
+
+        // Submit transaction with a fee token that is not allowed.
+        let (tx, eth_sig) = from.sign_transfer(
+            1,
+            "PHNX",
+            100u64.into(),
+            100u64.into(),
+            &to.address,
+            0.into(),
+            false,
+        );
+        let transfer_bad_token = ZkSyncTx::Transfer(Box::new(tx));
+        assert!(client
+            .submit_tx(
+                transfer_bad_token.clone(),
+                Some(TxEthSignature::EthereumSignature(eth_sig)),
+                None
+            )
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("Chosen token is not suitable for paying fees"));
+
+        // Prepare batch and make the same mistake.
+        let bad_batch = vec![transfer_bad_token.clone(), transfer_bad_token];
+        let batch_message = crate::api_server::tx_sender::get_batch_sign_message(bad_batch.iter());
+        let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+        assert!(client
+            .submit_tx_batch(bad_batch, Some(TxEthSignature::EthereumSignature(eth_sig)),)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("Chosen token is not suitable for paying fees"));
+
+        // Finally, prepare the batch in which fee is covered by the supported token.
+        let (tx, _) = from.sign_transfer(
+            1,
+            "PHNX",
+            100u64.into(),
+            0u64.into(), // Note that fee is zero, which is OK.
+            &to.address,
+            0.into(),
+            false,
+        );
+        let phnx_transfer = ZkSyncTx::Transfer(Box::new(tx));
+        let phnx_transfer_hash = phnx_transfer.hash();
+        let (tx, _) = from.sign_transfer(
+            1,
+            "ETH",
+            0u64.into(),
+            200u64.into(), // Here we pay fees for both transfers in ETH.
+            &to.address,
+            0.into(),
+            false,
+        );
+        let fee_tx = ZkSyncTx::Transfer(Box::new(tx));
+        let fee_tx_hash = fee_tx.hash();
+
+        let good_batch = vec![phnx_transfer, fee_tx];
+        let good_batch_hashes = vec![phnx_transfer_hash, fee_tx_hash];
+        let batch_message = crate::api_server::tx_sender::get_batch_sign_message(good_batch.iter());
+        let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+
+        assert_eq!(
+            client
+                .submit_tx_batch(good_batch, Some(TxEthSignature::EthereumSignature(eth_sig)))
+                .await?,
+            good_batch_hashes
         );
 
         server.stop().await;
