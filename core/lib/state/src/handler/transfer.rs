@@ -1,4 +1,5 @@
 use anyhow::{ensure, format_err};
+use std::time::Instant;
 use zksync_crypto::params::{self, max_account_id};
 use zksync_types::{
     Account, AccountUpdate, AccountUpdates, Address, PubKeyHash, Transfer, TransferOp,
@@ -78,6 +79,7 @@ impl ZkSyncState {
         &mut self,
         op: &TransferOp,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         ensure!(
             op.from <= max_account_id(),
             "Transfer from account id is bigger than max supported"
@@ -143,6 +145,7 @@ impl ZkSyncState {
             amount: op.tx.fee.clone(),
         };
 
+        metrics::histogram!("state.transfer", start.elapsed());
         Ok((Some(fee), updates))
     }
 
@@ -150,6 +153,7 @@ impl ZkSyncState {
         &mut self,
         op: &TransferOp,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         ensure!(
             op.from <= max_account_id(),
             "Transfer to self from account id is bigger than max supported"
@@ -193,6 +197,7 @@ impl ZkSyncState {
             amount: op.tx.fee.clone(),
         };
 
+        metrics::histogram!("state.transfer_to_self", start.elapsed());
         Ok((Some(fee), updates))
     }
 
@@ -200,6 +205,7 @@ impl ZkSyncState {
         &mut self,
         op: &TransferToNewOp,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         let mut updates = Vec::new();
 
         ensure!(
@@ -264,6 +270,7 @@ impl ZkSyncState {
             amount: op.tx.fee.clone(),
         };
 
+        metrics::histogram!("state.transfer_to_new", start.elapsed());
         Ok((Some(fee), updates))
     }
 }

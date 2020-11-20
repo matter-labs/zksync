@@ -1,5 +1,5 @@
 // Built-in uses
-use std::time::Duration;
+use std::time::{Duration, Instant};
 // External uses
 use anyhow::format_err;
 use futures::channel::mpsc::{Receiver, Sender};
@@ -75,6 +75,7 @@ async fn save_pending_block(
     applied_updates_request: AppliedUpdatesRequest,
     pool: &ConnectionPool,
 ) {
+    let start = Instant::now();
     let mut storage = pool
         .access_storage()
         .await
@@ -111,6 +112,8 @@ async fn save_pending_block(
         .commit()
         .await
         .expect("Unable to commit DB transaction");
+
+    metrics::histogram!("committer.save_pending_block", start.elapsed());
 }
 
 async fn commit_block(
@@ -119,6 +122,7 @@ async fn commit_block(
     pool: &ConnectionPool,
     mempool_req_sender: &mut Sender<MempoolRequest>,
 ) {
+    let start = Instant::now();
     let BlockCommitRequest {
         block,
         accounts_updated,
@@ -188,6 +192,8 @@ async fn commit_block(
         .commit()
         .await
         .expect("Unable to commit DB transaction");
+
+    metrics::histogram!("committer.commit_block", start.elapsed());
 }
 
 async fn poll_for_new_proofs_task(pool: ConnectionPool) {

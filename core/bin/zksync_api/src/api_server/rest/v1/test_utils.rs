@@ -4,6 +4,8 @@
 
 // External uses
 use actix_web::{web, App, Scope};
+use once_cell::sync::Lazy;
+use tokio::sync::Mutex;
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
@@ -56,7 +58,7 @@ impl TestServerConfig {
     }
 
     /// Creates several transactions and the corresponding executed operations.
-    fn gen_zk_txs() -> Vec<(ZkSyncTx, ExecutedOperations)> {
+    pub fn gen_zk_txs(fee: u64) -> Vec<(ZkSyncTx, ExecutedOperations)> {
         let from = ZkSyncAccount::rand();
         from.set_account_id(Some(0xdead));
 
@@ -67,7 +69,7 @@ impl TestServerConfig {
 
         // Sign change pubkey tx pair
         {
-            let tx = from.sign_change_pubkey_tx(None, false, 0, 0_u64.into(), false);
+            let tx = from.sign_change_pubkey_tx(None, false, 0, fee.into(), false);
 
             let zksync_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
                 tx: tx.clone(),
@@ -92,15 +94,7 @@ impl TestServerConfig {
         // Transfer tx pair
         {
             let tx = from
-                .sign_transfer(
-                    0,
-                    "ETH",
-                    1_u64.into(),
-                    0_u64.into(),
-                    &to.address,
-                    None,
-                    false,
-                )
+                .sign_transfer(0, "ETH", 1_u64.into(), fee.into(), &to.address, None, false)
                 .0;
 
             let zksync_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -129,12 +123,24 @@ impl TestServerConfig {
     }
 
     pub async fn fill_database(&self) -> anyhow::Result<()> {
+        static INITED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+
+        // Hold this guard until transaction will be committed to avoid double init.
+        let mut inited_guard = INITED.lock().await;
+        if *inited_guard {
+            return Ok(());
+        }
+        *inited_guard = true;
+
         let mut storage = self.pool.access_storage().await?;
 
         // Check if database is been already inited.
         if storage.chain().block_schema().get_block(1).await?.is_some() {
             return Ok(());
         }
+
+        // Make changes atomic.
+        let mut storage = storage.start_transaction().await?;
 
         // Below lies the initialization of the data for the test.
         let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
@@ -156,7 +162,10 @@ impl TestServerConfig {
 
             // Add transactions to every odd block.
             let txs = if block_number % 2 == 1 {
-                Self::gen_zk_txs().into_iter().map(|(_tx, op)| op).collect()
+                Self::gen_zk_txs(1_000)
+                    .into_iter()
+                    .map(|(_tx, op)| op)
+                    .collect()
             } else {
                 vec![]
             };
@@ -241,6 +250,11 @@ impl TestServerConfig {
                     .await?;
             }
         }
+
+        storage.commit().await?;
+        // Storage has been inited, so we can safely drop this guard.
+        drop(inited_guard);
+
         Ok(())
     }
 }

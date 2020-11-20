@@ -9,8 +9,6 @@ license = "Apache-2.0"
 keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 zksync_types = { path = "../types", version = "1.0" }
 

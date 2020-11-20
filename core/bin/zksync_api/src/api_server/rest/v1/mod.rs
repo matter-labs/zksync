@@ -14,10 +14,10 @@ use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
-use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
 
 // Local uses
+use crate::api_server::tx_sender::TxSender;
 
 mod blocks;
 pub mod client;
@@ -25,16 +25,23 @@ mod config;
 mod error;
 #[cfg(test)]
 mod test_utils;
+mod tokens;
+mod transactions;
 
 /// Maximum limit value in the requests.
 pub const MAX_LIMIT: u32 = 100;
 
 type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
-pub(crate) fn api_scope(pool: ConnectionPool, env_options: ConfigurationOptions) -> Scope {
+pub(crate) fn api_scope(tx_sender: TxSender, env_options: ConfigurationOptions) -> Scope {
     web::scope("/api/v1")
         .service(config::api_scope(&env_options))
-        .service(blocks::api_scope(&env_options, pool))
+        .service(blocks::api_scope(&env_options, tx_sender.pool.clone()))
+        .service(transactions::api_scope(tx_sender.clone()))
+        .service(tokens::api_scope(
+            tx_sender.tokens,
+            tx_sender.ticker_requests,
+        ))
 }
 
 /// Internal pagination query representation in according to spec:

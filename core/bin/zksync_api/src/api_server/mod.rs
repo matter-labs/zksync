@@ -22,6 +22,7 @@ mod loggers;
 mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;
+mod tx_sender;
 
 /// Amount of threads used by each server to serve requests.
 const THREADS_PER_SERVER: usize = 128;
@@ -47,6 +48,8 @@ pub fn start_api_server(
         config_options.rest_api_server_address,
         config_options.contract_eth_addr,
         panic_notify.clone(),
+        ticker_request_sender.clone(),
+        sign_check_sender.clone(),
         config_options.clone(),
     );
     rpc_subscriptions::start_ws_server(

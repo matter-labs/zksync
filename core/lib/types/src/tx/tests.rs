@@ -245,3 +245,41 @@ fn test_ethereum_signature_sign() {
         assert_eq!(signature, correct_signature, "signature is incorrect");
     }
 }
+
+/// Checks that we are able to decode old entries from the database.
+#[test]
+fn eth_sign_data_compatibility() {
+    // Messages were stored as strings rather than byte vectors.
+    #[derive(Clone, Serialize)]
+    struct OldEthSignData {
+        pub signature: TxEthSignature,
+        pub message: String,
+    }
+    // Generate dummy signature.
+    let private_key = "0b43c0f5b5a13a7047408d1f8c8ad32ba5879902ea6212184e0a5d1157281d76"
+        .parse()
+        .unwrap();
+    let message = "Sample text".to_owned();
+    let signature = TxEthSignature::EthereumSignature(
+        PackedEthSignature::sign(&private_key, message.as_bytes()).unwrap(),
+    );
+
+    let old_eth_sign_data = OldEthSignData { signature, message };
+    let value = serde_json::to_value(old_eth_sign_data.clone()).unwrap();
+
+    let eth_sign_data: EthSignData =
+        serde_json::from_value(value).expect("failed to decode old message format");
+
+    assert_eq!(old_eth_sign_data.signature, eth_sign_data.signature);
+    assert_eq!(
+        old_eth_sign_data.message.as_bytes(),
+        eth_sign_data.message.as_slice()
+    );
+    // We are able to encode/decode messages in new format.
+    let value = serde_json::to_value(eth_sign_data.clone()).unwrap();
+    let deserialized: EthSignData =
+        serde_json::from_value(value).expect("failed to decode EthSignData");
+
+    assert_eq!(deserialized.signature, eth_sign_data.signature);
+    assert_eq!(deserialized.message, eth_sign_data.message);
+}

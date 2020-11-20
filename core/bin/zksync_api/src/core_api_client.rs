@@ -31,7 +31,9 @@ impl CoreApiClient {
         eth_signature: Option<TxEthSignature>,
     ) -> anyhow::Result<Result<(), TxAddError>> {
         let endpoint = format!("{}/new_txs_batch", self.addr);
-        self.post(&endpoint, (txs, eth_signature)).await
+        let data = (txs, eth_signature);
+
+        self.post(&endpoint, data).await
     }
 
     /// Queries information about unconfirmed deposit operations for a certain address from a Core.

@@ -170,12 +170,16 @@ async fn test_deposit<S: EthereumSigner + Clone>(
 
     if !deposit_wallet.tokens.is_eth(token.address.into()) {
         if !ethereum.is_erc20_deposit_approved(token.address).await? {
-            let tx_approve_deposits = ethereum.approve_erc20_token_deposits(token.address).await?;
+            let tx_approve_deposits = ethereum
+                .limited_approve_erc20_token_deposits(token.address, U256::from(amount))
+                .await?;
             ethereum.wait_for_tx(tx_approve_deposits).await?;
         }
 
         assert!(
-            ethereum.is_erc20_deposit_approved(token.address).await?,
+            ethereum
+                .is_limited_erc20_deposit_approved(token.address, U256::from(amount))
+                .await?,
             "Token should be approved"
         );
     };
@@ -195,6 +199,15 @@ async fn test_deposit<S: EthereumSigner + Clone>(
     // let balance_after = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
 
     if !sync_wallet.tokens.is_eth(token.address.into()) {
+        // It should not be approved because we have approved only DEPOSIT_AMOUNT, not the maximum possible amount of deposit
+        assert!(
+            !ethereum
+                .is_limited_erc20_deposit_approved(token.address, U256::from(amount))
+                .await?
+        );
+        // Unlimited approve for deposit
+        let tx_approve_deposits = ethereum.approve_erc20_token_deposits(token.address).await?;
+        ethereum.wait_for_tx(tx_approve_deposits).await?;
         assert!(ethereum.is_erc20_deposit_approved(token.address).await?);
     }
 

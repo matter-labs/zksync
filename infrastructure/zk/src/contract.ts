@@ -56,15 +56,15 @@ async function prepareTestContracts() {
     });
 
     const setConstant = (target: string, name: string, value: string) => {
-        const regex = new RegExp(`(.*constant ${name} =)(.*);`, 'g');
+        const regex = new RegExp(`(constant ${name} =)(.*?);`, 'gs');
         return target.replace(regex, `$1 ${value};`);
     };
 
     const createGetter = (target: string, name: string) => {
-        const regex = new RegExp(`    (.*) (constant ${name} =)(.*);(.*)`, 'g');
+        const regex = new RegExp(`    (.*) constant ${name} =(.|\s)*?;.*`, 'g');
         return target.replace(
             regex,
-            `    $1 $2$3;$4\n    function get_${name}() external pure returns ($1) {\n        return ${name};\n    }`
+            `    $&\n    function get_${name}() external pure returns ($1) {\n        return ${name};\n    }`
         );
     };
 
