@@ -294,7 +294,7 @@ pub fn run_prover_server(
                     pool_maintainer.start(panic_notify.clone());
                 }
                 // Start HTTP server.
-                let gone_timeout = prover_options.gone_timeout.clone();
+                let gone_timeout = prover_options.gone_timeout;
                 let idle_provers = prover_options.idle_provers;
                 HttpServer::new(move || {
                     let app_state =

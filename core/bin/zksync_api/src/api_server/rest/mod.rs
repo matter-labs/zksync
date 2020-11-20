@@ -62,6 +62,7 @@ async fn start_server(
 }
 
 /// Start HTTP REST API
+#[allow(clippy::too_many_arguments)]
 pub(super) fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
