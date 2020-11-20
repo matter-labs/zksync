@@ -265,7 +265,7 @@ impl RpcApp {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
-                tx_type: tx_type.clone(),
+                tx_type,
                 address,
                 token: token.clone(),
                 response: req.0,

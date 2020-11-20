@@ -168,20 +168,13 @@ impl RpcApp {
         address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
-        let token_allowed =
-            Self::token_allowed_for_fees(self.tx_sender.ticker_requests.clone(), token.clone())
-                .await?;
+        let ticker = self.tx_sender.ticker_requests.clone();
+        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        Self::ticker_request(
-            self.tx_sender.ticker_requests.clone(),
-            tx_type,
-            address,
-            token,
-        )
-        .await
+        Self::ticker_request(ticker.clone(), tx_type, address, token).await
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -198,26 +191,18 @@ impl RpcApp {
             });
         }
 
-        let token_allowed =
-            Self::token_allowed_for_fees(self.tx_sender.ticker_requests.clone(), token.clone())
-                .await?;
+        let ticker = self.tx_sender.ticker_requests.clone();
+        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let ticker_request_sender = self.tx_sender.ticker_requests.clone();
-
         let mut total_fee = BigUint::from(0u32);
 
         for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
-            total_fee += Self::ticker_request(
-                ticker_request_sender.clone(),
-                tx_type.clone(),
-                *address,
-                token.clone(),
-            )
-            .await?
-            .total_fee;
+            let ticker = ticker.clone();
+            let fee = Self::ticker_request(ticker, *tx_type, *address, token.clone()).await?;
+            total_fee += fee.total_fee;
         }
         // Sum of transactions can be unpackable
         total_fee = closest_packable_fee_amount(&total_fee);
