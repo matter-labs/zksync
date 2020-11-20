@@ -37,6 +37,7 @@ use crate::fee_ticker::{
 };
 use zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL;
 
+mod fee_token_validator;
 mod ticker_api;
 mod ticker_info;
 
@@ -270,9 +271,9 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
     async fn get_token_price(
         &self,
         token: TokenLike,
-        req_rype: TokenPriceRequestType,
+        request_type: TokenPriceRequestType,
     ) -> Result<BigDecimal, anyhow::Error> {
-        let factor = match req_rype {
+        let factor = match request_type {
             TokenPriceRequestType::USDForOneWei => {
                 let token_decimals = self.api.get_token(token.clone()).await?.decimals;
                 BigUint::from(10u32).pow(u32::from(token_decimals))
