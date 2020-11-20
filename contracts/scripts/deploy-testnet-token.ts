@@ -13,14 +13,14 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
 (async () => {
     const parser = new ArgumentParser({
-        version: "0.1.0",
+        version: '0.1.0',
         addHelp: true,
-        description: "Deploy contracts and publish them on Etherscan/Tesseracts",
+        description: 'Deploy contracts and publish them on Etherscan/Tesseracts'
     });
-    parser.addArgument("--publish", {
+    parser.addArgument('--publish', {
         required: false,
-        action: "storeTrue",
-        help: "Only publish code for deployed tokens",
+        action: 'storeTrue',
+        help: 'Only publish code for deployed tokens'
     });
     parser.addArgument("--deployerPrivateKey", {required: false, help: "Wallet used to deploy contracts"});
     const args = parser.parseArgs(process.argv.slice(2));
@@ -31,12 +31,12 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
     const contractCode = readContractCode("TestnetERC20Token");
 
-    if (process.env.ETH_NETWORK === "mainnet") {
-        throw new Error("Test ERC20 tokens should not be deployed to mainnet");
+    if (process.env.ETH_NETWORK === 'mainnet') {
+        throw new Error('Test ERC20 tokens should not be deployed to mainnet');
     }
 
     if (args.publish) {
-        console.log("Publishing source code");
+        console.log('Publishing source code');
         let verifiedOnce = false;
         const networkTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.ETH_NETWORK}`);
         for (const token of networkTokens) {
@@ -47,10 +47,10 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
                 console.log(`Publishing code for : ${token.symbol}, ${token.address}`);
                 const constructorArgs = [`${token.name} (${process.env.ETH_NETWORK})`, token.symbol, token.decimals];
                 const rawArgs = encodeConstructorArgs(contractCode, constructorArgs);
-                await publishSourceCodeToEtherscan(token.address, "TestnetERC20Token", rawArgs, "contracts/test");
+                await publishSourceCodeToEtherscan(token.address, 'TestnetERC20Token', rawArgs, 'contracts/test');
                 verifiedOnce = true;
             } catch (e) {
-                console.log("Error failed to verified code:", e);
+                console.log('Error failed to verified code:', e);
             }
         }
         return;

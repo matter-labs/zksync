@@ -1,3 +1,4 @@
+
 import { ethers, Wallet } from "ethers";
 import { Deployer, readContractCode, readTestContracts, readProductionContracts } from "../src.ts/deploy";
 import { deployContract } from "ethereum-waffle";
@@ -10,21 +11,21 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
 (async () => {
     const parser = new ArgumentParser({
-        version: "0.1.0",
+        version: '0.1.0',
         addHelp: true,
-        description: "Deploy testkit contracts",
+        description: 'Deploy testkit contracts'
     });
-    parser.addArgument("--prodContracts", {
+    parser.addArgument('--prodContracts', {
         required: false,
-        help: "deploy production contracts",
-        action: "storeTrue",
+        help: 'deploy production contracts',
+        action: 'storeTrue'
     });
-    parser.addArgument("--genesisRoot", { required: true, help: "genesis root" });
+    parser.addArgument('--genesisRoot', { required: true, help: 'genesis root' });
     const args = parser.parseArgs(process.argv.slice(2));
     process.env.GENESIS_ROOT = args.genesisRoot;
 
-    if (process.env.ETH_NETWORK !== "test") {
-        console.error("This deploy script is only for localhost-test network");
+    if (process.env.ETH_NETWORK !== 'test') {
+        console.error('This deploy script is only for localhost-test network');
         process.exit(1);
     }
 
@@ -40,14 +41,14 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
     const erc20 = await deployContract(
         deployWallet,
-        readContractCode("TestnetERC20Token"),
-        ["Matter Labs Trial Token", "MLTT", 18],
+        readContractCode('TestnetERC20Token'),
+        ['Matter Labs Trial Token', 'MLTT', 18],
         { gasLimit: 5000000 }
     );
     console.log(`TEST_ERC20=${erc20.address}`);
     await (await governance.addToken(erc20.address)).wait();
     if ((await governance.tokenIds(erc20.address)) !== 1) {
-        console.error("Problem with testkit deployment, TEST_ERC20 token should have id 1");
+        console.error('Problem with testkit deployment, TEST_ERC20 token should have id 1');
         process.exit(1);
     }
 

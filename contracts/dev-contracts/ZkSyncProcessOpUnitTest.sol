@@ -1,10 +1,8 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 import "generated/ZkSyncTest.sol";
 
-
 contract ZkSyncProcessOpUnitTest is ZkSyncTest {
-
     function testProcessOperation(
         bytes calldata _publicData,
         bytes calldata _ethWitness,
@@ -12,5 +10,4 @@ contract ZkSyncProcessOpUnitTest is ZkSyncTest {
     ) external {
         collectOnchainOps(0, _publicData, _ethWitness, _ethWitnessSizes);
     }
-
 }

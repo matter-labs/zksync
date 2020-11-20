@@ -157,6 +157,9 @@ export interface Tokens {
     };
 }
 
+// we have to ignore this becase a bug in prettier causes this exact block
+// to have double semicolons inside
+// prettier-ignore
 export interface ChangePubKeyFee {
     // Note: Ignore, since it just looks more intuitive if `"ChangePubKey"` is kept as a string literal)
     // prettier-ignore

@@ -21,7 +21,7 @@ async function main() {
         
     const deployer = new Deployer({ deployWallet: wallet });
     const upgradeGatekeeper = deployer.upgradeGatekeeperContract(wallet);
-    const tx = await upgradeGatekeeper.finishUpgrade(["0x", "0x", "0x"]);
+    const tx = await upgradeGatekeeper.finishUpgrade(['0x', '0x', '0x']);
     console.log(tx);
 }
 

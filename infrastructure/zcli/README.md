@@ -6,8 +6,7 @@ Config file `.zcli-config.json` is auto-generated and is not to be edited.
 
 Config management can be done through the CLI.
 
-By default, `zcli` tries to open `./.zcli-config.json`. If not present,
-`$ZCLI_HOME/.zcli-config.json`.
+By default, `zcli` tries to open `./.zcli-config.json`. If not present, `$ZCLI_HOME/.zcli-config.json`.
 
 ## Usage
 
@@ -19,8 +18,7 @@ If any error occures, process exits with error code 1.
 
 ### Wallet management
 
-All wallets are stored as unencrypted private keys in `.zcli-config.json`.
-One of them may be set as default wallet.
+All wallets are stored as unencrypted private keys in `.zcli-config.json`. One of them may be set as default wallet.
 
 ```bash
 # lists all wallets' addresses
@@ -43,8 +41,8 @@ zcli wallets delete ADDRESS
 
 ### Network management
 
-In every command, default network may be overriden by `-n NETWORK` flag.
-`NETWORK` can be either `localhost`, `rinkeby`, `ropsten` or `mainnet`.
+In every command, default network may be overriden by `-n NETWORK` flag. `NETWORK` can be either `localhost`, `rinkeby`,
+`ropsten` or `mainnet`.
 
 ```bash
 # list available networks
@@ -90,9 +88,8 @@ zcli transfer [--fast] AMOUNT TOKEN ADDRESS
 zcli transfer [--fast] --json '{ amount: AMOUNT, token: TOKEN, from: PRIVATE_KEY, to: ADDRESS }'
 ```
 
-If `--fast` is set, the command will not wait for transaction commitment and only print the transaction hash.
-Otherwise, full information about transaction is printed.
-
+If `--fast` is set, the command will not wait for transaction commitment and only print the transaction hash. Otherwise,
+full information about transaction is printed.
 
 ## Installation
 

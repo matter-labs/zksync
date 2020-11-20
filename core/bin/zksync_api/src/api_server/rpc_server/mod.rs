@@ -2,7 +2,7 @@
 use futures::{
     channel::{
         mpsc,
-        oneshot::{self, Receiver},
+        oneshot::{self},
     },
     SinkExt,
 };
@@ -17,21 +17,15 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{
-    tx::{TxEthSignature, TxHash},
-    Address, PriorityOp, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
-};
+use zksync_types::{tx::TxHash, Address, PriorityOp, TokenLike, TxFeeTypes};
 // Local uses
 use crate::{
     core_api_client::{CoreApiClient, EthBlockId},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
-    signature_checker::TxWithSignData,
-    signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
-    tx_error::TxAddError,
-    utils::{shared_lru_cache::SharedLruCache, token_db_cache::TokenDBCache},
+    signature_checker::VerifyTxSignatureRequest,
+    utils::shared_lru_cache::SharedLruCache,
 };
 use bigdecimal::BigDecimal;
-use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 pub mod error;
@@ -39,9 +33,9 @@ mod rpc_impl;
 mod rpc_trait;
 pub mod types;
 
-use self::error::*;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
+use super::tx_sender::TxSender;
 
 pub(crate) async fn get_ongoing_priority_ops(
     api_client: &CoreApiClient,
@@ -62,22 +56,12 @@ pub struct RpcApp {
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_complete_withdrawal_tx_hashes: SharedLruCache<TxHash, String>,
 
-    pub api_client: CoreApiClient,
-    pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
-    pub ticker_request_sender: mpsc::Sender<TickerRequest>,
-
-    pub connection_pool: ConnectionPool,
-
     pub confirmations_for_eth_event: u64,
-    pub token_cache: TokenDBCache,
 
-    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
-    forced_exit_minimum_account_age: chrono::Duration,
-    enforce_pubkey_change_fee: bool,
+    tx_sender: TxSender,
 }
 
 impl RpcApp {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
@@ -88,17 +72,15 @@ impl RpcApp {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
 
-        let token_cache = TokenDBCache::new(connection_pool.clone());
-
-        let api_client = CoreApiClient::new(api_server_options.core_server_url.clone());
-
-        let api_requests_caches_size = api_server_options.api_requests_caches_size;
+        let api_requests_caches_size = config_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
-        let enforce_pubkey_change_fee = api_server_options.enforce_pubkey_change_fee;
 
-        let forced_exit_minimum_account_age =
-            chrono::Duration::from_std(api_server_options.forced_exit_minimum_account_age)
-                .expect("Unable to convert std::Duration to chrono::Duration");
+        let tx_sender = TxSender::new(
+            connection_pool,
+            sign_verify_request_sender,
+            ticker_request_sender,
+            config_options,
+        );
 
         RpcApp {
             runtime_handle,
@@ -108,67 +90,21 @@ impl RpcApp {
             cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
             cache_of_complete_withdrawal_tx_hashes: SharedLruCache::new(api_requests_caches_size),
 
-            connection_pool,
-            api_client,
-
-            sign_verify_request_sender,
-            ticker_request_sender,
-
             confirmations_for_eth_event,
-            token_cache,
 
-            forced_exit_minimum_account_age,
-            enforce_pubkey_change_fee,
+            tx_sender,
         }
     }
 
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
     }
-
-    async fn token_info_from_id(&self, token_id: TokenId) -> Result<Token> {
-        fn rpc_message(error: impl ToString) -> Error {
-            Error {
-                code: RpcErrorCodes::Other.into(),
-                message: error.to_string(),
-                data: None,
-            }
-        }
-
-        self.token_cache
-            .get_token(token_id)
-            .await
-            .map_err(rpc_message)?
-            .ok_or_else(|| rpc_message("Token not found in the DB"))
-    }
-
-    /// Returns a message that user has to sign to send the transaction.
-    /// If the transaction doesn't need a message signature, returns `None`.
-    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
-    async fn get_tx_info_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<Vec<u8>>> {
-        match tx {
-            ZkSyncTx::Transfer(tx) => {
-                let token = self.token_info_from_id(tx.token).await?;
-                Ok(Some(
-                    tx.get_ethereum_sign_message(&token.symbol, token.decimals)
-                        .into_bytes(),
-                ))
-            }
-            ZkSyncTx::Withdraw(tx) => {
-                let token = self.token_info_from_id(tx.token).await?;
-                Ok(Some(
-                    tx.get_ethereum_sign_message(&token.symbol, token.decimals)
-                        .into_bytes(),
-                ))
-            }
-            _ => Ok(None),
-        }
-    }
 }
 
 impl RpcApp {
     async fn access_storage(&self) -> Result<StorageProcessor<'_>> {
-        self.connection_pool
+        self.tx_sender
+            .pool
             .access_storage()
             .await
             .map_err(|_| Error::internal_error())
@@ -178,7 +114,8 @@ impl RpcApp {
     async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
         let confirmations_for_eth_event = self.confirmations_for_eth_event;
 
-        let ongoing_ops = get_ongoing_priority_ops(&self.api_client, address).await?;
+        let ongoing_ops =
+            get_ongoing_priority_ops(&self.tx_sender.core_api_client, address).await?;
 
         let mut max_block_number = 0;
 
@@ -386,50 +323,15 @@ impl RpcApp {
         if let Some((account_id, commited_state)) = account_info.committed {
             result.account_id = Some(account_id);
             result.committed =
-                ResponseAccountState::try_restore(commited_state, &self.token_cache).await?;
+                ResponseAccountState::try_restore(commited_state, &self.tx_sender.tokens).await?;
         };
 
         if let Some((_, verified_state)) = account_info.verified {
             result.verified =
-                ResponseAccountState::try_restore(verified_state, &self.token_cache).await?;
+                ResponseAccountState::try_restore(verified_state, &self.tx_sender.tokens).await?;
         };
 
         Ok(result)
-    }
-
-    /// For forced exits, we must check that target account exists for more
-    /// than 24 hours in order to give new account owners give an opportunity
-    /// to set the signing key. While `ForcedExit` operation doesn't do anything
-    /// bad to the account, it's more user-friendly to only allow this operation
-    /// after we're somewhat sure that zkSync account is not owned by anybody.
-    async fn check_forced_exit(&self, forced_exit: &zksync_types::ForcedExit) -> Result<()> {
-        let target_account_address = forced_exit.target;
-        let mut storage = self.access_storage().await?;
-        let account_age = storage
-            .chain()
-            .operations_ext_schema()
-            .account_created_on(&target_account_address)
-            .await
-            .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, forced_exit);
-                Error::internal_error()
-            })?;
-
-        match account_age {
-            Some(age) => {
-                if (chrono::Utc::now() - age) >= self.forced_exit_minimum_account_age {
-                    // Account does exist long enough, everything is OK.
-                    Ok(())
-                } else {
-                    let err = format!(
-                        "Target account exists less than required minimum amount ({} hours)",
-                        self.forced_exit_minimum_account_age.num_hours()
-                    );
-                    Err(Error::invalid_params(err))
-                }
-            }
-            None => Err(Error::invalid_params("Target account does not exist")),
-        }
     }
 
     async fn eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> Result<Option<String>> {
@@ -496,124 +398,6 @@ pub fn start_rpc_server(
             .unwrap();
         server.wait();
     });
-}
-
-fn rpc_error(error: TxAddError) -> Error {
-    Error {
-        code: RpcErrorCodes::from(error).into(),
-        message: error.to_string(),
-        data: None,
-    }
-}
-
-async fn send_verify_request_and_recv(
-    request: VerifyTxSignatureRequest,
-    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
-    receiver: Receiver<std::result::Result<VerifiedTx, TxAddError>>,
-) -> Result<VerifiedTx> {
-    // Send the check request.
-    req_channel.send(request).await.map_err(|err| {
-        log::warn!(
-            "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-            file!(),
-            line!(),
-            column!(),
-            err
-        );
-        Error::internal_error()
-    })?;
-
-    // Wait for the check result.
-    receiver
-        .await
-        .map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                file!(),
-                line!(),
-                column!(),
-                err
-            );
-            Error::internal_error()
-        })?
-        .map_err(rpc_error)
-}
-
-/// Send a request for Ethereum signature verification and wait for the response.
-/// If `msg_to_sign` is not `None`, then the signature must be present.
-async fn verify_tx_info_message_signature(
-    tx: &ZkSyncTx,
-    signature: Option<TxEthSignature>,
-    msg_to_sign: Option<Vec<u8>>,
-    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
-) -> Result<VerifiedTx> {
-    let eth_sign_data = match msg_to_sign {
-        Some(message_to_sign) => {
-            let signature = signature.ok_or_else(|| rpc_error(TxAddError::MissingEthSignature))?;
-
-            Some(EthSignData {
-                signature,
-                message: message_to_sign,
-            })
-        }
-        None => None,
-    };
-
-    let (sender, receiever) = oneshot::channel();
-
-    let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Tx(TxWithSignData {
-            tx: tx.clone(),
-            eth_sign_data,
-        }),
-        response: sender,
-    };
-
-    send_verify_request_and_recv(request, req_channel, receiever).await
-}
-
-/// Send a request for Ethereum signature verification and wait for the response.
-/// Unlike in case of `verify_tx_info_message_signature`, we do not require
-/// every transaction from the batch to be signed. The signature must be obtained
-/// through signing hash of concatenated transactions bytes.
-async fn verify_txs_batch_signature(
-    batch: Vec<TxWithSignature>,
-    signature: TxEthSignature,
-    msgs_to_sign: Vec<Option<Vec<u8>>>,
-    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
-) -> Result<VerifiedTx> {
-    let mut txs = Vec::with_capacity(batch.len());
-    for (tx, message) in batch.into_iter().zip(msgs_to_sign.into_iter()) {
-        // If we have more signatures provided than required,
-        // we will verify those too.
-        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
-            Some(EthSignData { signature, message })
-        } else {
-            None
-        };
-        txs.push(TxWithSignData {
-            tx: tx.tx,
-            eth_sign_data,
-        });
-    }
-    // User is expected to sign hash of the data of all transactions in the batch.
-    let message = tiny_keccak::keccak256(
-        txs.iter()
-            .flat_map(|tx| tx.tx.get_bytes())
-            .collect::<Vec<u8>>()
-            .as_slice(),
-    )
-    .to_vec();
-    let eth_sign_data = EthSignData { signature, message };
-
-    let (sender, receiever) = oneshot::channel();
-
-    let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs, eth_sign_data),
-        response: sender,
-    };
-
-    send_verify_request_and_recv(request, req_channel, receiever).await
 }
 
 #[cfg(test)]
