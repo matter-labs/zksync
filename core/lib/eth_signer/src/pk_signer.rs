@@ -57,7 +57,7 @@ mod test {
     #[actix_rt::test]
     async fn test_generating_signature() {
         let private_key = H256::from([5; 32]);
-        let signer = PrivateKeySigner::new(private_key.clone());
+        let signer = PrivateKeySigner::new(private_key);
         let raw_transaction = RawTransaction {
             chain_id: 1,
             nonce: U256::from(1),

@@ -466,7 +466,7 @@ mod tests {
         });
         // Get address is ok,  unlock address is ok, recover address from signature is also ok
         let client = JsonRpcSigner::new(address, None, None, None).await.unwrap();
-        let msg = "some_text_message".as_bytes();
+        let msg = b"some_text_message";
         if let TxEthSignature::EthereumSignature(signature) =
             client.sign_message(msg).await.unwrap()
         {
