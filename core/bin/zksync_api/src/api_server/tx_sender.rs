@@ -451,8 +451,7 @@ async fn verify_tx_info_message_signature(
 ) -> Result<VerifiedTx, SubmitError> {
     let eth_sign_data = match msg_to_sign {
         Some(message_to_sign) => {
-            let signature =
-                signature.ok_or_else(|| SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+            let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
 
             Some(EthSignData {
                 signature,
