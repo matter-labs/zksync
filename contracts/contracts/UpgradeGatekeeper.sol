@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 pragma experimental ABIEncoderV2;
 
 import "./SafeMath.sol";
@@ -16,24 +16,20 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     Upgradeable[] public managedContracts;
 
     /// @notice Upgrade mode statuses
-    enum UpgradeStatus {
-        Idle,
-        NoticePeriod,
-        Preparation
-    }
+    enum UpgradeStatus {Idle, NoticePeriod, Preparation}
 
     UpgradeStatus public upgradeStatus;
 
     /// @notice Notice period finish timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint public noticePeriodFinishTimestamp;
+    uint256 public noticePeriodFinishTimestamp;
 
     /// @notice Addresses of the next versions of the contracts to be upgraded (if element of this array is equal to zero address it means that appropriate upgradeable contract wouldn't be upgraded this time)
     /// @dev Will be empty in case of not active upgrade mode
     address[] public nextTargets;
 
     /// @notice Version id of contracts
-    uint public versionId;
+    uint256 public versionId;
 
     /// @notice Contract which defines notice period duration and allows finish upgrade during preparation of it
     UpgradeableMaster public mainContract;
@@ -41,7 +37,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @notice Contract constructor
     /// @param _mainContract Contract which defines notice period duration and allows finish upgrade during preparation of it
     /// @dev Calls Ownable contract constructor
-    constructor(UpgradeableMaster _mainContract) Ownable(msg.sender) public {
+    constructor(UpgradeableMaster _mainContract) public Ownable(msg.sender) {
         mainContract = _mainContract;
         versionId = 0;
     }
@@ -63,7 +59,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(upgradeStatus == UpgradeStatus.Idle, "spu11"); // spu11 - unable to activate active upgrade mode
         require(newTargets.length == managedContracts.length, "spu12"); // spu12 - number of new targets must be equal to the number of managed contracts
 
-        uint noticePeriod = mainContract.getNoticePeriod();
+        uint256 noticePeriod = mainContract.getNoticePeriod();
         mainContract.upgradeNoticePeriodStarted();
         upgradeStatus = UpgradeStatus.NoticePeriod;
         noticePeriodFinishTimestamp = now.add(noticePeriod);
@@ -121,5 +117,4 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         noticePeriodFinishTimestamp = 0;
         delete nextTargets;
     }
-
 }

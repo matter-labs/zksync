@@ -4,12 +4,13 @@
 
 The application tries to locate a configuration file in the current working directory - `./.analytics-config.json`.
 
-The configuration file contains the default network and a list of all networks with their parameters. Each network has the following arguments:
+The configuration file contains the default network and a list of all networks with their parameters. Each network has
+the following arguments:
 
-| Parameter | Description |
-| :-- | :-- |
+| Parameter                  | Description                                                    |
+| :------------------------- | :------------------------------------------------------------- |
 | `OPERATOR_FEE_ETH_ADDRESS` | Ethereum Address to be used for zkSync account to collect fees |
-| `REST_API_ADDR` | Address where the zkSync REST API is located |
+| `REST_API_ADDR`            | Address where the zkSync REST API is located                   |
 
 Also load environment variable `ETHERSCAN_API_KEY` from .env file only once
 
@@ -24,7 +25,7 @@ $ yarn start help
     -V, --version            output the version number
     -n, --network <network>  select network
     -h, --help               display help for command
-    
+
   Commands:
     current-balances         output worth of tokens on operator balances in zkSync as ETH and USD
     fees [options]           output information about collected fees in the selected period
@@ -40,16 +41,16 @@ All output printed to stdout is strict JSON
 ### Options/flags
 
 - --network \<network\> (Default: from config file)  
-select a network from the list of the configuration file
+  select a network from the list of the configuration file
 - --timeFrom \<time\>  
-start of time period in format 'YYYY-MM-DDTHH:MM:SS'
+  start of time period in format 'YYYY-MM-DDTHH:MM:SS'
 - --timeTo \<time\> (Default - current time)  
-end of time period in format 'YYYY-MM-DDTHH:MM:SS' 
+  end of time period in format 'YYYY-MM-DDTHH:MM:SS'
 
 ### Current balances reports
 
 ```console
-$ yarn start current-balances 
+yarn start current-balances
 ```
 
 Output current balance of on operator balances in zkSync as ETH and USD.
@@ -59,16 +60,20 @@ The report contains information about all tokens that are supported in zkSync.
 ### Collected fees reports
 
 ```console
-$ yarn start fees --timeFrom <time> [--timeTo <time>] 
+yarn start fees --timeFrom <time> [--timeTo <time>]
 ```
+
 Output such information:
-- amount of ETH spent for `commit`, `verify` and `completeWithdrawals` operations in L1 and it's equivalent in USD (at present moment)
-- information about fees collected during this period in each token and their equivalent in ETH and their equivalent in ETH and USD (at present moment)
+
+- amount of ETH spent for `commit`, `verify` and `completeWithdrawals` operations in L1 and it's equivalent in USD (at
+  present moment)
+- information about fees collected during this period in each token and their equivalent in ETH and their equivalent in
+  ETH and USD (at present moment)
 
 ### Liquidations reports
 
 ```console
-$ yarn start liquidations --timeFrom <time> [--timeTo <time>]
+yarn start liquidations --timeFrom <time> [--timeTo <time>]
 ```
 
 Output the total amount of ETH accrued as a result of token liquidations during the specified period.
@@ -76,13 +81,13 @@ Output the total amount of ETH accrued as a result of token liquidations during 
 ## Testing
 
 ```console
-$ yarn test 
+yarn test
 ```
 
 ## Usage examples
 
-```console 
-$ yarn start current-balances 
+```console
+$ yarn start current-balances
 {
     "total": {
         "eth": 101.23231,

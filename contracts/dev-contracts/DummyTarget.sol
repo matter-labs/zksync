@@ -1,11 +1,9 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 import "../contracts/Upgradeable.sol";
 import "../contracts/UpgradeableMaster.sol";
 
-
 interface DummyTarget {
-
     function get_DUMMY_INDEX() external pure returns (uint256);
 
     function initialize(bytes calldata initializationParameters) external;
@@ -13,17 +11,16 @@ interface DummyTarget {
     function upgrade(bytes calldata upgradeParameters) external;
 
     function verifyPriorityOperation() external;
-
 }
 
 contract DummyFirst is UpgradeableMaster, DummyTarget {
+    uint256 constant UPGRADE_NOTICE_PERIOD = 4;
 
-    uint constant UPGRADE_NOTICE_PERIOD = 4;
-    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint) {
+    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function getNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -40,6 +37,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
     }
 
     uint256 private constant DUMMY_INDEX = 1;
+
     function get_DUMMY_INDEX() external pure returns (uint256) {
         return DUMMY_INDEX;
     }
@@ -55,9 +53,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
         }
     }
 
-    function upgrade(bytes calldata upgradeParameters) external {
-
-    }
+    function upgrade(bytes calldata upgradeParameters) external {}
 
     function totalVerifiedPriorityOperations() internal returns (uint64) {
         return _verifiedPriorityOperations;
@@ -70,17 +66,16 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
     function verifyPriorityOperation() external {
         _verifiedPriorityOperations++;
     }
-
 }
 
 contract DummySecond is UpgradeableMaster, DummyTarget {
+    uint256 constant UPGRADE_NOTICE_PERIOD = 4;
 
-    uint constant UPGRADE_NOTICE_PERIOD = 4;
-    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint) {
+    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function getNoticePeriod() external returns (uint) {
+    function getNoticePeriod() external returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -97,6 +92,7 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
     }
 
     uint256 private constant DUMMY_INDEX = 2;
+
     function get_DUMMY_INDEX() external pure returns (uint256) {
         return DUMMY_INDEX;
     }
@@ -127,5 +123,4 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
     function verifyPriorityOperation() external {
         _verifiedPriorityOperations++;
     }
-
 }

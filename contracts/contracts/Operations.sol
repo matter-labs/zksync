@@ -1,11 +1,9 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 import "./Bytes.sol";
 
-
 /// @title zkSync operations tools
 library Operations {
-
     // Circuit ops and their pubdata (chunks * bytes)
 
     /// @notice zkSync circuit operation type
@@ -52,19 +50,17 @@ library Operations {
         address owner;
     }
 
-    uint public constant PACKED_DEPOSIT_PUBDATA_BYTES = 
+    uint256 public constant PACKED_DEPOSIT_PUBDATA_BYTES =
         ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES;
 
     /// Deserialize deposit pubdata
-    function readDepositPubdata(bytes memory _data) internal pure
-        returns (Deposit memory parsed)
-    {
+    function readDepositPubdata(bytes memory _data) internal pure returns (Deposit memory parsed) {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = 0;
+        uint256 offset = 0;
         (offset, parsed.accountId) = Bytes.readUInt32(_data, offset); // accountId
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);   // tokenId
-        (offset, parsed.amount) = Bytes.readUInt128(_data, offset);   // amount
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);    // owner
+        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
+        (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
 
         require(offset == PACKED_DEPOSIT_PUBDATA_BYTES, "rdp10"); // reading invalid deposit pubdata size
     }
@@ -72,10 +68,10 @@ library Operations {
     /// Serialize deposit pubdata
     function writeDepositPubdata(Deposit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
-            bytes4(0),   // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
-            op.tokenId,  // tokenId
-            op.amount,   // amount
-            op.owner     // owner
+            bytes4(0), // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            op.tokenId, // tokenId
+            op.amount, // amount
+            op.owner // owner
         );
     }
 
@@ -96,41 +92,39 @@ library Operations {
         uint128 amount;
     }
 
-    uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
+    uint256 public constant PACKED_FULL_EXIT_PUBDATA_BYTES =
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
-    function readFullExitPubdata(bytes memory _data) internal pure
-        returns (FullExit memory parsed)
-    {
+    function readFullExitPubdata(bytes memory _data) internal pure returns (FullExit memory parsed) {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = 0;
-        (offset, parsed.accountId) = Bytes.readUInt32(_data, offset);      // accountId
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
-        (offset, parsed.amount) = Bytes.readUInt128(_data, offset);        // amount
+        uint256 offset = 0;
+        (offset, parsed.accountId) = Bytes.readUInt32(_data, offset); // accountId
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
+        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
+        (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
 
         require(offset == PACKED_FULL_EXIT_PUBDATA_BYTES, "rfp10"); // reading invalid full exit pubdata size
     }
 
     function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
-            op.accountId,  // accountId
-            op.owner,      // owner
-            op.tokenId,    // tokenId
-            op.amount      // amount
+            op.accountId, // accountId
+            op.owner, // owner
+            op.tokenId, // tokenId
+            op.amount // amount
         );
     }
 
     /// @notice Check that full exit pubdata from request and block matches
     function fullExitPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
         // `amount` is ignored because it is present in block pubdata but not in priority queue
-        uint lhs = Bytes.trim(_lhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
-        uint rhs = Bytes.trim(_rhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
+        uint256 lhs = Bytes.trim(_lhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
+        uint256 rhs = Bytes.trim(_rhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
         return lhs == rhs;
     }
 
     // PartialExit pubdata
-    
+
     struct PartialExit {
         //uint32 accountId; -- present in pubdata, ignored at serialization
         uint16 tokenId;
@@ -139,29 +133,31 @@ library Operations {
         address owner;
     }
 
-    function readPartialExitPubdata(bytes memory _data, uint _offset) internal pure
+    function readPartialExitPubdata(bytes memory _data, uint256 _offset)
+        internal
+        pure
         returns (PartialExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
+        uint256 offset = _offset + ACCOUNT_ID_BYTES; // accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
-        offset += FEE_BYTES;                                        // fee (ignored)
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
+        offset += FEE_BYTES; // fee (ignored)
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
     }
 
     function writePartialExitPubdata(PartialExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
-            bytes4(0),  // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            bytes4(0), // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
             op.tokenId, // tokenId
-            op.amount,  // amount
-            bytes2(0),  // fee (ignored)  (update when FEE_BYTES is changed)
-            op.owner    // owner
+            op.amount, // amount
+            bytes2(0), // fee (ignored)  (update when FEE_BYTES is changed)
+            op.owner // owner
         );
     }
 
     // ForcedExit pubdata
-    
+
     struct ForcedExit {
         //uint32 initiatorAccountId; -- present in pubdata, ignored at serialization
         //uint32 targetAccountId; -- present in pubdata, ignored at serialization
@@ -171,25 +167,27 @@ library Operations {
         address target;
     }
 
-    function readForcedExitPubdata(bytes memory _data, uint _offset) internal pure
+    function readForcedExitPubdata(bytes memory _data, uint256 _offset)
+        internal
+        pure
         returns (ForcedExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES * 2;               // initiatorAccountId + targetAccountId (ignored)
+        uint256 offset = _offset + ACCOUNT_ID_BYTES * 2; // initiatorAccountId + targetAccountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
-        offset += FEE_BYTES;                                        // fee (ignored)
+        offset += FEE_BYTES; // fee (ignored)
         (offset, parsed.target) = Bytes.readAddress(_data, offset); // target
     }
 
     function writeForcedExitPubdata(ForcedExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
-            bytes4(0),  // initiatorAccountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
-            bytes4(0),  // targetAccountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            bytes4(0), // initiatorAccountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
+            bytes4(0), // targetAccountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
             op.tokenId, // tokenId
-            op.amount,  // amount
-            bytes2(0),  // fee (ignored)  (update when FEE_BYTES is changed)
-            op.target   // target
+            op.amount, // amount
+            bytes2(0), // fee (ignored)  (update when FEE_BYTES is changed)
+            op.target // target
         );
     }
 
@@ -204,26 +202,34 @@ library Operations {
         //uint16 fee; -- present in pubdata, ignored at serialization
     }
 
-    function readChangePubKeyPubdata(bytes memory _data, uint _offset) internal pure
+    function readChangePubKeyPubdata(bytes memory _data, uint256 _offset)
+        internal
+        pure
         returns (ChangePubKey memory parsed)
     {
-        uint offset = _offset;
-        (offset, parsed.accountId) = Bytes.readUInt32(_data, offset);                // accountId
-        (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset);              // pubKeyHash
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
-        (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce
+        uint256 offset = _offset;
+        (offset, parsed.accountId) = Bytes.readUInt32(_data, offset); // accountId
+        (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset); // pubKeyHash
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
+        (offset, parsed.nonce) = Bytes.readUInt32(_data, offset); // nonce
     }
 
     // Withdrawal data process
 
-    function readWithdrawalData(bytes memory _data, uint _offset) internal pure
-        returns (bool _addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
+    function readWithdrawalData(bytes memory _data, uint256 _offset)
+        internal
+        pure
+        returns (
+            bool _addToPendingWithdrawalsQueue,
+            address _to,
+            uint16 _tokenId,
+            uint128 _amount
+        )
     {
-        uint offset = _offset;
+        uint256 offset = _offset;
         (offset, _addToPendingWithdrawalsQueue) = Bytes.readBool(_data, offset);
         (offset, _to) = Bytes.readAddress(_data, offset);
         (offset, _tokenId) = Bytes.readUInt16(_data, offset);
         (offset, _amount) = Bytes.readUInt128(_data, offset);
     }
-
 }

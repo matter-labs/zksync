@@ -1,14 +1,12 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 import "./KeysWithPlonkVerifier.sol";
 
 // Hardcoded constants to avoid accessing store
 contract Verifier is KeysWithPlonkVerifier {
-
     bool constant DUMMY_VERIFIER = false;
 
-    function initialize(bytes calldata) external {
-    }
+    function initialize(bytes calldata) external {}
 
     /// @notice Verifier contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
@@ -28,8 +26,8 @@ contract Verifier is KeysWithPlonkVerifier {
         uint32 _chunks
     ) external view returns (bool) {
         if (DUMMY_VERIFIER) {
-            uint oldGasValue = gasleft();
-            uint tmp;
+            uint256 oldGasValue = gasleft();
+            uint256 tmp;
             while (gasleft() + 470000 > oldGasValue) {
                 tmp += 1;
             }

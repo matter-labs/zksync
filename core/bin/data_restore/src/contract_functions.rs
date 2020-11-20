@@ -59,7 +59,7 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
         }
         _ => None,
     }
-    .ok_or_else(|| Err("Invalid token in parameters"))
+    .ok_or(Err("Invalid token in parameters"))
     .map_err(|_: Result<Account, _>| {
         anyhow::Error::from(Box::new(std::io::Error::new(
             std::io::ErrorKind::NotFound,

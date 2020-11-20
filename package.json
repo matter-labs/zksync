@@ -37,6 +37,14 @@
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
-    "zk": "yarn workspace zk"
+    "zk": "yarn workspace zk",
+    "lint:md": "markdownlint $(find . -name '*.md' -print -o -path '*/node_modules' -prune)",
+    "lint:sol": "solhint contracts/{,dev-}contracts{,/**}/*.sol"
+  },
+  "devDependencies": {
+    "markdownlint-cli": "^0.24.0",
+    "prettier": "^2.1.2",
+    "prettier-plugin-solidity": "^1.0.0-alpha.60",
+    "solhint": "^3.3.2"
   }
 }

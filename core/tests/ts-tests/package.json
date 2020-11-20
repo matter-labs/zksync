@@ -2,14 +2,6 @@
   "name": "ts-tests",
   "version": "1.0.0",
   "license": "MIT",
-  "prettier": {
-    "tabWidth": 4,
-    "printWidth": 120,
-    "parser": "typescript",
-    "singleQuote": true,
-    "trailingComma": "none",
-    "bracketSpacing": true
-},
   "mocha": {
     "timeout": 240000,
     "exit": true,
@@ -22,8 +14,7 @@
   },
   "scripts": {
     "test": "zk f mocha tests/main.test.ts",
-    "api-test": "zk f mocha tests/api.test.ts",
-    "fmt": "prettier --write {tests,api-types}/*.ts"
+    "api-test": "zk f mocha tests/api.test.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.14",
@@ -36,7 +27,6 @@
     "mocha": "^8.2.0",
     "mocha-steps": "^1.3.0",
     "node-fetch": "^2.6.1",
-    "prettier": "^2.1.2",
     "ts-node": "^9.0.0",
     "typescript": "^4.0.5",
     "zksync": "link:../../../sdk/zksync.js"
