@@ -72,14 +72,14 @@ impl RpcApp {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
 
-        let api_requests_caches_size = config_options.api_requests_caches_size;
+        let api_requests_caches_size = api_server_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
 
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
             ticker_request_sender,
-            config_options,
+            api_server_options,
         );
 
         RpcApp {

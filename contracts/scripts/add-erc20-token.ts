@@ -25,7 +25,7 @@ async function main() {
 
     const governorWallet = args.deployerPrivateKey
         ? new Wallet(args.deployerPrivateKey, provider)
-        : Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+        : Wallet.fromMnemonic(ethTestConfig.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
     console.log('Adding new ERC20 token to network: ', args.tokenAddress);
 

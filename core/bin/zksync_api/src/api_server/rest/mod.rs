@@ -30,12 +30,13 @@ async fn start_server(
 
         let api_v1_scope = {
             let env_options = api_v01.config_options.clone();
+            let api_server_options = api_v01.api_server_options.clone();
 
             let tx_sender = TxSender::new(
                 api_v01.connection_pool.clone(),
                 sign_verifier.clone(),
                 fee_ticker.clone(),
-                &env_options,
+                &api_server_options,
             );
             v1::api_scope(tx_sender, env_options, api_server_options)
         };
