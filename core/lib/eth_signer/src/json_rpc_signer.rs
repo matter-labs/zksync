@@ -9,15 +9,16 @@ use zksync_types::Address;
 
 use serde_json::Value;
 
-pub fn verify_address_by_signature(
+pub fn is_signature_from_address(
     signature: &PackedEthSignature,
     msg: &[u8],
     address: Address,
 ) -> Result<bool, SignerError> {
-    Ok(signature
+    let signature_is_correct = signature
         .signature_recover_signer(msg)
         .map_err(|err| SignerError::RecoverAddress(err.to_string()))?
-        == address)
+        == address;
+    Ok(signature_is_correct)
 }
 
 #[derive(Debug, Clone)]
@@ -74,7 +75,7 @@ impl EthereumSigner for JsonRpcSigner {
         };
 
         // Checks the correctness of the message signature without a prefix
-        if verify_address_by_signature(&signature, msg, self.address()?)? {
+        if is_signature_from_address(&signature, msg, self.address()?)? {
             Ok(TxEthSignature::EthereumSignature(signature))
         } else {
             Err(SignerError::SigningFailed(
@@ -202,11 +203,11 @@ impl JsonRpcSigner {
                 .map_err(|err| SignerError::SigningFailed(err.to_string()))?
         };
 
-        if verify_address_by_signature(&signature, &msg.as_bytes(), self.address()?)? {
+        if is_signature_from_address(&signature, &msg.as_bytes(), self.address()?)? {
             self.signer_type = Some(SignerType::NotNeedPrefix);
         }
 
-        if verify_address_by_signature(&signature, &msg_with_prefix.as_bytes(), self.address()?)? {
+        if is_signature_from_address(&signature, &msg_with_prefix.as_bytes(), self.address()?)? {
             self.signer_type = Some(SignerType::NotNeedPrefix);
         }
 
@@ -370,6 +371,7 @@ mod messages {
 #[cfg(test)]
 mod tests {
     use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
+    use futures::future::{AbortHandle, Abortable};
     use jsonrpc_core::{Failure, Id, Output, Success, Version};
     use parity_crypto::publickey::{Generator, KeyPair, Random};
     use serde_json::json;
@@ -379,7 +381,7 @@ mod tests {
         Address,
     };
 
-    use super::{messages::JsonRpcRequest, verify_address_by_signature};
+    use super::{is_signature_from_address, messages::JsonRpcRequest};
     use crate::{EthereumSigner, JsonRpcSigner, RawTransaction};
 
     #[post("/")]
@@ -437,7 +439,7 @@ mod tests {
         key_pairs: Vec<KeyPair>,
     }
 
-    fn run_server(state: State) -> String {
+    fn run_server(state: State) -> (String, AbortHandle) {
         let mut url = None;
         let mut server = None;
         for i in 9000..9999 {
@@ -453,15 +455,18 @@ mod tests {
                 break;
             }
         }
+
         let server = server.expect("Could not bind to port from 9000 to 9999");
-        tokio::spawn(server.run());
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        let future = Abortable::new(server.run(), abort_registration);
+        tokio::spawn(future);
         let address = format!("http://{}/", &url.unwrap());
-        address
+        (address, abort_handle)
     }
 
     #[actix_rt::test]
     async fn run_client() {
-        let address = run_server(State {
+        let (address, abort_handle) = run_server(State {
             key_pairs: vec![Random.generate()],
         });
         // Get address is ok,  unlock address is ok, recover address from signature is also ok
@@ -470,9 +475,7 @@ mod tests {
         if let TxEthSignature::EthereumSignature(signature) =
             client.sign_message(msg).await.unwrap()
         {
-            assert!(
-                verify_address_by_signature(&signature, msg, client.address().unwrap()).unwrap()
-            )
+            assert!(is_signature_from_address(&signature, msg, client.address().unwrap()).unwrap())
         } else {
             panic!("Wrong signature type")
         }
@@ -489,5 +492,6 @@ mod tests {
             .await
             .unwrap();
         assert_ne!(transaction_signature.len(), 0);
+        abort_handle.abort();
     }
 }

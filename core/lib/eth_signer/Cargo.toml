@@ -30,4 +30,5 @@ async-trait = "0.1"
 actix-rt = "1.1.1"
 tokio = { version = "0.2", features = ["full"] }
 actix-web = "3.0.0"
+futures = "0.3"
 

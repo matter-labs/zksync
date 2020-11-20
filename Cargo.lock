@@ -5755,6 +5755,7 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "async-trait",
+ "futures 0.3.6",
  "hex",
  "jsonrpc-core",
  "parity-crypto",
