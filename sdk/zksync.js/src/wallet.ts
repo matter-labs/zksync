@@ -2,6 +2,7 @@ import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from '
 import { ErrorCode } from '@ethersproject/logger';
 import { ETHProxy, Provider } from './provider';
 import { Signer } from './signer';
+import { BatchBuilder } from './batch-builder';
 import {
     AccountState,
     Address,
@@ -101,6 +102,10 @@ export class Wallet {
             type: this.ethSignerType.verificationMethod === 'ECDSA' ? 'EthereumSignature' : 'EIP1271Signature',
             signature
         };
+    }
+
+    async batchBuilder(nonce?: Nonce): Promise<BatchBuilder> {
+        return await BatchBuilder.fromWallet(this, nonce);
     }
 
     async getTransfer(transfer: {
@@ -855,4 +860,13 @@ export async function submitSignedTransaction(
 ): Promise<Transaction> {
     const transactionHash = await provider.submitTx(signedTx.tx, signedTx.ethereumSignature, fastProcessing);
     return new Transaction(signedTx, transactionHash, provider);
+}
+
+export async function submitSignedTransactionBatch(
+    signedTxs: SignedTransaction[],
+    ethSignature: TxEthSignature,
+    provider: Provider
+): Promise<Transaction[]> {
+    const transactionHashes = await provider.submitTxsBatch(signedTxs, ethSignature);
+    return transactionHashes.map((txHash, idx) => new Transaction(signedTxs[idx], txHash, provider));
 }
