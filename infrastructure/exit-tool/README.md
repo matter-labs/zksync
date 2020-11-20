@@ -5,7 +5,8 @@ This tool is capable of generating input data for exit transaction for zkSync ex
 ## Prerequisites
 
 - `Docker` and `docker-compose`.
-- 20+ GB of free space. In order to create an exit proof, the universal cryptographical setup must be downloaded (~8GB), and besides that there should be enough space to fit the whole zkSync chain.
+- 20+ GB of free space. In order to create an exit proof, the universal cryptographical setup must be downloaded (~8GB),
+  and besides that there should be enough space to fit the whole zkSync chain.
 - Access to the Web3 API (e.g. provided by Ethereum node or Infura) in order to gather data from Ethereum blockchain.
 
 ## Mechanics
@@ -19,8 +20,10 @@ In order to create exit proof, the following steps must be done:
 
 This tool handles these steps as follows:
 
-- PostgreSQl database is initialized via docker-compose with data folder mounted to the host system folder `./volumes`. Mounting to the host system is required to not lose the partially synchronized state between launches.
-- Cryptographical setup is downloaded upon first launch into the local folder `./setup`. Its size is roughly 8GB and this operation will only be done once.
+- PostgreSQl database is initialized via docker-compose with data folder mounted to the host system folder `./volumes`.
+  Mounting to the host system is required to not lose the partially synchronized state between launches.
+- Cryptographical setup is downloaded upon first launch into the local folder `./setup`. Its size is roughly 8GB and
+  this operation will only be done once.
 - Restoring the network state and the exit proof generating are encapsulated into a docker container.
 
 ## Usage
@@ -52,9 +55,11 @@ Example:
 ./exit-tool.sh run rinkeby 1 0 http://127.0.0.1:8545
 ```
 
-In this example, we use Rinkeby Ethereum testnet, generate a proof for account with ID 1 and token with ID 0 (Ether), and use the API located at http://127.0.0.1:8545
+In this example, we use Rinkeby Ethereum testnet, generate a proof for account with ID 1 and token with ID 0 (Ether),
+and use the API located at `http://127.0.0.1:8545`
 
-**Note:** Synchronizing the state will scan a big part of Ethereum blockchain, and that's a lot of work to do. It may take hours or even days to complete, depending on the size of zkSync blockchain.
+**Note:** Synchronizing the state will scan a big part of Ethereum blockchain, and that's a lot of work to do. It may
+take hours or even days to complete, depending on the size of zkSync blockchain.
 
 However, if the synchronization process was interrupted, it is possible to resume a previously started data restore:
 
@@ -64,7 +69,8 @@ However, if the synchronization process was interrupted, it is possible to resum
 
 In that case, a partially restored state will be loaded from the database, and restoring will continue from this point.
 
-Once the state is restored, tool will generate an exit proof and will print it to the console. Output may look roughly as follows:
+Once the state is restored, tool will generate an exit proof and will print it to the console. Output may look roughly
+as follows:
 
 ```json
 {
@@ -73,9 +79,7 @@ Once the state is restored, tool will generate an exit proof and will print it t
   "account_address": "0x3b48b21a2f4910c04c04de00a23f7c07bf3cb04f",
   "amount": "3939999843080000000000",
   "proof": {
-    "inputs": [
-      "0x11e55c73db5f552b9d95b3351a90165676da2af365be22721e874448bb47c6ca"
-    ],
+    "inputs": ["0x11e55c73db5f552b9d95b3351a90165676da2af365be22721e874448bb47c6ca"],
     "proof": [
       "0x314676cac431331aacfab085471f78e5dd4151c886f83a342a9e8aad7064eb2",
       "0x1a6147ba1176be942b8b1abcc347f91de54955a3cf87726bdd99050edba2d01",
@@ -115,9 +119,14 @@ Once the state is restored, tool will generate an exit proof and will print it t
 }
 ```
 
-This data represents inputs for an [`exit` method on the smart contract](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L351).
+This data represents inputs for an
+[`exit` method on the smart contract](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L351).
 
 What user has to do after that:
 
 1. Create transaction for an `exit` method call, sign it and broadcast to register balance to withdraw.
-2. Send a transaction which invokes either [`withdrawETH`](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L175) or [`withdrawERC20`](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L202) method of contract to obtain their funds.
+2. Send a transaction which invokes either
+   [`withdrawETH`](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L175)
+   or
+   [`withdrawERC20`](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L202)
+   method of contract to obtain their funds.

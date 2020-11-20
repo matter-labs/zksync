@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow
@@ -54,7 +54,11 @@ library SafeMathUInt128 {
      *
      * _Available since v2.4.0._
      */
-    function sub(uint128 a, uint128 b, string memory errorMessage) internal pure returns (uint128) {
+    function sub(
+        uint128 a,
+        uint128 b,
+        string memory errorMessage
+    ) internal pure returns (uint128) {
         require(b <= a, errorMessage);
         uint128 c = a - b;
 
@@ -112,7 +116,11 @@ library SafeMathUInt128 {
      *
      * _Available since v2.4.0._
      */
-    function div(uint128 a, uint128 b, string memory errorMessage) internal pure returns (uint128) {
+    function div(
+        uint128 a,
+        uint128 b,
+        string memory errorMessage
+    ) internal pure returns (uint128) {
         // Solidity only automatically asserts when dividing by 0
         require(b > 0, errorMessage);
         uint128 c = a / b;
@@ -149,7 +157,11 @@ library SafeMathUInt128 {
      *
      * _Available since v2.4.0._
      */
-    function mod(uint128 a, uint128 b, string memory errorMessage) internal pure returns (uint128) {
+    function mod(
+        uint128 a,
+        uint128 b,
+        string memory errorMessage
+    ) internal pure returns (uint128) {
         require(b != 0, errorMessage);
         return a % b;
     }
