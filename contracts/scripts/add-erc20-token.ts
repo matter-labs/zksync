@@ -1,8 +1,12 @@
-import {ArgumentParser} from "argparse";
+import { ArgumentParser } from "argparse";
 import { BigNumber, Wallet, ethers } from "ethers";
 import { Deployer } from "../src.ts/deploy";
+import * as fs from "fs";
+import * as path from "path";		
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function main() {
     const parser = new ArgumentParser({
@@ -18,7 +22,7 @@ async function main() {
 
     const deployer = new Deployer({ deployWallet: ethers.Wallet.createRandom() });
     const governorWallet = args.deployerPrivateKey ? new Wallet(args.deployerPrivateKey, provider) :
-        Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+        Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
     console.log("Adding new ERC20 token to network: ", args.tokenAddress);
 
