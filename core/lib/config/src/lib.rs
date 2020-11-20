@@ -35,6 +35,30 @@ impl EthSenderOptions {
     }
 }
 
+/// Configuration options for `eth_client`.
+#[derive(Debug, Clone)]
+pub struct EthClientOptions {
+    pub chain_id: u8,
+    pub gas_price_factor: f64,
+    pub operator_commit_eth_addr: H160,
+    pub operator_private_key: Option<H256>,
+    pub web3_url: String,
+    pub contract_eth_addr: H160,
+}
+
+impl EthClientOptions {
+    pub fn from_env() -> Self {
+        Self {
+            operator_commit_eth_addr: parse_env_with("OPERATOR_COMMIT_ETH_ADDRESS", |s| &s[2..]),
+            operator_private_key: parse_env_if_exists("OPERATOR_PRIVATE_KEY"),
+            chain_id: parse_env("CHAIN_ID"),
+            gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
+            web3_url: get_env("WEB3_URL"),
+            contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProverOptions {
     pub prepare_data_interval: Duration,
@@ -134,53 +158,59 @@ impl MiniblockTimings {
 }
 
 #[derive(Debug, Clone)]
-pub struct EthClientOptions {
-    pub chain_id: u8,
-    pub gas_price_factor: f64,
-    pub operator_commit_eth_addr: H160,
-    pub operator_private_key: Option<H256>,
-    pub web3_url: String,
-    pub contract_eth_addr: H160,
+pub struct ApiServerOptions {
+    pub rest_api_server_address: SocketAddr,
+    pub json_rpc_http_server_address: SocketAddr,
+    pub json_rpc_ws_server_address: SocketAddr,
+    pub core_server_address: SocketAddr,
+    pub core_server_url: String,
+    pub api_requests_caches_size: usize,
+    pub token_price_source: TokenPriceSource,
+    /// Fee increase coefficient for fast processing of withdrawal.
+    pub ticker_fast_processing_coeff: f64,
+    pub forced_exit_minimum_account_age: Duration,
+    pub enforce_pubkey_change_fee: bool,
 }
 
-impl EthClientOptions {
+impl ApiServerOptions {
     pub fn from_env() -> Self {
+        let forced_exit_minimum_account_age =
+            Duration::from_secs(parse_env::<u64>("FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS"));
+
+        if forced_exit_minimum_account_age.as_secs() == 0 {
+            log::error!("Forced exit minimum account age is set to 0, this is an incorrect value for production");
+        }
+
         Self {
-            operator_commit_eth_addr: parse_env_with("OPERATOR_COMMIT_ETH_ADDRESS", |s| &s[2..]),
-            operator_private_key: parse_env_if_exists("OPERATOR_PRIVATE_KEY"),
-            chain_id: parse_env("CHAIN_ID"),
-            gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
-            web3_url: get_env("WEB3_URL"),
-            contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
+            rest_api_server_address: parse_env_port("REST_API_PORT"),
+            json_rpc_http_server_address: parse_env_port("HTTP_RPC_API_PORT"),
+            json_rpc_ws_server_address: parse_env_port("WS_API_PORT"),
+            core_server_address: parse_env_port("PRIVATE_CORE_SERVER_PORT"),
+            core_server_url: parse_env("PRIVATE_CORE_SERVER_URL"),
+            api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
+            token_price_source: TokenPriceSource::from_env(),
+            ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
+            forced_exit_minimum_account_age,
+            enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
+                .unwrap_or(true),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
-    pub rest_api_server_address: SocketAddr,
-    pub json_rpc_http_server_address: SocketAddr,
-    pub json_rpc_ws_server_address: SocketAddr,
-    pub core_server_address: SocketAddr,
-    pub core_server_url: String,
     pub web3_url: String,
     pub genesis_tx_hash: H256,
     pub contract_eth_addr: H160,
     pub governance_eth_addr: H160,
     pub operator_fee_eth_addr: H160,
     pub confirmations_for_eth_event: u64,
-    pub api_requests_caches_size: usize,
     pub available_block_chunk_sizes: Vec<usize>,
     pub max_number_of_withdrawals_per_block: usize,
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
     pub miniblock_timings: MiniblockTimings,
     pub prometheus_export_port: u16,
-    pub token_price_source: TokenPriceSource,
-    /// Fee increase coefficient for fast processing of withdrawal.
-    pub ticker_fast_processing_coeff: f64,
-    pub forced_exit_minimum_account_age: Duration,
-    pub enforce_pubkey_change_fee: bool,
 }
 
 impl ConfigurationOptions {
@@ -195,26 +225,13 @@ impl ConfigurationOptions {
 
         available_block_chunk_sizes.sort_unstable();
 
-        let forced_exit_minimum_account_age =
-            Duration::from_secs(parse_env::<u64>("FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS"));
-
-        if forced_exit_minimum_account_age.as_secs() == 0 {
-            log::error!("Forced exit minimum account age is set to 0, this is an incorrect value for production");
-        }
-
         Self {
-            rest_api_server_address: parse_env_port("REST_API_PORT"),
-            json_rpc_http_server_address: parse_env_port("HTTP_RPC_API_PORT"),
-            json_rpc_ws_server_address: parse_env_port("WS_API_PORT"),
-            core_server_address: parse_env_port("PRIVATE_CORE_SERVER_PORT"),
-            core_server_url: parse_env("PRIVATE_CORE_SERVER_URL"),
             web3_url: get_env("WEB3_URL"),
             genesis_tx_hash: parse_env_with("GENESIS_TX_HASH", |s| &s[2..]),
             contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
             governance_eth_addr: parse_env_with("GOVERNANCE_ADDR", |s| &s[2..]),
             operator_fee_eth_addr: parse_env_with("OPERATOR_FEE_ETH_ADDRESS", |s| &s[2..]),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
-            api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
             available_block_chunk_sizes,
             max_number_of_withdrawals_per_block: parse_env("MAX_NUMBER_OF_WITHDRAWALS_PER_BLOCK"),
             eth_watch_poll_interval: Duration::from_millis(parse_env::<u64>(
@@ -223,11 +240,6 @@ impl ConfigurationOptions {
             eth_network: parse_env("ETH_NETWORK"),
             miniblock_timings: MiniblockTimings::from_env(),
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
-            token_price_source: TokenPriceSource::from_env(),
-            ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
-            forced_exit_minimum_account_age,
-            enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
-                .unwrap_or(true),
         }
     }
 }

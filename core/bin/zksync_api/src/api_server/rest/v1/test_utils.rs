@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::test_data::{
     dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
@@ -28,6 +28,7 @@ use super::client::Client;
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
     pub env_options: ConfigurationOptions,
+    pub api_server_options: ApiServerOptions,
     pub pool: ConnectionPool,
 }
 
@@ -35,6 +36,7 @@ impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
             env_options: ConfigurationOptions::from_env(),
+            api_server_options: ApiServerOptions::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::ApiServerOptions;
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber};
@@ -257,8 +257,8 @@ async fn blocks_range(
     Ok(Json(range))
 }
 
-pub fn api_scope(env_options: &ConfigurationOptions, pool: ConnectionPool) -> Scope {
-    let data = ApiBlocksData::new(pool, env_options.api_requests_caches_size);
+pub fn api_scope(api_server_options: &ApiServerOptions, pool: ConnectionPool) -> Scope {
+    let data = ApiBlocksData::new(pool, api_server_options.api_requests_caches_size);
 
     web::scope("blocks")
         .data(data)
@@ -277,7 +277,7 @@ mod tests {
         cfg.fill_database().await?;
 
         let (client, server) =
-            cfg.start_server(|cfg| api_scope(&cfg.env_options, cfg.pool.clone()));
+            cfg.start_server(|cfg| api_scope(&cfg.api_server_options, cfg.pool.clone()));
 
         // Block requests part
         let blocks: Vec<BlockInfo> = {

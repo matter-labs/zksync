@@ -2,7 +2,7 @@
 
 use crate::{api_server::start_api_server, fee_ticker::run_ticker_task};
 use futures::channel::mpsc;
-use zksync_config::{AdminServerOptions, ConfigurationOptions};
+use zksync_config::{AdminServerOptions, ApiServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
 
 pub mod api_server;
@@ -22,11 +22,12 @@ pub fn run_api(
     let (ticker_request_sender, ticker_request_receiver) = mpsc::channel(channel_size);
 
     let config_options = ConfigurationOptions::from_env();
+    let api_server_options = ApiServerOptions::from_env();
     let admin_server_options = AdminServerOptions::from_env();
 
     let ticker_task = run_ticker_task(
-        config_options.token_price_source.clone(),
-        config_options.ticker_fast_processing_coeff,
+        api_server_options.token_price_source.clone(),
+        api_server_options.ticker_fast_processing_coeff,
         connection_pool.clone(),
         ticker_request_receiver,
     );
@@ -36,6 +37,7 @@ pub fn run_api(
         panic_notify,
         ticker_request_sender,
         config_options,
+        api_server_options,
         admin_server_options,
     );
 

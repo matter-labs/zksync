@@ -14,7 +14,7 @@ use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
 
@@ -39,10 +39,11 @@ pub(crate) fn api_scope(
     fee_ticker: mpsc::Sender<TickerRequest>,
     tokens_db: TokenDBCache,
     env_options: ConfigurationOptions,
+    api_server_options: ApiServerOptions,
 ) -> Scope {
     web::scope("/api/v1")
         .service(config::api_scope(&env_options))
-        .service(blocks::api_scope(&env_options, pool))
+        .service(blocks::api_scope(&api_server_options, pool))
         .service(tokens::api_scope(tokens_db, fee_ticker))
 }
 

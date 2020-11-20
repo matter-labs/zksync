@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
 use zksync_types::H160;
 
@@ -30,7 +30,14 @@ async fn start_server(
             let token_db = TokenDBCache::new(pool.clone());
 
             let env_options = api_v01.config_options.clone();
-            v1::api_scope(pool, fee_ticker.clone(), token_db, env_options)
+            let api_server_options = api_v01.api_server_options.clone();
+            v1::api_scope(
+                pool,
+                fee_ticker.clone(),
+                token_db,
+                env_options,
+                api_server_options,
+            )
         };
 
         App::new()
@@ -61,6 +68,7 @@ pub(super) fn start_server_thread_detached(
     panic_notify: mpsc::Sender<bool>,
     fee_ticker: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
+    api_server_options: ApiServerOptions,
 ) {
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
@@ -68,7 +76,12 @@ pub(super) fn start_server_thread_detached(
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
             actix_rt::System::new("api-server").block_on(async move {
-                let api_v01 = ApiV01::new(connection_pool, contract_address, config_options);
+                let api_v01 = ApiV01::new(
+                    connection_pool,
+                    contract_address,
+                    config_options,
+                    api_server_options,
+                );
                 api_v01.spawn_network_status_updater(panic_notify);
 
                 start_server(api_v01, fee_ticker, listen_addr).await;

@@ -9,7 +9,7 @@ use futures::{
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_storage::{
     chain::{
         block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
@@ -79,24 +79,25 @@ pub struct RpcApp {
 impl RpcApp {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        config_options: &ConfigurationOptions,
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
+        config_options: &ConfigurationOptions,
+        api_server_options: &ApiServerOptions,
     ) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
 
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
-        let api_client = CoreApiClient::new(config_options.core_server_url.clone());
+        let api_client = CoreApiClient::new(api_server_options.core_server_url.clone());
 
-        let api_requests_caches_size = config_options.api_requests_caches_size;
+        let api_requests_caches_size = api_server_options.api_requests_caches_size;
         let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
-        let enforce_pubkey_change_fee = config_options.enforce_pubkey_change_fee;
+        let enforce_pubkey_change_fee = api_server_options.enforce_pubkey_change_fee;
 
         let forced_exit_minimum_account_age =
-            chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
+            chrono::Duration::from_std(api_server_options.forced_exit_minimum_account_age)
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
         RpcApp {
@@ -467,19 +468,21 @@ impl RpcApp {
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
-    config_options: ConfigurationOptions,
     connection_pool: ConnectionPool,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
+    config_options: ConfigurationOptions,
+    api_server_options: ApiServerOptions,
 ) {
-    let addr = config_options.json_rpc_http_server_address;
+    let addr = api_server_options.json_rpc_http_server_address;
 
     let rpc_app = RpcApp::new(
-        &config_options,
         connection_pool,
         sign_verify_request_sender,
         ticker_request_sender,
+        &config_options,
+        &api_server_options,
     );
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);
