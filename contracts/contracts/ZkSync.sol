@@ -260,7 +260,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
 
         // Check onchain operations
-        (bytes32 pendingOnchainOpsHash, uint64 priorityReqCommitted, bytes32 onchainOpsOffsetCommitment) = collectOnchainOps(_newBlock);
+        (bytes32 pendingOnchainOpsHash, uint64 priorityReqCommitted, bytes memory onchainOpsOffsetCommitment) = collectOnchainOps(_newBlock);
 
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(_previousBlock, _newBlock, onchainOpsOffsetCommitment);
@@ -331,7 +331,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Ensure block was committed
         require(hashStoredBlockInfo(_blockExecuteData.storedBlock) == storedBlockHashes[_blockExecuteData.storedBlock.blockNumber], "exe10"); // incorrect previous block data
         require(_blockExecuteData.storedBlock.blockNumber == totalBlocksVerified + _executedBlockIdx + 1, "exe11"); // Execute blocks in order
-        require(_blockExecuteData.storedBlock.blockNumber < totalBlocksVerified, "exe03"); // Can't execute blocks more then committed currently.
+        require(_blockExecuteData.storedBlock.blockNumber <= totalBlocksCommitted, "exe03"); // Can't execute blocks more then committed currently.
         // Ensure block was verified
         require(openAndCheckCommitmentInSlot(_blockExecuteData.storedBlock.commitment, _blockExecuteData.commitmentsInSlot, _blockExecuteData.commitmentIdx), "exe12"); // block is verified
 
@@ -531,22 +531,22 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev priorityOperationsProcessed - number of priority operations processed in this block (Deposits, FullExits)
     /// @dev offsetsCommitment - array where 1 is stored in chunk where onchainOperation begins and other are 0 (used in commitments)
     function collectOnchainOps(CommitBlockInfo memory _newBlockData)
-        internal returns (bytes32 processableOperationsHash, uint64 priorityOperationsProcessed, bytes32 offsetsCommitment) {
+        internal returns (bytes32 processableOperationsHash, uint64 priorityOperationsProcessed, bytes memory offsetsCommitment) {
         bytes memory pubData = _newBlockData.publicData;
 
-        require(pubData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
 
         uint64 uncommittedPriorityRequestsOffset = firstPriorityRequestId + totalCommittedPriorityRequests;
         priorityOperationsProcessed = 0;
         processableOperationsHash = EMPTY_STRING_KECCAK;
 
-        bytes memory priorityChunks = new bytes(_newBlockData.publicData.length / CHUNK_BYTES);
+        require(pubData.length % CHUNK_BYTES == 0, "fcs11"); // pubdata length must be a multiple of CHUNK_BYTES
+        offsetsCommitment = new bytes(pubData.length / CHUNK_BYTES);
         for (uint32 i = 0; i < _newBlockData.onchainOperations.length; ++i) {
             OnchainOperationData memory onchainOpData = _newBlockData.onchainOperations[i];
 
             uint pubdataOffset = onchainOpData.publicDataOffset;
             require(pubdataOffset % CHUNK_BYTES == 0, "fcso2"); // offsets should be on chunks boundaries
-            priorityChunks[pubdataOffset / CHUNK_BYTES] = byte(0x01);
+            offsetsCommitment[pubdataOffset / CHUNK_BYTES] = byte(0x01);
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[pubdataOffset]));
 
@@ -602,8 +602,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 revert("fpp14"); // unsupported op
             }
         }
-
-        offsetsCommitment = sha256(abi.encodePacked(priorityChunks));
     }
 
     /// @notice Checks that change operation is correct
@@ -653,17 +651,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function createBlockCommitment(
         StoredBlockInfo memory _previousBlock,
         CommitBlockInfo memory _newBlockData,
-        bytes32 _offsetCommitment
+        bytes memory _offsetCommitment
     ) internal view returns (bytes32 commitment) {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_newBlockData.blockNumber), uint256(_newBlockData.feeAccount))
         );
         hash = sha256(abi.encodePacked(hash, _previousBlock.stateHash));
         hash = sha256(abi.encodePacked(hash, _newBlockData.newStateHash));
-        hash = sha256(abi.encodePacked(hash, _offsetCommitment));
         hash = sha256(abi.encodePacked(hash, uint256(_newBlockData.timestamp)));
 
-        bytes memory pubdata = _newBlockData.publicData;
+        bytes memory pubdata = abi.encodePacked(_newBlockData.publicData, _offsetCommitment);
 
         /// The code below is equivalent to `commitment = sha256(abi.encodePacked(hash, _publicData))`
 

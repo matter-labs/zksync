@@ -27,50 +27,6 @@ pub mod mempool;
 pub mod private_api;
 pub mod state_keeper;
 
-pub async fn insert_pending_withdrawals(
-    storage: &mut StorageProcessor<'_>,
-    eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
-) {
-    // Check if the pending withdrawals table is empty
-    let no_stored_pending_withdrawals = storage
-        .chain()
-        .operations_schema()
-        .no_stored_pending_withdrawals()
-        .await
-        .expect("failed to call no_stored_pending_withdrawals function");
-    if no_stored_pending_withdrawals {
-        let eth_watcher_channel = oneshot::channel();
-
-        eth_watch_req_sender
-            .clone()
-            .send(EthWatchRequest::GetPendingWithdrawalsQueueIndex {
-                resp: eth_watcher_channel.0,
-            })
-            .await
-            .expect("EthWatchRequest::GetPendingWithdrawalsQueueIndex request sending failed");
-
-        let pending_withdrawals_queue_index = eth_watcher_channel
-            .1
-            .await
-            .expect("EthWatchRequest::GetPendingWithdrawalsQueueIndex response error")
-            .expect("Err as result of EthWatchRequest::GetPendingWithdrawalsQueueIndex");
-
-        // Let's add to the db one 'fake' pending withdrawal with
-        // id equals to (pending_withdrawals_queue_index-1)
-        // Next withdrawals will be added to the db with correct
-        // corresponding indexes in contract's pending withdrawals queue
-        storage
-            .chain()
-            .operations_schema()
-            .add_pending_withdrawal(
-                &TxHash::default(),
-                Some(pending_withdrawals_queue_index as i64 - 1),
-            )
-            .await
-            .expect("can't save fake pending withdrawal in the db");
-    }
-}
-
 /// Waits for *any* of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
 /// as application runs, any possible outcome (either `Ok` or `Err`) is considered
@@ -158,7 +114,6 @@ pub async fn run_core(
 
     // Insert pending withdrawals into database (if required)
     let mut storage_processor = connection_pool.access_storage().await?;
-    insert_pending_withdrawals(&mut storage_processor, eth_watch_req_sender.clone()).await;
 
     // Start State Keeper.
     let state_keeper_init = ZkSyncStateInitParams::restore_from_db(&mut storage_processor).await?;

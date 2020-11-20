@@ -165,6 +165,8 @@ pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
 
+pub const TIMESTAMP_BIT_WIDTH: usize = 8 * 8;
+
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();

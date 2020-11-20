@@ -51,6 +51,7 @@ pub struct WitnessBuilder<'a> {
     pub account_tree: &'a mut CircuitAccountTree,
     pub fee_account_id: AccountId,
     pub block_number: BlockNumber,
+    pub timestamp: u64,
     pub initial_root_hash: Fr,
     pub initial_used_subtree_root_hash: Fr,
     pub operations: Vec<Operation<Engine>>,
@@ -68,6 +69,7 @@ impl<'a> WitnessBuilder<'a> {
         account_tree: &'a mut CircuitAccountTree,
         fee_account_id: AccountId,
         block_number: BlockNumber,
+        timestamp: u64,
     ) -> WitnessBuilder {
         let initial_root_hash = account_tree.root_hash();
         let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
@@ -75,6 +77,7 @@ impl<'a> WitnessBuilder<'a> {
             account_tree,
             fee_account_id,
             block_number,
+            timestamp,
             initial_root_hash,
             initial_used_subtree_root_hash,
             operations: Vec::new(),
@@ -177,6 +180,7 @@ impl<'a> WitnessBuilder<'a> {
                     .expect("pubdata commitment not present"),
             ),
             block_number: Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
+            block_timestamp: Some(Fr::from_str(&self.timestamp.to_string()).unwrap()),
             validator_account: self
                 .fee_account_witness
                 .expect("fee account witness not present"),
@@ -605,7 +609,12 @@ pub fn build_block_witness<'a>(
 
     log::info!("building prover data for block {}", &block_number);
 
-    let mut witness_accum = WitnessBuilder::new(account_tree, block.fee_account, block_number);
+    let mut witness_accum = WitnessBuilder::new(
+        account_tree,
+        block.fee_account,
+        block_number,
+        block.timestamp,
+    );
 
     let ops = block
         .block_transactions

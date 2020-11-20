@@ -11,7 +11,7 @@ use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use zksync_crypto::params::CHUNK_BIT_WIDTH;
+use zksync_crypto::params::{CHUNK_BIT_WIDTH, CHUNK_BYTES};
 use zksync_crypto::serialization::FrSerde;
 
 /// An intermediate state of the block in the zkSync network.
@@ -204,6 +204,8 @@ impl Block {
             fee_account,
             previous_block_root_hash,
             block.get_eth_encoded_root(),
+            block.timestamp,
+            &block.get_onchain_op_commitment(),
             &block.get_eth_public_data(),
         );
         block
@@ -319,11 +321,22 @@ impl Block {
         (onchain_ops, H256::from(processable_ops_hash), priority_ops)
     }
 
+    /// Returns the public data for the Ethereum Commit operation.
+    pub fn get_onchain_op_commitment(&self) -> Vec<u8> {
+        let mut res = vec![0u8; self.block_chunks_size];
+        for op in self.get_onchain_operations_block_info().0 {
+            res[op.public_data_offset as usize / CHUNK_BYTES] = 0x01;
+        }
+        res
+    }
+
     fn get_commitment(
         block_number: BlockNumber,
         fee_account: AccountId,
         old_state_hash: H256,
         new_state_hash: H256,
+        timestamp: u64,
+        onchain_op_commitment: &[u8],
         public_data: &[u8],
     ) -> H256 {
         let mut hash_arg = vec![0u8; 64];
@@ -337,7 +350,12 @@ impl Block {
         hash_arg.extend_from_slice(&new_state_hash.as_bytes());
         hash_arg = sha256(&hash_arg).to_vec();
 
+        hash_arg.resize(64, 0u8);
+        U256::from(timestamp).to_big_endian(&mut hash_arg[32..]);
+        hash_arg = sha256(&hash_arg).to_vec();
+
         hash_arg.extend_from_slice(&public_data);
+        hash_arg.extend_from_slice(&onchain_op_commitment);
         H256::from_slice(&sha256(&hash_arg))
     }
 
@@ -350,6 +368,8 @@ impl Block {
             self.fee_account,
             old_block_info.state_hash,
             self.get_eth_encoded_root(),
+            self.timestamp,
+            &self.get_onchain_op_commitment(),
             &self.get_eth_public_data(),
         );
 

@@ -85,9 +85,6 @@ pub enum EthWatchRequest {
         eth_hash: Vec<u8>,
         resp: oneshot::Sender<Option<(EthBlockId, PriorityOp)>>,
     },
-    GetPendingWithdrawalsQueueIndex {
-        resp: oneshot::Sender<Result<u32, anyhow::Error>>,
-    },
 }
 
 pub struct EthWatch<T: Transport> {
@@ -420,41 +417,6 @@ impl<T: Transport> EthWatch<T> {
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
-    async fn pending_withdrawals_queue_index(&self) -> Result<u32, anyhow::Error> {
-        let first_pending_withdrawal_index: u32 = self
-            .zksync_contract
-            .1
-            .query(
-                "firstPendingWithdrawalIndex",
-                (),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "Failed to query contract firstPendingWithdrawalIndex: {}",
-                    e
-                )
-            })?;
-        let number_of_pending_withdrawals: u32 = self
-            .zksync_contract
-            .1
-            .query(
-                "numberOfPendingWithdrawals",
-                (),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| {
-                format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e)
-            })?;
-        Ok(first_pending_withdrawal_index + number_of_pending_withdrawals)
-    }
-
     fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<(EthBlockId, PriorityOp)> {
         self.eth_state
             .unconfirmed_queue()
@@ -595,13 +557,6 @@ impl<T: Transport> EthWatch<T> {
                         .await
                         .unwrap_or(false);
                     resp.send(authorized).unwrap_or_default();
-                }
-                EthWatchRequest::GetPendingWithdrawalsQueueIndex { resp } => {
-                    let pending_withdrawals_queue_index =
-                        self.pending_withdrawals_queue_index().await;
-
-                    resp.send(pending_withdrawals_queue_index)
-                        .unwrap_or_default();
                 }
             }
         }

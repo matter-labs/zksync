@@ -43,4 +43,4 @@ members = [
 ]
 
 [patch.crates-io]
-ethabi = { path = "../ethabi/ethabi", version = "12.0.0" }
+ethabi = { git = "https://github.com/dvush/ethabi.git" }

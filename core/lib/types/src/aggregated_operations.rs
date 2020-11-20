@@ -74,14 +74,25 @@ pub struct BlocksProofOperation {
 
 impl BlocksProofOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
+        let recursive_input = Token::Array(vec![Token::Uint(U256::from(0)); 1]);
+        let proof = Token::Array(vec![Token::Uint(U256::from(0)); 33]);
+        let vk_indexes = Token::Array(vec![Token::Uint(U256::from(0)); self.commitments.len()]);
         let commitments = Token::Array(
             self.commitments
                 .iter()
-                .map(|(commitment, _)| Token::FixedBytes(commitment.as_bytes().to_vec()))
+                .map(|(commitment, _)| {
+                    Token::Uint(U256::from_big_endian(&commitment.to_fixed_bytes()))
+                })
                 .collect(),
         );
-        let proof = Token::Array(vec![Token::Uint(U256::from(0)); 33]);
-        vec![commitments, proof]
+        let subproof_limbs = Token::FixedArray(vec![Token::Uint(U256::from(0)); 16]);
+        vec![
+            recursive_input,
+            proof,
+            vk_indexes,
+            commitments,
+            subproof_limbs,
+        ]
     }
 }
 

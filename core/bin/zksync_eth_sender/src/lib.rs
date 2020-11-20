@@ -624,7 +624,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Calculates the gas limit for transaction to be send, depending on the type of operation.
     fn gas_limit_for_op(op: &ETHOperation) -> U256 {
         // TODO:
-        U256::from(1_000_000)
+        U256::from(5_000_000)
         // match op.op_type {
         //     OperationType::Commit => {
         //         op.op

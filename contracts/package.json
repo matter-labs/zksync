@@ -39,6 +39,7 @@
   },
   "scripts": {
     "build": "hardhat compile",
+    "build-dev": "hardhat compile",
     "test": "yarn build && zk f mocha -r ts-node/register test/**/*.ts",
     "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
     "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",
