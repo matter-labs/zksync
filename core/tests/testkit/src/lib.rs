@@ -15,7 +15,7 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::Transport;
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ConfigurationOptions, EthClientOptions};
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
 use zksync_core::state_keeper::{
@@ -585,9 +585,10 @@ pub struct TestkitConfig {
 
 pub fn get_testkit_config_from_env() -> TestkitConfig {
     let env_config = ConfigurationOptions::from_env();
+    let eth_client_options = EthClientOptions::from_env();
     TestkitConfig {
-        chain_id: env_config.chain_id,
-        gas_price_factor: env_config.gas_price_factor,
+        chain_id: eth_client_options.chain_id,
+        gas_price_factor: eth_client_options.gas_price_factor,
         web3_url: env_config.web3_url,
     }
 }
