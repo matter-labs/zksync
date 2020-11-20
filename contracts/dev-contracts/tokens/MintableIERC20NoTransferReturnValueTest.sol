@@ -1,11 +1,10 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
  * the optional functions; to access them see {ERC20Detailed}.
  */
 interface MintableIERC20NoTransferReturnValueTest {
-
     function mint(address to, uint256 amount) external;
 
     /**
@@ -61,7 +60,11 @@ interface MintableIERC20NoTransferReturnValueTest {
      *
      * Emits a {Transfer} event.
      */
-    function transferFrom(address sender, address recipient, uint256 amount) external;
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external;
 
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to

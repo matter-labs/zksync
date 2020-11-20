@@ -58,7 +58,7 @@ impl TestServerConfig {
     }
 
     /// Creates several transactions and the corresponding executed operations.
-    fn gen_zk_txs() -> Vec<(ZkSyncTx, ExecutedOperations)> {
+    pub fn gen_zk_txs(fee: u64) -> Vec<(ZkSyncTx, ExecutedOperations)> {
         let from = ZkSyncAccount::rand();
         from.set_account_id(Some(0xdead));
 
@@ -69,7 +69,7 @@ impl TestServerConfig {
 
         // Sign change pubkey tx pair
         {
-            let tx = from.sign_change_pubkey_tx(None, false, 0, 0_u64.into(), false);
+            let tx = from.sign_change_pubkey_tx(None, false, 0, fee.into(), false);
 
             let zksync_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
                 tx: tx.clone(),
@@ -94,15 +94,7 @@ impl TestServerConfig {
         // Transfer tx pair
         {
             let tx = from
-                .sign_transfer(
-                    0,
-                    "ETH",
-                    1_u64.into(),
-                    0_u64.into(),
-                    &to.address,
-                    None,
-                    false,
-                )
+                .sign_transfer(0, "ETH", 1_u64.into(), fee.into(), &to.address, None, false)
                 .0;
 
             let zksync_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -170,7 +162,10 @@ impl TestServerConfig {
 
             // Add transactions to every odd block.
             let txs = if block_number % 2 == 1 {
-                Self::gen_zk_txs().into_iter().map(|(_tx, op)| op).collect()
+                Self::gen_zk_txs(1_000)
+                    .into_iter()
+                    .map(|(_tx, op)| op)
+                    .collect()
             } else {
                 vec![]
             };

@@ -354,10 +354,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     fn try_parse_hex(&self, query: &str) -> Option<String> {
         const HASH_STRING_SIZE: usize = 32 * 2; // 32 bytes, 2 symbols per byte.
 
-        if query.starts_with("0x") {
-            Some(query[2..].into())
-        } else if query.starts_with("sync-bl:") {
-            Some(query[8..].into())
+        if let Some(query) = query.strip_prefix("0x") {
+            Some(query.into())
+        } else if let Some(query) = query.strip_prefix("sync-bl:") {
+            Some(query.into())
         } else if query.len() == HASH_STRING_SIZE && hex::decode(query).is_ok() {
             Some(query.into())
         } else {

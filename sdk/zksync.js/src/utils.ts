@@ -1,5 +1,4 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
-import { keccak256 } from 'ethers/lib/utils';
 import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address, Transfer } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -14,10 +13,13 @@ export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require('../abi/S
 
 export const IEIP1271_INTERFACE = new utils.Interface(require('../abi/IEIP1271.json').abi);
 
-export const MAX_ERC20_APPROVE_AMOUNT =
-    BigNumber.from('115792089237316195423570985008687907853269984665640564039457584007913129639935'); // 2^256 - 1
+export const MAX_ERC20_APPROVE_AMOUNT = BigNumber.from(
+    '115792089237316195423570985008687907853269984665640564039457584007913129639935'
+); // 2^256 - 1
 
-export const ERC20_APPROVE_TRESHOLD = BigNumber.from('57896044618658097711785492504343953926634992332820282019728792003956564819968'); // 2^255
+export const ERC20_APPROVE_TRESHOLD = BigNumber.from(
+    '57896044618658097711785492504343953926634992332820282019728792003956564819968'
+); // 2^255
 
 export const ERC20_DEPOSIT_GAS_LIMIT = BigNumber.from('300000'); // 300k
 
@@ -330,7 +332,7 @@ export async function verifyERC1271Signature(
 
     // sign_message = keccak256("\x19Ethereum Signed Message:\n{message_len}" + message)
     const signMessage = getSignedBytesFromMessage(message, true);
-    const signMessageHash = keccak256(signMessage);
+    const signMessageHash = utils.keccak256(signMessage);
 
     const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
     const eipRetVal = await eip1271.isValidSignature(signMessageHash, signature);

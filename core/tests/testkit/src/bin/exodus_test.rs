@@ -344,7 +344,7 @@ async fn check_exit_correct_proof_incorrect_sender(
 
 async fn exit_test() {
     env_logger::init();
-    let testkit_config = get_testkit_config_from_env();
+    let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =

@@ -55,11 +55,20 @@ impl Client {
         [&self.url, "/api/v1/", method].concat()
     }
 
-    /// Constructs get request for the specified method.
+    /// Constructs GET request for the specified method.
     pub(crate) fn get(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
         let url = self.endpoint(method.as_ref());
         ClientRequestBuilder {
             inner: self.inner.get(&url),
+            url,
+        }
+    }
+
+    /// Constructs POST request for the specified method.
+    pub(crate) fn post(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
+        let url = self.endpoint(method.as_ref());
+        ClientRequestBuilder {
+            inner: self.inner.post(&url),
             url,
         }
     }
@@ -81,6 +90,18 @@ impl ClientRequestBuilder {
     pub fn query<Q: Serialize + ?Sized>(self, query: &Q) -> Self {
         Self {
             inner: self.inner.query(query),
+            url: self.url,
+        }
+    }
+
+    /// Send a JSON body.
+    ///
+    /// See [reqwest] documentation for details
+    ///
+    /// [reqwest]: https://docs.rs/reqwest/latest/reqwest/struct.RequestBuilder.html#method.json
+    pub fn body<B: Serialize + ?Sized>(self, body: &B) -> Self {
+        Self {
+            inner: self.inner.json(body),
             url: self.url,
         }
     }

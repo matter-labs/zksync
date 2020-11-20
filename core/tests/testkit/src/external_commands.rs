@@ -20,35 +20,30 @@ pub struct Contracts {
 }
 
 fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
-    if deploy_script_out.starts_with("GOVERNANCE_ADDR=0x") {
+    if let Some(output) = deploy_script_out.strip_prefix("GOVERNANCE_ADDR=0x") {
         Some((
             String::from("GOVERNANCE_ADDR"),
-            Address::from_str(&deploy_script_out["GOVERNANCE_ADDR=0x".len()..])
-                .expect("can't parse contract address"),
+            Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if deploy_script_out.starts_with("VERIFIER_ADDR=0x") {
+    } else if let Some(output) = deploy_script_out.strip_prefix("VERIFIER_ADDR=0x") {
         Some((
             String::from("VERIFIER_ADDR"),
-            Address::from_str(&deploy_script_out["VERIFIER_ADDR=0x".len()..])
-                .expect("can't parse contract address"),
+            Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if deploy_script_out.starts_with("CONTRACT_ADDR=0x") {
+    } else if let Some(output) = deploy_script_out.strip_prefix("CONTRACT_ADDR=0x") {
         Some((
             String::from("CONTRACT_ADDR"),
-            Address::from_str(&deploy_script_out["CONTRACT_ADDR=0x".len()..])
-                .expect("can't parse contract address"),
+            Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if deploy_script_out.starts_with("UPGRADE_GATEKEEPER_ADDR=0x") {
+    } else if let Some(output) = deploy_script_out.strip_prefix("UPGRADE_GATEKEEPER_ADDR=0x") {
         Some((
             String::from("UPGRADE_GATEKEEPER_ADDR"),
-            Address::from_str(&deploy_script_out["UPGRADE_GATEKEEPER_ADDR=0x".len()..])
-                .expect("can't parse contract address"),
+            Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if deploy_script_out.starts_with("TEST_ERC20=0x") {
+    } else if let Some(output) = deploy_script_out.strip_prefix("TEST_ERC20=0x") {
         Some((
             String::from("TEST_ERC20"),
-            Address::from_str(&deploy_script_out["TEST_ERC20=0x".len()..])
-                .expect("can't parse contract address"),
+            Address::from_str(output).expect("can't parse contract address"),
         ))
     } else {
         None

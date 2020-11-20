@@ -26,7 +26,7 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
-    await utils.spawn('yarn zksync build');
+    await utils.spawn('yarn zksync prepublish');
 }
 
 export async function deployTestkit(genesisRoot: string, prodContracts: boolean = false) {
@@ -59,7 +59,7 @@ export async function plonkSetup(powers?: number[]) {
 }
 
 export async function revertReason(txHash: string, web3url?: string) {
-    await utils.spawn(`cd contracts && npx ts-node revert-reason.ts ${txHash} ${web3url || ''}`);
+    await utils.spawn(`yarn contracts ts-node revert-reason.ts ${txHash} ${web3url || ''}`);
 }
 
 export async function explorer() {

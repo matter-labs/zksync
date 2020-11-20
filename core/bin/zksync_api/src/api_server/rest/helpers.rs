@@ -11,12 +11,14 @@ use zksync_storage::StorageProcessor;
 use zksync_types::{PriorityOp, Token, TokenId, ZkSyncPriorityOp, H256};
 
 pub fn remove_prefix(query: &str) -> &str {
-    if query.starts_with("0x") {
-        &query[2..]
-    } else if query.starts_with("sync-bl:") || query.starts_with("sync-tx:") {
-        &query[8..]
+    if let Some(query) = query.strip_prefix("0x") {
+        query
+    } else if let Some(query) = query.strip_prefix("sync-bl:") {
+        query
+    } else if let Some(query) = query.strip_prefix("sync-tx:") {
+        query
     } else {
-        &query
+        query
     }
 }
 
