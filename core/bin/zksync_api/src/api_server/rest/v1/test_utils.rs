@@ -40,6 +40,12 @@ impl Default for TestServerConfig {
     }
 }
 
+#[derive(Debug)]
+pub struct TestTransactions {
+    pub acc: ZkSyncAccount,
+    pub txs: Vec<(ZkSyncTx, ExecutedOperations)>,
+}
+
 impl TestServerConfig {
     pub fn start_server<F>(&self, scope_factory: F) -> (Client, actix_web::test::TestServer)
     where
@@ -58,7 +64,7 @@ impl TestServerConfig {
     }
 
     /// Creates several transactions and the corresponding executed operations.
-    pub fn gen_zk_txs(fee: u64) -> Vec<(ZkSyncTx, ExecutedOperations)> {
+    pub fn gen_zk_txs(fee: u64) -> TestTransactions {
         let from = ZkSyncAccount::rand();
         from.set_account_id(Some(0xdead));
 
@@ -119,7 +125,7 @@ impl TestServerConfig {
             ));
         }
 
-        txs
+        TestTransactions { acc: from, txs }
     }
 
     pub async fn fill_database(&self) -> anyhow::Result<()> {
@@ -163,6 +169,7 @@ impl TestServerConfig {
             // Add transactions to every odd block.
             let txs = if block_number % 2 == 1 {
                 Self::gen_zk_txs(1_000)
+                    .txs
                     .into_iter()
                     .map(|(_tx, op)| op)
                     .collect()

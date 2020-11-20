@@ -61,6 +61,7 @@ pub enum TokenPriceRequestType {
     USDForOneToken,
 }
 
+#[derive(Debug)]
 pub enum TickerRequest {
     GetTxFee {
         tx_type: TxFeeTypes,

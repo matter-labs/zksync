@@ -174,14 +174,16 @@ mod tests {
     use bigdecimal::BigDecimal;
     use futures::{channel::mpsc, prelude::*};
     use num::BigUint;
-    use zksync_types::SignedZkSyncTx;
+    use zksync_types::{tx::PackedEthSignature, SignedZkSyncTx};
 
-    use super::{super::test_utils::TestServerConfig, *};
+    use super::{
+        super::test_utils::{TestServerConfig, TestTransactions},
+        *,
+    };
     use crate::{
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
-        signature_checker::VerifiedTx,
-        signature_checker::VerifyTxSignatureRequest,
+        signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     };
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
@@ -299,7 +301,7 @@ mod tests {
         let (core_client, core_server) = submit_txs_loopback();
 
         let signed_tx = SignedZkSyncTx {
-            tx: TestServerConfig::gen_zk_txs(0)[0].0.clone(),
+            tx: TestServerConfig::gen_zk_txs(0).txs[0].0.clone(),
             eth_sign_data: None,
         };
 
@@ -315,12 +317,12 @@ mod tests {
         let (client, server) = TestServer::new().await?;
 
         // Submit correct transaction.
-        let tx = TestServerConfig::gen_zk_txs(1_00)[0].0.clone();
+        let tx = TestServerConfig::gen_zk_txs(1_00).txs[0].0.clone();
         let expected_tx_hash = tx.hash();
         assert_eq!(client.submit_tx(tx, None, None).await?, expected_tx_hash);
 
         // Submit transaction without fee.
-        let tx = TestServerConfig::gen_zk_txs(0)[0].0.clone();
+        let tx = TestServerConfig::gen_zk_txs(0).txs[0].0.clone();
         assert!(client
             .submit_tx(tx, None, None)
             .await
@@ -329,7 +331,8 @@ mod tests {
             .contains("Transaction fee is too low"));
 
         // Submit correct transactions batch.
-        let (txs, tx_hashes): (Vec<_>, Vec<_>) = TestServerConfig::gen_zk_txs(1_00)
+        let TestTransactions { acc, txs } = TestServerConfig::gen_zk_txs(1_00);
+        let (txs, tx_hashes): (Vec<_>, Vec<_>) = txs
             .into_iter()
             .map(|(tx, _op)| {
                 let tx_hash = tx.hash();
@@ -337,15 +340,13 @@ mod tests {
             })
             .unzip();
 
-        let signature: TxEthSignature = serde_json::from_value(
-            serde_json::json!({
-                "type": "EthereumSignature",
-                "signature": "0x080d5db7ab0ef71a31c2919cbe48e5a8c0b28812f8fefffff9231ba8b6d7396773780b783e65d214db162d1471854916f8608c84eba6ea0fbcbe19f9a8b9a8311b",
-            })
-        ).unwrap();
+        let batch_message = crate::api_server::tx_sender::get_batch_sign_message(txs.iter());
+        let signature = PackedEthSignature::sign(&acc.eth_private_key, &batch_message).unwrap();
 
         assert_eq!(
-            client.submit_tx_batch(txs, Some(signature)).await?,
+            client
+                .submit_tx_batch(txs, Some(TxEthSignature::EthereumSignature(signature)))
+                .await?,
             tx_hashes
         );
 

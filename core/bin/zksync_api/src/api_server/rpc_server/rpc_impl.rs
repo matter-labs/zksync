@@ -10,7 +10,10 @@ use zksync_types::{
 };
 
 // Local uses
-use crate::fee_ticker::{BatchFee, Fee, TokenPriceRequestType};
+use crate::{
+    api_server::tx_sender::SubmitError,
+    fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
+};
 use bigdecimal::BigDecimal;
 
 use super::{error::*, types::*, RpcApp};
@@ -144,13 +147,7 @@ impl RpcApp {
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {
         let mut storage = self.access_storage().await?;
         let mut tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                file!(),
-                line!(),
-                column!(),
-                err
-            );
+            log::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
         Ok(tokens
@@ -171,6 +168,13 @@ impl RpcApp {
         address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
+        let token_allowed =
+            Self::token_allowed_for_fees(self.tx_sender.ticker_requests.clone(), token.clone())
+                .await?;
+        if !token_allowed {
+            return Err(SubmitError::InappropriateFeeToken.into());
+        }
+
         Self::ticker_request(
             self.tx_sender.ticker_requests.clone(),
             tx_type,
@@ -192,6 +196,13 @@ impl RpcApp {
                 message: "Number of tx_types must be equal to the number of addresses".to_string(),
                 data: None,
             });
+        }
+
+        let token_allowed =
+            Self::token_allowed_for_fees(self.tx_sender.ticker_requests.clone(), token.clone())
+                .await?;
+        if !token_allowed {
+            return Err(SubmitError::InappropriateFeeToken.into());
         }
 
         let ticker_request_sender = self.tx_sender.ticker_requests.clone();

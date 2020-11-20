@@ -235,6 +235,27 @@ impl RpcApp {
         Ok(res)
     }
 
+    async fn token_allowed_for_fees(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+    ) -> Result<bool> {
+        let (sender, receiver) = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::IsTokenAllowed {
+                token: token.clone(),
+                response: sender,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        receiver
+            .await
+            .expect("ticker answer sender dropped")
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                Error::internal_error()
+            })
+    }
+
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
