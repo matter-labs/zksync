@@ -164,14 +164,7 @@ impl RpcApp {
                     .get_executed_priority_operation(serial_id)
                     .await
                     .map_err(|err| {
-                        log::warn!(
-                            "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                            file!(),
-                            line!(),
-                            column!(),
-                            err,
-                            serial_id,
-                        );
+                        vlog::warn!("Internal Server Error: '{}'; input: {}", err, serial_id);
                         Error::internal_error()
                     })?;
 
@@ -222,13 +215,10 @@ impl RpcApp {
                 .tx_receipt(tx_hash.as_ref())
                 .await
                 .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                        file!(),
-                        line!(),
-                        column!(),
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: {}",
                         err,
-                        tx_hash.to_string(),
+                        tx_hash.to_string()
                     );
                     Error::internal_error()
                 })?;
@@ -263,11 +253,8 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: {:?}, {:?}",
                 err,
                 tx_type,
                 token,
@@ -292,14 +279,7 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}",
-                file!(),
-                line!(),
-                column!(),
-                err,
-                token,
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
             Error::internal_error()
         })
     }
@@ -319,10 +299,10 @@ impl RpcApp {
             verified: Default::default(),
         };
 
-        if let Some((account_id, commited_state)) = account_info.committed {
+        if let Some((account_id, committed_state)) = account_info.committed {
             result.account_id = Some(account_id);
             result.committed =
-                ResponseAccountState::try_restore(commited_state, &self.tx_sender.tokens).await?;
+                ResponseAccountState::try_restore(committed_state, &self.tx_sender.tokens).await?;
         };
 
         if let Some((_, verified_state)) = account_info.verified {
