@@ -4,20 +4,11 @@
     "main": "build/index.js",
     "license": "MIT",
     "bin": "build/index.js",
-    "prettier": {
-        "tabWidth": 4,
-        "printWidth": 120,
-        "parser": "typescript",
-        "singleQuote": true,
-        "trailingComma": "none",
-        "bracketSpacing": true
-    },
     "scripts": {
         "build": "tsc",
         "watch": "tsc --watch",
         "start": "node build/index.js",
-        "test": "zk f mocha --no-timeout -r ts-node/register test/*.test.ts",
-        "fmt": "prettier --write {src,test}/*.ts"
+        "test": "zk f mocha --no-timeout -r ts-node/register test/*.test.ts"
     },
     "dependencies": {
         "commander": "^6.2.0",
@@ -36,7 +27,6 @@
         "chai-as-promised": "^7.1.1",
         "mocha": "^8.2.0",
         "mock-fs": "^4.13.0",
-        "prettier": "^2.1.1",
         "ts-node": "^9.0.0",
         "typescript": "^4.0.5"
     }

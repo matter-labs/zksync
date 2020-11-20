@@ -32,7 +32,12 @@ jobs:
 
     - name: lints
       run: |
-        zk db setup # So database will be created for compilation.
+        # lint non-rust code
+        zk fmt --check
+        yarn lint:md
+        yarn lint:sol
+        # So database will be created for compilation.
+        zk db setup
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
