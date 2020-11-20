@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{collections::VecDeque, time::Instant};
+use std::{collections::VecDeque, convert::TryFrom, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
@@ -293,6 +293,28 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "contains_tx");
         Ok(contains)
+    }
+
+    /// Returns zkSync transaction with thr given hash.
+    pub async fn get_tx(&mut self, tx_hash: TxHash) -> QueryResult<Option<SignedZkSyncTx>> {
+        let start = Instant::now();
+
+        let tx_hash = hex::encode(tx_hash.as_ref());
+
+        let mempool_tx = sqlx::query_as!(
+            MempoolTx,
+            "SELECT * from mempool_txs
+            WHERE tx_hash = $1",
+            &tx_hash
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_tx");
+        mempool_tx
+            .map(SignedZkSyncTx::try_from)
+            .transpose()
+            .map_err(anyhow::Error::from)
     }
 
     /// Removes transactions that are already committed.

@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
-use zksync_types::{tx::TxEthSignature, tx::TxHash, BlockNumber, ZkSyncTx};
+use zksync_types::{
+    tx::{TxEthSignature, TxHash},
+    BlockNumber, SignedZkSyncTx, ZkSyncTx,
+};
 
 // Local uses
 use super::{client::Client, client::ClientError, Error as ApiError, JsonResult};
@@ -149,6 +152,28 @@ impl ApiTransactionsData {
 
         Ok(Some(tx_status))
     }
+
+    async fn tx_data(&self, tx_hash: TxHash) -> QueryResult<Option<SignedZkSyncTx>> {
+        let mut storage = self.tx_sender.pool.access_storage().await?;
+
+        let operation = storage
+            .chain()
+            .operations_schema()
+            .get_executed_operation(tx_hash.as_ref())
+            .await?;
+
+        if let Some(op) = operation {
+            let signed_tx = SignedZkSyncTx {
+                tx: serde_json::from_value(op.tx)?,
+                eth_sign_data: op.eth_sign_data.map(serde_json::from_value).transpose()?,
+            };
+
+            Ok(Some(signed_tx))
+        } else {
+            // Check memory pool for pending transactions.
+            storage.chain().mempool_schema().get_tx(tx_hash).await
+        }
+    }
 }
 
 // Data transfer objects.
@@ -224,6 +249,13 @@ impl Client {
             .send()
             .await
     }
+
+    /// Gets transaction content.
+    pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<SignedZkSyncTx>, ClientError> {
+        self.get(&format!("transactions/{}/data", tx_hash.to_string()))
+            .send()
+            .await
+    }
 }
 
 // Server implementation
@@ -235,6 +267,15 @@ async fn tx_status(
     let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
 
     Ok(Json(tx_status))
+}
+
+async fn tx_data(
+    data: web::Data<ApiTransactionsData>,
+    web::Path(tx_hash): web::Path<TxHash>,
+) -> JsonResult<Option<SignedZkSyncTx>> {
+    let tx_data = data.tx_data(tx_hash).await.map_err(ApiError::internal)?;
+
+    Ok(Json(tx_data))
 }
 
 async fn submit_tx(
@@ -272,6 +313,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
     web::scope("transactions")
         .data(data)
         .route("{tx_hash}", web::get().to(tx_status))
+        .route("{tx_hash}/data", web::get().to(tx_data))
         .route("submit", web::post().to(submit_tx))
         .route("submit/batch", web::post().to(submit_tx_batch))
 }
@@ -291,8 +333,7 @@ mod tests {
         api_server::rest::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
-        signature_checker::VerifiedTx,
-        signature_checker::VerifyTxSignatureRequest,
+        signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     };
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
@@ -425,7 +466,7 @@ mod tests {
     async fn test_transactions_scope() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
-        // Tx status for committed transaction.
+        // Tx status and data for committed transaction.
         let tx_hash = {
             let mut storage = server.pool.access_storage().await?;
 
@@ -441,7 +482,9 @@ mod tests {
             client.tx_status(tx_hash).await?,
             Some(TxStatus::Verified { block: 1 })
         );
-        // Tx status for pending transaction.
+        assert_eq!(client.tx_data(tx_hash).await?.unwrap().hash(), tx_hash);
+
+        // Tx status and data for pending transaction.
         let tx_hash = {
             let mut storage = server.pool.access_storage().await?;
 
@@ -459,9 +502,12 @@ mod tests {
             tx_hash
         };
         assert_eq!(client.tx_status(tx_hash).await?, Some(TxStatus::Pending));
+        assert_eq!(client.tx_data(tx_hash).await?.unwrap().hash(), tx_hash);
+
         // Tx status for unknown transaction.
         let tx_hash = TestServerConfig::gen_zk_txs(1_u64)[1].0.hash();
-        assert_eq!(client.tx_status(tx_hash).await?, None,);
+        assert_eq!(client.tx_status(tx_hash).await?, None);
+        assert!(client.tx_data(tx_hash).await?.is_none());
 
         // Submit correct transaction.
         let tx = TestServerConfig::gen_zk_txs(1_00)[0].0.clone();

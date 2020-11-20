@@ -290,15 +290,18 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
 /// Checks that memory pool contains previously inserted transaction.
 #[db_test]
-async fn contrains_tx(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+async fn contrains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let txs = gen_transfers(5);
 
     // Make sure that the mempool responds that these transactions are missing.
     for tx in &txs {
+        let tx_hash = tx.hash();
+
         assert_eq!(
-            MempoolSchema(&mut storage).contains_tx(tx.hash()).await?,
+            MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
             false
         );
+        assert!(MempoolSchema(&mut storage).get_tx(tx_hash).await?.is_none());
     }
 
     // Submit transactions.
@@ -315,9 +318,20 @@ async fn contrains_tx(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Make sure that the memory pool now responds that these transactions exist.
     for tx in &txs {
+        let tx_hash = tx.hash();
+
         assert_eq!(
-            MempoolSchema(&mut storage).contains_tx(tx.hash()).await?,
+            MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
             true
+        );
+        assert_eq!(
+            MempoolSchema(&mut storage)
+                .get_tx(tx_hash)
+                .await?
+                .as_ref()
+                .unwrap()
+                .hash(),
+            tx_hash,
         );
     }
 

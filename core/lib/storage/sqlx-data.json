@@ -3199,6 +3199,56 @@
       ]
     }
   },
+  "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
+    "query": "SELECT * from mempool_txs\n            WHERE tx_hash = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_sign_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
+    }
+  },
   "e001bf06d7000d3b045a1a7c38ad1f5bfa96294bf80a07228b69de24b1cea003": {
     "query": "UPDATE prover_runs \n            SET updated_at = now()\n            WHERE id = $1",
     "describe": {
