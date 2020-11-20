@@ -1,4 +1,4 @@
-import * as zksync from "zksync";
+import * as zksync from 'zksync';
 
 export interface TestVectorEntry {
     inputs: any;

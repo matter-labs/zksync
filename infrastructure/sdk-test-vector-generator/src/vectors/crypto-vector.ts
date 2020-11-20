@@ -1,7 +1,7 @@
-import { TestVector, TestVectorEntry } from "../types";
-import * as zksync from "zksync";
-import { utils } from "ethers";
-import { generateArray } from "../utils";
+import { TestVector, TestVectorEntry } from '../types';
+import * as zksync from 'zksync';
+import { utils } from 'ethers';
+import { generateArray } from '../utils';
 
 /**
  * Interface for the crypto primitives test vector.
@@ -37,17 +37,17 @@ export async function generateCryptoTestVectors(): Promise<TestVector<CryptoPrim
     const item = {
         inputs: {
             seed: utils.hexlify(seed),
-            message: utils.hexlify(bytesToSign),
+            message: utils.hexlify(bytesToSign)
         },
         outputs: {
             privateKey: utils.hexlify(privateKey),
             pubKeyHash: pubKey,
-            signature: signature,
-        },
+            signature: signature
+        }
     };
 
     return {
-        description: "Contains the seed for private key and the message for signing",
-        items: [item],
+        description: 'Contains the seed for private key and the message for signing',
+        items: [item]
     };
 }

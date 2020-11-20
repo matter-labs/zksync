@@ -10,5 +10,4 @@ yarn
 yarn generate
 ```
 
-Result test vector will be created in the package directory.
-Output file name is `test-vectors.json`.
+Result test vector will be created in the package directory. Output file name is `test-vectors.json`.

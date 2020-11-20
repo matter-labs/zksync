@@ -1,6 +1,6 @@
-import * as zksync from "zksync";
-import { TestVector, TestVectorEntry } from "../types";
-import { utils } from "ethers";
+import * as zksync from 'zksync';
+import { TestVector, TestVectorEntry } from '../types';
+import { utils } from 'ethers';
 
 /**
  * Utilities test vector consist of several independent test vectors.
@@ -56,12 +56,12 @@ export function generateUtilsVectors(): UtilsVectors {
     return {
         amountPacking,
         feePacking,
-        tokenFormatting,
+        tokenFormatting
     };
 }
 
 function generateFeePackingVector(): TestVector<PackingTestEntry> {
-    const test_vector = ["0", "1000", "1111", "474732833474", "474732833400", "10000000000000"];
+    const test_vector = ['0', '1000', '1111', '474732833474', '474732833400', '10000000000000'];
     const items = [];
     for (let value of test_vector) {
         const packable = zksync.utils.isTransactionFeePackable(value);
@@ -69,26 +69,26 @@ function generateFeePackingVector(): TestVector<PackingTestEntry> {
         const packed = zksync.utils.packFeeChecked(closestPackable);
         items.push({
             inputs: {
-                value,
+                value
             },
             outputs: {
                 packable,
                 closestPackable: closestPackable.toString(),
-                packedValue: utils.hexlify(packed),
-            },
+                packedValue: utils.hexlify(packed)
+            }
         });
     }
 
     const vector = {
-        description: "Checks for fee packing",
-        items,
+        description: 'Checks for fee packing',
+        items
     };
 
     return vector;
 }
 
 function generateAmountPackingVector(): TestVector<PackingTestEntry> {
-    const testVector = ["0", "1000", "1111", "474732833474", "474732833400", "10000000000000"];
+    const testVector = ['0', '1000', '1111', '474732833474', '474732833400', '10000000000000'];
     const items = [];
     for (const value of testVector) {
         const packable = zksync.utils.isTransactionAmountPackable(value);
@@ -96,19 +96,19 @@ function generateAmountPackingVector(): TestVector<PackingTestEntry> {
         const packed = zksync.utils.packAmountChecked(closestPackable);
         items.push({
             inputs: {
-                value,
+                value
             },
             outputs: {
                 packable,
                 closestPackable: closestPackable.toString(),
-                packedValue: utils.hexlify(packed),
-            },
+                packedValue: utils.hexlify(packed)
+            }
         });
     }
 
     const vector = {
-        description: "Checks for amount packing",
-        items,
+        description: 'Checks for amount packing',
+        items
     };
 
     return vector;
@@ -116,10 +116,10 @@ function generateAmountPackingVector(): TestVector<PackingTestEntry> {
 
 function generateTokenFormattingVector(): TestVector<TokenFormattingEntry> {
     const testVector = [
-        { token: "NNM", decimals: 0, amount: "1000000000000000100000", formatted: "1000000000000000100000.0 NNM" },
-        { token: "DAI", decimals: 6, amount: "1000000", formatted: "1.0 DAI" },
-        { token: "ZRO", decimals: 11, amount: "0", formatted: "0.0 ZRO" },
-        { token: "ETH", decimals: 18, amount: "1000000000000000100000", formatted: "1000.0000000000001 ETH" },
+        { token: 'NNM', decimals: 0, amount: '1000000000000000100000', formatted: '1000000000000000100000.0 NNM' },
+        { token: 'DAI', decimals: 6, amount: '1000000', formatted: '1.0 DAI' },
+        { token: 'ZRO', decimals: 11, amount: '0', formatted: '0.0 ZRO' },
+        { token: 'ETH', decimals: 18, amount: '1000000000000000100000', formatted: '1000.0000000000001 ETH' }
     ];
 
     const items = [];
@@ -128,16 +128,16 @@ function generateTokenFormattingVector(): TestVector<TokenFormattingEntry> {
             inputs: {
                 token: value.token,
                 decimals: value.decimals,
-                amount: value.amount,
+                amount: value.amount
             },
             outputs: {
-                formatted: value.formatted,
-            },
+                formatted: value.formatted
+            }
         });
     }
 
     return {
-        description: "Checks for token amount formatting",
-        items,
+        description: 'Checks for token amount formatting',
+        items
     };
 }
