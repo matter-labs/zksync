@@ -41,23 +41,23 @@ pub struct ProverOptions {
     pub heartbeat_interval: Duration,
     pub cycle_wait: Duration,
     pub gone_timeout: Duration,
+    pub prover_server_address: SocketAddr,
+    pub idle_provers: u32,
+    pub witness_generators: usize,
 }
 
 impl ProverOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
-        let prepare_data_interval =
-            Duration::from_millis(parse_env("PROVER_PREPARE_DATA_INTERVAL"));
-        let heartbeat_interval = Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL"));
-        let cycle_wait = Duration::from_millis(parse_env("PROVER_CYCLE_WAIT"));
-        let gone_timeout = Duration::from_millis(parse_env("PROVER_GONE_TIMEOUT"));
-
         Self {
-            prepare_data_interval,
-            heartbeat_interval,
-            cycle_wait,
-            gone_timeout,
+            prepare_data_interval: Duration::from_millis(parse_env("PROVER_PREPARE_DATA_INTERVAL")),
+            heartbeat_interval: Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL")),
+            cycle_wait: Duration::from_millis(parse_env("PROVER_CYCLE_WAIT")),
+            gone_timeout: Duration::from_millis(parse_env("PROVER_GONE_TIMEOUT")),
+            prover_server_address: parse_env_port("PROVER_SERVER_PORT"),
+            witness_generators: parse_env("WITNESS_GENERATORS"),
+            idle_provers: parse_env("IDLE_PROVERS"),
         }
     }
 }
@@ -134,6 +134,29 @@ impl MiniblockTimings {
 }
 
 #[derive(Debug, Clone)]
+pub struct EthClientOptions {
+    pub chain_id: u8,
+    pub gas_price_factor: f64,
+    pub operator_commit_eth_addr: H160,
+    pub operator_private_key: Option<H256>,
+    pub web3_url: String,
+    pub contract_eth_addr: H160,
+}
+
+impl EthClientOptions {
+    pub fn from_env() -> Self {
+        Self {
+            operator_commit_eth_addr: parse_env_with("OPERATOR_COMMIT_ETH_ADDRESS", |s| &s[2..]),
+            operator_private_key: parse_env_if_exists("OPERATOR_PRIVATE_KEY"),
+            chain_id: parse_env("CHAIN_ID"),
+            gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
+            web3_url: get_env("WEB3_URL"),
+            contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
     pub json_rpc_http_server_address: SocketAddr,
@@ -145,22 +168,15 @@ pub struct ConfigurationOptions {
     pub contract_eth_addr: H160,
     pub governance_eth_addr: H160,
     pub operator_fee_eth_addr: H160,
-    pub operator_commit_eth_addr: H160,
-    pub operator_private_key: Option<H256>,
-    pub chain_id: u8,
-    pub gas_price_factor: f64,
-    pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
     pub api_requests_caches_size: usize,
     pub available_block_chunk_sizes: Vec<usize>,
     pub max_number_of_withdrawals_per_block: usize,
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
-    pub idle_provers: u32,
     pub miniblock_timings: MiniblockTimings,
     pub prometheus_export_port: u16,
     pub token_price_source: TokenPriceSource,
-    pub witness_generators: usize,
     /// Fee increase coefficient for fast processing of withdrawal.
     pub ticker_fast_processing_coeff: f64,
     pub forced_exit_minimum_account_age: Duration,
@@ -196,12 +212,7 @@ impl ConfigurationOptions {
             genesis_tx_hash: parse_env_with("GENESIS_TX_HASH", |s| &s[2..]),
             contract_eth_addr: parse_env_with("CONTRACT_ADDR", |s| &s[2..]),
             governance_eth_addr: parse_env_with("GOVERNANCE_ADDR", |s| &s[2..]),
-            operator_commit_eth_addr: parse_env_with("OPERATOR_COMMIT_ETH_ADDRESS", |s| &s[2..]),
             operator_fee_eth_addr: parse_env_with("OPERATOR_FEE_ETH_ADDRESS", |s| &s[2..]),
-            operator_private_key: parse_env_if_exists("OPERATOR_PRIVATE_KEY"),
-            chain_id: parse_env("CHAIN_ID"),
-            gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
-            prover_server_address: parse_env_port("PROVER_SERVER_PORT"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
             available_block_chunk_sizes,
@@ -210,11 +221,9 @@ impl ConfigurationOptions {
                 "ETH_WATCH_POLL_INTERVAL",
             )),
             eth_network: parse_env("ETH_NETWORK"),
-            idle_provers: parse_env("IDLE_PROVERS"),
             miniblock_timings: MiniblockTimings::from_env(),
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
             token_price_source: TokenPriceSource::from_env(),
-            witness_generators: parse_env("WITNESS_GENERATORS"),
             ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
             forced_exit_minimum_account_age,
             enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
