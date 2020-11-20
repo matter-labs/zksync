@@ -141,12 +141,17 @@ impl FeeTickerAPI for MockApiProvider {
 }
 
 struct MockTickerInfo;
+
 #[async_trait]
 impl FeeTickerInfo for MockTickerInfo {
     async fn is_account_new(&mut self, _address: Address) -> bool {
         // Always false for simplicity.
         false
     }
+}
+
+fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
+    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(num, precision)
 }
 
 #[test]
@@ -185,61 +190,62 @@ fn test_ticker_formula() {
         ratio_to_big_decimal(&((&max - &min) / min), 6)
     };
 
-    {
-        let expected_price_of_eth_token_transfer_usd =
-            get_token_fee_in_usd(TxFeeTypes::Transfer, 0.into(), Address::default());
-        let expected_price_of_eth_token_withdraw_usd =
-            get_token_fee_in_usd(TxFeeTypes::Withdraw, 0.into(), Address::default());
-        let expected_price_of_eth_token_fast_withdraw_usd =
-            get_token_fee_in_usd(TxFeeTypes::FastWithdraw, 0.into(), Address::default());
+    let expected_price_of_eth_token_transfer_usd =
+        get_token_fee_in_usd(TxFeeTypes::Transfer, 0.into(), Address::default());
+    let expected_price_of_eth_token_withdraw_usd =
+        get_token_fee_in_usd(TxFeeTypes::Withdraw, 0.into(), Address::default());
+    let expected_price_of_eth_token_fast_withdraw_usd =
+        get_token_fee_in_usd(TxFeeTypes::FastWithdraw, 0.into(), Address::default());
 
-        // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits (mantissa len == 11)
-        let threshold = BigDecimal::from_str("0.01").unwrap();
-        for token in TestToken::all_tokens() {
-            let transfer_fee =
-                get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into(), Address::default());
-            let expected_fee =
-                expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
-            let transfer_diff = get_relative_diff(&transfer_fee, &expected_fee);
-            assert!(
-                    transfer_diff <= threshold.clone(),
-                    "token transfer fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>", token.id, 
-                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&transfer_fee,6),
-                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&expected_fee,6),
-                    transfer_diff, &threshold);
-
-            let withdraw_fee =
-                get_token_fee_in_usd(TxFeeTypes::Withdraw, token.id.into(), Address::default());
-            let expected_fee =
-                expected_price_of_eth_token_withdraw_usd.clone() * token.risk_factor();
-            let withdraw_diff = get_relative_diff(&withdraw_fee, &expected_fee);
-            assert!(
-                    withdraw_diff <= threshold.clone(),
-                    "token withdraw fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>", token.id,
-                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&withdraw_fee,6),
-                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&expected_fee,6),
-                    withdraw_diff, &threshold
-                );
-
-            let fast_withdraw_fee = get_token_fee_in_usd(
-                TxFeeTypes::FastWithdraw,
-                token.id.into(),
-                Address::default(),
+    // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits
+    // (mantissa len == 11)
+    let threshold = BigDecimal::from_str("0.01").unwrap();
+    for token in TestToken::all_tokens() {
+        let transfer_fee =
+            get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into(), Address::default());
+        let expected_fee = expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
+        let transfer_diff = get_relative_diff(&transfer_fee, &expected_fee);
+        assert!(
+                transfer_diff <= threshold.clone(),
+                "token transfer fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>",
+                token.id,
+                format_with_dot(&transfer_fee, 6),
+                format_with_dot(&expected_fee, 6),
+                transfer_diff, &threshold
             );
-            let expected_fee =
-                expected_price_of_eth_token_fast_withdraw_usd.clone() * token.risk_factor();
-            let fast_withdraw_diff = get_relative_diff(&fast_withdraw_fee, &expected_fee);
-            assert!(
-                    fast_withdraw_diff <= threshold.clone(),
-                    "token fast withdraw fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>", token.id,
-                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&fast_withdraw_fee,6),
-                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&expected_fee,6),
-                    fast_withdraw_diff, &threshold
-                );
-            assert!(
-                fast_withdraw_fee > withdraw_fee,
-                "Fast withdraw fee must be greater than usual withdraw fee"
+
+        let withdraw_fee =
+            get_token_fee_in_usd(TxFeeTypes::Withdraw, token.id.into(), Address::default());
+        let expected_fee = expected_price_of_eth_token_withdraw_usd.clone() * token.risk_factor();
+        let withdraw_diff = get_relative_diff(&withdraw_fee, &expected_fee);
+        assert!(
+                withdraw_diff <= threshold.clone(),
+                "token withdraw fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>",
+                token.id,
+                format_with_dot(&withdraw_fee, 6),
+                format_with_dot(&expected_fee, 6),
+                withdraw_diff, &threshold
             );
-        }
+
+        let fast_withdraw_fee = get_token_fee_in_usd(
+            TxFeeTypes::FastWithdraw,
+            token.id.into(),
+            Address::default(),
+        );
+        let expected_fee =
+            expected_price_of_eth_token_fast_withdraw_usd.clone() * token.risk_factor();
+        let fast_withdraw_diff = get_relative_diff(&fast_withdraw_fee, &expected_fee);
+        assert!(
+                fast_withdraw_diff <= threshold.clone(),
+                "token fast withdraw fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>",
+                token.id,
+                format_with_dot(&fast_withdraw_fee, 6),
+                format_with_dot(&expected_fee, 6),
+                fast_withdraw_diff, &threshold
+            );
+        assert!(
+            fast_withdraw_fee > withdraw_fee,
+            "Fast withdraw fee must be greater than usual withdraw fee"
+        );
     }
 }
