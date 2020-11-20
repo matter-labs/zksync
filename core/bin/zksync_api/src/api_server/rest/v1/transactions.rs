@@ -420,7 +420,7 @@ mod tests {
         let phnx_transfer = ZkSyncTx::Transfer(Box::new(tx));
         let phnx_transfer_hash = phnx_transfer.hash();
         let (tx, _) = from.sign_transfer(
-            1,
+            0,
             "ETH",
             0u64.into(),
             200u64.into(), // Here we pay fees for both transfers in ETH.
