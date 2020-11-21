@@ -862,7 +862,7 @@ export async function submitSignedTransaction(
     return new Transaction(signedTx, transactionHash, provider);
 }
 
-export async function submitSignedTransactionBatch(
+export async function submitSignedTransactionsBatch(
     signedTxs: SignedTransaction[],
     ethSignature: TxEthSignature,
     provider: Provider

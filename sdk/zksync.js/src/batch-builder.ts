@@ -36,7 +36,8 @@ export class BatchBuilder {
     }
 
     /**
-     * Construct the batch from the given transactions. Returs it with the corresponding Ethereum signature (or null).
+     * Construct the batch from the given transactions.
+     * Returs it with the corresponding Ethereum signature and total fee.
      * The message signed is keccak256(batchBytes) possibly prefixed with ChangePubKeyMessage if it's in the batch.
      * @param feeToken If provided, the fee for the whole batch will be obtained from the server in this token.
      * Possibly creates phantom transfer.
@@ -217,6 +218,7 @@ export class BatchBuilder {
                     break;
                 case 'ChangePubKey':
                     const changePubKey = { tx: await this.wallet.getChangePubKey(tx.tx) };
+                    // We will sign it if necessary and store the batch hash.
                     this.changePubKeyTx = changePubKey.tx;
                     _bytes.push(serializeChangePubKey(changePubKey.tx));
                     txs.push(changePubKey);
