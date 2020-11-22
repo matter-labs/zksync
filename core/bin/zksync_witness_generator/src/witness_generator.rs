@@ -3,7 +3,6 @@ use std::{thread, time};
 // External
 use futures::channel::mpsc;
 // Workspace deps
-use std::time::Instant;
 use zksync_circuit::witness::utils::build_block_witness;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
@@ -103,6 +102,7 @@ impl WitnessGenerator {
         block: BlockNumber,
         storage: &mut StorageProcessor<'_>,
     ) -> Result<CircuitAccountTree, anyhow::Error> {
+        let start = time::Instant::now();
         let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
 
         if let Some((cached_block, account_tree_cache)) = storage
@@ -182,11 +182,14 @@ impl WitnessGenerator {
                 "account tree root hash restored incorrectly"
             );
         }
+
+        metrics::histogram!("witness_generator.load_account_tree", start.elapsed());
         Ok(circuit_account_tree)
     }
 
     async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), anyhow::Error> {
-        let timer = Instant::now();
+        let start = time::Instant::now();
+        let timer = time::Instant::now();
         let mut storage = self.conn_pool.access_storage().await?;
 
         let mut circuit_account_tree = self
@@ -197,7 +200,7 @@ impl WitnessGenerator {
             timer.elapsed().as_secs()
         );
 
-        let timer = Instant::now();
+        let timer = time::Instant::now();
         let witness: ProverData = build_block_witness(&mut circuit_account_tree, &block)?.into();
         log::trace!(
             "Witness generator witness build {}s",
@@ -212,6 +215,10 @@ impl WitnessGenerator {
             )
             .await?;
 
+        metrics::histogram!(
+            "witness_generator.prepare_witness_and_save_it",
+            start.elapsed()
+        );
         Ok(())
     }
 

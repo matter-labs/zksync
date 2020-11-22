@@ -2,6 +2,7 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
 use web3::transports::Http;
+use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
 use zksync_testkit::*;
 
 /// Executes blocks with some basic operations with new state keeper
@@ -10,7 +11,7 @@ async fn execute_blocks_with_new_state_keeper(
     contracts: Contracts,
     block_processing: BlockProcessing,
 ) {
-    let testkit_config = get_testkit_config_from_env();
+    let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =

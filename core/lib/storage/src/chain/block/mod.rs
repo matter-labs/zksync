@@ -1,4 +1,5 @@
 // Built-in deps
+use std::time::Instant;
 // External imports
 use zksync_basic_types::{H256, U256};
 // Workspace imports
@@ -39,6 +40,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// 1. Stores the operation.
     /// 2. Stores the proof (if it isn't stored already) for the verify operation.
     pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let block_number = op.block.block_number;
@@ -72,6 +74,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = stored.into_op(&mut transaction).await;
 
         transaction.commit().await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "execute_operation");
         result
     }
 
@@ -81,6 +84,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         block_number: u32,
         operations: Vec<ExecutedOperations>,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         for block_tx in operations.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
@@ -100,10 +104,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 }
             }
         }
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "save_block_transactions");
         Ok(())
     }
 
     async fn get_storage_block(&mut self, block: BlockNumber) -> QueryResult<Option<StorageBlock>> {
+        let start = Instant::now();
         let block = sqlx::query_as!(
             StorageBlock,
             "SELECT * FROM blocks WHERE number = $1",
@@ -112,12 +118,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_storage_block");
+
         Ok(block)
     }
 
     /// Given the block number, attempts to retrieve it from the database.
     /// Returns `None` if the block with provided number does not exist yet.
     pub async fn get_block(&mut self, block: BlockNumber) -> QueryResult<Option<Block>> {
+        let start = Instant::now();
         // Load block header.
         let stored_block = if let Some(block) = self.get_storage_block(block).await? {
             block
@@ -134,7 +143,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         let commitment = H256::from_slice(&stored_block.commitment);
         // Return the obtained block in the expected format.
-        Ok(Some(Block::new(
+        let result = Some(Block::new(
             block,
             new_root_hash,
             stored_block.fee_account_id as AccountId,
@@ -148,26 +157,34 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             U256::from(stored_block.verify_gas_limit as u64),
             commitment,
             stored_block.timestamp.unwrap_or_default() as u64,
-        )))
+        ));
+
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block");
+
+        Ok(result)
     }
 
     /// Same as `get_block_executed_ops`, but returns a vector of `ZkSyncOp` instead
     /// of `ExecutedOperations`.
     pub async fn get_block_operations(&mut self, block: BlockNumber) -> QueryResult<Vec<ZkSyncOp>> {
+        let start = Instant::now();
         let executed_ops = self.get_block_executed_ops(block).await?;
-        Ok(executed_ops
+        let result = executed_ops
             .into_iter()
             .filter_map(|exec_op| match exec_op {
                 ExecutedOperations::Tx(tx) => tx.op,
                 ExecutedOperations::PriorityOp(priorop) => Some(priorop.op),
             })
-            .collect())
+            .collect();
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block_operations");
+        Ok(result)
     }
 
     pub async fn get_block_transactions(
         &mut self,
         block: BlockNumber,
     ) -> QueryResult<Vec<BlockTransactionItem>> {
+        let start = Instant::now();
         let block_txs = sqlx::query_as!(
             BlockTransactionItem,
             r#"
@@ -211,6 +228,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block_transactions");
         Ok(block_txs)
     }
 
@@ -219,6 +237,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         &mut self,
         block: BlockNumber,
     ) -> QueryResult<Vec<ExecutedOperations>> {
+        let start = Instant::now();
         let mut executed_operations = Vec::new();
 
         // Load both executed transactions and executed priority operations
@@ -272,6 +291,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             }
         });
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block_executed_ops");
         Ok(executed_operations)
     }
 
@@ -281,6 +301,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         max_block: BlockNumber,
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
+        let start = Instant::now();
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
         //   tables to collect the data:
@@ -325,6 +346,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             i64::from(limit)
         ).fetch_all(self.0.conn())
         .await?;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_block_range");
         Ok(details)
     }
 
@@ -334,10 +357,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     fn try_parse_hex(&self, query: &str) -> Option<String> {
         const HASH_STRING_SIZE: usize = 32 * 2; // 32 bytes, 2 symbols per byte.
 
-        if query.starts_with("0x") {
-            Some(query[2..].into())
-        } else if query.starts_with("sync-bl:") {
-            Some(query[8..].into())
+        if let Some(query) = query.strip_prefix("0x") {
+            Some(query.into())
+        } else if let Some(query) = query.strip_prefix("sync-bl:") {
+            Some(query.into())
         } else if query.len() == HASH_STRING_SIZE && hex::decode(query).is_ok() {
             Some(query.into())
         } else {
@@ -353,6 +376,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
     pub async fn find_block_by_height_or_hash(&mut self, query: String) -> Option<BlockDetails> {
+        let start = Instant::now();
         // If the input looks like hash, add the hash lookup part.
         let hash_bytes = if let Some(hex_query) = self.try_parse_hex(&query) {
             // It must be a hexadecimal value, so unwrap is safe.
@@ -388,7 +412,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         //   + query equals to the ETH verify transaction hash (in form of `0x00{..}00`);
         //   + query equals to the state hash obtained in the block (in form of `sync-bl:00{..}00`);
         //   + query equals to the number of the block.
-        sqlx::query_as!(
+        let result = sqlx::query_as!(
             BlockDetails,
             r#"
             WITH eth_ops AS (
@@ -429,18 +453,28 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         ).fetch_optional(self.0.conn())
             .await
             .ok()
-            .flatten()
+            .flatten();
+
+        metrics::histogram!(
+            "sql.chain",
+            start.elapsed(),
+            "block" => "find_block_by_height_or_hash"
+        );
+        result
     }
 
     pub async fn load_commit_op(&mut self, block_number: BlockNumber) -> Option<Operation> {
+        let start = Instant::now();
         let op = OperationsSchema(self.0)
             .get_operation(block_number, ActionType::COMMIT)
             .await;
-        if let Some(stored_op) = op {
+        let result = if let Some(stored_op) = op {
             stored_op.into_op(self.0).await.ok()
         } else {
             None
-        }
+        };
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_commit_op");
+        result
     }
 
     pub async fn load_committed_block(&mut self, block_number: BlockNumber) -> Option<Block> {
@@ -449,9 +483,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     /// Returns the number of last block
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
-        OperationsSchema(self.0)
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::COMMIT, None)
-            .await
+            .await;
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_last_committed_block");
+        result
     }
 
     /// Returns the number of last block for which proof has been created.
@@ -460,20 +497,27 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// is updated only after corresponding transaction is confirmed on the Ethereum blockchain.
     /// In order to see the last block with updated state, use `get_last_verified_confirmed_block` method.
     pub async fn get_last_verified_block(&mut self) -> QueryResult<BlockNumber> {
-        OperationsSchema(self.0)
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::VERIFY, None)
-            .await
+            .await;
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_last_verified_block");
+        result
     }
 
     /// Returns the number of last block for which proof has been confirmed on Ethereum.
     /// Essentially, it's number of last block for which updates were applied to the chain state.
     pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
-        OperationsSchema(self.0)
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::VERIFY, Some(true))
-            .await
+            .await;
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_last_verified_confirmed_block");
+        result
     }
 
     async fn load_storage_pending_block(&mut self) -> QueryResult<Option<StoragePendingBlock>> {
+        let start = Instant::now();
         let maybe_block = sqlx::query_as!(
             StoragePendingBlock,
             "SELECT * FROM pending_block
@@ -482,11 +526,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         )
         .fetch_optional(self.0.conn())
         .await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_storage_pending_block");
 
         Ok(maybe_block)
     }
 
     pub async fn load_pending_block(&mut self) -> QueryResult<Option<PendingBlock>> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let pending_block_result = BlockSchema(&mut transaction)
@@ -526,6 +572,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_pending_block");
         Ok(Some(result))
     }
 
@@ -537,6 +584,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub async fn save_pending_block(&mut self, pending_block: PendingBlock) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let storage_block = StoragePendingBlock {
@@ -577,6 +625,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .await?;
 
         transaction.commit().await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_pending_block");
 
         Ok(())
     }
@@ -599,6 +648,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub(crate) async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let number = i64::from(block.block_number);
@@ -652,6 +702,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "save_block");
         Ok(())
     }
 
@@ -661,6 +712,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         block: BlockNumber,
         tree_cache: serde_json::Value,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         if block == 0 {
             return Ok(());
         }
@@ -678,6 +730,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "block" => "store_account_tree_cache");
         Ok(())
     }
 

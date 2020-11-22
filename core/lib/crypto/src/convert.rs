@@ -36,8 +36,8 @@ pub trait FeConvert: PrimeField {
 
     /// Reads a field element from its hexadecimal representation.
     fn from_hex(value: &str) -> Result<Self, anyhow::Error> {
-        let value = if value.starts_with("0x") {
-            &value[2..]
+        let value = if let Some(value) = value.strip_prefix("0x") {
+            value
         } else {
             value
         };

@@ -134,10 +134,10 @@ impl NewExecutedPriorityOperation {
 impl NewExecutedTransaction {
     pub fn prepare_stored_tx(exec_tx: ExecutedTx, block: BlockNumber) -> Self {
         fn cut_prefix(input: &str) -> String {
-            if input.starts_with("0x") {
-                input[2..].into()
-            } else if input.starts_with("sync:") {
-                input[5..].into()
+            if let Some(input) = input.strip_prefix("0x") {
+                input.into()
+            } else if let Some(input) = input.strip_prefix("sync:") {
+                input.into()
             } else {
                 input.into()
             }

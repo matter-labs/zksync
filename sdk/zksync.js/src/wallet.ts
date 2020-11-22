@@ -86,7 +86,7 @@ export class Wallet {
         return wallet;
     }
 
-    async getEthMessageSignature(message: string): Promise<TxEthSignature> {
+    async getEthMessageSignature(message: ethers.utils.BytesLike): Promise<TxEthSignature> {
         if (this.ethSignerType == null) {
             throw new Error('ethSignerType is unknown');
         }
@@ -251,8 +251,9 @@ export class Wallet {
             bytes = ethers.utils.concat([bytes, serializeTransfer(tx)]);
             batch.push({ tx, signature: null });
         }
-
-        const ethSignature = await this.getEthMessageSignature(ethers.utils.keccak256(bytes).slice(2));
+        const hash = ethers.utils.keccak256(bytes).slice(2);
+        const message = Uint8Array.from(Buffer.from(hash, 'hex'));
+        const ethSignature = await this.getEthMessageSignature(message);
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignature);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
@@ -524,7 +525,10 @@ export class Wallet {
         return balance;
     }
 
-    async isERC20DepositsApproved(token: TokenLike): Promise<boolean> {
+    async isERC20DepositsApproved(
+        token: TokenLike,
+        erc20ApproveThreshold: BigNumber = ERC20_APPROVE_TRESHOLD
+    ): Promise<boolean> {
         if (isTokenETH(token)) {
             throw Error('ETH token does not need approval.');
         }
@@ -535,13 +539,16 @@ export class Wallet {
                 this.address(),
                 this.provider.contractAddress.mainContract
             );
-            return BigNumber.from(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
+            return BigNumber.from(currentAllowance).gte(erc20ApproveThreshold);
         } catch (e) {
             this.modifyEthersError(e);
         }
     }
 
-    async approveERC20TokenDeposits(token: TokenLike): Promise<ContractTransaction> {
+    async approveERC20TokenDeposits(
+        token: TokenLike,
+        max_erc20_approve_amount: BigNumber = MAX_ERC20_APPROVE_AMOUNT
+    ): Promise<ContractTransaction> {
         if (isTokenETH(token)) {
             throw Error('ETH token does not need approval.');
         }
@@ -549,7 +556,7 @@ export class Wallet {
         const erc20contract = new Contract(tokenAddress, IERC20_INTERFACE, this.ethSigner);
 
         try {
-            return erc20contract.approve(this.provider.contractAddress.mainContract, MAX_ERC20_APPROVE_AMOUNT);
+            return erc20contract.approve(this.provider.contractAddress.mainContract, max_erc20_approve_amount);
         } catch (e) {
             this.modifyEthersError(e);
         }

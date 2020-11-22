@@ -8,6 +8,22 @@ pub struct TxHash {
     pub(crate) data: [u8; 32],
 }
 
+impl TxHash {
+    /// Reads a transaction hash from its byte sequence representation.
+    ///
+    /// Returns none if the slice length does not match with hash length.
+    pub fn from_slice(slice: &[u8]) -> Option<Self> {
+        let mut out = TxHash { data: [0_u8; 32] };
+
+        if slice.len() != out.data.len() {
+            None
+        } else {
+            out.data.copy_from_slice(slice);
+            Some(out)
+        }
+    }
+}
+
 impl AsRef<[u8]> for TxHash {
     fn as_ref(&self) -> &[u8] {
         &self.data

@@ -3,10 +3,11 @@ use crate::external_commands::{deploy_contracts, get_test_accounts, run_upgrade_
 use crate::zksync_account::ZkSyncAccount;
 use std::time::Instant;
 use web3::transports::Http;
+use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
 use zksync_testkit::*;
 
 async fn migration_test() {
-    let testkit_config = get_testkit_config_from_env();
+    let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =

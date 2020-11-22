@@ -29,12 +29,8 @@
     "prettier": "^1.18.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.27",
     "querystring": "^0.2.0",
-    "solhint": "^2.1.2",
-    "solhint-plugin-prettier": "^0.0.3",
-    "ts-node": "^8.3.0",
-    "tslint": "^5.18.0",
-    "typechain": "^4.0.0",
-    "typescript": "^3.5.3",
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.5",
     "zksync": "link:../sdk/zksync.js"
   },
   "scripts": {
@@ -46,12 +42,10 @@
     "unit-test-watch": "yarn build && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
+    "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "ts-node scripts/publish.ts",
-    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
-    "lint:solidity": "solhint contracts/**/*.sol",
-    "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
-    "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts"
+    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts"
   }
 }

@@ -4,6 +4,9 @@
 //! `mod rpc_server` - JSON rpc via HTTP (for request reply functions)
 //! `mod rpc_subscriptions` - JSON rpc via WebSocket (for request reply functions and subscriptions)
 
+// Public uses
+pub use rest::v1;
+
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
@@ -19,6 +22,7 @@ mod loggers;
 mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;
+mod tx_sender;
 
 /// Amount of threads used by each server to serve requests.
 const THREADS_PER_SERVER: usize = 128;
@@ -44,6 +48,8 @@ pub fn start_api_server(
         config_options.rest_api_server_address,
         config_options.contract_eth_addr,
         panic_notify.clone(),
+        ticker_request_sender.clone(),
+        sign_check_sender.clone(),
         config_options.clone(),
     );
     rpc_subscriptions::start_ws_server(

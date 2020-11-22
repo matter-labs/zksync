@@ -1,9 +1,9 @@
-use crate::{error::ClientError, types::network::Network, utils::private_key_from_seed};
+use crate::{error::ClientError, utils::private_key_from_seed};
 
 use web3::types::{Address, H256};
 use zksync_crypto::PrivateKey;
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
-use zksync_types::tx::TxEthSignature;
+use zksync_types::{network::Network, tx::TxEthSignature};
 
 pub struct WalletCredentials<S: EthereumSigner> {
     pub(crate) eth_signer: Option<S>,

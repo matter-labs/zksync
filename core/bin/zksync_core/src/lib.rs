@@ -48,7 +48,7 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
 
 /// Inserts the initial information about zkSync tokens into the database.
 pub async fn genesis_init() {
-    let pool = ConnectionPool::new(Some(1)).await;
+    let pool = ConnectionPool::new(Some(1));
     let config_options = ConfigurationOptions::from_env();
 
     log::info!("Generating genesis block.");

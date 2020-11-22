@@ -7,6 +7,7 @@ use crate::{
 use num::BigUint;
 use parity_crypto::digest::sha256;
 
+use super::utils::deserialize_eth_message;
 use crate::operations::ChangePubKeyOp;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
@@ -14,12 +15,18 @@ use zksync_basic_types::Address;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
     pub signature: TxEthSignature,
-    pub message: String,
+    #[serde(deserialize_with = "deserialize_eth_message")]
+    pub message: Vec<u8>,
 }
 
+/// Represents transaction with the corresponding Ethereum signature and the message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedZkSyncTx {
+    /// Underlying zkSync transaction.
     pub tx: ZkSyncTx,
+    /// `eth_sign_data` is a tuple of the Ethereum signature and the message
+    /// which user should have signed with their private key.
+    /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<EthSignData>,
 }
 

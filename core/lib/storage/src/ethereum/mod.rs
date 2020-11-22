@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{collections::VecDeque, convert::TryFrom, str::FromStr};
+use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
 // External imports
 use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
@@ -27,6 +27,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Loads the list of operations that were not confirmed on Ethereum,
     /// each operation has a list of sent Ethereum transactions.
     pub async fn load_unconfirmed_operations(&mut self) -> QueryResult<VecDeque<ETHOperation>> {
+        let start = Instant::now();
         // Load the operations with the associated Ethereum transactions
         // from the database.
         // Here we obtain a sequence of one-to-one mappings (ETH tx) -> (operation ID).
@@ -116,6 +117,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "load_unconfirmed_operations");
         Ok(ops)
     }
 
@@ -126,6 +128,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     pub async fn load_unprocessed_operations(
         &mut self,
     ) -> QueryResult<Vec<(i64, AggregatedOperation)>> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let raw_ops = sqlx::query_as!(
@@ -153,6 +156,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "load_unprocessed_operations");
         Ok(operations)
     }
 
@@ -166,6 +170,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         last_used_gas_price: BigUint,
         raw_tx: Vec<u8>,
     ) -> QueryResult<InsertedOperationResponse> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         // It's important to assign nonce within the same db transaction
@@ -225,11 +230,13 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "save_new_eth_tx");
         Ok(response)
     }
 
     /// Retrieves the Ethereum operation ID given the tx hash.
     async fn get_eth_op_id(&mut self, hash: &H256) -> QueryResult<i64> {
+        let start = Instant::now();
         let hash_entry = sqlx::query_as!(
             ETHTxHash,
             "SELECT * FROM eth_tx_hashes WHERE tx_hash = $1",
@@ -238,11 +245,13 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "get_eth_op_id");
         Ok(hash_entry.eth_op_id)
     }
 
     /// Adds a tx hash entry associated with some Ethereum operation to the database.
     pub async fn add_hash_entry(&mut self, eth_op_id: i64, hash: &H256) -> QueryResult<()> {
+        let start = Instant::now();
         // Insert the new hash entry.
         sqlx::query!(
             "INSERT INTO eth_tx_hashes (eth_op_id, tx_hash) VALUES ($1, $2)",
@@ -251,6 +260,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "add_hash_entry");
         Ok(())
     }
 
@@ -262,6 +272,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         new_deadline_block: i64,
         new_gas_value: BigUint,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         // Update the stored tx.
         let new_gas_price = BigDecimal::from(BigInt::from(new_gas_value));
         sqlx::query!(
@@ -275,6 +286,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "update_eth_tx");
         Ok(())
     }
 
@@ -290,6 +302,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         &mut self,
         _operation_type: AggregatedActionType,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
@@ -309,6 +322,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "report_created_operation");
         Ok(())
     }
 
@@ -322,6 +336,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         gas_price_limit: U256,
         average_gas_price: U256,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let gas_price_limit: i64 =
             i64::try_from(gas_price_limit).expect("Can't convert U256 to i64");
         let average_gas_price: i64 =
@@ -338,6 +353,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "update_gas_price");
         Ok(())
     }
 
@@ -377,6 +393,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Marks the stored Ethereum transaction as confirmed (and thus the associated `Operation`
     /// is marked as confirmed as well).
     pub async fn confirm_eth_tx(&mut self, hash: &H256) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let eth_op_id = EthereumSchema(&mut transaction).get_eth_op_id(hash).await?;
@@ -409,6 +426,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "confirm_eth_tx");
         Ok(())
     }
 
@@ -419,6 +437,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     pub(crate) async fn get_next_nonce(&mut self) -> QueryResult<i64> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let old_nonce: ETHParams = EthereumSchema(&mut transaction).load_eth_params().await?;
@@ -438,14 +457,16 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "get_next_nonce");
         Ok(old_nonce_value)
     }
 
     /// Method that internally initializes the `eth_parameters` table.
     /// Since in db tests the database is empty, we must provide a possibility
     /// to initialize required db fields.
-    #[cfg(test)]
+    #[doc = "hidden"]
     pub async fn initialize_eth_data(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
         #[derive(Debug)]
         pub struct NewETHParams {
             pub nonce: i64,
@@ -478,6 +499,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             .await?;
         }
 
+        metrics::histogram!("sql", start.elapsed(), "ethereum" => "initialize_eth_data");
         Ok(())
     }
 

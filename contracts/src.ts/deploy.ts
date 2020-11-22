@@ -1,13 +1,13 @@
-import {deployContract} from "ethereum-waffle";
-import {Contract, ethers, Signer, providers} from "ethers";
-import {formatEther, Interface} from "ethers/lib/utils";
-import * as fs from "fs";
+import { deployContract } from 'ethereum-waffle';
+import { Contract, ethers, Signer, providers } from 'ethers';
+import { formatEther, Interface } from 'ethers/lib/utils';
+import * as fs from 'fs';
 import {
     encodeConstructorArgs,
     encodeProxyContstuctorArgs,
     publishAbiToTesseracts,
-    publishSourceCodeToEtherscan,
-} from "./publish-utils";
+    publishSourceCodeToEtherscan
+} from './publish-utils';
 import {Governance, GovernanceFactory} from "../typechain";
 
 export interface Contracts {
@@ -37,27 +37,27 @@ export interface DeployerConfig {
 }
 
 export function readContractCode(name: string) {
-        const fileName = name.split("/").pop();
-        return JSON.parse(fs.readFileSync(`artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, {encoding: "utf-8"}));
+    const fileName = name.split("/").pop();
+    return JSON.parse(fs.readFileSync(`artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, { encoding: 'utf-8' }));
 }
 
 export function readProductionContracts(): Contracts {
     return {
-        governance: readContractCode("Governance"),
-        zkSync: readContractCode("ZkSync"),
-        verifier: readContractCode("Verifier"),
-        proxy: readContractCode("Proxy"),
-        upgradeGatekeeper: readContractCode("UpgradeGatekeeper"),
+        governance: readContractCode('Governance'),
+        zkSync: readContractCode('ZkSync'),
+        verifier: readContractCode('Verifier'),
+        proxy: readContractCode('Proxy'),
+        upgradeGatekeeper: readContractCode('UpgradeGatekeeper')
     };
 }
 
 export function readTestContracts(): Contracts {
     return {
-        governance: readContractCode("GovernanceTest"),
-        zkSync: readContractCode("ZkSyncTest"),
-        verifier: readContractCode("VerifierTest"),
-        proxy: readContractCode("Proxy"),
-        upgradeGatekeeper: readContractCode("UpgradeGatekeeperTest"),
+        governance: readContractCode('GovernanceTest'),
+        zkSync: readContractCode('ZkSyncTest'),
+        verifier: readContractCode('VerifierTest'),
+        proxy: readContractCode('Proxy'),
+        upgradeGatekeeper: readContractCode('UpgradeGatekeeperTest')
     };
 }
 
@@ -70,7 +70,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         Verifier: process.env.VERIFIER_ADDR,
         VerifierTarget: process.env.VERIFIER_TARGET_ADDR,
         ZkSync: process.env.CONTRACT_ADDR,
-        ZkSyncTarget: process.env.CONTRACT_TARGET_ADDR,
+        ZkSyncTarget: process.env.CONTRACT_TARGET_ADDR
     };
 }
 
@@ -84,7 +84,7 @@ export class Deployer {
 
     constructor(config: DeployerConfig) {
         this.deployWallet = config.deployWallet;
-        this.deployFactoryCode = readContractCode("DeployFactory");
+        this.deployFactoryCode = readContractCode('DeployFactory');
         this.verbose = config.verbose != null ? config.verbose : false;
         this.addresses = deployedAddressesFromEnv();
         this.contracts = config.contracts != null ? config.contracts : readProductionContracts();
@@ -93,57 +93,66 @@ export class Deployer {
 
     public async deployGovernanceTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
-            console.log("Deploying governance target");
+            console.log('Deploying governance target');
         }
-        const govContract = await deployContract(
-            this.deployWallet,
-            this.contracts.governance, [],
-            {gasLimit: 600000, ...ethTxOptions},
-        );
+        const govContract = await deployContract(this.deployWallet, this.contracts.governance, [], {
+            gasLimit: 600000,
+            ...ethTxOptions
+        });
         const govRec = await govContract.deployTransaction.wait();
         const govGasUsed = govRec.gasUsed;
         const gasPrice = govContract.deployTransaction.gasPrice;
         if (this.verbose) {
             console.log(`GOVERNANCE_TARGET_ADDR=${govContract.address}`);
-            console.log(`Governance target deployed, gasUsed: ${govGasUsed.toString()}, eth spent: ${formatEther(govGasUsed.mul(gasPrice))}`);
+            console.log(
+                `Governance target deployed, gasUsed: ${govGasUsed.toString()}, eth spent: ${formatEther(
+                    govGasUsed.mul(gasPrice)
+                )}`
+            );
         }
         this.addresses.GovernanceTarget = govContract.address;
     }
 
     public async deployVerifierTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
-            console.log("Deploying verifier target");
+            console.log('Deploying verifier target');
         }
-        const verifierContract = await deployContract(
-            this.deployWallet,
-            this.contracts.verifier, [],
-            {gasLimit: 8000000, ...ethTxOptions},
-        );
+        const verifierContract = await deployContract(this.deployWallet, this.contracts.verifier, [], {
+            gasLimit: 8000000,
+            ...ethTxOptions
+        });
         const verRec = await verifierContract.deployTransaction.wait();
         const verGasUsed = verRec.gasUsed;
         const gasPrice = verifierContract.deployTransaction.gasPrice;
         if (this.verbose) {
             console.log(`VERIFIER_TARGET_ADDR=${verifierContract.address}`);
-            console.log(`Verifier target deployed, gasUsed: ${verGasUsed.toString()}, eth spent: ${formatEther(verGasUsed.mul(gasPrice))}`);
+            console.log(
+                `Verifier target deployed, gasUsed: ${verGasUsed.toString()}, eth spent: ${formatEther(
+                    verGasUsed.mul(gasPrice)
+                )}`
+            );
         }
         this.addresses.VerifierTarget = verifierContract.address;
     }
 
     public async deployZkSyncTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
-            console.log("Deploying zkSync target");
+            console.log('Deploying zkSync target');
         }
-        const zksContract = await deployContract(
-            this.deployWallet,
-            this.contracts.zkSync, [],
-            {gasLimit: 6000000, ...ethTxOptions},
-        );
+        const zksContract = await deployContract(this.deployWallet, this.contracts.zkSync, [], {
+            gasLimit: 6000000,
+            ...ethTxOptions
+        });
         const zksRec = await zksContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
         const gasPrice = zksContract.deployTransaction.gasPrice;
         if (this.verbose) {
             console.log(`CONTRACT_TARGET_ADDR=${zksContract.address}`);
-            console.log(`zkSync target deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(zksGasUsed.mul(gasPrice))}`);
+            console.log(
+                `zkSync target deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
         }
         this.addresses.ZkSyncTarget = zksContract.address;
     }
@@ -151,11 +160,17 @@ export class Deployer {
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
         const deployFactoryContract = await deployContract(
             this.deployWallet,
-            this.deployFactoryCode, [this.addresses.GovernanceTarget, this.addresses.VerifierTarget,
-                this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_COMMIT_ETH_ADDRESS,
-                this.governorAddress, process.env.OPERATOR_FEE_ETH_ADDRESS
+            this.deployFactoryCode,
+            [
+                this.addresses.GovernanceTarget,
+                this.addresses.VerifierTarget,
+                this.addresses.ZkSyncTarget,
+                process.env.GENESIS_ROOT,
+                process.env.OPERATOR_COMMIT_ETH_ADDRESS,
+                this.governorAddress,
+                process.env.OPERATOR_FEE_ETH_ADDRESS
             ],
-            {gasLimit: 5000000, ...ethTxOptions},
+            { gasLimit: 5000000, ...ethTxOptions }
         );
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
         const deployFactoryInterface = new Interface(this.deployFactoryCode.abi);
@@ -181,47 +196,68 @@ export class Deployer {
             console.log(`VERIFIER_ADDR=${this.addresses.Verifier}`);
             console.log(`UPGRADE_GATEKEEPER_ADDR=${this.addresses.UpgradeGatekeeper}`);
             console.log(`GENESIS_TX_HASH=${txHash}`);
-            console.log(`Deploy finished, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
+            console.log(
+                `Deploy finished, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`
+            );
         }
     }
 
     public async publishSourcesToTesseracts() {
-        console.log("Publishing ABI for UpgradeGatekeeper");
+        console.log('Publishing ABI for UpgradeGatekeeper');
         await publishAbiToTesseracts(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper);
-        console.log("Publishing ABI for ZkSync (proxy)");
+        console.log('Publishing ABI for ZkSync (proxy)');
         await publishAbiToTesseracts(this.addresses.ZkSync, this.contracts.zkSync);
-        console.log("Publishing ABI for Verifier (proxy)");
+        console.log('Publishing ABI for Verifier (proxy)');
         await publishAbiToTesseracts(this.addresses.Verifier, this.contracts.verifier);
-        console.log("Publishing ABI for Governance (proxy)");
+        console.log('Publishing ABI for Governance (proxy)');
         await publishAbiToTesseracts(this.addresses.Governance, this.contracts.governance);
     }
 
     public async publishSourcesToEtherscan() {
-        console.log("Publishing sourcecode for UpgradeGatekeeper", this.addresses.UpgradeGatekeeper);
-        await publishSourceCodeToEtherscan(this.addresses.UpgradeGatekeeper, "UpgradeGatekeeper",
-            encodeConstructorArgs(this.contracts.upgradeGatekeeper, [this.addresses.ZkSync]));
+        console.log('Publishing sourcecode for UpgradeGatekeeper', this.addresses.UpgradeGatekeeper);
+        await publishSourceCodeToEtherscan(
+            this.addresses.UpgradeGatekeeper,
+            'UpgradeGatekeeper',
+            encodeConstructorArgs(this.contracts.upgradeGatekeeper, [this.addresses.ZkSync])
+        );
 
-        console.log("Publishing sourcecode for ZkSyncTarget", this.addresses.ZkSyncTarget);
-        await publishSourceCodeToEtherscan(this.addresses.ZkSyncTarget, "ZkSync", "");
-        console.log("Publishing sourcecode for GovernanceTarget", this.addresses.GovernanceTarget);
-        await publishSourceCodeToEtherscan(this.addresses.GovernanceTarget, "Governance", "");
-        console.log("Publishing sourcecode for VerifierTarget", this.addresses.VerifierTarget);
-        await publishSourceCodeToEtherscan(this.addresses.VerifierTarget, "Verifier", "");
+        console.log('Publishing sourcecode for ZkSyncTarget', this.addresses.ZkSyncTarget);
+        await publishSourceCodeToEtherscan(this.addresses.ZkSyncTarget, 'ZkSync', '');
+        console.log('Publishing sourcecode for GovernanceTarget', this.addresses.GovernanceTarget);
+        await publishSourceCodeToEtherscan(this.addresses.GovernanceTarget, 'Governance', '');
+        console.log('Publishing sourcecode for VerifierTarget', this.addresses.VerifierTarget);
+        await publishSourceCodeToEtherscan(this.addresses.VerifierTarget, 'Verifier', '');
 
-        console.log("Publishing sourcecode for ZkSync (proxy)", this.addresses.ZkSync);
-        await publishSourceCodeToEtherscan(this.addresses.ZkSync, "Proxy",
-            encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.ZkSyncTarget,
+        console.log('Publishing sourcecode for ZkSync (proxy)', this.addresses.ZkSync);
+        await publishSourceCodeToEtherscan(
+            this.addresses.ZkSync,
+            'Proxy',
+            encodeProxyContstuctorArgs(
+                this.contracts.proxy,
+                this.addresses.ZkSyncTarget,
                 [this.addresses.Governance, this.addresses.Verifier, process.env.GENESIS_ROOT],
-                ["address", "address", "bytes32"]));
+                ['address', 'address', 'bytes32']
+            )
+        );
 
-        console.log("Publishing sourcecode for Verifier (proxy)", this.addresses.Verifier);
-        await publishSourceCodeToEtherscan(this.addresses.Verifier, "Proxy",
-            encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.VerifierTarget, [], []));
+        console.log('Publishing sourcecode for Verifier (proxy)', this.addresses.Verifier);
+        await publishSourceCodeToEtherscan(
+            this.addresses.Verifier,
+            'Proxy',
+            encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.VerifierTarget, [], [])
+        );
 
-        console.log("Publishing sourcecode for Governance (proxy)", this.addresses.Governance);
-        await publishSourceCodeToEtherscan(this.addresses.Governance, "Proxy",
-            encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.GovernanceTarget,
-                [this.addresses.DeployFactory], ["address"]));
+        console.log('Publishing sourcecode for Governance (proxy)', this.addresses.Governance);
+        await publishSourceCodeToEtherscan(
+            this.addresses.Governance,
+            'Proxy',
+            encodeProxyContstuctorArgs(
+                this.contracts.proxy,
+                this.addresses.GovernanceTarget,
+                [this.addresses.DeployFactory],
+                ['address']
+            )
+        );
     }
 
     public async deployAll(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -244,6 +280,10 @@ export class Deployer {
     }
 
     public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper.abi, signerOrProvider);
+        return new ethers.Contract(
+            this.addresses.UpgradeGatekeeper,
+            this.contracts.upgradeGatekeeper.abi,
+            signerOrProvider
+        );
     }
 }

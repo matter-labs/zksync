@@ -43,7 +43,8 @@ Usually, it is a good idea to do `zk init` once after each merge to the `dev` br
 you may try removing `$ZKSYNC_HOME/etc/env/dev.env` and running `zk init` once again. This may help if the application
 configuration has changed.
 
-If you don't need all of the `zk init` functionality, but just need to start/stop containers, use the following commands:
+If you don't need all of the `zk init` functionality, but just need to start/stop containers, use the following
+commands:
 
 ```sh
 zk up   # Set up `geth` and `postgres` containers
@@ -52,9 +53,8 @@ zk down # Shut down `geth` and `postgres` containers
 
 ## Committing changes
 
-`zksync` uses pre-commit git hooks for basic code integrity checks. Hooks are set up automatically
-within the workspace initialization process. These hooks will not allow to commit the code which does
-not pass several checks.
+`zksync` uses pre-commit git hooks for basic code integrity checks. Hooks are set up automatically within the workspace
+initialization process. These hooks will not allow to commit the code which does not pass several checks.
 
 Currently the following criteria are checked:
 
@@ -65,8 +65,8 @@ Currently the following criteria are checked:
 
 Using the real prover for the development can be not really handy, since it's pretty slow and resource consuming.
 
-Instead, one may want to use the Dummy Prover: lightweight version of the prover, which does not actually prove anything,
-but acts like it does.
+Instead, one may want to use the Dummy Prover: lightweight version of the prover, which does not actually prove
+anything, but acts like it does.
 
 To enable the dummy prover, run:
 
@@ -107,27 +107,32 @@ Existing migrations are located in `core/lib/storage/migrations`.
 Adding a new migration requires the following actions:
 
 1. Go to the `storage` folder:
-  ```sh
-  cd core/lib/storage
-  ```
+
+   ```sh
+   cd core/lib/storage
+   ```
+
 2. Generate a blanket migration:
-  ```sh
-  diesel migration generate name-of-your-migration
-  ```
-3. Implement migration: `up.sql` must contain new changes for the DB, and `down.sql`
-    must revert the migration and return the database into previous state.
+
+   ```sh
+   diesel migration generate name-of-your-migration
+   ```
+
+3. Implement migration: `up.sql` must contain new changes for the DB, and `down.sql` must revert the migration and
+   return the database into previous state.
 4. Run `zk db migrate` to apply migration.
 5. Implement corresponding changes in the `storage` crate.
 6. Implement tests for new functionality.
 7. Run database tests:
-  ```sh
-  zk test db
-  ```
+
+```sh
+zk test db
+```
 
 ## Testing
 
 - Running the `rust` unit-tests (heavy tests such as ones for `circuit` and database will not be run):
-  
+
   ```sh
   f cargo test
   ```
@@ -137,6 +142,7 @@ Adding a new migration requires the following actions:
   ```
   zk test db
   ```
+
 - Running the integration test:
 
   ```sh
@@ -163,7 +169,7 @@ Adding a new migration requires the following actions:
   f cargo bench
   ```
 
-- Running  the loadtest:
+- Running the loadtest:
 
   ```sh
   zk server # Has to be run in the 1st terminal
@@ -173,16 +179,18 @@ Adding a new migration requires the following actions:
 
 ## Developing circuit
 
-* To generate proofs one must have the universal setup files (which are downloaded during the first initialization).
-* To verify generated proofs one must have verification keys. Verification keys are generated for specific circuit & Verifier.sol contract; without these keys it is impossible to verify proofs on the Ethereum network.
+- To generate proofs one must have the universal setup files (which are downloaded during the first initialization).
+- To verify generated proofs one must have verification keys. Verification keys are generated for specific circuit &
+  Verifier.sol contract; without these keys it is impossible to verify proofs on the Ethereum network.
 
 Steps to do after updating circuit:
-1. Update circuit version by updating `KEY_DIR` in your env file (don't forget to place it to `dev.env.example`)
-(last parts of this variable usually means last commit where you updated circuit).
+
+1. Update circuit version by updating `KEY_DIR` in your env file (don't forget to place it to `dev.env.example`) (last
+   parts of this variable usually means last commit where you updated circuit).
 2. Regenerate verification keys and Verifier contract using `zk run verify-keys gen` command.
 3. Pack generated verification keys using `zk run verify-keys pack` command and commit resulting file to repo.
 
-## Build and push Docker images to dockerhub:
+## Build and push Docker images to dockerhub
 
 ```sh
 zk docker push <IMAGE>
@@ -190,7 +198,7 @@ zk docker push <IMAGE>
 
 ## Contracts
 
-### Re-build contracts:
+### Re-build contracts
 
 ```sh
 zk contract build

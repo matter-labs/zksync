@@ -3426,6 +3426,22 @@
       ]
     }
   },
+  "ec815cee37d8ac3557b523521a6bee44c7e8d949309e7dd9b0d0364edd2e85e9": {
+    "query": "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)\n                VALUES ($1, $2, $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "ede4a4f728f00df1e8149f67bf3b3f1bdeb9733165163ac45338ed6fec037505": {
     "query": "SELECT COUNT(*) as \"count!\" FROM pending_withdrawals",
     "describe": {

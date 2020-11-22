@@ -5,7 +5,7 @@
 
 // Built-in deps
 use std::collections::VecDeque;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 // External uses
 use tokio::{task::JoinHandle, time};
 use web3::{
@@ -197,6 +197,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Gets the incoming operations from the database and adds them to the
     /// transactions queue.
     async fn load_new_operations(&mut self) {
+        let start = Instant::now();
         let mut connection = match self.db.acquire_connection().await {
             Ok(connection) => connection,
             Err(err) => {
@@ -218,6 +219,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         for operation in new_operations {
             self.add_operation_to_queue(operation);
         }
+
+        metrics::histogram!("eth_sender.load_new_operations", start.elapsed());
     }
 
     /// This method does two main things:
@@ -226,6 +229,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
     async fn proceed_next_operations(&mut self) {
+        let start = Instant::now();
         // Queue for storing all the operations that were not finished at this iteration.
         let mut new_ongoing_ops = VecDeque::new();
 
@@ -292,6 +296,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         // Store the ongoing operations for the next round.
         self.ongoing_ops = new_ongoing_ops;
+        metrics::histogram!("eth_sender.proceed_next_operations", start.elapsed());
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
@@ -406,6 +411,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         &mut self,
         op: &mut ETHOperation,
     ) -> anyhow::Result<OperationCommitment> {
+        let start = Instant::now();
         assert!(
             !op.used_tx_hashes.is_empty(),
             "OperationETHState should have at least one transaction"
@@ -518,6 +524,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         self.ethereum.send_tx(&new_tx).await?;
         transaction.commit().await?;
 
+        metrics::histogram!("eth_sender.perform_commitment_step", start.elapsed());
         Ok(OperationCommitment::Pending)
     }
 

@@ -17,19 +17,25 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
     } else if (command == 'new') {
-        await utils.spawn(`yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`);
+        await utils.spawn(
+            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
+        );
     }
 }
 
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
-    await utils.spawn('yarn zksync build');
+    await utils.spawn('yarn zksync prepublish');
 }
 
 export async function deployTestkit(genesisRoot: string, prodContracts: boolean = false) {
     const option = prodContracts ? '--prodContracts' : '';
     await utils.spawn(`yarn contracts deploy-testkit --genesisRoot ${genesisRoot} ${option}`);
+}
+
+export async function deployEIP1271() {
+    await utils.spawn(`yarn contracts deploy-eip1271`);
 }
 
 export async function testUpgrade(contract: string, gatekeeper: string) {
@@ -132,6 +138,13 @@ command
     .option('--prodContracts')
     .action(async (cmd: Command) => {
         await deployTestkit(cmd.genesisRoot, cmd.prodContracts);
+    });
+
+command
+    .command('deploy-eip1271')
+    .description('deploy test EIP-1271 "smart wallet"')
+    .action(async (cmd: Command) => {
+        await deployEIP1271();
     });
 
 command

@@ -44,6 +44,7 @@ pub mod ethereum;
 pub mod gas_counter;
 pub mod helpers;
 pub mod mempool;
+pub mod network;
 pub mod operations;
 pub mod priority_ops;
 pub mod tokens;

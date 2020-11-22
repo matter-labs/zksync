@@ -15,7 +15,7 @@ use zksync_circuit::witness::utils::get_used_subtree_root_hash;
 use zksync_witness_generator::run_prover_server;
 
 async fn connect_to_db() -> zksync_storage::ConnectionPool {
-    zksync_storage::ConnectionPool::new(Some(1)).await
+    zksync_storage::ConnectionPool::new(Some(1))
 }
 
 async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
