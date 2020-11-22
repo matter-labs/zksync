@@ -4,32 +4,19 @@ pragma solidity ^0.7.0;
 
 import "./Config.sol";
 
-
 /// @title Governance Contract
 /// @author Matter Labs
 contract Governance is Config {
-
     /// @notice Token added to Franklin net
-    event NewToken(
-        address indexed token,
-        uint16 indexed tokenId
-    );
+    event NewToken(address indexed token, uint16 indexed tokenId);
 
     /// @notice Governor changed
-    event NewGovernor(
-        address newGovernor
-    );
+    event NewGovernor(address newGovernor);
 
     /// @notice Validator's status changed
-    event ValidatorStatusUpdate(
-        address indexed validatorAddress,
-        bool isActive
-    );
+    event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
 
-    event TokenPausedUpdate(
-        address indexed token,
-        bool paused
-    );
+    event TokenPausedUpdate(address indexed token, bool paused);
 
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;

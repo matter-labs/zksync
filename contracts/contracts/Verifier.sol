@@ -7,7 +7,6 @@ import "./KeysWithPlonkVerifier.sol";
 
 // Hardcoded constants to avoid accessing store
 contract Verifier is KeysWithPlonkVerifier {
-
     bool constant DUMMY_VERIFIER = false;
 
     function initialize(bytes calldata) external {}
@@ -24,20 +23,30 @@ contract Verifier is KeysWithPlonkVerifier {
         uint256[16] memory _subproofs_limbs
     ) external view returns (bool) {
         if (DUMMY_VERIFIER) {
-            uint oldGasValue = gasleft();
-            uint tmp;
+            uint256 oldGasValue = gasleft();
+            uint256 tmp;
             while (gasleft() + 500000 > oldGasValue) {
                 tmp += 1;
             }
             return true;
         }
-        for (uint i = 0; i < _individual_vks_inputs.length; ++i) {
+        for (uint256 i = 0; i < _individual_vks_inputs.length; ++i) {
             uint256 commitment = _individual_vks_inputs[i];
             uint256 mask = (~uint256(0)) >> 3;
             _individual_vks_inputs[i] = uint256(commitment) & mask;
         }
         VerificationKey memory vk = getVkAggregated(uint32(_vkIndexes.length));
-        return  verify_serialized_proof_with_recursion(_recursiveInput, _proof, VK_TREE_ROOT, VK_MAX_INDEX, _vkIndexes, _individual_vks_inputs, _subproofs_limbs, vk);
+        return
+            verify_serialized_proof_with_recursion(
+                _recursiveInput,
+                _proof,
+                VK_TREE_ROOT,
+                VK_MAX_INDEX,
+                _vkIndexes,
+                _individual_vks_inputs,
+                _subproofs_limbs,
+                vk
+            );
     }
 
     function verifyExitProof(

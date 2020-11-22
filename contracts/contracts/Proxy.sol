@@ -6,12 +6,10 @@ import "./Ownable.sol";
 import "./Upgradeable.sol";
 import "./UpgradeableMaster.sol";
 
-
 /// @title Proxy Contract
 /// @dev NOTICE: Proxy must implement UpgradeableMaster interface to prevent calling some function of it not by master of proxy
 /// @author Matter Labs
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
-
     /// @dev Storage position of "target" (actual implementation address: keccak256('eip1967.proxy.implementation') - 1)
     bytes32 private constant targetPosition = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
@@ -21,9 +19,8 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @param targetInitializationParameters Target initialization parameters
     constructor(address target, bytes memory targetInitializationParameters) Ownable(msg.sender) {
         setTarget(target);
-        (bool initializationSuccess, ) = getTarget().delegatecall(
-            abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters)
-        );
+        (bool initializationSuccess, ) =
+            getTarget().delegatecall(abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters));
         require(initializationSuccess, "uin11"); // uin11 - target initialization failed
     }
 
@@ -62,16 +59,15 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
         requireMaster(msg.sender);
 
         setTarget(newTarget);
-        (bool upgradeSuccess, ) = getTarget().delegatecall(
-            abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters)
-        );
+        (bool upgradeSuccess, ) =
+            getTarget().delegatecall(abi.encodeWithSignature("upgrade(bytes)", newTargetUpgradeParameters));
         require(upgradeSuccess, "ufu11"); // ufu11 - target upgrade failed
     }
 
     /// @notice Performs a delegatecall to the contract implementation
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation
     /// This function will return whatever the implementation call returns
-    function _fallback () internal {
+    function _fallback() internal {
         address _target = getTarget();
         assembly {
             // The pointer to the free memory slot
@@ -79,48 +75,41 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(ptr, 0x0, calldatasize())
             // Delegatecall method of the implementation contract, returns 0 on error
-            let result := delegatecall(
-                gas(),
-                _target,
-                ptr,
-                calldatasize(),
-                0x0,
-                0
-            )
+            let result := delegatecall(gas(), _target, ptr, calldatasize(), 0x0, 0)
             // Get the size of the last return data
             let size := returndatasize()
             // Copy the size length of bytes from return data at zero position to pointer position
             returndatacopy(ptr, 0x0, size)
             // Depending on result value
             switch result
-            case 0 {
-                // End execution and revert state changes
-                revert(ptr, size)
-            }
-            default {
-                // Return data with length of size at pointers position
-                return(ptr, size)
-            }
+                case 0 {
+                    // End execution and revert state changes
+                    revert(ptr, size)
+                }
+                default {
+                    // Return data with length of size at pointers position
+                    return(ptr, size)
+                }
         }
     }
 
     /// @notice Will run when no functions matches call data
-    fallback () external payable {
+    fallback() external payable {
         _fallback();
     }
 
     /// @notice Same as fallback but called when calldata is empty
-    receive () external payable {
+    receive() external payable {
         _fallback();
     }
 
     /// UpgradeableMaster functions
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function getNoticePeriod() external override returns (uint) {
+    function getNoticePeriod() external override returns (uint256) {
         (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("getNoticePeriod()"));
         require(success, "unp11"); // unp11 - upgradeNoticePeriod delegatecall failed
-        return abi.decode(result, (uint));
+        return abi.decode(result, (uint256));
     }
 
     /// @notice Notifies proxy contract that notice period started
@@ -158,5 +147,4 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
         require(success, "rfu11"); // rfu11 - readyForUpgrade delegatecall failed
         return abi.decode(result, (bool));
     }
-
 }

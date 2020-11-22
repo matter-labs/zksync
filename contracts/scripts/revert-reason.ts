@@ -33,7 +33,7 @@ async function reason() {
         try {
             const parsedTransaction = franklinInterface.parseTransaction({ data: tx.data });
             if (parsedTransaction) {
-                console.log('parsed tx: ',parsedTransaction.name, JSON.stringify(parsedTransaction.args,null,2));
+                console.log('parsed tx: ', parsedTransaction.name, JSON.stringify(parsedTransaction.args, null, 2));
             } else {
                 console.log('tx:', tx);
             }

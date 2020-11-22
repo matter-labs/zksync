@@ -33,9 +33,9 @@ import "../../SafeMath.sol";
 contract MintableERC20NoTransferReturnValueTest is ContextTest, MintableIERC20NoTransferReturnValueTest {
     using SafeMath for uint256;
 
-    mapping (address => uint256) private _balances;
+    mapping(address => uint256) private _balances;
 
-    mapping (address => mapping (address => uint256)) private _allowances;
+    mapping(address => mapping(address => uint256)) private _allowances;
 
     uint256 private _totalSupply;
 
@@ -100,9 +100,17 @@ contract MintableERC20NoTransferReturnValueTest is ContextTest, MintableIERC20No
      * - the caller must have allowance for `sender`'s tokens of at least
      * `amount`.
      */
-    function transferFrom(address sender, address recipient, uint256 amount) public override {
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) public override {
         _transfer(sender, recipient, amount);
-        _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
+        _approve(
+            sender,
+            _msgSender(),
+            _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance")
+        );
     }
 
     /**
@@ -137,7 +145,11 @@ contract MintableERC20NoTransferReturnValueTest is ContextTest, MintableIERC20No
      * `subtractedValue`.
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
+        _approve(
+            _msgSender(),
+            spender,
+            _allowances[_msgSender()][spender].sub(subtractedValue, "ERC20: decreased allowance below zero")
+        );
         return true;
     }
 
@@ -155,7 +167,11 @@ contract MintableERC20NoTransferReturnValueTest is ContextTest, MintableIERC20No
      * - `recipient` cannot be the zero address.
      * - `sender` must have a balance of at least `amount`.
      */
-    function _transfer(address sender, address recipient, uint256 amount) internal {
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
@@ -213,7 +229,11 @@ contract MintableERC20NoTransferReturnValueTest is ContextTest, MintableIERC20No
      * - `owner` cannot be the zero address.
      * - `spender` cannot be the zero address.
      */
-    function _approve(address owner, address spender, uint256 amount) internal {
+    function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
@@ -229,6 +249,10 @@ contract MintableERC20NoTransferReturnValueTest is ContextTest, MintableIERC20No
      */
     function _burnFrom(address account, uint256 amount) internal {
         _burn(account, amount);
-        _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "ERC20: burn amount exceeds allowance"));
+        _approve(
+            account,
+            _msgSender(),
+            _allowances[account][_msgSender()].sub(amount, "ERC20: burn amount exceeds allowance")
+        );
     }
 }

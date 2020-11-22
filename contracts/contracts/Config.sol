@@ -2,11 +2,9 @@
 
 pragma solidity ^0.7.0;
 
-
 /// @title zkSync configuration constants
 /// @author Matter Labs
 contract Config {
-
     /// @dev ERC20 token withdrawal gas limit, used only for complete withdrawals
     uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 50000;
 
@@ -34,7 +32,7 @@ contract Config {
     uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = 128;
 
     /// @dev Max account id that could be registered in the network
-    uint32 constant MAX_ACCOUNT_ID = (2 ** 24) - 1;
+    uint32 constant MAX_ACCOUNT_ID = (2**24) - 1;
 
     /// @dev Expected average period of block creation
     uint256 constant BLOCK_PERIOD = 15 seconds;
@@ -74,19 +72,20 @@ contract Config {
     uint64 constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
 
     /// @dev Reserved time for users to send full exit priority operation in case of an upgrade (in seconds)
-    uint constant MASS_FULL_EXIT_PERIOD = 3 days;
+    uint256 constant MASS_FULL_EXIT_PERIOD = 3 days;
 
     /// @dev Reserved time for users to withdraw funds from full exit priority operation in case of an upgrade (in seconds)
-    uint constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;
+    uint256 constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;
 
     /// @dev Notice period before activation preparation status of upgrade mode (in seconds)
     /// @dev NOTE: we must reserve for users enough time to send full exit operation, wait maximum time for processing this operation and withdraw funds from it.
-    uint constant UPGRADE_NOTICE_PERIOD = MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
+    uint256 constant UPGRADE_NOTICE_PERIOD =
+        MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
 
     /// @dev Timestamp - seconds since unix epoch
-    uint constant COMMIT_TIMESTAMP_NOT_OLDER = 8 hours;
+    uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 8 hours;
 
     /// @dev Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
     /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)
-    uint constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 minutes;
+    uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 minutes;
 }

@@ -8,7 +8,7 @@ import {
     publishAbiToTesseracts,
     publishSourceCodeToEtherscan
 } from './publish-utils';
-import {Governance, GovernanceFactory} from "../typechain";
+import { Governance, GovernanceFactory } from '../typechain';
 
 export interface Contracts {
     governance;
@@ -37,8 +37,10 @@ export interface DeployerConfig {
 }
 
 export function readContractCode(name: string) {
-    const fileName = name.split("/").pop();
-    return JSON.parse(fs.readFileSync(`artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, { encoding: 'utf-8' }));
+    const fileName = name.split('/').pop();
+    return JSON.parse(
+        fs.readFileSync(`artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, { encoding: 'utf-8' })
+    );
 }
 
 export function readProductionContracts(): Contracts {

@@ -17,7 +17,7 @@ type Token = {
 async function deployToken(token: Token): Promise<Token> {
     const erc20 = await deployContract(
         wallet,
-        readContractCode("dev-contracts/TestnetERC20Token"),
+        readContractCode('dev-contracts/TestnetERC20Token'),
         [token.name, token.symbol, token.decimals],
         { gasLimit: 5000000 }
     );

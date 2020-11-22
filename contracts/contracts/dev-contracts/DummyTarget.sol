@@ -5,9 +5,7 @@ pragma solidity ^0.7.0;
 import "../Upgradeable.sol";
 import "../UpgradeableMaster.sol";
 
-
 interface DummyTarget {
-
     function get_DUMMY_INDEX() external pure returns (uint256);
 
     function initialize(bytes calldata initializationParameters) external;
@@ -15,21 +13,20 @@ interface DummyTarget {
     function upgrade(bytes calldata upgradeParameters) external;
 
     function verifyPriorityOperation() external;
-
 }
 
 contract DummyFirst is UpgradeableMaster, DummyTarget {
+    uint256 constant UPGRADE_NOTICE_PERIOD = 4;
 
-    uint constant UPGRADE_NOTICE_PERIOD = 4;
-    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint) {
+    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function getNoticePeriod() external pure override returns (uint) {
+    function getNoticePeriod() external pure override returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function upgradeNoticePeriodStarted() external override  {}
+    function upgradeNoticePeriodStarted() external override {}
 
     function upgradePreparationStarted() external override {}
 
@@ -42,6 +39,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
     }
 
     uint256 private constant DUMMY_INDEX = 1;
+
     function get_DUMMY_INDEX() external pure override returns (uint256) {
         return DUMMY_INDEX;
     }
@@ -57,9 +55,7 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
         }
     }
 
-    function upgrade(bytes calldata upgradeParameters) external override {
-
-    }
+    function upgrade(bytes calldata upgradeParameters) external override {}
 
     function totalVerifiedPriorityOperations() internal view returns (uint64) {
         return _verifiedPriorityOperations;
@@ -72,17 +68,16 @@ contract DummyFirst is UpgradeableMaster, DummyTarget {
     function verifyPriorityOperation() external override {
         _verifiedPriorityOperations++;
     }
-
 }
 
 contract DummySecond is UpgradeableMaster, DummyTarget {
+    uint256 constant UPGRADE_NOTICE_PERIOD = 4;
 
-    uint constant UPGRADE_NOTICE_PERIOD = 4;
-    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint) {
+    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
-    function getNoticePeriod() external pure override returns (uint) {
+    function getNoticePeriod() external pure override returns (uint256) {
         return UPGRADE_NOTICE_PERIOD;
     }
 
@@ -99,7 +94,8 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
     }
 
     uint256 private constant DUMMY_INDEX = 2;
-    function get_DUMMY_INDEX() external override pure returns (uint256) {
+
+    function get_DUMMY_INDEX() external pure override returns (uint256) {
         return DUMMY_INDEX;
     }
 
@@ -129,5 +125,4 @@ contract DummySecond is UpgradeableMaster, DummyTarget {
     function verifyPriorityOperation() external override {
         _verifiedPriorityOperations++;
     }
-
 }
