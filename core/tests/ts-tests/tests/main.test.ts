@@ -9,6 +9,7 @@ import './transfer';
 import './withdraw';
 import './forced-exit';
 import './misc';
+import './batch-builder';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -52,6 +53,23 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should change pubkey onchain', async () => {
         await tester.testChangePubKey(alice, token, true);
+    });
+
+    step('batch-builder tests', async () => {
+        const david = await tester.fundedWallet('1.0');
+        const frank = await tester.fundedWallet('1.0');
+        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        // Add these accounts to the network.
+        await tester.testDeposit(david, token, DEPOSIT_AMOUNT, true);
+        await tester.testDeposit(frank, token, DEPOSIT_AMOUNT, true);
+        // Also deposit another token to pay with.
+        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
+
+        await tester.testBatchBuilderInvalidUsage(david, token);
+        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
+        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
+        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
     });
 
     step('should execute a transfer to new account', async () => {

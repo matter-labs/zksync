@@ -84,9 +84,10 @@ export class BatchBuilder {
         };
     }
 
-    private async setFeeToken(feeToken: TokenLike): Promise<BatchBuilder> {
-        if (this.txs.find((tx) => tx.tx.fee > 0) != undefined) {
-            throw new Error('Fees are expected to be zero.');
+    private async setFeeToken(feeToken: TokenLike) {
+        // If user specified a token he wants to pay with, we expect all fees to be zero.
+        if (this.txs.find((tx) => !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
+            throw new Error('Fees are expected to be zero');
         }
         let txWithFeeToken = this.txs.find((tx) => tx.token == feeToken);
         // If there's no transaction with the given token, create dummy transfer.
@@ -102,7 +103,6 @@ export class BatchBuilder {
         const addresses = this.txs.map((tx) => tx.address);
 
         txWithFeeToken.tx.fee = await this.wallet.provider.getTransactionsBatchFee(txTypes, addresses, feeToken);
-        return this;
     }
 
     addWithdraw(withdraw: {
@@ -218,6 +218,10 @@ export class BatchBuilder {
                     break;
                 case 'ChangePubKey':
                     const changePubKey = { tx: await this.wallet.getChangePubKey(tx.tx) };
+                    const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
+                    if (currentPubKeyHash === changePubKey.tx.newPkHash) {
+                        throw new Error('Current signing key is already set');
+                    }
                     // We will sign it if necessary and store the batch hash.
                     this.changePubKeyTx = changePubKey.tx;
                     _bytes.push(serializeChangePubKey(changePubKey.tx));
