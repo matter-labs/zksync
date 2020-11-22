@@ -27,11 +27,10 @@ export class BatchBuilder {
     private changePubKeyTx: ChangePubKey = null;
     private changePubKeyOnChain: boolean = null;
 
-    private constructor(private wallet: Wallet, private nonce: number, private txs: InternalTx[] = []) {}
+    private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
 
-    static async fromWallet(wallet: Wallet, nonce?: Nonce): Promise<BatchBuilder> {
-        const _nonce = await wallet.getNonce(nonce);
-        const batchBuilder = new BatchBuilder(wallet, _nonce);
+    static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
+        const batchBuilder = new BatchBuilder(wallet, nonce);
         return batchBuilder;
     }
 
@@ -113,14 +112,13 @@ export class BatchBuilder {
         fee?: BigNumberish;
         fastProcessing?: boolean;
     }): BatchBuilder {
-        const nonce = this.nonce++;
         const fee = withdraw.fee != undefined ? withdraw.fee : 0;
         const _withdraw = {
             ethAddress: withdraw.ethAddress,
             token: withdraw.token,
             amount: withdraw.amount,
             fee: fee,
-            nonce: nonce
+            nonce: null
         };
         const feeType = withdraw.fastProcessing === true ? 'FastWithdraw' : 'Withdraw';
         this.txs.push({
@@ -134,14 +132,13 @@ export class BatchBuilder {
     }
 
     addTransfer(transfer: { to: Address; token: TokenLike; amount: BigNumberish; fee?: BigNumberish }): BatchBuilder {
-        const nonce = this.nonce++;
         const fee = transfer.fee != undefined ? transfer.fee : 0;
         const _transfer = {
             to: transfer.to,
             token: transfer.token,
             amount: transfer.amount,
             fee: fee,
-            nonce: nonce
+            nonce: null
         };
         this.txs.push({
             type: 'Transfer',
@@ -157,14 +154,13 @@ export class BatchBuilder {
         if (this.changePubKeyOnChain != null) {
             throw new Error('ChangePubKey operation must be unique within a batch');
         }
-        const nonce = this.nonce++;
         const fee = changePubKey.fee != undefined ? changePubKey.fee : 0;
         const onchainAuth = changePubKey.onchainAuth != undefined ? changePubKey.onchainAuth : false;
         this.changePubKeyOnChain = onchainAuth;
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
             fee: fee,
-            nonce: nonce,
+            nonce: null,
             onchainAuth: onchainAuth
         };
         const feeType = {
@@ -183,13 +179,12 @@ export class BatchBuilder {
     }
 
     addForcedExit(forcedExit: { target: Address; token: TokenLike; fee?: BigNumberish }): BatchBuilder {
-        const nonce = this.nonce++;
         const fee = forcedExit.fee != undefined ? forcedExit.fee : 0;
         const _forcedExit = {
             target: forcedExit.target,
             token: forcedExit.token,
             fee: fee,
-            nonce: nonce
+            nonce: null
         };
         this.txs.push({
             type: 'ForcedExit',
@@ -201,10 +196,15 @@ export class BatchBuilder {
         return this;
     }
 
+    /**
+     * Sets transactions nonces, assembles the batch and serializes them into single array.
+     */
     private async processTransactions(): Promise<{ txs: SignedTransaction[]; bytes: Uint8Array }> {
         let txs: SignedTransaction[] = [];
         let _bytes: Uint8Array[] = [];
-        for (const tx of this.txs) {
+        let nonce: number = await this.wallet.getNonce(this.nonce);
+        for (let tx of this.txs) {
+            tx.tx.nonce = nonce++;
             switch (tx.type) {
                 case 'Withdraw':
                     const withdraw = { tx: await this.wallet.getWithdrawFromSyncToEthereum(tx.tx) };

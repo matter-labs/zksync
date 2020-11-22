@@ -104,8 +104,8 @@ export class Wallet {
         };
     }
 
-    async batchBuilder(nonce?: Nonce): Promise<BatchBuilder> {
-        return await BatchBuilder.fromWallet(this, nonce);
+    batchBuilder(nonce?: Nonce): BatchBuilder {
+        return BatchBuilder.fromWallet(this, nonce);
     }
 
     async getTransfer(transfer: {
