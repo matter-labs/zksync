@@ -41,3 +41,4 @@ zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 jsonrpc-core = "14.0.0"
 db_test_macro = { path = "../../lib/storage/db_test_macro" }
 futures = "0.3.5"
+actix-rt = "1.1.1"

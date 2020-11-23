@@ -20,7 +20,7 @@ use zksync_types::{
 
 use crate::data_restore_driver::DataRestoreDriver;
 use crate::database_storage_interactor::DatabaseStorageInteractor;
-use crate::tests::utils::{create_log, u32_to_32bytes};
+use crate::tests::utils::{create_log, u32_to_32bytes, InMemoryStorageInteractor};
 use crate::{END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP};
 use num::BigUint;
 use std::cmp::max;
@@ -353,6 +353,149 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         .load_committed_events_state()
         .await
         .unwrap();
+
+    assert_eq!(driver.events_state.committed_events.len(), events.len());
+
+    // Nullify the state of driver
+    let mut driver = DataRestoreDriver::new(
+        transport.clone(),
+        [1u8; 20].into(),
+        [1u8; 20].into(),
+        ETH_BLOCKS_STEP,
+        END_ETH_BLOCKS_OFFSET,
+        vec![6, 30],
+        true,
+        None,
+    );
+    // Load state from db and check it
+    assert!(driver.load_state_from_storage(&mut interactor).await);
+    assert_eq!(driver.events_state.committed_events.len(), events.len());
+    assert_eq!(driver.tree_state.state.block_number, 2)
+}
+
+#[actix_rt::test]
+async fn test_with_inmemory_storage() {
+    let mut transport = Web3Transport::new();
+
+    let mut interactor = InMemoryStorageInteractor::new();
+    let contract = zksync_contract();
+    let gov_contract = governance_contract();
+
+    let block_verified_topic = contract
+        .event("BlockVerification")
+        .expect("Main contract abi error")
+        .signature();
+    let block_verified_topic_string = format!("{:?}", block_verified_topic);
+    transport.insert_logs(
+        block_verified_topic_string,
+        vec![
+            create_log(
+                block_verified_topic,
+                vec![u32_to_32bytes(1).into()],
+                Bytes(vec![]),
+                1,
+                u32_to_32bytes(1).into(),
+            ),
+            create_log(
+                block_verified_topic,
+                vec![u32_to_32bytes(2).into()],
+                Bytes(vec![]),
+                2,
+                u32_to_32bytes(2).into(),
+            ),
+        ],
+    );
+
+    let block_committed_topic = contract
+        .event("BlockCommit")
+        .expect("Main contract abi error")
+        .signature();
+    let block_commit_topic_string = format!("{:?}", block_committed_topic);
+    transport.insert_logs(
+        block_commit_topic_string,
+        vec![
+            create_log(
+                block_committed_topic,
+                vec![u32_to_32bytes(1).into()],
+                Bytes(vec![]),
+                1,
+                u32_to_32bytes(1).into(),
+            ),
+            create_log(
+                block_committed_topic,
+                vec![u32_to_32bytes(2).into()],
+                Bytes(vec![]),
+                2,
+                u32_to_32bytes(2).into(),
+            ),
+        ],
+    );
+
+    let reverted_topic = contract
+        .event("BlocksRevert")
+        .expect("Main contract abi error")
+        .signature();
+    let _reverted_topic_string = format!("{:?}", reverted_topic);
+
+    let new_token_topic = gov_contract
+        .event("NewToken")
+        .expect("Main contract abi error")
+        .signature();
+    let new_token_topic_string = format!("{:?}", new_token_topic);
+    transport.insert_logs(
+        new_token_topic_string,
+        vec![create_log(
+            new_token_topic,
+            vec![[0; 32].into(), u32_to_32bytes(3).into()],
+            Bytes(vec![]),
+            3,
+            u32_to_32bytes(1).into(),
+        )],
+    );
+
+    transport.push_transactions(vec![
+        create_transaction(
+            1,
+            create_block(
+                1,
+                vec![create_deposit(Default::default(), Default::default(), 50)],
+            ),
+        ),
+        create_transaction(
+            2,
+            create_block(
+                2,
+                vec![create_withdraw_operations(
+                    0,
+                    Default::default(),
+                    Default::default(),
+                    10,
+                )],
+            ),
+        ),
+    ]);
+
+    let mut driver = DataRestoreDriver::new(
+        transport.clone(),
+        [1u8; 20].into(),
+        [1u8; 20].into(),
+        ETH_BLOCKS_STEP,
+        END_ETH_BLOCKS_OFFSET,
+        vec![6, 30],
+        true,
+        None,
+    );
+    driver.run_state_update(&mut interactor).await;
+
+    // Check that it's stores some account, created by deposit
+    let (_, account) = interactor
+        .get_account_by_address(&Default::default())
+        .unwrap();
+    let balance = account.get_balance(0);
+
+    assert_eq!(BigUint::from(40u32), balance);
+    assert_eq!(driver.events_state.committed_events.len(), 2);
+    let events = interactor.load_committed_events_state();
 
     assert_eq!(driver.events_state.committed_events.len(), events.len());
 

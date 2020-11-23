@@ -38,8 +38,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         Self { storage }
     }
 
-    // Method allowed for using in tests
-    pub(crate) fn storage(&mut self) -> &mut StorageProcessor<'a> {
+    pub fn storage(&mut self) -> &mut StorageProcessor<'a> {
         &mut self.storage
     }
 

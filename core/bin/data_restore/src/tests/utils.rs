@@ -5,18 +5,18 @@ use crate::events::{BlockEvent, EventType};
 use crate::events_state::{EventsState, NewTokenEvent};
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor::StorageInteractor;
-use ethabi::Address;
+use std::cmp::max;
 use std::collections::HashMap;
+use web3::types::Address;
 use web3::{
     types::H256,
     types::{Bytes, Log},
     RequestId, Transport,
 };
-use zksync_storage::data_restore::records::NewBlockEvent;
 use zksync_types::block::Block;
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, EncodedProofPlonk,
-    Operation, Token, TokenGenesisListItem, ZkSyncOp,
+    Operation, Token, TokenGenesisListItem,
 };
 
 #[derive(Debug, Clone)]
@@ -70,7 +70,7 @@ pub(crate) fn create_log(
     }
 }
 
-struct InMemoryStorageInteractor {
+pub struct InMemoryStorageInteractor {
     rollups: Vec<RollupOpsBlock>,
     storage_state: StorageUpdateState,
     tokens: HashMap<u16, Token>,
@@ -85,6 +85,7 @@ struct InMemoryStorageInteractor {
 impl StorageInteractor for InMemoryStorageInteractor {
     async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]) {
         self.rollups = blocks.to_vec();
+        self.storage_state = StorageUpdateState::Operations
     }
 
     async fn update_tree_state(&mut self, block: Block, accounts_updated: AccountUpdates) {
@@ -106,6 +107,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
         self.last_verified_block = verify_op.block.block_number as u64;
 
         self.commit_state_update(block.block_number, accounts_updated);
+        self.storage_state = StorageUpdateState::None
         // TODO save operations
     }
 
@@ -180,6 +182,27 @@ impl StorageInteractor for InMemoryStorageInteractor {
 }
 
 impl InMemoryStorageInteractor {
+    pub fn new() -> Self {
+        Self {
+            rollups: vec![],
+            storage_state: StorageUpdateState::None,
+            tokens: Default::default(),
+            events_state: vec![],
+            last_watched_block: 0,
+            last_committed_block: 0,
+            last_verified_block: 0,
+            accounts: Default::default(),
+        }
+    }
+    pub fn get_account_by_address(&self, address: &Address) -> Option<(AccountId, Account)> {
+        let accounts: Vec<(AccountId, Account)> = self
+            .accounts
+            .iter()
+            .filter(|(_, acc)| acc.address == address.clone())
+            .map(|(acc_id, acc)| (*acc_id, acc.clone()))
+            .collect();
+        accounts.first().map(|a| a.clone()).clone()
+    }
     fn load_verified_events_state(&self) -> Vec<BlockEvent> {
         self.events_state
             .clone()
@@ -187,7 +210,7 @@ impl InMemoryStorageInteractor {
             .filter(|event| event.block_type == EventType::Verified)
             .collect()
     }
-    fn load_committed_events_state(&self) -> Vec<BlockEvent> {
+    pub(crate) fn load_committed_events_state(&self) -> Vec<BlockEvent> {
         // TODO avoid clone
         self.events_state
             .clone()
@@ -203,26 +226,23 @@ impl InMemoryStorageInteractor {
         let update_order_ids =
             first_update_order_id..first_update_order_id + accounts_updated.len() as u32;
 
-        for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
+        for (_, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             match *upd {
                 AccountUpdate::Create { ref address, nonce } => {
                     let (mut acc, _) = Account::create_account(*id, address.clone());
                     acc.nonce = nonce;
                     self.accounts.insert(*id, acc);
                 }
-                AccountUpdate::Delete { ref address, nonce } => {
-                    let accounts: Vec<u32> = self
-                        .accounts
-                        .iter()
-                        .filter(|(acc_id, acc)| acc.address == address.clone())
-                        .map(|(acc_id, _)| *acc_id)
-                        .collect();
-                    self.accounts
-                        .remove(accounts.first().expect("account should be exists"));
+                AccountUpdate::Delete {
+                    ref address,
+                    nonce: _,
+                } => {
+                    let (acc_id, _) = self.get_account_by_address(address).unwrap();
+                    self.accounts.remove(&acc_id);
                 }
                 AccountUpdate::UpdateBalance {
-                    balance_update: (token, ref old_balance, ref new_balance),
-                    old_nonce,
+                    balance_update: (token, _, ref new_balance),
+                    old_nonce: _,
                     new_nonce,
                 } => {
                     let account = self
@@ -230,17 +250,19 @@ impl InMemoryStorageInteractor {
                         .get_mut(id)
                         .expect("In tests this account should be stored");
                     account.set_balance(token, new_balance.clone());
+                    account.nonce = max(account.nonce, new_nonce);
                 }
                 AccountUpdate::ChangePubKeyHash {
-                    ref old_pub_key_hash,
+                    old_pub_key_hash: _,
                     ref new_pub_key_hash,
-                    old_nonce,
+                    old_nonce: _,
                     new_nonce,
                 } => {
                     let account = self
                         .accounts
                         .get_mut(id)
                         .expect("In tests this account should be stored");
+                    account.nonce = max(account.nonce, new_nonce);
                     account.pub_key_hash = new_pub_key_hash.clone();
                 }
             }
