@@ -198,10 +198,10 @@ impl InMemoryStorageInteractor {
         let accounts: Vec<(AccountId, Account)> = self
             .accounts
             .iter()
-            .filter(|(_, acc)| acc.address == address.clone())
+            .filter(|(_, acc)| acc.address == *address)
             .map(|(acc_id, acc)| (*acc_id, acc.clone()))
             .collect();
-        accounts.first().map(|a| a.clone()).clone()
+        accounts.first().cloned()
     }
     fn load_verified_events_state(&self) -> Vec<BlockEvent> {
         self.events_state
@@ -229,7 +229,7 @@ impl InMemoryStorageInteractor {
         for (_, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             match *upd {
                 AccountUpdate::Create { ref address, nonce } => {
-                    let (mut acc, _) = Account::create_account(*id, address.clone());
+                    let (mut acc, _) = Account::create_account(*id, *address);
                     acc.nonce = nonce;
                     self.accounts.insert(*id, acc);
                 }
