@@ -14,6 +14,7 @@ use zksync_types::{tx::TxEthSignature, tx::TxHash, ZkSyncTx};
 
 // Local uses
 use super::{client::Client, client::ClientError, Error as ApiError, JsonResult};
+use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 #[derive(Debug, Clone, Copy)]
@@ -145,7 +146,14 @@ async fn submit_tx_batch(
     data: web::Data<ApiTransactionsData>,
     Json(body): Json<IncomingTxBatch>,
 ) -> JsonResult<Vec<TxHash>> {
-    let txs = body.txs.into_iter().zip(std::iter::repeat(None)).collect();
+    let txs = body
+        .txs
+        .into_iter()
+        .map(|tx| TxWithSignature {
+            tx,
+            signature: None,
+        })
+        .collect();
 
     let tx_hashes = data
         .tx_sender

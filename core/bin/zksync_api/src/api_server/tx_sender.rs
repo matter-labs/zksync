@@ -23,6 +23,7 @@ use zksync_types::{
 };
 
 // Local uses
+use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::{
     core_api_client::CoreApiClient,
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
@@ -30,6 +31,7 @@ use crate::{
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
+use zksync_types::tx::BatchSignData;
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -218,20 +220,24 @@ impl TxSender {
 
     pub async fn submit_txs_batch(
         &self,
-        txs: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
+        txs: Vec<TxWithSignature>,
         eth_signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>, SubmitError> {
-        debug_assert!(txs.is_empty(), "Transaction batch cannot be empty");
+        if txs.is_empty() {
+            return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
+        }
 
-        if txs.iter().any(|tx| tx.0.is_close()) {
-            return Err(SubmitError::AccountCloseDisabled);
+        for tx in &txs {
+            if tx.tx.is_close() {
+                return Err(SubmitError::AccountCloseDisabled);
+            }
         }
 
         // Checking fees data
         let mut required_total_usd_fee = BigDecimal::from(0);
         let mut provided_total_usd_fee = BigDecimal::from(0);
         for tx in &txs {
-            let tx_fee_info = tx.0.get_fee_info();
+            let tx_fee_info = tx.tx.get_fee_info();
 
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
                 let required_fee = Self::ticker_request(
@@ -268,28 +274,37 @@ impl TxSender {
 
         let mut messages_to_sign = vec![];
         for tx in &txs {
-            messages_to_sign.push(self.tx_message_to_sign(&tx.0).await?);
+            messages_to_sign.push(self.tx_message_to_sign(&tx.tx).await?);
         }
 
         if let Some(signature) = eth_signature {
             // User provided the signature for the whole batch.
-            let (verified_batch, sign_data) = verify_txs_batch_signature(
+            let _txs = txs
+                .iter()
+                .map(|tx| tx.tx.clone())
+                .collect::<Vec<ZkSyncTx>>();
+            // Create batch signature data.
+            let batch_sign_data =
+                BatchSignData::new(&_txs, signature).map_err(SubmitError::other)?;
+
+            // Send batch and provided signature for verification.
+            let (verified_batch, signature) = verify_txs_batch_signature(
                 txs,
-                signature,
+                batch_sign_data.0.signature,
                 messages_to_sign,
                 self.sign_verify_requests.clone(),
             )
             .await?
             .unwrap_batch();
 
-            verified_signature = Some(sign_data.signature);
+            verified_signature = Some(signature.signature);
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
             for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
                 let verified_tx = verify_tx_info_message_signature(
-                    &tx.0,
-                    tx.1.clone(),
+                    &tx.tx,
+                    tx.signature.clone(),
                     msg_to_sign,
                     self.sign_verify_requests.clone(),
                 )
@@ -301,14 +316,17 @@ impl TxSender {
         }
 
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
+
         // Send verified transactions to the mempool.
-        self.core_api_client
+        let tx_add_result = self
+            .core_api_client
             .send_txs_batch(verified_txs, verified_signature)
             .await
-            .map_err(SubmitError::communication_core_server)?
-            .map_err(SubmitError::TxAdd)?;
+            .map_err(SubmitError::internal)
+            .map_err(|_| SubmitError::other("Error communicating core server"))?;
 
-        Ok(tx_hashes)
+        // Check the mempool response and, if everything is OK, return the transactions hashes.
+        tx_add_result.map(|_| tx_hashes).map_err(SubmitError::TxAdd)
     }
 
     /// For forced exits, we must check that target account exists for more
@@ -479,7 +497,7 @@ async fn verify_tx_info_message_signature(
 /// every transaction from the batch to be signed. The signature must be obtained
 /// through signing hash of concatenated transactions bytes.
 async fn verify_txs_batch_signature(
-    batch: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
+    batch: Vec<TxWithSignature>,
     signature: TxEthSignature,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
@@ -488,13 +506,13 @@ async fn verify_txs_batch_signature(
     for (tx, message) in batch.into_iter().zip(msgs_to_sign.into_iter()) {
         // If we have more signatures provided than required,
         // we will verify those too.
-        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.1, message) {
+        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
             Some(EthSignData { signature, message })
         } else {
             None
         };
         txs.push(SignedZkSyncTx {
-            tx: tx.0,
+            tx: tx.tx,
             eth_sign_data,
         });
     }
@@ -511,7 +529,7 @@ async fn verify_txs_batch_signature(
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs, eth_sign_data),
+        tx: TxVariant::Batch(txs, BatchSignData(eth_sign_data)),
         response: sender,
     };
 

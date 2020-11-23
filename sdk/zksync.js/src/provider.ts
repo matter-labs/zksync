@@ -197,7 +197,7 @@ export class Provider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw')[],
+        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee)[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {

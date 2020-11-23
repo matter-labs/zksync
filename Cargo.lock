@@ -5952,6 +5952,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
+ "tiny-keccak 1.5.0",
  "zksync_basic_types",
  "zksync_crypto",
  "zksync_utils",

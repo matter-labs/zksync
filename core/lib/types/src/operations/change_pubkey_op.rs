@@ -37,11 +37,11 @@ impl ChangePubKeyOp {
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
         if let Some(eth_signature) = &self.tx.eth_signature {
-            let change_pubkey_ecsda_id = 0x00;
-            let mut eth_witness = vec![change_pubkey_ecsda_id];
-            eth_witness.extend_from_slice(&eth_signature.serialize_packed());
-            eth_witness.extend_from_slice(&[0u8; 32]);
-            eth_witness
+            [
+                &eth_signature.serialize_packed(),
+                self.tx.batch_hash.as_bytes(),
+            ]
+            .concat()
         } else {
             Vec::new()
         }

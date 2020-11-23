@@ -19,6 +19,7 @@ type ChangePubKey = {
             signature: string;
         };
         ethSignature: string | null;
+        batchHash: string;
         newPkHash: string;
         nonce: number;
         type: 'ChangePubKey';

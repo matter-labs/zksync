@@ -128,11 +128,11 @@ describe('zkSync signature verification unit tests', function () {
     it('signature verification success', async () => {
         for (const message of [Buffer.from('msg', 'ascii'), Buffer.alloc(0), Buffer.alloc(10, 1)]) {
             const signature = await wallet.signMessage(message);
-            const sinedMessage = Buffer.concat([
+            const signedMessage = Buffer.concat([
                 Buffer.from(`\x19Ethereum Signed Message:\n${message.length}`, 'ascii'),
                 message
             ]);
-            const address = await testContract.testRecoverAddressFromEthSignature(signature, sinedMessage);
+            const address = await testContract.testRecoverAddressFromEthSignature(signature, signedMessage);
             expect(address, `address mismatch, message ${message.toString('hex')}`).eq(wallet.address);
         }
     });
@@ -730,7 +730,9 @@ describe('zkSync test process next operation', function () {
         const nonce = 0x1234;
         const pubkeyHash = 'sync:fefefefefefefefefefefefefefefefefefefefe';
         const accountId = 0x00ffee12;
-        const ethWitness = await wallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
+        const _ethWitness = await wallet.signMessage(zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId));
+        const ethWitnessBytes = Uint8Array.from(Buffer.from(_ethWitness.slice(2), 'hex'));
+        const ethWitness = ethers.utils.concat([ethWitnessBytes, new Uint8Array(32).fill(0)])
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 
@@ -746,7 +748,7 @@ describe('zkSync test process next operation', function () {
         offset += 20;
         pubdata.writeUInt32BE(nonce, offset);
 
-        await zksyncContract.testProcessOperation(pubdata, ethWitness, [(ethWitness.length - 2) / 2]); // (ethWitness.length - 2) / 2   ==   len of ethWitness in bytes
+        await zksyncContract.testProcessOperation(pubdata, ethWitness, [(_ethWitness.length - 2) / 2 + 32]); // (ethWitness.length - 2) / 2   ==   len of ethWitness in bytes
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         expect(committedPriorityRequestsAfter, 'priority request number').eq(committedPriorityRequestsBefore);

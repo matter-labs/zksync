@@ -107,7 +107,6 @@ impl RpcApp {
         txs: Vec<TxWithSignature>,
         eth_signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>> {
-        let txs = txs.into_iter().map(|tx| (tx.tx, tx.signature)).collect();
         self.tx_sender
             .submit_txs_batch(txs, eth_signature)
             .await
