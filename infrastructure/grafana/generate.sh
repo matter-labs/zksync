@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 
@@ -8,19 +8,18 @@ fi
 
 mkdir -p build
 
-for template in $(ls dashboards); do
-    echo -n "Building $template ... "
-    dashboard=build/$(basename $template net)
-    jsonnet dashboards/$template > $dashboard
-    echo Done
-done
-
 # AUTH must be in the form `login:password`
-# We should move to using API Keys instead
-[ -z $AUTH ] && echo 'Set $AUTH to deploy dashboards' && exit
+# We should move to using API Keys later
+[ -z "$AUTH" ] && echo 'Set $AUTH to deploy dashboards'
 
 for template in $(ls dashboards); do
     dashboard=$(basename $template net)
+    # check if source is newer than target, otherwise we don't have to do anything
+    [ "build/$dashboard" -nt "dashboards/$template" ] && continue
+    echo -n "Building $template ... "
+    jsonnet dashboards/$template > build/$dashboard
+    echo Done
+    [ -z "$AUTH" ] && continue
     echo -n "Deploying $dashboard ... "
     curl -X POST -H "Content-Type: application/json" \
         -d  "$(jq '{"folderId": 0, "overwrite": true, "dashboard": .}' build/$dashboard)" \

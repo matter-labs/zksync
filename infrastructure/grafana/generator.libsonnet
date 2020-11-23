@@ -1,9 +1,9 @@
 {
   grafana:: import 'grafonnet-lib/grafonnet/grafana.libsonnet',
+  width:: 1337,
+  height:: 10,
 
   panel(metric, span = '1h')::
-    local width = 1337;
-    local height = 10;
     local formatted = std.strReplace(metric, '.', '_');
     $.grafana.graphPanel.new(
       title = metric,
@@ -14,13 +14,14 @@
           % [formatted, span, formatted, span],
         legendFormat = '{{namespace}}'
       )
-    ) + { gridPos: { h: height, w: width } },
+    ) + { gridPos: { h: $.height, w: $.width } },
 
   dashboard(title = '', panels = [])::
     $.grafana.dashboard.new(
       title,
       schemaVersion = 18,
       editable = true,
-      refresh = '1m'
+      refresh = '1m',
+      tags = ['prometheus']
     ).addPanels(panels)
 }
