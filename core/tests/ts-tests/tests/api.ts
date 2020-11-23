@@ -15,7 +15,7 @@ const apiTypesFolder = './api-types';
 const ADDRESS_REGEX = /^0x([0-9a-fA-F]){40}$/;
 const DATE_REGEX = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?/;
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const apiTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/api.json`, { encoding: "utf-8" }));
+const apiTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/api.json`, { encoding: 'utf-8' }));
 
 // Checks that json string has the expected js type.
 // Usage: pass a path to .ts file that exports a type named `Interface` and a json string.

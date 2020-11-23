@@ -9,8 +9,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const EIP1271TestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eip1271.json`, { encoding: "utf-8" }));
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+const EIP1271TestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eip1271.json`, { encoding: 'utf-8' }));
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 (async () => {
     try {
@@ -27,7 +27,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
         );
         const smartWallet = await deployContract(
             deployWallet,
-            readContractCode("AccountMock"),
+            readContractCode('AccountMock'),
             [EIP1271TestConfig.owner_address],
             {
                 gasLimit: 5000000

@@ -1,13 +1,12 @@
-import { ArgumentParser } from "argparse";
-import { BigNumber, Wallet, ethers } from "ethers";
-import { Deployer } from "../src.ts/deploy";
-import * as fs from "fs";
-import * as path from "path";		
-
+import { ArgumentParser } from 'argparse';
+import { BigNumber, Wallet, ethers } from 'ethers';
+import { Deployer } from '../src.ts/deploy';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 async function main() {
     const parser = new ArgumentParser({

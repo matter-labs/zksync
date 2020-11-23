@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import * as utils from '../utils';
 import { Wallet } from 'ethers';
 import fs from 'fs';
-import * as path from "path";
+import * as path from 'path';
 import * as verifyKeys from './verify-keys';
 import * as dataRestore from './data-restore';
 
@@ -83,7 +83,7 @@ export async function catLogs(exitCode?: number) {
 
 export async function testAccounts() {
     const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-    const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+    const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
     const NUM_TEST_WALLETS = 10;
     const baseWalletPath = "m/44'/60'/0'/0/";
     const walletKeys = [];

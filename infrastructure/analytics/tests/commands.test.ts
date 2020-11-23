@@ -6,8 +6,8 @@ import { Config, Network } from '../src/types';
 import { loadConfig } from '../src/config';
 import { TimePeriod } from '../src/utils';
 import * as commands from '../src/commands';
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 
 use(chaiAsPromised);
 
@@ -20,7 +20,7 @@ describe('Tests', () => {
     before('prepare auxiliary data & create new zksync account, make transfer', async () => {
         config = loadConfig(network);
         const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-        const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+        const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
         const timeFrom = new Date().toISOString();
 

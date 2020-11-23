@@ -1,7 +1,7 @@
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import fs from 'fs';
-import * as path from "path";
+import * as path from 'path';
 import mock from 'mock-fs';
 import type { Network, Config } from '../src/types';
 import * as ethers from 'ethers';
@@ -12,7 +12,7 @@ import { saveConfig, loadConfig, configLocation, DEFAULT_CONFIG } from '../src/c
 use(chaiAsPromised);
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 describe('Fetching Information', () => {
     let ethDepositor: string;

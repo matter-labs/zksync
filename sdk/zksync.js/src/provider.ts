@@ -16,10 +16,7 @@ import {
 } from './types';
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from './utils';
 
-export async function getDefaultProvider(
-    network: Network,
-    transport: 'WS' | 'HTTP' = 'WS'
-): Promise<Provider> {
+export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'WS'): Promise<Provider> {
     if (network === 'localhost') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('ws://127.0.0.1:3031');

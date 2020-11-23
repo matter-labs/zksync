@@ -1,13 +1,13 @@
 import * as ethers from 'ethers';
 import * as zksync from 'zksync';
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 
 const franklin_abi = require('../../../../contracts/build/ZkSync.json').abi;
 type Network = 'localhost' | 'rinkeby' | 'ropsten';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 export class Tester {
     public contract: ethers.Contract;

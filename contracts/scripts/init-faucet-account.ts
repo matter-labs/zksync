@@ -1,29 +1,31 @@
-import { ArgumentParser } from "argparse";
-import * as fs from "fs";
-import * as path from "path";
-import * as zksync from "zksync";
-import { ethers } from "ethers";
+import { ArgumentParser } from 'argparse';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as zksync from 'zksync';
+import { ethers } from 'ethers';
 
-const DEPOSIT_AMOUNT = ethers.utils.parseEther("10000000000");
+const DEPOSIT_AMOUNT = ethers.utils.parseEther('10000000000');
 const network = process.env.ETH_NETWORK;
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 async function main() {
     const parser = new ArgumentParser({
-        version: "0.1.0",
-        addHelp: true,
+        version: '0.1.0',
+        addHelp: true
     });
-    parser.addArgument("--deployerPrivateKey", {required: false, help: "Wallet used to deploy contracts"});
-    parser.addArgument("--faucetPrivateKey", {required: false, help: "Wallet used as faucet"});
+    parser.addArgument('--deployerPrivateKey', { required: false, help: 'Wallet used to deploy contracts' });
+    parser.addArgument('--faucetPrivateKey', { required: false, help: 'Wallet used as faucet' });
     const args = parser.parseArgs(process.argv.slice(2));
 
-    const deployerEthWallet = args.deployerPrivateKey ? new ethers.Wallet(args.deployerPrivateKey, provider):
-        ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
-    const faucetEthWallet = args.faucetPrivateKey ? new ethers.Wallet(args.faucetPrivateKey, provider):
-        ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/2").connect(provider);
+    const deployerEthWallet = args.deployerPrivateKey
+        ? new ethers.Wallet(args.deployerPrivateKey, provider)
+        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+    const faucetEthWallet = args.faucetPrivateKey
+        ? new ethers.Wallet(args.faucetPrivateKey, provider)
+        : ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/2").connect(provider);
 
     const syncProvider = await zksync.getDefaultProvider(network as zksync.types.Network);
     const deployerWallet = await zksync.Wallet.fromEthSigner(deployerEthWallet, syncProvider);
