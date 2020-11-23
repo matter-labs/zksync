@@ -1,7 +1,7 @@
 {
   grafana:: import 'grafonnet-lib/grafonnet/grafana.libsonnet',
 
-  panel(metric, span = '5m')::
+  panel(metric, span = '1h')::
     local width = 1337;
     local height = 10;
     local formatted = std.strReplace(metric, '.', '_');
