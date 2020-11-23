@@ -19,6 +19,9 @@ import "./Operations.sol";
 
 import "./UpgradeableMaster.sol";
 
+//todo:
+import "hardhat/console.sol";
+
 /// @title zkSync main contract
 /// @author Matter Labs
 contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
@@ -666,9 +669,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         returns (bool)
     {
         Operations.ChangePubkeyType changePkType = Operations.ChangePubkeyType(uint8(_ethWitness[0]));
-        if (changePkType == Operations.ChangePubkeyType.ECSDA) {
-            return verifyChangePubkeyECSDA(_ethWitness, _changePk);
-        } else if (changePkType == Operations.ChangePubkeyType.Create2) {
+        if (changePkType == Operations.ChangePubkeyType.ECRECOVER) {
+            return verifyChangePubkeyECRECOVER(_ethWitness, _changePk);
+        } else if (changePkType == Operations.ChangePubkeyType.CREATE2) {
             return verifyChangePubkeyCREATE2(_ethWitness, _changePk);
         } else {
             revert("chp13"); // Incorrect ChangePubKey type
@@ -678,7 +681,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that signature is valid for pubkey change message
     /// @param _ethWitness Signature (65 bytes) + 32 bytes of the arbitrary signed data
     /// @param _changePk Parsed change pubkey operation
-    function verifyChangePubkeyECSDA(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk)
+    function verifyChangePubkeyECRECOVER(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk)
         internal
         pure
         returns (bool)

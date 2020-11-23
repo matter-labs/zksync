@@ -297,17 +297,11 @@ export function getChangePubkeyMessage(
     accountId: number,
     batchHash?: string
 ): Uint8Array {
-    const bytes = batchHash == undefined ? new Uint8Array(32).fill(0) : Uint8Array.from(Buffer.from(batchHash, 'hex'));
-    const msgNonce = utils.hexlify(serializeNonce(nonce));
-    const msgAccId = utils.hexlify(serializeAccountId(accountId));
-    const pubKeyHashHex = pubKeyHash.replace('sync:', '').toLowerCase();
-    const message =
-        `Register zkSync pubkey:\n\n` +
-        `${pubKeyHashHex}\n` +
-        `nonce: ${msgNonce}\n` +
-        `account id: ${msgAccId}\n\n` +
-        `Only sign this message for a trusted client!`;
-    return ethers.utils.concat([ethers.utils.toUtf8Bytes(message), bytes]);
+    const msgBatchHash = batchHash == undefined ? new Uint8Array(32).fill(0) : ethers.utils.arrayify(batchHash);
+    const msgNonce = serializeNonce(nonce);
+    const msgAccId = serializeAccountId(accountId);
+    const msgPubKeyHash= serializeAddress(pubKeyHash);
+    return ethers.utils.concat([msgPubKeyHash, msgNonce, msgAccId, msgBatchHash]);
 }
 
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {

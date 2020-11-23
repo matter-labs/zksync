@@ -27,7 +27,9 @@ interface ZkSyncProcessOpUnitTestInterface extends ethers.utils.Interface {
     "balancesToWithdraw(bytes22)": FunctionFragment;
     "blocks_DEPRECATED(uint32)": FunctionFragment;
     "cancelOutstandingDepositsForExodusMode(uint64)": FunctionFragment;
+    "collectOnchainOpsExternal(tuple,bytes32,uint64,bytes)": FunctionFragment;
     "commitBlocks(tuple,tuple[])": FunctionFragment;
+    "commitPriorityRequests()": FunctionFragment;
     "depositERC20(address,uint104,address)": FunctionFragment;
     "depositETH(address)": FunctionFragment;
     "executeBlocks(tuple[])": FunctionFragment;
@@ -48,7 +50,6 @@ interface ZkSyncProcessOpUnitTestInterface extends ethers.utils.Interface {
     "revertBlocks(tuple[])": FunctionFragment;
     "setAuthPubkeyHash(bytes,uint32)": FunctionFragment;
     "storedBlockHashes(uint32)": FunctionFragment;
-    "testProcessOperation(bytes,bytes,uint32[])": FunctionFragment;
     "totalBlocksCommitted()": FunctionFragment;
     "totalBlocksVerified()": FunctionFragment;
     "totalCommittedPriorityRequests()": FunctionFragment;
@@ -86,6 +87,25 @@ interface ZkSyncProcessOpUnitTestInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "collectOnchainOpsExternal",
+    values: [
+      {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      BytesLike,
+      BigNumberish,
+      BytesLike
+    ]
+  ): string;
+  encodeFunctionData(
     functionFragment: "commitBlocks",
     values: [
       {
@@ -108,6 +128,10 @@ interface ZkSyncProcessOpUnitTestInterface extends ethers.utils.Interface {
         }[];
       }[]
     ]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "commitPriorityRequests",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "depositERC20",
@@ -223,10 +247,6 @@ interface ZkSyncProcessOpUnitTestInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "testProcessOperation",
-    values: [BytesLike, BytesLike, BigNumberish[]]
-  ): string;
-  encodeFunctionData(
     functionFragment: "totalBlocksCommitted",
     values?: undefined
   ): string;
@@ -330,7 +350,15 @@ interface ZkSyncProcessOpUnitTestInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "collectOnchainOpsExternal",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "commitBlocks",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "commitPriorityRequests",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -390,10 +418,6 @@ interface ZkSyncProcessOpUnitTestInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "storedBlockHashes",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "testProcessOperation",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -588,6 +612,42 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    collectOnchainOpsExternal(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "collectOnchainOpsExternal(tuple,bytes32,uint64,bytes)"(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
@@ -631,6 +691,12 @@ export class ZkSyncProcessOpUnitTest extends Contract {
           ethWitness: BytesLike;
         }[];
       }[],
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    commitPriorityRequests(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "commitPriorityRequests()"(
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -956,20 +1022,6 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       0: string;
     }>;
 
-    testProcessOperation(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "testProcessOperation(bytes,bytes,uint32[])"(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
     totalBlocksCommitted(
       overrides?: CallOverrides
     ): Promise<{
@@ -1277,6 +1329,42 @@ export class ZkSyncProcessOpUnitTest extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  collectOnchainOpsExternal(
+    _newBlockData: {
+      blockNumber: BigNumberish;
+      feeAccount: BigNumberish;
+      newStateHash: BytesLike;
+      publicData: BytesLike;
+      timestamp: BigNumberish;
+      onchainOperations: {
+        publicDataOffset: BigNumberish;
+        ethWitness: BytesLike;
+      }[];
+    },
+    processableOperationsHash: BytesLike,
+    priorityOperationsProcessed: BigNumberish,
+    offsetsCommitment: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "collectOnchainOpsExternal(tuple,bytes32,uint64,bytes)"(
+    _newBlockData: {
+      blockNumber: BigNumberish;
+      feeAccount: BigNumberish;
+      newStateHash: BytesLike;
+      publicData: BytesLike;
+      timestamp: BigNumberish;
+      onchainOperations: {
+        publicDataOffset: BigNumberish;
+        ethWitness: BytesLike;
+      }[];
+    },
+    processableOperationsHash: BytesLike,
+    priorityOperationsProcessed: BigNumberish,
+    offsetsCommitment: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   commitBlocks(
     _lastCommittedBlockData: {
       blockNumber: BigNumberish;
@@ -1320,6 +1408,12 @@ export class ZkSyncProcessOpUnitTest extends Contract {
         ethWitness: BytesLike;
       }[];
     }[],
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  commitPriorityRequests(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "commitPriorityRequests()"(
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1585,20 +1679,6 @@ export class ZkSyncProcessOpUnitTest extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
-  testProcessOperation(
-    _publicData: BytesLike,
-    _ethWitness: BytesLike,
-    _ethWitnessSizes: BigNumberish[],
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "testProcessOperation(bytes,bytes,uint32[])"(
-    _publicData: BytesLike,
-    _ethWitness: BytesLike,
-    _ethWitnessSizes: BigNumberish[],
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
   totalBlocksCommitted(overrides?: CallOverrides): Promise<number>;
 
   "totalBlocksCommitted()"(overrides?: CallOverrides): Promise<number>;
@@ -1852,6 +1932,42 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    collectOnchainOpsExternal(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "collectOnchainOpsExternal(tuple,bytes32,uint64,bytes)"(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
@@ -1897,6 +2013,10 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       }[],
       overrides?: CallOverrides
     ): Promise<void>;
+
+    commitPriorityRequests(overrides?: CallOverrides): Promise<void>;
+
+    "commitPriorityRequests()"(overrides?: CallOverrides): Promise<void>;
 
     depositERC20(
       _token: string,
@@ -2159,20 +2279,6 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       arg0: BigNumberish,
       overrides?: CallOverrides
     ): Promise<string>;
-
-    testProcessOperation(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "testProcessOperation(bytes,bytes,uint32[])"(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: CallOverrides
-    ): Promise<void>;
 
     totalBlocksCommitted(overrides?: CallOverrides): Promise<number>;
 
@@ -2448,6 +2554,42 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    collectOnchainOpsExternal(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "collectOnchainOpsExternal(tuple,bytes32,uint64,bytes)"(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
@@ -2493,6 +2635,10 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       }[],
       overrides?: Overrides
     ): Promise<BigNumber>;
+
+    commitPriorityRequests(overrides?: Overrides): Promise<BigNumber>;
+
+    "commitPriorityRequests()"(overrides?: Overrides): Promise<BigNumber>;
 
     depositERC20(
       _token: string,
@@ -2732,20 +2878,6 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    testProcessOperation(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "testProcessOperation(bytes,bytes,uint32[])"(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
     totalBlocksCommitted(overrides?: CallOverrides): Promise<BigNumber>;
 
     "totalBlocksCommitted()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2958,6 +3090,42 @@ export class ZkSyncProcessOpUnitTest extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    collectOnchainOpsExternal(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "collectOnchainOpsExternal(tuple,bytes32,uint64,bytes)"(
+      _newBlockData: {
+        blockNumber: BigNumberish;
+        feeAccount: BigNumberish;
+        newStateHash: BytesLike;
+        publicData: BytesLike;
+        timestamp: BigNumberish;
+        onchainOperations: {
+          publicDataOffset: BigNumberish;
+          ethWitness: BytesLike;
+        }[];
+      },
+      processableOperationsHash: BytesLike,
+      priorityOperationsProcessed: BigNumberish,
+      offsetsCommitment: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     commitBlocks(
       _lastCommittedBlockData: {
         blockNumber: BigNumberish;
@@ -3001,6 +3169,14 @@ export class ZkSyncProcessOpUnitTest extends Contract {
           ethWitness: BytesLike;
         }[];
       }[],
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    commitPriorityRequests(
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "commitPriorityRequests()"(
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
@@ -3248,20 +3424,6 @@ export class ZkSyncProcessOpUnitTest extends Contract {
     "storedBlockHashes(uint32)"(
       arg0: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    testProcessOperation(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "testProcessOperation(bytes,bytes,uint32[])"(
-      _publicData: BytesLike,
-      _ethWitness: BytesLike,
-      _ethWitnessSizes: BigNumberish[],
-      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     totalBlocksCommitted(

@@ -27,6 +27,7 @@ interface ZKSyncSignatureUnitTestInterface extends ethers.utils.Interface {
     "balancesToWithdraw(bytes22)": FunctionFragment;
     "blocks_DEPRECATED(uint32)": FunctionFragment;
     "cancelOutstandingDepositsForExodusMode(uint64)": FunctionFragment;
+    "changePubkeySignatureCheck(bytes,bytes20,uint32,address,uint24)": FunctionFragment;
     "commitBlocks(tuple,tuple[])": FunctionFragment;
     "depositERC20(address,uint104,address)": FunctionFragment;
     "depositETH(address)": FunctionFragment;
@@ -48,6 +49,7 @@ interface ZKSyncSignatureUnitTestInterface extends ethers.utils.Interface {
     "revertBlocks(tuple[])": FunctionFragment;
     "setAuthPubkeyHash(bytes,uint32)": FunctionFragment;
     "storedBlockHashes(uint32)": FunctionFragment;
+    "testRecoverAddressFromEthSignature(bytes,bytes32)": FunctionFragment;
     "totalBlocksCommitted()": FunctionFragment;
     "totalBlocksVerified()": FunctionFragment;
     "totalCommittedPriorityRequests()": FunctionFragment;
@@ -83,6 +85,10 @@ interface ZKSyncSignatureUnitTestInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "cancelOutstandingDepositsForExodusMode",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "changePubkeySignatureCheck",
+    values: [BytesLike, BytesLike, BigNumberish, string, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "commitBlocks",
@@ -222,6 +228,10 @@ interface ZKSyncSignatureUnitTestInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "testRecoverAddressFromEthSignature",
+    values: [BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "totalBlocksCommitted",
     values?: undefined
   ): string;
@@ -325,6 +335,10 @@ interface ZKSyncSignatureUnitTestInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "changePubkeySignatureCheck",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "commitBlocks",
     data: BytesLike
   ): Result;
@@ -385,6 +399,10 @@ interface ZKSyncSignatureUnitTestInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "storedBlockHashes",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "testRecoverAddressFromEthSignature",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -578,6 +596,28 @@ export class ZKSyncSignatureUnitTest extends Contract {
       _n: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    changePubkeySignatureCheck(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "changePubkeySignatureCheck(bytes,bytes20,uint32,address,uint24)"(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
 
     commitBlocks(
       _lastCommittedBlockData: {
@@ -947,6 +987,22 @@ export class ZKSyncSignatureUnitTest extends Contract {
       0: string;
     }>;
 
+    testRecoverAddressFromEthSignature(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "testRecoverAddressFromEthSignature(bytes,bytes32)"(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     totalBlocksCommitted(
       overrides?: CallOverrides
     ): Promise<{
@@ -1253,6 +1309,24 @@ export class ZKSyncSignatureUnitTest extends Contract {
     _n: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
+
+  changePubkeySignatureCheck(
+    _signature: BytesLike,
+    _newPkHash: BytesLike,
+    _nonce: BigNumberish,
+    _ethAddress: string,
+    _accountId: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "changePubkeySignatureCheck(bytes,bytes20,uint32,address,uint24)"(
+    _signature: BytesLike,
+    _newPkHash: BytesLike,
+    _nonce: BigNumberish,
+    _ethAddress: string,
+    _accountId: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   commitBlocks(
     _lastCommittedBlockData: {
@@ -1562,6 +1636,18 @@ export class ZKSyncSignatureUnitTest extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
+  testRecoverAddressFromEthSignature(
+    _signature: BytesLike,
+    _messageHash: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<string>;
+
+  "testRecoverAddressFromEthSignature(bytes,bytes32)"(
+    _signature: BytesLike,
+    _messageHash: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<string>;
+
   totalBlocksCommitted(overrides?: CallOverrides): Promise<number>;
 
   "totalBlocksCommitted()"(overrides?: CallOverrides): Promise<number>;
@@ -1814,6 +1900,24 @@ export class ZKSyncSignatureUnitTest extends Contract {
       _n: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    changePubkeySignatureCheck(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "changePubkeySignatureCheck(bytes,bytes20,uint32,address,uint24)"(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     commitBlocks(
       _lastCommittedBlockData: {
@@ -2123,6 +2227,18 @@ export class ZKSyncSignatureUnitTest extends Contract {
       overrides?: CallOverrides
     ): Promise<string>;
 
+    testRecoverAddressFromEthSignature(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<string>;
+
+    "testRecoverAddressFromEthSignature(bytes,bytes32)"(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<string>;
+
     totalBlocksCommitted(overrides?: CallOverrides): Promise<number>;
 
     "totalBlocksCommitted()"(overrides?: CallOverrides): Promise<number>;
@@ -2395,6 +2511,24 @@ export class ZKSyncSignatureUnitTest extends Contract {
     "cancelOutstandingDepositsForExodusMode(uint64)"(
       _n: BigNumberish,
       overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    changePubkeySignatureCheck(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "changePubkeySignatureCheck(bytes,bytes20,uint32,address,uint24)"(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     commitBlocks(
@@ -2681,6 +2815,18 @@ export class ZKSyncSignatureUnitTest extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    testRecoverAddressFromEthSignature(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "testRecoverAddressFromEthSignature(bytes,bytes32)"(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     totalBlocksCommitted(overrides?: CallOverrides): Promise<BigNumber>;
 
     "totalBlocksCommitted()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2891,6 +3037,24 @@ export class ZKSyncSignatureUnitTest extends Contract {
     "cancelOutstandingDepositsForExodusMode(uint64)"(
       _n: BigNumberish,
       overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    changePubkeySignatureCheck(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "changePubkeySignatureCheck(bytes,bytes20,uint32,address,uint24)"(
+      _signature: BytesLike,
+      _newPkHash: BytesLike,
+      _nonce: BigNumberish,
+      _ethAddress: string,
+      _accountId: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     commitBlocks(
@@ -3182,6 +3346,18 @@ export class ZKSyncSignatureUnitTest extends Contract {
 
     "storedBlockHashes(uint32)"(
       arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    testRecoverAddressFromEthSignature(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "testRecoverAddressFromEthSignature(bytes,bytes32)"(
+      _signature: BytesLike,
+      _messageHash: BytesLike,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 

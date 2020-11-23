@@ -2,7 +2,7 @@
   "_format": "hh-sol-cache-1",
   "files": {
     "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol": {
-      "lastModificationDate": 1605674486709,
+      "lastModificationDate": 1606105396102,
       "sourceName": "@openzeppelin/contracts/token/ERC20/ERC20.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -40,7 +40,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/GSN/Context.sol": {
-      "lastModificationDate": 1605674486618,
+      "lastModificationDate": 1606105395872,
       "sourceName": "@openzeppelin/contracts/GSN/Context.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -73,7 +73,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol": {
-      "lastModificationDate": 1605674486710,
+      "lastModificationDate": 1606105396102,
       "sourceName": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -106,7 +106,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/math/SafeMath.sol": {
-      "lastModificationDate": 1605674486618,
+      "lastModificationDate": 1606105395872,
       "sourceName": "@openzeppelin/contracts/math/SafeMath.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -139,7 +139,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/utils/Address.sol": {
-      "lastModificationDate": 1605674486618,
+      "lastModificationDate": 1606105395884,
       "sourceName": "@openzeppelin/contracts/utils/Address.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -171,8 +171,41 @@
         "Address"
       ]
     },
+    "/home/dvush/code/zksync-dev/node_modules/hardhat/console.sol": {
+      "lastModificationDate": 1606105395819,
+      "sourceName": "hardhat/console.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.4.22 <0.8.0"
+      ],
+      "artifacts": [
+        "console"
+      ]
+    },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Bytes.sol": {
-      "lastModificationDate": 1606101411329,
+      "lastModificationDate": 1606112115876,
       "sourceName": "cache/solpp-generated-contracts/Bytes.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -205,7 +238,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/BytesTest.sol": {
-      "lastModificationDate": 1606101411389,
+      "lastModificationDate": 1606112115944,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/BytesTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -240,7 +273,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Utils.sol": {
-      "lastModificationDate": 1606101411553,
+      "lastModificationDate": 1606112116114,
       "sourceName": "cache/solpp-generated-contracts/Utils.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -276,7 +309,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/IERC20.sol": {
-      "lastModificationDate": 1606101411455,
+      "lastModificationDate": 1606112116012,
       "sourceName": "cache/solpp-generated-contracts/IERC20.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -309,7 +342,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Storage.sol": {
-      "lastModificationDate": 1606101411542,
+      "lastModificationDate": 1606112116104,
       "sourceName": "cache/solpp-generated-contracts/Storage.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -347,7 +380,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Governance.sol": {
-      "lastModificationDate": 1606101411454,
+      "lastModificationDate": 1606112116011,
       "sourceName": "cache/solpp-generated-contracts/Governance.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -382,7 +415,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Verifier.sol": {
-      "lastModificationDate": 1606101411556,
+      "lastModificationDate": 1606112116116,
       "sourceName": "cache/solpp-generated-contracts/Verifier.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -417,7 +450,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Operations.sol": {
-      "lastModificationDate": 1606101411475,
+      "lastModificationDate": 1606112116033,
       "sourceName": "cache/solpp-generated-contracts/Operations.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -452,7 +485,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Config.sol": {
-      "lastModificationDate": 1606101411350,
+      "lastModificationDate": 1606112115906,
       "sourceName": "cache/solpp-generated-contracts/Config.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -485,7 +518,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/KeysWithPlonkVerifier.sol": {
-      "lastModificationDate": 1606101411468,
+      "lastModificationDate": 1606112116028,
       "sourceName": "cache/solpp-generated-contracts/KeysWithPlonkVerifier.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -520,7 +553,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/PlonkCore.sol": {
-      "lastModificationDate": 1606101411521,
+      "lastModificationDate": 1606112116084,
       "sourceName": "cache/solpp-generated-contracts/PlonkCore.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -556,7 +589,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/OperationsTest.sol": {
-      "lastModificationDate": 1606101411423,
+      "lastModificationDate": 1606112115980,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/OperationsTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -591,7 +624,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/ZkSync.sol": {
-      "lastModificationDate": 1606101411585,
+      "lastModificationDate": 1606112116146,
       "sourceName": "cache/solpp-generated-contracts/ZkSync.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -626,7 +659,8 @@
         "./Events.sol",
         "./Bytes.sol",
         "./Operations.sol",
-        "./UpgradeableMaster.sol"
+        "./UpgradeableMaster.sol",
+        "hardhat/console.sol"
       ],
       "versionPragmas": [
         "^0.7.0"
@@ -636,7 +670,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/ReentrancyGuard.sol": {
-      "lastModificationDate": 1606101411533,
+      "lastModificationDate": 1606112116095,
       "sourceName": "cache/solpp-generated-contracts/ReentrancyGuard.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -669,7 +703,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/SafeMath.sol": {
-      "lastModificationDate": 1606101411536,
+      "lastModificationDate": 1606112116099,
       "sourceName": "cache/solpp-generated-contracts/SafeMath.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -702,7 +736,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/SafeMathUInt128.sol": {
-      "lastModificationDate": 1606101411538,
+      "lastModificationDate": 1606112116100,
       "sourceName": "cache/solpp-generated-contracts/SafeMathUInt128.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -735,7 +769,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/SafeCast.sol": {
-      "lastModificationDate": 1606101411535,
+      "lastModificationDate": 1606112116097,
       "sourceName": "cache/solpp-generated-contracts/SafeCast.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -768,7 +802,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Events.sol": {
-      "lastModificationDate": 1606101411449,
+      "lastModificationDate": 1606112116005,
       "sourceName": "cache/solpp-generated-contracts/Events.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -805,7 +839,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/UpgradeableMaster.sol": {
-      "lastModificationDate": 1606101411544,
+      "lastModificationDate": 1606112116105,
       "sourceName": "cache/solpp-generated-contracts/UpgradeableMaster.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -838,7 +872,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Upgradeable.sol": {
-      "lastModificationDate": 1606101411543,
+      "lastModificationDate": 1606112116105,
       "sourceName": "cache/solpp-generated-contracts/Upgradeable.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -871,7 +905,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/ZkSyncWithdrawalUnitTest.sol": {
-      "lastModificationDate": 1606101411446,
+      "lastModificationDate": 1606112116003,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/ZkSyncWithdrawalUnitTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -905,9 +939,9 @@
         "ZkSyncWithdrawalUnitTest"
       ]
     },
-    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/ZkSyncSignatureUnitTest.sol": {
-      "lastModificationDate": 1606101411445,
-      "sourceName": "cache/solpp-generated-contracts/dev-contracts/ZkSyncSignatureUnitTest.sol",
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/ZKSyncSignatureUnitTest.sol": {
+      "lastModificationDate": 1606112116002,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/ZKSyncSignatureUnitTest.sol",
       "solcConfig": {
         "version": "0.7.3",
         "settings": {
@@ -941,7 +975,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/ZkSyncProcessOpUnitTest.sol": {
-      "lastModificationDate": 1606101411444,
+      "lastModificationDate": 1606112116000,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/ZkSyncProcessOpUnitTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -976,7 +1010,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/DummyTarget.sol": {
-      "lastModificationDate": 1606101411404,
+      "lastModificationDate": 1606112115959,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/DummyTarget.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1014,7 +1048,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/UpgradeGatekeeper.sol": {
-      "lastModificationDate": 1606101411550,
+      "lastModificationDate": 1606112116111,
       "sourceName": "cache/solpp-generated-contracts/UpgradeGatekeeper.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1053,7 +1087,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Ownable.sol": {
-      "lastModificationDate": 1606101411476,
+      "lastModificationDate": 1606112116034,
       "sourceName": "cache/solpp-generated-contracts/Ownable.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1086,7 +1120,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Proxy.sol": {
-      "lastModificationDate": 1606101411530,
+      "lastModificationDate": 1606112116093,
       "sourceName": "cache/solpp-generated-contracts/Proxy.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1123,7 +1157,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/DeployFactory.sol": {
-      "lastModificationDate": 1606101411377,
+      "lastModificationDate": 1606112115933,
       "sourceName": "cache/solpp-generated-contracts/DeployFactory.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1163,7 +1197,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/TokenInit.sol": {
-      "lastModificationDate": 1606101411543,
+      "lastModificationDate": 1606112116104,
       "sourceName": "cache/solpp-generated-contracts/TokenInit.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1196,7 +1230,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20NoTransferReturnValueTest.sol": {
-      "lastModificationDate": 1606101411440,
+      "lastModificationDate": 1606112115996,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20NoTransferReturnValueTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1233,7 +1267,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/ContextTest.sol": {
-      "lastModificationDate": 1606101411426,
+      "lastModificationDate": 1606112115982,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/ContextTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1266,7 +1300,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20NoTransferReturnValueTest.sol": {
-      "lastModificationDate": 1606101411441,
+      "lastModificationDate": 1606112115997,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20NoTransferReturnValueTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1299,7 +1333,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20FeeAndDividendsTest.sol": {
-      "lastModificationDate": 1606101411435,
+      "lastModificationDate": 1606112115991,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20FeeAndDividendsTest.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1336,7 +1370,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20Test.sol": {
-      "lastModificationDate": 1606101411442,
+      "lastModificationDate": 1606112115999,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20Test.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1369,7 +1403,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/AccountMock.sol": {
-      "lastModificationDate": 1606101411384,
+      "lastModificationDate": 1606112115940,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/AccountMock.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1404,7 +1438,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/IEIP1271.sol": {
-      "lastModificationDate": 1606101411407,
+      "lastModificationDate": 1606112115963,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/IEIP1271.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1437,7 +1471,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/EIP1271.sol": {
-      "lastModificationDate": 1606101411406,
+      "lastModificationDate": 1606112115961,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/EIP1271.sol",
       "solcConfig": {
         "version": "0.7.3",
@@ -1472,7 +1506,7 @@
       ]
     },
     "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/TestnetERC20Token.sol": {
-      "lastModificationDate": 1606101411424,
+      "lastModificationDate": 1606112115981,
       "sourceName": "cache/solpp-generated-contracts/dev-contracts/TestnetERC20Token.sol",
       "solcConfig": {
         "version": "0.7.3",

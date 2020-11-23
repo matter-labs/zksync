@@ -22,7 +22,8 @@ export default {
     solpp: {
         defs: {
             UPGRADE_NOTICE_PERIOD: 0,
-            MAX_AMOUNT_OF_REGISTERED_TOKENS: 5
+            MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
+            PRIORITY_EXPIRATION: 101,
         }
     }
 };

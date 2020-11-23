@@ -179,7 +179,7 @@ library Operations {
 
     // ChangePubKey
 
-    enum ChangePubkeyType {ECSDA, Create2}
+    enum ChangePubkeyType {ECRECOVER, CREATE2}
 
     struct ChangePubKey {
         // uint8 opType; -- present in pubdata, ignored at serialization
