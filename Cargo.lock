@@ -5680,6 +5680,7 @@ name = "zksync_data_restore"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "db_test_macro",
  "env_logger 0.6.2",

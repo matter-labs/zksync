@@ -1,54 +1,43 @@
 pub mod contract_functions;
 pub mod data_restore_driver;
+pub mod database_storage_interactor;
 pub mod eth_tx_helpers;
 pub mod events;
 pub mod events_state;
 pub mod rollup_ops;
-pub mod storage_interactor;
+mod storage_interactor;
 
 #[cfg(test)]
 mod tests;
 pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
+use crate::database_storage_interactor::DatabaseStorageInteractor;
+use crate::storage_interactor::StorageInteractor;
 use serde::Deserialize;
 use structopt::StructOpt;
 use web3::transports::Http;
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::convert::FeConvert;
-use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{
-    tokens::{get_genesis_token_list, Token},
-    Address, TokenId, H256,
-};
+use zksync_storage::ConnectionPool;
+use zksync_types::{tokens::get_genesis_token_list, Address, H256};
 
 // How many blocks we will process at once.
 const ETH_BLOCKS_STEP: u64 = 10_000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
-async fn add_tokens_to_db(storage: &mut StorageProcessor<'_>, eth_network: &str) {
+async fn add_tokens_to_storage<I: StorageInteractor>(interactor: &mut I, eth_network: &str) {
     let genesis_tokens =
         get_genesis_token_list(&eth_network).expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
-        log::info!(
-            "Adding token: {}, id:{}, address: {}, decimals: {}",
-            token.symbol,
-            id,
-            token.address,
-            token.decimals
-        );
-        storage
-            .tokens_schema()
-            .store_token(Token {
-                id: id as TokenId,
-                symbol: token.symbol,
-                address: token.address[2..]
-                    .parse()
-                    .expect("failed to parse token address"),
-                decimals: token.decimals,
-            })
-            .await
-            .expect("failed to store token");
+        interactor.store_token(token, id).await;
+        //     log::info!(
+        //         "Adding token: {}, id:{}, address: {}, decimals: {}",
+        //         token.symbol,
+        //         id,
+        //         token.address,
+        //         token.decimals
+        //     );
     }
 }
 
@@ -138,7 +127,7 @@ async fn main() {
     } else {
         None
     };
-    let mut storage = connection_pool.access_storage().await.unwrap();
+    let storage = connection_pool.access_storage().await.unwrap();
 
     let mut driver = DataRestoreDriver::new(
         transport,
@@ -151,20 +140,21 @@ async fn main() {
         final_hash,
     );
 
+    let mut interactor = DatabaseStorageInteractor::new(storage);
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_db(&mut storage, &config.eth_network).await;
+        add_tokens_to_storage(&mut interactor, &config.eth_network).await;
 
         driver
-            .set_genesis_state(&mut storage, config.genesis_tx_hash)
+            .set_genesis_state(&mut interactor, config.genesis_tx_hash)
             .await;
     }
 
-    if opt.continue_mode && driver.load_state_from_storage(&mut storage).await {
+    if opt.continue_mode && driver.load_state_from_storage(&mut interactor).await {
         std::process::exit(0);
     }
 
-    driver.run_state_update(&mut storage).await;
+    driver.run_state_update(&mut interactor).await;
 }

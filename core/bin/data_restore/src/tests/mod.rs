@@ -19,6 +19,7 @@ use zksync_types::{
 };
 
 use crate::data_restore_driver::DataRestoreDriver;
+use crate::database_storage_interactor::DatabaseStorageInteractor;
 use crate::tests::utils::{create_log, u32_to_32bytes};
 use crate::{END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP};
 use num::BigUint;
@@ -227,6 +228,7 @@ impl Transport for Web3Transport {
 async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut transport = Web3Transport::new();
 
+    let mut interactor = DatabaseStorageInteractor::new(storage);
     let contract = zksync_contract();
     let gov_contract = governance_contract();
 
@@ -334,10 +336,10 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         true,
         None,
     );
-    driver.run_state_update(&mut storage).await;
+    driver.run_state_update(&mut interactor).await;
 
     // Check that it's stores some account, created by deposit
-    let (_, account) = AccountSchema(&mut storage)
+    let (_, account) = AccountSchema(interactor.storage())
         .account_state_by_address(&Default::default())
         .await
         .unwrap()
@@ -347,7 +349,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 
     assert_eq!(BigUint::from(40u32), balance);
     assert_eq!(driver.events_state.committed_events.len(), 2);
-    let events = DataRestoreSchema(&mut storage)
+    let events = DataRestoreSchema(interactor.storage())
         .load_committed_events_state()
         .await
         .unwrap();
@@ -366,7 +368,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         None,
     );
     // Load state from db and check it
-    assert!(driver.load_state_from_storage(&mut storage).await);
+    assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());
     assert_eq!(driver.tree_state.state.block_number, 2)
 }
