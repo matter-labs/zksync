@@ -2,6 +2,7 @@ import { Wallet } from './wallet';
 import { Provider, ETHProxy, getDefaultProvider } from './provider';
 import { Signer } from './signer';
 import { closestPackableTransactionAmount, closestPackableTransactionFee } from './utils';
+import { EthMessageSigner } from './eth-message-signer';
 
 import * as wallet from './wallet';
 import * as types from './types';
@@ -13,6 +14,7 @@ export {
     Signer,
     Provider,
     ETHProxy,
+    EthMessageSigner,
     closestPackableTransactionFee,
     closestPackableTransactionAmount,
     getDefaultProvider,

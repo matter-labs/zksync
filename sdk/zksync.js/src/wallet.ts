@@ -1,5 +1,6 @@
 import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from 'ethers';
 import { ErrorCode } from '@ethersproject/logger';
+import { EthMessageSigner } from './eth-message-signer';
 import { ETHProxy, Provider } from './provider';
 import { Signer } from './signer';
 import {
@@ -43,6 +44,7 @@ export class Wallet {
 
     private constructor(
         public ethSigner: ethers.Signer,
+        public ethMessageSigner: EthMessageSigner,
         public cachedAddress: Address,
         public signer?: Signer,
         public accountId?: number,
@@ -69,7 +71,15 @@ export class Wallet {
             throw new Error('If you passed signer, you must also pass ethSignerType.');
         }
 
-        const wallet = new Wallet(ethWallet, await ethWallet.getAddress(), signer, accountId, ethSignerType);
+        const ethMessageSigner = new EthMessageSigner(ethWallet, ethSignerType);
+        const wallet = new Wallet(
+            ethWallet,
+            ethMessageSigner,
+            await ethWallet.getAddress(),
+            signer,
+            accountId,
+            ethSignerType
+        );
 
         wallet.connect(provider);
         return wallet;
@@ -81,24 +91,17 @@ export class Wallet {
         accountId?: number,
         ethSignerType?: EthSignerType
     ): Promise<Wallet> {
-        const wallet = new Wallet(ethWallet, await ethWallet.getAddress(), undefined, accountId, ethSignerType);
+        const ethMessageSigner = new EthMessageSigner(ethWallet, ethSignerType);
+        const wallet = new Wallet(
+            ethWallet,
+            ethMessageSigner,
+            await ethWallet.getAddress(),
+            undefined,
+            accountId,
+            ethSignerType
+        );
         wallet.connect(provider);
         return wallet;
-    }
-
-    async getEthMessageSignature(message: ethers.utils.BytesLike): Promise<TxEthSignature> {
-        if (this.ethSignerType == null) {
-            throw new Error('ethSignerType is unknown');
-        }
-
-        const signedBytes = getSignedBytesFromMessage(message, !this.ethSignerType.isSignedMsgPrefixed);
-
-        const signature = await signMessagePersonalAPI(this.ethSigner, signedBytes);
-
-        return {
-            type: this.ethSignerType.verificationMethod === 'ECDSA' ? 'EthereumSignature' : 'EIP1271Signature',
-            signature
-        };
     }
 
     async getTransfer(transfer: {
@@ -141,14 +144,14 @@ export class Wallet {
         const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
         const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
-        const humanReadableTxInfo =
-            `Transfer ${stringAmount} ${stringToken}\n` +
-            `To: ${transfer.to.toLowerCase()}\n` +
-            `Nonce: ${transfer.nonce}\n` +
-            `Fee: ${stringFee} ${stringToken}\n` +
-            `Account Id: ${this.accountId}`;
-
-        const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
+        const txMessageEthSignature = await this.ethMessageSigner.ethSignTransfer({
+            stringAmount,
+            stringFee,
+            stringToken,
+            to: transfer.to,
+            nonce: transfer.nonce,
+            accountId: this.accountId
+        });
         return {
             tx: signedTransferTransaction,
             ethereumSignature: txMessageEthSignature
@@ -253,7 +256,7 @@ export class Wallet {
         }
         const hash = ethers.utils.keccak256(bytes).slice(2);
         const message = Uint8Array.from(Buffer.from(hash, 'hex'));
-        const ethSignature = await this.getEthMessageSignature(message);
+        const ethSignature = await this.ethMessageSigner.getEthMessageSignature(message);
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignature);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
@@ -302,14 +305,14 @@ export class Wallet {
         const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
         const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
-        const humanReadableTxInfo =
-            `Withdraw ${stringAmount} ${stringToken}\n` +
-            `To: ${withdraw.ethAddress.toLowerCase()}\n` +
-            `Nonce: ${withdraw.nonce}\n` +
-            `Fee: ${stringFee} ${stringToken}\n` +
-            `Account Id: ${this.accountId}`;
-
-        const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
+        const txMessageEthSignature = await this.ethMessageSigner.ethSignWithdraw({
+            stringAmount,
+            stringFee,
+            stringToken,
+            ethAddress: withdraw.ethAddress,
+            nonce: withdraw.nonce,
+            accountId: this.accountId
+        });
 
         const signedWithdrawTransaction = await this.signer.signSyncWithdraw(transactionData);
 
@@ -365,10 +368,16 @@ export class Wallet {
 
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
-        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
-        const ethSignature = changePubKey.onchainAuth
-            ? null
-            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+        let ethSignature = null;
+        if (!changePubKey.onchainAuth) {
+            const ethSignData = await this.ethMessageSigner.ethSignChangePubKey({
+                pubKeyHash: newPubKeyHash,
+                nonce: changePubKey.nonce,
+                accountId: this.accountId
+            });
+
+            ethSignature = ethSignData.signature;
+        }
 
         const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
             accountId: this.accountId,
