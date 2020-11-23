@@ -19,9 +19,6 @@ import "./Operations.sol";
 
 import "./UpgradeableMaster.sol";
 
-//todo:
-import "hardhat/console.sol";
-
 /// @title zkSync main contract
 /// @author Matter Labs
 contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
