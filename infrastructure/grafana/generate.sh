@@ -7,8 +7,10 @@ fi
 mkdir -p build
 
 for template in $(ls *.jsonnet); do
+    echo -n "Building $template ... "
     out=build/$(basename $template net)
-    jsonnet -J grafonnet-lib $template > $out
+    jsonnet $template > $out
+    echo Done
 done
 
 
