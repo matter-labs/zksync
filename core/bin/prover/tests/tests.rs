@@ -127,7 +127,7 @@ fn new_test_data_for_prover() -> ProverData {
     let fee_account = Account::default_with_address(&Address::default());
     circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1, 0);
 
     let empty_account_id = 1;
     let empty_account_address = [7u8; 20].into();
@@ -144,8 +144,13 @@ fn new_test_data_for_prover() -> ProverData {
     let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
     let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
+    let offset_commitment = deposit_witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        deposit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.extend_pubdata_with_noops(smallest_block_size_for_chunks(
         DepositOp::CHUNKS,
         &ConfigurationOptions::from_env().available_block_chunk_sizes,
@@ -164,6 +169,7 @@ fn new_test_data_for_prover() -> ProverData {
         validator_balances: witness_accum.fee_account_balances.unwrap(),
         validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
         validator_account: witness_accum.fee_account_witness.unwrap(),
+        block_timestamp: witness_accum.timestamp,
     }
 }
 

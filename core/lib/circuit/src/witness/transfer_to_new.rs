@@ -116,6 +116,10 @@ impl Witness for TransferToNewWitness<Bn256> {
         pubdata_bits
     }
 
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        vec![false; TransferToNewOp::CHUNKS * 8]
+    }
+
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()

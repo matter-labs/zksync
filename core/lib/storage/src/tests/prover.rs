@@ -243,6 +243,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
             success_operations: vec![],
             failed_txs: Vec::new(),
             previous_block_root_hash: H256::default(),
+            timestamp: 0,
         })
         .await?;
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;

@@ -90,6 +90,7 @@ impl TransactionsHistoryTestSetup {
             1_000_000.into(), // Not important
             1_500_000.into(), // Not important
             H256::default(),
+            0,
         );
 
         self.blocks.push(block);

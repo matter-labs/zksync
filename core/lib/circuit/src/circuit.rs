@@ -515,6 +515,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
             pack_bits.extend(global_variables.block_timestamp.into_padded_be_bits(256));
+            assert_eq!(pack_bits.len(), 512);
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with timestamp"), &pack_bits)?;
 

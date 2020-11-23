@@ -295,6 +295,7 @@ mod tests {
             U256::default(),
             U256::default(),
             H256::default(),
+            0,
         );
         assert_eq!(
             WitnessGenerator::next_witness_block(3, 4, &BlockInfo::NoWitness(empty_block)),

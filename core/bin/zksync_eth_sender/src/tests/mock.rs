@@ -21,6 +21,7 @@ use super::ETHSender;
 
 use crate::ethereum_interface::EthereumInterface;
 use crate::transactions::{ETHStats, ExecutedTxStatus};
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
@@ -122,18 +123,19 @@ impl DatabaseInterface for MockDatabase {
     async fn load_new_operations(
         &self,
         _connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<Vec<Operation>> {
-        let unprocessed_operations = self
-            .unprocessed_operations
-            .read()
-            .await
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
-
-        self.unprocessed_operations.write().await.clear();
-
-        Ok(unprocessed_operations)
+    ) -> anyhow::Result<Vec<(i64, AggregatedOperation)>> {
+        todo!()
+        // let unprocessed_operations = self
+        //     .unprocessed_operations
+        //     .read()
+        //     .await
+        //     .values()
+        //     .cloned()
+        //     .collect::<Vec<_>>();
+        //
+        // self.unprocessed_operations.write().await.clear();
+        //
+        // Ok(unprocessed_operations)
     }
 
     async fn update_gas_price_params(
@@ -151,50 +153,52 @@ impl DatabaseInterface for MockDatabase {
     async fn restore_state(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<Operation>)> {
-        Ok((
-            self.restore_state.clone(),
-            self.load_new_operations(connection).await?,
-        ))
+    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<(i64, AggregatedOperation)>)> {
+        todo!()
+        // Ok((
+        //     self.restore_state.clone(),
+        //     self.load_new_operations(connection).await?,
+        // ))
     }
 
     async fn save_new_eth_tx(
         &self,
-        _connection: &mut StorageProcessor<'_>,
-        op_type: OperationType,
-        op: Option<Operation>,
+        connection: &mut StorageProcessor<'_>,
+        op_type: AggregatedActionType,
+        op: Option<(i64, AggregatedOperation)>,
         deadline_block: i64,
         used_gas_price: U256,
-        encoded_tx_data: Vec<u8>,
+        raw_tx: Vec<u8>,
     ) -> anyhow::Result<InsertedOperationResponse> {
-        let id = *(self.pending_op_id.read().await);
-        let mut pending_op_id = self.pending_op_id.write().await;
-        *pending_op_id = id + 1;
-
-        let nonce = self.next_nonce().await?;
-
-        // Store with the assigned ID.
-        let state = ETHOperation {
-            id,
-            op_type,
-            op,
-            nonce: nonce.into(),
-            last_deadline_block: deadline_block as u64,
-            last_used_gas_price: used_gas_price,
-            used_tx_hashes: vec![],
-            encoded_tx_data,
-            confirmed: false,
-            final_hash: None,
-        };
-
-        self.unconfirmed_operations.write().await.insert(id, state);
-
-        let response = InsertedOperationResponse {
-            id,
-            nonce: nonce.into(),
-        };
-
-        Ok(response)
+        todo!()
+        // let id = *(self.pending_op_id.read().await);
+        // let mut pending_op_id = self.pending_op_id.write().await;
+        // *pending_op_id = id + 1;
+        //
+        // let nonce = self.next_nonce().await?;
+        //
+        // // Store with the assigned ID.
+        // let state = ETHOperation {
+        //     id,
+        //     op_type,
+        //     op,
+        //     nonce: nonce.into(),
+        //     last_deadline_block: deadline_block as u64,
+        //     last_used_gas_price: used_gas_price,
+        //     used_tx_hashes: vec![],
+        //     encoded_tx_data,
+        //     confirmed: false,
+        //     final_hash: None,
+        // };
+        //
+        // self.unconfirmed_operations.write().await.insert(id, state);
+        //
+        // let response = InsertedOperationResponse {
+        //     id,
+        //     nonce: nonce.into(),
+        // };
+        //
+        // Ok(response)
     }
 
     /// Adds a tx hash entry associated with some Ethereum operation to the database.
@@ -250,30 +254,31 @@ impl DatabaseInterface for MockDatabase {
         hash: &H256,
         _op: &ETHOperation,
     ) -> anyhow::Result<()> {
-        let mut unconfirmed_operations = self.unconfirmed_operations.write().await;
-        let mut op_idx: Option<i64> = None;
-        for operation in unconfirmed_operations.values_mut() {
-            if operation.used_tx_hashes.contains(hash) {
-                operation.confirmed = true;
-                operation.final_hash = Some(*hash);
-                op_idx = Some(operation.id);
-                break;
-            }
-        }
-
-        assert!(
-            op_idx.is_some(),
-            "Request to confirm operation that was not stored"
-        );
-        let op_idx = op_idx.unwrap();
-
-        let operation = unconfirmed_operations.remove(&op_idx).unwrap();
-        self.confirmed_operations
-            .write()
-            .await
-            .insert(op_idx, operation);
-
-        Ok(())
+        todo!()
+        // let mut unconfirmed_operations = self.unconfirmed_operations.write().await;
+        // let mut op_idx: Option<i64> = None;
+        // for operation in unconfirmed_operations.values_mut() {
+        //     if operation.used_tx_hashes.contains(hash) {
+        //         operation.confirmed = true;
+        //         operation.final_hash = Some(*hash);
+        //         op_idx = Some(operation.id);
+        //         break;
+        //     }
+        // }
+        //
+        // assert!(
+        //     op_idx.is_some(),
+        //     "Request to confirm operation that was not stored"
+        // );
+        // let op_idx = op_idx.unwrap();
+        //
+        // let operation = unconfirmed_operations.remove(&op_idx).unwrap();
+        // self.confirmed_operations
+        //     .write()
+        //     .await
+        //     .insert(op_idx, operation);
+        //
+        // Ok(())
     }
 
     async fn load_gas_price_limit(
@@ -292,33 +297,34 @@ impl DatabaseInterface for MockDatabase {
         _connection: &mut StorageProcessor<'_>,
         op: &ETHOperation,
     ) -> anyhow::Result<bool> {
-        let confirmed = match op.op_type {
-            OperationType::Commit | OperationType::Verify => {
-                let op = op.op.as_ref().unwrap();
-                // We're checking previous block, so for the edge case of first block we can say that it was confirmed.
-                let block_to_check = if op.block.block_number > 1 {
-                    op.block.block_number - 1
-                } else {
-                    return Ok(true);
-                };
-
-                let confirmed_operations = self.confirmed_operations.read().await.clone();
-                let maybe_operation = confirmed_operations.get(&(block_to_check as i64));
-
-                let operation = match maybe_operation {
-                    Some(op) => op,
-                    None => return Ok(false),
-                };
-
-                operation.confirmed
-            }
-            OperationType::Withdraw => {
-                // Withdrawals aren't actually sequential, so we don't really care.
-                true
-            }
-        };
-
-        Ok(confirmed)
+        todo!()
+        // let confirmed = match op.op_type {
+        //     OperationType::Commit | OperationType::Verify => {
+        //         let op = op.op.as_ref().unwrap();
+        //         // We're checking previous block, so for the edge case of first block we can say that it was confirmed.
+        //         let block_to_check = if op.block.block_number > 1 {
+        //             op.block.block_number - 1
+        //         } else {
+        //             return Ok(true);
+        //         };
+        //
+        //         let confirmed_operations = self.confirmed_operations.read().await.clone();
+        //         let maybe_operation = confirmed_operations.get(&(block_to_check as i64));
+        //
+        //         let operation = match maybe_operation {
+        //             Some(op) => op,
+        //             None => return Ok(false),
+        //         };
+        //
+        //         operation.confirmed
+        //     }
+        //     OperationType::Withdraw => {
+        //         // Withdrawals aren't actually sequential, so we don't really care.
+        //         true
+        //     }
+        // };
+        //
+        // Ok(confirmed)
     }
 }
 
@@ -507,33 +513,34 @@ pub(in crate) async fn create_signed_tx(
     deadline_block: u64,
     nonce: i64,
 ) -> ETHOperation {
-    let mut options = Options::default();
-    options.nonce = Some(nonce.into());
-
-    let raw_tx = eth_sender.operation_to_raw_tx(&operation);
-    let signed_tx = eth_sender
-        .ethereum
-        .sign_prepared_tx(raw_tx.clone(), options)
-        .await
-        .unwrap();
-
-    let op_type = match operation.action {
-        Action::Commit => OperationType::Commit,
-        Action::Verify { .. } => OperationType::Verify,
-    };
-
-    ETHOperation {
-        id,
-        op_type,
-        op: Some(operation.clone()),
-        nonce: signed_tx.nonce,
-        last_deadline_block: deadline_block,
-        last_used_gas_price: signed_tx.gas_price,
-        used_tx_hashes: vec![signed_tx.hash],
-        encoded_tx_data: raw_tx,
-        confirmed: false,
-        final_hash: None,
-    }
+    todo!()
+    // let mut options = Options::default();
+    // options.nonce = Some(nonce.into());
+    //
+    // let raw_tx = eth_sender.operation_to_raw_tx(&operation);
+    // let signed_tx = eth_sender
+    //     .ethereum
+    //     .sign_prepared_tx(raw_tx.clone(), options)
+    //     .await
+    //     .unwrap();
+    //
+    // let op_type = match operation.action {
+    //     Action::Commit => OperationType::Commit,
+    //     Action::Verify { .. } => OperationType::Verify,
+    // };
+    //
+    // ETHOperation {
+    //     id,
+    //     op_type,
+    //     op: Some(operation.clone()),
+    //     nonce: signed_tx.nonce,
+    //     last_deadline_block: deadline_block,
+    //     last_used_gas_price: signed_tx.gas_price,
+    //     used_tx_hashes: vec![signed_tx.hash],
+    //     encoded_tx_data: raw_tx,
+    //     confirmed: false,
+    //     final_hash: None,
+    // }
 }
 
 /// Creates an `ETHOperation` object for a withdraw operation.
@@ -543,31 +550,32 @@ pub(in crate) async fn create_signed_withdraw_tx(
     deadline_block: u64,
     nonce: i64,
 ) -> ETHOperation {
-    let mut options = Options::default();
-    options.nonce = Some(nonce.into());
-
-    let raw_tx = eth_sender.ethereum.encode_tx_data(
-        "completeWithdrawals",
-        zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-    );
-    let signed_tx = eth_sender
-        .ethereum
-        .sign_prepared_tx(raw_tx.clone(), options)
-        .await
-        .unwrap();
-
-    let op_type = OperationType::Withdraw;
-
-    ETHOperation {
-        id,
-        op_type,
-        op: None,
-        nonce: signed_tx.nonce,
-        last_deadline_block: deadline_block,
-        last_used_gas_price: signed_tx.gas_price,
-        used_tx_hashes: vec![signed_tx.hash],
-        encoded_tx_data: raw_tx,
-        confirmed: false,
-        final_hash: None,
-    }
+    todo!()
+    // let mut options = Options::default();
+    // options.nonce = Some(nonce.into());
+    //
+    // let raw_tx = eth_sender.ethereum.encode_tx_data(
+    //     "completeWithdrawals",
+    //     zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+    // );
+    // let signed_tx = eth_sender
+    //     .ethereum
+    //     .sign_prepared_tx(raw_tx.clone(), options)
+    //     .await
+    //     .unwrap();
+    //
+    // let op_type = OperationType::Withdraw;
+    //
+    // ETHOperation {
+    //     id,
+    //     op_type,
+    //     op: None,
+    //     nonce: signed_tx.nonce,
+    //     last_deadline_block: deadline_block,
+    //     last_used_gas_price: signed_tx.gas_price,
+    //     used_tx_hashes: vec![signed_tx.hash],
+    //     encoded_tx_data: raw_tx,
+    //     confirmed: false,
+    //     final_hash: None,
+    // }
 }

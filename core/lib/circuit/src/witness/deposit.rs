@@ -94,6 +94,12 @@ impl Witness for DepositWitness<Bn256> {
         pubdata_bits
     }
 
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        let mut commitment = vec![false; DepositOp::CHUNKS * 8];
+        commitment[7] = true;
+        commitment
+    }
+
     fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
         let first_sig_msg = &Fr::zero();
         let second_sig_msg = &Fr::zero();

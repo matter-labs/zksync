@@ -192,110 +192,112 @@ mod tests {
     /// and retrieving them later.
     #[test]
     fn basic_operations() {
-        const MAX_IN_FLY: usize = 3;
-        const COMMIT_MARK: u8 = 0;
-        const VERIFY_MARK: u8 = 1;
-        const WITHDRAW_MARK: u8 = 2;
-
-        let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
-
-        // Add 2 commit, 2 verify and 2 withdraw operations.
-        queue.add_commit_operation(TxData::from_raw(
-            OperationType::Commit,
-            vec![COMMIT_MARK, 0],
-        ));
-        queue.add_commit_operation(TxData::from_raw(
-            OperationType::Commit,
-            vec![COMMIT_MARK, 1],
-        ));
-        queue.add_verify_operation(
-            1,
-            TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 0]),
-        );
-        queue.add_verify_operation(
-            2,
-            TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 1]),
-        );
-        queue.add_withdraw_operation(TxData::from_raw(
-            OperationType::Withdraw,
-            vec![WITHDRAW_MARK, 0],
-        ));
-        queue.add_withdraw_operation(TxData::from_raw(
-            OperationType::Withdraw,
-            vec![WITHDRAW_MARK, 1],
-        ));
-
-        // Retrieve the next {MAX_IN_FLY} operations.
-
-        // The first operation should be `commit`, since we can't send `verify` before the commitment.
-        let op_1 = queue.pop_front().unwrap();
-        assert_eq!(op_1.raw, vec![COMMIT_MARK, 0]);
-
-        // The second operation should be `verify`, since it has the highest priority.
-        let op_2 = queue.pop_front().unwrap();
-        assert_eq!(op_2.raw, vec![VERIFY_MARK, 0]);
-
-        // The third operation should be `withdraw`, since it has higher priority than `commit`, and we can't
-        // send the `verify` before the corresponding `commit` operation.
-        let op_3 = queue.pop_front().unwrap();
-        assert_eq!(op_3.raw, vec![WITHDRAW_MARK, 0]);
-
-        // After that we have {MAX_IN_FLY} operations, and `pop_front` should yield nothing.
-        assert_eq!(queue.pop_front(), None);
-
-        // Report that one operation is completed.
-        queue.report_commitment();
-
-        // Now we should obtain the next commit operation.
-        let op_4 = queue.pop_front().unwrap();
-        assert_eq!(op_4.raw, vec![COMMIT_MARK, 1]);
-
-        // The limit should be met again, and nothing more should be yielded.
-        assert_eq!(queue.pop_front(), None);
-
-        // Report the remaining three operations as completed.
-        assert_eq!(queue.sent_pending_txs, MAX_IN_FLY);
-        for _ in 0..MAX_IN_FLY {
-            queue.report_commitment();
-        }
-        assert_eq!(queue.sent_pending_txs, 0);
-
-        // Pop remaining operations.
-        let op_5 = queue.pop_front().unwrap();
-        assert_eq!(op_5.raw, vec![VERIFY_MARK, 1]);
-
-        let op_6 = queue.pop_front().unwrap();
-        assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
-
-        // Though the limit is not met (2 txs in fly, and limit is 3), there should be no txs in the queue.
-        assert_eq!(queue.pop_front(), None);
-
-        let pending_count = queue.sent_pending_txs;
-
-        // Return the operation to the queue.
-        queue.return_popped(op_6);
-
-        // Now, as we've returned tx to queue, pending count should be decremented.
-        assert_eq!(queue.sent_pending_txs, pending_count - 1);
-
-        let op_6 = queue.pop_front().unwrap();
-        assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
-
-        // We've popped the tx once again, now pending count should be increased.
-        assert_eq!(queue.sent_pending_txs, pending_count);
+        todo!()
+        // const MAX_IN_FLY: usize = 3;
+        // const COMMIT_MARK: u8 = 0;
+        // const VERIFY_MARK: u8 = 1;
+        // const WITHDRAW_MARK: u8 = 2;
+        //
+        // let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
+        //
+        // // Add 2 commit, 2 verify and 2 withdraw operations.
+        // queue.add_commit_operation(TxData::from_raw(
+        //     OperationType::Commit,
+        //     vec![COMMIT_MARK, 0],
+        // ));
+        // queue.add_commit_operation(TxData::from_raw(
+        //     OperationType::Commit,
+        //     vec![COMMIT_MARK, 1],
+        // ));
+        // queue.add_verify_operation(
+        //     1,
+        //     TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 0]),
+        // );
+        // queue.add_verify_operation(
+        //     2,
+        //     TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 1]),
+        // );
+        // queue.add_withdraw_operation(TxData::from_raw(
+        //     OperationType::Withdraw,
+        //     vec![WITHDRAW_MARK, 0],
+        // ));
+        // queue.add_withdraw_operation(TxData::from_raw(
+        //     OperationType::Withdraw,
+        //     vec![WITHDRAW_MARK, 1],
+        // ));
+        //
+        // // Retrieve the next {MAX_IN_FLY} operations.
+        //
+        // // The first operation should be `commit`, since we can't send `verify` before the commitment.
+        // let op_1 = queue.pop_front().unwrap();
+        // assert_eq!(op_1.raw, vec![COMMIT_MARK, 0]);
+        //
+        // // The second operation should be `verify`, since it has the highest priority.
+        // let op_2 = queue.pop_front().unwrap();
+        // assert_eq!(op_2.raw, vec![VERIFY_MARK, 0]);
+        //
+        // // The third operation should be `withdraw`, since it has higher priority than `commit`, and we can't
+        // // send the `verify` before the corresponding `commit` operation.
+        // let op_3 = queue.pop_front().unwrap();
+        // assert_eq!(op_3.raw, vec![WITHDRAW_MARK, 0]);
+        //
+        // // After that we have {MAX_IN_FLY} operations, and `pop_front` should yield nothing.
+        // assert_eq!(queue.pop_front(), None);
+        //
+        // // Report that one operation is completed.
+        // queue.report_commitment();
+        //
+        // // Now we should obtain the next commit operation.
+        // let op_4 = queue.pop_front().unwrap();
+        // assert_eq!(op_4.raw, vec![COMMIT_MARK, 1]);
+        //
+        // // The limit should be met again, and nothing more should be yielded.
+        // assert_eq!(queue.pop_front(), None);
+        //
+        // // Report the remaining three operations as completed.
+        // assert_eq!(queue.sent_pending_txs, MAX_IN_FLY);
+        // for _ in 0..MAX_IN_FLY {
+        //     queue.report_commitment();
+        // }
+        // assert_eq!(queue.sent_pending_txs, 0);
+        //
+        // // Pop remaining operations.
+        // let op_5 = queue.pop_front().unwrap();
+        // assert_eq!(op_5.raw, vec![VERIFY_MARK, 1]);
+        //
+        // let op_6 = queue.pop_front().unwrap();
+        // assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
+        //
+        // // Though the limit is not met (2 txs in fly, and limit is 3), there should be no txs in the queue.
+        // assert_eq!(queue.pop_front(), None);
+        //
+        // let pending_count = queue.sent_pending_txs;
+        //
+        // // Return the operation to the queue.
+        // queue.return_popped(op_6);
+        //
+        // // Now, as we've returned tx to queue, pending count should be decremented.
+        // assert_eq!(queue.sent_pending_txs, pending_count - 1);
+        //
+        // let op_6 = queue.pop_front().unwrap();
+        // assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
+        //
+        // // We've popped the tx once again, now pending count should be increased.
+        // assert_eq!(queue.sent_pending_txs, pending_count);
     }
 
     #[test]
     #[should_panic(expected = "No transactions are expected to be returned")]
     fn return_popped_empty() {
-        const MAX_IN_FLY: usize = 3;
-        const COMMIT_MARK: u8 = 0;
-
-        let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
-
-        queue.return_popped(TxData::from_raw(
-            OperationType::Commit,
-            vec![COMMIT_MARK, 0],
-        ));
+        todo!()
+        // const MAX_IN_FLY: usize = 3;
+        // const COMMIT_MARK: u8 = 0;
+        //
+        // let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
+        //
+        // queue.return_popped(TxData::from_raw(
+        //     OperationType::Commit,
+        //     vec![COMMIT_MARK, 0],
+        // ));
     }
 }

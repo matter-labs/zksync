@@ -12,6 +12,8 @@ use zksync_prover::{client, ApiClient};
 use zksync_types::{block::Block, Address, H256};
 // Local deps
 use zksync_circuit::witness::utils::get_used_subtree_root_hash;
+use zksync_crypto::params::CHUNK_BIT_WIDTH;
+use zksync_types::operations::NoopOp;
 use zksync_witness_generator::run_prover_server;
 
 async fn connect_to_db() -> zksync_storage::ConnectionPool {
@@ -266,10 +268,12 @@ pub async fn test_operation_and_wanted_prover_data(
         1_000_000.into(),
         1_500_000.into(),
         H256::default(),
+        0,
     );
 
     let mut pub_data = vec![];
     let mut operations = vec![];
+    let mut offset_commitment = vec![];
 
     if let zksync_types::ZkSyncPriorityOp::Deposit(deposit_op) = deposit_priority_op {
         let deposit_witness = DepositWitness::apply_tx(
@@ -283,6 +287,7 @@ pub async fn test_operation_and_wanted_prover_data(
         let deposit_operations = deposit_witness.calculate_operations(());
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
+        offset_commitment.extend(deposit_witness.get_offset_commitment_data());
     }
 
     for _ in 0..block_size_chunks - operations.len() {
@@ -290,7 +295,8 @@ pub async fn test_operation_and_wanted_prover_data(
             &circuit_tree,
             block.fee_account,
         ));
-        pub_data.extend(vec![false; 64]);
+        pub_data.extend(vec![false; NoopOp::CHUNKS * CHUNK_BIT_WIDTH]);
+        offset_commitment.extend(vec![false; NoopOp::CHUNKS * 8]);
     }
     assert_eq!(pub_data.len(), 64 * block_size_chunks);
     assert_eq!(operations.len(), block_size_chunks);
@@ -320,6 +326,8 @@ pub async fn test_operation_and_wanted_prover_data(
             Some(root_after_fee),
             Some(zksync_crypto::Fr::from_str(&block.fee_account.to_string()).unwrap()),
             Some(zksync_crypto::Fr::from_str(&(block.block_number).to_string()).unwrap()),
+            Some(zksync_crypto::Fr::from_str(&(block.timestamp).to_string()).unwrap()),
+            &offset_commitment,
         );
 
     (
@@ -338,6 +346,7 @@ pub async fn test_operation_and_wanted_prover_data(
             validator_balances,
             validator_audit_path,
             validator_account: validator_account_witness,
+            block_timestamp: block.timestamp,
         },
     )
 }
