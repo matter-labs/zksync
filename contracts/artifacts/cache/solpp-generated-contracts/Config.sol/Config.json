@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Config",
+  "sourceName": "cache/solpp-generated-contracts/Config.sol",
+  "abi": [],
+  "bytecode": "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358221220ea45f33d2addb48349c8e1d40be53d9da060fe03feb87664eb17c4f55862652964736f6c63430007030033",
+  "deployedBytecode": "0x6080604052600080fdfea2646970667358221220ea45f33d2addb48349c8e1d40be53d9da060fe03feb87664eb17c4f55862652964736f6c63430007030033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

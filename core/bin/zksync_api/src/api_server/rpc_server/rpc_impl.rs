@@ -5,7 +5,7 @@ use num::BigUint;
 // Workspace uses
 use zksync_types::{
     helpers::closest_packable_fee_amount,
-    tx::{BatchSignData, TxEthSignature, TxHash},
+    tx::{TxEthSignature, TxHash},
     Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -107,133 +107,10 @@ impl RpcApp {
         txs: Vec<TxWithSignature>,
         eth_signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>> {
-        if txs.is_empty() {
-            return Err(Error {
-                code: RpcErrorCodes::from(TxAddError::EmptyBatch).into(),
-                message: "Transaction batch cannot be empty".to_string(),
-                data: None,
-            });
-        }
-
-        for tx in &txs {
-            if tx.tx.is_close() {
-                return Err(Error {
-                    code: RpcErrorCodes::AccountCloseDisabled.into(),
-                    message: "Account close tx is disabled.".to_string(),
-                    data: None,
-                });
-            }
-        }
-
-        // Checking fees data
-        let mut required_total_usd_fee = BigDecimal::from(0);
-        let mut provided_total_usd_fee = BigDecimal::from(0);
-        for tx in &txs {
-            let tx_fee_info = tx.tx.get_fee_info();
-
-            if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
-                let required_fee = Self::ticker_request(
-                    self.ticker_request_sender.clone(),
-                    tx_type,
-                    address,
-                    token.clone(),
-                )
-                .await?;
-                let token_price_in_usd = Self::ticker_price_request(
-                    self.ticker_request_sender.clone(),
-                    token.clone(),
-                    TokenPriceRequestType::USDForOneWei,
-                )
-                .await?;
-                required_total_usd_fee +=
-                    BigDecimal::from(required_fee.total_fee.to_bigint().unwrap())
-                        * &token_price_in_usd;
-                provided_total_usd_fee +=
-                    BigDecimal::from(provided_fee.clone().to_bigint().unwrap())
-                        * &token_price_in_usd;
-            }
-        }
-        // We allow fee to be 5% off the required fee
-        let scaled_provided_fee_in_usd =
-            provided_total_usd_fee.clone() * BigDecimal::from(105u32) / BigDecimal::from(100u32);
-        if required_total_usd_fee >= scaled_provided_fee_in_usd {
-            return Err(Error {
-                code: RpcErrorCodes::from(TxAddError::TxBatchFeeTooLow).into(),
-                message: TxAddError::TxBatchFeeTooLow.to_string(),
-                data: None,
-            });
-        }
-
-        let mut verified_txs = Vec::new();
-        let mut verified_signature = None;
-
-        let mut messages_to_sign = vec![];
-        for tx in &txs {
-            messages_to_sign.push(self.get_tx_info_message_to_sign(&tx.tx).await?);
-        }
-
-        if let Some(signature) = eth_signature {
-            // User provided the signature for the whole batch.
-            let _txs = txs
-                .iter()
-                .map(|tx| tx.tx.clone())
-                .collect::<Vec<ZkSyncTx>>();
-            // Create batch signature data.
-            let batch_sign_data = BatchSignData::new(&_txs, signature).map_err(|e| Error {
-                code: RpcErrorCodes::Other.into(),
-                message: e.to_string(),
-                data: None,
-            })?;
-
-            // Send batch and provided signature for verification.
-            let (verified_batch, signature) = verify_txs_batch_signature(
-                txs,
-                batch_sign_data,
-                messages_to_sign,
-                self.sign_verify_request_sender.clone(),
-            )
-            .await?
-            .unwrap_batch();
-
-            verified_signature = Some(signature);
-            verified_txs.extend(verified_batch.into_iter());
-        } else {
-            // Otherwise, we process every transaction in turn.
-            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
-                let verified_tx = verify_tx_info_message_signature(
-                    &tx.tx,
-                    tx.signature.clone(),
-                    msg_to_sign,
-                    self.sign_verify_request_sender.clone(),
-                )
-                .await?
-                .unwrap_tx();
-
-                verified_txs.push(verified_tx);
-            }
-        }
-
-        let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
-
-        // Send verified transactions to the mempool.
-        let tx_add_result = self
-            .api_client
-            .send_txs_batch(verified_txs, verified_signature)
+        self.tx_sender
+            .submit_txs_batch(txs, eth_signature)
             .await
             .map_err(Error::from)
-            .await
-            .map_err(|_| Error {
-                code: RpcErrorCodes::Other.into(),
-                message: "Error communicating core server".into(),
-                data: None,
-            })?;
-
-        // Check the mempool response and, if everything is OK, return the transactions hashes.
-        tx_add_result.map(|_| tx_hashes).map_err(|e| Error {
-            code: RpcErrorCodes::from(e).into(),
-            message: e.to_string(),
-            data: None,
-        })
     }
 
     pub async fn _impl_contract_address(self) -> Result<ContractAddressResp> {

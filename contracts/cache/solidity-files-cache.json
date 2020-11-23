@@ -1,0 +1,1510 @@
+{
+  "_format": "hh-sol-cache-1",
+  "files": {
+    "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol": {
+      "lastModificationDate": 1605674486709,
+      "sourceName": "@openzeppelin/contracts/token/ERC20/ERC20.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../../GSN/Context.sol",
+        "./IERC20.sol",
+        "../../math/SafeMath.sol",
+        "../../utils/Address.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "ERC20"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/GSN/Context.sol": {
+      "lastModificationDate": 1605674486618,
+      "sourceName": "@openzeppelin/contracts/GSN/Context.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Context"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol": {
+      "lastModificationDate": 1605674486710,
+      "sourceName": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "IERC20"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/math/SafeMath.sol": {
+      "lastModificationDate": 1605674486618,
+      "sourceName": "@openzeppelin/contracts/math/SafeMath.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "SafeMath"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/node_modules/@openzeppelin/contracts/utils/Address.sol": {
+      "lastModificationDate": 1605674486618,
+      "sourceName": "@openzeppelin/contracts/utils/Address.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Address"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Bytes.sol": {
+      "lastModificationDate": 1606101411329,
+      "sourceName": "cache/solpp-generated-contracts/Bytes.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Bytes"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/BytesTest.sol": {
+      "lastModificationDate": 1606101411389,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/BytesTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../Bytes.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "BytesTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Utils.sol": {
+      "lastModificationDate": 1606101411553,
+      "sourceName": "cache/solpp-generated-contracts/Utils.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./IERC20.sol",
+        "./Bytes.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Utils"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/IERC20.sol": {
+      "lastModificationDate": 1606101411455,
+      "sourceName": "cache/solpp-generated-contracts/IERC20.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "IERC20"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Storage.sol": {
+      "lastModificationDate": 1606101411542,
+      "sourceName": "cache/solpp-generated-contracts/Storage.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./IERC20.sol",
+        "./Governance.sol",
+        "./Verifier.sol",
+        "./Operations.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Storage"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Governance.sol": {
+      "lastModificationDate": 1606101411454,
+      "sourceName": "cache/solpp-generated-contracts/Governance.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./Config.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Governance"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Verifier.sol": {
+      "lastModificationDate": 1606101411556,
+      "sourceName": "cache/solpp-generated-contracts/Verifier.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./KeysWithPlonkVerifier.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Verifier"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Operations.sol": {
+      "lastModificationDate": 1606101411475,
+      "sourceName": "cache/solpp-generated-contracts/Operations.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./Bytes.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Operations"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Config.sol": {
+      "lastModificationDate": 1606101411350,
+      "sourceName": "cache/solpp-generated-contracts/Config.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Config"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/KeysWithPlonkVerifier.sol": {
+      "lastModificationDate": 1606101411468,
+      "sourceName": "cache/solpp-generated-contracts/KeysWithPlonkVerifier.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./PlonkCore.sol"
+      ],
+      "versionPragmas": [
+        ">=0.5.0 <0.8.0"
+      ],
+      "artifacts": [
+        "KeysWithPlonkVerifier"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/PlonkCore.sol": {
+      "lastModificationDate": 1606101411521,
+      "sourceName": "cache/solpp-generated-contracts/PlonkCore.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.5.0 <0.8.0"
+      ],
+      "artifacts": [
+        "PairingsBn254",
+        "Plonk4VerifierWithAccessToDNext",
+        "TranscriptLibrary",
+        "VerifierWithDeserialize"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/OperationsTest.sol": {
+      "lastModificationDate": 1606101411423,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/OperationsTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../Operations.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "OperationsTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/ZkSync.sol": {
+      "lastModificationDate": 1606101411585,
+      "sourceName": "cache/solpp-generated-contracts/ZkSync.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./ReentrancyGuard.sol",
+        "./SafeMath.sol",
+        "./SafeMathUInt128.sol",
+        "./SafeCast.sol",
+        "./Utils.sol",
+        "./Storage.sol",
+        "./Config.sol",
+        "./Events.sol",
+        "./Bytes.sol",
+        "./Operations.sol",
+        "./UpgradeableMaster.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "ZkSync"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/ReentrancyGuard.sol": {
+      "lastModificationDate": 1606101411533,
+      "sourceName": "cache/solpp-generated-contracts/ReentrancyGuard.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "ReentrancyGuard"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/SafeMath.sol": {
+      "lastModificationDate": 1606101411536,
+      "sourceName": "cache/solpp-generated-contracts/SafeMath.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "SafeMath"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/SafeMathUInt128.sol": {
+      "lastModificationDate": 1606101411538,
+      "sourceName": "cache/solpp-generated-contracts/SafeMathUInt128.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "SafeMathUInt128"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/SafeCast.sol": {
+      "lastModificationDate": 1606101411535,
+      "sourceName": "cache/solpp-generated-contracts/SafeCast.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "SafeCast"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Events.sol": {
+      "lastModificationDate": 1606101411449,
+      "sourceName": "cache/solpp-generated-contracts/Events.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./Upgradeable.sol",
+        "./Operations.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Events",
+        "UpgradeEvents"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/UpgradeableMaster.sol": {
+      "lastModificationDate": 1606101411544,
+      "sourceName": "cache/solpp-generated-contracts/UpgradeableMaster.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "UpgradeableMaster"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Upgradeable.sol": {
+      "lastModificationDate": 1606101411543,
+      "sourceName": "cache/solpp-generated-contracts/Upgradeable.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Upgradeable"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/ZkSyncWithdrawalUnitTest.sol": {
+      "lastModificationDate": 1606101411446,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/ZkSyncWithdrawalUnitTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../ZkSync.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "ZkSyncWithdrawalUnitTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/ZkSyncSignatureUnitTest.sol": {
+      "lastModificationDate": 1606101411445,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/ZkSyncSignatureUnitTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../ZkSync.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "ZKSyncSignatureUnitTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/ZkSyncProcessOpUnitTest.sol": {
+      "lastModificationDate": 1606101411444,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/ZkSyncProcessOpUnitTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../ZkSync.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "ZkSyncProcessOpUnitTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/DummyTarget.sol": {
+      "lastModificationDate": 1606101411404,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/DummyTarget.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../Upgradeable.sol",
+        "../UpgradeableMaster.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "DummyFirst",
+        "DummySecond",
+        "DummyTarget"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/UpgradeGatekeeper.sol": {
+      "lastModificationDate": 1606101411550,
+      "sourceName": "cache/solpp-generated-contracts/UpgradeGatekeeper.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./SafeMath.sol",
+        "./Events.sol",
+        "./Ownable.sol",
+        "./Upgradeable.sol",
+        "./UpgradeableMaster.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "UpgradeGatekeeper"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Ownable.sol": {
+      "lastModificationDate": 1606101411476,
+      "sourceName": "cache/solpp-generated-contracts/Ownable.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Ownable"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/Proxy.sol": {
+      "lastModificationDate": 1606101411530,
+      "sourceName": "cache/solpp-generated-contracts/Proxy.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./Ownable.sol",
+        "./Upgradeable.sol",
+        "./UpgradeableMaster.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "Proxy"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/DeployFactory.sol": {
+      "lastModificationDate": 1606101411377,
+      "sourceName": "cache/solpp-generated-contracts/DeployFactory.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./Governance.sol",
+        "./Proxy.sol",
+        "./UpgradeGatekeeper.sol",
+        "./ZkSync.sol",
+        "./Verifier.sol",
+        "./TokenInit.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "DeployFactory"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/TokenInit.sol": {
+      "lastModificationDate": 1606101411543,
+      "sourceName": "cache/solpp-generated-contracts/TokenInit.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.5.0 <0.8.0"
+      ],
+      "artifacts": [
+        "TokenDeployInit"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20NoTransferReturnValueTest.sol": {
+      "lastModificationDate": 1606101411440,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20NoTransferReturnValueTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./ContextTest.sol",
+        "./MintableIERC20NoTransferReturnValueTest.sol",
+        "../../SafeMath.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "MintableERC20NoTransferReturnValueTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/ContextTest.sol": {
+      "lastModificationDate": 1606101411426,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/ContextTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "ContextTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20NoTransferReturnValueTest.sol": {
+      "lastModificationDate": 1606101411441,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20NoTransferReturnValueTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "MintableIERC20NoTransferReturnValueTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20FeeAndDividendsTest.sol": {
+      "lastModificationDate": 1606101411435,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableERC20FeeAndDividendsTest.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./ContextTest.sol",
+        "./MintableIERC20Test.sol",
+        "../../SafeMath.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "MintableERC20FeeAndDividendsTest"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20Test.sol": {
+      "lastModificationDate": 1606101411442,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/tokens/MintableIERC20Test.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "MintableIERC20Test"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/AccountMock.sol": {
+      "lastModificationDate": 1606101411384,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/AccountMock.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./IEIP1271.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "AccountMock"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/IEIP1271.sol": {
+      "lastModificationDate": 1606101411407,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/IEIP1271.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "IEIP1271"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/EIP1271.sol": {
+      "lastModificationDate": 1606101411406,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/EIP1271.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./IEIP1271.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "EIP1271"
+      ]
+    },
+    "/home/dvush/code/zksync-dev/contracts/cache/solpp-generated-contracts/dev-contracts/TestnetERC20Token.sol": {
+      "lastModificationDate": 1606101411424,
+      "sourceName": "cache/solpp-generated-contracts/dev-contracts/TestnetERC20Token.sol",
+      "solcConfig": {
+        "version": "0.7.3",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol"
+      ],
+      "versionPragmas": [
+        "^0.7.0"
+      ],
+      "artifacts": [
+        "TestnetERC20Token"
+      ]
+    }
+  }
+}

@@ -28,14 +28,8 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 /// either a single transaction, or the transaction batch.
 #[derive(Debug, Clone)]
 pub enum TxVariant {
-    Tx(TxWithSignData),
-    Batch(Vec<TxWithSignData>, BatchSignData),
-}
-
-#[derive(Debug, Clone)]
-pub enum SignedTxVariant {
     Tx(SignedZkSyncTx),
-    Batch(Vec<SignedZkSyncTx>, EthSignData),
+    Batch(Vec<SignedZkSyncTx>, BatchSignData),
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -58,7 +52,7 @@ impl VerifiedTx {
             .await
             .and_then(|_| verify_tx_correctness(&mut request.tx))
             .map(|_| match &request.tx {
-                TxVariant::Tx(tx) => Self(SignedTxVariant::Tx(SignedZkSyncTx {
+                TxVariant::Tx(tx) => Self(TxVariant::Tx(SignedZkSyncTx {
                     tx: tx.tx.clone(),
                     eth_sign_data: tx.eth_sign_data.clone(),
                 })),
@@ -70,12 +64,15 @@ impl VerifiedTx {
                             eth_sign_data: tx.eth_sign_data.clone(),
                         })
                         .collect::<Vec<_>>();
-                    Self(SignedTxVariant::Batch(
-                        txs,
-                        batch_sign_data.0.signature.clone(),
-                    ))
+                    Self(TxVariant::Batch(txs, batch_sign_data.clone()))
                 }
             })
+    }
+
+    /// Creates a verified wrapper without actually verifying the original data.
+    #[cfg(test)]
+    pub(crate) fn unverified(inner: TxVariant) -> Self {
+        Self(inner)
     }
 
     /// Takes the `TxVariant` out of the wrapper.
@@ -89,7 +86,7 @@ impl VerifiedTx {
     /// Takes the Vec of `SignedZkSyncTx` and the verified signature out of the wrapper.
     pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, EthSignData) {
         match self.0 {
-            TxVariant::Batch(txs, eth_signature) => (txs, eth_signature),
+            TxVariant::Batch(txs, eth_signature) => (txs, eth_signature.0),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
         }
     }

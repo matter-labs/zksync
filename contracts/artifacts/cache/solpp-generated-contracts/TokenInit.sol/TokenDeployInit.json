@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "TokenDeployInit",
+  "sourceName": "cache/solpp-generated-contracts/TokenInit.sol",
+  "abi": [],
+  "bytecode": "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea264697066735822122010b46c2d64bc2e573aab8c3dc659ed6075b8db6164cb0448f2d23943cb3ed0e764736f6c63430007030033",
+  "deployedBytecode": "0x6080604052600080fdfea264697066735822122010b46c2d64bc2e573aab8c3dc659ed6075b8db6164cb0448f2d23943cb3ed0e764736f6c63430007030033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
