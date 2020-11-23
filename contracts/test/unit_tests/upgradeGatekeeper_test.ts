@@ -19,18 +19,17 @@ describe('UpgradeGatekeeper unit tests', function () {
         provider = hardhat.ethers.provider;
         [wallet, wallet1] = await hardhat.ethers.getSigners();
 
-        const dummy1Factory = await hardhat.ethers.getContractFactory("DummyFirst");
+        const dummy1Factory = await hardhat.ethers.getContractFactory('DummyFirst');
         dummyFirst = await dummy1Factory.deploy();
-        const dummy2Factory = await hardhat.ethers.getContractFactory("DummySecond");
+        const dummy2Factory = await hardhat.ethers.getContractFactory('DummySecond');
         dummySecond = await dummy2Factory.deploy();
 
-
-        const proxyFactory = await hardhat.ethers.getContractFactory("Proxy");
+        const proxyFactory = await hardhat.ethers.getContractFactory('Proxy');
         proxyTestContract = await proxyFactory.deploy(dummyFirst.address, [bytes[0], bytes[1]]);
 
-        proxyDummyInterface = await hardhat.ethers.getContractAt("DummyTarget", proxyTestContract.address);
+        proxyDummyInterface = await hardhat.ethers.getContractAt('DummyTarget', proxyTestContract.address);
 
-        const upgradeGatekeeperFactory = await hardhat.ethers.getContractFactory("UpgradeGatekeeper");
+        const upgradeGatekeeperFactory = await hardhat.ethers.getContractFactory('UpgradeGatekeeper');
         upgradeGatekeeperContract = await upgradeGatekeeperFactory.deploy(proxyTestContract.address);
 
         await proxyTestContract.transferMastership(upgradeGatekeeperContract.address);
@@ -57,46 +56,40 @@ describe('UpgradeGatekeeper unit tests', function () {
             ).revertReason
         ).equal('oro11');
         expect(
-            (
-                await getCallRevertReason(() =>
-                    UpgradeGatekeeperContract_with_wallet2_signer.startUpgrade([])
-                )
-            ).revertReason
+            (await getCallRevertReason(() => UpgradeGatekeeperContract_with_wallet2_signer.startUpgrade([])))
+                .revertReason
         ).equal('oro11');
         expect(
             (await getCallRevertReason(() => UpgradeGatekeeperContract_with_wallet2_signer.cancelUpgrade()))
                 .revertReason
         ).equal('oro11');
         expect(
-            (
-                await getCallRevertReason(() =>
-                    UpgradeGatekeeperContract_with_wallet2_signer.finishUpgrade([])
-                )
-            ).revertReason
+            (await getCallRevertReason(() => UpgradeGatekeeperContract_with_wallet2_signer.finishUpgrade([])))
+                .revertReason
         ).equal('oro11');
     });
 
     it('checking UpgradeGatekeeper reverts; activation and cancelation upgrade', async () => {
-        expect(
-            (await getCallRevertReason(() => upgradeGatekeeperContract.cancelUpgrade())).revertReason
-        ).equal('cpu11');
-        expect(
-            (await getCallRevertReason(() => upgradeGatekeeperContract.startPreparation())).revertReason
-        ).equal('ugp11');
-        expect(
-            (await getCallRevertReason(() => upgradeGatekeeperContract.finishUpgrade([]))).revertReason
-        ).equal('fpu11');
+        expect((await getCallRevertReason(() => upgradeGatekeeperContract.cancelUpgrade())).revertReason).equal(
+            'cpu11'
+        );
+        expect((await getCallRevertReason(() => upgradeGatekeeperContract.startPreparation())).revertReason).equal(
+            'ugp11'
+        );
+        expect((await getCallRevertReason(() => upgradeGatekeeperContract.finishUpgrade([]))).revertReason).equal(
+            'fpu11'
+        );
 
-        expect(
-            (await getCallRevertReason(() => upgradeGatekeeperContract.startUpgrade([]))).revertReason
-        ).equal('spu12');
+        expect((await getCallRevertReason(() => upgradeGatekeeperContract.startUpgrade([]))).revertReason).equal(
+            'spu12'
+        );
         await expect(upgradeGatekeeperContract.startUpgrade([dummySecond.address])).to.emit(
             upgradeGatekeeperContract,
             'NoticePeriodStart'
         );
-        expect(
-            (await getCallRevertReason(() => upgradeGatekeeperContract.startUpgrade([]))).revertReason
-        ).equal('spu11');
+        expect((await getCallRevertReason(() => upgradeGatekeeperContract.startUpgrade([]))).revertReason).equal(
+            'spu11'
+        );
         await expect(upgradeGatekeeperContract.cancelUpgrade()).to.emit(upgradeGatekeeperContract, 'UpgradeCancel');
     });
 
@@ -134,16 +127,13 @@ describe('UpgradeGatekeeper unit tests', function () {
             }
         }
 
-        expect(
-            (await getCallRevertReason(() => upgradeGatekeeperContract.finishUpgrade([]))).revertReason
-        ).equal('fpu12');
+        expect((await getCallRevertReason(() => upgradeGatekeeperContract.finishUpgrade([]))).revertReason).equal(
+            'fpu12'
+        );
         // finish upgrade without verifying priority operations
         expect(
-            (
-                await getCallRevertReason(() =>
-                    upgradeGatekeeperContract.finishUpgrade([[bytes[2], bytes[3]]])
-                )
-            ).revertReason
+            (await getCallRevertReason(() => upgradeGatekeeperContract.finishUpgrade([[bytes[2], bytes[3]]])))
+                .revertReason
         ).equal('fpu13');
         // finish upgrade
         await proxyDummyInterface.verifyPriorityOperation();

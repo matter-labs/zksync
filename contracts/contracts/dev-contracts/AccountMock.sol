@@ -14,7 +14,7 @@ contract AccountMock is IEIP1271 {
         owner = _owner;
     }
 
-    function isValidSignature(bytes32 _hash, bytes memory _signature) override public view returns (bytes4) {
+    function isValidSignature(bytes32 _hash, bytes memory _signature) public view override returns (bytes4) {
         require(_signature.length == 65, "Signature length is incorrect");
         uint8 v;
         bytes32 r;

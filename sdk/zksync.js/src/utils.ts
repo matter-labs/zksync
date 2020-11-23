@@ -300,7 +300,7 @@ export function getChangePubkeyMessage(
     const msgBatchHash = batchHash == undefined ? new Uint8Array(32).fill(0) : ethers.utils.arrayify(batchHash);
     const msgNonce = serializeNonce(nonce);
     const msgAccId = serializeAccountId(accountId);
-    const msgPubKeyHash= serializeAddress(pubKeyHash);
+    const msgPubKeyHash = serializeAddress(pubKeyHash);
     return ethers.utils.concat([msgPubKeyHash, msgNonce, msgAccId, msgBatchHash]);
 }
 

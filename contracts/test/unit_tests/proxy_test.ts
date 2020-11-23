@@ -1,6 +1,6 @@
 const { expect } = require('chai');
 const { getCallRevertReason } = require('./common');
-const hardhat = require("hardhat");
+const hardhat = require('hardhat');
 
 import { Contract, constants } from 'ethers';
 
@@ -16,17 +16,17 @@ describe('Proxy unit tests', function () {
     before(async () => {
         [wallet, wallet1] = await hardhat.ethers.getSigners();
 
-        const dummyFactory = await hardhat.ethers.getContractFactory("DummyFirst");
+        const dummyFactory = await hardhat.ethers.getContractFactory('DummyFirst');
         dummyFirst = await dummyFactory.deploy();
-        const proxyFactory = await hardhat.ethers.getContractFactory("Proxy");
+        const proxyFactory = await hardhat.ethers.getContractFactory('Proxy');
         proxyTestContract = await proxyFactory.deploy(dummyFirst.address, [1, 2]);
     });
 
     it('check delegatecall', async () => {
-        const dummyFactory = await hardhat.ethers.getContractFactory("DummyFirst");
+        const dummyFactory = await hardhat.ethers.getContractFactory('DummyFirst');
         const proxyDummyInterface = dummyFactory.attach(proxyTestContract.address);
         expect(await proxyDummyInterface.get_DUMMY_INDEX()).to.equal(1);
-    })
+    });
 
     it('checking that requireMaster calls present', async () => {
         const testContract_with_wallet2_signer = await proxyTestContract.connect(wallet1);

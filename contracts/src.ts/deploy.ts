@@ -10,7 +10,8 @@ import {
 } from './publish-utils';
 import {
     Governance,
-    GovernanceFactory, UpgradeGatekeeper,
+    GovernanceFactory,
+    UpgradeGatekeeper,
     UpgradeGatekeeperFactory,
     Verifier,
     VerifierFactory,
@@ -282,14 +283,14 @@ export class Deployer {
     }
 
     public zkSyncContract(signerOrProvider: Signer | providers.Provider): ZkSync {
-        return ZkSyncFactory.connect(this.addresses.ZkSync, signerOrProvider)
+        return ZkSyncFactory.connect(this.addresses.ZkSync, signerOrProvider);
     }
 
     public verifierContract(signerOrProvider: Signer | providers.Provider): Verifier {
         return VerifierFactory.connect(this.addresses.Verifier, signerOrProvider);
     }
 
-    public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): UpgradeGatekeeper{
+    public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): UpgradeGatekeeper {
         return UpgradeGatekeeperFactory.connect(this.addresses.UpgradeGatekeeper, signerOrProvider);
     }
 }

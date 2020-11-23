@@ -64,7 +64,8 @@ contract Config {
     uint256 constant PRIORITY_EXPIRATION_PERIOD = 3 days;
 
     /// @dev Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint256 constant PRIORITY_EXPIRATION = $(defined(PRIORITY_EXPIRATION) ? PRIORITY_EXPIRATION : PRIORITY_EXPIRATION_PERIOD / BLOCK_PERIOD);
+    uint256 constant PRIORITY_EXPIRATION =
+        $(defined(PRIORITY_EXPIRATION) ? PRIORITY_EXPIRATION : PRIORITY_EXPIRATION_PERIOD / BLOCK_PERIOD);
 
     /// @dev Maximum number of priority request to clear during verifying the block
     /// @dev Cause deleting storage slots cost 5k gas per each slot it's unprofitable to clear too many slots
