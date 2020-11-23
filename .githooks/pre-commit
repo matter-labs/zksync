@@ -7,7 +7,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Check that formatting rules are not violated.
-if ! zk fmt --check; then
+if !(cargo fmt -- --check && zk fmt --check); then
     echo -e "${RED}Commit error!${NC}"
     echo "Please format the code via 'cargo fmt', cannot commit unformatted code"
     exit 1
