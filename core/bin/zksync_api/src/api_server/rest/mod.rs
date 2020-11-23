@@ -9,21 +9,35 @@ use zksync_types::H160;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 use self::v01::api_decl::ApiV01;
+use crate::{fee_ticker::TickerRequest, signature_checker::VerifyTxSignatureRequest};
+
+use super::tx_sender::TxSender;
 
 mod helpers;
 mod v01;
 pub mod v1;
 
-async fn start_server(api_v01: ApiV01, bind_to: SocketAddr) {
+async fn start_server(
+    api_v01: ApiV01,
+    fee_ticker: mpsc::Sender<TickerRequest>,
+    sign_verifier: mpsc::Sender<VerifyTxSignatureRequest>,
+    bind_to: SocketAddr,
+) {
     let logger_format = crate::api_server::loggers::rest::get_logger_format();
 
     HttpServer::new(move || {
         let api_v01 = api_v01.clone();
 
         let api_v1_scope = {
-            let pool = api_v01.connection_pool.clone();
             let env_options = api_v01.config_options.clone();
-            v1::api_scope(pool, env_options)
+
+            let tx_sender = TxSender::new(
+                api_v01.connection_pool.clone(),
+                sign_verifier.clone(),
+                fee_ticker.clone(),
+                &env_options,
+            );
+            v1::api_scope(tx_sender, env_options)
         };
 
         App::new()
@@ -52,6 +66,8 @@ pub(super) fn start_server_thread_detached(
     listen_addr: SocketAddr,
     contract_address: H160,
     panic_notify: mpsc::Sender<bool>,
+    fee_ticker: mpsc::Sender<TickerRequest>,
+    sign_verifier: mpsc::Sender<VerifyTxSignatureRequest>,
     config_options: ConfigurationOptions,
 ) {
     std::thread::Builder::new()
@@ -63,7 +79,7 @@ pub(super) fn start_server_thread_detached(
                 let api_v01 = ApiV01::new(connection_pool, contract_address, config_options);
                 api_v01.spawn_network_status_updater(panic_notify);
 
-                start_server(api_v01, listen_addr).await;
+                start_server(api_v01, fee_ticker, sign_verifier, listen_addr).await;
             });
         })
         .expect("Api server thread");

@@ -1,3 +1,4 @@
+use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, ZkSyncOp};
 
@@ -45,6 +46,7 @@ impl TxHandler<Deposit> for ZkSyncState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         let mut updates = Vec::new();
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
@@ -71,6 +73,7 @@ impl TxHandler<Deposit> for ZkSyncState {
 
         let fee = None;
 
+        metrics::histogram!("state.deposit", start.elapsed());
         Ok((fee, updates))
     }
 }

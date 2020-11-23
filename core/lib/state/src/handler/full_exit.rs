@@ -1,4 +1,5 @@
 use num::BigUint;
+use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, FullExit, FullExitOp, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
@@ -50,6 +51,7 @@ impl TxHandler<FullExit> for ZkSyncState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
             amount.clone()
@@ -89,6 +91,7 @@ impl TxHandler<FullExit> for ZkSyncState {
 
         let fee = None;
 
+        metrics::histogram!("state.full_exit", start.elapsed());
         Ok((fee, updates))
     }
 }

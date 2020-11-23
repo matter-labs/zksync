@@ -1,4 +1,5 @@
 // Built-in deps
+use std::time::Instant;
 // External imports
 use sqlx::Acquire;
 use zksync_basic_types::Address;
@@ -27,6 +28,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         address: &Address,
     ) -> QueryResult<StoredAccountState> {
+        let start = Instant::now();
         // Find the account in `account_creates` table.
         let mut results = sqlx::query_as!(
             StorageAccountCreation,
@@ -65,6 +67,8 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .last_verified_state_for_account(account_id)
             .await?
             .map(|a| (account_id, a));
+
+        metrics::histogram!("sql.chain", start.elapsed(), "account" => "account_state_by_address");
         Ok(StoredAccountState {
             committed,
             verified,
@@ -77,6 +81,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         // Get the last certain state of the account.
@@ -156,6 +161,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.chain", start.elapsed(), "account" => "last_committed_state_for_account");
         Ok(account_state)
     }
 
@@ -165,7 +171,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
+        let start = Instant::now();
         let (_, account) = self.get_account_and_last_block(account_id).await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "account" => "last_verified_state_for_account"
+        );
         Ok(account)
     }
 
@@ -174,6 +183,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
+        let start = Instant::now();
         let mut transaction = self.0.conn().begin().await?;
 
         // `accounts::table` is updated only after the block verification, so we should
@@ -219,6 +229,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
+        metrics::histogram!("sql.chain", start.elapsed(), "account" => "get_account_and_last_block");
         result
     }
 }

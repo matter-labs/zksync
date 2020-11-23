@@ -1,6 +1,6 @@
 use super::ExecutedOps;
 use futures::{channel::mpsc, SinkExt};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::ExecutedOperations, block::PendingBlock, ActionType, BlockNumber, Operation,
@@ -115,6 +115,7 @@ impl EventFetcher {
     }
 
     fn update_pending_block(&mut self, new: PendingBlock) -> Option<ExecutedOps> {
+        let start = Instant::now();
         if new.number <= self.last_committed_block {
             // Outdated block, we're not interested in it.
             return None;
@@ -159,6 +160,7 @@ impl EventFetcher {
         }
 
         self.pending_block = Some(new);
+        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "update_pending_block");
         Some(executed_ops)
     }
 
@@ -168,6 +170,7 @@ impl EventFetcher {
         new_last_operation: BlockNumber,
         action: ActionType,
     ) {
+        let start = Instant::now();
         // There may be more than one block in the gap.
         for block_idx in (current_last_block + 1)..=new_last_operation {
             let operation = await_db!(self.load_operation(block_idx, action), continue);
@@ -176,9 +179,11 @@ impl EventFetcher {
                 .await
                 .unwrap_or_default();
         }
+        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "send_operations");
     }
 
     async fn load_pending_block(&mut self) -> anyhow::Result<Option<PendingBlock>> {
+        let start = Instant::now();
         let mut storage = self
             .db_pool
             .access_storage()
@@ -186,10 +191,12 @@ impl EventFetcher {
             .expect("Can't get access to the storage");
         let pending_block = storage.chain().block_schema().load_pending_block().await?;
 
+        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "load_pending_block");
         Ok(pending_block)
     }
 
     async fn last_committed_block(&mut self) -> anyhow::Result<BlockNumber> {
+        let start = Instant::now();
         let mut storage = self
             .db_pool
             .access_storage()
@@ -202,10 +209,12 @@ impl EventFetcher {
             .get_last_committed_block()
             .await?;
 
+        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "last_committed_block");
         Ok(last_block)
     }
 
     async fn last_verified_block(&mut self) -> anyhow::Result<BlockNumber> {
+        let start = Instant::now();
         let mut storage = self
             .db_pool
             .access_storage()
@@ -218,6 +227,7 @@ impl EventFetcher {
             .get_last_verified_confirmed_block()
             .await?;
 
+        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "last_verified_block");
         Ok(last_block)
     }
 
@@ -226,6 +236,7 @@ impl EventFetcher {
         block_number: BlockNumber,
         action_type: ActionType,
     ) -> anyhow::Result<Operation> {
+        let start = Instant::now();
         let mut storage = self
             .db_pool
             .access_storage()
@@ -239,6 +250,7 @@ impl EventFetcher {
             .await
             .expect("Operation must exist");
 
+        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "load_operation");
         op.into_op(&mut storage).await
     }
 }

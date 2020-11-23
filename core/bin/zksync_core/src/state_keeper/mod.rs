@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::time::Instant;
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -378,6 +379,7 @@ impl ZkSyncStateKeeper {
     }
 
     pub async fn initialize(&mut self, pending_block: Option<SendablePendingBlock>) {
+        let start = Instant::now();
         if let Some(pending_block) = pending_block {
             // Transform executed operations into non-executed, so they will be executed again.
             // Since it's a pending block, the state updates were not actually applied in the
@@ -415,9 +417,12 @@ impl ZkSyncStateKeeper {
         } else {
             log::info!("There is no pending block to restore");
         }
+
+        metrics::histogram!("state_keeper.initialize", start.elapsed());
     }
 
     pub async fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
+        let start = Instant::now();
         let mut storage = pool
             .access_storage()
             .await
@@ -466,6 +471,7 @@ impl ZkSyncStateKeeper {
         let root_hash = state.root_hash();
         log::info!("Genesis block created, state: {}", state.root_hash());
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
+        metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
     }
 
     async fn run(mut self, pending_block: Option<SendablePendingBlock>) {
@@ -492,6 +498,7 @@ impl ZkSyncStateKeeper {
     }
 
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
+        let start = Instant::now();
         let mut executed_ops = Vec::new();
 
         let mut priority_op_queue = proposed_block
@@ -562,6 +569,8 @@ impl ZkSyncStateKeeper {
         } else {
             self.store_pending_block().await;
         }
+
+        metrics::histogram!("state_keeper.execute_proposed_block", start.elapsed());
     }
 
     // Err if there is no space in current block
@@ -569,6 +578,7 @@ impl ZkSyncStateKeeper {
         &mut self,
         priority_op: PriorityOp,
     ) -> Result<ExecutedOperations, PriorityOp> {
+        let start = Instant::now();
         let chunks_needed = priority_op.data.chunks();
         if self.pending_block.chunks_left < chunks_needed {
             return Err(priority_op);
@@ -614,6 +624,8 @@ impl ZkSyncStateKeeper {
             .success_operations
             .push(exec_result.clone());
         self.current_unprocessed_priority_op += 1;
+
+        metrics::histogram!("state_keeper.apply_priority_op", start.elapsed());
         Ok(exec_result)
     }
 
@@ -622,6 +634,8 @@ impl ZkSyncStateKeeper {
         txs: &[SignedZkSyncTx],
         batch_id: i64,
     ) -> Result<Vec<ExecutedOperations>, ()> {
+        metrics::gauge!("tx_batch_size", txs.len() as f64);
+        let start = Instant::now();
         let chunks_needed = self.state.chunks_for_batch(txs);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -713,10 +727,12 @@ impl ZkSyncStateKeeper {
             };
         }
 
+        metrics::histogram!("state_keeper.apply_batch", start.elapsed());
         Ok(executed_operations)
     }
 
     fn apply_tx(&mut self, tx: &SignedZkSyncTx) -> Result<ExecutedOperations, ()> {
+        let start = Instant::now();
         let chunks_needed = self.state.chunks_for_tx(&tx);
 
         // If we can't add the tx to the block due to the size limit, we return this tx,
@@ -805,11 +821,13 @@ impl ZkSyncStateKeeper {
             }
         };
 
+        metrics::histogram!("state_keeper.apply_tx", start.elapsed());
         Ok(exec_result)
     }
 
     /// Finalizes the pending block, transforming it into a full block.
     async fn seal_pending_block(&mut self) {
+        let start = Instant::now();
         let mut pending_block = std::mem::replace(
             &mut self.pending_block,
             PendingBlock::new(
@@ -878,11 +896,14 @@ impl ZkSyncStateKeeper {
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
+
+        metrics::histogram!("state_keeper.seal_pending_block", start.elapsed());
     }
 
     /// Stores intermediate representation of a pending block in the database,
     /// so the executed transactions are persisted and won't be lost.
     async fn store_pending_block(&mut self) {
+        let start = Instant::now();
         // Create a pending block object to send.
         // Note that failed operations are not included, as per any operation failure
         // the full block is created immediately.
@@ -916,6 +937,8 @@ impl ZkSyncStateKeeper {
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
+
+        metrics::histogram!("state_keeper.store_pending_block", start.elapsed());
     }
 
     fn account(&self, address: &Address) -> Option<(AccountId, Account)> {
