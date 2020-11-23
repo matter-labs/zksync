@@ -1,5 +1,4 @@
-use num::{BigUint, ToPrimitive};
-use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::{
@@ -10,8 +9,13 @@ use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS};
 use zksync_crypto::public_key_from_private;
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
+use lazy_static::lazy_static;
+use num::{BigUint, ToPrimitive};
+use serde::{Deserialize, Serialize};
+
 use super::*;
 use crate::{
+    account::PubKeyHash,
     helpers::{pack_fee_amount, pack_token_amount},
     AccountId, Engine, TokenId,
 };
@@ -282,4 +286,60 @@ fn eth_sign_data_compatibility() {
 
     assert_eq!(deserialized.signature, eth_sign_data.signature);
     assert_eq!(deserialized.message, eth_sign_data.message);
+}
+
+#[cfg(test)]
+pub mod predefined_test {
+    use super::*;
+
+    /// TODO: Provide good doc-comments
+    lazy_static! {
+        static ref ACCOUNT_ID: u32 = 100;
+        static ref ALICE: Address =
+            Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap();
+        static ref BOB: Address =
+            Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap();
+        static ref PK_HASH: PubKeyHash =
+            PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap();
+        static ref AMOUNT: BigUint = BigUint::from(12345678u64);
+        static ref TOKEN_ID: u16 = 5;
+        static ref FEE: BigUint = BigUint::from(1000000u32);
+        static ref NONCE: u32 = 20;
+    }
+
+    /// TODO: Provide good doc-comments
+    lazy_static! {
+        static ref CHANGE_PUBKEY: ChangePubKey = ChangePubKey::new(
+            *ACCOUNT_ID,
+            *ALICE,
+            (*PK_HASH).clone(),
+            *TOKEN_ID,
+            (*FEE).clone(),
+            *NONCE,
+            None,
+            None
+        );
+        static ref TRANSFER: Transfer = Transfer::new(
+            *ACCOUNT_ID,
+            *ALICE,
+            *BOB,
+            *TOKEN_ID,
+            (*AMOUNT).clone(),
+            (*FEE).clone(),
+            *NONCE,
+            None
+        );
+        static ref FORCED_EXIT: ForcedExit =
+            ForcedExit::new(*ACCOUNT_ID, *ALICE, *TOKEN_ID, (*FEE).clone(), *NONCE, None);
+        static ref WITHDRAW: Withdraw = Withdraw::new(
+            *ACCOUNT_ID,
+            *ALICE,
+            *BOB,
+            *TOKEN_ID,
+            (*AMOUNT).clone(),
+            (*FEE).clone(),
+            *NONCE,
+            None
+        );
+    }
 }
