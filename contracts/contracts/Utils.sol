@@ -21,10 +21,13 @@ library Utils {
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @return bool flag indicating that transfer is successful
-    function sendERC20(IERC20 _token, address _to, uint256 _amount) internal returns (bool) {
-        (bool callSuccess, bytes memory callReturnValueEncoded) = address(_token).call(
-            abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
-        );
+    function sendERC20(
+        IERC20 _token,
+        address _to,
+        uint256 _amount
+    ) internal returns (bool) {
+        (bool callSuccess, bytes memory callReturnValueEncoded) =
+            address(_token).call(abi.encodeWithSignature("transfer(address,uint256)", _to, _amount));
         // `transfer` method may return (bool) or nothing.
         bool returnedSuccess = callReturnValueEncoded.length == 0 || abi.decode(callReturnValueEncoded, (bool));
         return callSuccess && returnedSuccess;
@@ -38,10 +41,14 @@ library Utils {
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @return bool flag indicating that transfer is successful
-    function transferFromERC20(IERC20 _token, address _from, address _to, uint256 _amount) internal returns (bool) {
-        (bool callSuccess, bytes memory callReturnValueEncoded) = address(_token).call(
-            abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _amount)
-        );
+    function transferFromERC20(
+        IERC20 _token,
+        address _from,
+        address _to,
+        uint256 _amount
+    ) internal returns (bool) {
+        (bool callSuccess, bytes memory callReturnValueEncoded) =
+            address(_token).call(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _amount));
         // `transferFrom` method may return (bool) or nothing.
         bool returnedSuccess = callReturnValueEncoded.length == 0 || abi.decode(callReturnValueEncoded, (bool));
         return callSuccess && returnedSuccess;
@@ -63,12 +70,16 @@ library Utils {
     /// @param _signature 65 bytes concatenated. R (32) + S (32) + V (1)
     /// @param _message signed message.
     /// @return address of the signer
-    function recoverAddressFromEthSignature(bytes memory _signature, bytes memory _message) internal pure returns (address) {
+    function recoverAddressFromEthSignature(bytes memory _signature, bytes memory _message)
+        internal
+        pure
+        returns (address)
+    {
         require(_signature.length == 65 + 32, "ves10"); // incorrect signature length
 
         bytes32 signR;
         bytes32 signS;
-        uint offset = 0;
+        uint256 offset = 0;
 
         (offset, signR) = Bytes.readBytes32(_signature, offset);
         (offset, signS) = Bytes.readBytes32(_signature, offset);
