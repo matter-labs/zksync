@@ -19,7 +19,9 @@ use zksync_types::{
 };
 
 // Local uses
-use super::{client::Client, client::ClientError, Error as ApiError, JsonResult};
+use super::{
+    client::Client, client::ClientError, Error as ApiError, JsonResult, Pagination, PaginationQuery,
+};
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 #[derive(Debug, Clone, Copy)]
@@ -256,6 +258,34 @@ impl Client {
             .send()
             .await
     }
+
+    /// Gets transaction receipt by ID.
+    pub async fn tx_receipt_by_id(
+        &self,
+        tx_hash: TxHash,
+        receipt_id: u32,
+    ) -> Result<Option<TxStatus>, ClientError> {
+        self.get(&format!(
+            "transactions/{}/receipts/{}",
+            tx_hash.to_string(),
+            receipt_id
+        ))
+        .send()
+        .await
+    }
+
+    /// Gets transaction receipts.
+    pub async fn tx_receipts(
+        &self,
+        tx_hash: TxHash,
+        from: Pagination,
+        limit: BlockNumber,
+    ) -> Result<Vec<TxStatus>, ClientError> {
+        self.get(&format!("transactions/{}/receipts", tx_hash.to_string()))
+            .query(&from.into_query(limit))
+            .send()
+            .await
+    }
 }
 
 // Server implementation
@@ -276,6 +306,42 @@ async fn tx_data(
     let tx_data = data.tx_data(tx_hash).await.map_err(ApiError::internal)?;
 
     Ok(Json(tx_data))
+}
+
+async fn tx_receipt_by_id(
+    data: web::Data<ApiTransactionsData>,
+    web::Path((tx_hash, receipt_id)): web::Path<(TxHash, u32)>,
+) -> JsonResult<Option<TxStatus>> {
+    // At the moment we store only last receipt, so this endpoint is just only a stub.
+    if receipt_id > 0 {
+        return Ok(Json(None));
+    }
+
+    let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
+
+    Ok(Json(tx_status))
+}
+
+async fn tx_receipts(
+    data: web::Data<ApiTransactionsData>,
+    web::Path(tx_hash): web::Path<TxHash>,
+    web::Query(pagination): web::Query<PaginationQuery>,
+) -> JsonResult<Vec<TxStatus>> {
+    let (pagination, _limit) = pagination.into_inner()?;
+    // At the moment we store only last receipt, so this endpoint is just only a stub.
+    let is_some = match pagination {
+        Pagination::Before(before) if before < 1 => false,
+        Pagination::After(_after) => false,
+        _ => true,
+    };
+
+    if is_some {
+        let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
+
+        Ok(Json(tx_status.into_iter().collect()))
+    } else {
+        Ok(Json(vec![]))
+    }
 }
 
 async fn submit_tx(
@@ -314,6 +380,11 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .data(data)
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))
+        .route(
+            "{tx_hash}/receipts/{receipt_id}",
+            web::get().to(tx_receipt_by_id),
+        )
+        .route("{tx_hash}/receipts", web::get().to(tx_receipts))
         .route("submit", web::post().to(submit_tx))
         .route("submit/batch", web::post().to(submit_tx_batch))
 }
@@ -466,8 +537,7 @@ mod tests {
     async fn test_transactions_scope() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
-        // Tx status and data for committed transaction.
-        let tx_hash = {
+        let committed_tx_hash = {
             let mut storage = server.pool.access_storage().await?;
 
             let transactions = storage
@@ -478,11 +548,59 @@ mod tests {
 
             try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
         };
+
+        // Tx receipt by ID.
+        let unknown_tx_hash = TxHash::default();
+        assert!(client
+            .tx_receipt_by_id(committed_tx_hash, 0)
+            .await?
+            .is_some());
+        assert!(client
+            .tx_receipt_by_id(committed_tx_hash, 1)
+            .await?
+            .is_none());
+        assert!(client.tx_receipt_by_id(unknown_tx_hash, 0).await?.is_none());
+
+        // Tx receipts.
+        let queries = vec![
+            (
+                (committed_tx_hash, Pagination::Before(1), 1),
+                vec![TxStatus::Verified { block: 1 }],
+            ),
+            (
+                (committed_tx_hash, Pagination::Last, 1),
+                vec![TxStatus::Verified { block: 1 }],
+            ),
+            (
+                (committed_tx_hash, Pagination::Before(2), 1),
+                vec![TxStatus::Verified { block: 1 }],
+            ),
+            ((committed_tx_hash, Pagination::After(0), 1), vec![]),
+            ((unknown_tx_hash, Pagination::Last, 1), vec![]),
+        ];
+
+        for (query, expected_response) in queries {
+            let actual_response = client.tx_receipts(query.0, query.1, query.2).await?;
+
+            assert_eq!(
+                actual_response,
+                expected_response,
+                "tx: {} from: {:?} limit: {:?}",
+                query.0.to_string(),
+                query.1,
+                query.2
+            );
+        }
+
+        // Tx status and data for committed transaction.
         assert_eq!(
-            client.tx_status(tx_hash).await?,
+            client.tx_status(committed_tx_hash).await?,
             Some(TxStatus::Verified { block: 1 })
         );
-        assert_eq!(client.tx_data(tx_hash).await?.unwrap().hash(), tx_hash);
+        assert_eq!(
+            client.tx_data(committed_tx_hash).await?.unwrap().hash(),
+            committed_tx_hash
+        );
 
         // Tx status and data for pending transaction.
         let tx_hash = {
