@@ -25,13 +25,13 @@ declare module './tester' {
             feeToken: TokenLike,
             amount: BigNumber
         ): Promise<void>;
-        // testBatchBuilderGenerisUsage(
-        //     from: Wallet,
-        //     to: Wallet,
-        //     target: Wallet,
-        //     token: TokenLike,
-        //     amount: BigNumber
-        // ): Promise<void>;
+        testBatchBuilderGenerisUsage(
+            from: Wallet,
+            to: Wallet,
+            target: Wallet,
+            token: TokenLike,
+            amount: BigNumber
+        ): Promise<void>;
     }
 }
 
@@ -150,30 +150,30 @@ Tester.prototype.testBatchBuilderPayInDifferentToken = async function (
     // Do not increase running fee, feeToken is different.
 };
 
-// Tester.prototype.testBatchBuilderGenerisUsage = async function (
-//     sender: Wallet,
-//     receiver: Wallet,
-//     target: Wallet,
-//     token: TokenLike,
-//     amount: BigNumber
-// ) {
-//     const batch = await sender
-//         .batchBuilder()
-//         .addTransfer({ to: receiver.address(), token, amount })
-//         .addWithdraw({ ethAddress: sender.address(), token, amount })
-//         .addForcedExit({ target: target.address(), token })
-//         .build(token);
+Tester.prototype.testBatchBuilderGenerisUsage = async function (
+    sender: Wallet,
+    receiver: Wallet,
+    target: Wallet,
+    token: TokenLike,
+    amount: BigNumber
+) {
+    const batch = await sender
+        .batchBuilder()
+        .addTransfer({ to: receiver.address(), token, amount })
+        .addWithdraw({ ethAddress: sender.address(), token, amount })
+        .addForcedExit({ target: target.address(), token })
+        .build(token);
 
-//     const senderBefore = await sender.getBalance(token);
-//     const receiverBefore = await receiver.getBalance(token);
-//     const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, sender.provider);
-//     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
-//     const senderAfter = await sender.getBalance(token);
-//     const receiverAfter = await receiver.getBalance(token);
-//     const targetBalance = await target.getBalance(token);
+    const senderBefore = await sender.getBalance(token);
+    const receiverBefore = await receiver.getBalance(token);
+    const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, sender.provider);
+    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    const senderAfter = await sender.getBalance(token);
+    const receiverAfter = await receiver.getBalance(token);
+    const targetBalance = await target.getBalance(token);
 
-//     expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(batch.totalFee)), 'Batch execution failed').to.be.true;
-//     expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed').to.be.true;
-//     expect(targetBalance.isZero(), 'Forced exit failed');
-//     this.runningFee = this.runningFee.add(batch.totalFee);
-// };
+    expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(batch.totalFee)), 'Batch execution failed').to.be.true;
+    expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed').to.be.true;
+    expect(targetBalance.isZero(), 'Forced exit failed');
+    this.runningFee = this.runningFee.add(batch.totalFee);
+};

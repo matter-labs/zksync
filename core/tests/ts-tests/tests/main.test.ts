@@ -59,23 +59,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(alice, token, true);
     });
 
-    step('batch-builder tests', async () => {
-        const david = await tester.fundedWallet('1.0');
-        const frank = await tester.fundedWallet('1.0');
-        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
-        // Add these accounts to the network.
-        await tester.testDeposit(david, token, DEPOSIT_AMOUNT, true);
-        await tester.testDeposit(frank, token, DEPOSIT_AMOUNT, true);
-        // Also deposit another token to pay with.
-        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
-
-        await tester.testBatchBuilderInvalidUsage(david, token);
-        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
-        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
-        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
-        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
-    });
-
     step('should execute a transfer to new account', async () => {
         await tester.testTransfer(alice, bob, token, TX_AMOUNT);
     });
@@ -96,6 +79,28 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testFailedBatch(alice, bob, token, TX_AMOUNT);
+    });
+
+    step('should test batch-builder', async () => {
+        const david = await tester.fundedWallet('1.0');
+        const frank = await tester.fundedWallet('1.0');
+        const carl = await tester.fundedWallet('1.0');
+        // We will pay with different token.
+        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        // Add these accounts to the network.
+        await tester.testDeposit(david, token, DEPOSIT_AMOUNT, true);
+        await tester.testDeposit(frank, token, DEPOSIT_AMOUNT, true);
+        await tester.testDeposit(carl, token, DEPOSIT_AMOUNT, true);
+        // Also deposit another token to pay with.
+        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
+
+        await tester.testBatchBuilderInvalidUsage(david, token);
+        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
+        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
+        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+        // Finally, transfer, withdraw and forcedexit in a single batch.
+        await tester.testBatchBuilderGenerisUsage(david, frank, carl, token, TX_AMOUNT);
     });
 
     step('should execute a withdrawal', async () => {
