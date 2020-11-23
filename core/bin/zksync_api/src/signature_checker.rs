@@ -4,6 +4,9 @@
 //! which is used to spawn concurrent tasks to efficiently check the
 //! transactions signatures.
 
+// Built-in uses
+use std::time::Instant;
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -21,17 +24,6 @@ use zksync_config::ConfigurationOptions;
 use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
-/// Represents yet unverified transaction with the corresponding
-/// Ethereum signature and the message.
-#[derive(Debug, Clone)]
-pub struct TxWithSignData {
-    pub tx: ZkSyncTx,
-    /// `eth_sign_data` is a tuple of the Ethereum signature and the message
-    /// which user should have signed with their private key.
-    /// Can be `None` if the Ethereum signature is not required.
-    pub eth_sign_data: Option<EthSignData>,
-}
-
 /// `TxVariant` is used to form a verify request. It is possible to wrap
 /// either a single transaction, or the transaction batch.
 #[derive(Debug, Clone)]
@@ -43,17 +35,17 @@ pub enum TxVariant {
 #[derive(Debug, Clone)]
 pub enum SignedTxVariant {
     Tx(SignedZkSyncTx),
-    Batch(Vec<SignedZkSyncTx>, TxEthSignature),
+    Batch(Vec<SignedZkSyncTx>, EthSignData),
 }
 
-/// Wrapper on a `SignedTxVariant` which guarantees that (a batch of)
+/// Wrapper on a `TxVariant` which guarantees that (a batch of)
 /// transaction(s) was checked and signatures associated with
 /// this transactions are correct.
 ///
-/// Underlying `SignedTxVariant` is a private field, thus no such
+/// Underlying `TxVariant` is a private field, thus no such
 /// object can be created without verification.
 #[derive(Debug, Clone)]
-pub struct VerifiedTx(SignedTxVariant);
+pub struct VerifiedTx(TxVariant);
 
 impl VerifiedTx {
     /// Checks the (batch of) transaction(s) correctness by verifying its
@@ -86,19 +78,19 @@ impl VerifiedTx {
             })
     }
 
-    /// Takes the `SignedZkSyncTx` out of the wrapper.
+    /// Takes the `TxVariant` out of the wrapper.
     pub fn unwrap_tx(self) -> SignedZkSyncTx {
         match self.0 {
-            SignedTxVariant::Tx(tx) => tx,
-            SignedTxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
+            TxVariant::Tx(tx) => tx,
+            TxVariant::Batch(_, _) => panic!("called `unwrap_tx` on a `Batch` value"),
         }
     }
 
     /// Takes the Vec of `SignedZkSyncTx` and the verified signature out of the wrapper.
-    pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, TxEthSignature) {
+    pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, EthSignData) {
         match self.0 {
-            SignedTxVariant::Batch(txs, eth_signature) => (txs, eth_signature),
-            SignedTxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
+            TxVariant::Batch(txs, eth_signature) => (txs, eth_signature),
+            TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
         }
     }
 }
@@ -126,9 +118,10 @@ async fn verify_eth_signature(
 }
 
 async fn verify_eth_signature_single_tx(
-    tx: &TxWithSignData,
+    tx: &SignedZkSyncTx,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
+    let start = Instant::now();
     // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
     if let ZkSyncTx::ChangePubKey(change_pk) = &tx.tx {
         if change_pk.eth_signature.is_none() {
@@ -177,14 +170,19 @@ async fn verify_eth_signature_single_tx(
         };
     }
 
+    metrics::histogram!(
+        "signature_checker.verify_eth_signature_single_tx",
+        start.elapsed()
+    );
     Ok(())
 }
 
 async fn verify_eth_signature_txs_batch(
-    txs: &[TxWithSignData],
+    txs: &[SignedZkSyncTx],
     batch_sign_data: &BatchSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
+    let start = Instant::now();
     match &batch_sign_data.0.signature {
         TxEthSignature::EthereumSignature(packed_signature) => {
             let signer_account = packed_signature
@@ -213,6 +211,10 @@ async fn verify_eth_signature_txs_batch(
         }
     };
 
+    metrics::histogram!(
+        "signature_checker.verify_eth_signature_txs_batch",
+        start.elapsed()
+    );
     Ok(())
 }
 

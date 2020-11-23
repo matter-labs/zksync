@@ -1,4 +1,5 @@
 use anyhow::{ensure, format_err};
+use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{
     operations::{ChangePubKeyOp, ZkSyncOp},
@@ -54,6 +55,7 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+        let start = Instant::now();
         let mut updates = Vec::new();
         let mut account = self.get_account(op.account_id).unwrap();
 
@@ -103,6 +105,7 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
             amount: op.tx.fee.clone(),
         };
 
+        metrics::histogram!("state.change_pubkey", start.elapsed());
         Ok((Some(fee), updates))
     }
 }

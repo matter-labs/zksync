@@ -184,7 +184,7 @@ fn gen_unpacked_amount(rng: &mut impl Rng) -> BigUint {
 }
 
 async fn gas_price_test() {
-    let testkit_config = get_testkit_config_from_env();
+    let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =

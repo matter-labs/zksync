@@ -12,8 +12,8 @@ use zksync_testkit::eth_account::EthereumAccount;
 use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
 use zksync_testkit::zksync_account::ZkSyncAccount;
 use zksync_testkit::{
-    genesis_state, get_testkit_config_from_env, spawn_state_keeper, AccountSet, ETHAccountId,
-    TestSetup, Token, ZKSyncAccountId,
+    genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
+    ZKSyncAccountId,
 };
 use zksync_types::DepositOp;
 
@@ -21,7 +21,7 @@ use zksync_types::DepositOp;
 async fn main() {
     env_logger::init();
 
-    let testkit_config = get_testkit_config_from_env();
+    let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =

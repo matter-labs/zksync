@@ -7,7 +7,7 @@ use web3::{
 // Workspace deps
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;
-use zksync_storage::ConnectionPool;
+use zksync_storage::StorageProcessor;
 use zksync_types::{AccountMap, AccountUpdate};
 // Local deps
 use crate::{
@@ -45,8 +45,6 @@ pub enum StorageUpdateState {
 /// - Tree
 /// - Storage
 pub struct DataRestoreDriver<T: Transport> {
-    /// Database connection pool
-    pub connection_pool: ConnectionPool,
     /// Web3 provider endpoint
     pub web3: Web3<T>,
     /// Provides Ethereum Governance contract unterface
@@ -86,7 +84,6 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        connection_pool: ConnectionPool,
         web3_transport: T,
         governance_contract_eth_addr: H160,
         zksync_contract_eth_addr: H160,
@@ -119,7 +116,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         let tree_state = TreeState::new(available_block_chunk_sizes.clone());
 
         Self {
-            connection_pool,
             web3,
             governance_contract,
             zksync_contract,
@@ -141,7 +137,11 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     ///
-    pub async fn set_genesis_state(&mut self, genesis_tx_hash: H256) {
+    pub async fn set_genesis_state(
+        &mut self,
+        storage: &mut StorageProcessor<'_>,
+        genesis_tx_hash: H256,
+    ) {
         let genesis_transaction = get_ethereum_transaction(&self.web3, &genesis_tx_hash)
             .await
             .expect("Cant get zkSync genesis transaction");
@@ -153,13 +153,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             .expect("Cant set genesis block number for events state");
         log::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        storage_interactor::save_events_state(
-            &self.connection_pool,
-            &[],
-            &[],
-            genesis_eth_block_number,
-        )
-        .await;
+        storage_interactor::save_events_state(storage, &[], &[], genesis_eth_block_number).await;
 
         let genesis_fee_account =
             get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
@@ -192,7 +186,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         log::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         log::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        storage_interactor::save_genesis_tree_state(&self.connection_pool, account_update).await;
+        storage_interactor::save_genesis_tree_state(storage, account_update).await;
 
         log::info!("Saved genesis tree state\n");
 
@@ -200,12 +194,11 @@ impl<T: Transport> DataRestoreDriver<T> {
     }
 
     /// Stops states from storage
-    pub async fn load_state_from_storage(&mut self) {
+    pub async fn load_state_from_storage(&mut self, storage: &mut StorageProcessor<'_>) -> bool {
         log::info!("Loading state from storage");
-        let state = storage_interactor::get_storage_state(&self.connection_pool).await;
-        self.events_state =
-            storage_interactor::get_block_events_state_from_storage(&self.connection_pool).await;
-        let tree_state = storage_interactor::get_tree_state(&self.connection_pool).await;
+        let state = storage_interactor::get_storage_state(storage).await;
+        self.events_state = storage_interactor::get_block_events_state_from_storage(storage).await;
+        let tree_state = storage_interactor::get_tree_state(storage).await;
         self.tree_state = TreeState::load(
             tree_state.0, // current block
             tree_state.1, // account map
@@ -216,16 +209,15 @@ impl<T: Transport> DataRestoreDriver<T> {
         match state {
             StorageUpdateState::Events => {
                 // Update operations
-                let new_ops_blocks = self.update_operations_state().await;
+                let new_ops_blocks = self.update_operations_state(storage).await;
                 // Update tree
-                self.update_tree_state(new_ops_blocks).await;
+                self.update_tree_state(storage, new_ops_blocks).await;
             }
             StorageUpdateState::Operations => {
                 // Update operations
-                let new_ops_blocks =
-                    storage_interactor::get_ops_blocks_from_storage(&self.connection_pool).await;
+                let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(storage).await;
                 // Update tree
-                self.update_tree_state(new_ops_blocks).await;
+                self.update_tree_state(storage, new_ops_blocks).await;
             }
             StorageUpdateState::None => {}
         }
@@ -238,27 +230,24 @@ impl<T: Transport> DataRestoreDriver<T> {
             self.tree_state.root_hash()
         );
 
-        if self.finite_mode && (total_verified_blocks == last_verified_block) {
-            // We've already completed finalizing the state, so exit immediately.
-            std::process::exit(0);
-        }
+        self.finite_mode && (total_verified_blocks == last_verified_block)
     }
 
     /// Activates states updates
-    pub async fn run_state_update(&mut self) {
+    pub async fn run_state_update(&mut self, storage: &mut StorageProcessor<'_>) {
         let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
             log::debug!("Last watched ethereum block: {:?}", last_wached_block);
 
             // Update events
-            if self.update_events_state().await {
+            if self.update_events_state(storage).await {
                 // Update operations
-                let new_ops_blocks = self.update_operations_state().await;
+                let new_ops_blocks = self.update_operations_state(storage).await;
 
                 if !new_ops_blocks.is_empty() {
                     // Update tree
-                    self.update_tree_state(new_ops_blocks).await;
+                    self.update_tree_state(storage, new_ops_blocks).await;
 
                     let total_verified_blocks =
                         get_total_verified_blocks(&self.zksync_contract).await;
@@ -266,7 +255,7 @@ impl<T: Transport> DataRestoreDriver<T> {
 
                     // We must update the Ethereum stats table to match the actual stored state
                     // to keep the `state_keeper` consistent with the `eth_sender`.
-                    storage_interactor::update_eth_stats(&self.connection_pool).await;
+                    storage_interactor::update_eth_stats(storage).await;
 
                     log::info!(
                         "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
@@ -313,7 +302,7 @@ impl<T: Transport> DataRestoreDriver<T> {
 
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     /// Returns bool flag, true if there are new block events
-    async fn update_events_state(&mut self) -> bool {
+    async fn update_events_state(&mut self, storage: &mut StorageProcessor<'_>) -> bool {
         let (block_events, token_events, last_watched_eth_block_number) = self
             .events_state
             .update_events_state(
@@ -327,7 +316,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             .expect("Updating events state: cant update events state");
 
         storage_interactor::save_events_state(
-            &self.connection_pool,
+            storage,
             &block_events,
             token_events.as_slice(),
             last_watched_eth_block_number,
@@ -345,7 +334,11 @@ impl<T: Transport> DataRestoreDriver<T> {
     ///
     /// * `new_ops_blocks` - the new Rollup operations blocks
     ///
-    async fn update_tree_state(&mut self, new_ops_blocks: Vec<RollupOpsBlock>) {
+    async fn update_tree_state(
+        &mut self,
+        storage: &mut StorageProcessor<'_>,
+        new_ops_blocks: Vec<RollupOpsBlock>,
+    ) {
         let mut blocks = vec![];
         let mut updates = vec![];
         let mut count = 0;
@@ -359,12 +352,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             count += 1;
         }
         for i in 0..count {
-            storage_interactor::update_tree_state(
-                &self.connection_pool,
-                blocks[i].clone(),
-                updates[i].clone(),
-            )
-            .await;
+            storage_interactor::update_tree_state(storage, blocks[i].clone(), updates[i].clone())
+                .await;
         }
 
         log::debug!("Updated state");
@@ -372,10 +361,13 @@ impl<T: Transport> DataRestoreDriver<T> {
 
     /// Gets new operations blocks from events, updates rollup operations stored state.
     /// Returns new rollup operations blocks
-    async fn update_operations_state(&mut self) -> Vec<RollupOpsBlock> {
+    async fn update_operations_state(
+        &mut self,
+        storage: &mut StorageProcessor<'_>,
+    ) -> Vec<RollupOpsBlock> {
         let new_blocks = self.get_new_operation_blocks_from_events().await;
 
-        storage_interactor::save_rollup_ops(&self.connection_pool, &new_blocks).await;
+        storage_interactor::save_rollup_ops(storage, &new_blocks).await;
 
         log::debug!("Updated operations storage");
 

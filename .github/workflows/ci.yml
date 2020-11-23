@@ -32,7 +32,12 @@ jobs:
 
     - name: lints
       run: |
-        zk db setup # So database will be created for compilation.
+        # lint non-rust code
+        zk fmt --check
+        yarn lint:md
+        yarn lint:sol
+        # So database will be created for compilation.
+        zk db setup
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
@@ -40,6 +45,14 @@ jobs:
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
+    
+    - name: generic-init
+      run: |
+        # Unpack keys to build dev contracts
+        zk run verify-keys unpack
+        # EIP1271 contract is used in Rust & JS unit tests.
+        zk contract build-dev
+        zk run deploy-eip1271
 
     - name: integration-tests
       run: zk test integration all --in-docker

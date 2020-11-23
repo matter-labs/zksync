@@ -113,7 +113,7 @@ export async function server() {
     await utils.spawn('yarn ts-tests test');
 }
 
-export async function testkit(command: string) {
+export async function testkit(command: string, timeout: number) {
     let containerID = '';
     const prevUrl = process.env.WEB3_URL;
     if (process.env.ZKSYNC_ENV == 'ci') {
@@ -128,6 +128,13 @@ export async function testkit(command: string) {
         // we have to emit this manually, as SIGINT is considered explicit termination
         process.emit('beforeExit', 130);
     });
+
+    // set a timeout in case tests hang
+    const timer = setTimeout(() => {
+        console.log('Timeout reached!');
+        process.emit('beforeExit', 1);
+    }, timeout * 1000);
+    timer.unref();
 
     // since we HAVE to make an async call upon exit,
     // the only solution is to use beforeExit hook
@@ -155,7 +162,7 @@ export async function testkit(command: string) {
     if (command == 'block-sizes') {
         await utils.spawn('cargo run --bin block_sizes_test --release');
     } else if (command == 'fast') {
-        await utils.spawn('cargo run --bin zksync_testkit --release');
+        await utils.spawn('cargo run --bin testkit_tests --release');
         await utils.spawn('cargo run --bin gas_price_test --release');
         await utils.spawn('cargo run --bin migration_test --release');
         await utils.spawn('cargo run --bin revert_blocks_test --release');
@@ -225,5 +232,5 @@ command
         if (mode != 'fast' && mode != 'block-sizes') {
             throw new Error('modes are either "fast" or "block-sizes"');
         }
-        await testkit(mode);
+        await testkit(mode, 600);
     });

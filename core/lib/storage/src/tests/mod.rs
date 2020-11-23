@@ -30,7 +30,7 @@
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 // use diesel::Connection;
 
-mod chain;
+pub(crate) mod chain;
 mod config;
 mod data_restore;
 mod ethereum;
