@@ -190,7 +190,9 @@ async fn gas_price_test() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
-    let contracts = deploy_contracts(false, Default::default());
+    let genesis_root = genesis_state(&fee_account.address).tree.root_hash();
+
+    let contracts = deploy_contracts(false, genesis_root);
 
     let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
@@ -242,7 +244,7 @@ async fn gas_price_test() {
         accounts,
         &contracts,
         commit_account,
-        Default::default(),
+        genesis_root,
     );
 
     let rng = &mut XorShiftRng::from_seed([0, 1, 2, 3]);

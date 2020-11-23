@@ -31,7 +31,6 @@ use self::{
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
 use zksync_types::aggregated_operations::AggregatedOperation;
-use zksync_types::block::{ExecuteBlockInfo, StoredBlockInfo};
 
 mod database;
 mod ethereum_interface;

@@ -69,7 +69,6 @@ impl ZkSyncPriorityOp {
         // see contracts/contracts/Operations.sol
         match op_type_id {
             DepositOp::OP_CODE => {
-                println!("dep pd {}", hex::encode(pub_data));
                 let pub_data_left = pub_data;
 
                 let (_, pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);

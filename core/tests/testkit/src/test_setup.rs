@@ -9,8 +9,8 @@ use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
 use zksync_core::state_keeper::StateKeeperRequest;
 use zksync_types::{
-    mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address,
-    PriorityOp, TokenId, ZkSyncTx,
+    mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address, Fr,
+    PriorityOp, TokenId, ZkSyncTx, H256, U256,
 };
 
 use web3::types::TransactionReceipt;
@@ -21,6 +21,9 @@ use zksync_types::block::Block;
 use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
+use zksync_types::aggregated_operations::{
+    BlockExecuteOperationArg, BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
+};
 
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
@@ -40,6 +43,8 @@ pub struct TestSetup {
     pub expected_changes_for_current_block: ExpectedAccountState,
 
     pub commit_account: EthereumAccount<Http>,
+
+    pub last_committed_block: Block,
 }
 
 impl TestSetup {
@@ -48,6 +53,7 @@ impl TestSetup {
         accounts: AccountSet<Http>,
         deployed_contracts: &Contracts,
         commit_account: EthereumAccount<Http>,
+        initial_root: Fr,
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address);
@@ -59,6 +65,18 @@ impl TestSetup {
             tokens,
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
+            last_committed_block: Block::new(
+                0,
+                initial_root,
+                0,
+                vec![],
+                (0, 0),
+                0,
+                U256::from(0),
+                U256::from(0),
+                H256::default(),
+                0,
+            ),
         }
     }
 
@@ -617,21 +635,22 @@ impl TestSetup {
 
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
     pub async fn execute_commit_block(&mut self) -> (ETHExecResult, Block) {
-        self.state_keeper_request_sender
-            .clone()
-            .send(StateKeeperRequest::SealBlock)
-            .await
-            .expect("sk receiver dropped");
-
-        let new_block = self.await_for_block_commit_request().await;
-
-        (
-            self.commit_account
-                .commit_block(&new_block.block)
-                .await
-                .expect("block commit fail"),
-            new_block.block,
-        )
+        unimplemented!();
+        // self.state_keeper_request_sender
+        //     .clone()
+        //     .send(StateKeeperRequest::SealBlock)
+        //     .await
+        //     .expect("sk receiver dropped");
+        //
+        // let new_block = self.await_for_block_commit_request().await;
+        //
+        // (
+        //     self.commit_account
+        //         .commit_block(&new_block.block)
+        //         .await
+        //         .expect("block commit fail"),
+        //     new_block.block,
+        // )
     }
 
     pub async fn execute_verify_block(
@@ -639,10 +658,11 @@ impl TestSetup {
         block: &Block,
         proof: EncodedProofPlonk,
     ) -> ETHExecResult {
-        self.commit_account
-            .verify_block(block, Some(proof))
-            .await
-            .expect("block verify fail")
+        unimplemented!()
+        // self.commit_account
+        //     .verify_block(block, Some(proof))
+        //     .await
+        //     .expect("block verify fail")
     }
 
     pub async fn execute_commit_and_verify_block(
@@ -654,27 +674,46 @@ impl TestSetup {
             .await
             .expect("sk receiver dropped");
 
-        let new_block = self.await_for_block_commit_request().await;
+        let new_block = self.await_for_block_commit_request().await.block;
 
+        let block_commit_op = BlocksCommitOperation {
+            last_committed_block: self.last_committed_block.clone(),
+            blocks: vec![new_block.clone()],
+        };
         let commit_result = self
             .commit_account
-            .commit_block(&new_block.block)
+            .commit_block(&block_commit_op)
             .await
             .expect("block commit send tx")
             .expect_success();
+
+        let block_proof_op = BlocksProofOperation {
+            commitments: vec![(new_block.block_commitment, new_block.block_number)],
+        };
         let verify_result = self
             .commit_account
-            .verify_block(&new_block.block, None)
+            .verify_block(&block_proof_op)
             .await
             .expect("block verify send tx")
             .expect_success();
+
+        let block_execute_op = BlocksExecuteOperation {
+            blocks: vec![BlockExecuteOperationArg {
+                block: new_block.clone(),
+                commitments: vec![new_block.block_commitment],
+                commitment_idx: 0,
+            }],
+        };
         let withdrawals_result = self
             .commit_account
-            .complete_withdrawals()
+            .execute_block(&block_execute_op)
             .await
-            .expect("complete withdrawal send tx")
+            .expect("execute block tx")
             .expect_success();
-        let block_chunks = new_block.block.block_chunks_size;
+
+        self.last_committed_block = new_block.clone();
+
+        let block_chunks = new_block.block_chunks_size;
 
         let mut block_checks_failed = false;
         for ((eth_account, token), expeted_balance) in
@@ -708,7 +747,7 @@ impl TestSetup {
         if block_checks_failed {
             println!(
                 "Failed block exec_operations: {:#?}",
-                new_block.block.block_transactions
+                new_block.block_transactions
             );
             bail!("Block checks failed")
         }

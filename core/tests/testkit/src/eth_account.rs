@@ -16,7 +16,10 @@ use zksync_crypto::convert::FeConvert;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::block::{Block, CommitBlockInfo, ExecuteBlockInfo, StoredBlockInfo};
+use zksync_types::aggregated_operations::{
+    BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
+};
+use zksync_types::block::Block;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 
 pub fn parse_ether(eth_value: &str) -> Result<BigUint, anyhow::Error> {
@@ -364,46 +367,13 @@ impl<T: Transport> EthereumAccount<T> {
 
     pub async fn commit_block(
         &self,
-        old_block_stored_info: StoredBlockInfo,
-        commit_info: CommitBlockInfo,
+        commit_operation: &BlocksCommitOperation,
     ) -> Result<ETHExecResult, anyhow::Error> {
-        // todo: move elsewhere
-        use ethabi::Token as EthToken;
-        let stored_block_info = EthToken::Tuple(vec![
-            EthToken::Uint(U256::from(old_block_stored_info.block_number)),
-            EthToken::Uint(U256::from(old_block_stored_info.priority_ops)),
-            EthToken::FixedBytes(
-                old_block_stored_info
-                    .processable_onchain_ops_hash
-                    .as_bytes()
-                    .to_vec(),
-            ),
-            EthToken::FixedBytes(old_block_stored_info.state_hash.as_bytes().to_vec()),
-            EthToken::FixedBytes(old_block_stored_info.commitment.as_bytes().to_vec()),
-        ]);
-        let onchain_ops = commit_info
-            .onchain_operations
-            .into_iter()
-            .map(|op| {
-                EthToken::Tuple(vec![
-                    EthToken::Uint(U256::from(op.public_data_offset)),
-                    EthToken::Bytes(op.eth_witness),
-                ])
-            })
-            .collect::<Vec<_>>();
-        let new_block_info = EthToken::Array(vec![EthToken::Tuple(vec![
-            EthToken::Uint(U256::from(commit_info.block_number)),
-            EthToken::Uint(U256::from(commit_info.fee_account)),
-            EthToken::FixedBytes(commit_info.state_hash.as_bytes().to_vec()),
-            EthToken::Bytes(commit_info.public_data),
-            EthToken::Array(onchain_ops),
-        ])]);
-
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "commitBlocks",
-                (stored_block_info, new_block_info),
+                commit_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await
@@ -418,14 +388,13 @@ impl<T: Transport> EthereumAccount<T> {
     // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
     pub async fn verify_block(
         &self,
-        commitment: H256,
-        proof: Option<EncodedProofPlonk>,
+        proof_operation: &BlocksProofOperation,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "verifyCommitments",
-                (vec![commitment], proof.unwrap_or_default().proof),
+                proof_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
             .await
@@ -438,44 +407,13 @@ impl<T: Transport> EthereumAccount<T> {
     // Completes pending withdrawals.
     pub async fn execute_block(
         &self,
-        block_info: &ExecuteBlockInfo,
+        execute_operation: &BlocksExecuteOperation,
     ) -> Result<ETHExecResult, anyhow::Error> {
-        use ethabi::Token as EthToken;
-        let execute_info = EthToken::Array(vec![EthToken::Tuple(vec![
-            EthToken::Tuple(vec![
-                EthToken::Uint(U256::from(block_info.stored_block_info.block_number)),
-                EthToken::Uint(U256::from(block_info.stored_block_info.priority_ops)),
-                EthToken::FixedBytes(
-                    block_info
-                        .stored_block_info
-                        .processable_onchain_ops_hash
-                        .as_bytes()
-                        .to_vec(),
-                ),
-                EthToken::FixedBytes(block_info.stored_block_info.state_hash.as_bytes().to_vec()),
-                EthToken::FixedBytes(block_info.stored_block_info.commitment.as_bytes().to_vec()),
-            ]),
-            EthToken::Array(
-                block_info
-                    .processable_ops_pubdata
-                    .iter()
-                    .map(|pubdata| EthToken::Bytes(pubdata.clone()))
-                    .collect(),
-            ),
-            EthToken::Array(
-                block_info
-                    .commitments_in_slot
-                    .iter()
-                    .map(|commitment| EthToken::FixedBytes(commitment.as_bytes().to_vec()))
-                    .collect(),
-            ),
-            EthToken::Uint(block_info.commitment_index),
-        ])]);
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "executeBlocks",
-                execute_info,
+                execute_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await

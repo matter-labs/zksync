@@ -159,22 +159,11 @@ impl ChangePubKey {
         // operation. Instead, fee data is signed via zkSync signature, which is essentially
         // free. This signature will be verified in the circuit.
 
-        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 184;
+        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 60;
         let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
-        eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");
-        eth_signed_msg.extend_from_slice(
-            format!(
-                "{pubkey}\n\
-                 nonce: 0x{nonce}\n\
-                 account id: 0x{account_id}\
-                 \n\n",
-                pubkey = hex::encode(&self.new_pk_hash.data).to_ascii_lowercase(),
-                nonce = hex::encode(&self.nonce.to_be_bytes()).to_ascii_lowercase(),
-                account_id = hex::encode(&self.account_id.to_be_bytes()).to_ascii_lowercase()
-            )
-            .as_bytes(),
-        );
-        eth_signed_msg.extend_from_slice(b"Only sign this message for a trusted client!");
+        eth_signed_msg.extend_from_slice(&self.new_pk_hash.data);
+        eth_signed_msg.extend_from_slice(&self.nonce.to_be_bytes());
+        eth_signed_msg.extend_from_slice(&self.account_id.to_be_bytes());
         // In case this transaction is not part of a batch, we simply append zeros.
         eth_signed_msg.extend_from_slice(self.batch_hash.as_bytes());
         ensure!(

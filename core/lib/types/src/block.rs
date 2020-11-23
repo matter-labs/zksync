@@ -359,41 +359,6 @@ impl Block {
         H256::from_slice(&sha256(&hash_arg))
     }
 
-    pub fn commit_block_info(
-        &self,
-        old_block_info: StoredBlockInfo,
-    ) -> (StoredBlockInfo, CommitBlockInfo) {
-        let commitment = Block::get_commitment(
-            self.block_number,
-            self.fee_account,
-            old_block_info.state_hash,
-            self.get_eth_encoded_root(),
-            self.timestamp,
-            &self.get_onchain_op_commitment(),
-            &self.get_eth_public_data(),
-        );
-
-        let (onchain_operations, processable_onchain_ops_hash, priority_ops) =
-            self.get_onchain_operations_block_info();
-        let new_stored_block_info = StoredBlockInfo {
-            block_number: self.block_number,
-            priority_ops,
-            processable_onchain_ops_hash,
-            state_hash: self.get_eth_encoded_root(),
-            commitment,
-        };
-
-        let commit_block_info = CommitBlockInfo {
-            block_number: self.block_number,
-            fee_account: self.fee_account,
-            state_hash: self.get_eth_encoded_root(),
-            public_data: self.get_eth_public_data(),
-            onchain_operations,
-        };
-
-        (new_stored_block_info, commit_block_info)
-    }
-
     pub fn processable_ops_pubdata(&self) -> Vec<Vec<u8>> {
         self.block_transactions
             .iter()
@@ -427,63 +392,7 @@ pub fn smallest_block_size_for_chunks(
 }
 
 #[derive(Debug, Clone)]
-pub struct StoredBlockInfo {
-    pub block_number: BlockNumber,
-    pub priority_ops: u64,
-    pub processable_onchain_ops_hash: H256,
-    pub state_hash: H256,
-    pub commitment: H256,
-}
-
-impl StoredBlockInfo {
-    pub fn genesis_block_stored_info(state_hash: Fr) -> Self {
-        let mut be_bytes = [0u8; 32];
-        state_hash
-            .into_repr()
-            .write_be(be_bytes.as_mut())
-            .expect("Write commit bytes");
-        let state_hash = H256::from(be_bytes);
-
-        Self {
-            block_number: 0,
-            priority_ops: 0,
-            processable_onchain_ops_hash: Vec::new().keccak256().into(),
-            state_hash,
-            commitment: H256::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct OnchainOperationsBlockInfo {
     pub public_data_offset: u32,
     pub eth_witness: Vec<u8>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CommitBlockInfo {
-    pub block_number: BlockNumber,
-    pub fee_account: AccountId,
-    pub state_hash: H256,
-    pub public_data: Vec<u8>,
-    pub onchain_operations: Vec<OnchainOperationsBlockInfo>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ExecuteBlockInfo {
-    pub stored_block_info: StoredBlockInfo,
-    pub processable_ops_pubdata: Vec<Vec<u8>>,
-    pub commitments_in_slot: Vec<H256>,
-    pub commitment_index: U256,
-}
-
-impl ExecuteBlockInfo {
-    pub fn new(stored_block_info: &StoredBlockInfo, block: &Block, commitment: H256) -> Self {
-        Self {
-            stored_block_info: stored_block_info.clone(),
-            processable_ops_pubdata: block.processable_ops_pubdata(),
-            commitments_in_slot: vec![commitment],
-            commitment_index: U256::from(0),
-        }
-    }
 }

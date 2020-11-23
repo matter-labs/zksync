@@ -1,13 +1,13 @@
 import { ArgumentParser } from 'argparse';
 import { deployContract } from 'ethereum-waffle';
 import { constants, ethers } from 'ethers';
-import { readTestContracts } from '../src.ts/deploy';
+import {readProductionContracts, readTestContracts} from '../src.ts/deploy';
 
 const { expect } = require('chai');
 
 export const FranklinTestUpgradeTargetContractCode = require(`../build/ZkSyncTestUpgradeTarget`);
 
-const testContracts = readTestContracts();
+const testContracts = readProductionContracts();
 
 async function main() {
     try {

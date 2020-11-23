@@ -23,9 +23,11 @@ pub async fn perform_basic_tests() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
+    let initial_root = genesis_state(&fee_account.address).tree.root_hash();
+
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_contracts(false, Default::default());
+    let contracts = deploy_contracts(false, initial_root);
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -77,7 +79,13 @@ pub async fn perform_basic_tests() {
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        initial_root,
+    );
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
