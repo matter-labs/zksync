@@ -24,7 +24,7 @@ export default {
             UPGRADE_NOTICE_PERIOD: 0,
             MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
             PRIORITY_EXPIRATION: 101,
-            DUMMY_VERIFIER: true,
+            DUMMY_VERIFIER: true
         }
     }
 };
