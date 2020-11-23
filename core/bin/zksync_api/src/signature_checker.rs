@@ -16,7 +16,7 @@ use tokio::runtime::{Builder, Handle};
 // Workspace uses
 use zksync_types::{
     tx::{BatchSignData, TxEthSignature},
-    SignedZkSyncTx, ZkSyncTx,
+    Address, SignedZkSyncTx, ZkSyncTx,
 };
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
@@ -81,16 +81,24 @@ async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
+    let accounts = &request.senders;
+
     match &request.tx {
         TxVariant::Tx(tx) => {
-            verify_eth_signature_single_tx(tx, eth_checker).await?;
+            if accounts.len() != 1 {
+                return Err(TxAddError::Other);
+            }
+            verify_eth_signature_single_tx(tx, accounts[0], eth_checker).await?;
         }
         TxVariant::Batch(txs, batch_sign_data) => {
-            verify_eth_signature_txs_batch(txs, batch_sign_data, eth_checker).await?;
+            if accounts.len() != txs.len() {
+                return Err(TxAddError::Other);
+            }
+            verify_eth_signature_txs_batch(accounts, batch_sign_data, eth_checker).await?;
             // In case there're signatures provided for some of transactions
             // we still verify them.
-            for tx in txs {
-                verify_eth_signature_single_tx(tx, eth_checker).await?;
+            for (tx, &account) in txs.iter().zip(accounts.iter()) {
+                verify_eth_signature_single_tx(tx, account, eth_checker).await?;
             }
         }
     }
@@ -100,6 +108,7 @@ async fn verify_eth_signature(
 
 async fn verify_eth_signature_single_tx(
     tx: &SignedZkSyncTx,
+    sender_address: Address,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
     let start = Instant::now();
@@ -130,14 +139,14 @@ async fn verify_eth_signature_single_tx(
                     .signature_recover_signer(&sign_data.message)
                     .or(Err(TxAddError::IncorrectEthSignature))?;
 
-                if signer_account != tx.tx.account() {
+                if signer_account != sender_address {
                     return Err(TxAddError::IncorrectEthSignature);
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
                 let signature_correct = eth_checker
                     .is_eip1271_signature_correct(
-                        tx.tx.account(),
+                        sender_address,
                         &sign_data.message,
                         signature.clone(),
                     )
@@ -159,7 +168,7 @@ async fn verify_eth_signature_single_tx(
 }
 
 async fn verify_eth_signature_txs_batch(
-    txs: &[SignedZkSyncTx],
+    senders: &[Address],
     batch_sign_data: &BatchSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
@@ -170,15 +179,15 @@ async fn verify_eth_signature_txs_batch(
                 .signature_recover_signer(&batch_sign_data.0.message)
                 .or(Err(TxAddError::IncorrectEthSignature))?;
 
-            if txs.iter().any(|tx| tx.tx.account() != signer_account) {
+            if senders.iter().any(|&account| account != signer_account) {
                 return Err(TxAddError::IncorrectEthSignature);
             }
         }
         TxEthSignature::EIP1271Signature(signature) => {
-            for tx in txs {
+            for &account in senders {
                 let signature_correct = eth_checker
                     .is_eip1271_signature_correct(
-                        tx.tx.account(),
+                        account,
                         &batch_sign_data.0.message,
                         signature.clone(),
                     )
@@ -221,6 +230,10 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
 #[derive(Debug)]
 pub struct VerifyTxSignatureRequest {
     pub tx: TxVariant,
+    /// Senders of transactions. This field is needed since for `ForcedExit` account affected by
+    /// the transaction and actual sender can be different. Thus, we require request sender to
+    /// perform a database query and fetch actual addresses if necessary.
+    pub senders: Vec<Address>,
     /// Channel for sending the check response.
     pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
 }

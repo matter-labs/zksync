@@ -23,6 +23,22 @@ pub use self::stored_state::StoredAccountState;
 pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
+    pub async fn account_address_by_id(&mut self, account_id: AccountId) -> QueryResult<Address> {
+        let start = Instant::now();
+
+        let bytes = sqlx::query!(
+            "SELECT address FROM account_creates WHERE account_id = $1",
+            i64::from(account_id)
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .address;
+        let address = Address::from_slice(&bytes);
+
+        metrics::histogram!("sql.chain", start.elapsed(), "account" => "account_address_by_id");
+        Ok(address)
+    }
+
     /// Obtains both committed and verified state for the account by its address.
     pub async fn account_state_by_address(
         &mut self,

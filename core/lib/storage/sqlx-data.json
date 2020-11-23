@@ -1798,6 +1798,26 @@
       ]
     }
   },
+  "74a5cc4affa23433b5b7834df6dfa1a7a2c5a65f23289de3de5a4f1b93f89c06": {
+    "query": "SELECT address FROM account_creates WHERE account_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "address",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "79117ff48eeebec2c4a80c403c8870705285420fa707e1474c2604490bfa778e": {
     "query": "SELECT * FROM proofs WHERE block_number = $1",
     "describe": {
