@@ -68,7 +68,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?
             .map(|a| (account_id, a));
 
-        metrics::histogram!("sql.chain", start.elapsed(), "account" => "account_state_by_address");
+        metrics::histogram!(
+            "sql.chain.account.account_state_by_address",
+            start.elapsed()
+        );
         Ok(StoredAccountState {
             committed,
             verified,
@@ -161,7 +164,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "account" => "last_committed_state_for_account");
+        metrics::histogram!(
+            "sql.chain.account.last_committed_state_for_account",
+            start.elapsed()
+        );
         Ok(account_state)
     }
 
@@ -173,7 +179,9 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     ) -> QueryResult<Option<Account>> {
         let start = Instant::now();
         let (_, account) = self.get_account_and_last_block(account_id).await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "account" => "last_verified_state_for_account"
+        metrics::histogram!(
+            "sql.chain.account.last_verified_state_for_account",
+            start.elapsed()
         );
         Ok(account)
     }
@@ -229,7 +237,10 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "account" => "get_account_and_last_block");
+        metrics::histogram!(
+            "sql.chain.account.get_account_and_last_block",
+            start.elapsed()
+        );
         result
     }
 }
