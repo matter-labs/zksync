@@ -24,7 +24,7 @@ use serde::export::PhantomData;
 /// - None - The state is updated completely last time - start from fetching the new events
 /// - Events - The events fetched and saved successfully - now get operations from them and update tree
 /// - Operations - There are operations that are not presented in the tree state - update tree state
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum StorageUpdateState {
     None,
     Events,

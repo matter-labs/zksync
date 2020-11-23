@@ -1,17 +1,23 @@
 use std::future::Future;
 
 use crate::data_restore_driver::StorageUpdateState;
-use crate::events::BlockEvent;
+use crate::events::{BlockEvent, EventType};
 use crate::events_state::{EventsState, NewTokenEvent};
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor::StorageInteractor;
+use ethabi::Address;
+use std::collections::HashMap;
 use web3::{
     types::H256,
     types::{Bytes, Log},
     RequestId, Transport,
 };
+use zksync_storage::data_restore::records::NewBlockEvent;
 use zksync_types::block::Block;
-use zksync_types::{AccountMap, AccountUpdate, AccountUpdates, TokenGenesisListItem};
+use zksync_types::{
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, EncodedProofPlonk,
+    Operation, Token, TokenGenesisListItem, ZkSyncOp,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct FakeTransport;
@@ -64,19 +70,55 @@ pub(crate) fn create_log(
     }
 }
 
-struct InMemoryStorageInteractor {}
+struct InMemoryStorageInteractor {
+    rollups: Vec<RollupOpsBlock>,
+    storage_state: StorageUpdateState,
+    tokens: HashMap<u16, Token>,
+    events_state: Vec<BlockEvent>,
+    last_watched_block: u64,
+    last_committed_block: u64,
+    last_verified_block: u64,
+    accounts: AccountMap,
+}
 
+#[async_trait::async_trait]
 impl StorageInteractor for InMemoryStorageInteractor {
     async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]) {
-        unimplemented!()
+        self.rollups = blocks.to_vec();
     }
 
     async fn update_tree_state(&mut self, block: Block, accounts_updated: AccountUpdates) {
-        unimplemented!()
+        let commit_op = Operation {
+            action: Action::Commit,
+            block: block.clone(),
+            id: None,
+        };
+
+        let verify_op = Operation {
+            action: Action::Verify {
+                proof: Box::new(EncodedProofPlonk::default()),
+            },
+            block: block.clone(),
+            id: None,
+        };
+
+        self.last_committed_block = commit_op.block.block_number as u64;
+        self.last_verified_block = verify_op.block.block_number as u64;
+
+        self.commit_state_update(block.block_number, accounts_updated);
+        // TODO save operations
     }
 
     async fn store_token(&mut self, token: TokenGenesisListItem, token_id: u16) {
-        unimplemented!()
+        let token = Token {
+            id: token_id,
+            symbol: token.symbol,
+            address: token.address[2..]
+                .parse()
+                .expect("failed to parse token address"),
+            decimals: token.decimals,
+        };
+        self.tokens.insert(token_id, token);
     }
 
     async fn save_events_state(
@@ -85,30 +127,123 @@ impl StorageInteractor for InMemoryStorageInteractor {
         tokens: &[NewTokenEvent],
         last_watched_eth_block_number: u64,
     ) {
-        unimplemented!()
+        self.events_state = block_events.to_vec();
+
+        for &NewTokenEvent { id, address } in tokens {
+            self.tokens.insert(
+                id,
+                Token {
+                    id,
+                    address,
+                    symbol: format!("ERC20-{}", id),
+                    decimals: 18,
+                },
+            );
+        }
+
+        self.last_watched_block = last_watched_eth_block_number;
+        self.storage_state = StorageUpdateState::Events;
     }
 
     async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate) {
-        unimplemented!()
+        self.commit_state_update(0, vec![(0, genesis_acc_update)]);
     }
 
     async fn get_block_events_state_from_storage(&mut self) -> EventsState {
-        unimplemented!()
+        let committed_events = self.load_committed_events_state();
+
+        let verified_events = self.load_verified_events_state();
+
+        EventsState {
+            committed_events,
+            verified_events,
+            last_watched_eth_block_number: self.last_watched_block,
+        }
     }
 
     async fn get_tree_state(&mut self) -> (u32, AccountMap, u64, u32) {
-        unimplemented!()
+        // TODO find a way how to get unprocessed_prior_ops and fee_acc_id
+        (self.last_verified_block as u32, self.accounts.clone(), 0, 0)
     }
 
     async fn get_ops_blocks_from_storage(&mut self) -> Vec<RollupOpsBlock> {
-        unimplemented!()
+        self.rollups.clone()
     }
 
     async fn update_eth_state(&mut self) {
-        unimplemented!()
+        // Do nothing it needs only for database
     }
 
     async fn get_storage_state(&mut self) -> StorageUpdateState {
-        unimplemented!()
+        self.storage_state
+    }
+}
+
+impl InMemoryStorageInteractor {
+    fn load_verified_events_state(&self) -> Vec<BlockEvent> {
+        self.events_state
+            .clone()
+            .into_iter()
+            .filter(|event| event.block_type == EventType::Verified)
+            .collect()
+    }
+    fn load_committed_events_state(&self) -> Vec<BlockEvent> {
+        // TODO avoid clone
+        self.events_state
+            .clone()
+            .into_iter()
+            .filter(|event| event.block_type == EventType::Committed)
+            .collect()
+    }
+    fn commit_state_update(
+        &mut self,
+        first_update_order_id: u32,
+        accounts_updated: AccountUpdates,
+    ) {
+        let update_order_ids =
+            first_update_order_id..first_update_order_id + accounts_updated.len() as u32;
+
+        for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
+            match *upd {
+                AccountUpdate::Create { ref address, nonce } => {
+                    let (mut acc, _) = Account::create_account(*id, address.clone());
+                    acc.nonce = nonce;
+                    self.accounts.insert(*id, acc);
+                }
+                AccountUpdate::Delete { ref address, nonce } => {
+                    let accounts: Vec<u32> = self
+                        .accounts
+                        .iter()
+                        .filter(|(acc_id, acc)| acc.address == address.clone())
+                        .map(|(acc_id, _)| *acc_id)
+                        .collect();
+                    self.accounts
+                        .remove(accounts.first().expect("account should be exists"));
+                }
+                AccountUpdate::UpdateBalance {
+                    balance_update: (token, ref old_balance, ref new_balance),
+                    old_nonce,
+                    new_nonce,
+                } => {
+                    let account = self
+                        .accounts
+                        .get_mut(id)
+                        .expect("In tests this account should be stored");
+                    account.set_balance(token, new_balance.clone());
+                }
+                AccountUpdate::ChangePubKeyHash {
+                    ref old_pub_key_hash,
+                    ref new_pub_key_hash,
+                    old_nonce,
+                    new_nonce,
+                } => {
+                    let account = self
+                        .accounts
+                        .get_mut(id)
+                        .expect("In tests this account should be stored");
+                    account.pub_key_hash = new_pub_key_hash.clone();
+                }
+            }
+        }
     }
 }
