@@ -1,10 +1,14 @@
 pub(crate) mod utils;
 
+use std::cmp::max;
+use std::{collections::HashMap, future::Future};
+
 use chrono::Utc;
 use futures::future;
 use jsonrpc_core::Params;
+use num::BigUint;
 use serde_json::{json, Value};
-use std::{collections::HashMap, future::Future};
+use web3::types::Bytes;
 use web3::{contract::tokens::Tokenize, types::Transaction, RequestId, Transport};
 
 use db_test_macro::test as db_test;
@@ -18,13 +22,13 @@ use zksync_types::{
     Log, PriorityOp, Withdraw, WithdrawOp, ZkSyncOp, H256,
 };
 
-use crate::data_restore_driver::DataRestoreDriver;
-use crate::database_storage_interactor::DatabaseStorageInteractor;
-use crate::tests::utils::{create_log, u32_to_32bytes, InMemoryStorageInteractor};
-use crate::{END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP};
-use num::BigUint;
-use std::cmp::max;
-use web3::types::Bytes;
+use crate::{
+    data_restore_driver::DataRestoreDriver,
+    database_storage_interactor::DatabaseStorageInteractor,
+    inmemory_storage_interactor::InMemoryStorageInteractor,
+    tests::utils::{create_log, u32_to_32bytes},
+    END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
+};
 
 fn create_withdraw_operations(
     account_id: u32,

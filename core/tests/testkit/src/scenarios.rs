@@ -5,6 +5,11 @@ use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::state_keeper_utils::spawn_state_keeper;
 use crate::zksync_account::ZkSyncAccount;
 
+use zksync_data_restore::{
+    data_restore_driver::DataRestoreDriver, inmemory_storage_interactor::InMemoryStorageInteractor,
+    END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
+};
+
 use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
@@ -33,6 +38,7 @@ pub async fn perform_basic_tests() {
     );
 
     let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
+
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
         commit_account_info.private_key,
@@ -90,6 +96,19 @@ pub async fn perform_basic_tests() {
         )
         .await;
     }
+    let mut interactor = InMemoryStorageInteractor::new();
+    let mut driver = DataRestoreDriver::new(
+        transport,
+        contracts.governance,
+        contracts.contract,
+        ETH_BLOCKS_STEP,
+        END_ETH_BLOCKS_OFFSET,
+        testkit_config.available_block_chunk_sizes,
+        true,
+        Default::default(),
+    );
+
+    driver.run_state_update(&mut interactor).await;
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");

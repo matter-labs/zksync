@@ -1,19 +1,3 @@
-pub mod contract_functions;
-pub mod data_restore_driver;
-pub mod database_storage_interactor;
-pub mod eth_tx_helpers;
-pub mod events;
-pub mod events_state;
-pub mod rollup_ops;
-mod storage_interactor;
-
-#[cfg(test)]
-mod tests;
-pub mod tree_state;
-
-use crate::data_restore_driver::DataRestoreDriver;
-use crate::database_storage_interactor::DatabaseStorageInteractor;
-use crate::storage_interactor::StorageInteractor;
 use serde::Deserialize;
 use structopt::StructOpt;
 use web3::transports::Http;
@@ -22,24 +6,11 @@ use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 use zksync_types::{tokens::get_genesis_token_list, Address, H256};
 
-// How many blocks we will process at once.
-const ETH_BLOCKS_STEP: u64 = 10_000;
-const END_ETH_BLOCKS_OFFSET: u64 = 40;
-
-async fn add_tokens_to_storage<I: StorageInteractor>(interactor: &mut I, eth_network: &str) {
-    let genesis_tokens =
-        get_genesis_token_list(&eth_network).expect("Initial token list not found");
-    for (id, token) in (1..).zip(genesis_tokens) {
-        interactor.store_token(token, id).await;
-        //     log::info!(
-        //         "Adding token: {}, id:{}, address: {}, decimals: {}",
-        //         token.symbol,
-        //         id,
-        //         token.address,
-        //         token.decimals
-        //     );
-    }
-}
+use zksync_data_restore::{
+    add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
+    database_storage_interactor::DatabaseStorageInteractor, storage_interactor::StorageInteractor,
+    END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
+};
 
 #[derive(StructOpt)]
 #[structopt(
