@@ -15,6 +15,8 @@ for template in $(ls dashboards); do
     echo Done
 done
 
+# AUTH must be in the form `login:password`
+# We should move to using API Keys instead
 [ -z $AUTH ] && echo 'Set $AUTH to deploy dashboards' && exit
 
 for template in $(ls dashboards); do

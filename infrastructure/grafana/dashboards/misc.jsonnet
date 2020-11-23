@@ -8,6 +8,8 @@ local metrics = [
   'mempool.propose_new_block',
   'signature_checker.verify_eth_signature_single_tx',
   'signature_checker.verify_eth_signature_txs_batch',
+  "sql.load_config",
+  "sql.connection_acquire",
 ];
 
 G.dashboard(

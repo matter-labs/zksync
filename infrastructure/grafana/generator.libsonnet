@@ -20,6 +20,7 @@
     $.grafana.dashboard.new(
       title,
       schemaVersion = 18,
-      editable = true
+      editable = true,
+      refresh = '1m'
     ).addPanels(panels)
 }
