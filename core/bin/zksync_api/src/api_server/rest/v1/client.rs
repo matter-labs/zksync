@@ -5,7 +5,7 @@ pub use super::{
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
     tokens::TokenPriceKind,
-    transactions::TxStatus,
+    transactions::{TxReceipt, SumbitErrorCode},
 };
 
 // Built-in uses
