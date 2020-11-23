@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Pre-push hook verifying that inappropriate code will not be pushed.
+
+# Colors for the terminal output
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Check that prettier formatting rules are not violated.
+if ! zk fmt --check; then
+    echo -e "${RED}Commit error!${NC}"
+    echo "Please format the code via 'zk fmt', cannot push unformatted code"
+    exit 1
+fi
