@@ -5,12 +5,12 @@ local gauge(title, metric) =
     title,
     datasource = 'Prometheus',
     reducerFunction = 'last'
-    ).addTarget(
-      G.grafana.prometheus.target(
-        metric,
-        legendFormat = '{{namespace}}'
-      )
-    ) + { gridPos: { h: G.height, w: G.width } };
+  ).addTarget(
+    G.grafana.prometheus.target(
+      metric,
+      legendFormat = '{{namespace}}'
+    )
+  ) + { gridPos: { h: G.height, w: G.width } };
 
 G.dashboard(
   'Metrics / statistics',
