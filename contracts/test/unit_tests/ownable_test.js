@@ -1,16 +1,17 @@
 const { expect } = require("chai")
-const { deployContract } = require("ethereum-waffle");
-const { wallet1, wallet2, deployTestContract, getCallRevertReason } = require("./common")
+const { getCallRevertReason } = require("./common")
+const hardhat = require("hardhat");
 
 
 describe("Ownable unit tests", function () {
     this.timeout(50000);
 
     let testContract
+    let wallet1, wallet2;
     before(async () => {
-        testContract = await deployContract(wallet1, require('../../build/Ownable'), [wallet1.address], {
-            gasLimit: 6000000,
-        })
+        [wallet1, wallet2] = await hardhat.ethers.getSigners();
+        const contractFactory = await hardhat.ethers.getContractFactory("Ownable");
+        testContract = await contractFactory.deploy(wallet1.address);
     });
 
     it("checking correctness of setting mastership in constructor", async () => {

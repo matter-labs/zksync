@@ -1,12 +1,13 @@
 const { expect } = require("chai")
-const { provider, wallet, deployTestContract, getCallRevertReason } = require("./common")
+const hardhat = require("hardhat");
 
 describe("Operations unit tests", function () {
     this.timeout(50000);
 
     let testContract
     before(async () => {
-        testContract = await deployTestContract('../../build/OperationsTest')
+        const contractFactory = await hardhat.ethers.getContractFactory("OperationsTest");
+        testContract = await contractFactory.deploy();
     });
 
     // Deposit
@@ -17,6 +18,7 @@ describe("Operations unit tests", function () {
 
     it("should return true when offchain and onchain Deposit pubdata match", async () => {
         let offchain = "0x" +
+            "01" +                                            // opType
             "01020304" +                                      // accountId -- not matching
             "0102" +                                          // tokenId
             "101112131415161718191a1b1c1d1e1f" +              // amount
@@ -26,6 +28,7 @@ describe("Operations unit tests", function () {
 
     it("should return true when padded offchain and packed onchain Deposit pubdata match", async () => {
         let offchain = "0x" +
+            "01" +                                          // opType
             "01020304" +                                    // accountId -- not matching
             "0102" +                                        // tokenId
             "101112131415161718191a1b1c1d1e1f" +            // amount
@@ -36,6 +39,7 @@ describe("Operations unit tests", function () {
 
     it("should return false when offchain and onchain Deposit pubdata don't match", async () => {
         let offchain = "0x" +
+            "01" +                                          // opType
             "01020304" +                                    // accountId
             "0000" +                                        // tokenId -- not matching
             "101112131415161718191a1b1c1d1e1f" +            // amount
@@ -43,6 +47,7 @@ describe("Operations unit tests", function () {
         expect(await testContract.testDepositMatch(offchain)).to.equal(false)
 
         offchain = "0x" +
+            "01" +                                            // opType
             "01020304" +                                      // accountId
             "0102" +                                          // tokenId
             "101112131415161718191a1b1c1d1e1f" +              // amount
@@ -58,6 +63,7 @@ describe("Operations unit tests", function () {
 
     it("should return true when offchain and onchain FullExit pubdata match", async () => {
         let offchain = "0x" +
+            "06" +                                        // opType
             "01020304" +                                  // accountId
             "823B747710C5bC9b8A47243f2c3d1805F1aA00c5" +  // owner
             "3132" +                                      // tokenId
@@ -67,6 +73,7 @@ describe("Operations unit tests", function () {
 
     it("should return true when padded offchain and unpadded onchain FullExit pubdata match", async () => {
         let offchain = "0x" +
+            "06" +                                        // opType
             "01020304" +                                  // accountId
             "823B747710C5bC9b8A47243f2c3d1805F1aA00c5" +  // owner
             "3132" +                                      // tokenId
@@ -77,6 +84,7 @@ describe("Operations unit tests", function () {
 
     it("should return false when offchain and onchain FullExit pubdata match", async () => {
         let offchain = "0x" +
+            "06" +                                        // opType
             "00020304" +                                  // accountId -- not matching
             "823B747710C5bC9b8A47243f2c3d1805F1aA00c5" +  // owner
             "3132" +                                      // tokenId
@@ -84,6 +92,7 @@ describe("Operations unit tests", function () {
         expect(await testContract.testFullExitMatch(offchain)).to.equal(false)
 
         offchain = "0x" +
+            "06" +                                        // opType
             "00020304" +                                  // accountId -- not matching
             "823B747710C5bC9b8A47243f2c3d1805F1aA00c5" +  // owner
             "3132" +                                      // tokenId
@@ -102,5 +111,4 @@ describe("Operations unit tests", function () {
     it("should convert ForcedExit pubdata", async () => {
         await testContract.testForcedExit()
     });
-
 });

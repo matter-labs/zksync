@@ -1,4 +1,5 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.7.0;
 
 import "./IEIP1271.sol";
 
@@ -9,11 +10,11 @@ contract AccountMock is IEIP1271 {
     // bytes4(keccak256("isValidSignature(bytes32,bytes)")
     bytes4 internal constant EIP1271_SUCCESS_RETURN_VALUE = 0x1626ba7e;
 
-    constructor(address _owner) public {
+    constructor(address _owner) {
         owner = _owner;
     }
 
-    function isValidSignature(bytes32 _hash, bytes memory _signature) public view returns (bytes4) {
+    function isValidSignature(bytes32 _hash, bytes memory _signature) override public view returns (bytes4) {
         require(_signature.length == 65, "Signature length is incorrect");
         uint8 v;
         bytes32 r;

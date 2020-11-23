@@ -1,13 +1,15 @@
+const hardhat = require("hardhat");
 const { BigNumber } = require("ethers")
 const { expect } = require("chai")
-const { provider, wallet, deployTestContract, getCallRevertReason } = require("./common")
+const { getCallRevertReason } = require("./common")
 
 describe("Bytes unit tests", function () {
     this.timeout(50000);
 
     let bytesTestContract
     before(async () => {
-        bytesTestContract = await deployTestContract('../../build/BytesTest')
+        const contractFactory = await hardhat.ethers.getContractFactory("BytesTest");
+        bytesTestContract = await contractFactory.deploy();
     });
 
     // read
@@ -36,15 +38,4 @@ describe("Bytes unit tests", function () {
         expect(x).equal(r.r)
         expect(r.offset).equal(3)
     });
-
-    it("should convert to hex", async () => {
-        const x = Buffer.alloc(256);
-        for (let b = 0; b < 255; b++) {
-            x[b] = b
-        }
-        let hexString = x.toString("hex").toLowerCase();
-        let r = await bytesTestContract.bytesToHexConvert(x);
-        expect(r).eq(hexString);
-    });
-
 });

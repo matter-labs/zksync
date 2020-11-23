@@ -29,7 +29,7 @@ contract Config {
     uint8 constant SUCCESS_FLAG_BYTES = 1;
 
     /// @dev Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
-    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = 128;
+    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = $(MAX_AMOUNT_OF_REGISTERED_TOKENS);
 
     /// @dev Max account id that could be registered in the network
     uint32 constant MAX_ACCOUNT_ID = (2**24) - 1;
@@ -87,5 +87,5 @@ contract Config {
 
     /// @dev Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
     /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)
-    uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 minutes;
+    uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 15 minutes;
 }

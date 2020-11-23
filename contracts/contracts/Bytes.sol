@@ -232,51 +232,6 @@ library Bytes {
         r = bytesToBytes32(_data, _offset);
     }
 
-    // Helper function for hex conversion.
-    function halfByteToHex(bytes1 _byte) internal pure returns (bytes1 _hexByte) {
-        require(uint8(_byte) < 0x10, "hbh11"); // half byte's value is out of 0..15 range.
-
-        // "FEDCBA9876543210" ASCII-encoded, shifted and automatically truncated.
-        return bytes1(uint8(0x66656463626139383736353433323130 >> (uint8(_byte) * 8)));
-    }
-
-    // Convert bytes to ASCII hex representation
-    function bytesToHexASCIIBytes(bytes memory _input) internal pure returns (bytes memory _output) {
-        bytes memory outStringBytes = new bytes(_input.length * 2);
-
-        // code in `assembly` construction is equivalent of the next code:
-        // for (uint i = 0; i < _input.length; ++i) {
-        //     outStringBytes[i*2] = halfByteToHex(_input[i] >> 4);
-        //     outStringBytes[i*2+1] = halfByteToHex(_input[i] & 0x0f);
-        // }
-        assembly {
-            let input_curr := add(_input, 0x20)
-            let input_end := add(input_curr, mload(_input))
-
-            for {
-                let out_curr := add(outStringBytes, 0x20)
-            } lt(input_curr, input_end) {
-                input_curr := add(input_curr, 0x01)
-                out_curr := add(out_curr, 0x02)
-            } {
-                let curr_input_byte := shr(0xf8, mload(input_curr))
-                // here outStringByte from each half of input byte calculates by the next:
-                //
-                // "FEDCBA9876543210" ASCII-encoded, shifted and automatically truncated.
-                // outStringByte = byte (uint8 (0x66656463626139383736353433323130 >> (uint8 (_byteHalf) * 8)))
-                mstore(
-                    out_curr,
-                    shl(0xf8, shr(mul(shr(0x04, curr_input_byte), 0x08), 0x66656463626139383736353433323130))
-                )
-                mstore(
-                    add(out_curr, 0x01),
-                    shl(0xf8, shr(mul(and(0x0f, curr_input_byte), 0x08), 0x66656463626139383736353433323130))
-                )
-            }
-        }
-        return outStringBytes;
-    }
-
     /// Trim bytes into single word
     function trim(bytes memory _data, uint256 _new_length) internal pure returns (uint256 r) {
         require(_new_length <= 0x20, "trm10"); // new_length is longer than word

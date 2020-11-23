@@ -68,37 +68,58 @@ contract OperationsTest {
         return Operations.fullExitPubdataMatch(onchain, offchain);
     }
 
-    // TODO: read only test
-    //    function testPartialExit() external pure {
-    //        Operations.PartialExit memory x = Operations.PartialExit({
-    //            tokenId: 0x3132,
-    //            amount: 0x101112131415161718191a1b1c1d1e1f,
-    //            owner: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5
-    //        });
-    //
-    //        bytes memory pubdata = Operations.writePartialExitPubdata(x);
-    //        Operations.PartialExit memory r = Operations.readPartialExitPubdata(pubdata);
-    //
-    //        require(x.owner == r.owner,     "owner mismatch");
-    //        require(x.tokenId == r.tokenId, "tokenId mismatch");
-    //        require(x.amount == r.amount,   "amount mismatch");
-    //    }
+    function writePartialExitPubdata(Operations.PartialExit memory op) internal pure returns (bytes memory buf) {
+        buf = abi.encodePacked(
+            uint8(Operations.OpType.PartialExit),
+            bytes4(0), // accountId - ignored
+            op.tokenId, // tokenId
+            op.amount, // amount
+            bytes2(0), // fee - ignored
+            op.owner // owner
+        );
+    }
 
-    // TODO: read only test
-    //    function testForcedExit() external pure {
-    //        Operations.ForcedExit memory x = Operations.ForcedExit({
-    //            target: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
-    //            tokenId: 0x3132,
-    //            amount: 0x101112131415161718191a1b1c1d1e1f
-    //        });
-    //
-    //        bytes memory pubdata = Operations.writeForcedExitPubdata(x);
-    //        Operations.ForcedExit memory r = Operations.readForcedExitPubdata(pubdata);
-    //
-    //        require(x.target == r.target,   "target mismatch");
-    //        require(x.tokenId == r.tokenId, "tokenId mismatch");
-    //        require(x.amount == r.amount,   "packed amount mismatch");
-    //    }
+    function testPartialExit() external pure {
+            Operations.PartialExit memory x = Operations.PartialExit({
+                tokenId: 0x3132,
+                amount: 0x101112131415161718191a1b1c1d1e1f,
+                owner: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5
+            });
+
+            bytes memory pubdata = writePartialExitPubdata(x);
+            Operations.PartialExit memory r = Operations.readPartialExitPubdata(pubdata);
+
+            require(x.owner == r.owner,     "owner mismatch");
+            require(x.tokenId == r.tokenId, "tokenId mismatch");
+            require(x.amount == r.amount,   "amount mismatch");
+        }
+
+    function writeForcedExitPubdata(Operations.ForcedExit memory op) internal pure returns (bytes memory buf) {
+        buf = abi.encodePacked(
+            uint8(Operations.OpType.ForcedExit),
+            bytes4(0), // initator accountId - ignored
+            bytes4(0), // target accountId - ignored
+            op.tokenId, // tokenId
+            op.amount, // amount
+            bytes2(0), // fee - ignored
+            op.target // owner
+        );
+    }
+
+        function testForcedExit() external pure {
+            Operations.ForcedExit memory x = Operations.ForcedExit({
+                target: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
+                tokenId: 0x3132,
+                amount: 0x101112131415161718191a1b1c1d1e1f
+            });
+
+            bytes memory pubdata = writeForcedExitPubdata(x);
+            Operations.ForcedExit memory r = Operations.readForcedExitPubdata(pubdata);
+
+            require(x.target == r.target,   "target mismatch");
+            require(x.tokenId == r.tokenId, "tokenId mismatch");
+            require(x.amount == r.amount,   "packed amount mismatch");
+        }
 
     function parseDepositFromPubdata(bytes calldata _pubdata)
         external

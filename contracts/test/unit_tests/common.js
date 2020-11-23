@@ -57,7 +57,13 @@ async function getCallRevertReason(f) {
     try {
         result = await f();
     } catch(e) {
-        revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
+        try {
+            const data = e.stackTrace[e.stackTrace.length - 1].message.slice(4);
+            revertReason = ethers.utils.defaultAbiCoder.decode(["string"], data)[0];
+        } catch (err2) {
+            throw e;
+        }
+        // revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
     } 
     return {revertReason, result};
 }

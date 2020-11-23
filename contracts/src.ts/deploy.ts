@@ -1,5 +1,5 @@
 import { deployContract } from 'ethereum-waffle';
-import { Contract, ethers, Signer, providers } from 'ethers';
+import { ethers, Signer, providers } from 'ethers';
 import { formatEther, Interface } from 'ethers/lib/utils';
 import * as fs from 'fs';
 import {
@@ -8,7 +8,15 @@ import {
     publishAbiToTesseracts,
     publishSourceCodeToEtherscan
 } from './publish-utils';
-import { Governance, GovernanceFactory } from '../typechain';
+import {
+    Governance,
+    GovernanceFactory, UpgradeGatekeeper,
+    UpgradeGatekeeperFactory,
+    Verifier,
+    VerifierFactory,
+    ZkSync,
+    ZkSyncFactory
+} from '../typechain';
 
 export interface Contracts {
     governance;
@@ -273,19 +281,15 @@ export class Deployer {
         return GovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
     }
 
-    public zkSyncContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(this.addresses.ZkSync, this.contracts.zkSync.abi, signerOrProvider);
+    public zkSyncContract(signerOrProvider: Signer | providers.Provider): ZkSync {
+        return ZkSyncFactory.connect(this.addresses.ZkSync, signerOrProvider)
     }
 
-    public verifierContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(this.addresses.Verifier, this.contracts.verifier.abi, signerOrProvider);
+    public verifierContract(signerOrProvider: Signer | providers.Provider): Verifier {
+        return VerifierFactory.connect(this.addresses.Verifier, signerOrProvider);
     }
 
-    public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(
-            this.addresses.UpgradeGatekeeper,
-            this.contracts.upgradeGatekeeper.abi,
-            signerOrProvider
-        );
+    public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): UpgradeGatekeeper{
+        return UpgradeGatekeeperFactory.connect(this.addresses.UpgradeGatekeeper, signerOrProvider);
     }
 }
