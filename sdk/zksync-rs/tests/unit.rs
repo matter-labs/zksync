@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use zksync::{tokens_cache::TokensCache, web3::types::H160, zksync_types::Token};
+use zksync_config::test_config::unit_vectors::Config as TestVectorsConfig;
 
 #[test]
 fn test_tokens_cache() {
@@ -54,4 +55,10 @@ fn test_tokens_cache() {
     assert!(!tokens_hash.is_eth(token_dai.address.into()));
     assert!(!tokens_hash.is_eth(token_dai.id.into()));
     assert!(!tokens_hash.is_eth((&token_dai.symbol as &str).into()));
+}
+
+#[test]
+fn check_test_vectors() {
+    let test_vectors = TestVectorsConfig::load();
+    panic!("{:#?}", test_vectors);
 }

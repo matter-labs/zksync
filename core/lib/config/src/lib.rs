@@ -3,7 +3,7 @@ use std::{env, net::SocketAddr, str::FromStr, time::Duration};
 // External uses
 use url::Url;
 // Workspace uses
-use zksync_basic_types::{H160, H256};
+use zksync_types::{H160, H256};
 use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
 

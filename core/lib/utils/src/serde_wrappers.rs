@@ -76,3 +76,32 @@ impl From<BigUint> for BigUintSerdeWrapper {
         BigUintSerdeWrapper(uint)
     }
 }
+
+/// Serialize Vec<u8> into hex series
+#[derive(Debug)]
+pub struct PrefixedHex;
+
+impl PrefixedHex {
+    pub fn serialize<S>(val: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&format!("0x{}", hex::encode(val)))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use hex::FromHex;
+        use serde::de::Error;
+
+        let input = String::deserialize(deserializer)?;
+
+        if let Some(input) = input.strip_prefix("0x") {
+            Vec::from_hex(input).map_err(Error::custom)
+        } else {
+            Err(Error::custom("The prefix '0x' was expected but not found"))
+        }
+    }
+}
