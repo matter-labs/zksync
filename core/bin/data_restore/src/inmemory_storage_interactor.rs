@@ -29,6 +29,12 @@ pub struct InMemoryStorageInteractor {
     accounts: AccountMap,
 }
 
+impl Default for InMemoryStorageInteractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait::async_trait]
 impl StorageInteractor for InMemoryStorageInteractor {
     async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]) {

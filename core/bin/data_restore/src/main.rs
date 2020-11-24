@@ -4,12 +4,11 @@ use web3::transports::Http;
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
-use zksync_types::{tokens::get_genesis_token_list, Address, H256};
+use zksync_types::{Address, H256};
 
 use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
-    database_storage_interactor::DatabaseStorageInteractor, storage_interactor::StorageInteractor,
-    END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
+    database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
 
 #[derive(StructOpt)]
