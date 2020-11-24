@@ -390,29 +390,6 @@ async fn store_pending_block() {
 mod execute_proposed_block {
     use super::*;
 
-    /// Checks if executing an empty proposed_block is done correctly
-    #[tokio::test]
-    async fn empty() {
-        let mut tester = StateKeeperTester::new(1, 1, 1, 1);
-        let proposed_block = ProposedBlock {
-            txs: vec![],
-            priority_ops: vec![],
-        };
-        let pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
-        if let Some(CommitRequest::PendingBlock(_)) = tester.response_rx.next().await {
-            assert_eq!(
-                pending_block_iteration,
-                tester.state_keeper.pending_block.pending_block_iteration
-            );
-        } else {
-            panic!("Empty block not stored");
-        }
-    }
-
     /// Checks if executing a small proposed_block is done correctly
     #[tokio::test]
     async fn small() {
