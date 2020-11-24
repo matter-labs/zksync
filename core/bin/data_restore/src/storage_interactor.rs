@@ -16,6 +16,13 @@ use crate::{
     rollup_ops::RollupOpsBlock,
 };
 
+pub struct StoredTreeState {
+    pub last_block_number: u32,
+    pub account_map: AccountMap,
+    pub unprocessed_prior_ops: u64,
+    pub fee_acc_id: u32,
+}
+
 #[async_trait::async_trait]
 pub trait StorageInteractor {
     /// Saves Rollup operations blocks in storage
@@ -25,6 +32,7 @@ pub trait StorageInteractor {
     /// * `blocks` - Rollup operations blocks
     ///
     async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]);
+
     /// Updates stored tree state: saves block transactions in storage, stores blocks and account updates
     ///
     /// # Arguments
@@ -33,6 +41,13 @@ pub trait StorageInteractor {
     /// * `accounts_updated` - accounts updates
     ///
     async fn update_tree_state(&mut self, block: Block, accounts_updated: AccountUpdates);
+
+    /// Store token to the storage  
+    /// # Arguments
+    ///
+    /// * `token` - Token that added when deploying contract
+    /// * `token_id` - Id for token in our system
+    ///
     async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId);
 
     /// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
@@ -57,15 +72,20 @@ pub trait StorageInteractor {
     /// * `genesis_acc_update` - Genesis account update
     ///
     async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate);
+
     /// Returns Rollup contract events state from storage
     async fn get_block_events_state_from_storage(&mut self) -> EventsState;
+
     /// Returns the current Rollup block, tree accounts map, unprocessed priority ops and the last fee acc from storage
-    async fn get_tree_state(&mut self) -> (u32, AccountMap, u64, u32);
+    async fn get_tree_state(&mut self) -> StoredTreeState;
+
     /// Returns Rollup operations blocks from storage
     async fn get_ops_blocks_from_storage(&mut self) -> Vec<RollupOpsBlock>;
+
     /// Updates the `eth_stats` table with the currently last available committed/verified blocks
     /// data for `eth_sender` module to operate correctly.
     async fn update_eth_state(&mut self);
+
     /// Returns last recovery state update step from storage
     async fn get_storage_state(&mut self) -> StorageUpdateState;
 }

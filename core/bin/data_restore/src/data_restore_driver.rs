@@ -204,10 +204,10 @@ where
         self.events_state = interactor.get_block_events_state_from_storage().await;
         let tree_state = interactor.get_tree_state().await;
         self.tree_state = TreeState::load(
-            tree_state.0, // current block
-            tree_state.1, // account map
-            tree_state.2, // unprocessed priority op
-            tree_state.3, // fee account
+            tree_state.last_block_number,     // current block
+            tree_state.account_map,           // account map
+            tree_state.unprocessed_prior_ops, // unprocessed priority op
+            tree_state.fee_acc_id,            // fee account
             self.available_block_chunk_sizes.clone(),
         );
         match state {

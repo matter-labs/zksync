@@ -377,7 +377,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     assert_eq!(driver.tree_state.state.block_number, 2)
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_with_inmemory_storage() {
     let mut transport = Web3Transport::new();
 

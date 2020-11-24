@@ -15,6 +15,7 @@ use crate::{
     events_state::{EventsState, NewTokenEvent},
     rollup_ops::RollupOpsBlock,
     storage_interactor::StorageInteractor,
+    storage_interactor::StoredTreeState,
 };
 
 pub struct InMemoryStorageInteractor {
@@ -23,8 +24,8 @@ pub struct InMemoryStorageInteractor {
     tokens: HashMap<u16, Token>,
     events_state: Vec<BlockEvent>,
     last_watched_block: u64,
-    last_committed_block: u64,
-    last_verified_block: u64,
+    last_committed_block: u32,
+    last_verified_block: u32,
     accounts: AccountMap,
 }
 
@@ -50,8 +51,8 @@ impl StorageInteractor for InMemoryStorageInteractor {
             id: None,
         };
 
-        self.last_committed_block = commit_op.block.block_number as u64;
-        self.last_verified_block = verify_op.block.block_number as u64;
+        self.last_committed_block = commit_op.block.block_number;
+        self.last_verified_block = verify_op.block.block_number;
 
         self.commit_state_update(block.block_number, accounts_updated);
         self.storage_state = StorageUpdateState::None
@@ -110,9 +111,14 @@ impl StorageInteractor for InMemoryStorageInteractor {
         }
     }
 
-    async fn get_tree_state(&mut self) -> (u32, AccountMap, u64, u32) {
+    async fn get_tree_state(&mut self) -> StoredTreeState {
         // TODO find a way how to get unprocessed_prior_ops and fee_acc_id
-        (self.last_verified_block as u32, self.accounts.clone(), 0, 0)
+        StoredTreeState {
+            last_block_number: self.last_verified_block,
+            account_map: self.accounts.clone(),
+            unprocessed_prior_ops: 0,
+            fee_acc_id: 0,
+        }
     }
 
     async fn get_ops_blocks_from_storage(&mut self) -> Vec<RollupOpsBlock> {
@@ -174,10 +180,10 @@ impl InMemoryStorageInteractor {
             first_update_order_id..first_update_order_id + accounts_updated.len() as u32;
 
         for (_, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
-            match *upd {
+            match upd {
                 AccountUpdate::Create { ref address, nonce } => {
                     let (mut acc, _) = Account::create_account(*id, *address);
-                    acc.nonce = nonce;
+                    acc.nonce = *nonce;
                     self.accounts.insert(*id, acc);
                 }
                 AccountUpdate::Delete {
@@ -188,7 +194,7 @@ impl InMemoryStorageInteractor {
                     self.accounts.remove(&acc_id);
                 }
                 AccountUpdate::UpdateBalance {
-                    balance_update: (token, _, ref new_balance),
+                    balance_update: (token, _, new_balance),
                     old_nonce: _,
                     new_nonce,
                 } => {
@@ -196,8 +202,8 @@ impl InMemoryStorageInteractor {
                         .accounts
                         .get_mut(id)
                         .expect("In tests this account should be stored");
-                    account.set_balance(token, new_balance.clone());
-                    account.nonce = max(account.nonce, new_nonce);
+                    account.set_balance(*token, new_balance.clone());
+                    account.nonce = max(account.nonce, *new_nonce);
                 }
                 AccountUpdate::ChangePubKeyHash {
                     old_pub_key_hash: _,
@@ -209,7 +215,7 @@ impl InMemoryStorageInteractor {
                         .accounts
                         .get_mut(id)
                         .expect("In tests this account should be stored");
-                    account.nonce = max(account.nonce, new_nonce);
+                    account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = new_pub_key_hash.clone();
                 }
             }

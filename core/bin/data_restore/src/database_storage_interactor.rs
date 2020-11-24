@@ -5,10 +5,11 @@ use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
     Action, Operation, Token, TokenGenesisListItem, TokenId,
-    {block::Block, AccountMap, AccountUpdate, AccountUpdates, ZkSyncOp},
+    {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
 };
 
 // Local deps
+use crate::storage_interactor::StoredTreeState;
 use crate::{
     data_restore_driver::StorageUpdateState,
     events::BlockEvent,
@@ -205,7 +206,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         }
     }
 
-    async fn get_tree_state(&mut self) -> (u32, AccountMap, u64, u32) {
+    async fn get_tree_state(&mut self) -> StoredTreeState {
         let (last_block, account_map) = self
             .storage
             .chain()
@@ -225,7 +226,12 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         let (unprocessed_prior_ops, fee_acc_id) =
             (block.processed_priority_ops.1, block.fee_account);
 
-        (last_block, account_map, unprocessed_prior_ops, fee_acc_id)
+        StoredTreeState {
+            last_block_number: last_block,
+            account_map,
+            unprocessed_prior_ops,
+            fee_acc_id,
+        }
     }
 
     async fn get_ops_blocks_from_storage(&mut self) -> Vec<RollupOpsBlock> {
