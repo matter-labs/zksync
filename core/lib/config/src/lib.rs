@@ -13,7 +13,7 @@ pub mod test_config;
 fn addr_from_port(port: u16) -> SocketAddr {
     format!("0.0.0.0:{}", port)
         .parse::<SocketAddr>()
-        .expect("Cant get address from port")
+        .expect("Can't get address from port")
 }
 
 /// Configuration options for `eth_sender`.
