@@ -1,6 +1,8 @@
 //! `zksync_crypto` is a crate containing essential zkSync cryptographic primitives, such as private keys and hashers.
 
-use crate::franklin_crypto::bellman::pairing::bn256;
+use crate::franklin_crypto::bellman::{
+    pairing::bn256, plonk::better_cs::cs::PlonkCsWidth4WithNextStepParams,
+};
 use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
     jubjub::{FixedGenerators, JubjubEngine},
@@ -12,6 +14,7 @@ mod crypto_exports {
     pub use crate::franklin_crypto::bellman::pairing::ff;
     pub use franklin_crypto;
     pub use rand;
+    pub use recursive_aggregation_circuit;
 }
 
 pub use crypto_exports::*;
@@ -32,6 +35,7 @@ pub use fnv;
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
 pub type Fs = <Engine as JubjubEngine>::Fs;
+pub type PlonkCS = PlonkCsWidth4WithNextStepParams;
 
 pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;

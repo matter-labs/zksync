@@ -163,7 +163,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
         *self.prepared_computations.lock().unwrap() = Some(precomp);
 
         self.api_client
-            .publish(block, verified_proof)
+            .publish(block, todo!())
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
         log::info!("finished and published proof for block {}", block);

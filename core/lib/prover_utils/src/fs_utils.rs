@@ -91,3 +91,9 @@ pub fn get_verifier_contract_key_path() -> PathBuf {
     contract.push("KeysWithPlonkVerifier.sol");
     contract
 }
+
+pub fn get_recursive_verification_key_path(number_of_proofs: usize) -> PathBuf {
+    let mut key = get_keys_root_dir();
+    key.push(&format!("recursive_{}.key", number_of_proofs));
+    key
+}

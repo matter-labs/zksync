@@ -56,6 +56,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint256 commitmentIdx;
     }
 
+    /// @notice Recursive proof input data (individual commitments are constructed onchain)
+    struct ProofInput {
+        uint256[] recursiveInput;
+        uint256[] proof;
+        uint256[] commitments;
+        uint8[] vkIndexes;
+        uint256[16] subproofsLimbs;
+    }
+
     // Upgrade functional
 
     /// @notice Notice period before activation preparation status of upgrade mode
@@ -429,19 +438,20 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Blocks commitment verification.
     /// @notice Only verifies block commitments without any other processing
-    function verifyCommitments(
-        uint256[] memory _recursiveInput,
-        uint256[] memory _proof,
-        uint8[] memory _vkIndexes,
-        uint256[] memory _commitments,
-        uint256[16] memory _subproofsLibms
-    ) external {
+    function verifyCommitments(ProofInput memory _proof) external {
         bool success =
-            verifier.verifyAggregatedProof(_recursiveInput, _proof, _vkIndexes, _commitments, _subproofsLibms);
+            verifier.verifyAggregatedProof(
+                _proof.recursiveInput,
+                _proof.proof,
+                _proof.vkIndexes,
+                _proof.commitments,
+                _proof.subproofsLimbs,
+                true
+            );
 
         require(success, "vf1"); // Aggregated proof verification fail
 
-        verifiedCommitmentHashes[keccak256(abi.encode(_commitments))] = true;
+        verifiedCommitmentHashes[keccak256(abi.encode(_proof.commitments))] = true;
     }
 
     /// @notice Reverts unverified blocks
@@ -498,16 +508,30 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _accountId,
         uint16 _tokenId,
         uint128 _amount,
-        uint256[] calldata _proof
+        ProofInput memory _proof
     ) external nonReentrant {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
         require(exodusMode, "fet11"); // must be in exodus mode
         require(!exited[_accountId][_tokenId], "fet12"); // already exited
         require(storedBlockHashes[totalBlocksVerified] == hashStoredBlockInfo(_storedBlockInfo), "fet13"); // incorrect sotred block info
-        require(
-            verifier.verifyExitProof(_storedBlockInfo.stateHash, _accountId, msg.sender, _tokenId, _amount, _proof),
-            "fet13"
-        ); // verification failed
+
+        uint256 commitment =
+            uint256(sha256(abi.encodePacked(_storedBlockInfo.stateHash, _accountId, msg.sender, _tokenId, _amount)));
+        require(_proof.commitments.length == 1, "fet15");
+        uint256 mask = (~uint256(0)) >> 3;
+        commitment = commitment & mask;
+        require(_proof.commitments[0] == commitment, "fet14");
+
+        bool proofCorrect =
+            verifier.verifyAggregatedProof(
+                _proof.recursiveInput,
+                _proof.proof,
+                _proof.vkIndexes,
+                _proof.commitments,
+                _proof.subproofsLimbs,
+                false
+            );
+        require(proofCorrect, "fet13");
 
         increaseBalanceToWithdraw(packedBalanceKey, _amount);
         exited[_accountId][_tokenId] = true;

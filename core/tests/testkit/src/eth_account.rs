@@ -13,11 +13,11 @@ use web3::types::{
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::convert::FeConvert;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::{EncodedAggregatedProof, EncodedProofPlonk};
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::aggregated_operations::{
-    BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
+    stored_block_info, BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
 };
 use zksync_types::block::Block;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
@@ -160,23 +160,26 @@ impl<T: Transport> EthereumAccount<T> {
 
     pub async fn exit(
         &self,
+        last_block: &Block,
         account_id: AccountId,
         token_id: TokenId,
         amount: &BigUint,
-        proof: EncodedProofPlonk,
+        proof: EncodedAggregatedProof,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let mut options = Options::default();
         options.gas = Some(3_000_000.into()); // `exit` function requires more gas to operate.
 
+        let stored_block_info = stored_block_info(last_block);
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "exit",
                 (
+                    stored_block_info,
                     u64::from(account_id),
                     u64::from(token_id),
                     U128::from(amount.to_u128().unwrap()),
-                    proof.proof,
+                    proof.get_eth_tx_args(),
                 ),
                 options,
             )
@@ -388,13 +391,13 @@ impl<T: Transport> EthereumAccount<T> {
     // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
     pub async fn verify_block(
         &self,
-        proof_operation: &BlocksProofOperation,
+        proof: &EncodedAggregatedProof,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "verifyCommitments",
-                proof_operation.get_eth_tx_args().as_slice(),
+                proof.get_eth_tx_args(),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
             .await

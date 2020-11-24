@@ -18,7 +18,7 @@ export async function gen(command: 'contract' | 'all') {
 
     if (command == 'all') {
         const time = new Date();
-        fs.utimesSync('core/models/src/lib.rs', time, time);
+        fs.utimesSync('core/lib/crypto/src/params.rs', time, time);
         fs.mkdirSync(outputDir, { recursive: true });
         await utils.spawn('cargo run --bin key_generator --release -- keys');
     }

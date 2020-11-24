@@ -10,11 +10,13 @@
 //! and `SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS` that are read from env in config files.
 //! Before generating parameters universal setup keys should be downloaded using `zksync plonk-setup` command.
 
+mod recursive_keys;
 mod verifier_contract_generator;
 mod zksync_key;
 
 use structopt::StructOpt;
 
+use crate::recursive_keys::make_recursive_verification_keys;
 use crate::verifier_contract_generator::create_verifier_contract;
 use crate::zksync_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
 use zksync_config::AvailableBlockSizesConfig;
@@ -44,6 +46,7 @@ fn main() {
         Command::Keys => {
             make_plonk_exodus_verify_key();
             make_plonk_blocks_verify_keys(config);
+            make_recursive_verification_keys();
         }
         Command::Contract => {
             create_verifier_contract(config);

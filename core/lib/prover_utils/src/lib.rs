@@ -1,3 +1,4 @@
+use crate::aggregated_proofs::SingleProof;
 use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -6,15 +7,22 @@ use std::sync::{Arc, Mutex};
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use zksync_crypto::bellman::plonk::better_cs::{
     adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::Proof,
-    keys::SetupPolynomials, keys::VerificationKey,
+    keys::SetupPolynomials, keys::VerificationKey, verifier::verify,
 };
 use zksync_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-use zksync_crypto::bellman::plonk::{prove_by_steps, setup, transpile, verify};
+use zksync_crypto::bellman::plonk::{prove_by_steps, setup, transpile};
 use zksync_crypto::franklin_crypto::bellman::Circuit;
+use zksync_crypto::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
+use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use zksync_crypto::franklin_crypto::rescue::rescue_transcript::RescueTranscriptForRNS;
+use zksync_crypto::pairing::Engine as EngineTrait;
+use zksync_crypto::params::RECURSIVE_CIRCUIT_VK_TREE_DEPTH;
 use zksync_crypto::primitives::EthereumSerializer;
 use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::recursive_aggregation_circuit::circuit::create_vks_tree;
 use zksync_crypto::{Engine, Fr};
 
+pub mod aggregated_proofs;
 pub mod api;
 pub mod fs_utils;
 pub mod network_utils;
@@ -24,7 +32,7 @@ pub mod serialization;
 pub const SETUP_MIN_POW2: u32 = 20;
 pub const SETUP_MAX_POW2: u32 = 26;
 
-pub struct PlonkVerificationKey(VerificationKey<Engine, PlonkCsWidth4WithNextStepParams>);
+pub struct PlonkVerificationKey(pub VerificationKey<Engine, PlonkCsWidth4WithNextStepParams>);
 
 impl PlonkVerificationKey {
     pub fn read_verification_key_for_main_circuit(
@@ -39,6 +47,31 @@ impl PlonkVerificationKey {
         let verification_key =
             VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
         Ok(Self(verification_key))
+    }
+
+    pub fn get_vk_tree_root_hash(blocks_chunks: &[usize]) -> Fr {
+        let block_vks = blocks_chunks
+            .iter()
+            .map(|block_chunks| {
+                PlonkVerificationKey::read_verification_key_for_main_circuit(*block_chunks)
+                    .expect("Failed to get block vk")
+                    .0
+            })
+            .collect::<Vec<_>>();
+        let (_, (vk_tree, _)) = create_vks_tree(&block_vks, RECURSIVE_CIRCUIT_VK_TREE_DEPTH)
+            .expect("Failed to create vk tree");
+        vk_tree.get_commitment()
+    }
+
+    pub fn get_vk_tree_root_hash_exit_proof() -> Fr {
+        let vks = vec![
+            PlonkVerificationKey::read_verification_key_for_exit_circuit()
+                .expect("Failed to get block vk")
+                .0,
+        ];
+        let (_, (vk_tree, _)) = create_vks_tree(&vks, RECURSIVE_CIRCUIT_VK_TREE_DEPTH)
+            .expect("Failed to create vk tree");
+        vk_tree.get_commitment()
     }
 }
 
@@ -74,8 +107,13 @@ impl SetupForStepByStepProver {
         &self,
         circuit: C,
         vk: &PlonkVerificationKey,
-    ) -> Result<EncodedProofPlonk, anyhow::Error> {
-        let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
+    ) -> Result<SingleProof, anyhow::Error> {
+        let rns_params =
+            RnsParameters::<Engine, <Engine as EngineTrait>::Fq>::new_for_field(68, 110, 4);
+        let rescue_params = Bn256RescueParams::new_checked_2_into_1();
+
+        let transcript_params = (&rescue_params, &rns_params);
+        let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
             circuit,
             &self.hints,
             &self.setup_polynomials,
@@ -83,11 +121,13 @@ impl SetupForStepByStepProver {
             self.key_monomial_form
                 .as_ref()
                 .expect("Setup should have universal setup struct"),
+            Some(transcript_params),
         )?;
 
-        let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk.0)?;
+        let valid =
+            verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         anyhow::ensure!(valid, "proof for block is invalid");
-        Ok(serialize_proof(&proof))
+        Ok(proof)
     }
 }
 
@@ -104,7 +144,7 @@ impl Drop for SetupForStepByStepProver {
 /// Generates proof for exit given circuit using step-by-step algorithm.
 pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     circuit: C,
-) -> Result<EncodedProofPlonk, anyhow::Error> {
+) -> Result<SingleProof, anyhow::Error> {
     let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
 
     log::info!("Proof for circuit started");
@@ -116,19 +156,26 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     let size_log2 = std::cmp::max(size_log2, SETUP_MIN_POW2); // for exit circuit
     let key_monomial_form = get_universal_setup_monomial_form(size_log2, false)?;
 
-    let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
+    let rns_params =
+        RnsParameters::<Engine, <Engine as EngineTrait>::Fq>::new_for_field(68, 110, 4);
+    let rescue_params = Bn256RescueParams::new_checked_2_into_1();
+
+    let transcript_params = (&rescue_params, &rns_params);
+    let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
         circuit,
         &hints,
         &setup,
         None,
         &key_monomial_form,
+        Some(transcript_params),
     )?;
 
-    let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
+    let valid =
+        verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk, Some(transcript_params))?;
     anyhow::ensure!(valid, "proof for exit is invalid");
 
     log::info!("Proof for circuit successful");
-    Ok(serialize_proof(&proof))
+    Ok(proof)
 }
 
 pub fn serialize_proof(

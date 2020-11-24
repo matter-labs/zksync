@@ -132,7 +132,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Deposit to other account test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
+        test_setup.execute_commit_block().await; //.0.expect_success();
     }
 
     // test two deposits
@@ -160,7 +160,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Deposit test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
+        test_setup.execute_commit_block().await; //.0.expect_success();
     }
 
     // test transfers
@@ -248,7 +248,7 @@ pub async fn perform_basic_operations(
             .expect("Block execution failed");
         println!("Transfer test success, token_id: {}", token);
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
+        test_setup.execute_commit_block().await; //.0.expect_success();
     }
 
     test_setup.start_block();
@@ -261,6 +261,6 @@ pub async fn perform_basic_operations(
             .await
             .expect("Block execution failed");
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
+        test_setup.execute_commit_block().await; //.0.expect_success();
     }
 }

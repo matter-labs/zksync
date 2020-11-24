@@ -9,34 +9,26 @@ pub struct BlocksCommitOperation {
     pub blocks: Vec<Block>,
 }
 
+pub fn stored_block_info(block: &Block) -> Token {
+    Token::Tuple(vec![
+        Token::Uint(U256::from(block.block_number)),
+        Token::Uint(U256::from(block.number_of_processed_prior_ops())),
+        Token::FixedBytes(
+            block
+                .get_onchain_operations_block_info()
+                .1
+                .as_bytes()
+                .to_vec(),
+        ),
+        Token::Uint(U256::from(block.timestamp)),
+        Token::FixedBytes(block.get_eth_encoded_root().as_bytes().to_vec()),
+        Token::FixedBytes(block.block_commitment.as_bytes().to_vec()),
+    ])
+}
+
 impl BlocksCommitOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
-        let stored_block_info = Token::Tuple(vec![
-            Token::Uint(U256::from(self.last_committed_block.block_number)),
-            Token::Uint(U256::from(
-                self.last_committed_block.number_of_processed_prior_ops(),
-            )),
-            Token::FixedBytes(
-                self.last_committed_block
-                    .get_onchain_operations_block_info()
-                    .1
-                    .as_bytes()
-                    .to_vec(),
-            ),
-            Token::Uint(U256::from(self.last_committed_block.timestamp)),
-            Token::FixedBytes(
-                self.last_committed_block
-                    .get_eth_encoded_root()
-                    .as_bytes()
-                    .to_vec(),
-            ),
-            Token::FixedBytes(
-                self.last_committed_block
-                    .block_commitment
-                    .as_bytes()
-                    .to_vec(),
-            ),
-        ]);
+        let stored_block_info = stored_block_info(&self.last_committed_block);
         let blocks_to_commit = self
             .blocks
             .iter()
@@ -76,7 +68,6 @@ impl BlocksProofOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
         let recursive_input = Token::Array(vec![Token::Uint(U256::from(0)); 1]);
         let proof = Token::Array(vec![Token::Uint(U256::from(0)); 33]);
-        let vk_indexes = Token::Array(vec![Token::Uint(U256::from(0)); self.commitments.len()]);
         let commitments = Token::Array(
             self.commitments
                 .iter()
@@ -85,14 +76,15 @@ impl BlocksProofOperation {
                 })
                 .collect(),
         );
+        let vk_indexes = Token::Array(vec![Token::Uint(U256::from(0)); self.commitments.len()]);
         let subproof_limbs = Token::FixedArray(vec![Token::Uint(U256::from(0)); 16]);
-        vec![
+        vec![Token::Tuple(vec![
             recursive_input,
             proof,
-            vk_indexes,
             commitments,
+            vk_indexes,
             subproof_limbs,
-        ]
+        ])]
     }
 }
 

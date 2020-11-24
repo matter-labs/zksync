@@ -654,13 +654,13 @@ checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
 [[package]]
 name = "bellman_ce"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#f551a55d83d2ea604b2dbfe096fd9dcfdaedb189"
+source = "git+https://github.com/matter-labs/bellman?branch=dev#2b233f69e2941e91fa24177d3807a75ce333e887"
 dependencies = [
  "bit-vec",
  "blake2s_const",
  "blake2s_simd",
  "byteorder",
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "crossbeam",
  "futures 0.3.6",
  "hex",
@@ -677,7 +677,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1374191e2dd25f9ae02e3aa95041ed5d747fc77b3c102b49fe2dd9a8117a6244"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
  "serde",
@@ -712,6 +712,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake2"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
+dependencies = [
+ "crypto-mac 0.8.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
+
+[[package]]
 name = "blake2-rfc_bellman_edition"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -725,7 +736,7 @@ dependencies = [
 [[package]]
 name = "blake2s_const"
 version = "0.6.0"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#f551a55d83d2ea604b2dbfe096fd9dcfdaedb189"
+source = "git+https://github.com/matter-labs/bellman?branch=dev#2b233f69e2941e91fa24177d3807a75ce333e887"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.1",
@@ -1564,9 +1575,9 @@ dependencies = [
 
 [[package]]
 name = "ff_ce"
-version = "0.9.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83c0a6a2c53b0bd6d8cae976816dc8a171e0554c03f304e3dac110473e0219fd"
+checksum = "38107cbd8bac0d907d7e7513c9f68c95adbda9e6f6f6bdf3f5111c6ecac4fe47"
 dependencies = [
  "byteorder",
  "ff_derive_ce",
@@ -1576,11 +1587,11 @@ dependencies = [
 
 [[package]]
 name = "ff_derive_ce"
-version = "0.7.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7543567f0c51910363eb5706ee2f5368a64e79a8ae607d0332aa60bae03a1bb1"
+checksum = "77d4fecbd8714dc12f4bab026d74e3f5766436bf4d9fc1161709d6e45a593400"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
  "proc-macro2",
@@ -1648,21 +1659,26 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#8361d0768ea0f252e387b87c707cdc3e46a92974"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=dev#9490a611b974f3247af94b1a2fd0234aa1ff4544"
 dependencies = [
  "bellman_ce",
  "bit-vec",
+ "blake2",
  "blake2-rfc_bellman_edition",
+ "blake2s_simd",
  "byteorder",
  "digest 0.7.6",
+ "hex",
  "hmac 0.7.1",
- "num-bigint",
+ "itertools 0.9.0",
+ "num-bigint 0.3.1",
  "num-integer",
  "num-traits",
  "rand 0.4.6",
  "serde",
  "serde_derive",
  "sha2 0.8.2",
+ "splitmut",
  "tiny-keccak 1.5.0",
 ]
 
@@ -2939,7 +2955,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8536030f9fea7127f841b45bb6243b27255787fb4eb83958aa1ef9d2fdc0c36"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-complex",
  "num-integer",
  "num-iter",
@@ -2957,6 +2973,17 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e9a41747ae4633fce5adffb4d2e81ffc5e89593cb19917f8fb2cc5ff76507bf"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -2998,7 +3025,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c000134b5dbf44adc5cb772486d335293351644b801551abe8f75c84cfa4aef"
 dependencies = [
  "autocfg 1.0.1",
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
  "serde",
@@ -3088,11 +3115,12 @@ dependencies = [
 
 [[package]]
 name = "pairing_ce"
-version = "0.20.0"
+version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c7b23aa7f0489d9a5e8e15cc5b7cb4f3e9b9d64812b8875fb91d25b640b0939"
+checksum = "1e753515675eaaa98071d814bea0148ae8c9d7995fa0531bf222e7857e3f1759"
 dependencies = [
  "byteorder",
+ "cfg-if 1.0.0",
  "ff_ce",
  "rand 0.4.6",
 ]
@@ -3719,6 +3747,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "recursive_aggregation_circuit"
+version = "1.0.0"
+source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git#6582c2ade8edca3aa14a0e397430d766326e515f"
+dependencies = [
+ "franklin-crypto",
+ "hex",
+ "once_cell",
+ "sha2 0.9.1",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4121,7 +4160,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "692ca13de57ce0613a363c8c2f1de925adebc81b04c923ac60c5488bb44abe4b"
 dependencies = [
  "chrono",
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-traits",
 ]
 
@@ -4186,6 +4225,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
+name = "splitmut"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c85070f382340e8b23a75808e83573ddf65f9ad9143df9573ca37c1ed2ee956a"
+
+[[package]]
 name = "sqlformat"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4235,7 +4280,7 @@ dependencies = [
  "lru-cache",
  "md-5",
  "memchr",
- "num-bigint",
+ "num-bigint 0.2.6",
  "once_cell",
  "parking_lot 0.11.0",
  "percent-encoding 2.1.0",
@@ -5662,6 +5707,7 @@ name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "ethabi 12.0.0",
  "fnv",
  "franklin-crypto",
  "hex",
@@ -5669,6 +5715,7 @@ dependencies = [
  "num",
  "rand 0.4.6",
  "rayon",
+ "recursive_aggregation_circuit",
  "serde",
  "serde_json",
  "zksync_basic_types",

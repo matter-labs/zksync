@@ -14,7 +14,7 @@ use zksync_types::{
 };
 
 use web3::types::TransactionReceipt;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::{EncodedAggregatedProof, EncodedProofPlonk};
 use zksync_crypto::rand::Rng;
 use zksync_types::block::Block;
 
@@ -265,10 +265,11 @@ impl TestSetup {
         account_id: AccountId,
         token_id: Token,
         amount: &BigUint,
-        proof: EncodedProofPlonk,
+        proof: EncodedAggregatedProof,
     ) -> ETHExecResult {
+        let last_block = &self.last_committed_block;
         self.accounts.eth_accounts[sending_account.0]
-            .exit(account_id, token_id.0, amount, proof)
+            .exit(last_block, account_id, token_id.0, amount, proof)
             .await
             .expect("Exit failed")
     }
@@ -634,23 +635,26 @@ impl TestSetup {
     }
 
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
-    pub async fn execute_commit_block(&mut self) -> (ETHExecResult, Block) {
-        unimplemented!();
-        // self.state_keeper_request_sender
-        //     .clone()
-        //     .send(StateKeeperRequest::SealBlock)
-        //     .await
-        //     .expect("sk receiver dropped");
-        //
-        // let new_block = self.await_for_block_commit_request().await;
-        //
-        // (
-        //     self.commit_account
-        //         .commit_block(&new_block.block)
-        //         .await
-        //         .expect("block commit fail"),
-        //     new_block.block,
-        // )
+    pub async fn execute_commit_block(&mut self) -> Block {
+        self.state_keeper_request_sender
+            .clone()
+            .send(StateKeeperRequest::SealBlock)
+            .await
+            .expect("sk receiver dropped");
+
+        let new_block = self.await_for_block_commit_request().await;
+
+        new_block.block
+    }
+
+    pub async fn execute_verify_commitments(
+        &mut self,
+        proof: EncodedAggregatedProof,
+    ) -> ETHExecResult {
+        self.commit_account
+            .verify_block(&proof)
+            .await
+            .expect("block verify fail")
     }
 
     pub async fn execute_verify_block(
@@ -687,12 +691,15 @@ impl TestSetup {
             .expect("block commit send tx")
             .expect_success();
 
-        let block_proof_op = BlocksProofOperation {
-            commitments: vec![(new_block.block_commitment, new_block.block_number)],
-        };
+        // let block_proof_op = BlocksProofOperation {
+        //     commitments: vec![(new_block.block_commitment, new_block.block_number)],
+        // };
+        let mut proof = EncodedAggregatedProof::default();
+        proof.individual_vk_inputs[0] =
+            U256::from_big_endian(new_block.block_commitment.as_bytes());
         let verify_result = self
             .commit_account
-            .verify_block(&block_proof_op)
+            .verify_block(&proof)
             .await
             .expect("block verify send tx")
             .expect_success();
@@ -877,7 +884,7 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedProofPlonk, BigUint) {
+    ) -> (EncodedAggregatedProof, BigUint) {
         let owner = &self.accounts.zksync_accounts[fund_owner.0];
         let owner_id = owner
             .get_account_id()
