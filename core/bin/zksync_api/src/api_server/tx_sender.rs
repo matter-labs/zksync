@@ -301,7 +301,6 @@ impl TxSender {
                     .await
                     .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
             );
-            // tx_senders.push(self.get_tx_sender(&tx.0).await.map_err(SubmitError::internal)?);
         }
 
         if let Some(signature) = eth_signature {

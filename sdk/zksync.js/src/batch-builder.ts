@@ -200,8 +200,8 @@ export class BatchBuilder {
      * Sets transactions nonces, assembles the batch and serializes them into single array.
      */
     private async processTransactions(): Promise<{ txs: SignedTransaction[]; bytes: Uint8Array }> {
-        let txs: SignedTransaction[] = [];
-        let _bytes: Uint8Array[] = [];
+        const txs: SignedTransaction[] = [];
+        const _bytes: Uint8Array[] = [];
         let nonce: number = await this.wallet.getNonce(this.nonce);
         for (let tx of this.txs) {
             tx.tx.nonce = nonce++;

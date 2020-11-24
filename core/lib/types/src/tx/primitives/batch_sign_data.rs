@@ -1,5 +1,5 @@
 // External uses
-use anyhow::{ensure, Result};
+use anyhow::ensure;
 use tiny_keccak::keccak256;
 // Local uses
 use super::eth_signature::TxEthSignature;
@@ -13,7 +13,7 @@ pub struct BatchSignData(pub EthSignData);
 impl BatchSignData {
     /// Construct the message user is expected to sign for the given batch and pack
     /// it along with signature.
-    pub fn new(txs: &[ZkSyncTx], signature: TxEthSignature) -> Result<BatchSignData> {
+    pub fn new(txs: &[ZkSyncTx], signature: TxEthSignature) -> anyhow::Result<BatchSignData> {
         ensure!(!txs.is_empty(), "Transaction batch cannot be empty");
         // First, check, if `ChangePubKey` is present in the batch. If it is,
         // we expect its signature to be always present and the following message to be signed:
@@ -32,12 +32,12 @@ impl BatchSignData {
             iter.next().is_none(),
             "ChangePubKey operation must be unique within a batch"
         );
-
+        // We only prefix the batch message in case `change_pub_key` has Ethereum signature.
         let change_pub_key_message = change_pub_key
             .filter(|tx| tx.eth_signature.is_some())
             .map(|tx| tx.get_eth_signed_data())
             .transpose()?;
-
+        // The hash is already present in `change_pub_key_message`.
         let message = change_pub_key_message.unwrap_or_else(|| {
             keccak256(
                 txs.iter()
