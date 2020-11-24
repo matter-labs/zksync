@@ -68,7 +68,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             Ok(None)
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "tx_receipt");
+        metrics::histogram!("sql.chain.operations_ext.tx_receipt", start.elapsed());
         result
     }
 
@@ -107,7 +107,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }),
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_priority_op_receipt");
+        metrics::histogram!(
+            "sql.chain.operations_ext.get_priority_op_receipt",
+            start.elapsed()
+        );
         result
     }
 
@@ -219,7 +222,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             None
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "find_tx_by_hash");
+        metrics::histogram!("sql.chain.operations_ext.find_tx_by_hash", start.elapsed());
         Ok(result)
     }
 
@@ -299,7 +302,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             None
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "find_priority_op_by_hash");
+        metrics::histogram!(
+            "sql.chain.operations_ext.find_priority_op_by_hash",
+            start.elapsed()
+        );
         Ok(result)
     }
 
@@ -348,7 +354,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "account_created_on");
+        metrics::histogram!(
+            "sql.chain.operations_ext.account_created_on",
+            start.elapsed()
+        );
         Ok(first_history_entry.map(|entry| entry.created_at))
     }
 
@@ -488,7 +497,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }
         }
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_account_transactions_history");
+        metrics::histogram!(
+            "sql.chain.operations_ext.get_account_transactions_history",
+            start.elapsed()
+        );
         Ok(tx_history)
     }
 
@@ -657,7 +669,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }
         }
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_account_transactions_history_from");
+        metrics::histogram!(
+            "sql.chain.operations_ext.get_account_transactions_history_from",
+            start.elapsed()
+        );
         Ok(tx_history)
     }
 }
