@@ -304,8 +304,10 @@ pub mod conversion_test {
     use super::*;
 
     // General configuration parameters for all types of operations
+    const ACCOUNT_ID: u32 = 100;
+    const TOKEN_ID: u16 = 5;
+    const NONCE: u32 = 20;
     lazy_static! {
-        static ref ACCOUNT_ID: u32 = 100;
         static ref ALICE: Address =
             Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap();
         static ref BOB: Address =
@@ -313,20 +315,18 @@ pub mod conversion_test {
         static ref PK_HASH: PubKeyHash =
             PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap();
         static ref AMOUNT: BigUint = BigUint::from(12345678u64);
-        static ref TOKEN_ID: u16 = 5;
         static ref FEE: BigUint = BigUint::from(1000000u32);
-        static ref NONCE: u32 = 20;
     }
 
     #[test]
     fn test_convert_to_bytes_change_pubkey() {
         let change_pubkey = ChangePubKey::new(
-            *ACCOUNT_ID,
+            ACCOUNT_ID,
             *ALICE,
             (*PK_HASH).clone(),
-            *TOKEN_ID,
+            TOKEN_ID,
             (*FEE).clone(),
-            *NONCE,
+            NONCE,
             None,
             None,
         );
@@ -338,13 +338,13 @@ pub mod conversion_test {
     #[test]
     fn test_convert_to_bytes_transfer() {
         let transfer = Transfer::new(
-            *ACCOUNT_ID,
+            ACCOUNT_ID,
             *ALICE,
             *BOB,
-            *TOKEN_ID,
+            TOKEN_ID,
             (*AMOUNT).clone(),
             (*FEE).clone(),
-            *NONCE,
+            NONCE,
             None,
         );
 
@@ -355,7 +355,7 @@ pub mod conversion_test {
     #[test]
     fn test_convert_to_bytes_forced_exit() {
         let forced_exit =
-            ForcedExit::new(*ACCOUNT_ID, *ALICE, *TOKEN_ID, (*FEE).clone(), *NONCE, None);
+            ForcedExit::new(ACCOUNT_ID, *ALICE, TOKEN_ID, (*FEE).clone(), NONCE, None);
 
         let bytes = forced_exit.get_bytes();
         assert_eq!(
@@ -367,13 +367,13 @@ pub mod conversion_test {
     #[test]
     fn test_convert_to_bytes_withdraw() {
         let withdraw = Withdraw::new(
-            *ACCOUNT_ID,
+            ACCOUNT_ID,
             *ALICE,
             *BOB,
-            *TOKEN_ID,
+            TOKEN_ID,
             (*AMOUNT).clone(),
             (*FEE).clone(),
-            *NONCE,
+            NONCE,
             None,
         );
 
