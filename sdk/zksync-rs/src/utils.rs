@@ -28,12 +28,13 @@ pub fn private_key_from_seed(seed: &[u8]) -> Result<PrivateKey, ClientError> {
         return Err(ClientError::SeedTooShort);
     }
 
-    let sha256_bytes = |input: &[u8]| -> Vec<u8> {
+    let sha256_bytes = |input: &[u8]| {
         let mut hasher = Sha256::new();
         hasher.input(input);
-        hasher.result().to_vec()
+        hasher.result()
     };
 
+    // FIXME: why do hash first time and then again?
     let mut effective_seed = sha256_bytes(seed);
 
     loop {
@@ -97,16 +98,43 @@ pub fn biguint_to_u256(value: BigUint) -> U256 {
     U256::from_little_endian(&bytes)
 }
 
-#[test]
-fn test_biguint_u256_conversions() {
-    // Make the value is big enough.
-    let u256 = U256::from(1_235_999_123_u64).pow(4u64.into());
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let biguint = u256_to_biguint(u256);
-    // Make sure that the string representations are the same.
-    assert_eq!(biguint.to_string(), u256.to_string());
+    fn biguint_u256_conversion_roundrip(u256: U256) {
+        let biguint = u256_to_biguint(u256);
+        // Make sure that the string representations are the same.
+        assert_eq!(biguint.to_string(), u256.to_string());
 
-    let u256_2 = biguint_to_u256(biguint);
+        let restored = biguint_to_u256(biguint);
+        assert_eq!(u256, restored);
+    }
 
-    assert_eq!(u256, u256_2);
+    #[test]
+    fn test_zero_conversion() {
+        biguint_u256_conversion_roundrip(U256::zero())
+    }
+
+    #[test]
+    fn test_biguint_u256_conversion() {
+        // random value that is big enough
+        let u256 = U256::from(1_235_999_123_u64).pow(4u64.into());
+        biguint_u256_conversion_roundrip(u256)
+    }
+
+    #[test]
+    fn test_biguint_with_msb_conversion() {
+        // make sure the most significant bit was set
+        let u256 = U256::from_big_endian(&[0b11010011; 32]);
+        biguint_u256_conversion_roundrip(u256)
+    }
+
+    #[test]
+    fn test_private_key_from_seed_too_short() {
+        let short_seed = &[42; 30];
+
+        let pk_err = private_key_from_seed(short_seed).map(|_| ()).unwrap_err();
+        assert_eq!(pk_err, ClientError::SeedTooShort);
+    }
 }
