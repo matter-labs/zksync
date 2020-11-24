@@ -681,6 +681,7 @@ mod execute_proposed_block {
             .execute_proposed_block(proposed_block_1)
             .await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.number, 1); // It's the first block.
             assert_eq!(block.success_operations.len(), 1);
             assert_eq!(
                 block.success_operations[0]
@@ -704,6 +705,7 @@ mod execute_proposed_block {
             .execute_proposed_block(proposed_block_2)
             .await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.number, 1); // It still should be the first block.
             assert_eq!(block.success_operations.len(), 1);
             assert_eq!(
                 block.success_operations[0]
