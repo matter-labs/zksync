@@ -552,4 +552,75 @@ mod execute_proposed_block {
             Some(CommitRequest::Block(_))
         ));
     }
+
+    /// Checks that only the difference between two states of a pending block is transmitted
+    /// to the committer.
+    #[tokio::test]
+    async fn pending_block_diff() {
+        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+
+        let good_withdraw_1 = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+        let bad_withdraw_1 = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let proposed_block_1 = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(good_withdraw_1.clone()),
+                SignedTxVariant::Tx(bad_withdraw_1.clone()),
+            ],
+            priority_ops: vec![],
+        };
+
+        let good_withdraw_2 = create_account_and_withdrawal(&mut tester, 0, 3, 200u32, 145u32);
+        let bad_withdraw_2 = create_account_and_withdrawal(&mut tester, 2, 4, 100u32, 145u32);
+        let proposed_block_2 = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(good_withdraw_2.clone()),
+                SignedTxVariant::Tx(bad_withdraw_2.clone()),
+            ],
+            priority_ops: vec![],
+        };
+
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block_1)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.success_operations.len(), 1);
+            assert_eq!(
+                block.success_operations[0]
+                    .get_executed_tx()
+                    .unwrap()
+                    .signed_tx
+                    .hash(),
+                good_withdraw_1.hash()
+            );
+
+            assert_eq!(block.failed_txs.len(), 1);
+            assert_eq!(block.failed_txs[0].signed_tx.hash(), bad_withdraw_1.hash());
+        } else {
+            panic!("Block #1 not stored");
+        }
+
+        // Now we execute the next proposed block and expect that only the diff between `pending_block_2` and
+        // `pending_block_1` will be sent.
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block_2)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.success_operations.len(), 1);
+            assert_eq!(
+                block.success_operations[0]
+                    .get_executed_tx()
+                    .unwrap()
+                    .signed_tx
+                    .hash(),
+                good_withdraw_2.hash()
+            );
+
+            assert_eq!(block.failed_txs.len(), 1);
+            assert_eq!(block.failed_txs[0].signed_tx.hash(), bad_withdraw_2.hash());
+        } else {
+            panic!("Block #2 not stored");
+        }
+    }
 }
