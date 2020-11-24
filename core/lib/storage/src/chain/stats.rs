@@ -24,7 +24,7 @@ impl<'a, 'c> StatsSchema<'a, 'c> {
         .count
         .unwrap_or(0);
 
-        metrics::histogram!("sql.chain", start.elapsed(), "stats" => "count_outstanding_proofs");
+        metrics::histogram!("sql.chain.stats.count_outstanding_proofs", start.elapsed());
         Ok(count as u32)
     }
 
@@ -44,7 +44,7 @@ impl<'a, 'c> StatsSchema<'a, 'c> {
             .count
             .unwrap_or(0);
 
-        metrics::histogram!("sql.chain", start.elapsed(), "stats" => "count_total_transactions");
+        metrics::histogram!("sql.chain.stats.count_total_transactions", start.elapsed());
         Ok((count_tx + prior_ops) as u32)
     }
 }
