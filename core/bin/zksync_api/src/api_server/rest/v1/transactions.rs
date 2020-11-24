@@ -98,18 +98,18 @@ impl ApiTransactionsData {
             if let Some(tx_receipt) = Self::tx_receipt(&mut storage, tx_hash).await? {
                 tx_receipt
             } else {
-                let contains_tx = storage
+                let tx_in_mempool = storage
                     .chain()
                     .mempool_schema()
                     .contains_tx(tx_hash)
                     .await?;
 
-                let tx_status = if contains_tx {
+                let tx_receipt = if tx_in_mempool {
                     Some(TxReceipt::Pending)
                 } else {
                     None
                 };
-                return Ok(tx_status);
+                return Ok(tx_receipt);
             }
         };
 
@@ -144,7 +144,7 @@ impl ApiTransactionsData {
             .filter(|block| block.commit_tx_hash.is_some())
             .is_some();
 
-        let tx_status = if is_committed {
+        let tx_receipt = if is_committed {
             TxReceipt::Committed {
                 block: block_number,
             }
@@ -152,7 +152,7 @@ impl ApiTransactionsData {
             TxReceipt::Executed
         };
 
-        Ok(Some(tx_status))
+        Ok(Some(tx_receipt))
     }
 
     async fn tx_data(&self, tx_hash: TxHash) -> QueryResult<Option<SignedZkSyncTx>> {
@@ -245,7 +245,7 @@ impl Client {
             .await
     }
 
-    /// Gets transaction status.
+    /// Gets actual transaction receipt.
     pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<TxReceipt>, ClientError> {
         self.get(&format!("transactions/{}", tx_hash.to_string()))
             .send()

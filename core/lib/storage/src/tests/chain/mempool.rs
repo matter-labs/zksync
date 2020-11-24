@@ -290,7 +290,7 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
 /// Checks that memory pool contains previously inserted transaction.
 #[db_test]
-async fn contrains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let txs = gen_transfers(5);
 
     // Make sure that the mempool responds that these transactions are missing.
