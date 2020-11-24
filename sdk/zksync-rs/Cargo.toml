@@ -27,6 +27,7 @@ thiserror = "1.0"
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
 anyhow = "1.0"
+hex = "0.4"
 
 [features]
 integration-tests = []

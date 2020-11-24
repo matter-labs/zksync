@@ -16,7 +16,7 @@ use crate::wallet::Wallet;
 // Public re-exports.
 pub use zksync_types::helpers::{
     closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
-    is_token_amount_packable,
+    is_token_amount_packable, pack_fee_amount, pack_token_amount,
 };
 
 /// Generates a new `PrivateKey` from seed using a deterministic algorithm:

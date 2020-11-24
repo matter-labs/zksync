@@ -49,10 +49,9 @@ pub struct CryptoPrimitiveInput {
 pub struct CryptoPrimitiveOutput {
     #[serde(with = "PrefixedHex")]
     pub private_key: Vec<u8>,
-    #[serde(with = "hex")]
-    pub pub_key_hash: Vec<u8>,
-    #[serde(with = "hex")]
-    pub signature: Vec<u8>,
+    // FIXME: is it really a hash?
+    pub pub_key_hash: String,
+    pub signature: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -182,10 +181,8 @@ pub struct TxOutput {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Signature {
-    #[serde(with = "hex")]
-    pub pub_key: Vec<u8>,
-    #[serde(with = "hex")]
-    pub signature: Vec<u8>,
+    pub pub_key: String,
+    pub signature: String,
 }
 
 #[derive(Debug, Deserialize)]
