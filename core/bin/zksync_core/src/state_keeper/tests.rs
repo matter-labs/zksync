@@ -553,6 +553,126 @@ mod execute_proposed_block {
         ));
     }
 
+    /// Checks the following things:
+    /// 1. if proposed block is empty, no pending block is yielded from the state keeper.
+    /// 2. if there were no successful operations in the block, pending block iteration is not incremented after empty or rejected-only updates.
+    /// 3. if there were successful operations in the block, pending block iteration is incremented after each `execute_proposed_block` call.
+    #[tokio::test]
+    async fn pending_block_updates() {
+        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+
+        // --- Phase 1: Empty pending block, empty update. ---
+
+        // Check that empty update with empty pending block doesn't increment the iteration.
+        let proposed_block = ProposedBlock {
+            txs: vec![],
+            priority_ops: vec![],
+        };
+
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+
+        // There should be no pending block yielded.
+        let next_block = tester.response_rx.try_next();
+        assert!(next_block.is_err(), "Empty pending block was yielded");
+
+        // No successful operations in the pending block => no increment.
+        let pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        assert_eq!(pending_block_iteration, 0);
+
+        // --- Phase 2: Empty pending block, only failed tx in update. ---
+
+        // Then send the block with the bad transaction only
+        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![SignedTxVariant::Tx(bad_withdraw)],
+            priority_ops: vec![],
+        };
+
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+
+        // Pending block should be created.
+        let next_block = tester.response_rx.next().await;
+        assert!(next_block.is_some(), "No pending block was yielded");
+
+        // Iteration should still not be incremented.
+        let pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        assert_eq!(pending_block_iteration, 0);
+
+        // --- Phase 3: Empty pending block, successful tx in update. ---
+
+        // First, create some block with successfull operation.
+        let good_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 200u32, 145u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![SignedTxVariant::Tx(good_withdraw)],
+            priority_ops: vec![],
+        };
+
+        let pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+
+        // Pending block should be created.
+        let next_block = tester.response_rx.next().await;
+        assert!(next_block.is_some(), "No pending block was yielded");
+
+        // Iteration should be incremented.
+        let new_pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        assert_eq!(new_pending_block_iteration, pending_block_iteration + 1);
+
+        // --- Phase 4: Successful tx in pending block, failed tx in update. ---
+
+        // Then send the block with the bad transaction only
+        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![SignedTxVariant::Tx(bad_withdraw)],
+            priority_ops: vec![],
+        };
+
+        let pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+
+        // Pending block should be created.
+        let next_block = tester.response_rx.next().await;
+        assert!(next_block.is_some(), "No pending block was yielded");
+
+        // Iteration should still be incremented.
+        let new_pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        assert_eq!(new_pending_block_iteration, pending_block_iteration + 1);
+
+        // --- Phase 5: Successful tx in pending block, empty update. ---
+
+        // Finally, execute an empty block.
+        let proposed_block = ProposedBlock {
+            txs: vec![],
+            priority_ops: vec![],
+        };
+
+        let pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+
+        // There should be no pending block yielded.
+        let next_block = tester.response_rx.try_next();
+        assert!(next_block.is_err(), "Empty pending block was yielded");
+
+        // Iteration should still be incremented even after an empty block: there was a successful operation earlier.
+        let new_pending_block_iteration = tester.state_keeper.pending_block.pending_block_iteration;
+        assert_eq!(new_pending_block_iteration, pending_block_iteration + 1);
+    }
+
     /// Checks that only the difference between two states of a pending block is transmitted
     /// to the committer.
     #[tokio::test]
