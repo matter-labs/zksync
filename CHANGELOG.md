@@ -1,5 +1,16 @@
 # zkSync changelog
 
+### Contracts v4 and protocol (24.11.2020)
+
+- Timestamp is added to the block commitment. Rollup block timestamp validity is checked when block is committed onchain.
+- Offchain ChangePubKey can be performed for smart contract wallets that can be deployed with CREATE2 when pubkey hash is encoded in the CREATE2 salt parameter.
+- Governance contract can pause token deposits.
+- ChangePubKey message signature is changed.
+- Onchain operation processing changed on the contract.
+- Recursive block verifier added.
+- Onchain rollup block commitment changed, multiple blocks can be committed, verified at once.
+
+
 ### Contracts v3 and protocol (4.09.2020)
 
 - Change pubkey operation requires fee for processing.

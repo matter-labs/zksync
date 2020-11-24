@@ -35,6 +35,7 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
             process.exit(1);
         }
         console.log(`Using nonce: ${args.nonce}`);
+        args.nonce = parseInt(args.nonce);
     }
 
     const governorAddress = args.governor ? args.governor : wallet.address;
@@ -53,8 +54,8 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     if (args.contract === 'Governance' || args.contract == null) {
         await deployer.deployGovernanceTarget({ gasPrice, nonce: args.nonce });
     }
-
-    if (args.contract === 'Proxies' || args.contract == null) {
-        await deployer.deployProxiesAndGatekeeper({ gasPrice, nonce: args.nonce });
-    }
+    //
+    // if (args.contract === 'Proxies' || args.contract == null) {
+    //     await deployer.deployProxiesAndGatekeeper({ gasPrice, nonce: args.nonce });
+    // }
 })();

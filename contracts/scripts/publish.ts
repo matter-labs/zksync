@@ -1,17 +1,21 @@
-import { Wallet } from 'ethers';
-import { Deployer } from '../src.ts/deploy';
+import {deployedAddressesFromEnv} from "../src.ts/deploy";
 
-(async () => {
-    try {
-        // Wallet is not needed for publishing
-        const deployer = new Deployer({ deployWallet: Wallet.createRandom() });
-        if (process.env.ETH_NETWORK === 'localhost') {
-            await deployer.publishSourcesToTesseracts();
-        } else {
-            await deployer.publishSourcesToEtherscan();
+const hre = require("hardhat");
+
+async function main() {
+    const addresses = deployedAddressesFromEnv();
+    for (const address of [addresses.ZkSyncTarget, addresses.VerifierTarget, addresses.GovernanceTarget]) {
+        try {
+            await hre.run('verify', {address});
+        } catch (e) {
+            console.log(e)
         }
-        process.exit(0);
-    } catch (e) {
-        console.error('Failed to publish contracts code:', e.toString());
     }
-})();
+}
+
+main()
+    .then(() => process.exit(0))
+    .catch(error => {
+        console.error(error);
+        process.exit(1);
+    });

@@ -2,6 +2,32 @@ import '@nomiclabs/hardhat-waffle';
 import '@nomiclabs/hardhat-solpp';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
+import "@nomiclabs/hardhat-etherscan";
+
+const prodConfig = {
+    // UPGRADE_NOTICE_PERIOD: 0,
+    MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
+    // PRIORITY_EXPIRATION: 101,
+    DUMMY_VERIFIER: false
+}
+const testnetConfig = {
+    UPGRADE_NOTICE_PERIOD: 0,
+    MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
+    // PRIORITY_EXPIRATION: 101,
+    DUMMY_VERIFIER: false
+}
+const testConfig = {
+    UPGRADE_NOTICE_PERIOD: 0,
+    MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
+    PRIORITY_EXPIRATION: 101,
+    DUMMY_VERIFIER: true
+}
+const contractDefs = {
+    rinkeby: testnetConfig,
+    ropsten: testnetConfig,
+    mainnet: prodConfig,
+    test:  testConfig,
+};
 
 export default {
     solidity: {
@@ -20,11 +46,14 @@ export default {
         sources: './contracts'
     },
     solpp: {
-        defs: {
-            UPGRADE_NOTICE_PERIOD: 0,
-            MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
-            PRIORITY_EXPIRATION: 101,
-            DUMMY_VERIFIER: false
+        defs: process.env.ETH_NETWORK ? contractDefs[process.env.ETH_NETWORK] : contractDefs["test"],
+    },
+    networks: {
+        env : {
+            url: process.env.WEB3_URL
         }
+    },
+    etherscan: {
+        apiKey: process.env.ETHERSCAN_API_KEY
     }
 };

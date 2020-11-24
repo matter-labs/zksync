@@ -81,7 +81,7 @@ contract Config {
     /// @dev Notice period before activation preparation status of upgrade mode (in seconds)
     /// @dev NOTE: we must reserve for users enough time to send full exit operation, wait maximum time for processing this operation and withdraw funds from it.
     uint256 constant UPGRADE_NOTICE_PERIOD =
-        MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT;
+        $(defined(UPGRADE_NOTICE_PERIOD) ? UPGRADE_NOTICE_PERIOD : MASS_FULL_EXIT_PERIOD + PRIORITY_EXPIRATION_PERIOD + TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT);
 
     /// @dev Timestamp - seconds since unix epoch
     uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 8 hours;
