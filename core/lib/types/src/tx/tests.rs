@@ -303,7 +303,7 @@ fn test_check_signature() {
 pub mod conversion_test {
     use super::*;
 
-    /// General configuration parameters for all types of operations
+    // General configuration parameters for all types of operations
     lazy_static! {
         static ref ACCOUNT_ID: u32 = 100;
         static ref ALICE: Address =
