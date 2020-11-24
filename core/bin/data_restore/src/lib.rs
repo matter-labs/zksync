@@ -23,13 +23,11 @@ pub async fn add_tokens_to_storage<I: StorageInteractor>(interactor: &mut I, eth
     let genesis_tokens =
         get_genesis_token_list(&eth_network).expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
+        let add_token_log = format!(
+            "Adding token: {}, id:{}, address: {}, decimals: {}",
+            &token.symbol, id, &token.address, &token.decimals
+        );
         interactor.store_token(token, id).await;
-        //     log::info!(
-        //         "Adding token: {}, id:{}, address: {}, decimals: {}",
-        //         token.symbol,
-        //         id,
-        //         token.address,
-        //         token.decimals
-        //     );
+        log::info!("{}", add_token_log);
     }
 }
