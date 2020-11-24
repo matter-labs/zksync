@@ -102,9 +102,9 @@ pub struct ZkSyncStateKeeper {
     // Two fields below are for optimization: we don't want to overwrite all the block contents over and over.
     // With these fields we'll be able save the diff between two pending block states only.
     /// Amount of succeeded transactions in the pending block at the last pending block synchronization step.
-    last_success_tx_len: usize,
+    success_txs_pending_len: usize,
     /// Amount of failed transactions in the pending block at the last pending block synchronization step.
-    last_failed_tx_len: usize,
+    failed_txs_pending_len: usize,
 }
 
 pub struct ZkSyncStateInitParams {
@@ -378,8 +378,8 @@ impl ZkSyncStateKeeper {
             fast_miniblock_iterations,
             max_number_of_withdrawals_per_block,
 
-            last_success_tx_len: 0,
-            last_failed_tx_len: 0,
+            success_txs_pending_len: 0,
+            failed_txs_pending_len: 0,
         };
 
         let root = keeper.state.root_hash();
@@ -858,8 +858,8 @@ impl ZkSyncStateKeeper {
         );
 
         // Once block is sealed, we refresh the counters for the next block.
-        self.last_success_tx_len = 0;
-        self.last_failed_tx_len = 0;
+        self.success_txs_pending_len = 0;
+        self.failed_txs_pending_len = 0;
 
         // Apply fees of pending block
         let fee_updates = self
@@ -933,12 +933,12 @@ impl ZkSyncStateKeeper {
         // limits if we'll be spammed by incorrect transactions (we don't have a limit for an amount of rejected
         // transactions in the block).
         let new_success_operations =
-            self.pending_block.success_operations[self.last_success_tx_len..].to_vec();
+            self.pending_block.success_operations[self.success_txs_pending_len..].to_vec();
         let new_failed_operations =
-            self.pending_block.failed_txs[self.last_failed_tx_len..].to_vec();
+            self.pending_block.failed_txs[self.failed_txs_pending_len..].to_vec();
 
-        self.last_success_tx_len = self.pending_block.success_operations.len();
-        self.last_failed_tx_len = self.pending_block.failed_txs.len();
+        self.success_txs_pending_len = self.pending_block.success_operations.len();
+        self.failed_txs_pending_len = self.pending_block.failed_txs.len();
 
         // Create a pending block object to send.
         // Note that failed operations are not included, as per any operation failure
