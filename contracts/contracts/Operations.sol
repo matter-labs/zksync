@@ -51,6 +51,7 @@ library Operations {
 
     // Deposit pubdata
     struct Deposit {
+        // uint8 opType
         uint32 accountId;
         uint16 tokenId;
         uint128 amount;
@@ -95,6 +96,7 @@ library Operations {
     // FullExit pubdata
 
     struct FullExit {
+        // uint8 opType
         uint32 accountId;
         address owner;
         uint16 tokenId;

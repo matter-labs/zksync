@@ -372,8 +372,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(
             hashStoredBlockInfo(_blockExecuteData.storedBlock) ==
                 storedBlockHashes[_blockExecuteData.storedBlock.blockNumber],
-            "exe10"
-        ); // incorrect previous block data
+            "exe10" // executing block should be committed
+        );
         require(_blockExecuteData.storedBlock.blockNumber == totalBlocksVerified + _executedBlockIdx + 1, "exe11"); // Execute blocks in order
         require(_blockExecuteData.storedBlock.blockNumber <= totalBlocksCommitted, "exe03"); // Can't execute blocks more then committed currently.
         // Ensure block was verified
@@ -438,7 +438,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Blocks commitment verification.
     /// @notice Only verifies block commitments without any other processing
-    function verifyCommitments(ProofInput memory _proof) external {
+    function verifyCommitments(ProofInput memory _proof) external nonReentrant {
         bool success =
             verifier.verifyAggregatedProof(
                 _proof.recursiveInput,
@@ -631,6 +631,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             uint256 pubdataOffset = onchainOpData.publicDataOffset;
             require(pubdataOffset % CHUNK_BYTES == 0, "fcso2"); // offsets should be on chunks boundaries
+            require(offsetsCommitment[pubdataOffset / CHUNK_BYTES] == 0x00, "fcso3"); // offset commitment should be empty
             offsetsCommitment[pubdataOffset / CHUNK_BYTES] = bytes1(0x01);
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[pubdataOffset]));

@@ -124,7 +124,7 @@ contract Storage {
         return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
 
-    /// @Rollup block stored data - not used in current version
+    /// @Rollup block stored data
     /// @member blockNumber Rollup block number
     /// @member priorityOperations Number of priority operations processed
     /// @member pendingOnchainOperationsHash Hash of all operations that must be processed after verify
