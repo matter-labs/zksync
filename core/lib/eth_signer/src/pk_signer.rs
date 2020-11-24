@@ -46,3 +46,40 @@ impl EthereumSigner for PrivateKeySigner {
         Ok(raw_tx.rlp_encode_tx(sig))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::PrivateKeySigner;
+    use super::RawTransaction;
+    use crate::EthereumSigner;
+    use zksync_types::{H160, H256, U256};
+
+    #[actix_rt::test]
+    async fn test_generating_signature() {
+        let private_key = H256::from([5; 32]);
+        let signer = PrivateKeySigner::new(private_key);
+        let raw_transaction = RawTransaction {
+            chain_id: 1,
+            nonce: U256::from(1),
+            to: Some(H160::zero()),
+            value: U256::from(10),
+            gas_price: U256::from(1),
+            gas: U256::from(2),
+            data: vec![1, 2, 3],
+        };
+        let signature = signer
+            .sign_transaction(raw_transaction.clone())
+            .await
+            .unwrap();
+        assert_ne!(signature.len(), 1);
+        // precalculated signature with right algorithm implementation
+        let precalculated_signature: Vec<u8> = vec![
+            248, 96, 1, 1, 2, 148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10,
+            131, 1, 2, 3, 37, 160, 152, 202, 15, 174, 50, 167, 190, 239, 206, 183, 109, 215, 135,
+            60, 43, 71, 11, 74, 252, 97, 83, 86, 66, 249, 237, 111, 118, 121, 105, 214, 130, 249,
+            160, 106, 110, 143, 138, 113, 12, 177, 239, 121, 188, 247, 21, 236, 236, 163, 254, 28,
+            48, 250, 5, 20, 234, 54, 58, 162, 103, 252, 20, 243, 121, 7, 19,
+        ];
+        assert_eq!(signature, precalculated_signature);
+    }
+}
