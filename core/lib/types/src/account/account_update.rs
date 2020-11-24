@@ -61,8 +61,8 @@ impl AccountUpdate {
                 old_nonce,
                 new_nonce,
             } => AccountUpdate::ChangePubKeyHash {
-                old_pub_key_hash: new_pub_key_hash.clone(),
-                new_pub_key_hash: old_pub_key_hash.clone(),
+                old_pub_key_hash: *new_pub_key_hash,
+                new_pub_key_hash: *old_pub_key_hash,
                 old_nonce: *new_nonce,
                 new_nonce: *old_nonce,
             },

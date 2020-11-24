@@ -41,7 +41,7 @@ impl ApiTokensData {
     }
 
     async fn tokens(&self) -> QueryResult<Vec<Token>> {
-        let mut storage = self.tokens.db.access_storage().await?;
+        let mut storage = self.tokens.pool.access_storage().await?;
 
         let tokens = storage.tokens_schema().load_tokens().await?;
         Ok(tokens.into_iter().map(|(_k, v)| v).collect())

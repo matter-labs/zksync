@@ -17,6 +17,27 @@ mod stored_state;
 pub(crate) use self::restore_account::restore_account;
 pub use self::stored_state::StoredAccountState;
 
+/// Account query.
+#[derive(Debug, Copy, Clone)]
+pub enum AccountQuery {
+    /// By ID.
+    Id(AccountId),
+    /// By Address.
+    Address(Address),
+}
+
+impl From<AccountId> for AccountQuery {
+    fn from(account_id: AccountId) -> Self {
+        Self::Id(account_id)
+    }
+}
+
+impl From<Address> for AccountQuery {
+    fn from(account_address: Address) -> Self {
+        Self::Address(account_address)
+    }
+}
+
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
 #[derive(Debug)]
@@ -24,33 +45,16 @@ pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
     /// Obtains both committed and verified state for the account by its address.
-    pub async fn account_state_by_address(
+    pub async fn account_state(
         &mut self,
-        address: &Address,
+        query: impl Into<AccountQuery>,
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
-        // Find the account in `account_creates` table.
-        let mut results = sqlx::query_as!(
-            StorageAccountCreation,
-            "
-                SELECT * FROM account_creates
-                WHERE address = $1 AND is_create = $2
-                ORDER BY block_number desc
-                LIMIT 1
-            ",
-            address.as_bytes(),
-            true
-        )
-        .fetch_all(self.0.conn())
-        .await?;
-
-        assert!(results.len() <= 1, "LIMIT 1 is in query");
-        let account_create_record = results.pop();
 
         // If account wasn't found, we return no state for it.
         // Otherwise we obtain the account ID for the state lookup.
-        let account_id = if let Some(account_create_record) = account_create_record {
-            account_create_record.account_id as AccountId
+        let account_id = if let Some(account_id) = self.get_account_id(query.into()).await? {
+            account_id
         } else {
             return Ok(StoredAccountState {
                 committed: None,
@@ -231,5 +235,27 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         transaction.commit().await?;
         metrics::histogram!("sql.chain", start.elapsed(), "account" => "get_account_and_last_block");
         result
+    }
+
+    async fn get_account_id(&mut self, query: AccountQuery) -> QueryResult<Option<AccountId>> {
+        match query {
+            AccountQuery::Id(account_id) => Ok(Some(account_id)),
+            AccountQuery::Address(address) => {
+                // Find the account in `account_creates` table.
+                let result = sqlx::query!(
+                    "SELECT account_id FROM account_creates
+                        WHERE address = $1 AND is_create = $2
+                        ORDER BY block_number desc
+                        LIMIT 1
+                    ",
+                    address.as_bytes(),
+                    true
+                )
+                .fetch_optional(self.0.conn())
+                .await?;
+
+                Ok(result.map(|record| record.account_id as AccountId))
+            }
+        }
     }
 }

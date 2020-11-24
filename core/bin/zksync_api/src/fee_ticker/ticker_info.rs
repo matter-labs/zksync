@@ -38,7 +38,7 @@ impl FeeTickerInfo for TickerInfo {
         let account_state = storage
             .chain()
             .account_schema()
-            .account_state_by_address(&address)
+            .account_state(address)
             .await
             .expect("Unable to query account state from the database");
 

@@ -148,7 +148,7 @@ impl NotifierState {
         let account_state = storage
             .chain()
             .account_schema()
-            .account_state_by_address(&address)
+            .account_state(address)
             .await?;
 
         let account_id = if let Some(id) = account_state.committed.as_ref().map(|(id, _)| id) {

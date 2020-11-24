@@ -10,7 +10,7 @@ use zksync_types::{
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 // Local uses
-use crate::utils::token_db_cache::TokenDBCache;
+use crate::{api_server::v1::accounts::AccountState, utils::token_db_cache::TokenDBCache};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,25 +29,17 @@ pub struct ResponseAccountState {
 
 impl ResponseAccountState {
     pub async fn try_restore(account: Account, tokens: &TokenDBCache) -> Result<Self> {
-        let mut balances = HashMap::new();
-        for (token_id, balance) in account.get_nonzero_balances() {
-            if token_id == 0 {
-                balances.insert("ETH".to_string(), balance);
-            } else {
-                let token = tokens
-                    .get_token(token_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .ok_or_else(Error::internal_error)?;
-                balances.insert(token.symbol.clone(), balance);
-            }
-        }
+        let inner = AccountState::from_storage(&account, tokens)
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        // To provide backward compatibility with the old code.
+        let balances: HashMap<_, _> = inner.balances.into_iter().collect();
 
         Ok(Self {
             balances,
-            nonce: account.nonce,
-            pub_key_hash: account.pub_key_hash,
+            nonce: inner.nonce,
+            pub_key_hash: inner.pub_key_hash,
         })
     }
 }

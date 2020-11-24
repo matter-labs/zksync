@@ -72,7 +72,7 @@ impl<S: EthereumSigner> Signer<S> {
         let mut change_pubkey = ChangePubKey::new_signed(
             account_id,
             self.address,
-            self.pubkey_hash.clone(),
+            self.pubkey_hash,
             fee_token.id,
             fee,
             nonce,

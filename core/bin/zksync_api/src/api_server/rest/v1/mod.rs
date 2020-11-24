@@ -19,6 +19,7 @@ use zksync_types::BlockNumber;
 // Local uses
 use crate::api_server::tx_sender::TxSender;
 
+pub(crate) mod accounts;
 mod blocks;
 pub mod client;
 mod config;
@@ -35,8 +36,9 @@ type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
 pub(crate) fn api_scope(tx_sender: TxSender, env_options: ConfigurationOptions) -> Scope {
     web::scope("/api/v1")
-        .service(config::api_scope(&env_options))
+        .service(accounts::api_scope(&env_options, tx_sender.clone()))
         .service(blocks::api_scope(&env_options, tx_sender.pool.clone()))
+        .service(config::api_scope(&env_options))
         .service(transactions::api_scope(tx_sender.clone()))
         .service(tokens::api_scope(
             tx_sender.tokens,
