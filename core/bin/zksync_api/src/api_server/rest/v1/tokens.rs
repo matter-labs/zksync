@@ -47,7 +47,7 @@ impl ApiTokensData {
 
         // Provide tokens in a predictable order.
         let mut tokens: Vec<_> = tokens.into_iter().map(|(_k, v)| v).collect();
-        tokens.sort_unstable_by(|lhs, rhs| lhs.id.cmp(&rhs.id));
+        tokens.sort_unstable_by_key(|token| token.id);
 
         Ok(tokens)
     }

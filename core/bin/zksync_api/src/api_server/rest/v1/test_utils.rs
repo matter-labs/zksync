@@ -155,7 +155,7 @@ impl TestServerConfig {
         // Required since we use `EthereumSchema` in this test.
         storage.ethereum_schema().initialize_eth_data().await?;
 
-        // Insert DAI token
+        // Insert PHNX token
         storage
             .tokens_schema()
             .store_token(Token::new(
