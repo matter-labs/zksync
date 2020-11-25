@@ -27,6 +27,7 @@ anyhow = "1.0"
 structopt = "0.3.20"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 tokio = { version = "0.2", features = ["full"] }
+async-trait = "0.1"
 
 zksync_state = { path = "../../lib/state", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
