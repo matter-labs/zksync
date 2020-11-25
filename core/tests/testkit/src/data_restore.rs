@@ -1,5 +1,6 @@
 use web3::{transports::Http, types::Address};
 
+use zksync_crypto::Fr;
 use zksync_data_restore::{
     data_restore_driver::DataRestoreDriver, inmemory_storage_interactor::InMemoryStorageInteractor,
     ETH_BLOCKS_STEP,
@@ -15,6 +16,7 @@ pub async fn verify_restore(
     fee_account_address: Address,
     acc_state_from_test_setup: AccountMap,
     tokens: Vec<u16>,
+    root_hash: Fr,
 ) {
     let transport = Http::new(web3_url).expect("http transport start");
 
@@ -33,6 +35,8 @@ pub async fn verify_restore(
     interactor.insert_new_account(0, &fee_account_address);
     driver.load_state_from_storage(&mut interactor).await;
     driver.run_state_update(&mut interactor).await;
+
+    assert_eq!(driver.tree_state.root_hash(), root_hash);
 
     for (id, account) in acc_state_from_test_setup {
         let driver_acc = driver.tree_state.get_account(id).expect("Should be exist");
