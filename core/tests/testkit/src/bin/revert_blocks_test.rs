@@ -98,17 +98,20 @@ async fn execute_blocks_with_new_state_keeper(
             .revert_blocks(blocks_committed - blocks_verified)
             .await
             .expect("revert_blocks call fails");
-    }
+    } else {
+        // Do not restore in reverting state, because there no working states
+        println!("Start restoring");
 
-    verify_restore(
-        &testkit_config.web3_url,
-        testkit_config.available_block_chunk_sizes.clone(),
-        &contracts,
-        fee_account_address,
-        test_setup.get_accounts_state().await,
-        tokens,
-    )
-    .await;
+        verify_restore(
+            &testkit_config.web3_url,
+            testkit_config.available_block_chunk_sizes.clone(),
+            &contracts,
+            fee_account_address,
+            test_setup.get_accounts_state().await,
+            tokens,
+        )
+        .await;
+    }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");

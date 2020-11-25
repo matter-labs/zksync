@@ -5679,7 +5679,6 @@ dependencies = [
 name = "zksync_data_restore"
 version = "1.0.0"
 dependencies = [
- "actix-rt",
  "anyhow",
  "async-trait",
  "chrono",
