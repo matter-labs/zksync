@@ -122,7 +122,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 .nonce(),
         });
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "load_txs");
+        metrics::histogram!("sql.chain.mempool.load_txs", start.elapsed());
         Ok(txs.into())
     }
 
@@ -210,7 +210,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "insert_batch");
+        metrics::histogram!("sql.chain.mempool.insert_batch", start.elapsed());
         Ok(batch_id)
     }
 
@@ -238,7 +238,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "insert_tx");
+        metrics::histogram!("sql.chain.mempool.insert_tx", start.elapsed());
         Ok(())
     }
 
@@ -254,7 +254,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "remove_tx");
+        metrics::histogram!("sql.chain.mempool.remove_tx", start.elapsed());
         Ok(())
     }
 
@@ -270,7 +270,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "remove_txs");
+        metrics::histogram!("sql.chain.mempool.remove_txs", start.elapsed());
         Ok(())
     }
 
@@ -363,7 +363,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         self.remove_txs(&tx_hashes_to_remove).await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "collect_garbage");
+        metrics::histogram!("sql.chain.mempool.collect_garbage", start.elapsed());
         Ok(())
     }
 }

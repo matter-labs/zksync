@@ -5947,6 +5947,7 @@ dependencies = [
  "criterion",
  "ethabi 12.0.0",
  "hex",
+ "lazy_static",
  "log 0.4.11",
  "num",
  "parity-crypto",
