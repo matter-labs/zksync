@@ -85,7 +85,7 @@ Tester.prototype.testBatchBuilderChangePubKey = async function (
 
     const balanceBefore = await wallet.getBalance(token);
     const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, wallet.provider);
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
     expect(await wallet.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
     const balanceAfter = await wallet.getBalance(token);
     expect(balanceBefore.sub(balanceAfter).eq(amount.add(batch.totalFee)), 'Wrong amount in wallet after withdraw').to
@@ -167,7 +167,7 @@ Tester.prototype.testBatchBuilderGenerisUsage = async function (
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
     const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, sender.provider);
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
     const targetBalance = await target.getBalance(token);

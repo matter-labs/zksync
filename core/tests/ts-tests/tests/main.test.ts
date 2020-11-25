@@ -21,12 +21,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let tester: Tester;
     let alice: Wallet;
     let bob: Wallet;
+    let david: Wallet;
+    let frank: Wallet;
+    let judy: Wallet;
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport);
         alice = await tester.fundedWallet('5.0');
         bob = await tester.emptyWallet();
+        david = await tester.fundedWallet('1.0');
+        frank = await tester.fundedWallet('1.0');
+        judy = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
 
@@ -81,16 +87,21 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testFailedBatch(alice, bob, token, TX_AMOUNT);
     });
 
+    step('should execute a withdrawal', async () => {
+        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
+    });
+
+    step('should execute a ForcedExit', async () => {
+        await tester.testVerifiedForcedExit(alice, bob, token);
+    });
+
     step('should test batch-builder', async () => {
-        const david = await tester.fundedWallet('1.0');
-        const frank = await tester.fundedWallet('1.0');
-        const carl = await tester.fundedWallet('1.0');
         // We will pay with different token.
         const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
         // Add these accounts to the network.
-        await tester.testDeposit(david, token, DEPOSIT_AMOUNT, true);
-        await tester.testDeposit(frank, token, DEPOSIT_AMOUNT, true);
-        await tester.testDeposit(carl, token, DEPOSIT_AMOUNT, true);
+        await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(5));
+        await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(5));
+        await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(5));
         // Also deposit another token to pay with.
         await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
 
@@ -100,15 +111,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
         // Finally, transfer, withdraw and forcedexit in a single batch.
-        await tester.testBatchBuilderGenerisUsage(david, frank, carl, token, TX_AMOUNT);
-    });
-
-    step('should execute a withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
-    });
-
-    step('should execute a ForcedExit', async () => {
-        await tester.testVerifiedForcedExit(alice, bob, token);
+        await tester.testBatchBuilderGenerisUsage(david, frank, judy, token, TX_AMOUNT);
     });
 
     it('should check collected fees', async () => {
