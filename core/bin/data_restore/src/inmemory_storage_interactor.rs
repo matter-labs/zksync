@@ -153,6 +153,12 @@ impl InMemoryStorageInteractor {
             accounts: Default::default(),
         }
     }
+
+    pub fn insert_new_account(&mut self, id: AccountId, address: &Address) {
+        self.accounts
+            .insert(id, Account::default_with_address(address));
+    }
+
     pub fn get_account_by_address(&self, address: &Address) -> Option<(AccountId, Account)> {
         let accounts: Vec<(AccountId, Account)> = self
             .accounts
@@ -162,6 +168,7 @@ impl InMemoryStorageInteractor {
             .collect();
         accounts.first().cloned()
     }
+
     fn load_verified_events_state(&self) -> Vec<BlockEvent> {
         self.events_state
             .clone()
@@ -169,6 +176,7 @@ impl InMemoryStorageInteractor {
             .filter(|event| event.block_type == EventType::Verified)
             .collect()
     }
+
     pub(crate) fn load_committed_events_state(&self) -> Vec<BlockEvent> {
         // TODO avoid clone
         self.events_state
@@ -177,6 +185,11 @@ impl InMemoryStorageInteractor {
             .filter(|event| event.block_type == EventType::Committed)
             .collect()
     }
+
+    pub fn get_account(&self, id: &AccountId) -> Option<&Account> {
+        self.accounts.get(id)
+    }
+
     fn commit_state_update(
         &mut self,
         first_update_order_id: u32,

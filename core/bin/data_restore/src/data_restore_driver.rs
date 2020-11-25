@@ -239,10 +239,10 @@ where
 
     /// Activates states updates
     pub async fn run_state_update(&mut self, interactor: &mut I) {
-        let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
+        let mut last_watched_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
-            log::debug!("Last watched ethereum block: {:?}", last_wached_block);
+            log::debug!("Last watched ethereum block: {:?}", last_watched_block);
 
             // Update events
             if self.update_events_state(interactor).await {
@@ -296,10 +296,10 @@ where
                 }
             }
 
-            if last_wached_block == self.events_state.last_watched_eth_block_number {
+            if last_watched_block == self.events_state.last_watched_eth_block_number {
                 std::thread::sleep(std::time::Duration::from_secs(5));
             } else {
-                last_wached_block = self.events_state.last_watched_eth_block_number;
+                last_watched_block = self.events_state.last_watched_eth_block_number;
             }
         }
     }

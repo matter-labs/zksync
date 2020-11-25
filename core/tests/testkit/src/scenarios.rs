@@ -1,18 +1,16 @@
 //! Common scenarios used by testkit derivatives.
 
-use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_contracts, get_test_accounts};
-use crate::state_keeper_utils::spawn_state_keeper;
-use crate::zksync_account::ZkSyncAccount;
-
-use zksync_data_restore::{
-    data_restore_driver::DataRestoreDriver, inmemory_storage_interactor::InMemoryStorageInteractor,
-    END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
-};
-
 use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
+
+use crate::{
+    data_restore::verify_restore,
+    eth_account::{parse_ether, EthereumAccount},
+    external_commands::{deploy_contracts, get_test_accounts},
+    state_keeper_utils::spawn_state_keeper,
+    zksync_account::ZkSyncAccount,
+};
 
 use super::*;
 
@@ -25,8 +23,9 @@ pub async fn perform_basic_tests() {
     let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
+    let fee_account_address = fee_account.address;
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account.address);
+        spawn_state_keeper(&fee_account_address);
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
@@ -87,6 +86,7 @@ pub async fn perform_basic_tests() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
+    let mut tokens = vec![];
     for token in 0..=1 {
         perform_basic_operations(
             token,
@@ -95,20 +95,18 @@ pub async fn perform_basic_tests() {
             BlockProcessing::CommitAndVerify,
         )
         .await;
+        tokens.push(token);
     }
-    let mut interactor = InMemoryStorageInteractor::new();
-    let mut driver = DataRestoreDriver::new(
-        transport,
-        contracts.governance,
-        contracts.contract,
-        ETH_BLOCKS_STEP,
-        END_ETH_BLOCKS_OFFSET,
-        testkit_config.available_block_chunk_sizes,
-        true,
-        Default::default(),
-    );
 
-    driver.run_state_update(&mut interactor).await;
+    verify_restore(
+        &testkit_config.web3_url,
+        testkit_config.available_block_chunk_sizes.clone(),
+        &contracts,
+        fee_account_address,
+        test_setup.get_accounts_state().await,
+        tokens,
+    )
+    .await;
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");

@@ -1,9 +1,14 @@
+use web3::transports::Http;
+
+use zksync_testkit::*;
+use zksync_testkit::{
+    data_restore::verify_restore,
+    scenarios::{perform_basic_operations, BlockProcessing},
+};
+
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
-use web3::transports::Http;
-use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
-use zksync_testkit::*;
 
 /// Executes blocks with some basic operations with new state keeper
 /// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
@@ -17,6 +22,7 @@ async fn execute_blocks_with_new_state_keeper(
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
+    let fee_account_address = fee_account.address;
     let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
@@ -66,6 +72,7 @@ async fn execute_blocks_with_new_state_keeper(
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
+    let mut tokens = vec![];
     for token in 0..=1 {
         perform_basic_operations(
             token,
@@ -74,6 +81,7 @@ async fn execute_blocks_with_new_state_keeper(
             block_processing,
         )
         .await;
+        tokens.push(token);
     }
 
     if block_processing == BlockProcessing::NoVerify {
@@ -91,6 +99,16 @@ async fn execute_blocks_with_new_state_keeper(
             .await
             .expect("revert_blocks call fails");
     }
+
+    verify_restore(
+        &testkit_config.web3_url,
+        testkit_config.available_block_chunk_sizes.clone(),
+        &contracts,
+        fee_account_address,
+        test_setup.get_accounts_state().await,
+        tokens,
+    )
+    .await;
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
