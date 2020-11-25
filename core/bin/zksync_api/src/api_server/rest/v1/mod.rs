@@ -36,7 +36,11 @@ type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
 pub(crate) fn api_scope(tx_sender: TxSender, env_options: ConfigurationOptions) -> Scope {
     web::scope("/api/v1")
-        .service(accounts::api_scope(&env_options, tx_sender.clone()))
+        .service(accounts::api_scope(
+            &env_options,
+            tx_sender.tokens.clone(),
+            tx_sender.core_api_client.clone(),
+        ))
         .service(blocks::api_scope(&env_options, tx_sender.pool.clone()))
         .service(config::api_scope(&env_options))
         .service(transactions::api_scope(tx_sender.clone()))
@@ -63,7 +67,7 @@ struct PaginationQuery {
 
 /// Pagination request parameter.
 ///
-/// Used together with the limit parameter to perform  pagination.
+/// Used together with the limit parameter to perform pagination.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 pub enum Pagination {
     /// Request to return some items before specified (not including itself).

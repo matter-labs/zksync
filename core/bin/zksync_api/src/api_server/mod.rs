@@ -18,6 +18,7 @@ use crate::signature_checker;
 
 mod admin_server;
 mod event_notify;
+mod helpers;
 mod loggers;
 mod rest;
 pub mod rpc_server;
