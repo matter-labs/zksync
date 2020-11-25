@@ -7,7 +7,7 @@ use super::*;
 use crate::{
     account::PubKeyHash,
     priority_ops::{Deposit, FullExit},
-    tx::{ChangePubKey, Close, ForcedExit, PackedEthSignature, Transfer, TxSignature, Withdraw},
+    tx::{ChangePubKey, ForcedExit, PackedEthSignature, Transfer, Withdraw},
 };
 
 // Public data parameters, using them we can restore `ZkSyncOp`.
@@ -15,7 +15,6 @@ const NOOP_PUBLIC_DATA: &str = "000000000000000000";
 const DEPOSIT_PUBLIC_DATA: &str = "010000002a002a0000000000000000000000000000002a21abaed8712072e918632259780e587698ef58da0000000000000000000000";
 const TRANSFER_TO_NEW_PUBLIC_DATA: &str = "0200000001002a000000054021abaed8712072e918632259780e587698ef58da00000002054000000000000000000000000000000000";
 const WITHDRAW_PUBLIC_DATA: &str = "030000002a002a0000000000000000000000000000002a054021abaed8712072e918632259780e587698ef58da000000000000000000";
-const CLOSE_PUBLIC_DATA: &str = "040000002a00000000";
 const TRANSFER_PUBLIC_DATA: &str = "0500000001002a0000000200000005400540";
 const FULL_EXIT_PUBLIC_DATA: &str = "060000002a2a0a81e257a2f5d6ed4f07b81dbda09f107bd026002a000000000000000000000000000000000000000000000000000000";
 const CHANGE_PUBKEY_PUBLIC_DATA: &str = "070000002a3cfb9a39096d9e02b24187355f628f9a6331511b2a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a002a054000";
@@ -107,25 +106,6 @@ fn test_public_data_convetions_withdraw() {
     assert_eq!(
         hex::encode(expected_op.get_public_data()),
         WITHDRAW_PUBLIC_DATA
-    );
-}
-
-#[test]
-fn test_public_data_convetions_close() {
-    let expected_op = {
-        let tx = Close {
-            account: Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
-            nonce: 42,
-            signature: TxSignature::default(),
-        };
-        let account_id = 42;
-
-        CloseOp { tx, account_id }
-    };
-
-    assert_eq!(
-        hex::encode(expected_op.get_public_data()),
-        CLOSE_PUBLIC_DATA
     );
 }
 
@@ -226,6 +206,8 @@ fn test_withdrawal_data() {
 
 #[test]
 fn test_eth_witness() {
+    // TODO: Change pre-defined input / output after merging breaking to dev (#1188).
+
     let mut change_pubkey =
         ChangePubKeyOp::from_public_data(&hex::decode(CHANGE_PUBKEY_PUBLIC_DATA).unwrap()).unwrap();
 
