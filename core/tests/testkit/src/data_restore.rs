@@ -39,8 +39,8 @@ pub async fn verify_restore(
     assert_eq!(driver.tree_state.root_hash(), root_hash);
 
     for (id, account) in acc_state_from_test_setup {
-        let driver_acc = driver.tree_state.get_account(id).expect("Should be exist");
-        let inter_acc = interactor.get_account(&id).expect("Should be exist");
+        let driver_acc = driver.tree_state.get_account(id).expect("Should exist");
+        let inter_acc = interactor.get_account(&id).expect("Should exist");
         for id in &tokens {
             assert_eq!(driver_acc.address, inter_acc.address);
             assert_eq!(account.address, inter_acc.address);
