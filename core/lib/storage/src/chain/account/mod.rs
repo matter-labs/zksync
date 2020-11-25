@@ -35,7 +35,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         .address;
         let address = Address::from_slice(&bytes);
 
-        metrics::histogram!("sql.chain", start.elapsed(), "account" => "account_address_by_id");
+        metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
         Ok(address)
     }
 
