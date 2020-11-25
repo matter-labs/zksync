@@ -20,9 +20,7 @@ use super::{error::*, types::*, RpcApp};
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
-        use std::time::Instant;
-
-        let started = Instant::now();
+        let start = std::time::Instant::now();
 
         let account_state = self.get_account_state(&address).await?;
 
@@ -34,9 +32,10 @@ impl RpcApp {
         log::trace!(
             "account_info: address {}, total request processing {}ms",
             &address,
-            started.elapsed().as_millis()
+            start.elapsed().as_millis()
         );
 
+        metrics::histogram!("api.rpc.account_info", start.elapsed());
         Ok(AccountInfoResp {
             address,
             id: account_state.account_id,

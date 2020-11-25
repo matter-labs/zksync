@@ -79,11 +79,9 @@ pub trait Rpc {
 
 impl Rpc for RpcApp {
     fn account_info(&self, addr: Address) -> FutureResp<AccountInfoResp> {
-        let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_account_info(addr)).await.unwrap() };
-        metrics::histogram!("api.rpc.account_info", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 

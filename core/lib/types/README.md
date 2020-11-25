@@ -17,7 +17,7 @@ zkSync operations are split into the following categories:
 
 ## License
 
-`zksync_models` is a part of zkSync stack, which is distributed under the terms of both the MIT license and the Apache
+`zksync_types` is a part of zkSync stack, which is distributed under the terms of both the MIT license and the Apache
 License (Version 2.0).
 
 See [LICENSE-APACHE](../../LICENSE-APACHE), [LICENSE-MIT](../../LICENSE-MIT) for details.
