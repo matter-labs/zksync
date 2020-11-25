@@ -85,8 +85,6 @@ fn assert_tx_signature(signature: &TxSignature, expected_pub: &str, expected_sig
 mod primitives_with_vectors {
     use super::*;
 
-    use zksync_config::test_config::unit_vectors::Config as TestVectorsConfig;
-
     #[test]
     fn test_signature() {
         let test_vectors = TestVectorsConfig::load();
@@ -146,6 +144,247 @@ mod utils_with_vectors {
         for TestEntry { inputs, outputs } in test_vectors.utils.token_formatting.items {
             let units_str = format_units(inputs.amount, inputs.decimals);
             assert_eq!(format!("{} {}", units_str, inputs.token), outputs.formatted);
+        }
+    }
+}
+
+#[cfg(test)]
+mod signatures_with_vectors {
+    use super::*;
+    use zksync::{signer::Signer, Provider, Wallet, WalletCredentials};
+    use zksync_config::test_config::unit_vectors::{EthSignature, Tx};
+    use zksync_eth_signer::PrivateKeySigner;
+    use zksync_types::{network::Network, AccountId, Address, H256};
+
+    async fn get_signer(
+        private_key_raw: &[u8],
+        from_address: Address,
+        account_id: AccountId,
+    ) -> Signer<PrivateKeySigner> {
+        let eth_signer = PrivateKeySigner::new(H256::from_slice(private_key_raw));
+
+        let creds =
+            WalletCredentials::from_eth_signer(from_address, eth_signer, Network::Localhost)
+                .await
+                .unwrap();
+
+        let provider = Provider::new(Network::Localhost);
+        let wallet = Wallet::new(provider, creds).await.unwrap();
+        let Wallet { mut signer, .. } = wallet;
+        signer.set_account_id(Some(account_id));
+        signer
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn test_transfer_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let Tx::Transfer(transfer_tx) = &inputs.tx {
+                let sign_data = if let EthSignature::Transfer(sign_data) = inputs.eth_sign_data {
+                    sign_data
+                } else {
+                    panic!("Signature data does not match transaction type (transfer)")
+                };
+
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    transfer_tx.from,
+                    sign_data.account_id,
+                )
+                .await;
+
+                let token = Token {
+                    id: transfer_tx.token_id,
+                    address: Default::default(),
+                    symbol: sign_data.string_token.clone(),
+                    decimals: 0,
+                };
+                let (transfer, eth_signature) = signer
+                    .sign_transfer(
+                        token,
+                        transfer_tx.amount.clone(),
+                        transfer_tx.fee.clone(),
+                        sign_data.to,
+                        sign_data.nonce,
+                    )
+                    .await
+                    .expect("Transfer signing error");
+
+                assert_eq!(transfer.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &transfer.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    transfer.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    outputs.eth_sign_message.unwrap()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn test_withdraw_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let Tx::Withdraw(withdraw_tx) = &inputs.tx {
+                let sign_data = if let EthSignature::Withdraw(sign_data) = inputs.eth_sign_data {
+                    sign_data
+                } else {
+                    panic!("Signature data does not match transaction type (withdraw)")
+                };
+
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    withdraw_tx.from,
+                    sign_data.account_id,
+                )
+                .await;
+
+                let token = Token {
+                    id: withdraw_tx.token_id,
+                    address: Default::default(),
+                    symbol: sign_data.string_token.clone(),
+                    decimals: 0,
+                };
+                let (withdraw, eth_signature) = signer
+                    .sign_withdraw(
+                        token,
+                        withdraw_tx.amount.clone(),
+                        withdraw_tx.fee.clone(),
+                        sign_data.eth_address,
+                        sign_data.nonce,
+                    )
+                    .await
+                    .expect("Withdraw signing error");
+
+                assert_eq!(withdraw.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &withdraw.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    withdraw.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    outputs.eth_sign_message.unwrap()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn test_change_pubkey_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let Tx::ChangePubKey(change_pubkey_tx) = &inputs.tx {
+                let sign_data = if let EthSignature::ChangePubKey(sign_data) = inputs.eth_sign_data
+                {
+                    sign_data
+                } else {
+                    panic!("Signature data does not match transaction type (change pub key)")
+                };
+
+                let mut signer = get_signer(
+                    &inputs.eth_private_key,
+                    change_pubkey_tx.account,
+                    sign_data.account_id,
+                )
+                .await;
+                signer.pubkey_hash = change_pubkey_tx.new_pk_hash.clone();
+
+                let token = Token {
+                    id: change_pubkey_tx.fee_token_id,
+                    address: Default::default(),
+                    symbol: String::new(),
+                    decimals: 0,
+                };
+                let change_pub_key = signer
+                    .sign_change_pubkey_tx(
+                        sign_data.nonce,
+                        false,
+                        token,
+                        change_pubkey_tx.fee.clone(),
+                    )
+                    .await
+                    .expect("Change pub key signing error");
+
+                assert_eq!(change_pub_key.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &change_pub_key.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    change_pub_key.get_eth_signed_data().unwrap(),
+                    outputs.eth_sign_message.unwrap().into_bytes()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = change_pub_key.eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn test_forced_exit_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let Tx::ForcedExit(forced_exit) = &inputs.tx {
+                if let EthSignature::ForcedExit = inputs.eth_sign_data {
+                } else {
+                    panic!("Signature data does not match transaction type (forced exit)")
+                }
+
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    forced_exit.from,
+                    forced_exit.initiator_account_id,
+                )
+                .await;
+
+                let token = Token {
+                    id: forced_exit.token_id,
+                    address: Default::default(),
+                    symbol: String::new(),
+                    decimals: 0,
+                };
+                let forced_exit = signer
+                    .sign_forced_exit(
+                        forced_exit.target,
+                        token,
+                        forced_exit.fee.clone(),
+                        forced_exit.nonce,
+                    )
+                    .await
+                    .expect("Forced exit signing error");
+
+                assert_eq!(forced_exit.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &forced_exit.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+            }
         }
     }
 }

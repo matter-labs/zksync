@@ -8,7 +8,7 @@ use num::BigUint;
 // Workspace uses
 use zksync_crypto::PrivateKey;
 use zksync_types::tx::{ChangePubKey, PackedEthSignature};
-use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Token, Transfer, Withdraw};
+use zksync_types::{AccountId, Address, ForcedExit, Nonce, PubKeyHash, Token, Transfer, Withdraw};
 
 fn signing_failed_error(err: impl ToString) -> SignerError {
     SignerError::SigningFailed(err.to_string())
@@ -106,8 +106,9 @@ impl<S: EthereumSigner> Signer<S> {
         change_pubkey.eth_signature = eth_signature;
 
         if !auth_onchain {
-            assert!(
-                change_pubkey.verify_eth_signature() == Some(self.address),
+            assert_eq!(
+                change_pubkey.verify_eth_signature(),
+                Some(self.address),
                 "eth signature is incorrect"
             );
         }
@@ -191,5 +192,18 @@ impl<S: EthereumSigner> Signer<S> {
         };
 
         Ok((withdraw, eth_signature))
+    }
+
+    pub async fn sign_forced_exit(
+        &self,
+        target: Address,
+        token: Token,
+        fee: BigUint,
+        nonce: Nonce,
+    ) -> Result<ForcedExit, SignerError> {
+        let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        ForcedExit::new_signed(account_id, target, token.id, fee, nonce, &self.private_key)
+            .map_err(signing_failed_error)
     }
 }
