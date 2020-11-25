@@ -115,7 +115,7 @@ async fn execute_blocks_with_new_state_keeper(
             fee_account_address,
             test_setup.get_accounts_state().await,
             tokens,
-            test_setup.current_state_root.expect("Should be exists"),
+            test_setup.current_state_root.expect("Should exist"),
         )
         .await;
     }

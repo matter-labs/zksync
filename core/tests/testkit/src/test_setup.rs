@@ -645,6 +645,7 @@ impl TestSetup {
             .expect("sk receiver dropped");
 
         let new_block = self.await_for_block_commit_request().await;
+        self.current_state_root = Some(new_block.block.new_root_hash);
 
         new_block.block
     }
