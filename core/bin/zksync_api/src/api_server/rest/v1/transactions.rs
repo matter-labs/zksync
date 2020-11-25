@@ -10,10 +10,18 @@ use actix_web::{
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_types::{tx::TxEthSignature, tx::TxHash, ZkSyncTx};
+use zksync_storage::{
+    chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
+};
+use zksync_types::{
+    tx::{TxEthSignature, TxHash},
+    BlockNumber, SignedZkSyncTx, ZkSyncTx,
+};
 
 // Local uses
-use super::{client::Client, client::ClientError, Error as ApiError, JsonResult};
+use super::{
+    client::Client, client::ClientError, Error as ApiError, JsonResult, Pagination, PaginationQuery,
+};
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 #[derive(Debug, Clone, Copy)]
@@ -73,13 +81,110 @@ impl ApiTransactionsData {
     fn new(tx_sender: TxSender) -> Self {
         Self { tx_sender }
     }
+
+    async fn tx_receipt(
+        storage: &mut StorageProcessor<'_>,
+        tx_hash: TxHash,
+    ) -> QueryResult<Option<TxReceiptResponse>> {
+        storage
+            .chain()
+            .operations_ext_schema()
+            .tx_receipt(tx_hash.as_ref())
+            .await
+    }
+
+    async fn tx_status(&self, tx_hash: TxHash) -> QueryResult<Option<TxReceipt>> {
+        let mut storage = self.tx_sender.pool.access_storage().await?;
+
+        let tx_receipt = {
+            if let Some(tx_receipt) = Self::tx_receipt(&mut storage, tx_hash).await? {
+                tx_receipt
+            } else {
+                let tx_in_mempool = storage
+                    .chain()
+                    .mempool_schema()
+                    .contains_tx(tx_hash)
+                    .await?;
+
+                let tx_receipt = if tx_in_mempool {
+                    Some(TxReceipt::Pending)
+                } else {
+                    None
+                };
+                return Ok(tx_receipt);
+            }
+        };
+
+        let block_number = tx_receipt.block_number as BlockNumber;
+        // Check the cases where we don't need to get block details.
+        if !tx_receipt.success {
+            return Ok(Some(TxReceipt::Rejected {
+                reason: tx_receipt.fail_reason,
+            }));
+        }
+
+        if tx_receipt.verified {
+            return Ok(Some(TxReceipt::Verified {
+                block: block_number,
+            }));
+        }
+
+        // To distinguish committed and executed transaction we have to examine
+        // the transaction's block.
+        //
+        // TODO `load_block_range` possibly is too heavy operation and we should write
+        // specific request in the storage schema. (Task number ????)
+        let block = storage
+            .chain()
+            .block_schema()
+            .load_block_range(block_number, 1)
+            .await?
+            .into_iter()
+            .next();
+
+        let is_committed = block
+            .filter(|block| block.commit_tx_hash.is_some())
+            .is_some();
+
+        let tx_receipt = if is_committed {
+            TxReceipt::Committed {
+                block: block_number,
+            }
+        } else {
+            TxReceipt::Executed
+        };
+
+        Ok(Some(tx_receipt))
+    }
+
+    async fn tx_data(&self, tx_hash: TxHash) -> QueryResult<Option<SignedZkSyncTx>> {
+        let mut storage = self.tx_sender.pool.access_storage().await?;
+
+        let operation = storage
+            .chain()
+            .operations_schema()
+            .get_executed_operation(tx_hash.as_ref())
+            .await?;
+
+        if let Some(op) = operation {
+            let signed_tx = SignedZkSyncTx {
+                tx: serde_json::from_value(op.tx)?,
+                eth_sign_data: op.eth_sign_data.map(serde_json::from_value).transpose()?,
+            };
+
+            Ok(Some(signed_tx))
+        } else {
+            // Check memory pool for pending transactions.
+            storage.chain().mempool_schema().get_tx(tx_hash).await
+        }
+    }
 }
 
 // Data transfer objects.
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct FastProcessingQuery {
-    pub fast_processing: Option<bool>,
+struct FastProcessingQuery {
+    fast_processing: Option<bool>,
 }
 
 /// This struct has the same layout as `SignedZkSyncTx`, expect that it used
@@ -94,6 +199,22 @@ struct IncomingTx {
 struct IncomingTxBatch {
     txs: Vec<ZkSyncTx>,
     signature: Option<TxEthSignature>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum TxReceipt {
+    /// The transaction is awaiting execution in the memorypool.
+    Pending,
+    /// The transaction has been executed, but the block containing this transaction has not
+    /// yet been committed.
+    Executed,
+    /// The block which contains this transaction has been committed.
+    Committed { block: BlockNumber },
+    /// The block which contains this transaction has been verified.
+    Verified { block: BlockNumber },
+    /// The transaction has been rejected for some reasons.
+    Rejected { reason: Option<String> },
 }
 
 // Client implementation
@@ -125,9 +246,105 @@ impl Client {
             .send()
             .await
     }
+
+    /// Gets actual transaction receipt.
+    pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<TxReceipt>, ClientError> {
+        self.get(&format!("transactions/{}", tx_hash.to_string()))
+            .send()
+            .await
+    }
+
+    /// Gets transaction content.
+    pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<SignedZkSyncTx>, ClientError> {
+        self.get(&format!("transactions/{}/data", tx_hash.to_string()))
+            .send()
+            .await
+    }
+
+    /// Gets transaction receipt by ID.
+    pub async fn tx_receipt_by_id(
+        &self,
+        tx_hash: TxHash,
+        receipt_id: u32,
+    ) -> Result<Option<TxReceipt>, ClientError> {
+        self.get(&format!(
+            "transactions/{}/receipts/{}",
+            tx_hash.to_string(),
+            receipt_id
+        ))
+        .send()
+        .await
+    }
+
+    /// Gets transaction receipts.
+    pub async fn tx_receipts(
+        &self,
+        tx_hash: TxHash,
+        from: Pagination,
+        limit: BlockNumber,
+    ) -> Result<Vec<TxReceipt>, ClientError> {
+        self.get(&format!("transactions/{}/receipts", tx_hash.to_string()))
+            .query(&from.into_query(limit))
+            .send()
+            .await
+    }
 }
 
 // Server implementation
+
+async fn tx_status(
+    data: web::Data<ApiTransactionsData>,
+    web::Path(tx_hash): web::Path<TxHash>,
+) -> JsonResult<Option<TxReceipt>> {
+    let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
+
+    Ok(Json(tx_status))
+}
+
+async fn tx_data(
+    data: web::Data<ApiTransactionsData>,
+    web::Path(tx_hash): web::Path<TxHash>,
+) -> JsonResult<Option<SignedZkSyncTx>> {
+    let tx_data = data.tx_data(tx_hash).await.map_err(ApiError::internal)?;
+
+    Ok(Json(tx_data))
+}
+
+async fn tx_receipt_by_id(
+    data: web::Data<ApiTransactionsData>,
+    web::Path((tx_hash, receipt_id)): web::Path<(TxHash, u32)>,
+) -> JsonResult<Option<TxReceipt>> {
+    // At the moment we store only last receipt, so this endpoint is just only a stub.
+    if receipt_id > 0 {
+        return Ok(Json(None));
+    }
+
+    let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
+
+    Ok(Json(tx_status))
+}
+
+async fn tx_receipts(
+    data: web::Data<ApiTransactionsData>,
+    web::Path(tx_hash): web::Path<TxHash>,
+    web::Query(pagination): web::Query<PaginationQuery>,
+) -> JsonResult<Vec<TxReceipt>> {
+    let (pagination, _limit) = pagination.into_inner()?;
+    // At the moment we store only last receipt, so this endpoint is just only a stub.
+    let is_some = match pagination {
+        Pagination::Before(before) if before < 1 => false,
+        Pagination::After(_after) => false,
+        _ => true,
+    };
+
+    if is_some {
+        let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
+
+        Ok(Json(tx_status.into_iter().collect()))
+    } else {
+        Ok(Json(vec![]))
+    }
+}
 
 async fn submit_tx(
     data: web::Data<ApiTransactionsData>,
@@ -163,6 +380,13 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 
     web::scope("transactions")
         .data(data)
+        .route("{tx_hash}", web::get().to(tx_status))
+        .route("{tx_hash}/data", web::get().to(tx_data))
+        .route(
+            "{tx_hash}/receipts/{receipt_id}",
+            web::get().to(tx_receipt_by_id),
+        )
+        .route("{tx_hash}/receipts", web::get().to(tx_receipts))
         .route("submit", web::post().to(submit_tx))
         .route("submit/batch", web::post().to(submit_tx_batch))
 }
@@ -174,6 +398,7 @@ mod tests {
     use bigdecimal::BigDecimal;
     use futures::{channel::mpsc, prelude::*};
     use num::BigUint;
+    use zksync_storage::ConnectionPool;
     use zksync_test_account::ZkSyncAccount;
     use zksync_types::{tokens::TokenLike, tx::PackedEthSignature, SignedZkSyncTx};
 
@@ -182,6 +407,7 @@ mod tests {
         *,
     };
     use crate::{
+        api_server::rest::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
@@ -266,6 +492,7 @@ mod tests {
     struct TestServer {
         core_server: actix_web::test::TestServer,
         api_server: actix_web::test::TestServer,
+        pool: ConnectionPool,
     }
 
     impl TestServer {
@@ -273,6 +500,7 @@ mod tests {
             let (core_client, core_server) = submit_txs_loopback();
 
             let cfg = TestServerConfig::default();
+            let pool = cfg.pool.clone();
             cfg.fill_database().await?;
 
             let sign_verifier = dummy_sign_verifier();
@@ -293,6 +521,7 @@ mod tests {
                 Self {
                     core_server,
                     api_server,
+                    pool,
                 },
             ))
         }
@@ -322,6 +551,96 @@ mod tests {
     #[actix_rt::test]
     async fn test_transactions_scope() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
+
+        let committed_tx_hash = {
+            let mut storage = server.pool.access_storage().await?;
+
+            let transactions = storage
+                .chain()
+                .block_schema()
+                .get_block_transactions(1)
+                .await?;
+
+            try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
+        };
+
+        // Tx receipt by ID.
+        let unknown_tx_hash = TxHash::default();
+        assert!(client
+            .tx_receipt_by_id(committed_tx_hash, 0)
+            .await?
+            .is_some());
+        assert!(client
+            .tx_receipt_by_id(committed_tx_hash, 1)
+            .await?
+            .is_none());
+        assert!(client.tx_receipt_by_id(unknown_tx_hash, 0).await?.is_none());
+
+        // Tx receipts.
+        let queries = vec![
+            (
+                (committed_tx_hash, Pagination::Before(1), 1),
+                vec![TxReceipt::Verified { block: 1 }],
+            ),
+            (
+                (committed_tx_hash, Pagination::Last, 1),
+                vec![TxReceipt::Verified { block: 1 }],
+            ),
+            (
+                (committed_tx_hash, Pagination::Before(2), 1),
+                vec![TxReceipt::Verified { block: 1 }],
+            ),
+            ((committed_tx_hash, Pagination::After(0), 1), vec![]),
+            ((unknown_tx_hash, Pagination::Last, 1), vec![]),
+        ];
+
+        for (query, expected_response) in queries {
+            let actual_response = client.tx_receipts(query.0, query.1, query.2).await?;
+
+            assert_eq!(
+                actual_response,
+                expected_response,
+                "tx: {} from: {:?} limit: {:?}",
+                query.0.to_string(),
+                query.1,
+                query.2
+            );
+        }
+
+        // Tx status and data for committed transaction.
+        assert_eq!(
+            client.tx_status(committed_tx_hash).await?,
+            Some(TxReceipt::Verified { block: 1 })
+        );
+        assert_eq!(
+            client.tx_data(committed_tx_hash).await?.unwrap().hash(),
+            committed_tx_hash
+        );
+
+        // Tx status and data for pending transaction.
+        let tx_hash = {
+            let mut storage = server.pool.access_storage().await?;
+
+            let tx = TestServerConfig::gen_zk_txs(1_u64).txs[0].0.clone();
+            let tx_hash = tx.hash();
+            storage
+                .chain()
+                .mempool_schema()
+                .insert_tx(&SignedZkSyncTx {
+                    tx,
+                    eth_sign_data: None,
+                })
+                .await?;
+
+            tx_hash
+        };
+        assert_eq!(client.tx_status(tx_hash).await?, Some(TxReceipt::Pending));
+        assert_eq!(client.tx_data(tx_hash).await?.unwrap().hash(), tx_hash);
+
+        // Tx status for unknown transaction.
+        let tx_hash = TestServerConfig::gen_zk_txs(1_u64).txs[1].0.hash();
+        assert_eq!(client.tx_status(tx_hash).await?, None);
+        assert!(client.tx_data(tx_hash).await?.is_none());
 
         // Submit correct transaction.
         let tx = TestServerConfig::gen_zk_txs(1_00).txs[0].0.clone();
