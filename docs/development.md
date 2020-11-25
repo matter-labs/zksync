@@ -53,12 +53,13 @@ zk down # Shut down `geth` and `postgres` containers
 
 ## Committing changes
 
-`zksync` uses pre-commit git hooks for basic code integrity checks. Hooks are set up automatically within the workspace
-initialization process. These hooks will not allow to commit the code which does not pass several checks.
+`zksync` uses pre-commit and pre-push git hooks for basic code integrity checks. Hooks are set up automatically within
+the workspace initialization process. These hooks will not allow to commit the code which does not pass several checks.
 
 Currently the following criteria are checked:
 
-- Code should always be formatted via `cargo fmt`.
+- Rust code should always be formatted via `cargo fmt`.
+- Other code should always be formatted via `zk fmt`.
 - Dummy Prover should not be staged for commit (see below for the explanation).
 
 ## Using Dummy Prover
