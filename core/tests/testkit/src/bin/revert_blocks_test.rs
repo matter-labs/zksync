@@ -99,7 +99,7 @@ async fn execute_blocks_with_new_state_keeper(
             .await
             .expect("revert_blocks call fails");
     } else {
-        // Do not restore in reverting state, because there no working states
+        // Do not restore in reverting state, because there no valid blocks in blockchain
         println!("Start restoring");
 
         verify_restore(
