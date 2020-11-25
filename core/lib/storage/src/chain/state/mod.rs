@@ -161,7 +161,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "state" => "commit_state_update");
+        metrics::histogram!("sql.chain.state.commit_state_update", start.elapsed());
         Ok(())
     }
 
@@ -312,7 +312,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "state" => "apply_state_update");
+        metrics::histogram!("sql.chain.state.apply_state_update", start.elapsed());
         Ok(())
     }
 
@@ -350,7 +350,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_committed_state");
+        metrics::histogram!("sql.chain.state.load_committed_state", start.elapsed());
         result
     }
 
@@ -400,7 +400,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         }
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_verified_state");
+        metrics::histogram!("sql.chain.state.load_verified_state", start.elapsed());
         Ok((last_block, account_map))
     }
 
@@ -531,7 +531,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_state_diff");
+        metrics::histogram!("sql.chain.state.load_state_diff", start.elapsed());
 
         // We don't want to return an empty list to avoid the confusion, so return
         // `None` if there are no changes.
@@ -553,7 +553,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             .await
             .map(|diff| diff.unwrap_or_default().1);
 
-        metrics::histogram!("sql.chain", start.elapsed(), "state" => "load_state_diff");
+        metrics::histogram!("sql.chain.state.load_state_diff", start.elapsed());
         result
     }
 }

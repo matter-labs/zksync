@@ -37,6 +37,7 @@
         "tests": "mocha -r ts-node/register tests/**/*.test.ts",
         "build": "tsc",
         "watch": "tsc --watch",
-        "prepublish": "yarn build && rollup -c"
+        "prepublish": "yarn build && rollup -c",
+        "generate-test-vectors": "yarn ts-node tests/test-generator.ts"
     }
 }

@@ -83,7 +83,7 @@ impl Rpc for RpcApp {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_account_info(addr)).await.unwrap() };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "account_info");
+        metrics::histogram!("api.rpc.account_info", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -97,7 +97,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "ethop_info");
+        metrics::histogram!("api.rpc.ethop_info", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -106,7 +106,7 @@ impl Rpc for RpcApp {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_tx_info(hash)).await.unwrap() };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "tx_info");
+        metrics::histogram!("api.rpc.tx_info", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -125,7 +125,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "tx_submit");
+        metrics::histogram!("api.rpc.tx_submit", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -143,7 +143,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "submit_txs_batch");
+        metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -152,7 +152,7 @@ impl Rpc for RpcApp {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_contract_address()).await.unwrap() };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "contract_address");
+        metrics::histogram!("api.rpc.contract_address", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -161,7 +161,7 @@ impl Rpc for RpcApp {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move { handle.spawn(self_._impl_tokens()).await.unwrap() };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "tokens");
+        metrics::histogram!("api.rpc.tokens", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -180,7 +180,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "get_tx_fee");
+        metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -199,7 +199,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "get_txs_batch_fee_in_wei");
+        metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -213,7 +213,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "get_token_price");
+        metrics::histogram!("api.rpc.get_token_price", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 
@@ -227,7 +227,10 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "get_confirmations_for_eth_op_amount");
+        metrics::histogram!(
+            "api.rpc.get_confirmations_for_eth_op_amount",
+            start.elapsed()
+        );
         Box::new(resp.boxed().compat())
     }
 
@@ -241,7 +244,7 @@ impl Rpc for RpcApp {
                 .await
                 .unwrap()
         };
-        metrics::histogram!("api", start.elapsed(), "rpc" => "get_eth_tx_for_withdrawal");
+        metrics::histogram!("api.rpc.get_eth_tx_for_withdrawal", start.elapsed());
         Box::new(resp.boxed().compat())
     }
 }

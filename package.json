@@ -9,6 +9,7 @@
       "contracts",
       "infrastructure/analytics",
       "infrastructure/fee-seller",
+      "infrastructure/sdk-test-vector-generator",
       "infrastructure/zcli",
       "infrastructure/explorer",
       "infrastructure/zk",
