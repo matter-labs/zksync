@@ -22,11 +22,16 @@ const testConfig = {
     PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: true
 }
+
+const localConfig = Object.assign({}, prodConfig);
+localConfig.DUMMY_VERIFIER = process.env.DUMMY_VERIFIER ? true : localConfig.DUMMY_VERIFIER;
+
 const contractDefs = {
     rinkeby: testnetConfig,
     ropsten: testnetConfig,
     mainnet: prodConfig,
     test:  testConfig,
+    localhost: localConfig,
 };
 
 export default {
