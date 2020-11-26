@@ -82,7 +82,7 @@ command
     .option('--no-reset', 'do not reset the database before test starting')
     .allowUnknownOption()
     .action(async (cmd: Command, options: string[] | undefined) => {
-        await db(!cmd.reset, ...(options || []));
+        await db(cmd.reset, ...(options || []));
     });
 
 command

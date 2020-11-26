@@ -6,7 +6,7 @@ use zksync_eth_signer::error::SignerError;
 pub enum ClientError {
     #[error("Network '{0}' is not supported")]
     NetworkNotSupported(String),
-    #[error("Unable to decode server response")]
+    #[error("Unable to decode server response: {0}")]
     MalformedResponse(String),
     #[error("RPC error: {0:?}")]
     RpcError(RpcFailure),

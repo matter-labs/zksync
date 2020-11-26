@@ -122,7 +122,7 @@ pub struct TokenPrice {
 }
 
 /// Type of transaction fees that exist in the zkSync network.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
     /// Fee for the `Withdraw` or `ForcedExit` transaction.
     Withdraw,

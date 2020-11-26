@@ -157,14 +157,7 @@ impl RpcApp {
                     .get_executed_priority_operation(serial_id)
                     .await
                     .map_err(|err| {
-                        log::warn!(
-                            "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                            file!(),
-                            line!(),
-                            column!(),
-                            err,
-                            serial_id,
-                        );
+                        vlog::warn!("Internal Server Error: '{}'; input: {}", err, serial_id);
                         Error::internal_error()
                     })?;
 
@@ -215,13 +208,10 @@ impl RpcApp {
                 .tx_receipt(tx_hash.as_ref())
                 .await
                 .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                        file!(),
-                        line!(),
-                        column!(),
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: {}",
                         err,
-                        tx_hash.to_string(),
+                        tx_hash.to_string()
                     );
                     Error::internal_error()
                 })?;
@@ -238,6 +228,27 @@ impl RpcApp {
         Ok(res)
     }
 
+    async fn token_allowed_for_fees(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+    ) -> Result<bool> {
+        let (sender, receiver) = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::IsTokenAllowed {
+                token: token.clone(),
+                response: sender,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        receiver
+            .await
+            .expect("ticker answer sender dropped")
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                Error::internal_error()
+            })
+    }
+
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
@@ -247,7 +258,7 @@ impl RpcApp {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
-                tx_type: tx_type.clone(),
+                tx_type,
                 address,
                 token: token.clone(),
                 response: req.0,
@@ -256,11 +267,8 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: {:?}, {:?}",
                 err,
                 tx_type,
                 token,
@@ -285,14 +293,7 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}",
-                file!(),
-                line!(),
-                column!(),
-                err,
-                token,
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
             Error::internal_error()
         })
     }
@@ -312,10 +313,10 @@ impl RpcApp {
             verified: Default::default(),
         };
 
-        if let Some((account_id, commited_state)) = account_info.committed {
+        if let Some((account_id, committed_state)) = account_info.committed {
             result.account_id = Some(account_id);
             result.committed =
-                ResponseAccountState::try_restore(commited_state, &self.tx_sender.tokens).await?;
+                ResponseAccountState::try_restore(committed_state, &self.tx_sender.tokens).await?;
         };
 
         if let Some((_, verified_state)) = account_info.verified {

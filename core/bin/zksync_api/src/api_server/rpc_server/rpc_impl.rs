@@ -10,7 +10,10 @@ use zksync_types::{
 };
 
 // Local uses
-use crate::fee_ticker::{BatchFee, Fee, TokenPriceRequestType};
+use crate::{
+    api_server::tx_sender::SubmitError,
+    fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
+};
 use bigdecimal::BigDecimal;
 
 use super::{error::*, types::*, RpcApp};
@@ -144,13 +147,7 @@ impl RpcApp {
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {
         let mut storage = self.access_storage().await?;
         let mut tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                file!(),
-                line!(),
-                column!(),
-                err
-            );
+            log::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
         Ok(tokens
@@ -171,13 +168,13 @@ impl RpcApp {
         address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
-        Self::ticker_request(
-            self.tx_sender.ticker_requests.clone(),
-            tx_type,
-            address,
-            token,
-        )
-        .await
+        let ticker = self.tx_sender.ticker_requests.clone();
+        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
+        if !token_allowed {
+            return Err(SubmitError::InappropriateFeeToken.into());
+        }
+
+        Self::ticker_request(ticker.clone(), tx_type, address, token).await
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -194,19 +191,18 @@ impl RpcApp {
             });
         }
 
-        let ticker_request_sender = self.tx_sender.ticker_requests.clone();
+        let ticker = self.tx_sender.ticker_requests.clone();
+        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
+        if !token_allowed {
+            return Err(SubmitError::InappropriateFeeToken.into());
+        }
 
         let mut total_fee = BigUint::from(0u32);
 
         for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
-            total_fee += Self::ticker_request(
-                ticker_request_sender.clone(),
-                tx_type.clone(),
-                *address,
-                token.clone(),
-            )
-            .await?
-            .total_fee;
+            let ticker = ticker.clone();
+            let fee = Self::ticker_request(ticker, *tx_type, *address, token.clone()).await?;
+            total_fee += fee.total_fee;
         }
         // Sum of transactions can be unpackable
         total_fee = closest_packable_fee_amount(&total_fee);

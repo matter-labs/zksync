@@ -44,7 +44,12 @@ impl ApiTokensData {
         let mut storage = self.tokens.pool.access_storage().await?;
 
         let tokens = storage.tokens_schema().load_tokens().await?;
-        Ok(tokens.into_iter().map(|(_k, v)| v).collect())
+
+        // Provide tokens in a predictable order.
+        let mut tokens: Vec<_> = tokens.into_iter().map(|(_k, v)| v).collect();
+        tokens.sort_unstable_by_key(|token| token.id);
+
+        Ok(tokens)
     }
 
     async fn token(&self, token_like: TokenLike) -> QueryResult<Option<Token>> {
@@ -253,34 +258,44 @@ mod tests {
         let expected_tokens = {
             let mut storage = cfg.pool.access_storage().await?;
 
-            storage.tokens_schema().load_tokens().await?
+            let mut tokens: Vec<_> = storage
+                .tokens_schema()
+                .load_tokens()
+                .await?
+                .values()
+                .cloned()
+                .collect();
+            tokens.sort_unstable_by(|lhs, rhs| lhs.id.cmp(&rhs.id));
+            tokens
         };
 
-        assert_eq!(
-            client.tokens().await?,
-            expected_tokens.values().cloned().collect::<Vec<_>>()
-        );
+        assert_eq!(client.tokens().await?, expected_tokens);
 
-        let expected_token = expected_tokens.values().cloned().next();
-        assert_eq!(client.token_by_id(&TokenLike::Id(0)).await?, expected_token);
+        let expected_token = &expected_tokens[0];
         assert_eq!(
-            client
+            &client.token_by_id(&TokenLike::Id(0)).await?.unwrap(),
+            expected_token
+        );
+        assert_eq!(
+            &client
                 .token_by_id(&TokenLike::parse(
                     "0x0000000000000000000000000000000000000000"
                 ))
-                .await?,
+                .await?
+                .unwrap(),
             expected_token
         );
         assert_eq!(
-            client
+            &client
                 .token_by_id(&TokenLike::parse(
                     "0000000000000000000000000000000000000000"
                 ))
-                .await?,
+                .await?
+                .unwrap(),
             expected_token
         );
         assert_eq!(
-            client.token_by_id(&TokenLike::parse("ETH")).await?,
+            &client.token_by_id(&TokenLike::parse("ETH")).await?.unwrap(),
             expected_token
         );
         assert_eq!(client.token_by_id(&TokenLike::parse("XM")).await?, None);
