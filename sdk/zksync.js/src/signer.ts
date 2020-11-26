@@ -15,7 +15,7 @@ import {
 import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from './types';
 
 export class Signer {
-    #privateKey: Uint8Array;
+    readonly #privateKey: Uint8Array;
 
     private constructor(privKey: Uint8Array) {
         this.#privateKey = privKey;
