@@ -683,7 +683,7 @@ impl TestSetup {
 
         let new_block = self.await_for_block_commit_request().await.block;
 
-        self.current_state_root = Some(new_block.block.new_root_hash.clone());
+        self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),

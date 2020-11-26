@@ -384,7 +384,7 @@ where
             let block = RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
                 .await
                 .expect("Cant get new operation blocks from events");
-            blocks.push(block);
+            blocks.extend(block);
         }
 
         blocks
