@@ -9,6 +9,7 @@ use zksync_testkit::{
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
+use zksync_types::aggregated_operations::stored_block_info;
 
 /// Executes blocks with some basic operations with new state keeper
 /// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
@@ -101,7 +102,7 @@ async fn execute_blocks_with_new_state_keeper(
             .expect("total_blocks_verified call fails");
         assert_ne!(blocks_committed, blocks_verified, "no blocks to revert");
         test_setup
-            .revert_blocks(blocks_committed - blocks_verified)
+            .revert_blocks(vec![test_setup.last_committed_block.clone()])
             .await
             .expect("revert_blocks call fails");
     } else {

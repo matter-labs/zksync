@@ -647,6 +647,15 @@ impl TestSetup {
         let new_block = self.await_for_block_commit_request().await;
         self.current_state_root = Some(new_block.block.new_root_hash);
 
+        let block_commit_op = BlocksCommitOperation {
+            last_committed_block: self.last_committed_block.clone(),
+            blocks: vec![new_block.block.clone()],
+        };
+        self.commit_account
+            .commit_block(&block_commit_op)
+            .await
+            .expect("block commit fail");
+        self.last_committed_block = new_block.block.clone();
         new_block.block
     }
 
@@ -841,8 +850,8 @@ impl TestSetup {
         self.accounts.eth_accounts[0].total_blocks_verified().await
     }
 
-    pub async fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), anyhow::Error> {
-        self.commit_account.revert_blocks(blocks_to_revert).await?;
+    pub async fn revert_blocks(&self, blocks: Vec<Block>) -> Result<(), anyhow::Error> {
+        self.commit_account.revert_blocks(blocks).await?;
         Ok(())
     }
 

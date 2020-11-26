@@ -427,15 +427,16 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    pub async fn revert_blocks(
-        &self,
-        blocks_to_revert: u64,
-    ) -> Result<ETHExecResult, anyhow::Error> {
+    pub async fn revert_blocks(&self, blocks: Vec<Block>) -> Result<ETHExecResult, anyhow::Error> {
+        let reverted_blocks: Vec<_> = blocks
+            .iter()
+            .map(|block| stored_block_info(block))
+            .collect();
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "revertBlocks",
-                blocks_to_revert,
+                reverted_blocks,
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await
