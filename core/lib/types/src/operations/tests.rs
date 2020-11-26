@@ -21,14 +21,14 @@ const CHANGE_PUBKEY_PUBLIC_DATA: &str = "070000002a3cfb9a39096d9e02b24187355f628
 const FORCED_EXIT_PUBLIC_DATA: &str = "080000002a0000002a002a0000000000000000000000000000000005402a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000000000";
 
 #[test]
-fn test_public_data_convetions_noop() {
+fn test_public_data_conversions_noop() {
     let expected_op = NoopOp {};
 
     assert_eq!(hex::encode(expected_op.get_public_data()), NOOP_PUBLIC_DATA);
 }
 
 #[test]
-fn test_public_data_convetions_deposit() {
+fn test_public_data_conversions_deposit() {
     let expected_op = {
         let priority_op = Deposit {
             from: Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
@@ -51,7 +51,7 @@ fn test_public_data_convetions_deposit() {
 }
 
 #[test]
-fn test_public_data_convetions_transfer() {
+fn test_public_data_conversions_transfer() {
     let (expected_transfer, expected_transfer_to_new) = {
         let tx = Transfer::new(
             42,
@@ -86,7 +86,7 @@ fn test_public_data_convetions_transfer() {
 }
 
 #[test]
-fn test_public_data_convetions_withdraw() {
+fn test_public_data_conversions_withdraw() {
     let expected_op = {
         let tx = Withdraw::new(
             42,
@@ -110,7 +110,7 @@ fn test_public_data_convetions_withdraw() {
 }
 
 #[test]
-fn test_public_data_convetions_full_exit() {
+fn test_public_data_conversions_full_exit() {
     let expected_op = {
         let priority_op = FullExit {
             eth_address: Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
@@ -131,7 +131,7 @@ fn test_public_data_convetions_full_exit() {
 }
 
 #[test]
-fn test_public_data_convetions_change_pubkey() {
+fn test_public_data_conversions_change_pubkey() {
     let expected_op = {
         let tx = ChangePubKey::new(
                 42,
@@ -157,7 +157,7 @@ fn test_public_data_convetions_change_pubkey() {
 }
 
 #[test]
-fn test_public_data_convetions_forced_exit() {
+fn test_public_data_conversions_forced_exit() {
     let expected_op = {
         let tx = ForcedExit::new(
             42,
