@@ -456,7 +456,7 @@ export function calculateCreate2WalletAddressAndSalt(
 
     // CREATE2 salt
     const salt = ethers.utils.keccak256(
-        ethers.utils.concat([ethers.utils.arrayify(pubkeyHashHex), additionalSaltArgument])
+        ethers.utils.concat([additionalSaltArgument,ethers.utils.arrayify(pubkeyHashHex)])
     );
 
     // Address according to CREATE2 specification
