@@ -21,6 +21,7 @@ impl TxHandler<Deposit> for ZkSyncState {
         } else {
             self.get_free_account_id()
         };
+
         let op = DepositOp {
             priority_op,
             account_id,
