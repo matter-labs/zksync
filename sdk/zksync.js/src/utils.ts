@@ -510,6 +510,23 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
     return ethers.utils.concat([type, initiatorAccountIdBytes, targetBytes, tokenIdBytes, feeBytes, nonceBytes]);
 }
 
+/**
+ * Encodes the transaction data as the byte sequence according to the zkSync protocol.
+ * @param tx A transaction to serialize.
+ */
+export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | ForcedExit): Uint8Array {
+    switch (tx.type) {
+        case 'Transfer':
+            return serializeTransfer(tx);
+        case 'Withdraw':
+            return serializeWithdraw(tx);
+        case 'ChangePubKey':
+            return serializeChangePubKey(tx);
+        case 'ForcedExit':
+            return serializeForcedExit(tx);
+    }
+}
+
 function numberToBytesBE(number: number, bytes: number): Uint8Array {
     const result = new Uint8Array(bytes);
     for (let i = bytes - 1; i >= 0; i--) {

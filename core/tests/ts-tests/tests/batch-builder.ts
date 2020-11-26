@@ -2,9 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, utils } from 'zksync';
 import { BigNumber } from 'ethers';
-import { Transfer } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
-import { totalmem } from 'os';
 
 type TokenLike = types.TokenLike;
 
