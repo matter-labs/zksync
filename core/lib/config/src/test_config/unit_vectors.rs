@@ -4,7 +4,9 @@ use num::BigUint;
 use serde::Deserialize;
 // Workspace uses
 use zksync_types::{AccountId, Address, Nonce, PubKeyHash, TokenId};
-use zksync_utils::{BigUintSerdeAsRadix10Str, PrefixedHex};
+use zksync_utils::{
+    BigUintSerdeAsRadix10Str, OptionBytesToHexSerde, ZeroPrefixHexSerde, ZeroxPrefix,
+};
 // Local uses
 use super::{config_path, load_json};
 
@@ -38,16 +40,16 @@ pub struct TestEntry<I, O> {
 
 #[derive(Debug, Deserialize)]
 pub struct CryptoPrimitiveInput {
-    #[serde(with = "PrefixedHex")]
+    #[serde(with = "ZeroPrefixHexSerde")]
     pub seed: Vec<u8>,
-    #[serde(with = "PrefixedHex")]
+    #[serde(with = "ZeroPrefixHexSerde")]
     pub message: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CryptoPrimitiveOutput {
-    #[serde(with = "PrefixedHex")]
+    #[serde(with = "ZeroPrefixHexSerde")]
     pub private_key: Vec<u8>,
     // FIXME: is it really a hash?
     pub pub_key_hash: String,
@@ -57,7 +59,7 @@ pub struct CryptoPrimitiveOutput {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxInput {
-    #[serde(with = "PrefixedHex")]
+    #[serde(with = "ZeroPrefixHexSerde")]
     pub eth_private_key: Vec<u8>,
     #[serde(flatten)]
     pub tx: Tx,
@@ -171,11 +173,12 @@ pub struct ChangePubKeySignature {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxOutput {
-    #[serde(with = "PrefixedHex")]
+    #[serde(with = "ZeroPrefixHexSerde")]
     pub sign_bytes: Vec<u8>,
     pub signature: Signature,
     pub eth_sign_message: Option<String>,
-    pub eth_signature: Option<String>,
+    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
+    pub eth_signature: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -205,7 +208,7 @@ pub struct PackingOutput {
     pub packable: bool,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub closest_packable: BigUint,
-    #[serde(with = "PrefixedHex")]
+    #[serde(with = "ZeroPrefixHexSerde")]
     pub packed_value: Vec<u8>,
 }
 
