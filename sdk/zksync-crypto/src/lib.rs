@@ -78,10 +78,12 @@ fn read_signing_key(private_key: &[u8]) -> Result<PrivateKey<Engine>, JsValue> {
     fs_repr
         .read_be(private_key)
         .map_err(|_| JsValue::from_str("couldn't read private key repr"))?;
-    Ok(PrivateKey::<Engine>(Fs::from_repr(fs_repr).expect("couldn't read private key from repr")))
+    Ok(PrivateKey::<Engine>(
+        Fs::from_repr(fs_repr).expect("couldn't read private key from repr"),
+    ))
 }
 
-fn privkey_to_pubkey_internal(private_key: &[u8]) -> Result<PublicKey<Engine>,JsValue> {
+fn privkey_to_pubkey_internal(private_key: &[u8]) -> Result<PublicKey<Engine>, JsValue> {
     let p_g = FixedGenerators::SpendingKeyGenerator;
 
     let sk = read_signing_key(private_key)?;
