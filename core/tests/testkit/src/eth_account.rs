@@ -1,7 +1,7 @@
 use crate::external_commands::js_revert_reason;
 
 use anyhow::{bail, ensure, format_err};
-use ethabi::ParamType;
+use ethabi::{ParamType, Token};
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -427,16 +427,14 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    pub async fn revert_blocks(&self, blocks: Vec<Block>) -> Result<ETHExecResult, anyhow::Error> {
-        let reverted_blocks: Vec<_> = blocks
-            .iter()
-            .map(|block| stored_block_info(block))
-            .collect();
+    pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<ETHExecResult, anyhow::Error> {
+        let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
+
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "revertBlocks",
-                reverted_blocks,
+                tx_arg,
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await

@@ -13,6 +13,7 @@ use crate::{
 };
 
 use super::*;
+use zksync_types::block::Block;
 
 /// Performs a fixed set of operations which covers most of the main server's functionality.
 /// Aim is to cover operations processed by state keeper, while manually simulating everything else around it.
@@ -132,7 +133,8 @@ pub async fn perform_basic_operations(
     test_setup: &mut TestSetup,
     deposit_amount: BigUint,
     blocks_processing: BlockProcessing,
-) {
+) -> Vec<Block> {
+    let mut executed_blocks = Vec::new();
     // test deposit to other account
     test_setup.start_block();
     test_setup
@@ -143,15 +145,17 @@ pub async fn perform_basic_operations(
             deposit_amount.clone(),
         )
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
-        println!("Deposit to other account test success, token_id: {}", token);
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await; //.0.expect_success();
-    }
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!("Deposit to other account test success, token_id: {}", token);
 
     // test two deposits
     test_setup.start_block();
@@ -171,15 +175,17 @@ pub async fn perform_basic_operations(
             deposit_amount.clone(),
         )
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
-        println!("Deposit test success, token_id: {}", token);
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await; //.0.expect_success();
-    }
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!("Deposit test success, token_id: {}", token);
 
     // test transfers
     test_setup.start_block();
@@ -259,26 +265,33 @@ pub async fn perform_basic_operations(
             &deposit_amount / BigUint::from(4u32),
         )
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
-        println!("Transfer test success, token_id: {}", token);
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await; //.0.expect_success();
-    }
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!("Transfer test success, token_id: {}", token);
 
     test_setup.start_block();
     test_setup
         .full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token))
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await; //.0.expect_success();
-    }
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!("FullExit test success, token_id: {}", token);
+
+    executed_blocks
 }

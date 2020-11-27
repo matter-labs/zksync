@@ -3,6 +3,7 @@ use num::BigUint;
 use std::collections::HashMap;
 use web3::types::TransactionReceipt;
 use zksync_config::ConfigurationOptions;
+use zksync_types::block::Block;
 use zksync_types::TokenId;
 
 #[derive(Debug)]
@@ -36,6 +37,7 @@ pub struct Token(pub TokenId);
 
 #[derive(Debug, Clone)]
 pub struct BlockExecutionResult {
+    pub block: Block,
     pub commit_result: TransactionReceipt,
     pub verify_result: TransactionReceipt,
     pub withdrawals_result: TransactionReceipt,
@@ -44,12 +46,14 @@ pub struct BlockExecutionResult {
 
 impl BlockExecutionResult {
     pub fn new(
+        block: Block,
         commit_result: TransactionReceipt,
         verify_result: TransactionReceipt,
         withdrawals_result: TransactionReceipt,
         block_size_chunks: usize,
     ) -> Self {
         Self {
+            block,
             commit_result,
             verify_result,
             withdrawals_result,

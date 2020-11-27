@@ -45,7 +45,6 @@ pub struct TestSetup {
     pub commit_account: EthereumAccount<Http>,
 
     pub last_committed_block: Block,
-    pub current_state_root: Option<Fr>,
 }
 
 impl TestSetup {
@@ -78,7 +77,6 @@ impl TestSetup {
                 H256::default(),
                 0,
             ),
-            current_state_root: None,
         }
     }
 
@@ -644,19 +642,20 @@ impl TestSetup {
             .await
             .expect("sk receiver dropped");
 
-        let new_block = self.await_for_block_commit_request().await;
-        self.current_state_root = Some(new_block.block.new_root_hash);
+        let new_block = self.await_for_block_commit_request().await.block;
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
-            blocks: vec![new_block.block.clone()],
+            blocks: vec![new_block.clone()],
         };
         self.commit_account
             .commit_block(&block_commit_op)
             .await
-            .expect("block commit fail");
-        self.last_committed_block = new_block.block.clone();
-        new_block.block
+            .expect("block commit send tx")
+            .expect_success();
+        self.last_committed_block = new_block.clone();
+
+        new_block
     }
 
     pub async fn execute_verify_commitments(
@@ -671,8 +670,8 @@ impl TestSetup {
 
     pub async fn execute_verify_block(
         &mut self,
-        _block: &Block,
-        _proof: EncodedProofPlonk,
+        block: &Block,
+        proof: EncodedProofPlonk,
     ) -> ETHExecResult {
         unimplemented!()
         // self.commit_account
@@ -692,13 +691,10 @@ impl TestSetup {
 
         let new_block = self.await_for_block_commit_request().await.block;
 
-        self.current_state_root = Some(new_block.new_root_hash);
-
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
             blocks: vec![new_block.clone()],
         };
-
         let commit_result = self
             .commit_account
             .commit_block(&block_commit_op)
@@ -780,6 +776,7 @@ impl TestSetup {
         }
 
         Ok(BlockExecutionResult::new(
+            new_block,
             commit_result,
             verify_result,
             withdrawals_result,
@@ -850,7 +847,7 @@ impl TestSetup {
         self.accounts.eth_accounts[0].total_blocks_verified().await
     }
 
-    pub async fn revert_blocks(&self, blocks: Vec<Block>) -> Result<(), anyhow::Error> {
+    pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<(), anyhow::Error> {
         self.commit_account.revert_blocks(blocks).await?;
         Ok(())
     }
