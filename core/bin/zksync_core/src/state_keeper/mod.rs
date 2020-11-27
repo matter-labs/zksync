@@ -6,6 +6,7 @@ use futures::{
     stream::StreamExt,
     SinkExt,
 };
+use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_crypto::ff;
@@ -348,11 +349,10 @@ impl ZkSyncStateKeeper {
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
-        let is_sorted = {
-            let mut sorted = available_block_chunk_sizes.clone();
-            sorted.sort_unstable();
-            sorted == available_block_chunk_sizes
-        };
+        let is_sorted = available_block_chunk_sizes
+            .iter()
+            .tuple_windows()
+            .all(|(a, b)| a < b);
         assert!(is_sorted);
 
         let state = ZkSyncState::new(

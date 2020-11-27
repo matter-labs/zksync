@@ -8,7 +8,7 @@ use zksync_storage::chain::{
     operations_ext::records::{TransactionsHistoryItem, TxByHashResponse},
 };
 use zksync_storage::StorageProcessor;
-use zksync_types::{PriorityOp, Token, TokenId, ZkSyncPriorityOp, H256};
+use zksync_types::{tx::TxHash, PriorityOp, Token, TokenId, ZkSyncPriorityOp, H256};
 
 pub fn remove_prefix(query: &str) -> &str {
     if let Some(query) = query.strip_prefix("0x") {
@@ -25,14 +25,21 @@ pub fn remove_prefix(query: &str) -> &str {
 pub fn try_parse_hash(query: &str) -> Option<H256> {
     const HASH_SIZE: usize = 32; // 32 bytes
 
-    let query = remove_prefix(query);
-    let bytes = hex::decode(query).ok()?;
+    let mut slice = [0_u8; HASH_SIZE];
 
-    if bytes.len() == HASH_SIZE {
-        Some(H256::from_slice(&bytes))
-    } else {
-        None
-    }
+    let tx_hex = remove_prefix(query);
+    hex::decode_to_slice(&tx_hex, &mut slice).ok()?;
+    Some(H256::from_slice(&slice))
+}
+
+pub fn try_parse_tx_hash(query: &str) -> Option<TxHash> {
+    const HASH_SIZE: usize = 32; // 32 bytes
+
+    let mut slice = [0_u8; HASH_SIZE];
+
+    let tx_hex = remove_prefix(query);
+    hex::decode_to_slice(&tx_hex, &mut slice).ok()?;
+    TxHash::from_slice(&slice)
 }
 
 /// Checks if block is finalized, meaning that

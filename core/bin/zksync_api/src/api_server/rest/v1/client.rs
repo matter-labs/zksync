@@ -1,7 +1,12 @@
 //! Built-in API client.
 
 // Public uses
-pub use super::blocks::{BlockInfo, TransactionInfo};
+pub use super::{
+    blocks::{BlockInfo, TransactionInfo},
+    config::Contracts,
+    tokens::TokenPriceKind,
+    transactions::{SumbitErrorCode, TxReceipt},
+};
 
 // Built-in uses
 
