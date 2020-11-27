@@ -3,6 +3,7 @@ use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
 use web3::transports::Http;
 use zksync_crypto::Fr;
+use zksync_testkit::data_restore::verify_restore;
 use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
 use zksync_testkit::*;
 
@@ -75,6 +76,7 @@ async fn execute_blocks_with_new_state_keeper(
     let deposit_amount = parse_ether("1.0").unwrap();
 
     let mut executed_blocks = Vec::new();
+    let mut tokens = vec![];
     for token in 0..=1 {
         let blocks = perform_basic_operations(
             token,
@@ -84,6 +86,7 @@ async fn execute_blocks_with_new_state_keeper(
         )
         .await;
         executed_blocks.extend(blocks.into_iter());
+        tokens.push(token);
     }
 
     if block_processing == BlockProcessing::NoVerify {
@@ -102,6 +105,19 @@ async fn execute_blocks_with_new_state_keeper(
             .revert_blocks(&executed_blocks_reverse_order)
             .await
             .expect("revert_blocks call fails");
+    } else {
+        println!("Start restoring");
+
+        verify_restore(
+            &testkit_config.web3_url,
+            testkit_config.available_block_chunk_sizes.clone(),
+            &contracts,
+            fee_account.address,
+            test_setup.get_accounts_state().await,
+            tokens,
+            test_setup.current_state_root.expect("Should exist"),
+        )
+        .await;
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");

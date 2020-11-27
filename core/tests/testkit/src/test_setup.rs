@@ -43,6 +43,7 @@ pub struct TestSetup {
     pub expected_changes_for_current_block: ExpectedAccountState,
 
     pub commit_account: EthereumAccount<Http>,
+    pub current_state_root: Option<Fr>,
 
     pub last_committed_block: Block,
 }
@@ -65,6 +66,7 @@ impl TestSetup {
             tokens,
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
+            current_state_root: None,
             last_committed_block: Block::new(
                 0,
                 initial_root,
@@ -643,6 +645,7 @@ impl TestSetup {
             .expect("sk receiver dropped");
 
         let new_block = self.await_for_block_commit_request().await.block;
+        self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
@@ -690,6 +693,7 @@ impl TestSetup {
             .expect("sk receiver dropped");
 
         let new_block = self.await_for_block_commit_request().await.block;
+        self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
