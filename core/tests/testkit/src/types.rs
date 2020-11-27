@@ -10,6 +10,7 @@ pub struct TestkitConfig {
     pub chain_id: u8,
     pub gas_price_factor: f64,
     pub web3_url: String,
+    pub available_block_chunk_sizes: Vec<usize>,
 }
 
 impl TestkitConfig {
@@ -19,6 +20,7 @@ impl TestkitConfig {
             chain_id: env_config.chain_id,
             gas_price_factor: env_config.gas_price_factor,
             web3_url: env_config.web3_url,
+            available_block_chunk_sizes: env_config.available_block_chunk_sizes,
         }
     }
 }

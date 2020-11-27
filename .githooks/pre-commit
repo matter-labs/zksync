@@ -6,7 +6,7 @@
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Check that `rustfmt` rules are not violated.
+# Check that Rust formatting rules are not violated.
 if ! cargo fmt -- --check; then
     echo -e "${RED}Commit error!${NC}"
     echo "Please format the code via 'cargo fmt', cannot commit unformatted code"

@@ -159,6 +159,37 @@ pub fn create_deposit(token: TokenId, amount: impl Into<BigUint>) -> PriorityOp 
     }
 }
 
+/// Checks that StateKeeper will panic with incorrect initialization data
+#[test]
+#[should_panic]
+fn test_create_incorrect_state_keeper() {
+    const CHANNEL_SIZE: usize = 32768;
+    const MAX_ITERATIONS: usize = 100;
+    const FAST_ITERATIONS: usize = 100;
+    const NUMBER_OF_WITHDRAWALS: usize = 100;
+
+    let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
+    let (response_tx, _response_rx) = mpsc::channel(CHANNEL_SIZE);
+
+    let mut fee_collector = Account::default();
+    fee_collector.address = H160::random();
+
+    let mut init_params = ZkSyncStateInitParams::default();
+    init_params.insert_account(0, fee_collector.clone());
+
+    // should panic
+    ZkSyncStateKeeper::new(
+        init_params,
+        fee_collector.address,
+        request_rx,
+        response_tx,
+        vec![1, 2, 2], // `available_block_chunk_sizes` must be strictly increasing.
+        MAX_ITERATIONS,
+        FAST_ITERATIONS,
+        NUMBER_OF_WITHDRAWALS,
+    );
+}
+
 mod apply_priority_op {
     use super::*;
 

@@ -54,7 +54,7 @@ mod test {
     use crate::EthereumSigner;
     use zksync_types::{H160, H256, U256};
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_generating_signature() {
         let private_key = H256::from([5; 32]);
         let signer = PrivateKeySigner::new(private_key);
