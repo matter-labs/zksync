@@ -21,6 +21,19 @@ pub struct ZkSyncAccount {
     nonce: Mutex<Nonce>,
 }
 
+impl Clone for ZkSyncAccount {
+    fn clone(&self) -> Self {
+        Self {
+            private_key: priv_key_from_fs(self.private_key.0),
+            pubkey_hash: self.pubkey_hash.clone(),
+            address: self.address.clone(),
+            eth_private_key: self.eth_private_key.clone(),
+            account_id: Mutex::new(self.account_id.lock().unwrap().clone()),
+            nonce: Mutex::new(self.nonce.lock().unwrap().clone()),
+        }
+    }
+}
+
 impl fmt::Debug for ZkSyncAccount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // It is OK to disclose the private key contents for a testkit account.
