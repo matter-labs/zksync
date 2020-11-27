@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::time::Instant;
 // External uses
 use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
