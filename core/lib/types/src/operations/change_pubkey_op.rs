@@ -37,7 +37,11 @@ impl ChangePubKeyOp {
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
         if let Some(eth_signature) = &self.tx.eth_signature {
-            eth_signature.serialize_packed().to_vec()
+            [
+                &eth_signature.serialize_packed(),
+                self.tx.batch_hash.as_bytes(),
+            ]
+            .concat()
         } else {
             Vec::new()
         }

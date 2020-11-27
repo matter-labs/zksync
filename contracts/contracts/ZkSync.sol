@@ -666,7 +666,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     ) internal pure returns (bool) {
         bytes memory signedMessage =
             abi.encodePacked(
-                "\x19Ethereum Signed Message:\n152",
+                "\x19Ethereum Signed Message:\n184",
                 "Register zkSync pubkey:\n\n",
                 Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
                 "\n",
@@ -676,7 +676,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 "account id: 0x",
                 Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_accountId)),
                 "\n\n",
-                "Only sign this message for a trusted client!"
+                "Only sign this message for a trusted client!",
+                Bytes.slice(_signature, 65, 32)
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;

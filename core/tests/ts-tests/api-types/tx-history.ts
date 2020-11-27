@@ -85,6 +85,7 @@ type ChangePubKey = {
             pubKey: string;
             signature: string;
         };
+        batchHash: string;
     };
     success: boolean;
     fail_reason: string | null;

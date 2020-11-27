@@ -1,9 +1,6 @@
 // External uses
 use futures::{
-    channel::{
-        mpsc,
-        oneshot::{self},
-    },
+    channel::{mpsc, oneshot},
     SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};

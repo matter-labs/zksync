@@ -10,6 +10,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
+use itertools::izip;
 use num::{bigint::ToBigInt, BigUint};
 use thiserror::Error;
 
@@ -17,8 +18,7 @@ use thiserror::Error;
 use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    tx::EthSignData,
-    tx::{SignedZkSyncTx, TxEthSignature, TxHash},
+    tx::{BatchSignData, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash},
     Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -136,6 +136,24 @@ impl TxSender {
         }
     }
 
+    /// If `ForcedExit` has Ethereum siganture (e.g. it's a part of a batch), an actual signer
+    /// is initiator, not the target, thus, this function will perform a database query to acquire
+    /// the corresponding address.
+    async fn get_tx_sender(&self, tx: &ZkSyncTx) -> Result<Address, anyhow::Error> {
+        match tx {
+            ZkSyncTx::ForcedExit(tx) => {
+                self.pool
+                    .access_storage()
+                    .await?
+                    .chain()
+                    .account_schema()
+                    .account_address_by_id(tx.initiator_account_id)
+                    .await
+            }
+            _ => Ok(tx.account()),
+        }
+    }
+
     pub async fn submit_tx(
         &self,
         mut tx: ZkSyncTx,
@@ -197,8 +215,14 @@ impl TxSender {
             }
         }
 
+        let tx_sender = self
+            .get_tx_sender(&tx)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
         let verified_tx = verify_tx_info_message_signature(
             &tx,
+            tx_sender,
             signature.clone(),
             msg_to_sign,
             sign_verify_channel,
@@ -221,7 +245,9 @@ impl TxSender {
         txs: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
         eth_signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>, SubmitError> {
-        debug_assert!(txs.is_empty(), "Transaction batch cannot be empty");
+        if txs.is_empty() {
+            return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
+        }
 
         if txs.iter().any(|tx| tx.0.is_close()) {
             return Err(SubmitError::AccountCloseDisabled);
@@ -263,32 +289,44 @@ impl TxSender {
             return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
         }
 
-        let mut verified_txs = Vec::new();
+        let mut verified_txs = Vec::with_capacity(txs.len());
         let mut verified_signature = None;
 
-        let mut messages_to_sign = vec![];
+        let mut messages_to_sign = Vec::with_capacity(txs.len());
+        let mut tx_senders = Vec::with_capacity(txs.len());
         for tx in &txs {
             messages_to_sign.push(self.tx_message_to_sign(&tx.0).await?);
+            tx_senders.push(
+                self.get_tx_sender(&tx.0)
+                    .await
+                    .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
+            );
         }
 
         if let Some(signature) = eth_signature {
             // User provided the signature for the whole batch.
+            let _txs = txs.iter().map(|tx| tx.0.clone()).collect::<Vec<ZkSyncTx>>();
+            // Create batch signature data.
+            let batch_sign_data =
+                BatchSignData::new(&_txs, signature).map_err(SubmitError::other)?;
             let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
-                signature,
+                tx_senders,
+                batch_sign_data,
                 messages_to_sign,
                 self.sign_verify_requests.clone(),
             )
             .await?
             .unwrap_batch();
 
-            verified_signature = Some(sign_data.signature);
+            verified_signature = Some(sign_data.0.signature);
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
+            for (tx, sender, msg_to_sign) in izip!(txs, tx_senders, messages_to_sign) {
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.0,
+                    sender,
                     tx.1.clone(),
                     msg_to_sign,
                     self.sign_verify_requests.clone(),
@@ -445,6 +483,7 @@ async fn send_verify_request_and_recv(
 /// If `msg_to_sign` is not `None`, then the signature must be present.
 async fn verify_tx_info_message_signature(
     tx: &ZkSyncTx,
+    tx_sender: Address,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
@@ -468,6 +507,7 @@ async fn verify_tx_info_message_signature(
             tx: tx.clone(),
             eth_sign_data,
         }),
+        senders: vec![tx_sender],
         response: sender,
     };
 
@@ -480,7 +520,8 @@ async fn verify_tx_info_message_signature(
 /// through signing hash of concatenated transactions bytes.
 async fn verify_txs_batch_signature(
     batch: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
-    signature: TxEthSignature,
+    senders: Vec<Address>,
+    batch_sign_data: BatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
@@ -498,20 +539,12 @@ async fn verify_txs_batch_signature(
             eth_sign_data,
         });
     }
-    // User is expected to sign hash of the data of all transactions in the batch.
-    let message = tiny_keccak::keccak256(
-        txs.iter()
-            .flat_map(|tx| tx.tx.get_bytes())
-            .collect::<Vec<u8>>()
-            .as_slice(),
-    )
-    .to_vec();
-    let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiever) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs, eth_sign_data),
+        tx: TxVariant::Batch(txs, batch_sign_data),
+        senders,
         response: sender,
     };
 

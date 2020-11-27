@@ -17,6 +17,7 @@ zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 num = { version = "0.2", features = ["serde"] }
 hex = "0.4"
+tiny-keccak = "1.4.2"
 anyhow = "1.0"
 log = "0.4"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
