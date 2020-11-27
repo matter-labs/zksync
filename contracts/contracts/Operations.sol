@@ -5,6 +5,7 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./Bytes.sol";
+import "./Utils.sol";
 
 /// @title zkSync operations tools
 library Operations {
@@ -84,13 +85,9 @@ library Operations {
         );
     }
 
-    /// @notice Check that deposit pubdata from request and block matches
-    function depositPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
-        // We must ignore `accountId` and operation type because it is present in block pubdata but not in priority queue
-        uint256 skipBytes = ACCOUNT_ID_BYTES + OP_TYPE_BYTES;
-        bytes memory lhs_trimmed = Bytes.slice(_lhs, skipBytes, PACKED_DEPOSIT_PUBDATA_BYTES - skipBytes);
-        bytes memory rhs_trimmed = Bytes.slice(_rhs, skipBytes, PACKED_DEPOSIT_PUBDATA_BYTES - skipBytes);
-        return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
+    /// @notice Write deposit pubdata for priority queue check.
+    function checkDepositInPriorityQueue(Deposit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
+        return Utils.hashBytesToBytes20(writeDepositPubdata(op)) == hashedPubdata;
     }
 
     // FullExit pubdata
@@ -123,16 +120,13 @@ library Operations {
             op.accountId, // accountId
             op.owner, // owner
             op.tokenId, // tokenId
-            op.amount // amount
+            uint128(0) // amount -- ignored
         );
     }
 
-    /// @notice Check that full exit pubdata from request and block matches
-    function fullExitPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
-        // `amount` is ignored because it is present in block pubdata but not in priority queue
-        uint256 lhs = Bytes.trim(_lhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
-        uint256 rhs = Bytes.trim(_rhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
-        return lhs == rhs;
+    function checkFullExitInPriorityQueue(FullExit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
+        op.amount = 0;
+        return Utils.hashBytesToBytes20(writeFullExitPubdata(op)) == hashedPubdata;
     }
 
     // PartialExit pubdata

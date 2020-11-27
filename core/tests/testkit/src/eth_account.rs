@@ -391,13 +391,13 @@ impl<T: Transport> EthereumAccount<T> {
     // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
     pub async fn verify_block(
         &self,
-        proof: &EncodedAggregatedProof,
+        proof_operation: &BlocksProofOperation,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "verifyCommitments",
-                proof.get_eth_tx_args(),
+                "proofBlocks",
+                proof_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
             .await

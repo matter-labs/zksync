@@ -286,8 +286,11 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
     }
 
     if last_committed_block > last_aggregate_create_proof_block {
-        let mut commitments = Vec::new();
         let mut block_numbers = Vec::new();
+        let mut blocks = Vec::new();
+        let mut block_idxs_in_proof = Vec::new();
+
+        let mut idx = 0;
         for block_number in last_aggregate_create_proof_block + 1..=last_committed_block {
             let block = storage
                 .chain()
@@ -295,14 +298,20 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
                 .get_block(block_number)
                 .await?
                 .expect("Failed to get last committed block from db");
-            block_numbers.push(block_number);
-            commitments.push((block.block_commitment, block.block_number))
+            block_numbers.push(block.block_number);
+            blocks.push(block);
+            block_idxs_in_proof.push(idx);
+            idx += 1;
         }
 
         let aggregated_op_create = AggregatedOperation::CreateProofBlocks(block_numbers);
         // TODO: should execute after proof is produced
         let aggregated_op_publish =
-            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation { commitments });
+            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
+                blocks,
+                proof: Default::default(),
+                block_idxs_in_proof,
+            });
 
         storage
             .chain()
@@ -336,46 +345,7 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
                 .get_block(block_number)
                 .await?
                 .expect("Failed to get last committed block from db");
-            let publish_proof_op = storage
-                .chain()
-                .operations_schema()
-                .get_aggregated_op_that_affects_block(
-                    AggregatedActionType::PublishProofBlocksOnchain,
-                    block_number,
-                )
-                .await?
-                .expect("Aggregated op should exist");
-            let block_execution_op_arg =
-                if let AggregatedOperation::PublishProofBlocksOnchain(publish_arguments) =
-                    publish_proof_op
-                {
-                    let commitment_idx = publish_arguments
-                        .commitments
-                        .iter()
-                        .enumerate()
-                        .find_map(|(idx, (_, commitment_block))| {
-                            if *commitment_block == block_number {
-                                Some(idx)
-                            } else {
-                                None
-                            }
-                        })
-                        .expect("should be present");
-                    let commitments = publish_arguments
-                        .commitments
-                        .into_iter()
-                        .map(|(c, _)| c)
-                        .collect();
-
-                    BlockExecuteOperationArg {
-                        block,
-                        commitments,
-                        commitment_idx,
-                    }
-                } else {
-                    panic!("should be publish proof blocks onchain data");
-                };
-            blocks.push(block_execution_op_arg);
+            blocks.push(BlockExecuteOperationArg { block });
         }
         let aggregated_op = AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation { blocks });
         storage
