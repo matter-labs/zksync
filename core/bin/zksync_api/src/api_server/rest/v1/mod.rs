@@ -19,6 +19,8 @@ use zksync_types::BlockNumber;
 // Local uses
 use crate::api_server::tx_sender::TxSender;
 
+use Error as ApiError;
+
 pub(crate) mod accounts;
 mod blocks;
 pub mod client;
