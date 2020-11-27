@@ -60,7 +60,7 @@ impl GasOperationsCost {
     pub fn from_constants(fast_processing_coeff: f64) -> Self {
         // We increase gas price for fast withdrawals, since it will induce generating a smaller block
         // size, resulting in us paying more gas than for bigger block.
-        let standart_fast_withdrawal_cost =
+        let standard_fast_withdrawal_cost =
             (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
         let subsidy_fast_withdrawal_cost =
             (constants::SUBSIDY_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
@@ -80,7 +80,7 @@ impl GasOperationsCost {
             ),
             (
                 OutputFeeType::FastWithdraw,
-                standart_fast_withdrawal_cost.into(),
+                standard_fast_withdrawal_cost.into(),
             ),
             (
                 OutputFeeType::ChangePubKey {

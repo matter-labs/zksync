@@ -261,7 +261,7 @@ fn test_fee_for_unsubsidized_tokens() {
 
     let mut get_gas_amount =
         |tx_type: TxFeeTypes, token: TokenLike, address: Address| -> num::BigUint {
-            block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
+            block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token, address))
                 .expect("failed to get fee in token")
                 .gas_tx_amount
         };
