@@ -17,7 +17,9 @@ use zksync_storage::test_data::{
 };
 use zksync_storage::ConnectionPool;
 use zksync_test_account::ZkSyncAccount;
-use zksync_types::{ethereum::OperationType, helpers::apply_updates, AccountMap, Action};
+use zksync_types::{
+    ethereum::OperationType, helpers::apply_updates, AccountId, AccountMap, Action,
+};
 use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     Address, ExecutedOperations, ExecutedTx, Token, ZkSyncOp, ZkSyncTx,
@@ -66,11 +68,22 @@ impl TestServerConfig {
 
     /// Creates several transactions and the corresponding executed operations.
     pub fn gen_zk_txs(fee: u64) -> TestTransactions {
-        let from = ZkSyncAccount::rand();
-        from.set_account_id(Some(0xdead));
+        Self::gen_zk_txs_for_account(0xdead, ZkSyncAccount::rand().address, fee)
+    }
 
-        let to = ZkSyncAccount::rand();
-        to.set_account_id(Some(0xf00d));
+    /// Creates several transactions and the corresponding executed operations for the
+    /// specified account.
+    pub fn gen_zk_txs_for_account(
+        account_id: AccountId,
+        address: Address,
+        fee: u64,
+    ) -> TestTransactions {
+        let from = ZkSyncAccount::rand();
+        from.set_account_id(Some(0xf00d));
+
+        let mut to = ZkSyncAccount::rand();
+        to.set_account_id(Some(account_id));
+        to.address = address;
 
         let mut txs = Vec::new();
 
@@ -180,7 +193,9 @@ impl TestServerConfig {
 
             // Add transactions to every odd block.
             let txs = if block_number % 2 == 1 {
-                Self::gen_zk_txs(1_000)
+                let (&id, account) = accounts.iter().next().unwrap();
+
+                Self::gen_zk_txs_for_account(id, account.address, 1_000)
                     .txs
                     .into_iter()
                     .map(|(_tx, op)| op)
@@ -268,6 +283,22 @@ impl TestServerConfig {
                     .confirm_eth_tx(&eth_tx_hash)
                     .await?;
             }
+        }
+
+        // Get the accounts by their addresses.
+        for (_account_id, account) in accounts {
+            let account = account.clone();
+            let account_state = storage
+                .chain()
+                .account_schema()
+                .account_state(account.address)
+                .await?;
+
+            // Check that committed state is available.
+            assert!(
+                account_state.committed.is_some(),
+                "No committed state for account"
+            );
         }
 
         storage.commit().await?;

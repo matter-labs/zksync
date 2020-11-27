@@ -100,6 +100,16 @@ pub enum AccountReceipts {
     Latest,
 }
 
+impl AccountReceipts {
+    pub fn newer_than(block: BlockNumber, index: u64) -> Self {
+        Self::Newer(TxLocation { block, index })
+    }
+
+    pub fn older_than(block: BlockNumber, index: u64) -> Self {
+        Self::Older(TxLocation { block, index })
+    }
+}
+
 /// Direction to perform search of transactions to.
 #[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -133,7 +143,7 @@ pub struct AccountTxReceipt {
 pub struct PendingAccountTxReceipt {
     block: u64,
     // TODO find proper type.
-    hash: TxHash,
+    hash: Vec<u8>,
 }
 
 impl From<AccountQuery> for StorageAccountQuery {
@@ -161,7 +171,7 @@ impl Display for AccountQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AccountQuery::Id(id) => id.fmt(f),
-            AccountQuery::Address(address) => address.fmt(f),
+            AccountQuery::Address(address) => write!(f, "{:x}", address),
         }
     }
 }
@@ -346,6 +356,8 @@ impl TxLocation {
 
 impl From<TransactionsHistoryItem> for AccountTxReceipt {
     fn from(inner: TransactionsHistoryItem) -> Self {
+        dbg!(&inner.tx_id);
+
         let location = TxLocation::from_tx_id(&inner.tx_id)
             .unwrap_or_else(|| panic!("Database provided an incorrect transaction ID"));
 
@@ -379,11 +391,9 @@ impl From<TransactionsHistoryItem> for AccountTxReceipt {
 
 impl PendingAccountTxReceipt {
     pub fn from_priority_op(block_id: EthBlockId, op: PriorityOp) -> Self {
-        let hash = TxHash::from_slice(&op.eth_hash).expect("Incorrect hash sent by eth_watch");
-
         Self {
             block: block_id,
-            hash,
+            hash: op.eth_hash,
         }
     }
 }

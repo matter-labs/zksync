@@ -24,6 +24,8 @@ use self::types::{
 use super::{ApiError, JsonResult};
 
 mod client;
+#[cfg(test)]
+mod tests;
 mod types;
 
 fn unable_to_find_token(token_id: TokenId) -> anyhow::Error {
@@ -33,7 +35,8 @@ fn unable_to_find_token(token_id: TokenId) -> anyhow::Error {
 // Additional parser because actix-web doesn't understand enums in path extractor.
 fn parse_account_query(query: String) -> Result<AccountQuery, ApiError> {
     query.parse().map_err(|err| {
-        ApiError::internal("Must be specified either an account ID or an account address.")
+        dbg!(&err);
+        ApiError::bad_request("Must be specified either an account ID or an account address.")
             .detail(format!("An error occurred: {}", err))
     })
 }
@@ -161,6 +164,8 @@ impl ApiAccountsData {
             )
             .await?;
 
+        dbg!(&items);
+
         Ok(items.into_iter().map(AccountTxReceipt::from).collect())
     }
 
@@ -246,100 +251,4 @@ pub fn api_scope(
             "{id}/receipts/pending",
             web::get().to(account_pending_receipts),
         )
-}
-
-#[cfg(test)]
-mod tests {
-    use actix_web::{
-        web::{self, Json},
-        App,
-    };
-
-    use zksync_types::Address;
-
-    use crate::{
-        api_server::v1::{client::Client, test_utils::TestServerConfig},
-        core_api_client::CoreApiClient,
-        utils::token_db_cache::TokenDBCache,
-    };
-
-    use super::api_scope;
-
-    fn get_unconfirmed_deposits_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
-        async fn get_unconfirmed_deposits(
-            _path: web::Path<String>,
-        ) -> Json<Vec<serde_json::Value>> {
-            Json(vec![])
-        }
-
-        let server = actix_web::test::start(move || {
-            App::new().route(
-                "unconfirmed_deposits/{address}",
-                web::get().to(get_unconfirmed_deposits),
-            )
-        });
-
-        let mut url = server.url("");
-        url.pop(); // Pop last '/' symbol.
-
-        (CoreApiClient::new(url), server)
-    }
-
-    struct TestServer {
-        core_server: actix_web::test::TestServer,
-        api_server: actix_web::test::TestServer,
-    }
-
-    impl TestServer {
-        async fn new() -> anyhow::Result<(Client, Self)> {
-            let (core_client, core_server) = get_unconfirmed_deposits_loopback();
-
-            let cfg = TestServerConfig::default();
-            cfg.fill_database().await?;
-
-            let (api_client, api_server) = cfg.start_server(move |cfg| {
-                api_scope(
-                    &cfg.env_options,
-                    TokenDBCache::new(cfg.pool.clone()),
-                    core_client.clone(),
-                )
-            });
-
-            Ok((
-                api_client,
-                Self {
-                    core_server,
-                    api_server,
-                },
-            ))
-        }
-
-        async fn stop(self) {
-            self.api_server.stop().await;
-            self.core_server.stop().await;
-        }
-    }
-
-    #[actix_rt::test]
-    async fn test_get_unconfirmed_deposits_loopback() -> anyhow::Result<()> {
-        let (client, server) = get_unconfirmed_deposits_loopback();
-
-        client.get_unconfirmed_deposits(Address::default()).await?;
-
-        server.stop().await;
-        Ok(())
-    }
-
-    #[actix_rt::test]
-    async fn test_accounts_scope() -> anyhow::Result<()> {
-        let (client, server) = TestServer::new().await?;
-
-        // Get account information.
-        let account_info = client.account_info(0).await?.unwrap();
-        let address = account_info.address;
-        assert_eq!(client.account_info(address).await?, Some(account_info));
-
-        server.stop().await;
-        Ok(())
-    }
 }
