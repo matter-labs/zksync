@@ -1,16 +1,18 @@
 //! This file contains representation of not signed transactions and builders for them.
 
-use crate::{error::ClientError, provider::Provider, types::TransactionInfo};
 use std::time::{Duration, Instant};
+
 use zksync_types::tx::TxHash;
 
-mod change_pubkey;
-mod transfer;
-mod withdraw;
+use crate::{error::ClientError, provider::Provider, types::TransactionInfo};
 
 pub use self::{
     change_pubkey::ChangePubKeyBuilder, transfer::TransferBuilder, withdraw::WithdrawBuilder,
 };
+
+mod change_pubkey;
+mod transfer;
+mod withdraw;
 
 /// Handle for transaction, providing an interface to control its execution.
 /// For obtained handle it's possible to set the polling interval, commit timeout
@@ -19,16 +21,16 @@ pub use self::{
 /// By default, awaiting for transaction may run up to forever, and the polling is
 /// performed once a second.
 #[derive(Debug)]
-pub struct SyncTransactionHandle {
+pub struct SyncTransactionHandle<P: Provider> {
     hash: TxHash,
-    provider: Provider,
+    provider: P,
     polling_interval: Duration,
     commit_timeout: Option<Duration>,
     verify_timeout: Option<Duration>,
 }
 
-impl SyncTransactionHandle {
-    pub fn new(hash: TxHash, provider: Provider) -> Self {
+impl<P: Provider> SyncTransactionHandle<P> {
+    pub fn new(hash: TxHash, provider: P) -> Self {
         Self {
             hash,
             provider,

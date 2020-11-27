@@ -10,8 +10,7 @@ use zksync_crypto::{priv_key_from_fs, Fs, PrivateKey};
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, U256};
 
-use crate::error::ClientError;
-use crate::wallet::Wallet;
+use crate::{error::ClientError, provider::Provider, wallet::Wallet};
 
 // Public re-exports.
 pub use zksync_types::helpers::{
@@ -56,10 +55,14 @@ pub fn private_key_from_seed(seed: &[u8]) -> Result<PrivateKey, ClientError> {
 ///
 /// Should be used after making the initial deposit or transfer to a newly created account.
 ///
-pub async fn wait_for_account_id<S: EthereumSigner + Clone>(
-    wallet: &mut Wallet<S>,
+pub async fn wait_for_account_id<S, P>(
+    wallet: &mut Wallet<S, P>,
     timeout_ms: u64,
-) -> Option<AccountId> {
+) -> Option<AccountId>
+where
+    S: EthereumSigner + Clone,
+    P: Provider + Clone,
+{
     let timeout = Duration::from_millis(timeout_ms);
     let mut poller = tokio::time::interval(Duration::from_millis(100));
     let start = Instant::now();

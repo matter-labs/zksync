@@ -5518,6 +5518,7 @@ name = "zksync"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "async-trait",
  "ethabi 12.0.0",
  "hex",
  "jsonrpc-core",
