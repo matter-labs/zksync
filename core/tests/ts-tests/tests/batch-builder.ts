@@ -82,7 +82,7 @@ Tester.prototype.testBatchBuilderChangePubKey = async function (
         .build(token);
 
     const balanceBefore = await wallet.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, wallet.provider);
+    const handles = await submitSignedTransactionsBatch(wallet.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
     expect(await wallet.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
     const balanceAfter = await wallet.getBalance(token);
@@ -106,7 +106,7 @@ Tester.prototype.testBatchBuilderTransfers = async function (
 
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, sender.provider);
+    const handles = await submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
@@ -136,7 +136,7 @@ Tester.prototype.testBatchBuilderPayInDifferentToken = async function (
     const senderBeforeFeeToken = await sender.getBalance(feeToken);
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, sender.provider);
+    const handles = await submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfterFeeToken = await sender.getBalance(feeToken);
     const senderAfter = await sender.getBalance(token);
@@ -164,7 +164,7 @@ Tester.prototype.testBatchBuilderGenerisUsage = async function (
 
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(batch.txs, batch.signature, sender.provider);
+    const handles = await submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);

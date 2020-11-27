@@ -77,7 +77,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 Some(batch_id) => {
                     // Group of batched transactions.
                     // Signatures will be loaded afterwards.
-                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id, None);
+                    let variant = SignedTxVariant::batch(deserialized_txs, batch_id, vec![]);
                     txs.push(variant);
                 }
                 None => {
@@ -94,19 +94,21 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         // Load signatures for batches.
         for tx in &mut txs {
             if let SignedTxVariant::Batch(batch) = tx {
-                let eth_signature = sqlx::query!(
+                let eth_signatures: Vec<TxEthSignature> = sqlx::query!(
                     "SELECT eth_signature FROM txs_batches_signatures
                     WHERE batch_id = $1",
                     batch.batch_id
                 )
-                .fetch_optional(self.0.conn())
+                .fetch_all(self.0.conn())
                 .await?
+                .into_iter()
                 .map(|value| {
                     serde_json::from_value(value.eth_signature)
                         .expect("failed to decode TxEthSignature")
-                });
+                })
+                .collect();
 
-                batch.eth_signature = eth_signature;
+                batch.eth_signatures = eth_signatures;
             }
         }
 
@@ -131,7 +133,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn insert_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> QueryResult<i64> {
         let start = Instant::now();
         if txs.is_empty() {
@@ -198,8 +200,8 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
-        // If there's a signature for the whole batch, store it too.
-        if let Some(signature) = eth_signature {
+        // If there're signatures for the whole batch, store it too.
+        for signature in eth_signatures {
             let signature = serde_json::to_value(signature)?;
             sqlx::query!(
                 "INSERT INTO txs_batches_signatures VALUES($1, $2)",

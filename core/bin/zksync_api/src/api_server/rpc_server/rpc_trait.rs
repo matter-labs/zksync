@@ -41,7 +41,7 @@ pub trait Rpc {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> FutureResp<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -132,14 +132,14 @@ impl Rpc for RpcApp {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> FutureResp<Vec<TxHash>> {
         let start = Instant::now();
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
             handle
-                .spawn(self_._impl_submit_txs_batch(txs, eth_signature))
+                .spawn(self_._impl_submit_txs_batch(txs, eth_signatures))
                 .await
                 .unwrap()
         };

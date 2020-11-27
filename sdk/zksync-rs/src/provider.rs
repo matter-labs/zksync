@@ -94,9 +94,9 @@ impl Provider {
     pub async fn send_txs_batch(
         &self,
         txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
-        eth_signature: Option<PackedEthSignature>,
+        eth_signatures: Vec<PackedEthSignature>,
     ) -> Result<Vec<TxHash>, ClientError> {
-        let msg = JsonRpcRequest::submit_tx_batch(txs_signed, eth_signature);
+        let msg = JsonRpcRequest::submit_tx_batch(txs_signed, eth_signatures);
 
         let ret = self.post(&msg).await?;
         let tx_hashes = serde_json::from_value(ret)
@@ -279,7 +279,7 @@ mod messages {
 
         pub fn submit_tx_batch(
             txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
-            eth_signature: Option<PackedEthSignature>,
+            eth_signatures: Vec<PackedEthSignature>,
         ) -> Self {
             let mut params = Vec::with_capacity(2);
 
@@ -290,11 +290,15 @@ mod messages {
                         .expect("serialization fail"),
                 })
             }).collect();
+            let eth_signatures = eth_signatures
+                .into_iter()
+                .map(|signature| {
+                    serde_json::to_value(TxEthSignature::EthereumSignature(signature))
+                        .expect("serialization fail")
+                })
+                .collect();
             params.push(serde_json::Value::Array(txs_signed));
-            params.push(
-                serde_json::to_value(eth_signature.map(TxEthSignature::EthereumSignature))
-                    .expect("serialization fail"),
-            );
+            params.push(serde_json::Value::Array(eth_signatures));
 
             Self::create("submit_txs_batch", params)
         }

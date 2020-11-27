@@ -88,9 +88,12 @@ export class Provider {
     // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTxsBatch(
         transactions: { tx: any; signature?: TxEthSignature }[],
-        ethSignature?: TxEthSignature
+        ethSignatures?: TxEthSignature[]
     ): Promise<string[]> {
-        return await this.transport.request('submit_txs_batch', [transactions, ethSignature]);
+        return await this.transport.request('submit_txs_batch', [
+            transactions,
+            ethSignatures == undefined ? [] : ethSignatures
+        ]);
     }
 
     async getContractAddress(): Promise<ContractAddress> {

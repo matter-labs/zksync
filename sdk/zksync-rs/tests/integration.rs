@@ -701,7 +701,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
     // Send the batch and store its transaction hashes
     let handles = wallet
         .provider
-        .send_txs_batch(signed_transfers, None)
+        .send_txs_batch(signed_transfers, vec![])
         .await?
         .into_iter()
         .map(|tx_hash| SyncTransactionHandle::new(tx_hash, wallet.provider.clone()));

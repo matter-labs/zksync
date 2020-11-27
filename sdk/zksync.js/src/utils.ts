@@ -10,7 +10,8 @@ import {
     Transfer,
     ForcedExit,
     ChangePubKey,
-    Withdraw
+    Withdraw,
+    CloseAccount
 } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -514,7 +515,7 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
  */
-export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | ForcedExit): Uint8Array {
+export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
     switch (tx.type) {
         case 'Transfer':
             return serializeTransfer(tx);
@@ -524,6 +525,8 @@ export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | ForcedExit)
             return serializeChangePubKey(tx);
         case 'ForcedExit':
             return serializeForcedExit(tx);
+        default:
+            return new Uint8Array();
     }
 }
 
