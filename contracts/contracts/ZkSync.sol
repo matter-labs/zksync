@@ -331,7 +331,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalBlocksCommitted += uint32(_newBlocksData.length);
 
         totalCommittedPriorityRequests += committedPriorityRequests;
-        require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "fck11");
+        require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "fck12");
     }
 
     /// @dev 1. Try to send token to _recipients
