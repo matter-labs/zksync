@@ -4,7 +4,7 @@ use std::collections::HashMap;
 // Workspace deps
 use zksync_types::PriorityOp;
 // Local deps
-use super::{received_ops::ReceivedPriorityOp, EthBlockId};
+use super::received_ops::ReceivedPriorityOp;
 
 /// Gathered state of the Ethereum network.
 /// Contains information about the known token types and incoming
@@ -25,7 +25,7 @@ pub struct ETHState {
     /// they may be not executed in the future, so this list is approximate.
     ///
     /// Keys in this HashMap are numbers of blocks with `PriorityOp`.
-    unconfirmed_queue: Vec<(EthBlockId, PriorityOp)>,
+    unconfirmed_queue: Vec<PriorityOp>,
     /// Queue of priority operations that passed the confirmation
     /// threshold and are waiting to be executed.
     priority_queue: HashMap<u64, ReceivedPriorityOp>,
@@ -34,7 +34,7 @@ pub struct ETHState {
 impl ETHState {
     pub fn new(
         last_ethereum_block: u64,
-        unconfirmed_queue: Vec<(EthBlockId, PriorityOp)>,
+        unconfirmed_queue: Vec<PriorityOp>,
         priority_queue: HashMap<u64, ReceivedPriorityOp>,
     ) -> Self {
         Self {
@@ -52,7 +52,7 @@ impl ETHState {
         &self.priority_queue
     }
 
-    pub fn unconfirmed_queue(&self) -> &[(EthBlockId, PriorityOp)] {
+    pub fn unconfirmed_queue(&self) -> &[PriorityOp] {
         &self.unconfirmed_queue
     }
 }

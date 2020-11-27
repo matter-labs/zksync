@@ -43,8 +43,6 @@ mod worker;
 /// before repeating the request.
 const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
 
-pub type EthBlockId = u64;
-
 /// Ethereum Watcher operating mode.
 ///
 /// Normally Ethereum watcher will always poll the Ethereum node upon request,
@@ -76,11 +74,11 @@ pub enum EthWatchRequest {
     },
     GetUnconfirmedDeposits {
         address: Address,
-        resp: oneshot::Sender<Vec<(EthBlockId, PriorityOp)>>,
+        resp: oneshot::Sender<Vec<PriorityOp>>,
     },
     GetUnconfirmedOpByHash {
         eth_hash: Vec<u8>,
-        resp: oneshot::Sender<Option<(EthBlockId, PriorityOp)>>,
+        resp: oneshot::Sender<Option<PriorityOp>>,
     },
     GetPendingWithdrawalsQueueIndex {
         resp: oneshot::Sender<anyhow::Result<u32>>,
@@ -123,7 +121,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
     async fn get_unconfirmed_ops(
         &mut self,
         current_ethereum_block: u64,
-    ) -> anyhow::Result<Vec<(EthBlockId, PriorityOp)>> {
+    ) -> anyhow::Result<Vec<PriorityOp>> {
         // We want to scan the interval of blocks from the latest one up to the oldest one which may
         // have unconfirmed priority ops.
         // `+ 1` is added because if we subtract number of confirmations, we'll obtain the last block
@@ -143,7 +141,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
         let mut unconfirmed_ops = Vec::new();
 
         for priority_op in pending_events.into_iter() {
-            unconfirmed_ops.push((priority_op.eth_block, priority_op));
+            unconfirmed_ops.push(priority_op);
         }
 
         Ok(unconfirmed_ops)
@@ -284,19 +282,19 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
         Ok(first_pending_withdrawal_index + number_of_pending_withdrawals)
     }
 
-    fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<(EthBlockId, PriorityOp)> {
+    fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<PriorityOp> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .find(|(_block, op)| op.eth_hash.as_slice() == eth_hash)
+            .find(|op| op.eth_hash.as_slice() == eth_hash)
             .cloned()
     }
 
-    fn get_ongoing_deposits_for(&self, address: Address) -> Vec<(EthBlockId, PriorityOp)> {
+    fn get_ongoing_deposits_for(&self, address: Address) -> Vec<PriorityOp> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .filter(|(_block, op)| match &op.data {
+            .filter(|op| match &op.data {
                 ZkSyncPriorityOp::Deposit(deposit) => {
                     // Address may be set to either sender or recipient.
                     deposit.from == address || deposit.to == address
