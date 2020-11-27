@@ -319,6 +319,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
         Ok(())
     }
 
+    // TODO try to move it to eth worker
     fn is_backoff_requested(&self, error: &anyhow::Error) -> bool {
         error.to_string().contains("429 Too Many Requests")
     }

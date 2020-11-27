@@ -12,10 +12,6 @@ use zksync_types::{Address, Nonce, PriorityOp, H160};
 
 #[async_trait::async_trait]
 pub trait EthWorker {
-    /// Filters and parses the priority operation events from the Ethereum
-    /// within the provided range of blocks.
-    /// Returns the list of priority operations together with the block
-    /// numbers.
     async fn get_priority_op_events(
         &self,
         from: BlockNumber,
@@ -34,17 +30,13 @@ pub trait EthWorker {
 
 pub struct EthWorkerHttp {
     web3: Web3<Http>,
-    zksync_contract: (ethabi::Contract, Contract<Http>),
+    zksync_contract: Contract<Http>,
 }
 
 impl EthWorkerHttp {
     pub fn new(web3: Web3<Http>, zksync_contract_addr: H160) -> Self {
-        let zksync_contract = {
-            (
-                zksync_contract(),
-                Contract::new(web3.eth(), zksync_contract_addr, zksync_contract()),
-            )
-        };
+        let zksync_contract = Contract::new(web3.eth(), zksync_contract_addr, zksync_contract());
+
         Self {
             zksync_contract,
             web3,
@@ -77,12 +69,12 @@ impl EthWorker for EthWorkerHttp {
 
         let priority_op_event_topic = self
             .zksync_contract
-            .0
+            .abi()
             .event("NewPriorityRequest")
             .expect("main contract abi error")
             .signature();
         let filter = create_filter(
-            self.zksync_contract.1.address(),
+            self.zksync_contract.address(),
             from,
             to,
             vec![priority_op_event_topic],
@@ -112,12 +104,12 @@ impl EthWorker for EthWorkerHttp {
 
         let complete_withdrawals_event_topic = self
             .zksync_contract
-            .0
+            .abi()
             .event("PendingWithdrawalsComplete")
             .expect("main contract abi error")
             .signature();
         let filter = create_filter(
-            self.zksync_contract.1.address(),
+            self.zksync_contract.address(),
             from,
             to,
             vec![complete_withdrawals_event_topic],
@@ -143,9 +135,7 @@ impl EthWorker for EthWorkerHttp {
     }
 
     async fn get_auth_fact(&self, address: Address, nonce: u32) -> anyhow::Result<Vec<u8>> {
-        Ok(self
-            .zksync_contract
-            .1
+        self.zksync_contract
             .query(
                 "authFacts",
                 (address, u64::from(nonce)),
@@ -154,13 +144,11 @@ impl EthWorker for EthWorkerHttp {
                 None,
             )
             .await
-            .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?)
+            .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
     }
 
     async fn get_first_pending_withdrawal_index(&self) -> anyhow::Result<u32> {
-        Ok(self
-            .zksync_contract
-            .1
+        self.zksync_contract
             .query(
                 "firstPendingWithdrawalIndex",
                 (),
@@ -174,13 +162,11 @@ impl EthWorker for EthWorkerHttp {
                     "Failed to query contract firstPendingWithdrawalIndex: {}",
                     e
                 )
-            })?)
+            })
     }
 
     async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32> {
-        Ok(self
-            .zksync_contract
-            .1
+        self.zksync_contract
             .query(
                 "numberOfPendingWithdrawals",
                 (),
@@ -189,8 +175,6 @@ impl EthWorker for EthWorkerHttp {
                 None,
             )
             .await
-            .map_err(|e| {
-                format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e)
-            })?)
+            .map_err(|e| format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e))
     }
 }
