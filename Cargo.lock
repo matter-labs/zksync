@@ -5635,6 +5635,7 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "anyhow",
+ "async-trait",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",
