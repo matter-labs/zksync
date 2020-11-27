@@ -1,6 +1,5 @@
 local G = import '../generator.libsonnet';
 local metrics = [
-  "api.rpc.get_confirmations_for_eth_op_amount",
   "api.rpc.account_info",
   "api.rpc.contract_address",
   "api.rpc.ethop_info",
