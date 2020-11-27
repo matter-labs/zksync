@@ -31,7 +31,7 @@ fn test_private_key_read() {
 fn test_pubkey_hash() {
     let (pk, serialized_pk) = gen_private_key_and_its_be_bytes();
 
-    let wasm_pubkey_hash = private_key_to_pubkey_hash(&serialized_pk);
+    let wasm_pubkey_hash = private_key_to_pubkey_hash(&serialized_pk).unwrap();
     let zksync_types_pubkey_hash = PubKeyHash::from_privkey(&pk).data.to_vec();
     assert_eq!(wasm_pubkey_hash, zksync_types_pubkey_hash);
 }
