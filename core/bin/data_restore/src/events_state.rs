@@ -269,6 +269,7 @@ impl EventsState {
             .logs(filter)
             .await
             .map_err(|e| format_err!("No new logs: {}", e))?;
+
         Ok(result)
     }
 

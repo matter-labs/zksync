@@ -9,6 +9,7 @@ pub use self::{
 pub use zksync_test_account as zksync_account;
 
 pub mod account_set;
+pub mod data_restore;
 pub mod eth_account;
 pub mod external_commands;
 pub mod scenarios;

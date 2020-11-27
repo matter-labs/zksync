@@ -22,7 +22,7 @@ use super::{
     client::{self, Client},
     Error as ApiError, JsonResult, Pagination, PaginationQuery,
 };
-use crate::{api_server::rest::helpers::remove_prefix, utils::shared_lru_cache::AsyncLruCache};
+use crate::{api_server::rest::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]
@@ -119,7 +119,7 @@ pub struct BlockInfo {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct TransactionInfo {
     pub tx_hash: TxHash,
-    pub block_number: i64,
+    pub block_number: BlockNumber,
     pub op: Value,
     pub success: Option<bool>,
     pub fail_reason: Option<String>,
@@ -130,14 +130,28 @@ impl From<records::BlockDetails> for BlockInfo {
     fn from(inner: records::BlockDetails) -> Self {
         Self {
             block_number: inner.block_number as BlockNumber,
-            new_state_root: Fr::from_bytes(&inner.new_state_root)
-                .expect("Unable to decode `new_state_root` field"),
+            new_state_root: Fr::from_bytes(&inner.new_state_root).unwrap_or_else(|err| {
+                panic!(
+                    "Database provided an incorrect new_state_root field: {:?}, an error occurred {}",
+                    inner.new_state_root, err
+                )
+            }),
             block_size: inner.block_size as u64,
             commit_tx_hash: inner.commit_tx_hash.map(|bytes| {
-                TxHash::from_slice(&bytes).expect("Unable to decode `commit_tx_hash` field")
+                TxHash::from_slice(&bytes).unwrap_or_else(|| {
+                    panic!(
+                        "Database provided an incorrect commit_tx_hash field: {:?}",
+                        hex::encode(bytes)
+                    )
+                })
             }),
             verify_tx_hash: inner.verify_tx_hash.map(|bytes| {
-                TxHash::from_slice(&bytes).expect("Unable to decode `verify_tx_hash` field")
+                TxHash::from_slice(&bytes).unwrap_or_else(|| {
+                    panic!(
+                        "Database provided an incorrect verify_tx_hash field: {:?}",
+                        hex::encode(bytes)
+                    )
+                })
             }),
             committed_at: inner.committed_at,
             verified_at: inner.verified_at,
@@ -148,15 +162,13 @@ impl From<records::BlockDetails> for BlockInfo {
 impl From<records::BlockTransactionItem> for TransactionInfo {
     fn from(inner: records::BlockTransactionItem) -> Self {
         Self {
-            tx_hash: {
-                let mut slice = [0_u8; 32];
-
-                let tx_hex = remove_prefix(&inner.tx_hash);
-                hex::decode_to_slice(&tx_hex, &mut slice)
-                    .expect("Unable to decode `tx_hash` field");
-                TxHash::from_slice(&slice).unwrap()
-            },
-            block_number: inner.block_number,
+            tx_hash: try_parse_tx_hash(&inner.tx_hash).unwrap_or_else(|| {
+                panic!(
+                    "Database provided an incorrect transaction hash: {:?}",
+                    inner.tx_hash
+                )
+            }),
+            block_number: inner.block_number as BlockNumber,
             op: inner.op,
             success: inner.success,
             fail_reason: inner.fail_reason,

@@ -1,6 +1,6 @@
 {
     "name": "zksync",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "license": "MIT",
     "main": "build/index.js",
     "types": "build/index.d.ts",
@@ -37,6 +37,7 @@
         "tests": "mocha -r ts-node/register tests/**/*.test.ts",
         "build": "tsc",
         "watch": "tsc --watch",
-        "prepublish": "yarn build && rollup -c"
+        "prepublish": "yarn build && rollup -c",
+        "generate-test-vectors": "yarn ts-node tests/test-generator.ts"
     }
 }

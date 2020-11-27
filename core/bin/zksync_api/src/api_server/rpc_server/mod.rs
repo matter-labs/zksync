@@ -1,9 +1,8 @@
+// Built-in uses
+use std::time::Instant;
 // External uses
 use futures::{
-    channel::{
-        mpsc,
-        oneshot::{self},
-    },
+    channel::{mpsc, oneshot},
     SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
@@ -112,6 +111,7 @@ impl RpcApp {
 
     /// Async version of `get_ongoing_deposits` which does not use old futures as a return type.
     async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
+        let start = Instant::now();
         let confirmations_for_eth_event = self.confirmations_for_eth_event;
 
         let ongoing_ops =
@@ -141,6 +141,7 @@ impl RpcApp {
             None
         };
 
+        metrics::histogram!("api.rpc.get_ongoing_deposits", start.elapsed());
         Ok(OngoingDepositsResp {
             address,
             deposits,
@@ -154,6 +155,7 @@ impl RpcApp {
         &self,
         serial_id: u32,
     ) -> Result<Option<StoredExecutedPriorityOperation>> {
+        let start = Instant::now();
         let res =
             if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
                 Some(executed_op)
@@ -165,14 +167,7 @@ impl RpcApp {
                     .get_executed_priority_operation(serial_id)
                     .await
                     .map_err(|err| {
-                        log::warn!(
-                            "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                            file!(),
-                            line!(),
-                            column!(),
-                            err,
-                            serial_id,
-                        );
+                        vlog::warn!("Internal Server Error: '{}'; input: {}", err, serial_id);
                         Error::internal_error()
                     })?;
 
@@ -183,10 +178,13 @@ impl RpcApp {
 
                 executed_op
             };
+
+        metrics::histogram!("api.rpc.get_executed_priority_operation", start.elapsed());
         Ok(res)
     }
 
     async fn get_block_info(&self, block_number: i64) -> Result<Option<BlockDetails>> {
+        let start = Instant::now();
         let res = if let Some(block) = self.cache_of_blocks_info.get(&block_number) {
             Some(block)
         } else {
@@ -206,10 +204,13 @@ impl RpcApp {
 
             block
         };
+
+        metrics::histogram!("api.rpc.get_block_info", start.elapsed());
         Ok(res)
     }
 
     async fn get_tx_receipt(&self, tx_hash: TxHash) -> Result<Option<TxReceiptResponse>> {
+        let start = Instant::now();
         let res = if let Some(tx_receipt) = self
             .cache_of_transaction_receipts
             .get(&tx_hash.as_ref().to_vec())
@@ -223,13 +224,10 @@ impl RpcApp {
                 .tx_receipt(tx_hash.as_ref())
                 .await
                 .map_err(|err| {
-                    log::warn!(
-                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
-                        file!(),
-                        line!(),
-                        column!(),
+                    vlog::warn!(
+                        "Internal Server Error: '{}'; input: {}",
                         err,
-                        tx_hash.to_string(),
+                        tx_hash.to_string()
                     );
                     Error::internal_error()
                 })?;
@@ -243,7 +241,30 @@ impl RpcApp {
 
             tx_receipt
         };
+
+        metrics::histogram!("api.rpc.get_tx_receipt", start.elapsed());
         Ok(res)
+    }
+
+    async fn token_allowed_for_fees(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+    ) -> Result<bool> {
+        let (sender, receiver) = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::IsTokenAllowed {
+                token: token.clone(),
+                response: sender,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        receiver
+            .await
+            .expect("ticker answer sender dropped")
+            .map_err(|err| {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                Error::internal_error()
+            })
     }
 
     async fn ticker_request(
@@ -255,7 +276,7 @@ impl RpcApp {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
-                tx_type: tx_type.clone(),
+                tx_type,
                 address,
                 token: token.clone(),
                 response: req.0,
@@ -264,11 +285,8 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}, {:?}",
-                file!(),
-                line!(),
-                column!(),
+            vlog::warn!(
+                "Internal Server Error: '{}'; input: {:?}, {:?}",
                 err,
                 tx_type,
                 token,
@@ -293,19 +311,13 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: {:?}",
-                file!(),
-                line!(),
-                column!(),
-                err,
-                token,
-            );
+            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
             Error::internal_error()
         })
     }
 
     async fn get_account_state(&self, address: &Address) -> Result<AccountStateInfo> {
+        let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let account_info = storage
             .chain()
@@ -320,10 +332,10 @@ impl RpcApp {
             verified: Default::default(),
         };
 
-        if let Some((account_id, commited_state)) = account_info.committed {
+        if let Some((account_id, committed_state)) = account_info.committed {
             result.account_id = Some(account_id);
             result.committed =
-                ResponseAccountState::try_restore(commited_state, &self.tx_sender.tokens).await?;
+                ResponseAccountState::try_restore(committed_state, &self.tx_sender.tokens).await?;
         };
 
         if let Some((_, verified_state)) = account_info.verified {
@@ -331,6 +343,7 @@ impl RpcApp {
                 ResponseAccountState::try_restore(verified_state, &self.tx_sender.tokens).await?;
         };
 
+        metrics::histogram!("api.rpc.get_account_state", start.elapsed());
         Ok(result)
     }
 
