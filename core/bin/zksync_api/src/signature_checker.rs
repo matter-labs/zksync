@@ -185,7 +185,7 @@ async fn verify_eth_signature_txs_batch(
         if signers.len() == batch_sign_data.signatures.len() {
             return Err(TxAddError::IncorrectEthSignature);
         }
-        // This closure will return `true` at the first match or `false` if there's none.
+        // This block will return `true` at the first match or `false` if there's none.
         let sender_correct = async {
             for signature in &batch_sign_data.signatures {
                 match signature {

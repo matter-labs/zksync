@@ -42,6 +42,9 @@ pub struct TxSender {
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
     pub enforce_pubkey_change_fee: bool,
+    // Limit the number of both transactions and Ethereum signatures per batch.
+    pub max_number_of_transactions_per_batch: usize,
+    pub max_number_of_authors_per_batch: usize,
 }
 
 #[derive(Debug, Error)]
@@ -124,6 +127,10 @@ impl TxSender {
             chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
+        let max_number_of_transactions_per_batch =
+            config_options.max_number_of_transactions_per_batch;
+        let max_number_of_authors_per_batch = config_options.max_number_of_authors_per_batch;
+
         Self {
             core_api_client,
             pool: connection_pool.clone(),
@@ -133,6 +140,8 @@ impl TxSender {
 
             enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
+            max_number_of_transactions_per_batch,
+            max_number_of_authors_per_batch,
         }
     }
 
@@ -247,6 +256,16 @@ impl TxSender {
     ) -> Result<Vec<TxHash>, SubmitError> {
         if txs.is_empty() {
             return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
+        }
+        // Even though this is going to be checked on the Mempool part,
+        // we don't want to verify huge batches as long as this operation
+        // is expensive.
+        if txs.len() > self.max_number_of_transactions_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::BatchTooBig));
+        }
+        // Same check but in terms of signatures.
+        if eth_signatures.len() > self.max_number_of_authors_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::EthSignaturesLimitExceeded));
         }
 
         if txs.iter().any(|tx| tx.0.is_close()) {

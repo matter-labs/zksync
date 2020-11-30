@@ -165,6 +165,9 @@ pub struct ConfigurationOptions {
     pub ticker_fast_processing_coeff: f64,
     pub forced_exit_minimum_account_age: Duration,
     pub enforce_pubkey_change_fee: bool,
+    // Limit the number of both transactions and Ethereum signatures per batch.
+    pub max_number_of_transactions_per_batch: usize,
+    pub max_number_of_authors_per_batch: usize,
 }
 
 impl ConfigurationOptions {
@@ -219,6 +222,8 @@ impl ConfigurationOptions {
             forced_exit_minimum_account_age,
             enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
                 .unwrap_or(true),
+            max_number_of_transactions_per_batch: parse_env("MAX_TRANSACTIONS_PER_BATCH"),
+            max_number_of_authors_per_batch: parse_env("MAX_ETH_SIGNATURES_PER_BATCH"),
         }
     }
 }
