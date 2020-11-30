@@ -1,14 +1,17 @@
+use std::{collections::HashMap, convert::TryFrom, time::Instant};
+
 use anyhow::format_err;
 use ethabi::Hash;
-use std::convert::TryFrom;
-use std::time::Instant;
-use web3::contract::{Contract, Options};
-use web3::transports::Http;
-use web3::types::{BlockNumber, Filter, FilterBuilder};
-use web3::Web3;
+use serde::export::fmt::Debug;
+use web3::{
+    contract::{Contract, Options},
+    transports::Http,
+    types::{BlockNumber, FilterBuilder, Log},
+    Web3,
+};
+
 use zksync_contracts::zksync_contract;
-use zksync_types::ethereum::CompleteWithdrawalsTx;
-use zksync_types::{Address, Nonce, PriorityOp, H160};
+use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, H160};
 
 #[async_trait::async_trait]
 pub trait EthClient {
@@ -31,31 +34,67 @@ pub trait EthClient {
 pub struct EthHttpClient {
     web3: Web3<Http>,
     zksync_contract: Contract<Http>,
+    cached_topics: HashMap<String, Hash>,
 }
 
 impl EthHttpClient {
     pub fn new(web3: Web3<Http>, zksync_contract_addr: H160) -> Self {
         let zksync_contract = Contract::new(web3.eth(), zksync_contract_addr, zksync_contract());
+        let mut cached_topics = HashMap::new();
+
+        cached_topics.insert(
+            "NewPriorityRequest".to_string(),
+            zksync_contract
+                .abi()
+                .event("NewPriorityRequest")
+                .expect("main contract abi error")
+                .signature(),
+        );
+
+        cached_topics.insert(
+            "PendingWithdrawalsComplete".to_string(),
+            zksync_contract
+                .abi()
+                .event("PendingWithdrawalsComplete")
+                .expect("main contract abi error")
+                .signature(),
+        );
 
         Self {
             zksync_contract,
             web3,
+            cached_topics,
         }
     }
-}
 
-fn create_filter(
-    address: Address,
-    from: BlockNumber,
-    to: BlockNumber,
-    topics: Vec<Hash>,
-) -> Filter {
-    FilterBuilder::default()
-        .address(vec![address])
-        .from_block(from)
-        .to_block(to)
-        .topics(Some(topics), None, None, None)
-        .build()
+    async fn get_events<T>(
+        &self,
+        from: BlockNumber,
+        to: BlockNumber,
+        topics: Vec<Hash>,
+    ) -> anyhow::Result<Vec<T>>
+    where
+        T: TryFrom<Log>,
+        T::Error: Debug,
+    {
+        let filter = FilterBuilder::default()
+            .address(vec![self.zksync_contract.address()])
+            .from_block(from)
+            .to_block(to)
+            .topics(Some(topics), None, None, None)
+            .build();
+
+        self.web3
+            .eth()
+            .logs(filter)
+            .await?
+            .into_iter()
+            .map(|event| {
+                T::try_from(event)
+                    .map_err(|e| format_err!("Failed to parse event log from ETH: {:?}", e))
+            })
+            .collect()
+    }
 }
 
 #[async_trait::async_trait]
@@ -67,30 +106,11 @@ impl EthClient for EthHttpClient {
     ) -> anyhow::Result<Vec<PriorityOp>> {
         let start = Instant::now();
 
-        let priority_op_event_topic = self
-            .zksync_contract
-            .abi()
-            .event("NewPriorityRequest")
-            .expect("main contract abi error")
-            .signature();
-        let filter = create_filter(
-            self.zksync_contract.address(),
-            from,
-            to,
-            vec![priority_op_event_topic],
-        );
+        let priority_op_event_topic = *self.cached_topics.get("NewPriorityRequest").unwrap();
+
         let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await?
-            .into_iter()
-            .map(|event| {
-                PriorityOp::try_from(event).map_err(|e| {
-                    format_err!("Failed to parse priority queue event log from ETH: {:?}", e)
-                })
-            })
-            .collect();
+            .get_events(from, to, vec![priority_op_event_topic])
+            .await;
         metrics::histogram!("eth_watcher.get_priority_op_events", start.elapsed());
         result
     }
@@ -102,26 +122,14 @@ impl EthClient for EthHttpClient {
     ) -> anyhow::Result<Vec<CompleteWithdrawalsTx>> {
         let start = Instant::now();
 
-        let complete_withdrawals_event_topic = self
-            .zksync_contract
-            .abi()
-            .event("PendingWithdrawalsComplete")
-            .expect("main contract abi error")
-            .signature();
-        let filter = create_filter(
-            self.zksync_contract.address(),
-            from,
-            to,
-            vec![complete_withdrawals_event_topic],
-        );
+        let complete_withdrawals_event_topic = *self
+            .cached_topics
+            .get("PendingWithdrawalsComplete")
+            .unwrap();
+
         let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await?
-            .into_iter()
-            .map(CompleteWithdrawalsTx::try_from)
-            .collect();
+            .get_events(from, to, vec![complete_withdrawals_event_topic])
+            .await;
 
         metrics::histogram!(
             "eth_watcher.get_complete_withdrawals_event",
