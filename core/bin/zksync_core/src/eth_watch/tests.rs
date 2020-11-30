@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_types::{ethereum::CompleteWithdrawalsTx, Deposit, Log, PriorityOp, ZkSyncPriorityOp};
+use zksync_types::{ethereum::CompleteWithdrawalsTx, Deposit, PriorityOp, ZkSyncPriorityOp};
 
 use crate::eth_watch::{client::EthClient, storage::Storage, EthWatch};
 
