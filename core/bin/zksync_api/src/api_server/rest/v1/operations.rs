@@ -51,11 +51,11 @@ impl ApiOperationsData {
         let block_info = blocks.into_iter().next().map(BlockInfo::from);
 
         let status = match block_info {
-            None => todo!(),
-            Some(info) if info.commit_tx_hash.is_some() => TxReceipt::Committed {
+            None => TxReceipt::Pending,
+            Some(info) if info.verify_tx_hash.is_some() => TxReceipt::Verified {
                 block: info.block_number,
             },
-            Some(info) if info.verify_tx_hash.is_some() => TxReceipt::Verified {
+            Some(info) if info.commit_tx_hash.is_some() => TxReceipt::Committed {
                 block: info.block_number,
             },
             Some(_) => TxReceipt::Executed,
