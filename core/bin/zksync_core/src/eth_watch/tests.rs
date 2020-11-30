@@ -33,7 +33,7 @@ struct FakeEthClient {
     priority_ops: HashMap<u64, Vec<PriorityOp>>,
     withdrawals: HashMap<u64, Vec<CompleteWithdrawalsTx>>,
     last_block_number: u64,
-    pending_withdrawals: HashMap<u64, Log>,
+    // pending_withdrawals: HashMap<u64, Log>,
 }
 impl FakeEthClient {
     fn new() -> Self {
@@ -41,19 +41,16 @@ impl FakeEthClient {
             priority_ops: Default::default(),
             withdrawals: Default::default(),
             last_block_number: 0,
-            pending_withdrawals: Default::default(),
+            // pending_withdrawals: Default::default(),
         }
     }
     fn add_operations(&mut self, ops: &[PriorityOp]) {
         for op in ops {
             self.last_block_number = max(op.eth_block, self.last_block_number);
-            let operations = {
-                if !self.priority_ops.contains_key(&op.eth_block) {
-                    self.priority_ops.insert(op.eth_block, vec![]);
-                };
-                self.priority_ops.get_mut(&op.eth_block).unwrap()
-            };
-            operations.push(op.clone());
+            self.priority_ops
+                .entry(op.eth_block)
+                .or_insert(vec![])
+                .push(op.clone());
         }
     }
     fn block_to_number(&self, block: &BlockNumber) -> u64 {
@@ -123,8 +120,7 @@ impl EthClient for FakeEthClient {
 
 fn create_watcher(client: FakeEthClient) -> EthWatch<FakeEthClient, FakeStorage> {
     let storage = FakeStorage::new();
-    let eth_watch = EthWatch::new(client, storage, 1);
-    eth_watch
+    EthWatch::new(client, storage, 1)
 }
 
 #[tokio::test]
@@ -137,7 +133,7 @@ async fn test_operation_queues() {
                 from: Default::default(),
                 token: 0,
                 amount: Default::default(),
-                to: Default::default(),
+                to: [2u8; 20].into(),
             }),
             deadline_block: 0,
             eth_hash: vec![1, 2, 3, 4, 5],
@@ -165,7 +161,7 @@ async fn test_operation_queues() {
     assert_eq!(unconfirmed_queue.len(), 1);
     assert_eq!(unconfirmed_queue[0].serial_id, 0);
     priority_queues.get(&1).unwrap();
-    watcher
-        .find_ongoing_op_by_hash(&vec![1, 2, 3, 4, 5])
-        .unwrap();
+    watcher.find_ongoing_op_by_hash(&[1, 2, 3, 4, 5]).unwrap();
+    let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
+    assert_eq!(deposits.len(), 1);
 }
