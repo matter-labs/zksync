@@ -23,6 +23,7 @@ mod blocks;
 pub mod client;
 mod config;
 mod error;
+mod operations;
 #[cfg(test)]
 mod test_utils;
 mod tokens;
@@ -38,6 +39,7 @@ pub(crate) fn api_scope(tx_sender: TxSender, env_options: ConfigurationOptions) 
         .service(config::api_scope(&env_options))
         .service(blocks::api_scope(&env_options, tx_sender.pool.clone()))
         .service(transactions::api_scope(tx_sender.clone()))
+        .service(operations::api_scope(tx_sender.pool.clone()))
         .service(tokens::api_scope(
             tx_sender.tokens,
             tx_sender.ticker_requests,
