@@ -23,7 +23,7 @@ Tester.prototype.testDeposit = async function (wallet: Wallet, token: TokenLike,
         approveDepositAmountForERC20: approve
     });
 
-    const receipt = await depositHandle.awaitVerifyReceipt();
+    const receipt = await depositHandle.awaitReceipt();
     expect(receipt.executed, 'Deposit was not executed').to.be.true;
     const balanceAfter = await wallet.getBalance(token);
     expect(
@@ -35,7 +35,7 @@ Tester.prototype.testDeposit = async function (wallet: Wallet, token: TokenLike,
 Tester.prototype.testFullExit = async function (wallet: Wallet, token: TokenLike, accountId?: number) {
     const balanceBefore = await wallet.getBalance(token);
     const handle = await wallet.emergencyWithdraw({ token, accountId });
-    let receipt = await handle.awaitVerifyReceipt();
+    let receipt = await handle.awaitReceipt();
     expect(receipt.executed, 'Full Exit was not executed').to.be.true;
     const balanceAfter = await wallet.getBalance(token);
     return [balanceBefore, balanceAfter];
