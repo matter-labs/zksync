@@ -28,7 +28,10 @@ use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
 
 // Local deps
 use self::{
-    client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops, storage::Storage,
+    client::EthClient,
+    eth_state::ETHState,
+    received_ops::{sift_outdated_ops, ReceivedPriorityOp},
+    storage::Storage,
 };
 
 pub use client::EthHttpClient;
@@ -132,61 +135,11 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
             .await
     }
 
-    async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
-        let current_ethereum_block =
-            last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-
-        let new_block_with_accepted_events =
-            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-        let previous_block_with_accepted_events =
-            new_block_with_accepted_events.saturating_sub(PRIORITY_EXPIRATION);
-
-        // restore pending queue
-        let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
-
-        // restore complete withdrawals events
-        let complete_withdrawals_txs = self
-            .client
-            .get_complete_withdrawals_event(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-
-        self.storage
-            .store_complete_withdrawals(complete_withdrawals_txs)
-            .await?;
-
-        // restore priority queue
-        let prior_queue_events = self
-            .client
-            .get_priority_op_events(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-        let mut priority_queue = HashMap::new();
-        for priority_op in prior_queue_events.into_iter() {
-            priority_queue.insert(priority_op.serial_id, priority_op.into());
-        }
-
-        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
-
-        self.set_new_state(new_state);
-
-        log::trace!("ETH state: {:#?}", self.eth_state);
-
-        Ok(())
-    }
-
-    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
-        debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
-
-        let previous_block_with_accepted_events = (self.eth_state.last_ethereum_block() + 1)
-            .saturating_sub(self.number_of_confirmations_for_event);
-        let new_block_with_accepted_events =
-            last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-
+    async fn update_withdrawals(
+        &mut self,
+        previous_block_with_accepted_events: u64,
+        new_block_with_accepted_events: u64,
+    ) -> anyhow::Result<()> {
         // Get new complete withdrawals events
         let complete_withdrawals_txs = self
             .client
@@ -199,34 +152,68 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         self.storage
             .store_complete_withdrawals(complete_withdrawals_txs)
             .await?;
+        Ok(())
+    }
 
-        // Get new priority ops
-        let priority_op_events = self
+    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
+        debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
+
+        let (unconfirmed_queue, received_priority_queue) = self
+            .update_eth_state(last_ethereum_block, self.number_of_confirmations_for_event)
+            .await?;
+
+        // Extend the existing priority operations with the new ones.
+        let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
+        for (serial_id, op) in received_priority_queue {
+            priority_queue.insert(serial_id, op);
+        }
+
+        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
+        self.set_new_state(new_state);
+        Ok(())
+    }
+
+    async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
+        let (unconfirmed_queue, priority_queue) = self
+            .update_eth_state(last_ethereum_block, PRIORITY_EXPIRATION)
+            .await?;
+
+        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
+
+        self.set_new_state(new_state);
+        log::trace!("ETH state: {:#?}", self.eth_state);
+        Ok(())
+    }
+
+    async fn update_eth_state(
+        &mut self,
+        current_ethereum_block: u64,
+        depth_of_last_approved_block: u64,
+    ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
+        let new_block_with_accepted_events =
+            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
+        let previous_block_with_accepted_events =
+            new_block_with_accepted_events.saturating_sub(depth_of_last_approved_block);
+
+        self.update_withdrawals(
+            previous_block_with_accepted_events,
+            new_block_with_accepted_events,
+        )
+        .await?;
+
+        let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
+        let priority_queue = self
             .client
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
-            .await?;
+            .await?
+            .into_iter()
+            .map(|priority_op| (priority_op.serial_id, priority_op.into()))
+            .collect();
 
-        // Extend the existing priority operations with the new ones.
-        let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
-        for priority_op in priority_op_events.into_iter() {
-            log::debug!("New priority op: {:?}", priority_op);
-            priority_queue.insert(priority_op.serial_id, priority_op.into());
-        }
-
-        // Get new pending ops
-        let unconfirmed_queue = self.get_unconfirmed_ops(last_ethereum_block).await?;
-
-        // Now, after we've received all the data from the Ethereum, we can safely
-        // update the state. This is done atomically to avoid the situation when
-        // due to error occurred mid-update the overall `ETHWatcher` state become
-        // messed up.
-        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
-        self.set_new_state(new_state);
-
-        Ok(())
+        Ok((unconfirmed_queue, priority_queue))
     }
 
     fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
