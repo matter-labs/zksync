@@ -28,16 +28,19 @@ use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
 
 // Local deps
 use self::{
-    eth_state::ETHState, received_ops::sift_outdated_ops, storage::Storage, worker::EthWorker,
+    client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops, storage::Storage,
 };
 
+pub use client::EthHttpClient;
 pub use storage::DBStorage;
-pub use worker::EthWorkerHttp;
 
+mod client;
 mod eth_state;
 mod received_ops;
 mod storage;
-mod worker;
+
+#[cfg(test)]
+mod tests;
 
 /// As `infura` may limit the requests, upon error we need to wait for a while
 /// before repeating the request.
@@ -85,8 +88,8 @@ pub enum EthWatchRequest {
     },
 }
 
-pub struct EthWatch<W: EthWorker, S: Storage> {
-    worker: W,
+pub struct EthWatch<W: EthClient, S: Storage> {
+    client: W,
     storage: S,
     eth_state: ETHState,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
@@ -95,15 +98,15 @@ pub struct EthWatch<W: EthWorker, S: Storage> {
     eth_watch_req: mpsc::Receiver<EthWatchRequest>,
 }
 
-impl<W: EthWorker, S: Storage> EthWatch<W, S> {
+impl<W: EthClient, S: Storage> EthWatch<W, S> {
     pub fn new(
-        worker: W,
+        client: W,
         storage: S,
         number_of_confirmations_for_event: u64,
         eth_watch_req: mpsc::Receiver<EthWatchRequest>,
     ) -> Self {
         Self {
-            worker,
+            client,
             storage,
             eth_state: ETHState::default(),
             eth_watch_req,
@@ -132,19 +135,9 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
         let block_from = BlockNumber::Number(block_from_number.into());
         let block_to = BlockNumber::Latest;
 
-        let pending_events = self
-            .worker
+        self.client
             .get_priority_op_events(block_from, block_to)
-            .await?;
-
-        // Collect the unconfirmed operations.
-        let mut unconfirmed_ops = Vec::new();
-
-        for priority_op in pending_events.into_iter() {
-            unconfirmed_ops.push(priority_op);
-        }
-
-        Ok(unconfirmed_ops)
+            .await
     }
 
     async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
@@ -161,7 +154,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
 
         // restore complete withdrawals events
         let complete_withdrawals_txs = self
-            .worker
+            .client
             .get_complete_withdrawals_event(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
@@ -174,7 +167,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
 
         // restore priority queue
         let prior_queue_events = self
-            .worker
+            .client
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
@@ -204,7 +197,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
 
         // Get new complete withdrawals events
         let complete_withdrawals_txs = self
-            .worker
+            .client
             .get_complete_withdrawals_event(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
@@ -217,7 +210,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
 
         // Get new priority ops
         let priority_op_events = self
-            .worker
+            .client
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
@@ -269,15 +262,15 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
         nonce: Nonce,
         pub_key_hash: &PubKeyHash,
     ) -> anyhow::Result<bool> {
-        let auth_fact = self.worker.get_auth_fact(address, nonce).await?;
+        let auth_fact = self.client.get_auth_fact(address, nonce).await?;
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
     async fn pending_withdrawals_queue_index(&self) -> anyhow::Result<u32> {
         let first_pending_withdrawal_index =
-            self.worker.get_first_pending_withdrawal_index().await?;
+            self.client.get_first_pending_withdrawal_index().await?;
 
-        let number_of_pending_withdrawals = self.worker.get_number_of_pending_withdrawals().await?;
+        let number_of_pending_withdrawals = self.client.get_number_of_pending_withdrawals().await?;
 
         Ok(first_pending_withdrawal_index + number_of_pending_withdrawals)
     }
@@ -307,7 +300,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
 
     async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
         let start = Instant::now();
-        let last_block_number = self.worker.block_number().await?;
+        let last_block_number = self.client.block_number().await?;
 
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
@@ -317,7 +310,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
         Ok(())
     }
 
-    // TODO try to move it to eth worker
+    // TODO try to move it to eth client
     fn is_backoff_requested(&self, error: &anyhow::Error) -> bool {
         error.to_string().contains("429 Too Many Requests")
     }
@@ -348,7 +341,7 @@ impl<W: EthWorker, S: Storage> EthWatch<W, S> {
         // block number.
         // Normally, however, this loop is not expected to last more than one iteration.
         let block = loop {
-            let block = self.worker.block_number().await;
+            let block = self.client.block_number().await;
 
             match block {
                 Ok(block) => {
@@ -447,12 +440,12 @@ pub fn start_eth_watch(
 ) -> JoinHandle<()> {
     let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
-    let eth_worker = EthWorkerHttp::new(web3, config_options.contract_eth_addr);
+    let eth_client = EthHttpClient::new(web3, config_options.contract_eth_addr);
 
     let storage = DBStorage::new(db_pool);
 
     let eth_watch = EthWatch::new(
-        eth_worker,
+        eth_client,
         storage,
         config_options.confirmations_for_eth_event,
         eth_req_receiver,

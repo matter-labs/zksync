@@ -24,8 +24,8 @@ pub struct ETHState {
     /// Note that since these operations do not have enough confirmations,
     /// they may be not executed in the future, so this list is approximate.
     ///
-    /// Keys in this HashMap are numbers of blocks with `PriorityOp`.
     unconfirmed_queue: Vec<PriorityOp>,
+    /// Keys in this HashMap are numbers of blocks with `PriorityOp`.
     /// Queue of priority operations that passed the confirmation
     /// threshold and are waiting to be executed.
     priority_queue: HashMap<u64, ReceivedPriorityOp>,

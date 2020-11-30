@@ -1,7 +1,7 @@
 use futures::{channel::mpsc, SinkExt};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time};
-use zksync_core::eth_watch::{DBStorage, EthWatch, EthWatchRequest, EthWorkerHttp};
+use zksync_core::eth_watch::{DBStorage, EthHttpClient, EthWatch, EthWatchRequest};
 use zksync_storage::ConnectionPool;
 
 fn main() {
@@ -20,11 +20,11 @@ fn main() {
     let (eth_req_sender, eth_req_receiver) = mpsc::channel(256);
 
     let db_pool = ConnectionPool::new(None);
-    let eth_worker = EthWorkerHttp::new(web3, contract_address);
+    let eth_client = EthHttpClient::new(web3, contract_address);
 
     let storage = DBStorage::new(db_pool);
 
-    let watcher = EthWatch::new(eth_worker, storage, 0, eth_req_receiver);
+    let watcher = EthWatch::new(eth_client, storage, 0, eth_req_receiver);
 
     main_runtime.spawn(watcher.run());
     main_runtime.block_on(async move {

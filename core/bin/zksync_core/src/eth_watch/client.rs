@@ -11,7 +11,7 @@ use zksync_types::ethereum::CompleteWithdrawalsTx;
 use zksync_types::{Address, Nonce, PriorityOp, H160};
 
 #[async_trait::async_trait]
-pub trait EthWorker {
+pub trait EthClient {
     async fn get_priority_op_events(
         &self,
         from: BlockNumber,
@@ -28,12 +28,12 @@ pub trait EthWorker {
     async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32>;
 }
 
-pub struct EthWorkerHttp {
+pub struct EthHttpClient {
     web3: Web3<Http>,
     zksync_contract: Contract<Http>,
 }
 
-impl EthWorkerHttp {
+impl EthHttpClient {
     pub fn new(web3: Web3<Http>, zksync_contract_addr: H160) -> Self {
         let zksync_contract = Contract::new(web3.eth(), zksync_contract_addr, zksync_contract());
 
@@ -59,7 +59,7 @@ fn create_filter(
 }
 
 #[async_trait::async_trait]
-impl EthWorker for EthWorkerHttp {
+impl EthClient for EthHttpClient {
     async fn get_priority_op_events(
         &self,
         from: BlockNumber,
