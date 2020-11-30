@@ -4,9 +4,12 @@
 //! they take no `self` argument, but instead expect it to be set as `data` in the
 //! scope configuration. This is done by the `ApiV01::into_scope` method.
 
-use crate::api_server::rest::{
-    helpers::*,
-    v01::{api_decl::ApiV01, types::*},
+use crate::api_server::{
+    helpers::try_parse_hash,
+    rest::{
+        helpers::{deposit_op_to_tx_by_hash, parse_tx_id, priority_op_to_tx_history},
+        v01::{api_decl::ApiV01, types::*},
+    },
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use std::time::Instant;

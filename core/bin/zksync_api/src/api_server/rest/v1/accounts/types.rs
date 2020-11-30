@@ -23,7 +23,7 @@ use zksync_utils::BigUintSerdeWrapper;
 
 // Local uses
 use crate::{
-    api_server::{rest::helpers::remove_prefix, v1::MAX_LIMIT},
+    api_server::{helpers::remove_prefix, v1::MAX_LIMIT},
     core_api_client::EthBlockId,
     utils::token_db_cache::TokenDBCache,
 };

@@ -6,10 +6,10 @@ use actix_web::{
     web::{self, Json},
     App,
 };
-
-// Workspace uses
 use serde_json::json;
 use tokio::sync::Mutex;
+
+// Workspace uses
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{Address, H256};
 

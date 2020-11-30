@@ -22,7 +22,7 @@ use super::{
     client::{self, Client},
     Error as ApiError, JsonResult, Pagination, PaginationQuery,
 };
-use crate::{api_server::rest::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
+use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]
