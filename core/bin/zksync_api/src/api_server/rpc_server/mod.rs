@@ -1,13 +1,14 @@
+// Built-in uses
+use std::time::Instant;
+
 // External uses
 use futures::{
-    channel::{
-        mpsc,
-        oneshot::{self},
-    },
+    channel::{mpsc, oneshot},
     SinkExt,
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
+
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_storage::{
@@ -18,6 +19,7 @@ use zksync_storage::{
     ConnectionPool, StorageProcessor,
 };
 use zksync_types::{tx::TxHash, Address, TokenLike, TxFeeTypes};
+
 // Local uses
 use crate::{
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
@@ -100,6 +102,7 @@ impl RpcApp {
 
     /// Async version of `get_ongoing_deposits` which does not use old futures as a return type.
     async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
+        let start = Instant::now();
         let confirmations_for_eth_event = self.confirmations_for_eth_event;
 
         let ongoing_ops = self
@@ -133,6 +136,7 @@ impl RpcApp {
             None
         };
 
+        metrics::histogram!("api.rpc.get_ongoing_deposits", start.elapsed());
         Ok(OngoingDepositsResp {
             address,
             deposits,
@@ -146,6 +150,7 @@ impl RpcApp {
         &self,
         serial_id: u32,
     ) -> Result<Option<StoredExecutedPriorityOperation>> {
+        let start = Instant::now();
         let res =
             if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
                 Some(executed_op)
@@ -168,10 +173,13 @@ impl RpcApp {
 
                 executed_op
             };
+
+        metrics::histogram!("api.rpc.get_executed_priority_operation", start.elapsed());
         Ok(res)
     }
 
     async fn get_block_info(&self, block_number: i64) -> Result<Option<BlockDetails>> {
+        let start = Instant::now();
         let res = if let Some(block) = self.cache_of_blocks_info.get(&block_number) {
             Some(block)
         } else {
@@ -191,10 +199,13 @@ impl RpcApp {
 
             block
         };
+
+        metrics::histogram!("api.rpc.get_block_info", start.elapsed());
         Ok(res)
     }
 
     async fn get_tx_receipt(&self, tx_hash: TxHash) -> Result<Option<TxReceiptResponse>> {
+        let start = Instant::now();
         let res = if let Some(tx_receipt) = self
             .cache_of_transaction_receipts
             .get(&tx_hash.as_ref().to_vec())
@@ -225,6 +236,8 @@ impl RpcApp {
 
             tx_receipt
         };
+
+        metrics::histogram!("api.rpc.get_tx_receipt", start.elapsed());
         Ok(res)
     }
 
@@ -299,6 +312,7 @@ impl RpcApp {
     }
 
     async fn get_account_state(&self, address: Address) -> Result<AccountStateInfo> {
+        let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let account_info = storage
             .chain()
@@ -324,6 +338,7 @@ impl RpcApp {
                 ResponseAccountState::try_restore(verified_state, &self.tx_sender.tokens).await?;
         };
 
+        metrics::histogram!("api.rpc.get_account_state", start.elapsed());
         Ok(result)
     }
 
