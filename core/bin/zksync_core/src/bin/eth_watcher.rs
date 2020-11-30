@@ -24,9 +24,9 @@ fn main() {
 
     let storage = DBStorage::new(db_pool);
 
-    let watcher = EthWatch::new(eth_client, storage, 0, eth_req_receiver);
+    let watcher = EthWatch::new(eth_client, storage, 0);
 
-    main_runtime.spawn(watcher.run());
+    main_runtime.spawn(watcher.run(eth_req_receiver));
     main_runtime.block_on(async move {
         let mut timer = time::interval(Duration::from_secs(1));
 

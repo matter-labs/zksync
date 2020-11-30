@@ -14,7 +14,10 @@ use zksync_crypto::params::{
 use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
-use super::operations::{DepositOp, FullExitOp};
+use super::{
+    operations::{DepositOp, FullExitOp},
+    SerialId,
+};
 
 /// Deposit priority operation transfers funds from the L1 account to the desired L2 account.
 /// If the target L2 account didn't exist at the moment of the operation execution, a new
@@ -155,7 +158,7 @@ impl ZkSyncPriorityOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriorityOp {
     /// Unique ID of the priority operation.
-    pub serial_id: u64,
+    pub serial_id: SerialId,
     /// Priority operation.
     pub data: ZkSyncPriorityOp,
     /// Ethereum deadline block until which operation must be processed.

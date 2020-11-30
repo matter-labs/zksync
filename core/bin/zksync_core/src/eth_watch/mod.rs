@@ -95,22 +95,14 @@ pub struct EthWatch<W: EthClient, S: Storage> {
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
     mode: WatcherMode,
-    eth_watch_req: mpsc::Receiver<EthWatchRequest>,
 }
 
 impl<W: EthClient, S: Storage> EthWatch<W, S> {
-    pub fn new(
-        client: W,
-        storage: S,
-        number_of_confirmations_for_event: u64,
-        eth_watch_req: mpsc::Receiver<EthWatchRequest>,
-    ) -> Self {
+    pub fn new(client: W, storage: S, number_of_confirmations_for_event: u64) -> Self {
         Self {
             client,
             storage,
             eth_state: ETHState::default(),
-            eth_watch_req,
-
             mode: WatcherMode::Working,
             number_of_confirmations_for_event,
         }
@@ -336,7 +328,7 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self, mut eth_watch_req: mpsc::Receiver<EthWatchRequest>) {
         // As infura may be not responsive, we want to retry the query until we've actually got the
         // block number.
         // Normally, however, this loop is not expected to last more than one iteration.
@@ -367,7 +359,7 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
             .await
             .expect("Unable to restore ETHWatcher state");
 
-        while let Some(request) = self.eth_watch_req.next().await {
+        while let Some(request) = eth_watch_req.next().await {
             match request {
                 EthWatchRequest::PollETHNode => {
                     if !self.polling_allowed() {
@@ -448,9 +440,9 @@ pub fn start_eth_watch(
         eth_client,
         storage,
         config_options.confirmations_for_eth_event,
-        eth_req_receiver,
     );
-    tokio::spawn(eth_watch.run());
+
+    tokio::spawn(eth_watch.run(eth_req_receiver));
 
     tokio::spawn(async move {
         let mut timer = time::interval(config_options.eth_watch_poll_interval);

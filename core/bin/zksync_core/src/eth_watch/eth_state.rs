@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 // External uses
 // Workspace deps
-use zksync_types::PriorityOp;
+use zksync_types::{PriorityOp, SerialId};
 // Local deps
 use super::received_ops::ReceivedPriorityOp;
 
@@ -35,7 +35,7 @@ impl ETHState {
     pub fn new(
         last_ethereum_block: u64,
         unconfirmed_queue: Vec<PriorityOp>,
-        priority_queue: HashMap<u64, ReceivedPriorityOp>,
+        priority_queue: HashMap<SerialId, ReceivedPriorityOp>,
     ) -> Self {
         Self {
             last_ethereum_block,
