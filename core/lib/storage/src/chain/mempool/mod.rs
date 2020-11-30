@@ -200,7 +200,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
-        // If there're signatures for the whole batch, store it too.
+        // If there're signatures for the whole batch, store them too.
         for signature in eth_signatures {
             let signature = serde_json::to_value(signature)?;
             sqlx::query!(
