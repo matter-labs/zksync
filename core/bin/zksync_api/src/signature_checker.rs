@@ -185,48 +185,43 @@ async fn verify_eth_signature_txs_batch(
         if signers.len() == batch_sign_data.signatures.len() {
             return Err(TxAddError::IncorrectEthSignature);
         }
-        // This block will return `true` at the first match or `false` if there's none.
-        let sender_correct = async {
-            for signature in &batch_sign_data.signatures {
-                match signature {
-                    TxEthSignature::EthereumSignature(packed_signature) => {
-                        let signer_account = packed_signature
-                            .signature_recover_signer(&batch_sign_data.message)
-                            .or(Err(TxAddError::IncorrectEthSignature))?;
-                        // Always cache it as it's correct one.
-                        signers.insert(signer_account);
-
-                        if sender == &signer_account {
-                            return Ok(true);
-                        }
+        // This block will set the `sender_correct` variable to `true` at the first match.
+        let mut sender_correct = false;
+        for signature in &batch_sign_data.signatures {
+            match signature {
+                TxEthSignature::EthereumSignature(packed_signature) => {
+                    let signer_account = packed_signature
+                        .signature_recover_signer(&batch_sign_data.message)
+                        .or(Err(TxAddError::IncorrectEthSignature))?;
+                    // Always cache it as it's correct one.
+                    signers.insert(signer_account);
+                    if sender == &signer_account {
+                        sender_correct = true;
+                        break;
                     }
-                    TxEthSignature::EIP1271Signature(signature) => {
-                        let signature_correct = eth_checker
-                            .is_eip1271_signature_correct(
-                                *sender,
-                                &batch_sign_data.message,
-                                signature.clone(),
-                            )
-                            .await
-                            .expect("Unable to check EIP1271 signature");
-
-                        if signature_correct {
-                            signers.insert(*sender);
-                            return Ok(true);
-                        }
+                }
+                TxEthSignature::EIP1271Signature(signature) => {
+                    let signature_correct = eth_checker
+                        .is_eip1271_signature_correct(
+                            *sender,
+                            &batch_sign_data.message,
+                            signature.clone(),
+                        )
+                        .await
+                        .expect("Unable to check EIP1271 signature");
+                    if signature_correct {
+                        signers.insert(*sender);
+                        sender_correct = true;
+                        break;
                     }
                 }
             }
-            // No signature for this transaction found, return error.
-            Ok(false)
         }
-        .await?;
-
+        // No signature for this transaction found, return error.
         if !sender_correct {
             return Err(TxAddError::IncorrectEthSignature);
         }
     }
-
     metrics::histogram!(
         "signature_checker.verify_eth_signature_txs_batch",
         start.elapsed()
