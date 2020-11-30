@@ -32,9 +32,9 @@
             "nonce": 12
           },
           "ethSignData": {
-            "stringAmount": "1000000000000",
+            "stringAmount": "1000000000000.0",
             "stringToken": "ETH",
-            "stringFee": "1000000",
+            "stringFee": "1000000.0",
             "to": "0x19aa2ed8712072e918632259780e587698ef58df",
             "accountId": 44,
             "nonce": 12
@@ -46,8 +46,8 @@
             "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
             "signature": "cfcc4ce57f7915657e742c700bb835ee9a783ce0640f4f6f06b096c1e0d7f88cadfb3ae9ac5ac7d315a24173d612aac68c2709fe1e643deb8d51ad134959cb05"
           },
-          "ethSignMessage": "Transfer 1000000000000 ETH\nTo: 0x19aa2ed8712072e918632259780e587698ef58df\nNonce: 12\nFee: 1000000 ETH\nAccount Id: 44",
-          "ethSignature": "0x6de424125c2a65a42812c3e9249bdcf98cbe4d0328a616f32ed23fa86a780be6088cb62149f98f33b9433cdcfe900500e7bf6d6909560ba1a8de99d42521162a1b"
+          "ethSignMessage": "Transfer 1000000000000.0 ETH\nTo: 0x19aa2ed8712072e918632259780e587698ef58df\nNonce: 12\nFee: 1000000.0 ETH\nAccount Id: 44",
+          "ethSignature": "0x6f7e631024b648e8d3984f84aa14d4f1b1013191042ef51b6443e3f25b075a0346988ab824687041ce699a91ed6e20bedff7c730aac3d8c7a111dd408c1862e41c"
         }
       },
       {
@@ -92,9 +92,9 @@
             "nonce": 12
           },
           "ethSignData": {
-            "stringAmount": "1000000000000",
+            "stringAmount": "1000000000000.0",
             "stringToken": "ETH",
-            "stringFee": "1000000",
+            "stringFee": "1000000.0",
             "ethAddress": "0x19aa2ed8712072e918632259780e587698ef58df",
             "accountId": 44,
             "nonce": 12
@@ -106,8 +106,8 @@
             "pubKey": "40771354dc314593e071eaf4d0f42ccb1fad6c7006c57464feeb7ab5872b7490",
             "signature": "a194482cacc1e6962944fe12859d92ed53e6a489b3fd62666d7871a0a64a42a2bfa197448ed217e2a77cd60caf1cc4d48d1e5c619aa57dbba0d9efe5f5261900"
           },
-          "ethSignMessage": "Withdraw 1000000000000 ETH\nTo: 0x19aa2ed8712072e918632259780e587698ef58df\nNonce: 12\nFee: 1000000 ETH\nAccount Id: 44",
-          "ethSignature": "0x006ae08bbdf02f23dfd7965c2bb15b7365fe447f51b5fbf1428ca6ff54457bbc489488f3dc5f10c123796bca0ea4a155b2f7c3933f34432c155c14fb9caefb841c"
+          "ethSignMessage": "Withdraw 1000000000000.0 ETH\nTo: 0x19aa2ed8712072e918632259780e587698ef58df\nNonce: 12\nFee: 1000000.0 ETH\nAccount Id: 44",
+          "ethSignature": "0xaa6ea9d9b06457c2652f80707b7ab35ba3b5b4ef593624773d00660dd5f9174215b327be358c9bd2ae539ae5220d47033d252506119a46cd898b42ae2bb366891c"
         }
       },
       {

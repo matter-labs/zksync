@@ -75,9 +75,9 @@ async function getTransferSignVector(
     const transferSignBytes = signer.transferSignBytes(transferData);
     const transferSignature = (await signer.signSyncTransfer(transferData)).signature;
     const transferEthSignInput = {
-        stringAmount: '1000000000000',
+        stringAmount: '1000000000000.0',
         stringToken: 'ETH',
-        stringFee: '1000000',
+        stringFee: '1000000.0',
         to: transferData.to,
         accountId: transferData.accountId,
         nonce: transferData.nonce
@@ -161,9 +161,9 @@ async function getWithdrawSignVector(
     const withdrawSignBytes = signer.withdrawSignBytes(withdrawData);
     const withdrawSignature = (await signer.signSyncWithdraw(withdrawData)).signature;
     const withdrawEthSignInput = {
-        stringAmount: '1000000000000',
+        stringAmount: '1000000000000.0',
         stringToken: 'ETH',
-        stringFee: '1000000',
+        stringFee: '1000000.0',
         ethAddress: withdrawData.ethAddress,
         accountId: withdrawData.accountId,
         nonce: withdrawData.nonce
