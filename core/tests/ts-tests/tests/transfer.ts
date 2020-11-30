@@ -33,7 +33,7 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
         fee
     });
 
-    const receipt = await handle.awaitReceipt();
+    const receipt = await handle.awaitVerifyReceipt();
     expect(receipt.success, `Transfer transaction failed with a reason: ${receipt.failReason}`).to.be.true;
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
@@ -66,7 +66,7 @@ Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, t
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
     const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }]);
-    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
     expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(fee)), 'Batched transfer failed').to.be.true;
@@ -102,7 +102,7 @@ Tester.prototype.testIgnoredBatch = async function (
     ]);
 
     for (const handle of handles) {
-        await suppress(handle.awaitReceipt());
+        await suppress(handle.awaitVerifyReceipt());
     }
 
     const senderAfter = await sender.getBalance(token);
