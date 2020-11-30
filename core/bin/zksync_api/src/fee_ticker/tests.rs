@@ -87,6 +87,9 @@ fn get_test_ticker_config() -> TickerConfig {
                 t.risk_factor.map(|risk| (id, risk))
             })
             .collect(),
+        not_subsidized_tokens: vec![
+            Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
+        ],
     }
 }
 
@@ -126,8 +129,8 @@ impl FeeTickerAPI for MockApiProvider {
             if TokenLike::Id(test_token.id) == token {
                 return Ok(Token::new(
                     test_token.id,
-                    Address::from_str("2b591e99afe9f32eaa6214f7b7629768c40eeb39").unwrap(),
-                    "HEX",
+                    Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
+                    "",
                     test_token.precision,
                 ));
             }

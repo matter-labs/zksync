@@ -5,7 +5,6 @@
 
 // Built-in deps
 use std::collections::HashMap;
-use std::str::FromStr;
 // External deps
 use bigdecimal::BigDecimal;
 use futures::{
@@ -143,6 +142,7 @@ pub struct TickerConfig {
     zkp_cost_chunk_usd: Ratio<BigUint>,
     gas_cost_tx: GasOperationsCost,
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
+    not_subsidized_tokens: Vec<Address>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -181,6 +181,7 @@ struct FeeTicker<API, INFO> {
 #[must_use]
 pub fn run_ticker_task(
     token_price_source: TokenPriceSource,
+    not_subsidized_tokens: Vec<Address>,
     fast_processing_coeff: f64,
     db_pool: ConnectionPool,
     tricker_requests: Receiver<TickerRequest>,
@@ -189,6 +190,7 @@ pub fn run_ticker_task(
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
         gas_cost_tx: GasOperationsCost::from_constants(fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
+        not_subsidized_tokens,
     };
 
     let cache = TokenDBCache::new(db_pool.clone());
@@ -307,12 +309,10 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
 
     /// Returns `true` if the token is subsidized.
     async fn is_token_subsidized(&mut self, token: Token) -> bool {
-        let not_subsidized_tokens = &[
-            Address::from_str("2b591e99afe9f32eaa6214f7b7629768c40eeb39").unwrap(), // HEX
-        ];
-
-        let not_subsidize = not_subsidized_tokens.iter().any(|&t| t == token.address);
-        !not_subsidize
+        self.config
+            .not_subsidized_tokens
+            .iter()
+            .all(|&t| t != token.address)
     }
 
     async fn get_fee_from_ticker_in_wei(
