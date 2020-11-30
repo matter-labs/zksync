@@ -17,7 +17,7 @@ use zksync_storage::{
     QueryResult,
 };
 use zksync_types::{
-    tx::TxHash, Account, AccountId, Address, BlockNumber, Nonce, PriorityOp, PubKeyHash,
+    tx::TxHash, Account, AccountId, Address, BlockNumber, Nonce, PriorityOp, PubKeyHash, H256,
 };
 use zksync_utils::BigUintSerdeWrapper;
 
@@ -89,8 +89,8 @@ pub struct AccountInfo {
 pub struct TxLocation {
     /// The block containing the transaction.
     pub block: BlockNumber,
-    /// Transaction index in block.
-    pub index: u64,
+    /// Transaction index in block. Absent for rejected transactions.
+    pub index: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -102,11 +102,17 @@ pub enum AccountReceipts {
 
 impl AccountReceipts {
     pub fn newer_than(block: BlockNumber, index: u64) -> Self {
-        Self::Newer(TxLocation { block, index })
+        Self::Newer(TxLocation {
+            block,
+            index: Some(index),
+        })
     }
 
     pub fn older_than(block: BlockNumber, index: u64) -> Self {
-        Self::Older(TxLocation { block, index })
+        Self::Older(TxLocation {
+            block,
+            index: Some(index),
+        })
     }
 }
 
@@ -141,9 +147,8 @@ pub struct AccountTxReceipt {
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingAccountTxReceipt {
-    block: u64,
-    // TODO find proper type.
-    hash: Vec<u8>,
+    pub block: u64,
+    pub hash: H256,
 }
 
 impl From<AccountQuery> for StorageAccountQuery {
@@ -299,7 +304,7 @@ impl AccountReceiptsQuery {
             AccountReceipts::Latest => Self::from_parts(
                 TxLocation {
                     block: BlockNumber::MAX,
-                    index: 0,
+                    index: None,
                 },
                 SearchDirection::Newer,
                 limit,
@@ -311,7 +316,7 @@ impl AccountReceiptsQuery {
         Self {
             direction: Some(direction),
             block: Some(location.block),
-            index: Some(location.index),
+            index: location.index,
             limit,
         }
     }
@@ -327,11 +332,11 @@ impl AccountReceiptsQuery {
             (None, None, None) => (
                 TxLocation {
                     block: BlockNumber::MAX,
-                    index: 0,
+                    index: None,
                 },
                 SearchDirection::Older,
             ),
-            (Some(block), Some(index), Some(direction)) => (TxLocation { block, index }, direction),
+            (Some(block), index, Some(direction)) => (TxLocation { block, index }, direction),
 
             _ => {
                 return Err(ApiError::bad_request("Incorrect transaction location")
@@ -348,7 +353,7 @@ impl TxLocation {
         let mut iter = tx_id.splitn(2, ',').filter_map(|x| x.parse::<u64>().ok());
 
         let block = iter.next()? as BlockNumber;
-        let index = iter.next()?;
+        let index = iter.next();
 
         Some(TxLocation { block, index })
     }
@@ -356,8 +361,6 @@ impl TxLocation {
 
 impl From<TransactionsHistoryItem> for AccountTxReceipt {
     fn from(inner: TransactionsHistoryItem) -> Self {
-        dbg!(&inner.tx_id);
-
         let location = TxLocation::from_tx_id(&inner.tx_id)
             .unwrap_or_else(|| panic!("Database provided an incorrect transaction ID"));
 
@@ -393,7 +396,7 @@ impl PendingAccountTxReceipt {
     pub fn from_priority_op(block_id: EthBlockId, op: PriorityOp) -> Self {
         Self {
             block: block_id,
-            hash: op.eth_hash,
+            hash: H256::from_slice(&op.eth_hash),
         }
     }
 }

@@ -151,7 +151,7 @@ impl ApiAccountsData {
     ) -> QueryResult<Vec<AccountTxReceipt>> {
         let mut storage = self.tokens.pool.access_storage().await?;
 
-        let location = (location.block as u64, location.index);
+        let location = (location.block as u64, location.index.unwrap_or_default());
 
         let items = storage
             .chain()
@@ -163,8 +163,6 @@ impl ApiAccountsData {
                 limit as u64,
             )
             .await?;
-
-        dbg!(&items);
 
         Ok(items.into_iter().map(AccountTxReceipt::from).collect())
     }

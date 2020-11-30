@@ -11,11 +11,14 @@ use actix_web::{
 use serde_json::json;
 use tokio::sync::Mutex;
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::Address;
+use zksync_types::{Address, H256};
 
 // Local uses
 use crate::{
-    api_server::v1::{client::Client, test_utils::TestServerConfig},
+    api_server::v1::{
+        client::{Client, TxReceipt},
+        test_utils::TestServerConfig,
+    },
     core_api_client::CoreApiClient,
     utils::token_db_cache::TokenDBCache,
 };
@@ -141,7 +144,7 @@ async fn test_accounts_scope() -> anyhow::Result<()> {
                     "token": 0,
                 },
                 "deadline_block": 10,
-                "eth_hash": [0xDE, 0xAD, 0xBE, 0xEF],
+                "eth_hash": H256::default().as_ref().to_vec(),
                 "eth_block": 5,
             },
         ]
@@ -155,15 +158,18 @@ async fn test_accounts_scope() -> anyhow::Result<()> {
     assert_eq!(depositing_balances.expected_accept_block, 5);
     assert_eq!(depositing_balances.amount.0, 100_500_u64.into());
 
-    let pending_receipts = client.account_pending_receipts(id).await?;
-    dbg!(&pending_receipts);
-
-    // Get account tx receipts
+    // Get account tx receipts.
     let receipts = client
         .account_receipts(address, AccountReceipts::newer_than(0, 0), 100)
         .await?;
+    assert_eq!(receipts[0].location.block, 1);
+    assert_eq!(receipts[0].location.index, None);
+    assert_eq!(receipts[0].receipt, TxReceipt::Verified { block: 1 });
 
-    dbg!(receipts);
+    // Get account pending receipts.
+    let pending_receipts = client.account_pending_receipts(id).await?;
+    assert_eq!(pending_receipts[0].block, 5);
+    assert_eq!(pending_receipts[0].hash, H256::default());
 
     server.stop().await;
     Ok(())
