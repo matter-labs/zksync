@@ -16,9 +16,6 @@ mod transfer_op;
 mod transfer_to_new_op;
 mod withdraw_op;
 
-#[cfg(test)]
-mod tests;
-
 #[doc(hidden)]
 pub use self::close_op::CloseOp;
 pub use self::{
