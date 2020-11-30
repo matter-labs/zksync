@@ -22,7 +22,7 @@ use tokio::task::JoinHandle;
 use zksync_config::TokenPriceSource;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    Address, ChangePubKeyOp, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
+    Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
     WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
@@ -48,11 +48,101 @@ mod ticker_info;
 #[cfg(test)]
 mod tests;
 
+/// Contains cost of zkSync operations in Wei.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GasOperationsCost {
+    standard_cost: HashMap<OutputFeeType, BigUint>,
+    subsidize_cost: HashMap<OutputFeeType, BigUint>,
+}
+
+impl GasOperationsCost {
+    pub fn from_constants(fast_processing_coeff: f64) -> Self {
+        // We increase gas price for fast withdrawals, since it will induce generating a smaller block
+        // size, resulting in us paying more gas than for bigger block.
+        let standard_fast_withdrawal_cost =
+            (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
+        let subsidy_fast_withdrawal_cost =
+            (constants::SUBSIDY_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
+
+        let standard_cost = vec![
+            (
+                OutputFeeType::Transfer,
+                constants::BASE_TRANSFER_COST.into(),
+            ),
+            (
+                OutputFeeType::TransferToNew,
+                constants::BASE_TRANSFER_TO_NEW_COST.into(),
+            ),
+            (
+                OutputFeeType::Withdraw,
+                constants::BASE_WITHDRAW_COST.into(),
+            ),
+            (
+                OutputFeeType::FastWithdraw,
+                standard_fast_withdrawal_cost.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: false,
+                },
+                constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: true,
+                },
+                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+            ),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        let subsidize_cost = vec![
+            (
+                OutputFeeType::Transfer,
+                constants::SUBSIDY_TRANSFER_COST.into(),
+            ),
+            (
+                OutputFeeType::TransferToNew,
+                constants::SUBSIDY_TRANSFER_TO_NEW_COST.into(),
+            ),
+            (
+                OutputFeeType::Withdraw,
+                constants::SUBSIDY_WITHDRAW_COST.into(),
+            ),
+            (
+                OutputFeeType::FastWithdraw,
+                subsidy_fast_withdrawal_cost.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: false,
+                },
+                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey {
+                    onchain_pubkey_auth: true,
+                },
+                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+            ),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        Self {
+            standard_cost,
+            subsidize_cost,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TickerConfig {
     zkp_cost_chunk_usd: Ratio<BigUint>,
-    gas_cost_tx: HashMap<OutputFeeType, BigUint>, //wei
+    gas_cost_tx: GasOperationsCost,
     tokens_risk_factors: HashMap<TokenId, Ratio<BigUint>>,
+    not_subsidized_tokens: Vec<Address>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -91,47 +181,16 @@ struct FeeTicker<API, INFO> {
 #[must_use]
 pub fn run_ticker_task(
     token_price_source: TokenPriceSource,
+    not_subsidized_tokens: Vec<Address>,
     fast_processing_coeff: f64,
     db_pool: ConnectionPool,
     tricker_requests: Receiver<TickerRequest>,
 ) -> JoinHandle<()> {
-    // We increase gas price for fast withdrawals, since it will induce generating a smaller block
-    // size, resulting in us paying more gas than for bigger block.
-    let fast_withdrawal_cost =
-        (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
-
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
-        gas_cost_tx: vec![
-            (
-                OutputFeeType::Transfer,
-                constants::BASE_TRANSFER_COST.into(),
-            ),
-            (
-                OutputFeeType::TransferToNew,
-                constants::BASE_TRANSFER_TO_NEW_COST.into(),
-            ),
-            (
-                OutputFeeType::Withdraw,
-                constants::BASE_WITHDRAW_COST.into(),
-            ),
-            (OutputFeeType::FastWithdraw, fast_withdrawal_cost.into()),
-            (
-                OutputFeeType::ChangePubKey {
-                    onchain_pubkey_auth: false,
-                },
-                constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey {
-                    onchain_pubkey_auth: true,
-                },
-                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
-            ),
-        ]
-        .into_iter()
-        .collect(),
+        gas_cost_tx: GasOperationsCost::from_constants(fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
+        not_subsidized_tokens,
     };
 
     let cache = TokenDBCache::new(db_pool.clone());
@@ -248,6 +307,14 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         self.info.is_account_new(address).await
     }
 
+    /// Returns `true` if the token is subsidized.
+    async fn is_token_subsidized(&mut self, token: Token) -> bool {
+        self.config
+            .not_subsidized_tokens
+            .iter()
+            .all(|&t| t != token.address)
+    }
+
     async fn get_fee_from_ticker_in_wei(
         &mut self,
         tx_type: TxFeeTypes,
@@ -284,7 +351,24 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
-        let gas_tx_amount = self.config.gas_cost_tx.get(&fee_type).cloned().unwrap();
+        let gas_tx_amount = {
+            let is_token_subsidized = self.is_token_subsidized(token.clone()).await;
+            if is_token_subsidized {
+                self.config
+                    .gas_cost_tx
+                    .subsidize_cost
+                    .get(&fee_type)
+                    .cloned()
+                    .unwrap()
+            } else {
+                self.config
+                    .gas_cost_tx
+                    .standard_cost
+                    .get(&fee_type)
+                    .cloned()
+                    .unwrap()
+            }
+        };
         let gas_price_wei = self.api.get_gas_price_wei().await?;
         let wei_price_usd = self.api.get_last_quote(TokenLike::Id(0)).await?.usd_price
             / BigUint::from(10u32).pow(18u32);

@@ -8,7 +8,7 @@ use std::str::FromStr;
 use zksync_types::{Address, Token, TokenId, TokenPrice};
 use zksync_utils::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
-const TEST_FAST_WITHDRAW_COEFF: u64 = 10;
+const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
 
 #[derive(Debug, Clone)]
 struct TestToken {
@@ -46,15 +46,32 @@ impl TestToken {
         Self::new(0, 182.0, None, 18)
     }
 
-    fn cheap() -> Self {
+    fn hex() -> Self {
         Self::new(1, 1.0, Some(2.5), 6)
     }
+
+    fn cheap() -> Self {
+        Self::new(2, 1.0, Some(2.5), 6)
+    }
+
     fn expensive() -> Self {
-        Self::new(2, 173_134.192_3, Some(0.9), 18)
+        Self::new(3, 173_134.192_3, Some(0.9), 18)
+    }
+
+    fn subsidized_tokens() -> Vec<Self> {
+        vec![Self::eth(), Self::cheap(), Self::expensive()]
+    }
+
+    fn unsubsidized_tokens() -> Vec<Self> {
+        vec![Self::hex()]
     }
 
     fn all_tokens() -> Vec<Self> {
-        vec![Self::eth(), Self::cheap(), Self::expensive()]
+        let mut all_tokens = Vec::new();
+        all_tokens.extend_from_slice(&Self::subsidized_tokens());
+        all_tokens.extend_from_slice(&Self::unsubsidized_tokens());
+
+        all_tokens
     }
 }
 
@@ -62,38 +79,7 @@ fn get_test_ticker_config() -> TickerConfig {
     TickerConfig {
         zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot("0.001")
             .unwrap(),
-        gas_cost_tx: vec![
-            (
-                OutputFeeType::Transfer,
-                BigUint::from(constants::BASE_TRANSFER_COST),
-            ),
-            (
-                OutputFeeType::TransferToNew,
-                BigUint::from(constants::BASE_TRANSFER_TO_NEW_COST),
-            ),
-            (
-                OutputFeeType::Withdraw,
-                BigUint::from(constants::BASE_WITHDRAW_COST),
-            ),
-            (
-                OutputFeeType::FastWithdraw,
-                BigUint::from(constants::BASE_WITHDRAW_COST * TEST_FAST_WITHDRAW_COEFF),
-            ),
-            (
-                OutputFeeType::ChangePubKey {
-                    onchain_pubkey_auth: false,
-                },
-                constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
-            ),
-            (
-                OutputFeeType::ChangePubKey {
-                    onchain_pubkey_auth: true,
-                },
-                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
-            ),
-        ]
-        .into_iter()
-        .collect(),
+        gas_cost_tx: GasOperationsCost::from_constants(TEST_FAST_WITHDRAW_COEFF),
         tokens_risk_factors: TestToken::all_tokens()
             .into_iter()
             .filter_map(|t| {
@@ -101,6 +87,9 @@ fn get_test_ticker_config() -> TickerConfig {
                 t.risk_factor.map(|risk| (id, risk))
             })
             .collect(),
+        not_subsidized_tokens: vec![
+            Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
+        ],
     }
 }
 
@@ -126,11 +115,21 @@ impl FeeTickerAPI for MockApiProvider {
     }
 
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
-        for test_token in TestToken::all_tokens() {
+        for test_token in TestToken::subsidized_tokens() {
             if TokenLike::Id(test_token.id) == token {
                 return Ok(Token::new(
                     test_token.id,
                     Address::default(),
+                    "",
+                    test_token.precision,
+                ));
+            }
+        }
+        for test_token in TestToken::unsubsidized_tokens() {
+            if TokenLike::Id(test_token.id) == token {
+                return Ok(Token::new(
+                    test_token.id,
+                    Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
                     "",
                     test_token.precision,
                 ));
@@ -200,7 +199,7 @@ fn test_ticker_formula() {
     // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits
     // (mantissa len == 11)
     let threshold = BigDecimal::from_str("0.01").unwrap();
-    for token in TestToken::all_tokens() {
+    for token in TestToken::subsidized_tokens() {
         let transfer_fee =
             get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.into(), Address::default());
         let expected_fee = expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
@@ -247,5 +246,68 @@ fn test_ticker_formula() {
             fast_withdraw_fee > withdraw_fee,
             "Fast withdraw fee must be greater than usual withdraw fee"
         );
+    }
+}
+
+#[test]
+fn test_fee_for_unsubsidized_tokens() {
+    let validator = FeeTokenValidator::new(HashMap::new());
+
+    let config = get_test_ticker_config();
+    let mut ticker = FeeTicker::new(
+        MockApiProvider,
+        MockTickerInfo,
+        mpsc::channel(1).1,
+        config,
+        validator,
+    );
+
+    let mut get_gas_amount =
+        |tx_type: TxFeeTypes, token: TokenLike, address: Address| -> num::BigUint {
+            block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token, address))
+                .expect("failed to get fee in token")
+                .gas_tx_amount
+        };
+
+    for subsidized_tokens in TestToken::subsidized_tokens() {
+        for unsubsidized_tokens in TestToken::unsubsidized_tokens() {
+            assert!(
+                get_gas_amount(
+                    TxFeeTypes::Transfer,
+                    subsidized_tokens.id.into(),
+                    Address::default()
+                ) < get_gas_amount(
+                    TxFeeTypes::Transfer,
+                    unsubsidized_tokens.id.into(),
+                    Address::default()
+                )
+            );
+            assert!(
+                get_gas_amount(
+                    TxFeeTypes::Withdraw,
+                    subsidized_tokens.id.into(),
+                    Address::default()
+                ) < get_gas_amount(
+                    TxFeeTypes::Withdraw,
+                    unsubsidized_tokens.id.into(),
+                    Address::default()
+                )
+            );
+            assert!(
+                get_gas_amount(
+                    TxFeeTypes::ChangePubKey {
+                        onchain_pubkey_auth: false
+                    },
+                    subsidized_tokens.id.into(),
+                    Address::default()
+                ) < get_gas_amount(
+                    TxFeeTypes::ChangePubKey {
+                        onchain_pubkey_auth: false
+                    },
+                    unsubsidized_tokens.id.into(),
+                    Address::default()
+                )
+            );
+        }
     }
 }

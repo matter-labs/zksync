@@ -251,3 +251,20 @@ impl AvailableBlockSizesConfig {
         result
     }
 }
+
+/// Configuration options related to FeeTicker.
+#[derive(Debug)]
+pub struct FeeTickerOptions {
+    pub not_subsidized_tokens: Vec<H160>,
+}
+
+impl FeeTickerOptions {
+    pub fn from_env() -> Self {
+        Self {
+            not_subsidized_tokens: get_env("NOT_SUBSIDIZED_TOKENS")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+        }
+    }
+}
