@@ -384,3 +384,212 @@ mod signatures_with_vectors {
         }
     }
 }
+
+#[cfg(test)]
+mod wallet_tests {
+    use super::*;
+    use num::{BigUint, ToPrimitive};
+    use zksync::provider::Provider;
+    use zksync::types::{AccountState, BlockStatus};
+    use zksync::{
+        error::ClientError,
+        types::{AccountInfo, ContractAddress, Fee, Tokens, TransactionInfo},
+        Network, Wallet, WalletCredentials,
+    };
+    use zksync_eth_signer::PrivateKeySigner;
+    use zksync_types::{
+        tokens::get_genesis_token_list,
+        tx::{PackedEthSignature, TxHash},
+        Address, PubKeyHash, TokenLike, TxFeeTypes, ZkSyncTx, H256,
+    };
+
+    #[derive(Debug, Clone)]
+    struct MockProvider {
+        network: Network,
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for MockProvider {
+        async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
+            let mut committed_balances = HashMap::new();
+            committed_balances.insert("DAI".into(), BigUint::from(12345_u32).into());
+
+            let mut verified_balances = HashMap::new();
+            verified_balances.insert("USDC".into(), BigUint::from(98765_u32).into());
+
+            Ok(AccountInfo {
+                address,
+                id: Some(42),
+                depositing: Default::default(),
+                committed: AccountState {
+                    balances: committed_balances,
+                    nonce: 0,
+                    pub_key_hash: PubKeyHash::from_hex(
+                        "sync:0102030405060708091011121314151617181920",
+                    )
+                    .unwrap(),
+                },
+                verified: AccountState {
+                    balances: verified_balances,
+                    ..Default::default()
+                },
+            })
+        }
+
+        async fn tokens(&self) -> Result<Tokens, ClientError> {
+            let genesis_tokens = get_genesis_token_list(&self.network.to_string())
+                .expect("Initial token list not found");
+
+            let tokens = (1..)
+                .zip(&genesis_tokens[..3])
+                .map(|(id, token)| Token {
+                    id,
+                    symbol: token.symbol.clone(),
+                    address: token.address[2..]
+                        .parse()
+                        .expect("failed to parse token address"),
+                    decimals: token.decimals,
+                })
+                .map(|token| (token.symbol.clone(), token))
+                .collect();
+            Ok(tokens)
+        }
+
+        async fn tx_info(&self, _tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
+            unimplemented!()
+        }
+
+        async fn get_tx_fee(
+            &self,
+            _tx_type: TxFeeTypes,
+            _address: Address,
+            _token: impl Into<TokenLike> + Send + 'async_trait,
+        ) -> Result<Fee, ClientError> {
+            unimplemented!()
+        }
+
+        async fn send_tx(
+            &self,
+            _tx: ZkSyncTx,
+            _eth_signature: Option<PackedEthSignature>,
+        ) -> Result<TxHash, ClientError> {
+            unimplemented!()
+        }
+
+        fn network(&self) -> Network {
+            self.network
+        }
+
+        async fn contract_address(&self) -> Result<ContractAddress, ClientError> {
+            Ok(ContractAddress {
+                main_contract: "0x000102030405060708090a0b0c0d0e0f10111213".to_string(),
+                gov_contract: "".to_string(),
+            })
+        }
+    }
+
+    async fn get_test_wallet(
+        private_key_raw: &[u8],
+        network: Network,
+    ) -> Wallet<PrivateKeySigner, MockProvider> {
+        let private_key = H256::from_slice(private_key_raw);
+        let address = PackedEthSignature::address_from_private_key(&private_key).unwrap();
+
+        let eth_signer = PrivateKeySigner::new(private_key);
+        let creds = WalletCredentials::from_eth_signer(address, eth_signer, Network::Mainnet)
+            .await
+            .unwrap();
+
+        let provider = MockProvider { network };
+        Wallet::new(provider, creds).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_wallet_address() {
+        let wallet = get_test_wallet(&[5; 32], Network::Mainnet).await;
+        let expected_address =
+            PackedEthSignature::address_from_private_key(&H256::from([5; 32])).unwrap();
+        assert_eq!(wallet.address(), expected_address);
+    }
+
+    #[tokio::test]
+    async fn test_wallet_account_info() {
+        let wallet = get_test_wallet(&[10; 32], Network::Mainnet).await;
+        let account_info = wallet.account_info().await.unwrap();
+        assert_eq!(account_info.address, wallet.address());
+    }
+
+    #[tokio::test]
+    async fn test_wallet_account_id() {
+        let wallet = get_test_wallet(&[14; 32], Network::Mainnet).await;
+        assert_eq!(wallet.account_id(), Some(42));
+    }
+
+    #[tokio::test]
+    async fn test_wallet_refresh_tokens() {
+        let mut wallet = get_test_wallet(&[20; 32], Network::Mainnet).await;
+        let _dai_token = wallet
+            .tokens
+            .resolve(TokenLike::Symbol("DAI".into()))
+            .unwrap();
+
+        wallet.provider.network = Network::Rinkeby;
+        wallet.refresh_tokens_cache().await.unwrap();
+
+        // DAI is not in the Rinkeby network
+        assert!(wallet
+            .tokens
+            .resolve(TokenLike::Symbol("DAI".into()))
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_committed() {
+        let wallet = get_test_wallet(&[40; 32], Network::Mainnet).await;
+        let balance = wallet
+            .get_balance(BlockStatus::Committed, "DAI")
+            .await
+            .unwrap();
+        assert_eq!(balance.to_u32(), Some(12345));
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_committed_not_existent() {
+        let wallet = get_test_wallet(&[40; 32], Network::Mainnet).await;
+        let result = wallet.get_balance(BlockStatus::Committed, "ETH").await;
+
+        assert_eq!(result.unwrap_err(), ClientError::UnknownToken);
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_verified() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        let balance = wallet
+            .get_balance(BlockStatus::Verified, "USDC")
+            .await
+            .unwrap();
+        assert_eq!(balance.to_u32(), Some(98765));
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_verified_not_existent() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        let result = wallet.get_balance(BlockStatus::Verified, "ETH").await;
+
+        assert_eq!(result.unwrap_err(), ClientError::UnknownToken);
+    }
+
+    #[tokio::test]
+    async fn test_wallet_is_signing_key_set() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        assert!(wallet.is_signing_key_set().await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_wallet_ethereum() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        let eth_provider = wallet.ethereum("http://some.random.url").await.unwrap();
+        let expected_address: Vec<_> = (0..20).collect();
+        assert_eq!(eth_provider.contract_address().as_bytes(), expected_address);
+    }
+}

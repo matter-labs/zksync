@@ -56,7 +56,7 @@ pub trait Provider {
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<TxHash, ClientError>;
 
-    /// Type of network in use
+    /// Type of network this provider is allowing access to.
     fn network(&self) -> Network;
 
     /// Requests and returns a smart contract address (for Ethereum network associated with network specified in `Provider`).
@@ -100,8 +100,6 @@ impl Provider for RpcProvider {
         self.send_and_deserialize(&msg).await
     }
 
-    /// Submits a transaction to the zkSync network.
-    /// Returns the hash of the created transaction.
     async fn send_tx(
         &self,
         tx: ZkSyncTx,
