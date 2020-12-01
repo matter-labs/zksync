@@ -20,7 +20,7 @@ pub use zksync_types::helpers::{
 };
 
 /// Generates a new `PrivateKey` from seed using a deterministic algorithm:
-/// seed is hashed via `sha256` hash, and the output treated as a `PrivateKey`.
+/// seed is hashed via `sha256` hash (twice), and the output treated as a `PrivateKey`.
 /// If the obtained value doesn't have a correct value to be a `PrivateKey`, hashing operation is applied
 /// repeatedly to the previous output, until the value can be interpreted as a `PrivateKey`.
 pub fn private_key_from_seed(seed: &[u8]) -> Result<PrivateKey, ClientError> {
@@ -34,7 +34,6 @@ pub fn private_key_from_seed(seed: &[u8]) -> Result<PrivateKey, ClientError> {
         hasher.result()
     };
 
-    // FIXME: why do hash first time and then again?
     let mut effective_seed = sha256_bytes(seed);
 
     loop {
