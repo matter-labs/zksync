@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, time::Instant};
+use std::{convert::TryFrom, time::Instant};
 
 use anyhow::format_err;
 use ethabi::Hash;
@@ -12,6 +12,27 @@ use web3::{
 
 use zksync_contracts::zksync_contract;
 use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, H160};
+
+struct ContractTopics {
+    new_priority_request: Hash,
+    complete_withdrawals_event: Hash,
+}
+
+impl ContractTopics {
+    fn new(zksync_contract: &ethabi::Contract) -> Self {
+        Self {
+            new_priority_request: zksync_contract
+                .event("NewPriorityRequest")
+                .expect("main contract abi error")
+                .signature(),
+
+            complete_withdrawals_event: zksync_contract
+                .event("PendingWithdrawalsComplete")
+                .expect("main contract abi error")
+                .signature(),
+        }
+    }
+}
 
 #[async_trait::async_trait]
 pub trait EthClient {
@@ -34,36 +55,18 @@ pub trait EthClient {
 pub struct EthHttpClient {
     web3: Web3<Http>,
     zksync_contract: Contract<Http>,
-    cached_topics: HashMap<String, Hash>,
+    topics: ContractTopics,
 }
 
 impl EthHttpClient {
     pub fn new(web3: Web3<Http>, zksync_contract_addr: H160) -> Self {
         let zksync_contract = Contract::new(web3.eth(), zksync_contract_addr, zksync_contract());
-        let mut cached_topics = HashMap::new();
 
-        cached_topics.insert(
-            "NewPriorityRequest".to_string(),
-            zksync_contract
-                .abi()
-                .event("NewPriorityRequest")
-                .expect("main contract abi error")
-                .signature(),
-        );
-
-        cached_topics.insert(
-            "PendingWithdrawalsComplete".to_string(),
-            zksync_contract
-                .abi()
-                .event("PendingWithdrawalsComplete")
-                .expect("main contract abi error")
-                .signature(),
-        );
-
+        let topics = ContractTopics::new(zksync_contract.abi());
         Self {
             zksync_contract,
             web3,
-            cached_topics,
+            topics,
         }
     }
 
@@ -106,10 +109,8 @@ impl EthClient for EthHttpClient {
     ) -> anyhow::Result<Vec<PriorityOp>> {
         let start = Instant::now();
 
-        let priority_op_event_topic = *self.cached_topics.get("NewPriorityRequest").unwrap();
-
         let result = self
-            .get_events(from, to, vec![priority_op_event_topic])
+            .get_events(from, to, vec![self.topics.new_priority_request])
             .await;
         metrics::histogram!("eth_watcher.get_priority_op_events", start.elapsed());
         result
@@ -122,13 +123,8 @@ impl EthClient for EthHttpClient {
     ) -> anyhow::Result<Vec<CompleteWithdrawalsTx>> {
         let start = Instant::now();
 
-        let complete_withdrawals_event_topic = *self
-            .cached_topics
-            .get("PendingWithdrawalsComplete")
-            .unwrap();
-
         let result = self
-            .get_events(from, to, vec![complete_withdrawals_event_topic])
+            .get_events(from, to, vec![self.topics.complete_withdrawals_event])
             .await;
 
         metrics::histogram!(
