@@ -1,9 +1,9 @@
 // Built-in deps
-use std::{env, net::SocketAddr, str::FromStr, time::Duration};
+use std::{collections::HashSet, env, net::SocketAddr, str::FromStr, time::Duration};
 // External uses
 use url::Url;
 // Workspace uses
-use zksync_basic_types::{H160, H256};
+use zksync_basic_types::{Address, H256};
 use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
 
@@ -47,10 +47,10 @@ impl EthSenderOptions {
 pub struct EthClientOptions {
     pub chain_id: u8,
     pub gas_price_factor: f64,
-    pub operator_commit_eth_addr: H160,
+    pub operator_commit_eth_addr: Address,
     pub operator_private_key: Option<H256>,
     pub web3_url: String,
-    pub contract_eth_addr: H160,
+    pub contract_eth_addr: Address,
 }
 
 impl EthClientOptions {
@@ -164,6 +164,37 @@ impl MiniblockTimings {
     }
 }
 
+/// Configuration options related to fee ticker.
+#[derive(Debug)]
+pub struct FeeTickerOptions {
+    /// Source to fetch token prices from (e.g. CoinGecko or coinmarketcap).
+    pub token_price_source: TokenPriceSource,
+    /// Fee increase coefficient for fast processing of withdrawal.
+    pub fast_processing_coeff: f64,
+    /// List of the tokens that aren't acceptable for paying fee in.
+    pub disabled_tokens: HashSet<Address>,
+    /// Tokens for which subsidies are disabled.
+    pub not_subsidized_tokens: HashSet<Address>,
+}
+
+impl FeeTickerOptions {
+    fn comma_separated_addresses(name: &str) -> HashSet<Address> {
+        get_env(name)
+            .split(',')
+            .map(|p| p.parse().unwrap())
+            .collect()
+    }
+
+    pub fn from_env() -> Self {
+        Self {
+            token_price_source: TokenPriceSource::from_env(),
+            fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
+            disabled_tokens: Self::comma_separated_addresses("TICKER_DISABLED_TOKENS"),
+            not_subsidized_tokens: Self::comma_separated_addresses("NOT_SUBSIDIZED_TOKENS"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ApiServerOptions {
     pub rest_api_server_address: SocketAddr,
@@ -172,9 +203,7 @@ pub struct ApiServerOptions {
     pub core_server_address: SocketAddr,
     pub core_server_url: String,
     pub api_requests_caches_size: usize,
-    pub token_price_source: TokenPriceSource,
     /// Fee increase coefficient for fast processing of withdrawal.
-    pub ticker_fast_processing_coeff: f64,
     pub forced_exit_minimum_account_age: Duration,
     pub enforce_pubkey_change_fee: bool,
 }
@@ -195,8 +224,6 @@ impl ApiServerOptions {
             core_server_address: addr_from_port(parse_env("PRIVATE_CORE_SERVER_PORT")),
             core_server_url: parse_env("PRIVATE_CORE_SERVER_URL"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
-            token_price_source: TokenPriceSource::from_env(),
-            ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
             forced_exit_minimum_account_age,
             enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
                 .unwrap_or(true),
@@ -208,9 +235,9 @@ impl ApiServerOptions {
 pub struct ConfigurationOptions {
     pub web3_url: String,
     pub genesis_tx_hash: H256,
-    pub contract_eth_addr: H160,
-    pub governance_eth_addr: H160,
-    pub operator_fee_eth_addr: H160,
+    pub contract_eth_addr: Address,
+    pub governance_eth_addr: Address,
+    pub operator_fee_eth_addr: Address,
     pub confirmations_for_eth_event: u64,
     pub available_block_chunk_sizes: Vec<usize>,
     pub max_number_of_withdrawals_per_block: usize,

@@ -5957,6 +5957,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
+ "web3 0.13.0",
  "zksync_basic_types",
  "zksync_crypto",
  "zksync_utils",
@@ -5971,6 +5972,7 @@ dependencies = [
  "futures 0.3.6",
  "num",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
