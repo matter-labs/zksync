@@ -2,7 +2,7 @@
 //! an entity which decides whether certain ERC20 token is suitable for paying fees.
 
 // Built-in uses
-use std::{collections::HashMap, str::FromStr};
+use std::collections::{HashMap, HashSet};
 // Workspace uses
 use zksync_types::{
     tokens::{Token, TokenLike},
@@ -15,12 +15,18 @@ use crate::utils::token_db_cache::TokenDBCache;
 #[derive(Debug, Clone)]
 pub(crate) struct FeeTokenValidator {
     tokens_cache: TokenCacheWrapper,
+    /// List of tokens that aren't accepted to pay fees in.
+    disabled_tokens: HashSet<Address>,
 }
 
 impl FeeTokenValidator {
-    pub(crate) fn new(cache: impl Into<TokenCacheWrapper>) -> Self {
+    pub(crate) fn new(
+        cache: impl Into<TokenCacheWrapper>,
+        disabled_tokens: HashSet<Address>,
+    ) -> Self {
         Self {
             tokens_cache: cache.into(),
+            disabled_tokens,
         }
     }
 
@@ -40,12 +46,8 @@ impl FeeTokenValidator {
         // Later we'll check Uniswap trading volume for tokens. That's why this function is already `async` even
         // though it's not really `async` at this moment.
 
-        let not_supported_tokens = &[
-            Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(), // PHNX (PhoenixDAO)
-        ];
-
         if let Some(token) = token {
-            let not_acceptable = not_supported_tokens.iter().any(|&t| t == token.address);
+            let not_acceptable = self.disabled_tokens.contains(&token.address);
             Ok(!not_acceptable)
         } else {
             // Unknown tokens aren't suitable for our needs, obviously.
@@ -84,6 +86,8 @@ impl TokenCacheWrapper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
+    use std::str::FromStr;
 
     #[tokio::test]
     async fn check_tokens() {
@@ -98,7 +102,10 @@ mod tests {
         tokens.insert(TokenLike::Address(dai_token_address), dai_token);
         tokens.insert(TokenLike::Address(phnx_token_address), phnx_token);
 
-        let validator = FeeTokenValidator::new(tokens);
+        let mut disabled_tokens = HashSet::new();
+        disabled_tokens.insert(phnx_token_address);
+
+        let validator = FeeTokenValidator::new(tokens, disabled_tokens);
 
         let dai_allowed = validator
             .token_allowed(TokenLike::Address(dai_token_address))
