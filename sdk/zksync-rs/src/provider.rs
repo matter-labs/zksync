@@ -76,29 +76,17 @@ pub struct RpcProvider {
 impl Provider for RpcProvider {
     async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
         let msg = JsonRpcRequest::account_info(address);
-
-        let ret = self.post(&msg).await?;
-        let account_state = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(account_state)
+        self.send_and_deserialize(&msg).await
     }
 
     async fn tokens(&self) -> Result<Tokens, ClientError> {
         let msg = JsonRpcRequest::tokens();
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
+        self.send_and_deserialize(&msg).await
     }
 
     async fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
         let msg = JsonRpcRequest::tx_info(tx_hash);
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
+        self.send_and_deserialize(&msg).await
     }
 
     async fn get_tx_fee(
@@ -109,12 +97,7 @@ impl Provider for RpcProvider {
     ) -> Result<Fee, ClientError> {
         let token = token.into();
         let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token);
-
-        let ret = self.post(&msg).await?;
-        let fee = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-
-        Ok(fee)
+        self.send_and_deserialize(&msg).await
     }
 
     /// Submits a transaction to the zkSync network.
@@ -125,11 +108,7 @@ impl Provider for RpcProvider {
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<TxHash, ClientError> {
         let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
-
-        let ret = self.post(&msg).await?;
-        let tx_hash = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_hash)
+        self.send_and_deserialize(&msg).await
     }
 
     fn network(&self) -> Network {
@@ -138,11 +117,7 @@ impl Provider for RpcProvider {
 
     async fn contract_address(&self) -> Result<ContractAddress, ClientError> {
         let msg = JsonRpcRequest::contract_address();
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
+        self.send_and_deserialize(&msg).await
     }
 }
 
@@ -173,21 +148,13 @@ impl RpcProvider {
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<Vec<TxHash>, ClientError> {
         let msg = JsonRpcRequest::submit_tx_batch(txs_signed, eth_signature);
-
-        let ret = self.post(&msg).await?;
-        let tx_hashes = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_hashes)
+        self.send_and_deserialize(&msg).await
     }
 
     /// Requests and returns information about an Ethereum operation given its `serial_id`.
     pub async fn ethop_info(&self, serial_id: u32) -> Result<EthOpInfo, ClientError> {
         let msg = JsonRpcRequest::ethop_info(serial_id);
-
-        let ret = self.post(&msg).await?;
-        let eth_op_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(eth_op_info)
+        self.send_and_deserialize(&msg).await
     }
 
     /// Requests and returns eth withdrawal transaction hash for some offchain withdrawal.
@@ -196,11 +163,7 @@ impl RpcProvider {
         withdrawal_hash: TxHash,
     ) -> Result<Option<String>, ClientError> {
         let msg = JsonRpcRequest::eth_tx_for_withdrawal(withdrawal_hash);
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
+        self.send_and_deserialize(&msg).await
     }
 
     /// Performs a POST query to the JSON RPC endpoint,
@@ -269,6 +232,16 @@ impl RpcProvider {
             .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
 
         Ok(reply)
+    }
+
+    async fn send_and_deserialize<R>(&self, msg: &JsonRpcRequest) -> Result<R, ClientError>
+    where
+        R: serde::de::DeserializeOwned,
+    {
+        let ret = self.post(msg).await?;
+        let result = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
+        Ok(result)
     }
 }
 
