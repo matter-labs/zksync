@@ -163,7 +163,7 @@ pub struct PriorityOp {
     pub data: ZkSyncPriorityOp,
     /// Ethereum deadline block until which operation must be processed.
     pub deadline_block: u64,
-    /// Hash of the corresponding Ethereum transaction.
+    /// Hash of the corresponding Ethereum transaction. Size should be 32 bytes
     pub eth_hash: Vec<u8>,
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,

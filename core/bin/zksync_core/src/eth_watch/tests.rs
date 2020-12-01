@@ -12,6 +12,7 @@ use tokio::sync::RwLock;
 struct FakeStorage {
     withdrawal_txs: Vec<CompleteWithdrawalsTx>,
 }
+
 impl FakeStorage {
     fn new() -> Self {
         Self {
@@ -31,21 +32,21 @@ impl Storage for FakeStorage {
     }
 }
 
-struct FakeEthClient {
+struct FakeEthClientData {
     priority_ops: HashMap<u64, Vec<PriorityOp>>,
     withdrawals: HashMap<u64, Vec<CompleteWithdrawalsTx>>,
     last_block_number: u64,
-    // pending_withdrawals: HashMap<u64, Log>,
 }
-impl FakeEthClient {
+
+impl FakeEthClientData {
     fn new() -> Self {
         Self {
             priority_ops: Default::default(),
             withdrawals: Default::default(),
             last_block_number: 0,
-            // pending_withdrawals: Default::default(),
         }
     }
+
     fn add_operations(&mut self, ops: &[PriorityOp]) {
         for op in ops {
             self.last_block_number = max(op.eth_block, self.last_block_number);
@@ -55,9 +56,27 @@ impl FakeEthClient {
                 .push(op.clone());
         }
     }
-    fn block_to_number(&self, block: &BlockNumber) -> u64 {
+}
+
+#[derive(Clone)]
+struct FakeEthClient {
+    inner: Arc<RwLock<FakeEthClientData>>,
+}
+
+impl FakeEthClient {
+    fn new() -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(FakeEthClientData::new())),
+        }
+    }
+
+    async fn add_operations(&mut self, ops: &[PriorityOp]) {
+        self.inner.write().await.add_operations(ops);
+    }
+
+    async fn block_to_number(&self, block: &BlockNumber) -> u64 {
         match block {
-            BlockNumber::Latest => self.last_block_number,
+            BlockNumber::Latest => self.inner.read().await.last_block_number,
             BlockNumber::Earliest => 0,
             BlockNumber::Pending => unreachable!(),
             BlockNumber::Number(number) => number.as_u64(),
@@ -72,11 +91,11 @@ impl EthClient for FakeEthClient {
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<PriorityOp>, anyhow::Error> {
-        let from = self.block_to_number(&from);
-        let to = self.block_to_number(&to);
+        let from = self.block_to_number(&from).await;
+        let to = self.block_to_number(&to).await;
         let mut operations = vec![];
         for number in from..=to {
-            if let Some(ops) = self.priority_ops.get(&number) {
+            if let Some(ops) = self.inner.read().await.priority_ops.get(&number) {
                 operations.extend_from_slice(ops);
             }
         }
@@ -88,11 +107,11 @@ impl EthClient for FakeEthClient {
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<CompleteWithdrawalsTx>, anyhow::Error> {
-        let from = self.block_to_number(&from);
-        let to = self.block_to_number(&to);
+        let from = self.block_to_number(&from).await;
+        let to = self.block_to_number(&to).await;
         let mut withdrawals = vec![];
         for number in from..=to {
-            if let Some(ops) = self.withdrawals.get(&number) {
+            if let Some(ops) = self.inner.read().await.withdrawals.get(&number) {
                 withdrawals.extend_from_slice(ops);
             }
         }
@@ -100,7 +119,7 @@ impl EthClient for FakeEthClient {
     }
 
     async fn block_number(&self) -> Result<u64, anyhow::Error> {
-        Ok(self.last_block_number)
+        Ok(self.inner.read().await.last_block_number)
     }
 
     async fn get_auth_fact(
@@ -108,64 +127,18 @@ impl EthClient for FakeEthClient {
         _address: Address,
         _nonce: u32,
     ) -> Result<Vec<u8>, anyhow::Error> {
-        unimplemented!()
+        unreachable!()
     }
 
     async fn get_first_pending_withdrawal_index(&self) -> Result<u32, anyhow::Error> {
-        unimplemented!()
+        unreachable!()
     }
 
     async fn get_number_of_pending_withdrawals(&self) -> Result<u32, anyhow::Error> {
-        unimplemented!()
+        unreachable!()
     }
 }
 
-#[async_trait::async_trait]
-impl EthClient for Arc<RwLock<FakeEthClient>> {
-    async fn get_priority_op_events(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> anyhow::Result<Vec<PriorityOp>> {
-        (*self).read().await.get_priority_op_events(from, to).await
-    }
-
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> anyhow::Result<Vec<CompleteWithdrawalsTx>> {
-        (*self)
-            .read()
-            .await
-            .get_complete_withdrawals_event(from, to)
-            .await
-    }
-
-    async fn block_number(&self) -> anyhow::Result<u64> {
-        (*self).read().await.block_number().await
-    }
-
-    async fn get_auth_fact(&self, address: Address, nonce: u32) -> anyhow::Result<Vec<u8>> {
-        (*self).read().await.get_auth_fact(address, nonce).await
-    }
-
-    async fn get_first_pending_withdrawal_index(&self) -> anyhow::Result<u32> {
-        (*self)
-            .read()
-            .await
-            .get_first_pending_withdrawal_index()
-            .await
-    }
-
-    async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32> {
-        (*self)
-            .read()
-            .await
-            .get_number_of_pending_withdrawals()
-            .await
-    }
-}
 fn create_watcher<T: EthClient>(client: T) -> EthWatch<T, FakeStorage> {
     let storage = FakeStorage::new();
     EthWatch::new(client, storage, 1)
@@ -174,32 +147,34 @@ fn create_watcher<T: EthClient>(client: T) -> EthWatch<T, FakeStorage> {
 #[tokio::test]
 async fn test_operation_queues() {
     let mut client = FakeEthClient::new();
-    client.add_operations(&vec![
-        PriorityOp {
-            serial_id: 0,
-            data: ZkSyncPriorityOp::Deposit(Deposit {
-                from: Default::default(),
-                token: 0,
-                amount: Default::default(),
-                to: [2u8; 20].into(),
-            }),
-            deadline_block: 0,
-            eth_hash: vec![1, 2, 3, 4, 5],
-            eth_block: 4,
-        },
-        PriorityOp {
-            serial_id: 1,
-            data: ZkSyncPriorityOp::Deposit(Deposit {
-                from: Default::default(),
-                token: 0,
-                amount: Default::default(),
-                to: Default::default(),
-            }),
-            deadline_block: 0,
-            eth_hash: vec![6, 7, 8, 9],
-            eth_block: 3,
-        },
-    ]);
+    client
+        .add_operations(&vec![
+            PriorityOp {
+                serial_id: 0,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: [2u8; 20].into(),
+                }),
+                deadline_block: 0,
+                eth_hash: [2; 32].to_vec(),
+                eth_block: 4,
+            },
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: [3u8; 32].to_vec(),
+                eth_block: 3,
+            },
+        ])
+        .await;
     let mut watcher = create_watcher(client);
     watcher.poll_eth_node().await.unwrap();
     assert_eq!(watcher.eth_state.last_ethereum_block(), 4);
@@ -209,69 +184,73 @@ async fn test_operation_queues() {
     assert_eq!(unconfirmed_queue.len(), 1);
     assert_eq!(unconfirmed_queue[0].serial_id, 0);
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_hash(&[1, 2, 3, 4, 5]).unwrap();
+    watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
     let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
     assert_eq!(deposits.len(), 1);
 }
 
 #[tokio::test]
 async fn test_restore_and_poll() {
-    let client = Arc::new(RwLock::new(FakeEthClient::new()));
-    client.write().await.add_operations(&vec![
-        PriorityOp {
-            serial_id: 0,
-            data: ZkSyncPriorityOp::Deposit(Deposit {
-                from: Default::default(),
-                token: 0,
-                amount: Default::default(),
-                to: [2u8; 20].into(),
-            }),
-            deadline_block: 0,
-            eth_hash: vec![1, 2, 3, 4, 5],
-            eth_block: 4,
-        },
-        PriorityOp {
-            serial_id: 1,
-            data: ZkSyncPriorityOp::Deposit(Deposit {
-                from: Default::default(),
-                token: 0,
-                amount: Default::default(),
-                to: Default::default(),
-            }),
-            deadline_block: 0,
-            eth_hash: vec![6, 7, 8, 9],
-            eth_block: 3,
-        },
-    ]);
+    let mut client = FakeEthClient::new();
+    client
+        .add_operations(&vec![
+            PriorityOp {
+                serial_id: 0,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: [2u8; 20].into(),
+                }),
+                deadline_block: 0,
+                eth_hash: [2; 32].to_vec(),
+                eth_block: 4,
+            },
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: [3u8; 32].to_vec(),
+                eth_block: 3,
+            },
+        ])
+        .await;
 
     let mut watcher = create_watcher(client.clone());
     watcher.restore_state_from_eth(4).await.unwrap();
-    client.write().await.add_operations(&vec![
-        PriorityOp {
-            serial_id: 3,
-            data: ZkSyncPriorityOp::Deposit(Deposit {
-                from: Default::default(),
-                token: 0,
-                amount: Default::default(),
-                to: [2u8; 20].into(),
-            }),
-            deadline_block: 0,
-            eth_hash: vec![1, 2, 3, 4, 5],
-            eth_block: 5,
-        },
-        PriorityOp {
-            serial_id: 4,
-            data: ZkSyncPriorityOp::Deposit(Deposit {
-                from: Default::default(),
-                token: 0,
-                amount: Default::default(),
-                to: Default::default(),
-            }),
-            deadline_block: 0,
-            eth_hash: vec![6, 7, 8, 9],
-            eth_block: 5,
-        },
-    ]);
+    client
+        .add_operations(&vec![
+            PriorityOp {
+                serial_id: 3,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: [2u8; 20].into(),
+                }),
+                deadline_block: 0,
+                eth_hash: [2; 32].to_vec(),
+                eth_block: 5,
+            },
+            PriorityOp {
+                serial_id: 4,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: [3u8; 32].to_vec(),
+                eth_block: 5,
+            },
+        ])
+        .await;
     watcher.poll_eth_node().await.unwrap();
     assert_eq!(watcher.eth_state.last_ethereum_block(), 5);
     let priority_queues = watcher.eth_state.priority_queue();
@@ -280,7 +259,7 @@ async fn test_restore_and_poll() {
     assert_eq!(unconfirmed_queue.len(), 2);
     assert_eq!(unconfirmed_queue[0].serial_id, 3);
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_hash(&[1, 2, 3, 4, 5]).unwrap();
+    watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
     let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
     assert_eq!(deposits.len(), 1);
 }
