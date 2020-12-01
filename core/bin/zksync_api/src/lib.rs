@@ -24,12 +24,7 @@ pub fn run_api(
     let config_options = ConfigurationOptions::from_env();
     let admin_server_options = AdminServerOptions::from_env();
 
-    let ticker_task = run_ticker_task(
-        config_options.token_price_source.clone(),
-        config_options.ticker_fast_processing_coeff,
-        connection_pool.clone(),
-        ticker_request_receiver,
-    );
+    let ticker_task = run_ticker_task(connection_pool.clone(), ticker_request_receiver);
 
     start_api_server(
         connection_pool,
