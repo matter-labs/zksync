@@ -89,7 +89,9 @@ fn get_test_ticker_config() -> TickerConfig {
             .collect(),
         not_subsidized_tokens: vec![
             Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
-        ],
+        ]
+        .into_iter()
+        .collect(),
     }
 }
 
@@ -155,7 +157,7 @@ fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
 
 #[test]
 fn test_ticker_formula() {
-    let validator = FeeTokenValidator::new(HashMap::new());
+    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
 
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(
@@ -251,7 +253,7 @@ fn test_ticker_formula() {
 
 #[test]
 fn test_fee_for_unsubsidized_tokens() {
-    let validator = FeeTokenValidator::new(HashMap::new());
+    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
 
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(
