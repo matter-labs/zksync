@@ -151,31 +151,28 @@ mod utils_with_vectors {
 #[cfg(test)]
 mod signatures_with_vectors {
     use super::*;
-    use zksync::{signer::Signer, Provider, Wallet, WalletCredentials};
+    use zksync::{signer::Signer, WalletCredentials};
     use zksync_config::test_config::unit_vectors::{EthSignature, Tx};
     use zksync_eth_signer::PrivateKeySigner;
     use zksync_types::{network::Network, AccountId, Address, H256};
 
     async fn get_signer(
-        private_key_raw: &[u8],
+        eth_private_key_raw: &[u8],
         from_address: Address,
         account_id: AccountId,
     ) -> Signer<PrivateKeySigner> {
-        let eth_signer = PrivateKeySigner::new(H256::from_slice(private_key_raw));
+        let eth_private_key = H256::from_slice(eth_private_key_raw);
+        let eth_signer = PrivateKeySigner::new(eth_private_key);
 
-        let creds =
-            WalletCredentials::from_eth_signer(from_address, eth_signer, Network::Localhost)
-                .await
-                .unwrap();
+        let creds = WalletCredentials::from_eth_signer(from_address, eth_signer, Network::Mainnet)
+            .await
+            .unwrap();
 
-        let provider = Provider::new(Network::Localhost);
-        let wallet = Wallet::new(provider, creds).await.unwrap();
-        let Wallet { mut signer, .. } = wallet;
+        let mut signer = Signer::with_credentials(creds);
         signer.set_account_id(Some(account_id));
         signer
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_transfer_signature() {
         let test_vectors = TestVectorsConfig::load();
@@ -231,7 +228,6 @@ mod signatures_with_vectors {
         }
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_withdraw_signature() {
         let test_vectors = TestVectorsConfig::load();
@@ -287,7 +283,6 @@ mod signatures_with_vectors {
         }
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_change_pubkey_signature() {
         let test_vectors = TestVectorsConfig::load();
@@ -344,7 +339,6 @@ mod signatures_with_vectors {
         }
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_forced_exit_signature() {
         let test_vectors = TestVectorsConfig::load();

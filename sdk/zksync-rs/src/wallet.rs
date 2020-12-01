@@ -25,13 +25,9 @@ impl<S: EthereumSigner + Clone> Wallet<S> {
         provider: Provider,
         credentials: WalletCredentials<S>,
     ) -> Result<Self, ClientError> {
-        let mut signer = Signer::new(
-            credentials.zksync_private_key,
-            credentials.eth_address,
-            credentials.eth_signer,
-        );
-
         let account_info = provider.account_info(credentials.eth_address).await?;
+
+        let mut signer = Signer::with_credentials(credentials);
         signer.set_account_id(account_info.id);
 
         let tokens = TokensCache::new(provider.tokens().await?);

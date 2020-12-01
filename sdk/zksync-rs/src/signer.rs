@@ -9,6 +9,8 @@ use num::BigUint;
 use zksync_crypto::PrivateKey;
 use zksync_types::tx::{ChangePubKey, PackedEthSignature};
 use zksync_types::{AccountId, Address, ForcedExit, Nonce, PubKeyHash, Token, Transfer, Withdraw};
+// Local imports
+use crate::WalletCredentials;
 
 fn signing_failed_error(err: impl ToString) -> SignerError {
     SignerError::SigningFailed(err.to_string())
@@ -46,6 +48,15 @@ impl<S: EthereumSigner> Signer<S> {
             eth_signer,
             account_id: None,
         }
+    }
+
+    /// Construct a `Signer` with the given credentials
+    pub fn with_credentials(credentials: WalletCredentials<S>) -> Self {
+        Self::new(
+            credentials.zksync_private_key,
+            credentials.eth_address,
+            credentials.eth_signer,
+        )
     }
 
     pub fn pubkey_hash(&self) -> &PubKeyHash {
