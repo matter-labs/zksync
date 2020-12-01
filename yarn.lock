@@ -13774,15 +13774,15 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
-zksync-crypto@^0.4.1:
-  version "0.4.1"
-  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.4.1.tgz#1093f2dac2f6c126effa878f25fa44fa48f12246"
-  integrity sha512-y8GwqIKEbnJjnHKYBffnhvSmkxp43lLOApI2VuZ3kzIni+HFTlSsNDDSJAvXv10GRldMomv2MzTJq/LxZJgKmA==
+zksync-crypto@^0.4.2:
+  version "0.4.2"
+  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.4.2.tgz#58dd8629ce222f14b3ad83f2c50a68fec6363974"
+  integrity sha512-PQw0e7t80uP7c5LHonEh4dS4wGpK2TC4uYR/16jcDCaCS2wY/exF37hAOeQiskb0hnU2C6/jqtvBMbsMTzVh7Q==
 
 "zksync@link:sdk/zksync.js":
-  version "0.8.1"
+  version "0.8.3"
   dependencies:
     axios "^0.21.0"
     websocket "^1.0.30"
     websocket-as-promised "^1.1.0"
-    zksync-crypto "^0.4.1"
+    zksync-crypto "^0.4.2"
