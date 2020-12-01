@@ -20,12 +20,14 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let tester: Tester;
     let alice: Wallet;
     let bob: Wallet;
+    let chuck: Wallet;
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport);
         alice = await tester.fundedWallet('5.0');
         bob = await tester.emptyWallet();
+        chuck = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
 
@@ -59,11 +61,19 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a transfer to new account', async () => {
-        await tester.testTransfer(alice, bob, token, TX_AMOUNT);
+        await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
+    });
+
+    step('should execute a transfer to existing account', async () => {
+        await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
 
     it('should execute a transfer to self', async () => {
         await tester.testTransfer(alice, alice, token, TX_AMOUNT);
+    });
+
+    step('should change pubkey offchain', async () => {
+        await tester.testChangePubKey(chuck, token, false);
     });
 
     step('should test multi-transfers', async () => {
@@ -78,14 +88,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should execute a ForcedExit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
-    });
-    
-    step('should execute a transfer to existing account', async () => {
-        await tester.testTransfer(alice, bob, token, TX_AMOUNT);
-    });
-
-    step('should change pubkey offchain', async () => {
-        await tester.testChangePubKey(bob, token, false);
     });
 
     it('should check collected fees', async () => {
