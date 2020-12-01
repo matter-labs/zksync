@@ -1,9 +1,9 @@
 // Built-in deps
-use std::{env, net::SocketAddr, str::FromStr, time::Duration};
+use std::{collections::HashSet, env, net::SocketAddr, str::FromStr, time::Duration};
 // External uses
 use url::Url;
 // Workspace uses
-use zksync_basic_types::{H160, H256};
+use zksync_basic_types::{Address, H256};
 use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
 
@@ -133,6 +133,37 @@ impl MiniblockTimings {
     }
 }
 
+/// Configuration options related to fee ticker.
+#[derive(Debug)]
+pub struct FeeTickerOptions {
+    /// Source to fetch token prices from (e.g. CoinGecko or coinmarketcap).
+    pub token_price_source: TokenPriceSource,
+    /// Fee increase coefficient for fast processing of withdrawal.
+    pub fast_processing_coeff: f64,
+    /// List of the tokens that aren't acceptable for paying fee in.
+    pub disabled_tokens: HashSet<Address>,
+    /// Tokens for which subsidies are disabled.
+    pub not_subsidized_tokens: HashSet<Address>,
+}
+
+impl FeeTickerOptions {
+    fn comma_separated_addresses(name: &str) -> HashSet<Address> {
+        get_env(name)
+            .split(',')
+            .map(|p| p.parse().unwrap())
+            .collect()
+    }
+
+    pub fn from_env() -> Self {
+        Self {
+            token_price_source: TokenPriceSource::from_env(),
+            fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
+            disabled_tokens: Self::comma_separated_addresses("TICKER_DISABLED_TOKENS"),
+            not_subsidized_tokens: Self::comma_separated_addresses("NOT_SUBSIDIZED_TOKENS"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
@@ -142,10 +173,10 @@ pub struct ConfigurationOptions {
     pub core_server_url: String,
     pub web3_url: String,
     pub genesis_tx_hash: H256,
-    pub contract_eth_addr: H160,
-    pub governance_eth_addr: H160,
-    pub operator_fee_eth_addr: H160,
-    pub operator_commit_eth_addr: H160,
+    pub contract_eth_addr: Address,
+    pub governance_eth_addr: Address,
+    pub operator_fee_eth_addr: Address,
+    pub operator_commit_eth_addr: Address,
     pub operator_private_key: Option<H256>,
     pub chain_id: u8,
     pub gas_price_factor: f64,
@@ -159,10 +190,7 @@ pub struct ConfigurationOptions {
     pub idle_provers: u32,
     pub miniblock_timings: MiniblockTimings,
     pub prometheus_export_port: u16,
-    pub token_price_source: TokenPriceSource,
     pub witness_generators: usize,
-    /// Fee increase coefficient for fast processing of withdrawal.
-    pub ticker_fast_processing_coeff: f64,
     pub forced_exit_minimum_account_age: Duration,
     pub enforce_pubkey_change_fee: bool,
 }
@@ -213,9 +241,7 @@ impl ConfigurationOptions {
             idle_provers: parse_env("IDLE_PROVERS"),
             miniblock_timings: MiniblockTimings::from_env(),
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
-            token_price_source: TokenPriceSource::from_env(),
             witness_generators: parse_env("WITNESS_GENERATORS"),
-            ticker_fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
             forced_exit_minimum_account_age,
             enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
                 .unwrap_or(true),

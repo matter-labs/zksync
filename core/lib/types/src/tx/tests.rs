@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::{
     eddsa::{PrivateKey, PublicKey},
@@ -9,13 +7,11 @@ use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS};
 use zksync_crypto::public_key_from_private;
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
-use lazy_static::lazy_static;
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 use super::*;
 use crate::{
-    account::PubKeyHash,
     helpers::{pack_fee_amount, pack_token_amount},
     AccountId, Engine, TokenId,
 };
@@ -297,87 +293,4 @@ fn test_check_signature() {
         .unwrap();
 
     assert_eq!(hex::encode(signature), "4e3298ac8cc13868dbbc94ad6fb41085ffe05b3c2eee22f88b05e69b7a5126aea723d7a3e7282ef5a32d9479c9c8dde52b3e3c462dd445dcd8158ebb6edb6000");
-}
-
-#[cfg(test)]
-pub mod conversion_test {
-    use super::*;
-
-    // General configuration parameters for all types of operations
-    const ACCOUNT_ID: u32 = 100;
-    const TOKEN_ID: u16 = 5;
-    const NONCE: u32 = 20;
-    lazy_static! {
-        static ref ALICE: Address =
-            Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap();
-        static ref BOB: Address =
-            Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap();
-        static ref PK_HASH: PubKeyHash =
-            PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap();
-        static ref AMOUNT: BigUint = BigUint::from(12345678u64);
-        static ref FEE: BigUint = BigUint::from(1000000u32);
-    }
-
-    #[test]
-    fn test_convert_to_bytes_change_pubkey() {
-        let change_pubkey = ChangePubKey::new(
-            ACCOUNT_ID,
-            *ALICE,
-            *PK_HASH,
-            TOKEN_ID,
-            (*FEE).clone(),
-            NONCE,
-            None,
-            None,
-        );
-
-        let bytes = change_pubkey.get_bytes();
-        assert_eq!(hex::encode(bytes), "07000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd0263cfb9a39096d9e02b24187355f628f9a6331511b00057d0300000014");
-    }
-
-    #[test]
-    fn test_convert_to_bytes_transfer() {
-        let transfer = Transfer::new(
-            ACCOUNT_ID,
-            *ALICE,
-            *BOB,
-            TOKEN_ID,
-            (*AMOUNT).clone(),
-            (*FEE).clone(),
-            NONCE,
-            None,
-        );
-
-        let bytes = transfer.get_bytes();
-        assert_eq!(hex::encode(bytes), "05000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02621abaed8712072e918632259780e587698ef58da000500178c29c07d0300000014");
-    }
-
-    #[test]
-    fn test_convert_to_bytes_forced_exit() {
-        let forced_exit =
-            ForcedExit::new(ACCOUNT_ID, *ALICE, TOKEN_ID, (*FEE).clone(), NONCE, None);
-
-        let bytes = forced_exit.get_bytes();
-        assert_eq!(
-            hex::encode(bytes),
-            "08000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02600057d0300000014"
-        );
-    }
-
-    #[test]
-    fn test_convert_to_bytes_withdraw() {
-        let withdraw = Withdraw::new(
-            ACCOUNT_ID,
-            *ALICE,
-            *BOB,
-            TOKEN_ID,
-            (*AMOUNT).clone(),
-            (*FEE).clone(),
-            NONCE,
-            None,
-        );
-
-        let bytes = withdraw.get_bytes();
-        assert_eq!(hex::encode(bytes), "03000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02621abaed8712072e918632259780e587698ef58da000500000000000000000000000000bc614e7d0300000014");
-    }
 }

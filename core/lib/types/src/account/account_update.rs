@@ -13,6 +13,7 @@ pub enum AccountUpdate {
     Create { address: Address, nonce: Nonce },
     /// Delete an existing account.
     /// Note: Currently this kind of update is not used directly in the network.
+    /// However, it's used to revert made operation (e.g. to restore state back in time from the last verified block).
     Delete { address: Address, nonce: Nonce },
     /// Change the account balance.
     UpdateBalance {
