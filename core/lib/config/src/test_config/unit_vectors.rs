@@ -63,7 +63,7 @@ pub struct TxInput {
     pub eth_private_key: Vec<u8>,
     #[serde(flatten)]
     pub tx: Tx,
-    pub eth_sign_data: EthSignature,
+    pub eth_sign_data: EthSignatureInputs,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,16 +133,16 @@ pub struct ForcedExit {
 //  Thus, the variants are now sorted starting with the most constrained ones.
 //  #[serde(tag = "type", content = "ethSignData")]
 #[serde(untagged)]
-pub enum EthSignature {
-    Transfer(Box<TransferSignature>),
-    Withdraw(Box<WithdrawSignature>),
-    ChangePubKey(Box<ChangePubKeySignature>),
+pub enum EthSignatureInputs {
+    Transfer(Box<TransferSignatureInputs>),
+    Withdraw(Box<WithdrawSignatureInputs>),
+    ChangePubKey(Box<ChangePubKeySignatureInputs>),
     ForcedExit,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TransferSignature {
+pub struct TransferSignatureInputs {
     pub string_amount: String,
     pub string_token: String,
     pub string_fee: String,
@@ -153,7 +153,7 @@ pub struct TransferSignature {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WithdrawSignature {
+pub struct WithdrawSignatureInputs {
     pub string_amount: String,
     pub string_token: String,
     pub string_fee: String,
@@ -164,7 +164,7 @@ pub struct WithdrawSignature {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangePubKeySignature {
+pub struct ChangePubKeySignatureInputs {
     pub pub_key_hash: PubKeyHash,
     pub account_id: AccountId,
     pub nonce: Nonce,
