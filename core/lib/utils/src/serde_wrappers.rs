@@ -76,3 +76,39 @@ impl From<BigUint> for BigUintSerdeWrapper {
         BigUintSerdeWrapper(uint)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// Tests that `Ratio` serializer works correctly.
+    #[test]
+    fn test_ratio_serialize_as_decimal() {
+        #[derive(Clone, Serialize, Deserialize)]
+        struct RatioSerdeWrapper(
+            #[serde(with = "UnsignedRatioSerializeAsDecimal")] pub Ratio<BigUint>,
+        );
+        // It's essential that this number is a finite decimal, otherwise the precision will be lost
+        // and the assertion will fail.
+        let expected = RatioSerdeWrapper(Ratio::new(
+            BigUint::from(120315391195132u64),
+            BigUint::from(1250000000u64),
+        ));
+        let value =
+            serde_json::to_value(expected.clone()).expect("cannot serialize Ratio as Decimal");
+        let ratio: RatioSerdeWrapper =
+            serde_json::from_value(value).expect("cannot deserialize Ratio from Decimal");
+        assert_eq!(expected.0, ratio.0);
+    }
+
+    /// Tests that `BigUint` serializer works correctly.
+    #[test]
+    fn test_serde_big_uint_wrapper() {
+        let expected = BigUint::from(u64::MAX);
+        let wrapper = BigUintSerdeWrapper::from(expected.clone());
+        let value = serde_json::to_value(wrapper).expect("cannot serialize BigUintSerdeWrapper");
+        let uint: BigUintSerdeWrapper =
+            serde_json::from_value(value).expect("cannot deserialize BigUintSerdeWrapper");
+        assert_eq!(uint.0, expected);
+    }
+}

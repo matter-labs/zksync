@@ -24,3 +24,10 @@ pub(crate) const BASE_CHANGE_PUBKEY_OFFCHAIN_COST: u64 = CommitCost::CHANGE_PUBK
 pub(crate) const BASE_CHANGE_PUBKEY_ONCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_ONCHAIN
     + zksync_types::gas_counter::VerifyCost::CHANGE_PUBKEY_COST
     + 1000 * (ChangePubKeyOp::CHUNKS as u64);
+
+// The Subsidized cost of operations.
+// Represent the cost of performing operations after recursion is introduced to mainnet.
+pub(crate) const SUBSIDY_TRANSFER_COST: u64 = 550;
+pub(crate) const SUBSIDY_TRANSFER_TO_NEW_COST: u64 = 550 * 3;
+pub(crate) const SUBSIDY_WITHDRAW_COST: u64 = 45000;
+pub(crate) const SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST: u64 = 10000;
