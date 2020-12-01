@@ -122,7 +122,7 @@ pub fn api_scope(pool: ConnectionPool) -> Scope {
 #[cfg(test)]
 mod tests {
     use super::{
-        super::test_utils::{TestServerConfig, VERIFIED_OP_SERIAL_ID},
+        super::test_utils::{TestServerConfig, COMMITTED_OP_SERIAL_ID, VERIFIED_OP_SERIAL_ID},
         *,
     };
 
@@ -133,13 +133,26 @@ mod tests {
 
         let (client, server) = cfg.start_server(|cfg| api_scope(cfg.pool.clone()));
 
-        assert_eq!(
-            client.priority_op(VERIFIED_OP_SERIAL_ID).await?,
-            Some(PriorityOpReceipt {
-                index: 1,
-                status: TxReceipt::Verified { block: 1 },
-            })
-        );
+        let requests = vec![
+            (
+                VERIFIED_OP_SERIAL_ID,
+                Some(PriorityOpReceipt {
+                    index: 2,
+                    status: TxReceipt::Verified { block: 1 },
+                }),
+            ),
+            (
+                COMMITTED_OP_SERIAL_ID,
+                Some(PriorityOpReceipt {
+                    index: 1,
+                    status: TxReceipt::Committed { block: 4 },
+                }),
+            ),
+        ];
+
+        for (serial_id, expected_op) in requests {
+            assert_eq!(client.priority_op(serial_id).await?, expected_op);
+        }
 
         server.stop().await;
         Ok(())
