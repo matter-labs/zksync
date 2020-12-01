@@ -63,9 +63,12 @@ async function getTransferSignVector(
     signer: zksync.Signer,
     ethMessageSigner: zksync.EthMessageSigner
 ): Promise<TxTestEntry> {
+    const ethWallet = new ethers.Wallet(ethPrivateKey);
+    const fromAddress = ethWallet.address;
+
     const transferData = {
         accountId: 44,
-        from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
+        from: fromAddress,
         to: '0x19aa2ed8712072e918632259780e587698ef58df',
         tokenId: 0,
         amount: '1000000000000',
@@ -108,9 +111,12 @@ async function getChangePubKeySignVector(
     signer: zksync.Signer,
     ethMessageSigner: zksync.EthMessageSigner
 ): Promise<TxTestEntry> {
+    const ethWallet = new ethers.Wallet(ethPrivateKey);
+    const fromAddress = ethWallet.address;
+
     const changePubKeyData = {
         accountId: 55,
-        account: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
+        account: fromAddress,
         newPkHash: await signer.pubKeyHash(),
         feeTokenId: 0,
         fee: '1000000000',
@@ -149,9 +155,12 @@ async function getWithdrawSignVector(
     signer: zksync.Signer,
     ethMessageSigner: zksync.EthMessageSigner
 ): Promise<TxTestEntry> {
+    const ethWallet = new ethers.Wallet(ethPrivateKey);
+    const fromAddress = ethWallet.address;
+
     const withdrawData = {
         accountId: 44,
-        from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
+        from: fromAddress,
         ethAddress: '0x19aa2ed8712072e918632259780e587698ef58df',
         tokenId: 0,
         amount: '1000000000000',
@@ -190,9 +199,12 @@ async function getWithdrawSignVector(
 }
 
 async function getForcedExitSignVector(ethPrivateKey: Uint8Array, signer: zksync.Signer): Promise<TxTestEntry> {
+    const ethWallet = new ethers.Wallet(ethPrivateKey);
+    const fromAddress = ethWallet.address;
+
     const forcedExitData = {
         initiatorAccountId: 44,
-        from: '0xcdb6aaa2607df186f7dd2d8eb4ee60f83720b045',
+        from: fromAddress,
         target: '0x19aa2ed8712072e918632259780e587698ef58df',
         tokenId: 0,
         fee: '1000000',
