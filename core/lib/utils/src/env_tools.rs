@@ -47,3 +47,25 @@ where
         })
         .ok()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_env_tools() {
+        const KEY: &str = "KEY";
+        // Our test environment variable.
+        env::set_var(KEY, "123");
+        assert_eq!(get_env(KEY), "123");
+        assert_eq!(parse_env::<i32>(KEY), 123);
+        assert_eq!(parse_env_if_exists::<i32>(KEY), Some(123));
+
+        env::remove_var(KEY);
+        assert_eq!(parse_env_if_exists::<i32>(KEY), None);
+
+        env::set_var(KEY, "ABC123");
+        let parsed: i32 = parse_env_with(KEY, |key| &key[3..]);
+        assert_eq!(parsed, 123);
+    }
+}
