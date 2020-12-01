@@ -4,6 +4,7 @@
 pub use super::{
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
+    operations::PriorityOpReceipt,
     tokens::TokenPriceKind,
     transactions::{SumbitErrorCode, TxReceipt},
 };

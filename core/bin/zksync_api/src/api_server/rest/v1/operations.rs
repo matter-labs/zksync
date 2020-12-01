@@ -14,7 +14,12 @@ use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::BlockNumber;
 
 // Local uses
-use super::{blocks::BlockInfo, transactions::TxReceipt, Error as ApiError, JsonResult};
+use super::{
+    blocks::BlockInfo,
+    client::{Client, ClientError},
+    transactions::TxReceipt,
+    Error as ApiError, JsonResult,
+};
 
 /// Shared data between `api/v1/operations` endpoints.
 #[derive(Debug, Clone)]
@@ -73,11 +78,24 @@ impl ApiOperationsData {
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PriorityOpReceipt {
-    status: TxReceipt,
-    index: u64,
+    pub status: TxReceipt,
+    pub index: u64,
 }
 
 // Client implementation
+
+/// Operations API part.
+impl Client {
+    /// Gets priority operation receipt.
+    pub async fn priority_op(
+        &self,
+        serial_id: u64,
+    ) -> Result<Option<PriorityOpReceipt>, ClientError> {
+        self.get(&format!("operations/priority_op/{}", serial_id))
+            .send()
+            .await
+    }
+}
 
 // Server implementation
 
@@ -102,4 +120,28 @@ pub fn api_scope(pool: ConnectionPool) -> Scope {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::{
+        super::test_utils::{TestServerConfig, VERIFIED_OP_SERIAL_ID},
+        *,
+    };
+
+    #[actix_rt::test]
+    async fn test_operations_scope() -> anyhow::Result<()> {
+        let cfg = TestServerConfig::default();
+        cfg.fill_database().await?;
+
+        let (client, server) = cfg.start_server(|cfg| api_scope(cfg.pool.clone()));
+
+        assert_eq!(
+            client.priority_op(VERIFIED_OP_SERIAL_ID).await?,
+            Some(PriorityOpReceipt {
+                index: 1,
+                status: TxReceipt::Verified { block: 1 },
+            })
+        );
+
+        server.stop().await;
+        Ok(())
+    }
+}

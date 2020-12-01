@@ -11,13 +11,16 @@ use tokio::sync::Mutex;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
-use zksync_storage::test_data::{
-    dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
-    gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
-};
 use zksync_storage::ConnectionPool;
+use zksync_storage::{
+    chain::operations::records::NewExecutedPriorityOperation,
+    test_data::{
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
+        gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
+    },
+};
 use zksync_test_account::ZkSyncAccount;
-use zksync_types::{ethereum::OperationType, helpers::apply_updates, AccountMap, Action};
+use zksync_types::{ethereum::OperationType, helpers::apply_updates, AccountMap, Action, H256};
 use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     Address, ExecutedOperations, ExecutedTx, Token, ZkSyncOp, ZkSyncTx,
@@ -25,6 +28,9 @@ use zksync_types::{
 
 // Local uses
 use super::client::Client;
+
+/// Serial ID of the verified priority operation
+pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
@@ -269,6 +275,26 @@ impl TestServerConfig {
                     .await?;
             }
         }
+
+        // Store priority operation for some tests.
+        let executed_op = NewExecutedPriorityOperation {
+            block_number: 1,
+            block_index: 1,
+            operation: Default::default(),
+            from_account: Default::default(),
+            to_account: Default::default(),
+            priority_op_serialid: VERIFIED_OP_SERIAL_ID as i64,
+            deadline_block: 100,
+            eth_hash: H256::default().as_bytes().to_vec(),
+            eth_block: 10,
+            created_at: chrono::Utc::now(),
+        };
+
+        storage
+            .chain()
+            .operations_schema()
+            .store_executed_priority_op(executed_op)
+            .await?;
 
         storage.commit().await?;
         // Storage has been inited, so we can safely drop this guard.
