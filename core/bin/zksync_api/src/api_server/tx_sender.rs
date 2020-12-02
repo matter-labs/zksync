@@ -582,7 +582,7 @@ async fn verify_txs_batch_signature(
 /// Scales the fee provided by user up to check whether the provided fee is enough to cover our expenses for
 /// maintaining the protocol.
 ///
-/// We allow fee to be the greater of 5% or one cent off the required fee.
+/// We calculate both `provided_fee * 1.05` and `provided_fee + 1 cent` and choose the maximum.
 /// This is required since the price may change between signing the transaction and sending it to the server.
 fn scale_user_fee_up(provided_total_usd_fee: BigDecimal) -> BigDecimal {
     // Scale by 5%.
