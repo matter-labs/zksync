@@ -61,17 +61,29 @@ pub struct TxInput {
     #[serde(with = "ZeroPrefixHexSerde")]
     pub eth_private_key: Vec<u8>,
     #[serde(flatten)]
-    pub tx: Tx,
-    pub eth_sign_data: EthSignatureInputs,
+    pub data: TxData,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", content = "data")]
-pub enum Tx {
-    Transfer(Box<Transfer>),
-    Withdraw(Box<Withdraw>),
-    ChangePubKey(Box<ChangePubKey>),
-    ForcedExit(Box<ForcedExit>),
+#[serde(tag = "type")]
+pub enum TxData {
+    #[serde(rename_all = "camelCase")]
+    Transfer {
+        data: Box<Transfer>,
+        eth_sign_data: TransferSignatureInputs,
+    },
+    #[serde(rename_all = "camelCase")]
+    Withdraw {
+        data: Box<Withdraw>,
+        eth_sign_data: WithdrawSignatureInputs,
+    },
+    #[serde(rename_all = "camelCase")]
+    ChangePubKey {
+        data: Box<ChangePubKey>,
+        eth_sign_data: ChangePubKeySignatureInputs,
+    },
+    #[serde(rename_all = "camelCase")]
+    ForcedExit { data: Box<ForcedExit> },
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,19 +136,6 @@ pub struct ForcedExit {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     pub nonce: Nonce,
-}
-
-#[derive(Debug, Deserialize)]
-// TODO: find a way to tag the variants.
-//  The field "type" cannot tag both `Tx` and `EthSignature`.
-//  Thus, the variants are now sorted starting with the most constrained ones.
-//  #[serde(tag = "type", content = "ethSignData")]
-#[serde(untagged)]
-pub enum EthSignatureInputs {
-    Transfer(Box<TransferSignatureInputs>),
-    Withdraw(Box<WithdrawSignatureInputs>),
-    ChangePubKey(Box<ChangePubKeySignatureInputs>),
-    ForcedExit,
 }
 
 #[derive(Debug, Deserialize)]

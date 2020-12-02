@@ -152,7 +152,7 @@ mod utils_with_vectors {
 mod signatures_with_vectors {
     use super::*;
     use zksync::{signer::Signer, WalletCredentials};
-    use zksync_config::test_config::unit_vectors::{EthSignatureInputs, Tx};
+    use zksync_config::test_config::unit_vectors::TxData;
     use zksync_eth_signer::PrivateKeySigner;
     use zksync_types::{network::Network, AccountId, Address, H256};
 
@@ -177,14 +177,11 @@ mod signatures_with_vectors {
     async fn test_transfer_signature() {
         let test_vectors = TestVectorsConfig::load();
         for TestEntry { inputs, outputs } in test_vectors.transactions.items {
-            if let Tx::Transfer(transfer_tx) = &inputs.tx {
-                let sign_data =
-                    if let EthSignatureInputs::Transfer(sign_data) = inputs.eth_sign_data {
-                        sign_data
-                    } else {
-                        panic!("Signature data does not match transaction type (transfer)")
-                    };
-
+            if let TxData::Transfer {
+                data: transfer_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
                 let signer = get_signer(
                     &inputs.eth_private_key,
                     transfer_tx.from,
@@ -233,14 +230,11 @@ mod signatures_with_vectors {
     async fn test_withdraw_signature() {
         let test_vectors = TestVectorsConfig::load();
         for TestEntry { inputs, outputs } in test_vectors.transactions.items {
-            if let Tx::Withdraw(withdraw_tx) = &inputs.tx {
-                let sign_data =
-                    if let EthSignatureInputs::Withdraw(sign_data) = inputs.eth_sign_data {
-                        sign_data
-                    } else {
-                        panic!("Signature data does not match transaction type (withdraw)")
-                    };
-
+            if let TxData::Withdraw {
+                data: withdraw_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
                 let signer = get_signer(
                     &inputs.eth_private_key,
                     withdraw_tx.from,
@@ -289,14 +283,11 @@ mod signatures_with_vectors {
     async fn test_change_pubkey_signature() {
         let test_vectors = TestVectorsConfig::load();
         for TestEntry { inputs, outputs } in test_vectors.transactions.items {
-            if let Tx::ChangePubKey(change_pubkey_tx) = &inputs.tx {
-                let sign_data =
-                    if let EthSignatureInputs::ChangePubKey(sign_data) = inputs.eth_sign_data {
-                        sign_data
-                    } else {
-                        panic!("Signature data does not match transaction type (change pub key)")
-                    };
-
+            if let TxData::ChangePubKey {
+                data: change_pubkey_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
                 let mut signer = get_signer(
                     &inputs.eth_private_key,
                     change_pubkey_tx.account,
@@ -345,12 +336,7 @@ mod signatures_with_vectors {
     async fn test_forced_exit_signature() {
         let test_vectors = TestVectorsConfig::load();
         for TestEntry { inputs, outputs } in test_vectors.transactions.items {
-            if let Tx::ForcedExit(forced_exit) = &inputs.tx {
-                if let EthSignatureInputs::ForcedExit = inputs.eth_sign_data {
-                } else {
-                    panic!("Signature data does not match transaction type (forced exit)")
-                }
-
+            if let TxData::ForcedExit { data: forced_exit } = &inputs.data {
                 let signer = get_signer(
                     &inputs.eth_private_key,
                     forced_exit.from,
