@@ -47,6 +47,7 @@ pub struct EthereumProvider<S: EthereumSigner> {
     tokens_cache: TokensCache,
     eth_client: ETHClient<Http, S>,
     erc20_abi: ethabi::Contract,
+    confirmation_timeout: Duration,
 }
 
 impl<S: EthereumSigner> EthereumProvider<S> {
@@ -87,6 +88,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             eth_client,
             erc20_abi,
             tokens_cache,
+            confirmation_timeout: Duration::from_secs(10),
         })
     }
 
@@ -219,8 +221,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
 
         let signed_tx = if self.tokens_cache.is_eth(token) {
-            let mut options = Options::default();
-            options.value = Some(amount);
+            let options = Options::with(|options| options.value = Some(amount));
             self.eth_client
                 .sign_prepared_tx_for_addr(Vec::new(), to, options)
                 .await
@@ -322,10 +323,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         Ok(transaction_hash)
     }
 
+    /// Sets the timeout to wait for transactions to appear in the Ethereum network.
+    /// By default it is set to 10 seconds.
+    pub fn set_confirmation_timeout(&mut self, timeout: Duration) {
+        self.confirmation_timeout = timeout;
+    }
+
     /// Waits until the transaction is confirmed by the Ethereum blockchain.
     pub async fn wait_for_tx(&self, tx_hash: H256) -> Result<TransactionReceipt, ClientError> {
-        // TODO: Make timeouts configurable, or use high level solution like tokio::retry (#1127).
-        let timeout = Duration::from_secs(10);
         let mut poller = tokio::time::interval(Duration::from_millis(100));
 
         let start = Instant::now();
@@ -339,7 +344,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 return Ok(receipt);
             }
 
-            if start.elapsed() > timeout {
+            if start.elapsed() > self.confirmation_timeout {
                 return Err(ClientError::OperationTimeout);
             }
             poller.tick().await;
