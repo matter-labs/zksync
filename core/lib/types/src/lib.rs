@@ -70,6 +70,7 @@ pub use zksync_basic_types::*;
 pub type AccountMap = zksync_crypto::fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
+pub type SerialId = u64;
 
 use crate::block::Block;
 pub use zksync_crypto::{
