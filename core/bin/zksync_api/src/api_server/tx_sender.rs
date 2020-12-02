@@ -1,7 +1,7 @@
 //! Helper module to submit transactions into the zkSync Network.
 
 // Built-in uses
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 // External uses
 use bigdecimal::BigDecimal;
@@ -10,7 +10,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-use num::{bigint::ToBigInt, BigUint};
+use num::bigint::ToBigInt;
 use thiserror::Error;
 
 // Workspace uses
@@ -193,13 +193,19 @@ impl TxSender {
             let required_fee =
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
-            // We allow fee to be 5% off the required fee
-            let scaled_provided_fee =
-                provided_fee.clone() * BigUint::from(105u32) / BigUint::from(100u32);
-            if required_fee.total_fee >= scaled_provided_fee && should_enforce_fee {
-                vlog::warn!(
-                    "User provided fee is too low, required: {:?}, provided: {} (scaled: {}), token: {:?}",
-                    required_fee, provided_fee, scaled_provided_fee, token
+            // Converting `BitUint` to `BigInt` is safe.
+            let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
+            let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
+            // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
+            let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
+            if required_fee >= scaled_provided_fee && should_enforce_fee {
+                log::error!(
+                    "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
+                    required_fee.to_string(),
+                    provided_fee.to_string(),
+                    scaled_provided_fee.to_string(),
+                    (required_fee - scaled_provided_fee).to_string(),
+                    token
                 );
 
                 return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
@@ -284,10 +290,16 @@ impl TxSender {
                         * &token_price_in_usd;
             }
         }
-        // We allow fee to be 5% off the required fee
-        let scaled_provided_fee_in_usd =
-            provided_total_usd_fee.clone() * BigDecimal::from(105u32) / BigDecimal::from(100u32);
+        // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
+        let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
         if required_total_usd_fee >= scaled_provided_fee_in_usd {
+            log::error!(
+                "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
+                required_total_usd_fee.to_string(),
+                provided_total_usd_fee.to_string(),
+                scaled_provided_fee_in_usd.to_string(),
+                (required_total_usd_fee - scaled_provided_fee_in_usd).to_string(),
+            );
             return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
         }
 
@@ -565,4 +577,25 @@ async fn verify_txs_batch_signature(
     };
 
     send_verify_request_and_recv(request, req_channel, receiver).await
+}
+
+/// Scales the fee provided by user up to check whether the provided fee is enough to cover our expenses for
+/// maintaining the protocol.
+///
+/// We allow fee to be the greater of 5% or one cent off the required fee.
+/// This is required since the price may change between signing the transaction and sending it to the server.
+fn scale_user_fee_up(provided_total_usd_fee: BigDecimal) -> BigDecimal {
+    // Scale by 5%.
+    let scaled_percent_provided_fee_in_usd =
+        provided_total_usd_fee.clone() * BigDecimal::from(105u32) / BigDecimal::from(100u32);
+
+    // Scale by 1 cent.
+    let scaled_one_cent_provided_fee_in_usd =
+        provided_total_usd_fee + BigDecimal::from_str("0.01").unwrap();
+
+    // Choose the maximum of these two values.
+    std::cmp::max(
+        scaled_percent_provided_fee_in_usd,
+        scaled_one_cent_provided_fee_in_usd,
+    )
 }
