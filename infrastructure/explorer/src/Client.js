@@ -6,7 +6,9 @@ import {
 import {
     BlockExplorerClient
 } from './BlockExplorerClient';
-const zksync_promise = import('zksync');
+
+import { Provider } from 'zksync';
+
 import axios from 'axios';
 import * as ethers from 'ethers';
 
@@ -28,8 +30,7 @@ export class Client {
     }
 
     static async new() {
-        const zksync = await zksync_promise;
-        window.syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
+        window.syncProvider = await Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
         const tokensPromise = window.syncProvider.getTokens()
             .then(tokens => {
                 const res = {};
