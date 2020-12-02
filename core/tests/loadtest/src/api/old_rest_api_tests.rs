@@ -203,7 +203,7 @@ impl RestApiClient {
 macro_rules! declare_tests {
     (($builder:expr, $client:expr) => $($method:ident,)*) => {
         $builder $(
-            .append(concat!("rest_api/", stringify!($method)), {
+            .append(concat!("rest/old/", stringify!($method)), {
                 let client = $client.clone();
                 move || {
                     let client = client.clone();

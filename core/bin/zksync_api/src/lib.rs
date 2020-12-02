@@ -1,5 +1,7 @@
 #![recursion_limit = "256"]
 
+pub use crate::api_server::v1::client;
+
 use crate::{api_server::start_api_server, fee_ticker::run_ticker_task};
 use futures::channel::mpsc;
 use zksync_config::{AdminServerOptions, ApiServerOptions, ConfigurationOptions};
