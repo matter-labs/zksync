@@ -72,7 +72,7 @@ const components = {
 
 export default {
     name: 'home',
-    async created() {
+    created() {
         this.update();
     },
     timers: {
