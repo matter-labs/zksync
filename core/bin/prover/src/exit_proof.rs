@@ -54,5 +54,5 @@ pub fn create_exit_proof(
     )?;
 
     info!("Exit proof created: {} s", timer.elapsed().as_secs());
-    Ok((aggreagated_proof, balance))
+    todo!()
 }

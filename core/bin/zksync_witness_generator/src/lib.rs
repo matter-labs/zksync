@@ -8,11 +8,13 @@ use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use zksync_config::{ConfigurationOptions, ProverOptions};
-use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
 // Local deps
 use self::scaler::ScalerOracle;
+use zksync_prover_utils::api::{
+    ProverInputRequest, ProverInputResponse, ProverOutputRequest, WorkingOn,
+};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 mod scaler;
@@ -55,56 +57,42 @@ async fn status() -> actix_web::Result<String> {
     Ok("alive".into())
 }
 
-async fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
-    log::info!("register request for prover with name: {}", r.name);
-    if r.name == "" {
-        return Err(actix_web::error::ErrorBadRequest("empty name"));
-    }
-    let mut storage = data.access_storage().await?;
-    let id = storage
-        .prover_schema()
-        .register_prover(&r.name, r.block_size)
-        .await
-        .map_err(|e| {
-            vlog::warn!("Failed to register prover in the db: {}", e);
-            actix_web::error::ErrorInternalServerError(e)
-        })?;
-    Ok(id.to_string())
-}
-
-async fn block_to_prove(
+async fn get_job(
     data: web::Data<AppState>,
-    r: web::Json<ProverReq>,
+    r: web::Json<ProverInputRequest>,
 ) -> actix_web::Result<HttpResponse> {
-    log::trace!("request block to prove from worker: {}", r.name);
-    if r.name == "" {
+    log::trace!("request block to prove from worker: {}", r.prover_name);
+    if r.prover_name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
-    let ret = storage
-        .prover_schema()
-        .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
-        .await
-        .map_err(|e| {
-            vlog::warn!("could not get next unverified commit operation: {}", e);
-            actix_web::error::ErrorInternalServerError("storage layer error")
-        })?;
-    if let Some(prover_run) = ret {
-        log::info!(
-            "satisfied request block {} to prove from worker: {}",
-            prover_run.block_number,
-            r.name
-        );
-        Ok(HttpResponse::Ok().json(BlockToProveRes {
-            prover_run_id: prover_run.id,
-            block: prover_run.block_number,
-        }))
-    } else {
-        Ok(HttpResponse::Ok().json(BlockToProveRes {
-            prover_run_id: 0,
-            block: 0,
-        }))
-    }
+    // let ret = storage
+    //     .prover_schema()
+    //     .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
+    //     .await
+    //     .map_err(|e| {
+    //         vlog::warn!("could not get next unverified commit operation: {}", e);
+    //         actix_web::error::ErrorInternalServerError("storage layer error")
+    //     })?;
+    // let ret = ;
+    // if let Some(prover_run) = ret {
+    //     log::info!(
+    //         "satisfied request block {} to prove from worker: {}",
+    //         prover_run.block_number,
+    //         r.name
+    //     );
+    //     Ok(todo!())
+    // // Ok(HttpResponse::Ok().json(ProverInputResponse {
+    // //     job_id: prover_run.id,
+    // //     data: Some(ret.data),
+    // // }))
+    // } else {
+    //     Ok(HttpResponse::Ok().json(ProverInputResponse {
+    //         job_id: 0,
+    //         data: todo!(),
+    //     }))
+    // }
+    todo!("implement prover get data from storage")
 }
 
 async fn prover_data(
@@ -131,48 +119,46 @@ async fn prover_data(
 
 async fn working_on(
     data: web::Data<AppState>,
-    r: web::Json<WorkingOnReq>,
+    r: web::Json<WorkingOn>,
 ) -> actix_web::Result<HttpResponse> {
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
-    log::trace!(
-        "Received heartbeat for prover_run with id: {}",
-        r.prover_run_id
-    );
-    let mut storage = data
-        .access_storage()
-        .await
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-    storage
-        .prover_schema()
-        .record_prover_is_working(r.prover_run_id)
-        .await
-        .map_err(|e| {
-            vlog::warn!("failed to record prover work in progress request: {}", e);
-            actix_web::error::ErrorInternalServerError("storage layer error")
-        })?;
+    log::trace!("Received heartbeat for prover_run with id: {}", r.job_id);
+    // let mut storage = data
+    //     .access_storage()
+    //     .await
+    //     .map_err(actix_web::error::ErrorInternalServerError)?;
+    // storage
+    //     .prover_schema()
+    //     .record_prover_is_working(r.prover_run_id)
+    //     .await
+    //     .map_err(|e| {
+    //         vlog::warn!("failed to record prover work in progress request: {}", e);
+    //         actix_web::error::ErrorInternalServerError("storage layer error")
+    //     })?;
 
     Ok(HttpResponse::Ok().finish())
 }
 
 async fn publish(
     data: web::Data<AppState>,
-    r: web::Json<PublishReq>,
+    r: web::Json<ProverOutputRequest>,
 ) -> actix_web::Result<HttpResponse> {
-    log::info!("Received a proof for block: {}", r.block);
+    log::info!("Received a proof for job: {}", r.job_id);
     let mut storage = data
         .access_storage()
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    if let Err(e) = storage.prover_schema().store_proof(r.block, &r.proof).await {
-        vlog::error!("failed to store received proof: {}", e);
-        let message = if e.to_string().contains("duplicate key") {
-            "duplicate key"
-        } else {
-            "storage layer error"
-        };
-        return Err(actix_web::error::ErrorInternalServerError(message));
-    }
+    todo!("storage implement publish proof");
+    // if let Err(e) = storage.prover_schema().store_proof(r.block, &r.proof).await {
+    //     vlog::error!("failed to store received proof: {}", e);
+    //     let message = if e.to_string().contains("duplicate key") {
+    //         "duplicate key"
+    //     } else {
+    //         "storage layer error"
+    //     };
+    //     return Err(actix_web::error::ErrorInternalServerError(message));
+    // }
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -310,10 +296,8 @@ pub fn run_prover_server(
                         .wrap(actix_web::middleware::Logger::default())
                         .app_data(web::Data::new(app_state))
                         .route("/status", web::get().to(status))
-                        .route("/register", web::post().to(register))
-                        .route("/block_to_prove", web::get().to(block_to_prove))
+                        .route("/get_job", web::get().to(get_job))
                         .route("/working_on", web::post().to(working_on))
-                        .route("/prover_data", web::get().to(prover_data))
                         .route("/publish", web::post().to(publish))
                         .route("/stopped", web::post().to(stopped))
                         .route(

@@ -1,8 +1,13 @@
+use anyhow::Error;
 use std::sync::mpsc;
 use std::time::Duration;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_prover::cli_utils::main_for_prover_impl;
-use zksync_prover::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
+use zksync_prover::{ApiClient, ProverConfig, ProverImpl};
+use zksync_prover_utils::aggregated_proofs::{
+    AggregatedProof, NewProofType, OldProofType, SingleProof,
+};
+use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_utils::get_env;
 
 #[derive(Debug)]
@@ -22,84 +27,29 @@ impl ProverConfig for DummyProverConfig {
 }
 
 #[derive(Debug)]
-struct DummyProver<C> {
-    api_client: C,
-    heartbeat_interval: Duration,
+struct DummyProver {
     config: DummyProverConfig,
 }
 
-impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
+impl ProverImpl for DummyProver {
     type Config = DummyProverConfig;
 
-    fn create_from_config(
-        config: DummyProverConfig,
-        api_client: C,
-        heartbeat_interval: Duration,
-    ) -> Self {
-        DummyProver {
-            api_client,
-            heartbeat_interval,
-            config,
-        }
+    fn create_from_config(config: Self::Config) -> Self {
+        Self { config }
     }
 
-    fn next_round(
-        &self,
-        start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
-    ) -> Result<(), BabyProverError> {
-        let mut block = 0;
-        let mut job_id = 0;
-
-        for block_size in &self.config.block_sizes {
-            let block_to_prove = self.api_client.block_to_prove(*block_size).map_err(|e| {
-                let e = format!("failed to get block to prove {}", e);
-                BabyProverError::Api(e)
-            })?;
-
-            let (current_request_block, current_request_job_id) =
-                block_to_prove.unwrap_or_else(|| {
-                    log::trace!("no block to prove from the server for size: {}", block_size);
-                    (0, 0)
-                });
-
-            if current_request_job_id != 0 {
-                block = current_request_block;
-                job_id = current_request_job_id;
-                break;
+    fn create_proof(&self, data: JobRequestData) -> Result<JobResultData, Error> {
+        let empty_proof = match data {
+            JobRequestData::AggregatedBlockProof(_) => {
+                JobResultData::AggregatedBlockProof(Default::default())
             }
-        }
-
-        // Notify heartbeat routine on new proving block job or None.
-        start_heartbeats_tx
-            .send((job_id, false))
-            .expect("failed to send new job to heartbeat routine");
-        if job_id == 0 {
-            return Ok(());
-        }
-
-        log::info!("got job id: {}, block {}", job_id, block);
-        let _instance = self.api_client.prover_data(block).map_err(|err| {
-            BabyProverError::Api(format!(
-                "could not get prover data for block {}: {}",
-                block, err
-            ))
-        })?;
-
-        log::info!("starting to compute proof for block {}", block,);
-
-        self.api_client
-            .publish(block, EncodedProofPlonk::default())
-            .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
-
-        log::info!("finished and published proof for block {}", block);
-        Ok(())
-    }
-
-    fn get_heartbeat_options(&self) -> (&C, Duration) {
-        (&self.api_client, self.heartbeat_interval)
+            JobRequestData::BlockProof(..) => JobResultData::BlockProof(Default::default()),
+        };
+        Ok(empty_proof)
     }
 }
 
-fn main() {
-    main_for_prover_impl::<DummyProver<zksync_prover::client::ApiClient>>();
+#[tokio::main]
+async fn main() {
+    main_for_prover_impl::<DummyProver>();
 }

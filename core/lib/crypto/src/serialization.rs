@@ -142,6 +142,49 @@ impl VecOptionalFrSerde {
     }
 }
 
+/// Blanket structure implementing serializing/deserializing methods for `Vec<Fr>`.
+///
+/// ## Example:
+///
+/// ```
+/// use zksync_crypto::serialization::VecFrSerde;
+/// use zksync_crypto::Fr;
+/// use serde::{Serialize, Deserialize};
+///
+/// #[derive(Clone, Debug, Serialize, Deserialize)]
+/// pub struct SomeStructure {
+///     #[serde(with = "VeFrSerde")]
+///     pub vec_fr: Vec<Fr>,
+/// }
+/// ```
+pub struct VecFrSerde;
+
+impl VecFrSerde {
+    pub fn serialize<S>(operations: &[Fr], ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut res = Vec::with_capacity(operations.len());
+        for fr in operations.iter() {
+            res.push(fr.to_hex());
+        }
+        Vec::serialize(&res, ser)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Fr>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let str_vec: Vec<String> = Vec::deserialize(deserializer)?;
+        let mut res = Vec::with_capacity(str_vec.len());
+        for s in str_vec.into_iter() {
+            let v = Fr::from_hex(&s).map_err(de::Error::custom)?;
+            res.push(v);
+        }
+        Ok(res)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

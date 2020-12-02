@@ -652,6 +652,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
 
 [[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
+
+[[package]]
 name = "bellman_ce"
 version = "0.3.2"
 source = "git+https://github.com/matter-labs/bellman?branch=dev#2b233f69e2941e91fa24177d3807a75ce333e887"
@@ -5837,10 +5843,12 @@ name = "zksync_prover"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "backoff",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",
+ "futures 0.3.6",
  "hex",
  "log 0.4.11",
  "num",
@@ -5849,7 +5857,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tokio 0.1.22",
+ "tokio 0.2.22",
  "web3 0.13.0",
  "zksync_circuit",
  "zksync_config",
@@ -5866,6 +5874,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "backoff",
+ "base64 0.13.0",
  "lazy_static",
  "log 0.4.11",
  "reqwest",

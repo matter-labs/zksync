@@ -150,7 +150,7 @@ async fn main() {
             .expect("Failed to generate aggreagated proof");
 
         test_setup
-            .execute_verify_commitments(aggreagated_proof)
+            .execute_verify_commitments(todo!())
             .await
             .expect_success();
     }
@@ -213,10 +213,10 @@ async fn main() {
         let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
         let mut aggreagated_proof = gen_aggregate_proof(vks, proof_data, false)
             .expect("Failed to generate aggreagated proof");
-        aggreagated_proof.individual_vk_inputs = block_commitments;
+        // aggreagated_proof.individual_vk_inputs = block_commitments;
 
         let verify_result = test_setup
-            .execute_verify_commitments(aggreagated_proof)
+            .execute_verify_commitments(todo!())
             .await
             .expect_success();
     }

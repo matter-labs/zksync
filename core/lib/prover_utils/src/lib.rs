@@ -127,7 +127,7 @@ impl SetupForStepByStepProver {
         let valid =
             verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         anyhow::ensure!(valid, "proof for block is invalid");
-        Ok(proof)
+        Ok(SingleProof(proof))
     }
 }
 
@@ -175,7 +175,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     anyhow::ensure!(valid, "proof for exit is invalid");
 
     log::info!("Proof for circuit successful");
-    Ok(proof)
+    Ok(SingleProof(proof))
 }
 
 pub fn serialize_proof(
