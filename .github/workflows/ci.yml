@@ -27,6 +27,8 @@ jobs:
       run: |
         rustup update stable
         cargo install  sqlx-cli
+        cargo install  diesel_cli
+
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk
