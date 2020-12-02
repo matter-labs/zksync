@@ -4,13 +4,14 @@
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
     ethereum::OperationType, helpers::apply_updates, AccountMap, AccountUpdate, AccountUpdates,
-    Action, BlockNumber,
+    Action, ActionType, BlockNumber,
 };
 // Local imports
 use super::utils::{get_operation, get_operation_with_txs};
 use crate::{
     chain::{
         block::{records::BlockDetails, BlockSchema},
+        operations::records::NewOperation,
         state::StateSchema,
     },
     ethereum::EthereumSchema,
@@ -837,79 +838,110 @@ async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryRe
     Ok(())
 }
 
-// TODO: Restore this test (#1125).
-// /// Here we create blocks and publish proofs for them in different order
-// #[db_test]
-// async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-//     let _ = env_logger::try_init();
+/// Check that operations are counted correctly.
+#[db_test]
+async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Expect no operations stored.
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::COMMIT, false)
+            .await?,
+        0
+    );
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::VERIFY, false)
+            .await?,
+        0
+    );
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::COMMIT, true)
+            .await?,
+        0
+    );
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::VERIFY, true)
+            .await?,
+        0
+    );
 
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::COMMIT, false).await?,
-//         0
-//     );
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::VERIFY, false).await?,
-//         0
-//     );
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::COMMIT, true).await?,
-//         0
-//     );
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::VERIFY, true).await?,
-//         0
-//     );
+    // Store new operations.
+    for (block_number, action) in &[
+        (1, ActionType::COMMIT),
+        (2, ActionType::COMMIT),
+        (3, ActionType::COMMIT),
+        (4, ActionType::COMMIT),
+        (1, ActionType::VERIFY),
+        (2, ActionType::VERIFY),
+    ] {
+        storage
+            .chain()
+            .operations_schema()
+            .store_operation(NewOperation {
+                block_number: *block_number,
+                action_type: action.to_string(),
+            })
+            .await?;
+    }
 
-//     for (block_number, action) in &[
-//         (1, ActionType::COMMIT),
-//         (2, ActionType::COMMIT),
-//         (3, ActionType::COMMIT),
-//         (4, ActionType::COMMIT),
-//         (1, ActionType::VERIFY),
-//         (2, ActionType::VERIFY),
-//     ] {
-//         diesel::insert_into(operations::table)
-//             .values(NewOperation {
-//                 block_number: *block_number,
-//                 action_type: action.to_string(),
-//             })
-//             .execute(conn.conn())
-//             .expect("operation creation failed");
-//     }
+    // Set all of them confirmed except one.
+    for (block_number, action) in &[
+        (1, ActionType::COMMIT),
+        (2, ActionType::COMMIT),
+        (3, ActionType::COMMIT),
+        (1, ActionType::VERIFY),
+        (2, ActionType::VERIFY),
+    ] {
+        storage
+            .chain()
+            .operations_schema()
+            .confirm_operation(*block_number, *action)
+            .await?;
+    }
 
-//     for (block, action) in &[
-//         (1, ActionType::COMMIT),
-//         (2, ActionType::COMMIT),
-//         (3, ActionType::COMMIT),
-//         (1, ActionType::VERIFY),
-//         (2, ActionType::VERIFY),
-//     ] {
-//         diesel::update(
-//             operations::table
-//                 .filter(operations::block_number.eq(block))
-//                 .filter(operations::action_type.eq(action.to_string())),
-//         )
-//         .set(operations::confirmed.eq(true))
-//         .execute(conn.conn())
-//         .expect("operation update failed");
-//     }
+    // We have one unconfirmed COMMIT operation, the rest is confirmed.
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::COMMIT, false)
+            .await?,
+        1
+    );
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::VERIFY, false)
+            .await?,
+        0
+    );
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::COMMIT, true)
+            .await?,
+        3
+    );
+    assert_eq!(
+        storage
+            .chain()
+            .block_schema()
+            .count_operations(ActionType::VERIFY, true)
+            .await?,
+        2
+    );
 
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::COMMIT, false).await?,
-//         1
-//     );
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::VERIFY, false).await?,
-//         0
-//     );
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::COMMIT, true).await?,
-//         3
-//     );
-//     assert_eq!(
-//         BlockSchema(&mut storage).count_operations(ActionType::VERIFY, true).await?,
-//         2
-//     );
-
-//     Ok(())
-// }
+    Ok(())
+}

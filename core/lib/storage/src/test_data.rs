@@ -101,7 +101,7 @@ pub fn gen_operation_with_txs(
 }
 
 /// Generates EthSignData for testing (not a valid signature)
-pub fn gen_eth_sing_data(message: String) -> EthSignData {
+pub fn gen_eth_sign_data(message: String) -> EthSignData {
     let keypair = Random.generate();
     let private_key = keypair.secret();
 
