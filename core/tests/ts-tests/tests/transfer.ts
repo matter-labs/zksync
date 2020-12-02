@@ -126,7 +126,7 @@ Tester.prototype.testFailedBatch = async function (
 
     let thrown = true;
     try {
-        const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }]);
+        const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }, { ...tx }, { ...tx }, { ...tx }]);
         for (const handle of handles) {
             await handle.awaitVerifyReceipt();
         }
