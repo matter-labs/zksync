@@ -26,7 +26,7 @@ jobs:
     - name: update-deps
       run: |
         rustup update stable
-        cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
+        cargo install --version=0.1.0-beta.1 sqlx-cli
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk
