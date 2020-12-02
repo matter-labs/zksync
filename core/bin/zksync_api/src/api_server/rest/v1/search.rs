@@ -1,4 +1,4 @@
-//! Tokens part of API implementation.
+//! Search part of API implementation.
 
 // Built-in uses
 
@@ -21,7 +21,7 @@ use super::{
     Error as ApiError, JsonResult,
 };
 
-/// Shared data between `api/v1/tokens` endpoints.
+/// Shared data between `api/v1/search` endpoints.
 #[derive(Clone)]
 struct ApiSearchData {
     pool: ConnectionPool,
@@ -82,7 +82,7 @@ impl From<TxHash> for BlockSearchQuery {
     }
 }
 
-/// Tokens API part.
+/// Search API part.
 impl Client {
     /// Performs a block search with an uncertain query, which can be either of:
     ///
