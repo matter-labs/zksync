@@ -2,6 +2,11 @@ import { ethers, Wallet } from 'ethers';
 import { Deployer, readContractCode, readTestContracts, readProductionContracts } from '../src.ts/deploy';
 import { deployContract } from 'ethereum-waffle';
 import { ArgumentParser } from 'argparse';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 (async () => {
     const parser = new ArgumentParser({
@@ -26,7 +31,7 @@ import { ArgumentParser } from 'argparse';
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     provider.pollingInterval = 10;
 
-    const deployWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+    const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
     const contracts = args.prodContracts ? readProductionContracts() : readTestContracts();
     const deployer = new Deployer({ deployWallet, contracts, verbose: true });
     await deployer.deployAll();
@@ -47,7 +52,7 @@ import { ArgumentParser } from 'argparse';
     }
 
     for (let i = 0; i < 10; ++i) {
-        const testWallet = Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).connect(provider);
+        const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/" + i).connect(provider);
         await (await erc20.mint(testWallet.address, '0x4B3B4CA85A86C47A098A224000000000')).wait();
     }
 })();
