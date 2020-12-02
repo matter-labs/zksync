@@ -1,5 +1,5 @@
 // Built-in deps
-use std::{collections::VecDeque, time::Instant};
+use std::{collections::VecDeque, convert::TryFrom, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
@@ -122,7 +122,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 .nonce(),
         });
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "load_txs");
+        metrics::histogram!("sql.chain.mempool.load_txs", start.elapsed());
         Ok(txs.into())
     }
 
@@ -210,7 +210,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .await?;
         }
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "insert_batch");
+        metrics::histogram!("sql.chain.mempool.insert_batch", start.elapsed());
         Ok(batch_id)
     }
 
@@ -238,7 +238,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "insert_tx");
+        metrics::histogram!("sql.chain.mempool.insert_tx", start.elapsed());
         Ok(())
     }
 
@@ -254,7 +254,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "remove_tx");
+        metrics::histogram!("sql.chain.mempool.remove_tx", start.elapsed());
         Ok(())
     }
 
@@ -270,8 +270,51 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "remove_txs");
+        metrics::histogram!("sql.chain.mempool.remove_txs", start.elapsed());
         Ok(())
+    }
+
+    /// Checks if the memory pool contains transaction with the given hash.
+    pub async fn contains_tx(&mut self, tx_hash: TxHash) -> QueryResult<bool> {
+        let start = Instant::now();
+
+        let tx_hash = hex::encode(tx_hash.as_ref());
+
+        let row = sqlx::query!(
+            "SELECT count(*) from mempool_txs
+            WHERE tx_hash = $1",
+            &tx_hash
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .count;
+
+        let contains = row.filter(|&counter| counter > 0).is_some();
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "contains_tx");
+        Ok(contains)
+    }
+
+    /// Returns zkSync transaction with thr given hash.
+    pub async fn get_tx(&mut self, tx_hash: TxHash) -> QueryResult<Option<SignedZkSyncTx>> {
+        let start = Instant::now();
+
+        let tx_hash = hex::encode(tx_hash.as_ref());
+
+        let mempool_tx = sqlx::query_as!(
+            MempoolTx,
+            "SELECT * from mempool_txs
+            WHERE tx_hash = $1",
+            &tx_hash
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_tx");
+        mempool_tx
+            .map(SignedZkSyncTx::try_from)
+            .transpose()
+            .map_err(anyhow::Error::from)
     }
 
     /// Removes transactions that are already committed.
@@ -320,7 +363,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         self.remove_txs(&tx_hashes_to_remove).await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "collect_garbage");
+        metrics::histogram!("sql.chain.mempool.collect_garbage", start.elapsed());
         Ok(())
     }
 }

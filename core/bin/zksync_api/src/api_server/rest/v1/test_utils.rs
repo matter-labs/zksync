@@ -1,6 +1,7 @@
 //! API testing helpers.
 
 // Built-in uses
+use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
@@ -8,7 +9,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::test_data::{
     dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
@@ -19,7 +20,7 @@ use zksync_test_account::ZkSyncAccount;
 use zksync_types::{ethereum::OperationType, helpers::apply_updates, AccountMap, Action};
 use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
-    ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
+    Address, ExecutedOperations, ExecutedTx, Token, ZkSyncOp, ZkSyncTx,
 };
 
 // Local uses
@@ -28,6 +29,7 @@ use super::client::Client;
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
     pub env_options: ConfigurationOptions,
+    pub api_server_options: ApiServerOptions,
     pub pool: ConnectionPool,
 }
 
@@ -35,9 +37,16 @@ impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
             env_options: ConfigurationOptions::from_env(),
+            api_server_options: ApiServerOptions::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct TestTransactions {
+    pub acc: ZkSyncAccount,
+    pub txs: Vec<(ZkSyncTx, ExecutedOperations)>,
 }
 
 impl TestServerConfig {
@@ -58,7 +67,7 @@ impl TestServerConfig {
     }
 
     /// Creates several transactions and the corresponding executed operations.
-    pub fn gen_zk_txs(fee: u64) -> Vec<(ZkSyncTx, ExecutedOperations)> {
+    pub fn gen_zk_txs(fee: u64) -> TestTransactions {
         let from = ZkSyncAccount::rand();
         from.set_account_id(Some(0xdead));
 
@@ -119,7 +128,7 @@ impl TestServerConfig {
             ));
         }
 
-        txs
+        TestTransactions { acc: from, txs }
     }
 
     pub async fn fill_database(&self) -> anyhow::Result<()> {
@@ -148,6 +157,17 @@ impl TestServerConfig {
         // Required since we use `EthereumSchema` in this test.
         storage.ethereum_schema().initialize_eth_data().await?;
 
+        // Insert PHNX token
+        storage
+            .tokens_schema()
+            .store_token(Token::new(
+                1,
+                Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
+                "PHNX",
+                18,
+            ))
+            .await?;
+
         let mut accounts = AccountMap::default();
         let n_committed = 5;
         let n_verified = n_committed - 2;
@@ -163,6 +183,7 @@ impl TestServerConfig {
             // Add transactions to every odd block.
             let txs = if block_number % 2 == 1 {
                 Self::gen_zk_txs(1_000)
+                    .txs
                     .into_iter()
                     .map(|(_tx, op)| op)
                     .collect()

@@ -15,7 +15,7 @@ use futures::{
     future, SinkExt,
 };
 use tokio::task::JoinHandle;
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
@@ -139,6 +139,7 @@ pub async fn run_core(
     panic_notify: mpsc::Sender<bool>,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let config_opts = ConfigurationOptions::from_env();
+    let api_server_options = ApiServerOptions::from_env();
 
     let (proposed_blocks_sender, proposed_blocks_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
@@ -202,10 +203,10 @@ pub async fn run_core(
 
     // Start private API.
     start_private_core_api(
-        config_opts,
         panic_notify.clone(),
         mempool_request_sender,
         eth_watch_req_sender,
+        api_server_options,
     );
 
     let task_futures = vec![

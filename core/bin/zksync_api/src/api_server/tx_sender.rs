@@ -14,7 +14,7 @@ use num::{bigint::ToBigInt, BigUint};
 use thiserror::Error;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::ApiServerOptions;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tx::EthSignData,
@@ -56,6 +56,8 @@ pub enum SubmitError {
     IncorrectTx(String),
     #[error("Transaction adding error: {0}.")]
     TxAdd(TxAddError),
+    #[error("Chosen token is not suitable for paying fees.")]
+    InappropriateFeeToken,
 
     #[error("Communication error with the core server: {0}.")]
     CommunicationCoreServer(String),
@@ -99,16 +101,16 @@ impl TxSender {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config_options: &ConfigurationOptions,
+        api_server_options: &ApiServerOptions,
     ) -> Self {
-        let core_api_client = CoreApiClient::new(config_options.core_server_url.clone());
+        let core_api_client = CoreApiClient::new(api_server_options.core_server_url.clone());
 
         Self::with_client(
             core_api_client,
             connection_pool,
             sign_verify_request_sender,
             ticker_request_sender,
-            config_options,
+            api_server_options,
         )
     }
 
@@ -117,11 +119,11 @@ impl TxSender {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config_options: &ConfigurationOptions,
+        api_server_options: &ApiServerOptions,
     ) -> Self {
-        let enforce_pubkey_change_fee = config_options.enforce_pubkey_change_fee;
+        let enforce_pubkey_change_fee = api_server_options.enforce_pubkey_change_fee;
         let forced_exit_minimum_account_age =
-            chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
+            chrono::Duration::from_std(api_server_options.forced_exit_minimum_account_age)
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
         Self {
@@ -181,6 +183,13 @@ impl TxSender {
             let should_enforce_fee =
                 !matches!(tx_type, TxFeeTypes::ChangePubKey{..}) || self.enforce_pubkey_change_fee;
 
+            let fee_allowed =
+                Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
+
+            if !fee_allowed {
+                return Err(SubmitError::InappropriateFeeToken);
+            }
+
             let required_fee =
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
@@ -234,16 +243,35 @@ impl TxSender {
             let tx_fee_info = tx.0.get_fee_info();
 
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                let fee_allowed =
+                    Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
+                        .await?;
+
+                // In batches, transactions with non-popular token are allowed to be included, but should not
+                // used to pay fees. Fees must be covered by some more common token.
+                if !fee_allowed && provided_fee != 0u64.into() {
+                    return Err(SubmitError::InappropriateFeeToken);
+                }
+
+                let check_token = if fee_allowed {
+                    // For allowed tokens, we perform check in the transaction token (as expected).
+                    token.clone()
+                } else {
+                    // For non-popular tokens we've already checked that the provided fee is 0,
+                    // and the USD price will be checked in ETH.
+                    TokenLike::Id(0)
+                };
+
                 let required_fee = Self::ticker_request(
                     self.ticker_requests.clone(),
                     tx_type,
                     address,
-                    token.clone(),
+                    check_token.clone(),
                 )
                 .await?;
                 let token_price_in_usd = Self::ticker_price_request(
                     self.ticker_requests.clone(),
-                    token.clone(),
+                    check_token.clone(),
                     TokenPriceRequestType::USDForOneWei,
                 )
                 .await?;
@@ -393,7 +421,7 @@ impl TxSender {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
-                tx_type: tx_type.clone(),
+                tx_type,
                 address,
                 token: token.clone(),
                 response: req.0,
@@ -403,6 +431,24 @@ impl TxSender {
 
         let resp = req.1.await.map_err(SubmitError::internal)?;
         resp.map_err(|err| internal_error!(err))
+    }
+
+    async fn token_allowed_for_fees(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+    ) -> Result<bool, SubmitError> {
+        let (sender, receiver) = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::IsTokenAllowed {
+                token: token.clone(),
+                response: sender,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        receiver
+            .await
+            .expect("ticker answer sender dropped")
+            .map_err(SubmitError::internal)
     }
 
     async fn ticker_price_request(
@@ -474,6 +520,15 @@ async fn verify_tx_info_message_signature(
     send_verify_request_and_recv(request, req_channel, receiever).await
 }
 
+pub(crate) fn get_batch_sign_message<'a, I: Iterator<Item = &'a ZkSyncTx>>(txs: I) -> Vec<u8> {
+    tiny_keccak::keccak256(
+        txs.flat_map(|tx| tx.get_bytes())
+            .collect::<Vec<u8>>()
+            .as_slice(),
+    )
+    .to_vec()
+}
+
 /// Send a request for Ethereum signature verification and wait for the response.
 /// Unlike in case of `verify_tx_info_message_signature`, we do not require
 /// every transaction from the batch to be signed. The signature must be obtained
@@ -499,21 +554,15 @@ async fn verify_txs_batch_signature(
         });
     }
     // User is expected to sign hash of the data of all transactions in the batch.
-    let message = tiny_keccak::keccak256(
-        txs.iter()
-            .flat_map(|tx| tx.tx.get_bytes())
-            .collect::<Vec<u8>>()
-            .as_slice(),
-    )
-    .to_vec();
+    let message = get_batch_sign_message(txs.iter().map(|tx| &tx.tx));
     let eth_sign_data = EthSignData { signature, message };
 
-    let (sender, receiever) = oneshot::channel();
+    let (sender, receiver) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
         tx: TxVariant::Batch(txs, eth_sign_data),
         response: sender,
     };
 
-    send_verify_request_and_recv(request, req_channel, receiever).await
+    send_verify_request_and_recv(request, req_channel, receiver).await
 }

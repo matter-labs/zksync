@@ -15,14 +15,14 @@ import {
 import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from './types';
 
 export class Signer {
-    readonly privateKey: Uint8Array;
+    readonly #privateKey: Uint8Array;
 
     private constructor(privKey: Uint8Array) {
-        this.privateKey = privKey;
+        this.#privateKey = privKey;
     }
 
     async pubKeyHash(): Promise<PubKeyHash> {
-        return await privateKeyToPubKeyHash(this.privateKey);
+        return await privateKeyToPubKeyHash(this.#privateKey);
     }
 
     transferSignBytes(transfer: {
@@ -57,7 +57,7 @@ export class Signer {
         nonce: number;
     }): Promise<Transfer> {
         const msgBytes = this.transferSignBytes(transfer);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
             type: 'Transfer',
@@ -113,7 +113,7 @@ export class Signer {
         nonce: number;
     }): Promise<Withdraw> {
         const msgBytes = this.withdrawSignBytes(withdraw);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
             type: 'Withdraw',
@@ -161,7 +161,7 @@ export class Signer {
         nonce: number;
     }): Promise<ForcedExit> {
         const msgBytes = this.forcedExitSignBytes(forcedExit);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
             type: 'ForcedExit',
             initiatorAccountId: forcedExit.initiatorAccountId,
@@ -210,7 +210,7 @@ export class Signer {
         nonce: number;
     }): Promise<ChangePubKey> {
         const msgBytes = this.changePubKeySignBytes(changePubKey);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
             type: 'ChangePubKey',
             accountId: changePubKey.accountId,

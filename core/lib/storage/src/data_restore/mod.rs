@@ -122,7 +122,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 }
             })
             .collect();
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_rollup_ops_blocks");
+        metrics::histogram!("sql.data_restore.load_rollup_ops_blocks", start.elapsed());
         Ok(ops_blocks)
     }
 
@@ -145,7 +145,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_last_watched_block_number");
+        metrics::histogram!(
+            "sql.data_restore.update_last_watched_block_number",
+            start.elapsed()
+        );
         Ok(())
     }
 
@@ -161,7 +164,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_last_watched_block_number");
+        metrics::histogram!(
+            "sql.data_restore.load_last_watched_block_number",
+            start.elapsed()
+        );
         Ok(stored)
     }
 
@@ -227,7 +233,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .update_storage_state(new_state)
             .await?;
         transaction.commit().await?;
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "save_rollup_ops");
+        metrics::histogram!("sql.data_restore.save_rollup_ops", start.elapsed());
         Ok(())
     }
 
@@ -253,7 +259,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "initialize_eth_stats");
+        metrics::histogram!("sql.data_restore.initialize_eth_stats", start.elapsed());
         Ok(())
     }
 
@@ -269,7 +275,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_events_state");
+        metrics::histogram!("sql.data_restore.load_events_state", start.elapsed());
         Ok(events)
     }
 
@@ -291,7 +297,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_storage_state");
+        metrics::histogram!("sql.data_restore.load_storage_state", start.elapsed());
         Ok(state)
     }
 
@@ -310,7 +316,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_storage_state");
+        metrics::histogram!("sql.data_restore.update_storage_state", start.elapsed());
         Ok(())
     }
 
@@ -333,7 +339,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .await?;
         }
         transaction.commit().await?;
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_block_events");
+        metrics::histogram!("sql.data_restore.update_block_events", start.elapsed());
         Ok(())
     }
 }

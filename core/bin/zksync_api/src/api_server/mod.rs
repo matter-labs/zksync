@@ -10,7 +10,7 @@ pub use rest::v1;
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
-use zksync_config::{AdminServerOptions, ConfigurationOptions};
+use zksync_config::{AdminServerOptions, ApiServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
 // Local uses
 use crate::fee_ticker::TickerRequest;
@@ -33,6 +33,7 @@ pub fn start_api_server(
     panic_notify: mpsc::Sender<bool>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
+    api_server_opts: ApiServerOptions,
     admin_server_opts: AdminServerOptions,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
@@ -45,19 +46,22 @@ pub fn start_api_server(
 
     rest::start_server_thread_detached(
         connection_pool.clone(),
-        config_options.rest_api_server_address,
+        api_server_opts.rest_api_server_address,
         config_options.contract_eth_addr,
         panic_notify.clone(),
         ticker_request_sender.clone(),
         sign_check_sender.clone(),
         config_options.clone(),
+        api_server_opts.clone(),
     );
+
     rpc_subscriptions::start_ws_server(
-        &config_options,
         connection_pool.clone(),
         sign_check_sender.clone(),
         ticker_request_sender.clone(),
         panic_notify.clone(),
+        config_options.clone(),
+        api_server_opts.clone(),
     );
 
     admin_server::start_admin_server(
@@ -68,10 +72,11 @@ pub fn start_api_server(
     );
 
     rpc_server::start_rpc_server(
-        config_options,
         connection_pool,
         sign_check_sender,
         ticker_request_sender,
         panic_notify,
+        config_options,
+        api_server_opts,
     );
 }

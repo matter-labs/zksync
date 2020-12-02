@@ -104,7 +104,7 @@ impl OperationNotifier {
             }
         }
 
-        metrics::histogram!("api", start.elapsed(), "notifier" => "handle_new_block");
+        metrics::histogram!("api.notifier.handle_new_block", start.elapsed());
         Ok(())
     }
 
@@ -146,7 +146,7 @@ impl OperationNotifier {
                 }
             }
         }
-        metrics::histogram!("api", start.elapsed(), "notifier" => "handle_executed_operations");
+        metrics::histogram!("api.notifier.handle_executed_operations", start.elapsed());
         Ok(())
     }
 
@@ -216,7 +216,7 @@ impl OperationNotifier {
 
         self.prior_op_subs
             .insert_new(sub_id, sub, serial_id, action)?;
-        metrics::histogram!("api", start.elapsed(), "notifier" => "add_priority_op_sub");
+        metrics::histogram!("api.notifier.add_priority_op_sub", start.elapsed());
         Ok(())
     }
 
@@ -258,7 +258,7 @@ impl OperationNotifier {
         }
 
         self.tx_subs.insert_new(sub_id, sub, hash, action)?;
-        metrics::histogram!("api", start.elapsed(), "notifier" => "add_transaction_sub");
+        metrics::histogram!("api.notifier.add_transaction_sub", start.elapsed());
         Ok(())
     }
 
@@ -276,7 +276,7 @@ impl OperationNotifier {
 
         self.account_subs
             .insert_new(sub_id, sub, account_id, action)?;
-        metrics::histogram!("api", start.elapsed(), "notifier" => "add_account_update_sub");
+        metrics::histogram!("api.notifier.add_account_update_sub", start.elapsed());
         Ok(())
     }
 }
