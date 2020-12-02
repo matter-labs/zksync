@@ -78,6 +78,7 @@ impl ApiOperationsData {
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PriorityOpReceipt {
+    #[serde(flatten)]
     pub status: TxReceipt,
     pub index: u64,
 }
@@ -138,7 +139,7 @@ mod tests {
                 VERIFIED_OP_SERIAL_ID,
                 Some(PriorityOpReceipt {
                     index: 2,
-                    status: TxReceipt::Verified { block: 1 },
+                    status: TxReceipt::Verified { block: 2 },
                 }),
             ),
             (

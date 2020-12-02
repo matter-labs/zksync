@@ -36,7 +36,7 @@ pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
 /// Serial ID of the committed priority operation.
 pub const COMMITTED_OP_SERIAL_ID: u64 = 243;
 /// Number of committed blocks.
-pub const COMMITTED_BLOCKS_COUNT: BlockNumber = 5;
+pub const COMMITTED_BLOCKS_COUNT: BlockNumber = 8;
 /// Number of verified blocks.
 pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
@@ -286,7 +286,7 @@ impl TestServerConfig {
         let ops = vec![
             // Verified priority operation.
             NewExecutedPriorityOperation {
-                block_number: 1,
+                block_number: 2,
                 block_index: 2,
                 operation: Default::default(),
                 from_account: Default::default(),
