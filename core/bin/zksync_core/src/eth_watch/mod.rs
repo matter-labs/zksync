@@ -8,41 +8,46 @@
 // Built-in deps
 use std::{
     collections::HashMap,
-    convert::TryFrom,
     time::{Duration, Instant},
 };
+
 // External uses
-use anyhow::format_err;
 use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
+
 use tokio::{task::JoinHandle, time};
-use web3::{
-    contract::{Contract, Options},
-    types::{Address, BlockNumber, Filter, FilterBuilder, H160},
-    Transport, Web3,
-};
+use web3::types::{Address, BlockNumber};
+
 // Workspace deps
 use zksync_config::ConfigurationOptions;
-use zksync_contracts::zksync_contract;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_storage::ConnectionPool;
-use zksync_types::{
-    ethereum::CompleteWithdrawalsTx,
-    {Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp},
-};
-// Local deps
-use self::{eth_state::ETHState, received_ops::sift_outdated_ops};
+use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
 
+// Local deps
+use self::{
+    client::EthClient,
+    eth_state::ETHState,
+    received_ops::{sift_outdated_ops, ReceivedPriorityOp},
+    storage::Storage,
+};
+
+pub use client::EthHttpClient;
+pub use storage::DBStorage;
+
+mod client;
 mod eth_state;
 mod received_ops;
+mod storage;
+
+#[cfg(test)]
+mod tests;
 
 /// As `infura` may limit the requests, upon error we need to wait for a while
 /// before repeating the request.
 const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
-
-pub type EthBlockId = u64;
 
 /// Ethereum Watcher operating mode.
 ///
@@ -75,56 +80,34 @@ pub enum EthWatchRequest {
     },
     GetUnconfirmedDeposits {
         address: Address,
-        resp: oneshot::Sender<Vec<(EthBlockId, PriorityOp)>>,
+        resp: oneshot::Sender<Vec<PriorityOp>>,
     },
     GetUnconfirmedOpByHash {
         eth_hash: Vec<u8>,
-        resp: oneshot::Sender<Option<(EthBlockId, PriorityOp)>>,
+        resp: oneshot::Sender<Option<PriorityOp>>,
     },
     GetPendingWithdrawalsQueueIndex {
-        resp: oneshot::Sender<Result<u32, anyhow::Error>>,
+        resp: oneshot::Sender<anyhow::Result<u32>>,
     },
 }
 
-pub struct EthWatch<T: Transport> {
-    zksync_contract: (ethabi::Contract, Contract<T>),
+pub struct EthWatch<W: EthClient, S: Storage> {
+    client: W,
+    storage: S,
     eth_state: ETHState,
-    web3: Web3<T>,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
-
     mode: WatcherMode,
-
-    eth_watch_req: mpsc::Receiver<EthWatchRequest>,
-
-    db_pool: ConnectionPool,
 }
 
-impl<T: Transport> EthWatch<T> {
-    pub fn new(
-        web3: Web3<T>,
-        zksync_contract_addr: H160,
-        number_of_confirmations_for_event: u64,
-        eth_watch_req: mpsc::Receiver<EthWatchRequest>,
-        db_pool: ConnectionPool,
-    ) -> Self {
-        let zksync_contract = {
-            (
-                zksync_contract(),
-                Contract::new(web3.eth(), zksync_contract_addr, zksync_contract()),
-            )
-        };
-
+impl<W: EthClient, S: Storage> EthWatch<W, S> {
+    pub fn new(client: W, storage: S, number_of_confirmations_for_event: u64) -> Self {
         Self {
-            zksync_contract,
+            client,
+            storage,
             eth_state: ETHState::default(),
-            web3,
-            eth_watch_req,
-
             mode: WatcherMode::Working,
             number_of_confirmations_for_event,
-
-            db_pool,
         }
     }
 
@@ -133,131 +116,10 @@ impl<T: Transport> EthWatch<T> {
         self.eth_state = new_state;
     }
 
-    fn get_priority_op_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
-        let priority_op_event_topic = self
-            .zksync_contract
-            .0
-            .event("NewPriorityRequest")
-            .expect("main contract abi error")
-            .signature();
-        FilterBuilder::default()
-            .address(vec![self.zksync_contract.1.address()])
-            .from_block(from)
-            .to_block(to)
-            .topics(Some(vec![priority_op_event_topic]), None, None, None)
-            .build()
-    }
-
-    fn get_complete_withdrawals_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
-        let complete_withdrawals_event_topic = self
-            .zksync_contract
-            .0
-            .event("PendingWithdrawalsComplete")
-            .expect("main contract abi error")
-            .signature();
-        FilterBuilder::default()
-            .address(vec![self.zksync_contract.1.address()])
-            .from_block(from)
-            .to_block(to)
-            .topics(
-                Some(vec![complete_withdrawals_event_topic]),
-                None,
-                None,
-                None,
-            )
-            .build()
-    }
-
-    /// Filters and parses the priority operation events from the Ethereum
-    /// within the provided range of blocks.
-    /// Returns the list of priority operations together with the block
-    /// numbers.
-    async fn get_priority_op_events_with_blocks(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Result<Vec<(EthBlockId, PriorityOp)>, anyhow::Error> {
-        let start = Instant::now();
-        let filter = self.get_priority_op_event_filter(from, to);
-        let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await?
-            .into_iter()
-            .map(|event| {
-                let block_number: u64 = event
-                    .block_number
-                    .ok_or_else(|| {
-                        anyhow::format_err!("No block number set in the queue event log")
-                    })?
-                    .as_u64();
-
-                let priority_op = PriorityOp::try_from(event).map_err(|e| {
-                    format_err!("Failed to parse priority queue event log from ETH: {:?}", e)
-                })?;
-
-                Ok((block_number, priority_op))
-            })
-            .collect();
-
-        metrics::histogram!(
-            "eth_watcher.get_priority_op_events_with_blocks",
-            start.elapsed()
-        );
-        result
-    }
-
-    async fn get_priority_op_events(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Result<Vec<PriorityOp>, anyhow::Error> {
-        let start = Instant::now();
-        let filter = self.get_priority_op_event_filter(from, to);
-        let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await?
-            .into_iter()
-            .map(|event| {
-                PriorityOp::try_from(event).map_err(|e| {
-                    format_err!("Failed to parse priority queue event log from ETH: {:?}", e)
-                })
-            })
-            .collect();
-        metrics::histogram!("eth_watcher.get_priority_op_events", start.elapsed());
-        result
-    }
-
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Result<Vec<CompleteWithdrawalsTx>, anyhow::Error> {
-        let start = Instant::now();
-        let filter = self.get_complete_withdrawals_event_filter(from, to);
-        let result = self
-            .web3
-            .eth()
-            .logs(filter)
-            .await?
-            .into_iter()
-            .map(CompleteWithdrawalsTx::try_from)
-            .collect();
-
-        metrics::histogram!(
-            "eth_watcher.get_complete_withdrawals_event",
-            start.elapsed()
-        );
-        result
-    }
-
     async fn get_unconfirmed_ops(
         &mut self,
         current_ethereum_block: u64,
-    ) -> Result<Vec<(EthBlockId, PriorityOp)>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<PriorityOp>> {
         // We want to scan the interval of blocks from the latest one up to the oldest one which may
         // have unconfirmed priority ops.
         // `+ 1` is added because if we subtract number of confirmations, we'll obtain the last block
@@ -268,143 +130,101 @@ impl<T: Transport> EthWatch<T> {
         let block_from = BlockNumber::Number(block_from_number.into());
         let block_to = BlockNumber::Latest;
 
-        let pending_events = self
-            .get_priority_op_events_with_blocks(block_from, block_to)
-            .await?;
-
-        // Collect the unconfirmed operations.
-        let mut unconfirmed_ops = Vec::new();
-
-        for (block_number, priority_op) in pending_events.into_iter() {
-            unconfirmed_ops.push((block_number, priority_op));
-        }
-
-        Ok(unconfirmed_ops)
-    }
-
-    async fn store_complete_withdrawals(
-        &mut self,
-        complete_withdrawals_txs: Vec<CompleteWithdrawalsTx>,
-    ) -> Result<(), anyhow::Error> {
-        let mut storage = self
-            .db_pool
-            .access_storage()
+        self.client
+            .get_priority_op_events(block_from, block_to)
             .await
-            .map_err(|e| format_err!("Can't access storage: {}", e))?;
-        let mut transaction = storage.start_transaction().await?;
-        for tx in complete_withdrawals_txs {
-            transaction
-                .chain()
-                .operations_schema()
-                .add_complete_withdrawals_transaction(tx)
-                .await?;
-        }
-        transaction.commit().await?;
-
-        Ok(())
     }
 
-    async fn restore_state_from_eth(
+    async fn update_withdrawals(
         &mut self,
-        last_ethereum_block: u64,
-    ) -> Result<(), anyhow::Error> {
-        let current_ethereum_block =
-            last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-
-        let new_block_with_accepted_events =
-            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-        let previous_block_with_accepted_events =
-            new_block_with_accepted_events.saturating_sub(PRIORITY_EXPIRATION);
-
-        // restore pending queue
-        let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
-
-        // restore complete withdrawals events
-        let complete_withdrawals_txs = self
-            .get_complete_withdrawals_event(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-        self.store_complete_withdrawals(complete_withdrawals_txs)
-            .await?;
-
-        // restore priority queue
-        let prior_queue_events = self
-            .get_priority_op_events(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-        let mut priority_queue = HashMap::new();
-        for priority_op in prior_queue_events.into_iter() {
-            priority_queue.insert(priority_op.serial_id, priority_op.into());
-        }
-
-        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
-
-        self.set_new_state(new_state);
-
-        log::trace!("ETH state: {:#?}", self.eth_state);
-
-        Ok(())
-    }
-
-    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> Result<(), anyhow::Error> {
-        debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
-
-        let previous_block_with_accepted_events = (self.eth_state.last_ethereum_block() + 1)
-            .saturating_sub(self.number_of_confirmations_for_event);
-        let new_block_with_accepted_events =
-            last_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-
+        previous_block_with_accepted_events: u64,
+        new_block_with_accepted_events: u64,
+    ) -> anyhow::Result<()> {
         // Get new complete withdrawals events
         let complete_withdrawals_txs = self
+            .client
             .get_complete_withdrawals_event(
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
-        self.store_complete_withdrawals(complete_withdrawals_txs)
-            .await?;
 
-        // Get new priority ops
-        let priority_op_events = self
-            .get_priority_op_events(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
+        self.storage
+            .store_complete_withdrawals(complete_withdrawals_txs)
+            .await?;
+        Ok(())
+    }
+
+    async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
+        debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
+
+        let (unconfirmed_queue, received_priority_queue) = self
+            .update_eth_state(last_ethereum_block, self.number_of_confirmations_for_event)
             .await?;
 
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
-        for priority_op in priority_op_events.into_iter() {
-            log::debug!("New priority op: {:?}", priority_op);
-            priority_queue.insert(priority_op.serial_id, priority_op.into());
+        for (serial_id, op) in received_priority_queue {
+            priority_queue.insert(serial_id, op);
         }
 
-        // Get new pending ops
-        let unconfirmed_queue = self.get_unconfirmed_ops(last_ethereum_block).await?;
-
-        // Now, after we've received all the data from the Ethereum, we can safely
-        // update the state. This is done atomically to avoid the situation when
-        // due to error occurred mid-update the overall `ETHWatcher` state become
-        // messed up.
         let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
         self.set_new_state(new_state);
-
         Ok(())
     }
 
+    async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
+        let (unconfirmed_queue, priority_queue) = self
+            .update_eth_state(last_ethereum_block, PRIORITY_EXPIRATION)
+            .await?;
+
+        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
+
+        self.set_new_state(new_state);
+        log::trace!("ETH state: {:#?}", self.eth_state);
+        Ok(())
+    }
+
+    async fn update_eth_state(
+        &mut self,
+        current_ethereum_block: u64,
+        depth_of_last_approved_block: u64,
+    ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
+        let new_block_with_accepted_events =
+            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
+        let previous_block_with_accepted_events =
+            new_block_with_accepted_events.saturating_sub(depth_of_last_approved_block);
+
+        self.update_withdrawals(
+            previous_block_with_accepted_events,
+            new_block_with_accepted_events,
+        )
+        .await?;
+
+        let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
+        let priority_queue = self
+            .client
+            .get_priority_op_events(
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
+            )
+            .await?
+            .into_iter()
+            .map(|priority_op| (priority_op.serial_id, priority_op.into()))
+            .collect();
+
+        Ok((unconfirmed_queue, priority_queue))
+    }
+
     fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
-        let mut res = Vec::new();
+        let mut result = Vec::new();
 
         let mut used_chunks = 0;
         let mut current_priority_op = first_serial_id;
 
         while let Some(op) = self.eth_state.priority_queue().get(&current_priority_op) {
             if used_chunks + op.as_ref().data.chunks() <= max_chunks {
-                res.push(op.as_ref().clone());
+                result.push(op.as_ref().clone());
                 used_chunks += op.as_ref().data.chunks();
                 current_priority_op += 1;
             } else {
@@ -412,7 +232,7 @@ impl<T: Transport> EthWatch<T> {
             }
         }
 
-        res
+        result
     }
 
     async fn is_new_pubkey_hash_authorized(
@@ -420,70 +240,33 @@ impl<T: Transport> EthWatch<T> {
         address: Address,
         nonce: Nonce,
         pub_key_hash: &PubKeyHash,
-    ) -> Result<bool, anyhow::Error> {
-        let auth_fact: Vec<u8> = self
-            .zksync_contract
-            .1
-            .query(
-                "authFacts",
-                (address, u64::from(nonce)),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?;
+    ) -> anyhow::Result<bool> {
+        let auth_fact = self.client.get_auth_fact(address, nonce).await?;
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
-    async fn pending_withdrawals_queue_index(&self) -> Result<u32, anyhow::Error> {
-        let first_pending_withdrawal_index: u32 = self
-            .zksync_contract
-            .1
-            .query(
-                "firstPendingWithdrawalIndex",
-                (),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "Failed to query contract firstPendingWithdrawalIndex: {}",
-                    e
-                )
-            })?;
-        let number_of_pending_withdrawals: u32 = self
-            .zksync_contract
-            .1
-            .query(
-                "numberOfPendingWithdrawals",
-                (),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| {
-                format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e)
-            })?;
+    async fn pending_withdrawals_queue_index(&self) -> anyhow::Result<u32> {
+        let first_pending_withdrawal_index =
+            self.client.get_first_pending_withdrawal_index().await?;
+
+        let number_of_pending_withdrawals = self.client.get_number_of_pending_withdrawals().await?;
+
         Ok(first_pending_withdrawal_index + number_of_pending_withdrawals)
     }
 
-    fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<(EthBlockId, PriorityOp)> {
+    fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<PriorityOp> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .find(|(_block, op)| op.eth_hash.as_slice() == eth_hash)
+            .find(|op| op.eth_hash.as_slice() == eth_hash)
             .cloned()
     }
 
-    fn get_ongoing_deposits_for(&self, address: Address) -> Vec<(EthBlockId, PriorityOp)> {
+    fn get_ongoing_deposits_for(&self, address: Address) -> Vec<PriorityOp> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .filter(|(_block, op)| match &op.data {
+            .filter(|op| match &op.data {
                 ZkSyncPriorityOp::Deposit(deposit) => {
                     // Address may be set to either sender or recipient.
                     deposit.from == address || deposit.to == address
@@ -494,9 +277,9 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
-    async fn poll_eth_node(&mut self) -> Result<(), anyhow::Error> {
+    async fn poll_eth_node(&mut self) -> anyhow::Result<()> {
         let start = Instant::now();
-        let last_block_number = self.web3.eth().block_number().await?.as_u64();
+        let last_block_number = self.client.block_number().await?;
 
         if last_block_number > self.eth_state.last_ethereum_block() {
             self.process_new_blocks(last_block_number).await?;
@@ -506,6 +289,7 @@ impl<T: Transport> EthWatch<T> {
         Ok(())
     }
 
+    // TODO try to move it to eth client
     fn is_backoff_requested(&self, error: &anyhow::Error) -> bool {
         error.to_string().contains("429 Too Many Requests")
     }
@@ -531,16 +315,16 @@ impl<T: Transport> EthWatch<T> {
         }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self, mut eth_watch_req: mpsc::Receiver<EthWatchRequest>) {
         // As infura may be not responsive, we want to retry the query until we've actually got the
         // block number.
         // Normally, however, this loop is not expected to last more than one iteration.
         let block = loop {
-            let block = self.web3.eth().block_number().await;
+            let block = self.client.block_number().await;
 
             match block {
                 Ok(block) => {
-                    break block.as_u64();
+                    break block;
                 }
                 Err(error) => {
                     log::warn!(
@@ -562,7 +346,7 @@ impl<T: Transport> EthWatch<T> {
             .await
             .expect("Unable to restore ETHWatcher state");
 
-        while let Some(request) = self.eth_watch_req.next().await {
+        while let Some(request) = eth_watch_req.next().await {
             match request {
                 EthWatchRequest::PollETHNode => {
                     if !self.polling_allowed() {
@@ -635,15 +419,17 @@ pub fn start_eth_watch(
 ) -> JoinHandle<()> {
     let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
+    let eth_client = EthHttpClient::new(web3, config_options.contract_eth_addr);
+
+    let storage = DBStorage::new(db_pool);
 
     let eth_watch = EthWatch::new(
-        web3,
-        config_options.contract_eth_addr,
+        eth_client,
+        storage,
         config_options.confirmations_for_eth_event,
-        eth_req_receiver,
-        db_pool,
     );
-    tokio::spawn(eth_watch.run());
+
+    tokio::spawn(eth_watch.run(eth_req_receiver));
 
     tokio::spawn(async move {
         let mut timer = time::interval(config_options.eth_watch_poll_interval);

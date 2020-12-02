@@ -56,19 +56,37 @@ impl EIP1271Config {
 pub struct EthConfig {
     /// Address of the local Ethereum node.
     pub web3_url: String,
+    /// Set of 12 words for connecting to an Ethereum wallet.
+    pub test_mnemonic: String,
 }
 
-impl EthConfig {
-    pub fn load() -> Self {
-        let object = load_json(&config_path("constant/eth.json"));
-        serde_json::from_value(object).expect("Cannot deserialize Ethereum test config")
-    }
+/// Common Api addresses.
+#[derive(Debug, Deserialize)]
+pub struct ApiConfig {
+    /// Address of the rest api.
+    pub rest_api_url: String,
 }
+
+macro_rules! impl_config {
+    ($name_config:ident, $file:tt) => {
+        impl $name_config {
+            pub fn load() -> Self {
+                let object = load_json(&config_path(&format!("{}.json", $file)));
+                serde_json::from_value(object)
+                    .expect(&format!("Cannot deserialize config from '{}'", $file))
+            }
+        }
+    };
+}
+
+impl_config!(ApiConfig, "constant/api");
+impl_config!(EthConfig, "constant/eth");
 
 #[derive(Debug)]
 pub struct TestConfig {
     pub eip1271: EIP1271Config,
     pub eth: EthConfig,
+    pub api: ApiConfig,
 }
 
 impl TestConfig {
@@ -76,6 +94,7 @@ impl TestConfig {
         Self {
             eip1271: EIP1271Config::load(),
             eth: EthConfig::load(),
+            api: ApiConfig::load(),
         }
     }
 }
