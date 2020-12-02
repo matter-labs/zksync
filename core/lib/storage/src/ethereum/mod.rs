@@ -188,19 +188,6 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .await?
         .id;
 
-        // // Add a hash entry.
-        // let hash_entry = NewETHTxHash {
-        //     eth_op_id,
-        //     tx_hash: hash.as_bytes().to_vec(),
-        // };
-        // let inserted_hashes_rows = insert_into(eth_tx_hashes::table)
-        //     .values(&hash_entry)
-        //     .execute(self.0.conn())?;
-        // assert_eq!(
-        //     inserted_hashes_rows, 1,
-        //     "Wrong amount of updated rows (eth_tx_hashes)"
-        // );
-
         // If the operation ID was provided, we should also insert a binding entry.
         if let Some(op_id) = op_id {
             sqlx::query!(
@@ -333,8 +320,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Updates the stored gas price limit and average gas price used by GasAdjuster.
     ///
     /// This method expects the database to be initially prepared with inserting the actual
-    /// gas limit value. Currently the script `db-insert-eth-data.sh` is responsible for that
-    /// and it's invoked within `db-reset` subcommand.
+    /// gas limit value. The command responsible for that is `zk db insert eth-data`.
     pub async fn update_gas_price(
         &mut self,
         gas_price_limit: U256,
