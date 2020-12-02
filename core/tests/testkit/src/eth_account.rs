@@ -1,7 +1,7 @@
 use crate::external_commands::js_revert_reason;
 
 use anyhow::{bail, ensure, format_err};
-use ethabi::ParamType;
+use ethabi::{ParamType, Token};
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -391,13 +391,13 @@ impl<T: Transport> EthereumAccount<T> {
     // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
     pub async fn verify_block(
         &self,
-        proof: &EncodedAggregatedProof,
+        proof_operation: &BlocksProofOperation,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "verifyCommitments",
-                proof.get_eth_tx_args(),
+                "proofBlocks",
+                proof_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
             .await
@@ -427,15 +427,14 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    pub async fn revert_blocks(
-        &self,
-        blocks_to_revert: u64,
-    ) -> Result<ETHExecResult, anyhow::Error> {
+    pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<ETHExecResult, anyhow::Error> {
+        let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
+
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "revertBlocks",
-                blocks_to_revert,
+                tx_arg,
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await

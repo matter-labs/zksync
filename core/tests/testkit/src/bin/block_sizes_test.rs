@@ -16,6 +16,7 @@ use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
 };
+use zksync_types::aggregated_operations::BlocksProofOperation;
 use zksync_types::block::Block;
 use zksync_types::{DepositOp, U256};
 
@@ -149,8 +150,13 @@ async fn main() {
         let mut aggreagated_proof = gen_aggregate_proof(vks, proof_data, false)
             .expect("Failed to generate aggreagated proof");
 
+        let proof_op = BlocksProofOperation {
+            blocks: vec![block],
+            proof: aggreagated_proof.serialize_aggregated_proof(),
+            block_idxs_in_proof: vec![0],
+        };
         test_setup
-            .execute_verify_commitments(todo!())
+            .execute_verify_commitments(proof_op)
             .await
             .expect_success();
     }
@@ -162,8 +168,10 @@ async fn main() {
         let recursive_size = 5;
         let mut proofs = Vec::new();
         let mut block_commitments = Vec::new();
+        let mut blocks = Vec::new();
+        let mut block_idxs_in_proof = Vec::new();
 
-        for _ in 0..recursive_size {
+        for idx in 0..recursive_size {
             test_setup.start_block();
             for _ in 1..=(block_size / DepositOp::CHUNKS) {
                 test_setup
@@ -177,6 +185,8 @@ async fn main() {
             assert!(block.block_chunks_size <= block_size);
             // complete block to the correct size with noops
             block.block_chunks_size = block_size;
+            blocks.push(block.clone());
+            block_idxs_in_proof.push(idx);
 
             let timer = Instant::now();
             let witness = build_block_witness(&mut circuit_account_tree, &block)
@@ -215,8 +225,13 @@ async fn main() {
             .expect("Failed to generate aggreagated proof");
         // aggreagated_proof.individual_vk_inputs = block_commitments;
 
-        let verify_result = test_setup
-            .execute_verify_commitments(todo!())
+        let proof_op = BlocksProofOperation {
+            blocks,
+            proof: aggreagated_proof.serialize_aggregated_proof(),
+            block_idxs_in_proof,
+        };
+        test_setup
+            .execute_verify_commitments(proof_op)
             .await
             .expect_success();
     }

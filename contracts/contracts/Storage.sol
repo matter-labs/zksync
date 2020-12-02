@@ -70,15 +70,6 @@ contract Storage {
     }
     mapping(uint32 => Block_DEPRECATED) public blocks_DEPRECATED;
 
-    /// @notice Onchain operations - operations processed inside rollup blocks
-    /// @member opType Onchain operation type
-    /// @member amount Amount used in the operation
-    /// @member pubData Operation pubdata
-    struct OnchainOperation {
-        Operations.OpType opType;
-        bytes pubData;
-    }
-
     /// @notice Flag indicates that a user has exited certain token balance (per account id and tokenId)
     mapping(uint32 => mapping(uint16 => bool)) public exited;
 
@@ -89,11 +80,11 @@ contract Storage {
     /// @notice User authenticated fact hashes for some nonce.
     mapping(address => mapping(uint32 => bytes32)) public authFacts;
 
-    /// @notice Priority Operation container
+    /// @notice Old Priority Operation container
     /// @member opType Priority operation type
     /// @member pubData Priority operation public data
     /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
-    struct PriorityOperation {
+    struct PriorityOperation_DEPRECATED {
         Operations.OpType opType;
         bytes pubData;
         uint256 expirationBlock;
@@ -102,7 +93,7 @@ contract Storage {
     /// @notice Priority Requests mapping (request id - operation)
     /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
-    mapping(uint64 => PriorityOperation) public priorityRequests;
+    mapping(uint64 => PriorityOperation_DEPRECATED) public priorityRequests_DEPRECATED;
 
     /// @notice First open priority request id
     uint64 public firstPriorityRequestId;
@@ -148,6 +139,21 @@ contract Storage {
     /// @notice Stored hashed StoredBlockInfo for some block number
     mapping(uint32 => bytes32) public storedBlockHashes;
 
-    /// @notice Stores verified commitments hashed in one slot.
-    mapping(bytes32 => bool) public verifiedCommitmentHashes;
+    /// @notice Total blocks proofed.
+    uint32 public totalBlocksProofed;
+
+    /// @notice Priority Operation container
+    /// @member hashedPubData Hashed priority operation public data
+    /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
+    /// @member opType Priority operation type
+    struct PriorityOperation {
+        bytes20 hashedPubData;
+        uint64 expirationBlock;
+        Operations.OpType opType;
+    }
+
+    /// @notice Priority Requests mapping (request id - operation)
+    /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
+    /// @dev Numbers are in order of requests receiving
+    mapping(uint64 => PriorityOperation) public priorityRequests;
 }

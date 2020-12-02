@@ -1,5 +1,7 @@
 use crate::fs_utils::get_recursive_verification_key_path;
-use crate::serialization::{AggregatedProofSerde, SingleProofSerde};
+use crate::serialization::{
+    serialize_fe_for_ethereum, serialize_new_proof, AggregatedProofSerde, SingleProofSerde,
+};
 use crate::{get_universal_setup_monomial_form, PlonkVerificationKey};
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
@@ -55,11 +57,24 @@ impl Default for SingleProof {
 
 pub type NewProofType = NewProof<Engine, RecursiveAggregationCircuitBn256<'static>>;
 #[derive(Serialize, Deserialize)]
-pub struct AggregatedProof(#[serde(with = "AggregatedProofSerde")] pub(crate) NewProofType);
+pub struct AggregatedProof {
+    #[serde(with = "AggregatedProofSerde")]
+    pub(crate) proof: NewProofType,
+    #[serde(with = "VecFrSerde")]
+    pub(crate) individual_vk_inputs: Vec<Fr>,
+    pub(crate) individual_vk_idxs: Vec<usize>,
+    #[serde(with = "VecFrSerde")]
+    pub(crate) aggr_limbs: Vec<Fr>,
+}
 
 impl Default for AggregatedProof {
     fn default() -> Self {
-        AggregatedProof(NewProofType::empty())
+        AggregatedProof {
+            proof: NewProofType::empty(),
+            individual_vk_inputs: Vec::new(),
+            individual_vk_idxs: Vec::new(),
+            aggr_limbs: Vec::new(),
+        }
     }
 }
 
@@ -72,10 +87,15 @@ impl std::fmt::Debug for AggregatedProof {
 impl Clone for AggregatedProof {
     fn clone(&self) -> Self {
         let mut bytes = Vec::new();
-        self.0
+        self.proof
             .write(&mut bytes)
             .expect("Failed to serialize aggregated proof");
-        AggregatedProof(NewProof::read(&*bytes).expect("Failed to deserialize aggregated proof"))
+        AggregatedProof {
+            proof: NewProof::read(&*bytes).expect("Failed to deserialize aggregated proof"),
+            individual_vk_inputs: self.individual_vk_inputs.clone(),
+            individual_vk_idxs: self.individual_vk_idxs.clone(),
+            aggr_limbs: self.aggr_limbs.clone(),
+        }
     }
 }
 
@@ -216,14 +236,41 @@ pub fn gen_aggregate_proof(
         return Err(anyhow::anyhow!("Recursive proof is invalid"));
     };
 
-    Ok(AggregatedProof(rec_aggr_proof))
-    // let (inputs, proof) = serialize_new_proof(&rec_aggr_proof);
-    //
-    // Ok(EncodedAggregatedProof {
-    //     aggregated_input: inputs[0],
-    //     proof,
-    //     subproof_limbs: aggr_limbs,
-    //     individual_vk_inputs,
-    //     individual_vk_idxs,
-    // })
+    Ok(AggregatedProof {
+        proof: rec_aggr_proof,
+        individual_vk_inputs,
+        individual_vk_idxs,
+        aggr_limbs,
+    })
+}
+
+impl AggregatedProof {
+    pub fn serialize_aggregated_proof(&self) -> EncodedAggregatedProof {
+        let (inputs, proof) = serialize_new_proof(&self.proof);
+
+        let subproof_limbs = self
+            .aggr_limbs
+            .iter()
+            .map(serialize_fe_for_ethereum)
+            .collect();
+        let individual_vk_inputs = self
+            .individual_vk_inputs
+            .iter()
+            .map(serialize_fe_for_ethereum)
+            .collect();
+        let individual_vk_idxs = self
+            .individual_vk_idxs
+            .iter()
+            .cloned()
+            .map(U256::from)
+            .collect();
+
+        EncodedAggregatedProof {
+            aggregated_input: inputs[0],
+            proof,
+            subproof_limbs,
+            individual_vk_inputs,
+            individual_vk_idxs,
+        }
+    }
 }

@@ -94,4 +94,8 @@ library Utils {
     function concatHash(bytes32 _hash, bytes memory _bytes) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(_hash, _bytes));
     }
+
+    function hashBytesToBytes20(bytes memory _bytes) internal pure returns (bytes20) {
+        return bytes20(uint160(uint256(keccak256(_bytes))));
+    }
 }
