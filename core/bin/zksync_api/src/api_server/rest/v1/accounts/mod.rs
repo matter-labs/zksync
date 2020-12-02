@@ -41,21 +41,6 @@ fn parse_account_query(query: String) -> Result<AccountQuery, ApiError> {
     })
 }
 
-async fn find_account_address(
-    data: &web::Data<ApiAccountsData>,
-    query: String,
-) -> Result<Address, ApiError> {
-    let query = parse_account_query(query)?;
-
-    data.account_address(query)
-        .await
-        .map_err(ApiError::internal)?
-        .ok_or_else(|| {
-            ApiError::bad_request("Unable to find account.")
-                .detail(format!("Given account {:?} is absent", query))
-        })
-}
-
 /// Shared data between `api/v1/accounts` endpoints.
 #[derive(Clone)]
 struct ApiAccountsData {
@@ -75,6 +60,18 @@ impl ApiAccountsData {
             core_api_client,
             confirmations_for_eth_event,
         }
+    }
+
+    async fn find_account_address(&self, query: String) -> Result<Address, ApiError> {
+        let query = parse_account_query(query)?;
+
+        self.account_address(query)
+            .await
+            .map_err(ApiError::internal)?
+            .ok_or_else(|| {
+                ApiError::bad_request("Unable to find account.")
+                    .detail(format!("Given account {:?} is absent", query))
+            })
     }
 
     async fn account_address(&self, query: AccountQuery) -> QueryResult<Option<Address>> {
@@ -205,8 +202,7 @@ async fn account_receipts(
     web::Query(location_query): web::Query<AccountReceiptsQuery>,
 ) -> JsonResult<Vec<AccountTxReceipt>> {
     let (location, direction, limit) = location_query.validate()?;
-
-    let address = find_account_address(&data, account_query).await?;
+    let address = data.find_account_address(account_query).await?;
 
     let receipts = data
         .tx_receipts(address, location, direction, limit)
@@ -220,7 +216,7 @@ async fn account_pending_receipts(
     data: web::Data<ApiAccountsData>,
     web::Path(account_query): web::Path<String>,
 ) -> JsonResult<Vec<PendingAccountTxReceipt>> {
-    let address = find_account_address(&data, account_query).await?;
+    let address = data.find_account_address(account_query).await?;
 
     let receipts = data
         .pending_tx_receipts(address)
