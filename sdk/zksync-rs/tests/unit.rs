@@ -98,7 +98,7 @@ mod primitives_with_vectors {
             );
 
             let signature = TxSignature::sign_musig(&private_key, &inputs.message);
-            assert_tx_signature(&signature, &outputs.pub_key_hash, &outputs.signature);
+            assert_tx_signature(&signature, &outputs.pub_key, &outputs.signature);
         }
     }
 }
@@ -389,11 +389,12 @@ mod signatures_with_vectors {
 mod wallet_tests {
     use super::*;
     use num::{BigUint, ToPrimitive};
-    use zksync::provider::Provider;
-    use zksync::types::{AccountState, BlockStatus};
     use zksync::{
         error::ClientError,
-        types::{AccountInfo, ContractAddress, Fee, Tokens, TransactionInfo},
+        provider::Provider,
+        types::{
+            AccountInfo, AccountState, BlockStatus, ContractAddress, Fee, Tokens, TransactionInfo,
+        },
         Network, Wallet, WalletCredentials,
     };
     use zksync_eth_signer::PrivateKeySigner;
@@ -404,12 +405,18 @@ mod wallet_tests {
     };
 
     #[derive(Debug, Clone)]
+    /// Provides some hardcoded values the `Provider` responsible to
+    /// without communicating with the network
     struct MockProvider {
         network: Network,
     }
 
     #[async_trait::async_trait]
     impl Provider for MockProvider {
+        /// Returns the example `AccountInfo` instance:
+        ///  - assigns the '42' value to account_id;
+        ///  - adds single entry of "DAI" token to the committed balances;
+        ///  - adds single entry of "USDC" token to the verified balances.
         async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
             let mut committed_balances = HashMap::new();
             committed_balances.insert("DAI".into(), BigUint::from(12345_u32).into());
@@ -436,6 +443,8 @@ mod wallet_tests {
             })
         }
 
+        /// Returns first three tokens from the configuration found in
+        /// $ZKSYNC_HOME/etc/tokens/<NETWORK>.json
         async fn tokens(&self) -> Result<Tokens, ClientError> {
             let genesis_tokens = get_genesis_token_list(&self.network.to_string())
                 .expect("Initial token list not found");
@@ -456,7 +465,7 @@ mod wallet_tests {
         }
 
         async fn tx_info(&self, _tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
-            unimplemented!()
+            unreachable!()
         }
 
         async fn get_tx_fee(
@@ -465,7 +474,7 @@ mod wallet_tests {
             _address: Address,
             _token: impl Into<TokenLike> + Send + 'async_trait,
         ) -> Result<Fee, ClientError> {
-            unimplemented!()
+            unreachable!()
         }
 
         async fn send_tx(
@@ -473,13 +482,16 @@ mod wallet_tests {
             _tx: ZkSyncTx,
             _eth_signature: Option<PackedEthSignature>,
         ) -> Result<TxHash, ClientError> {
-            unimplemented!()
+            unreachable!()
         }
 
         fn network(&self) -> Network {
             self.network
         }
 
+        /// Returns the example `ContractAddress` instance:
+        ///  - the HEX-encoded sequence of bytes [0..20) provided as the `main_contract`;
+        ///  - the `gov_contract` is not usable in tests and it is simply an empty string.
         async fn contract_address(&self) -> Result<ContractAddress, ClientError> {
             Ok(ContractAddress {
                 main_contract: "0x000102030405060708090a0b0c0d0e0f10111213".to_string(),

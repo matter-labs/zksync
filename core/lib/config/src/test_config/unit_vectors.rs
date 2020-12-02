@@ -51,8 +51,7 @@ pub struct CryptoPrimitiveInput {
 pub struct CryptoPrimitiveOutput {
     #[serde(with = "ZeroPrefixHexSerde")]
     pub private_key: Vec<u8>,
-    // FIXME: is it really a hash?
-    pub pub_key_hash: String,
+    pub pub_key: String,
     pub signature: String,
 }
 

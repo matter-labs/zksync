@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 // External uses
+use async_trait::async_trait;
 use jsonrpc_core::{types::response::Output, ErrorCode};
 
 // Workspace uses
@@ -29,7 +30,10 @@ pub fn get_rpc_addr(network: Network) -> &'static str {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
+/// `Provider` used to connect to zkSync network in order to send transactions
+/// and retrieve some information from the server about
+/// zkSync accounts, transactions, supported tokens and the like.
 pub trait Provider {
     /// Requests and returns information about a ZKSync account given its address.
     async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError>;
@@ -72,7 +76,7 @@ pub struct RpcProvider {
     network: Network,
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl Provider for RpcProvider {
     async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
         let msg = JsonRpcRequest::account_info(address);

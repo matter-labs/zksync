@@ -9,7 +9,7 @@
         },
         "outputs": {
           "privateKey": "0x0552a69519d1f3043611126c13489ff4a2a867a1c667b1d9d9031cd27fdcff5a",
-          "pubKeyHash": "17f3708f5e2b2c39c640def0cf0010fd9dd9219650e389114ea9da47f5874184",
+          "pubKey": "17f3708f5e2b2c39c640def0cf0010fd9dd9219650e389114ea9da47f5874184",
           "signature": "5462c3083d92b832d540c9068eed0a0450520f6dd2e4ab169de1a46585b394a4292896a2ebca3c0378378963a6bc1710b64c573598e73de3a33d6cec2f5d7403"
         }
       }
