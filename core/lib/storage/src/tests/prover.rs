@@ -5,7 +5,6 @@ use std::time::Duration;
 use zksync_config::ConfigurationOptions;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
-
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
