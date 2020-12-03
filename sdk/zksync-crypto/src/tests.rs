@@ -23,7 +23,7 @@ fn gen_private_key_and_its_be_bytes() -> (PrivateKey<Engine>, Vec<u8>) {
 fn test_private_key_read() {
     let (zksync_types_pk, serialized_pk) = gen_private_key_and_its_be_bytes();
 
-    let wasm_pk = read_signing_key(&serialized_pk);
+    let wasm_pk = read_signing_key(&serialized_pk).unwrap();
     assert_eq!(ff::to_hex(&wasm_pk.0), ff::to_hex(&zksync_types_pk.0));
 }
 
@@ -31,7 +31,7 @@ fn test_private_key_read() {
 fn test_pubkey_hash() {
     let (pk, serialized_pk) = gen_private_key_and_its_be_bytes();
 
-    let wasm_pubkey_hash = private_key_to_pubkey_hash(&serialized_pk);
+    let wasm_pubkey_hash = private_key_to_pubkey_hash(&serialized_pk).unwrap();
     let zksync_types_pubkey_hash = PubKeyHash::from_privkey(&pk).data.to_vec();
     assert_eq!(wasm_pubkey_hash, zksync_types_pubkey_hash);
 }
@@ -47,7 +47,7 @@ fn test_signature() {
     for msg_len in &[0, 2, 4, 5, 32, 128] {
         let msg = random_msg(*msg_len);
 
-        let wasm_signature = sign_musig(&serialized_pk, &msg);
+        let wasm_signature = sign_musig(&serialized_pk, &msg).unwrap();
 
         let wasm_unpacked_signature = TxSignature::deserialize_from_packed_bytes(&wasm_signature)
             .expect("failed to unpack signature");

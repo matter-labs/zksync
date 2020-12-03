@@ -62,7 +62,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = stored.into_op(&mut transaction).await;
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "execute_operation");
+        metrics::histogram!("sql.chain.block.execute_operation", start.elapsed());
         result
     }
 
@@ -92,7 +92,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 }
             }
         }
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "save_block_transactions");
+        metrics::histogram!("sql.chain.block.save_block_transactions", start.elapsed());
         Ok(())
     }
 
@@ -106,7 +106,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_storage_block");
+        metrics::histogram!("sql.chain.block.get_storage_block", start.elapsed());
 
         Ok(block)
     }
@@ -147,7 +147,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             stored_block.timestamp.unwrap_or_default() as u64,
         ));
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block");
+        metrics::histogram!("sql.chain.block.get_block", start.elapsed());
 
         Ok(result)
     }
@@ -164,7 +164,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 ExecutedOperations::PriorityOp(priorop) => Some(priorop.op),
             })
             .collect();
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block_operations");
+        metrics::histogram!("sql.chain.block.get_block_operations", start.elapsed());
         Ok(result)
     }
 
@@ -216,7 +216,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block_transactions");
+        metrics::histogram!("sql.chain.block.get_block_transactions", start.elapsed());
         Ok(block_txs)
     }
 
@@ -279,7 +279,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             }
         });
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_block_executed_ops");
+        metrics::histogram!("sql.chain.block.get_block_executed_ops", start.elapsed());
         Ok(executed_operations)
     }
 
@@ -335,7 +335,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         ).fetch_all(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_block_range");
+        metrics::histogram!("sql.chain.block.load_block_range", start.elapsed());
         Ok(details)
     }
 
@@ -444,9 +444,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .flatten();
 
         metrics::histogram!(
-            "sql.chain",
-            start.elapsed(),
-            "block" => "find_block_by_height_or_hash"
+            "sql.chain.block.find_block_by_height_or_hash",
+            start.elapsed()
         );
         result
     }
@@ -461,7 +460,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         } else {
             None
         };
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_commit_op");
+        metrics::histogram!("sql.chain.block.load_commit_op", start.elapsed());
         result
     }
 
@@ -475,7 +474,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::COMMIT, None)
             .await;
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_last_committed_block");
+        metrics::histogram!("sql.chain.block.get_last_committed_block", start.elapsed());
         result
     }
 
@@ -489,7 +488,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::VERIFY, None)
             .await;
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_last_verified_block");
+        metrics::histogram!("sql.chain.block.get_last_verified_block", start.elapsed());
         result
     }
 
@@ -500,7 +499,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = OperationsSchema(self.0)
             .get_last_block_by_action(ActionType::VERIFY, Some(true))
             .await;
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "get_last_verified_confirmed_block");
+        metrics::histogram!(
+            "sql.chain.block.get_last_verified_confirmed_block",
+            start.elapsed()
+        );
         result
     }
 
@@ -514,7 +516,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         )
         .fetch_optional(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_storage_pending_block");
+        metrics::histogram!(
+            "sql.chain.block.load_storage_pending_block",
+            start.elapsed()
+        );
 
         Ok(maybe_block)
     }
@@ -560,7 +565,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_pending_block");
+        metrics::histogram!("sql.chain.block.load_pending_block", start.elapsed());
         Ok(Some(result))
     }
 
@@ -613,7 +618,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .await?;
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "load_pending_block");
+        metrics::histogram!("sql.chain.block.load_pending_block", start.elapsed());
 
         Ok(())
     }
@@ -690,7 +695,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "save_block");
+        metrics::histogram!("sql.chain.block.save_block", start.elapsed());
         Ok(())
     }
 
@@ -718,7 +723,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "block" => "store_account_tree_cache");
+        metrics::histogram!("sql.chain.block.store_account_tree_cache", start.elapsed());
         Ok(())
     }
 

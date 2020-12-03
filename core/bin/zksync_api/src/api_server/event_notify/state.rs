@@ -1,6 +1,7 @@
 use crate::api_server::rpc_server::types::{BlockInfo, ResponseAccountState};
 use crate::utils::token_db_cache::TokenDBCache;
 use lru_cache::LruCache;
+use std::time::Instant;
 use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
 use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
@@ -35,6 +36,7 @@ impl NotifierState {
         &mut self,
         hash: &TxHash,
     ) -> Result<Option<TxReceiptResponse>, anyhow::Error> {
+        let start = Instant::now();
         let res = if let Some(tx_receipt) = self
             .cache_of_transaction_receipts
             .get_mut(&hash.as_ref().to_vec())
@@ -57,6 +59,8 @@ impl NotifierState {
 
             tx_receipt
         };
+
+        metrics::histogram!("api.notifier.get_tx_receipt", start.elapsed());
         Ok(res)
     }
 
@@ -64,6 +68,7 @@ impl NotifierState {
         &mut self,
         block_number: u32,
     ) -> Result<Option<BlockInfo>, anyhow::Error> {
+        let start = Instant::now();
         let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
             block_info.clone()
         } else {
@@ -109,6 +114,8 @@ impl NotifierState {
 
             block_info
         };
+
+        metrics::histogram!("api.notifier.get_block_info", start.elapsed());
         Ok(Some(res))
     }
 
@@ -116,6 +123,7 @@ impl NotifierState {
         &mut self,
         serial_id: u32,
     ) -> Result<Option<StoredExecutedPriorityOperation>, anyhow::Error> {
+        let start = Instant::now();
         let res = if let Some(executed_op) = self
             .cache_of_executed_priority_operations
             .get_mut(&serial_id)
@@ -136,6 +144,11 @@ impl NotifierState {
 
             executed_op
         };
+
+        metrics::histogram!(
+            "api.notifier.get_executed_priority_operation",
+            start.elapsed()
+        );
         Ok(res)
     }
 
@@ -144,6 +157,7 @@ impl NotifierState {
         address: Address,
         action: ActionType,
     ) -> anyhow::Result<(AccountId, ResponseAccountState)> {
+        let start = Instant::now();
         let mut storage = self.db_pool.access_storage().await?;
         let account_state = storage
             .chain()
@@ -168,6 +182,7 @@ impl NotifierState {
             ResponseAccountState::default()
         };
 
+        metrics::histogram!("api.notifier.get_account_info", start.elapsed());
         Ok((account_id, account_state))
     }
 
@@ -176,6 +191,7 @@ impl NotifierState {
         id: AccountId,
         action: ActionType,
     ) -> anyhow::Result<Option<ResponseAccountState>> {
+        let start = Instant::now();
         let mut storage = self.db_pool.access_storage().await?;
 
         let stored_account = match action {
@@ -202,7 +218,7 @@ impl NotifierState {
         } else {
             None
         };
-
+        metrics::histogram!("api.notifier.get_account_state", start.elapsed());
         Ok(account)
     }
 }

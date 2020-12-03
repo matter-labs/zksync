@@ -1,6 +1,3 @@
-use num::{BigUint, ToPrimitive};
-use serde::{Deserialize, Serialize};
-
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::{
     eddsa::{PrivateKey, PublicKey},
@@ -9,6 +6,9 @@ use zksync_crypto::franklin_crypto::{
 use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS};
 use zksync_crypto::public_key_from_private;
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+
+use num::{BigUint, ToPrimitive};
+use serde::{Deserialize, Serialize};
 
 use super::*;
 use crate::{
@@ -282,4 +282,15 @@ fn eth_sign_data_compatibility() {
 
     assert_eq!(deserialized.signature, eth_sign_data.signature);
     assert_eq!(deserialized.message, eth_sign_data.message);
+}
+
+#[test]
+fn test_check_signature() {
+    let (pk, msg) = gen_pk_and_msg();
+    let signature = TxSignature::sign_musig(&pk, &msg[1])
+        .signature
+        .serialize_packed()
+        .unwrap();
+
+    assert_eq!(hex::encode(signature), "4e3298ac8cc13868dbbc94ad6fb41085ffe05b3c2eee22f88b05e69b7a5126aea723d7a3e7282ef5a32d9479c9c8dde52b3e3c462dd445dcd8158ebb6edb6000");
 }

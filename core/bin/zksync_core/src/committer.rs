@@ -286,37 +286,51 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
     }
 
     if last_committed_block > last_aggregate_create_proof_block {
-        let mut block_numbers = Vec::new();
-        let mut blocks = Vec::new();
-        let mut block_idxs_in_proof = Vec::new();
-
-        let mut idx = 0;
+        let mut proofs_exits = true;
         for block_number in last_aggregate_create_proof_block + 1..=last_committed_block {
-            let block = storage
-                .chain()
-                .block_schema()
-                .get_block(block_number)
-                .await?
-                .expect("Failed to get last committed block from db");
-            block_numbers.push(block.block_number);
-            blocks.push(block);
-            block_idxs_in_proof.push(idx);
-            idx += 1;
+            proofs_exits = proofs_exits
+                && storage
+                    .prover_schema()
+                    .load_proof(block_number)
+                    .await?
+                    .is_some();
+            if !proofs_exits {
+                break;
+            }
         }
+        if proofs_exits {
+            let mut block_numbers = Vec::new();
+            let mut blocks = Vec::new();
+            let mut block_idxs_in_proof = Vec::new();
 
-        let aggregated_op_create = AggregatedOperation::CreateProofBlocks(block_numbers);
+            let mut idx = 0;
+            for block_number in last_aggregate_create_proof_block + 1..=last_committed_block {
+                let block = storage
+                    .chain()
+                    .block_schema()
+                    .get_block(block_number)
+                    .await?
+                    .expect("Failed to get last committed block from db");
+                block_numbers.push(block.block_number);
+                blocks.push(block);
+                block_idxs_in_proof.push(idx);
+                idx += 1;
+            }
 
-        storage
-            .chain()
-            .operations_schema()
-            .store_aggregated_action(aggregated_op_create)
-            .await?;
+            let aggregated_op_create = AggregatedOperation::CreateProofBlocks(block_numbers);
 
-        log::info!(
-            "Created aggregated create proof op: {} - {}",
-            last_aggregate_create_proof_block + 1,
-            last_committed_block
-        );
+            storage
+                .chain()
+                .operations_schema()
+                .store_aggregated_action(aggregated_op_create)
+                .await?;
+
+            log::info!(
+                "Created aggregated create proof op: {} - {}",
+                last_aggregate_create_proof_block + 1,
+                last_committed_block
+            );
+        }
     }
 
     if last_aggregate_create_proof_block > last_aggregate_publish_proof_block {

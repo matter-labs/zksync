@@ -9,7 +9,7 @@ use super::{
 };
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
-const WAIT_CONFIRMATIONS: u64 = 1;
+const WAIT_CONFIRMATIONS: u64 = 3;
 
 pub mod mock;
 mod test_data;
@@ -48,8 +48,9 @@ async fn transaction_state() {
         test_data::commit_operation(0), // Will be committed.
         test_data::commit_operation(1), // Will be pending because of not enough confirmations.
         test_data::commit_operation(2), // Will be failed.
-        test_data::commit_operation(3), // Will be stuck.
-        test_data::commit_operation(4), // Will be pending due no response.
+        test_data::commit_operation(3), // Will be failed and pending (not enough confirmations).
+        test_data::commit_operation(4), // Will be stuck.
+        test_data::commit_operation(5), // Will be pending due no response.
     ];
     let mut eth_operations = Vec::with_capacity(operations.len());
 
@@ -99,6 +100,20 @@ async fn transaction_state() {
         .add_execution(&eth_operations[2].used_tx_hashes[0], &failed_response)
         .await;
 
+    // Pending failed operation.
+    let pending_failed_response = ExecutedTxStatus {
+        confirmations: WAIT_CONFIRMATIONS - 1,
+        success: false,
+        receipt: Some(Default::default()),
+    };
+    eth_sender
+        .ethereum
+        .add_execution(
+            &eth_operations[3].used_tx_hashes[0],
+            &pending_failed_response,
+        )
+        .await;
+
     // Committed operation.
     assert_eq!(
         eth_sender
@@ -141,13 +156,27 @@ async fn transaction_state() {
         TxCheckOutcome::Failed(Default::default())
     );
 
-    // Stuck operation.
+    // Pending failed operation should be considered as pending.
     assert_eq!(
         eth_sender
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[3],
                 &eth_operations[3].used_tx_hashes[0],
+                current_block + pending_failed_response.confirmations,
+            )
+            .await
+            .unwrap(),
+        TxCheckOutcome::Pending
+    );
+
+    // Stuck operation.
+    assert_eq!(
+        eth_sender
+            .check_transaction_state(
+                TxCheckMode::Latest,
+                &eth_operations[4],
+                &eth_operations[4].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS,
             )
             .await
@@ -160,8 +189,8 @@ async fn transaction_state() {
         eth_sender
             .check_transaction_state(
                 TxCheckMode::Latest,
-                &eth_operations[4],
-                &eth_operations[4].used_tx_hashes[0],
+                &eth_operations[5],
+                &eth_operations[5].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .await
@@ -174,8 +203,8 @@ async fn transaction_state() {
         eth_sender
             .check_transaction_state(
                 TxCheckMode::Old,
-                &eth_operations[4],
-                &eth_operations[4].used_tx_hashes[0],
+                &eth_operations[5],
+                &eth_operations[5].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .await
@@ -486,7 +515,7 @@ async fn restore_state() {
         let deadline_block = eth_sender.get_deadline_block(1);
         let commit_op_tx = create_signed_tx(0, &eth_sender, &commit_op, deadline_block, 0).await;
 
-        let deadline_block = eth_sender.get_deadline_block(2);
+        let deadline_block = eth_sender.get_deadline_block(1 + WAIT_CONFIRMATIONS);
         let verify_op_tx = create_signed_tx(1, &eth_sender, &verify_op, deadline_block, 1).await;
 
         let operations = vec![commit_op, verify_op];
@@ -669,7 +698,7 @@ async fn concurrent_operations_order() {
         // If we'll send all the operations together, the order will be "commit-verify-commit-verify-withdraw",
         // since withdraw is only sent after verify operation is confirmed.
         let (commit_op, verify_op) = operations_iter.next().unwrap();
-        println!("BEGIN");
+
         eth_sender
             .db
             .send_operation(commit_op.clone())
@@ -680,7 +709,7 @@ async fn concurrent_operations_order() {
             .send_operation(verify_op.clone())
             .await
             .unwrap();
-        println!("END");
+
         eth_sender.load_new_operations().await;
 
         // Call `proceed_next_operations`. Several txs should be sent.

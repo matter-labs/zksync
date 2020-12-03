@@ -4,7 +4,7 @@
  * Selling is done in steps:
  *    Step 1 - token is withdrawn to the ETH account
  *    Step 2 - token is swapped for ETH using 1inch
- *    Step 3 - ETH is transferred to the FEE_ACCUMULATOR_ADDRESS
+ *    Step 3 - ETH is transferred to the OPERATOR_FEE_ETH_ADDRESS
  *
  *    Each step happens one after another without waiting for previous to complete
  *    so this script should be run frequently (e.g. once every 15 min).
@@ -28,7 +28,7 @@ import {
 /** Env parameters. */
 const FEE_ACCOUNT_PRIVATE_KEY = process.env.FEE_ACCOUNT_PRIVATE_KEY;
 const MAX_LIQUIDATION_FEE_PERCENT = parseInt(process.env.MAX_LIQUIDATION_FEE_PERCENT);
-const FEE_ACCUMULATOR_ADDRESS = process.env.FEE_ACCUMULATOR_ADDRESS;
+const OPERATOR_FEE_ETH_ADDRESS = process.env.OPERATOR_FEE_ETH_ADDRESS;
 const ETH_NETWORK = process.env.ETH_NETWORK as any;
 const WEB3_URL = process.env.WEB3_URL;
 const MAX_LIQUIDATION_FEE_SLIPPAGE = parseInt(process.env.MAX_LIQUIDATION_FEE_SLIPPAGE) || 5;
@@ -196,8 +196,8 @@ async function sendETH(zksWallet: zksync.Wallet) {
         const ethTransferFee = BigNumber.from('21000').mul(await ethProvider.getGasPrice());
         const ethToSend = ethBalance.sub(ETH_TRANSFER_THRESHOLD);
         if (isOperationFeeAcceptable(ethToSend, ethTransferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
-            console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${FEE_ACCUMULATOR_ADDRESS}`);
-            const tx = await ethWallet.sendTransaction({ to: FEE_ACCUMULATOR_ADDRESS, value: ethToSend });
+            console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${OPERATOR_FEE_ETH_ADDRESS}`);
+            const tx = await ethWallet.sendTransaction({ to: OPERATOR_FEE_ETH_ADDRESS, value: ethToSend });
             console.log(`Tx hash: ${tx.hash}`);
 
             await sendNotification(

@@ -2,26 +2,26 @@ import '@nomiclabs/hardhat-waffle';
 import '@nomiclabs/hardhat-solpp';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
-import "@nomiclabs/hardhat-etherscan";
+import '@nomiclabs/hardhat-etherscan';
 
 const prodConfig = {
     // UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
     // PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: false
-}
+};
 const testnetConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
     // PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: false
-}
+};
 const testConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
     PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: true
-}
+};
 
 const localConfig = Object.assign({}, prodConfig);
 localConfig.DUMMY_VERIFIER = process.env.DUMMY_VERIFIER ? true : localConfig.DUMMY_VERIFIER;
@@ -30,8 +30,8 @@ const contractDefs = {
     rinkeby: testnetConfig,
     ropsten: testnetConfig,
     mainnet: prodConfig,
-    test:  testConfig,
-    localhost: localConfig,
+    test: testConfig,
+    localhost: localConfig
 };
 
 export default {
@@ -51,10 +51,10 @@ export default {
         sources: './contracts'
     },
     solpp: {
-        defs: process.env.ETH_NETWORK ? contractDefs[process.env.ETH_NETWORK] : contractDefs["test"],
+        defs: process.env.ETH_NETWORK ? contractDefs[process.env.ETH_NETWORK] : contractDefs['test']
     },
     networks: {
-        env : {
+        env: {
             url: process.env.WEB3_URL
         }
     },

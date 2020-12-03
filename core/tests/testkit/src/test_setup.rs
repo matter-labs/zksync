@@ -43,7 +43,6 @@ pub struct TestSetup {
     pub expected_changes_for_current_block: ExpectedAccountState,
 
     pub commit_account: EthereumAccount<Http>,
-
     pub last_committed_block: Block,
 }
 

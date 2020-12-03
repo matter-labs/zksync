@@ -7,7 +7,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 // Workspace deps
-use zksync_config::{ConfigurationOptions, ProverOptions};
+use zksync_config::ProverOptions;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::BlockNumber;
 // Local deps
@@ -72,33 +72,33 @@ async fn get_job(
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
-    // let ret = storage
-    //     .prover_schema()
-    //     .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
-    //     .await
-    //     .map_err(|e| {
-    //         vlog::warn!("could not get next unverified commit operation: {}", e);
-    //         actix_web::error::ErrorInternalServerError("storage layer error")
-    //     })?;
-    // let ret = ;
-    // if let Some(prover_run) = ret {
-    //     log::info!(
-    //         "satisfied request block {} to prove from worker: {}",
-    //         prover_run.block_number,
-    //         r.name
-    //     );
-    //     Ok(todo!())
-    // // Ok(HttpResponse::Ok().json(ProverInputResponse {
-    // //     job_id: prover_run.id,
-    // //     data: Some(ret.data),
-    // // }))
-    // } else {
-    //     Ok(HttpResponse::Ok().json(ProverInputResponse {
-    //         job_id: 0,
-    //         data: todo!(),
-    //     }))
-    // }
-    todo!("implement prover get data from storage")
+    let ret = storage
+        .prover_schema()
+        .get_idle_prover_job_from_job_queue()
+        .await
+        .map_err(|e| {
+            vlog::warn!("could not get next unverified commit operation: {}", e);
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })?;
+    if let Some(prover_job) = ret {
+        log::info!("satisfied request to prove from worker");
+        Ok(HttpResponse::Ok().json(ProverInputResponse {
+            job_id: prover_job.job_id,
+            first_block: prover_job.first_block,
+            last_block: prover_job.last_block,
+            data: Some(
+                serde_json::from_value(prover_job.job_data)
+                    .expect("Failed to parse prover job from db"),
+            ),
+        }))
+    } else {
+        Ok(HttpResponse::Ok().json(ProverInputResponse {
+            job_id: 0,
+            first_block: 0,
+            last_block: 0,
+            data: None,
+        }))
+    }
 }
 
 async fn prover_data(
@@ -335,7 +335,6 @@ pub fn run_prover_server(
     connection_pool: zksync_storage::ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     prover_options: ProverOptions,
-    config_options: ConfigurationOptions,
 ) {
     thread::Builder::new()
         .name("prover_server".to_string())
@@ -362,9 +361,9 @@ pub fn run_prover_server(
                 };
 
                 // Start pool maintainer threads.
-                for offset in 0..config_options.witness_generators {
+                for offset in 0..prover_options.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
-                    let block_step = config_options.witness_generators as u32;
+                    let block_step = prover_options.witness_generators as u32;
                     log::info!(
                         "Starting witness generator ({},{})",
                         start_block,
@@ -378,15 +377,12 @@ pub fn run_prover_server(
                     );
                     pool_maintainer.start(panic_notify.clone());
                 }
-
                 // Start HTTP server.
-                let idle_provers = config_options.idle_provers;
+                let gone_timeout = prover_options.gone_timeout;
+                let idle_provers = prover_options.idle_provers;
                 HttpServer::new(move || {
-                    let app_state = AppState::new(
-                        connection_pool.clone(),
-                        prover_options.gone_timeout,
-                        idle_provers,
-                    );
+                    let app_state =
+                        AppState::new(connection_pool.clone(), gone_timeout, idle_provers);
 
                     // By calling `register_data` instead of `data` we're avoiding double
                     // `Arc` wrapping of the object.
@@ -403,7 +399,7 @@ pub fn run_prover_server(
                             web::post().to(required_replicas),
                         )
                 })
-                .bind(&config_options.prover_server_address)
+                .bind(&prover_options.prover_server_address)
                 .expect("failed to bind")
                 .run()
                 .await

@@ -33,7 +33,8 @@ async function reason() {
         try {
             const parsedTransaction = franklinInterface.parseTransaction({ data: tx.data });
             if (parsedTransaction) {
-                console.log('parsed tx: ', parsedTransaction.name, JSON.stringify(parsedTransaction.args, null, 2));
+                console.log('parsed tx: ', parsedTransaction.name, parsedTransaction);
+                console.log('tx args: ', parsedTransaction.name, JSON.stringify(parsedTransaction.args, null, 2));
             } else {
                 console.log('tx:', tx);
             }
@@ -43,8 +44,8 @@ async function reason() {
 
         const transaction = await provider.getTransaction(hash);
         const receipt = await provider.getTransactionReceipt(hash);
-        // console.log('receipt:', receipt);
-        // console.log('\n \n ');
+        console.log('receipt:', receipt);
+        console.log('\n \n ');
 
         if (receipt.gasUsed) {
             const gasLimit = transaction.gasLimit;
