@@ -1,7 +1,8 @@
 import config from './env-config';
 import * as constants from './constants';
 import {
-    formatToken
+    formatToken,
+    isBlockVerified
 } from './utils';
 import {
     BlockExplorerClient
@@ -11,6 +12,15 @@ import { Provider } from 'zksync';
 
 import axios from 'axios';
 import * as ethers from 'ethers';
+
+import {
+    cacheBlock,
+    getCachedBlock,
+    cacheBlockTransactions,
+    getCachedBlockTransactions,
+    cacheTransaction,
+    getCachedTransaction
+} from './localStorageUtils';
 
 async function fetch(req) {
     let r = await axios(req);
@@ -89,17 +99,37 @@ export class Client {
     }
 
     async getBlock(blockNumber) {
-        return fetch({
+        const cached = getCachedBlock(blockNumber);
+        if(cached) {
+            return cached;
+        }
+
+        const block = await fetch({
             method: 'get',
             url: `${baseUrl()}/blocks/${blockNumber}`,
         });
+
+        // Cache only verified blocks since 
+        // these will definitely never change again 
+        if(isBlockVerified(block)) {
+            cacheBlock(block);
+        }
+
+        return block;
     }
 
     async getBlockTransactions(blockNumber) {
+        const cached = getCachedBlockTransactions(blockNumber);
+        if(cached) {
+            return cached;
+        }
+
         let txs = await fetch({
             method: 'get',
             url: `${baseUrl()}/blocks/${blockNumber}/transactions`,
         });
+
+        cacheBlockTransactions(blockNumber, txs);
 
         return txs;
     }
@@ -111,11 +141,13 @@ export class Client {
         });
     }
 
-    searchTx(txHash) {
-        return fetch({
+    async searchTx(txHash) {
+        const tx = await fetch({
             method: 'get',
             url: `${baseUrl()}/transactions_all/${txHash}`,
         });
+
+        return tx;
     }
 
     getAccount(address) {

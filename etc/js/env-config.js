@@ -41,4 +41,4 @@ export default {
         WS_API_ADDR: "wss://breaking-api.zksync.dev/jsrpc-ws",
         HTTP_RPC_API_ADDR: "https://breaking-api.zksync.dev/jsrpc",
     },
-}[`${location.protocol}//${location.hostname}`];
+}[`https://rinkeby.zkscan.io`];

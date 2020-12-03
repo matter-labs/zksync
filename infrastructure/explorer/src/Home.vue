@@ -73,6 +73,7 @@ const components = {
 export default {
     name: 'home',
     created() {
+        console.log('Created!!!');
         this.update();
     },
     timers: {
