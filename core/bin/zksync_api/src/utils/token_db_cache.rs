@@ -46,15 +46,7 @@ impl TokenDBCache {
     }
 
     pub async fn token_symbol(&self, token_id: TokenId) -> anyhow::Result<Option<String>> {
-        let symbol = if token_id == 0 {
-            Some("ETH".to_string())
-        } else {
-            match self.get_token(token_id).await? {
-                Some(token) => Some(token.symbol),
-                None => None,
-            }
-        };
-
-        Ok(symbol)
+        let token = self.get_token(token_id).await?;
+        Ok(token.map(|token| token.symbol))
     }
 }

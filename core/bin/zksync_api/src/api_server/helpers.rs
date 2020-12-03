@@ -21,22 +21,24 @@ pub fn remove_prefix(query: &str) -> &str {
     }
 }
 
-pub fn try_parse_hash(query: &str) -> Option<H256> {
+pub fn try_parse_hash(query: &str) -> Result<H256, hex::FromHexError> {
     const HASH_SIZE: usize = 32; // 32 bytes
 
     let mut slice = [0_u8; HASH_SIZE];
 
     let tx_hex = remove_prefix(query);
-    hex::decode_to_slice(&tx_hex, &mut slice).ok()?;
-    Some(H256::from_slice(&slice))
+    hex::decode_to_slice(&tx_hex, &mut slice)?;
+
+    Ok(H256::from_slice(&slice))
 }
 
-pub fn try_parse_tx_hash(query: &str) -> Option<TxHash> {
+pub fn try_parse_tx_hash(query: &str) -> Result<TxHash, hex::FromHexError> {
     const HASH_SIZE: usize = 32; // 32 bytes
 
     let mut slice = [0_u8; HASH_SIZE];
 
     let tx_hex = remove_prefix(query);
-    hex::decode_to_slice(&tx_hex, &mut slice).ok()?;
-    TxHash::from_slice(&slice)
+    hex::decode_to_slice(&tx_hex, &mut slice)?;
+
+    TxHash::from_slice(&slice).ok_or(hex::FromHexError::InvalidStringLength)
 }

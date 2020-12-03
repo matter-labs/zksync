@@ -308,7 +308,7 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let hash = try_parse_hash(&hash_hex_with_prefix)
-            .ok_or_else(|| HttpResponse::BadRequest().finish())?;
+            .map_err(|_| HttpResponse::BadRequest().finish())?;
 
         let mut res = self_
             .access_storage()
