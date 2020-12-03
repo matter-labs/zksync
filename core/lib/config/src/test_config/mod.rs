@@ -3,8 +3,10 @@ use std::fs;
 // External uses
 use serde::Deserialize;
 // Workspace uses
-use zksync_basic_types::{Address, H256};
+use zksync_types::{Address, H256};
 // Local uses
+
+pub mod unit_vectors;
 
 /// Transforms relative path like `constant/eip1271.json` into full path like
 /// `$ZKSYNC_HOME/etc/test_config/constant/eip1271.json`.

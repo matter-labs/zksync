@@ -6,8 +6,9 @@ use std::string::ToString;
 
 /// Formats amount in wei to tokens with precision.
 /// Behaves just like ethers.utils.formatUnits
-pub fn format_units(wei: &impl ToString, units: u8) -> String {
-    let mut chars = wei.to_string().drain(..).collect::<VecDeque<char>>();
+pub fn format_units(wei: impl ToString, units: u8) -> String {
+    let mut chars: VecDeque<char> = wei.to_string().chars().collect();
+
     while chars.len() < units as usize {
         chars.push_front('0');
     }
@@ -26,7 +27,7 @@ pub fn format_units(wei: &impl ToString, units: u8) -> String {
 
 /// Formats amount in wei to tokens.
 /// Behaves just like js ethers.utils.formatEther
-pub fn format_ether(wei: &impl ToString) -> String {
+pub fn format_ether(wei: impl ToString) -> String {
     format_units(wei, 18)
 }
 
