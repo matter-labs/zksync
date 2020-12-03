@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use zksync::{
     types::BlockStatus,
     utils::{closest_packable_fee_amount, closest_packable_token_amount},
-    Provider,
+    RpcProvider,
 };
 use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
@@ -72,7 +72,7 @@ impl Fees {
 impl LoadtestExecutor {
     /// Creates a new executor instance.
     pub async fn new(config: Config, env_options: ConfigurationOptions) -> anyhow::Result<Self> {
-        let monitor = Monitor::new(Provider::new(config.network.name)).await;
+        let monitor = Monitor::new(RpcProvider::new(config.network.name)).await;
 
         log::info!("Creating scenarios...");
 

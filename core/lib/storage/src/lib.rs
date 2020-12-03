@@ -93,7 +93,6 @@ pub mod ethereum;
 pub mod prover;
 pub mod test_data;
 pub mod tokens;
-pub mod utils;
 
 pub use crate::connection::ConnectionPool;
 pub type QueryResult<T> = Result<T, anyhow::Error>;

@@ -6,20 +6,26 @@ use zksync_types::{
     Nonce, Token, TokenLike, ZkSyncTx,
 };
 
-use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
+use crate::{
+    error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
+};
 
 #[derive(Debug)]
-pub struct ChangePubKeyBuilder<'a, S: EthereumSigner> {
-    wallet: &'a Wallet<S>,
+pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
+    wallet: &'a Wallet<S, P>,
     onchain_auth: bool,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     nonce: Option<Nonce>,
 }
 
-impl<'a, S: EthereumSigner + Clone> ChangePubKeyBuilder<'a, S> {
+impl<'a, S, P> ChangePubKeyBuilder<'a, S, P>
+where
+    S: EthereumSigner + Clone,
+    P: Provider + Clone,
+{
     /// Initializes a change public key transaction building process.
-    pub fn new(wallet: &'a Wallet<S>) -> Self {
+    pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
             onchain_auth: false,
@@ -75,7 +81,7 @@ impl<'a, S: EthereumSigner + Clone> ChangePubKeyBuilder<'a, S> {
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+    pub async fn send(self) -> Result<SyncTransactionHandle<P>, ClientError> {
         let provider = self.wallet.provider.clone();
 
         let tx = self.tx().await?;

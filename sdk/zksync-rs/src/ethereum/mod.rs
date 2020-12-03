@@ -51,8 +51,8 @@ pub struct EthereumProvider<S: EthereumSigner> {
 
 impl<S: EthereumSigner> EthereumProvider<S> {
     /// Creates a new Ethereum provider.
-    pub async fn new(
-        provider: &Provider,
+    pub async fn new<P: Provider>(
+        provider: &P,
         tokens_cache: TokensCache,
         eth_web3_url: impl AsRef<str>,
         eth_signer: S,
@@ -61,14 +61,15 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         let transport = Http::new(eth_web3_url.as_ref())
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
-        let network = provider.network;
+        let network = provider.network();
 
         let address_response = provider.contract_address().await?;
-        let contract_address = if address_response.main_contract.starts_with("0x") {
-            &address_response.main_contract[2..]
-        } else {
-            &address_response.main_contract
-        };
+        let contract_address =
+            if let Some(main_contract) = address_response.main_contract.strip_prefix("0x") {
+                main_contract
+            } else {
+                &address_response.main_contract
+            };
 
         let eth_client = ETHClient::new(
             transport,

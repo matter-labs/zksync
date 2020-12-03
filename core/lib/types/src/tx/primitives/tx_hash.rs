@@ -66,9 +66,7 @@ impl<'de> Deserialize<'de> for TxHash {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
-        String::deserialize(deserializer).and_then(|string| {
-            Self::from_str(&string).map_err(|err| Error::custom(err.to_string()))
-        })
+        let string = String::deserialize(deserializer)?;
+        Self::from_str(&string).map_err(serde::de::Error::custom)
     }
 }
