@@ -1,6 +1,7 @@
 //! Block sizes test is used to create blocks of all available sizes, make proofs of them and verify onchain
 
 use log::info;
+use std::io::Write;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_circuit::witness::utils::build_block_witness;
@@ -84,7 +85,7 @@ async fn main() {
         accounts,
         &contracts,
         commit_account,
-        Default::default(),
+        genesis_root,
     );
 
     let account_state = test_setup.get_accounts_state().await;
@@ -153,7 +154,6 @@ async fn main() {
         let proof_op = BlocksProofOperation {
             blocks: vec![block],
             proof: aggreagated_proof.serialize_aggregated_proof(),
-            block_idxs_in_proof: vec![0],
         };
         test_setup
             .execute_verify_commitments(proof_op)
@@ -228,7 +228,6 @@ async fn main() {
         let proof_op = BlocksProofOperation {
             blocks,
             proof: aggreagated_proof.serialize_aggregated_proof(),
-            block_idxs_in_proof,
         };
         test_setup
             .execute_verify_commitments(proof_op)

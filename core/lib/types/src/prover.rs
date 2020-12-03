@@ -26,8 +26,8 @@ impl ProverJobStatus {
     }
 }
 
-pub const SINGLE_PROOF_JOB_PRIORITY: i32 = 0;
-pub const AGGREGATED_PROOF_JOB_PRIORITY: i32 = 1;
+pub const SINGLE_PROOF_JOB_PRIORITY: i32 = 1;
+pub const AGGREGATED_PROOF_JOB_PRIORITY: i32 = 0;
 
 #[derive(Debug, Clone)]
 pub struct ProverJob {

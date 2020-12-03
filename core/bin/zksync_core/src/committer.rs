@@ -8,10 +8,11 @@ use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::mempool::MempoolRequest;
+use zksync_crypto::params::RECURSIVE_CIRCUIT_SIZES;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::aggregated_operations::{
     AggregatedActionType, AggregatedOperation, BlockExecuteOperationArg, BlocksCommitOperation,
-    BlocksExecuteOperation, BlocksProofOperation,
+    BlocksCreateProofOperation, BlocksExecuteOperation, BlocksProofOperation,
 };
 use zksync_types::{
     block::{Block, ExecutedOperations, PendingBlock},
@@ -286,25 +287,46 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
     }
 
     if last_committed_block > last_aggregate_create_proof_block {
-        let mut proofs_exits = true;
+        let mut consecutive_proofs = Vec::new();
         for block_number in last_aggregate_create_proof_block + 1..=last_committed_block {
-            proofs_exits = proofs_exits
-                && storage
-                    .prover_schema()
-                    .load_proof(block_number)
-                    .await?
-                    .is_some();
-            if !proofs_exits {
+            let proof_exists = storage
+                .prover_schema()
+                .load_proof(block_number)
+                .await?
+                .is_some();
+            if proof_exists {
+                consecutive_proofs.push(block_number);
+            } else {
                 break;
             }
         }
-        if proofs_exits {
+        if consecutive_proofs.len() > 0 {
+            let aggregate_sizes = RECURSIVE_CIRCUIT_SIZES
+                .iter()
+                .map(|(proofs, _)| *proofs)
+                .collect::<Vec<_>>();
+            let max_agg_size = *aggregate_sizes
+                .iter()
+                .max()
+                .expect("should be at least one recursive size");
+            let agg_size = aggregate_sizes
+                .into_iter()
+                .find(|agg_size| *agg_size >= consecutive_proofs.len())
+                .unwrap_or(max_agg_size);
+
             let mut block_numbers = Vec::new();
             let mut blocks = Vec::new();
             let mut block_idxs_in_proof = Vec::new();
 
+            let proofs_to_pad = if agg_size > consecutive_proofs.len() {
+                agg_size - consecutive_proofs.len()
+            } else {
+                0
+            };
             let mut idx = 0;
-            for block_number in last_aggregate_create_proof_block + 1..=last_committed_block {
+            for block_number in last_aggregate_create_proof_block + 1
+                ..=last_aggregate_create_proof_block + consecutive_proofs.len() as u32
+            {
                 let block = storage
                     .chain()
                     .block_schema()
@@ -317,7 +339,11 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
                 idx += 1;
             }
 
-            let aggregated_op_create = AggregatedOperation::CreateProofBlocks(block_numbers);
+            let aggregated_op_create =
+                AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
+                    blocks: block_numbers,
+                    proofs_to_pad,
+                });
 
             storage
                 .chain()
@@ -335,12 +361,15 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
 
     if last_aggregate_create_proof_block > last_aggregate_publish_proof_block {
         let create_proof_blocks =
-            if let Some(AggregatedOperation::CreateProofBlocks(create_proof_blocks)) = storage
+            if let Some(AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
+                blocks: create_proof_blocks,
+                ..
+            })) = storage
                 .chain()
                 .operations_schema()
                 .get_aggregated_op_that_affects_block(
                     AggregatedActionType::CreateProofBlocks,
-                    last_aggregate_create_proof_block + 1,
+                    last_aggregate_publish_proof_block + 1,
                 )
                 .await?
             {
@@ -359,8 +388,7 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
         if let Some(proof) = proof {
             let proof = proof.serialize_aggregated_proof();
             let mut blocks = Vec::new();
-            let mut block_idxs_in_proof = Vec::new();
-            for (idx, block_number) in create_proof_blocks.into_iter().enumerate() {
+            for block_number in create_proof_blocks {
                 let block = storage
                     .chain()
                     .block_schema()
@@ -368,14 +396,12 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
                     .await?
                     .expect("Failed to get last committed block from db");
                 blocks.push(block);
-                block_idxs_in_proof.push(idx);
             }
 
             let aggregated_op_publish =
                 AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
                     blocks,
                     proof,
-                    block_idxs_in_proof,
                 });
             storage
                 .chain()

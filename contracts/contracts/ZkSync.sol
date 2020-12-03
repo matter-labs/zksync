@@ -429,12 +429,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Blocks commitment verification.
     /// @notice Only verifies block commitments without any other processing
-    function proofBlocks(
-        StoredBlockInfo[] memory _committedBlocks,
-        uint256[] memory _commitmentIdxs,
-        ProofInput memory _proof
-    ) external nonReentrant {
-        require(_committedBlocks.length == _commitmentIdxs.length, "pbl1");
+    function proofBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
         uint32 currentTotalBlocksProofed = totalBlocksProofed;
         for (uint256 i = 0; i < _committedBlocks.length; ++i) {
             require(
@@ -444,10 +439,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             ++currentTotalBlocksProofed;
 
             uint256 mask = (~uint256(0)) >> 3;
-            require(
-                _proof.commitments[_commitmentIdxs[i]] & mask == uint256(_committedBlocks[i].commitment) & mask,
-                "pbl3"
-            ); // incorrect block commitment in proof
+            require(_proof.commitments[i] & mask == uint256(_committedBlocks[i].commitment) & mask, "pbl3"); // incorrect block commitment in proof
         }
 
         bool success =
@@ -485,7 +477,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         totalBlocksCommitted = blocksCommitted;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
-        if (totalBlocksCommitted > totalBlocksProofed) {
+        if (totalBlocksCommitted < totalBlocksProofed) {
             totalBlocksProofed = totalBlocksCommitted;
         }
 

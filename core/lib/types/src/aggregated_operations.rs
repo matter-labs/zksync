@@ -61,26 +61,24 @@ impl BlocksCommitOperation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlocksCreateProofOperation {
+    pub blocks: Vec<BlockNumber>,
+    pub proofs_to_pad: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlocksProofOperation {
     pub blocks: Vec<Block>,
     pub proof: EncodedAggregatedProof,
-    pub block_idxs_in_proof: Vec<usize>,
 }
 
 impl BlocksProofOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
         let blocks_arg = Token::Array(self.blocks.iter().map(|b| stored_block_info(b)).collect());
 
-        let committed_idxs = Token::Array(
-            self.block_idxs_in_proof
-                .iter()
-                .map(|idx| Token::Uint(U256::from(*idx)))
-                .collect(),
-        );
-
         let proof = self.proof.get_eth_tx_args();
 
-        vec![blocks_arg, committed_idxs, proof]
+        vec![blocks_arg, proof]
     }
 }
 
@@ -158,7 +156,7 @@ impl std::str::FromStr for AggregatedActionType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AggregatedOperation {
     CommitBlocks(BlocksCommitOperation),
-    CreateProofBlocks(Vec<BlockNumber>),
+    CreateProofBlocks(BlocksCreateProofOperation),
     PublishProofBlocksOnchain(BlocksProofOperation),
     ExecuteBlocks(BlocksExecuteOperation),
 }
@@ -181,7 +179,9 @@ impl AggregatedOperation {
                 blocks.first().map(|b| b.block_number).unwrap_or_default(),
                 blocks.last().map(|b| b.block_number).unwrap_or_default(),
             ),
-            AggregatedOperation::CreateProofBlocks(blocks) => (
+            AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
+                blocks, ..
+            }) => (
                 blocks.first().cloned().unwrap_or_default(),
                 blocks.last().cloned().unwrap_or_default(),
             ),

@@ -695,7 +695,6 @@ impl TestSetup {
         let block_proof_op = BlocksProofOperation {
             blocks: vec![new_block.clone()],
             proof,
-            block_idxs_in_proof: vec![0],
         };
         let verify_result = self
             .commit_account

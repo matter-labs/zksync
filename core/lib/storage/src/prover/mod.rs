@@ -48,8 +48,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         sqlx::query!(
         "
           WITH job_values as (
-            SELECT $1::int4, $2::int4, $3::text, $4::text, $5::int8, $6::int8, $7::jsonb
-            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $5 and last_block = $6 LIMIT 1)
+            SELECT $1::int4, $2::int4, $3::text, 'server_add_job', $4::int8, $5::int8, $6::jsonb
+            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $4 and last_block = $5 and job_type = $3 LIMIT 1)
           ) 
           INSERT INTO prover_job_queue (job_status, job_priority, job_type, updated_by, first_block, last_block, job_data) 
           SELECT * from job_values
@@ -57,7 +57,6 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             ProverJobStatus::Idle.to_number(),
             job_priority,
             job_type.to_string(),
-            "server".to_string(),
             i64::from(first_block),
             i64::from(last_block),
             job_data,
@@ -67,8 +66,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     //
     pub async fn mark_stale_jobs_as_idle(&mut self) -> QueryResult<()> {
         sqlx::query!(
-            "UPDATE prover_job_queue SET job_status = $1
-            WHERE job_status = $2 and (now() - updated_at) < interval '120 seconds'",
+            "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')
+            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
             ProverJobStatus::Idle.to_number(),
             ProverJobStatus::InProgress.to_number(),
         )
@@ -102,10 +101,10 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             sqlx::query!(
                 r#"
                 UPDATE prover_job_queue 
-                SET (job_status, updated_at, updated_by) = ($1, now(), 'server')
+                SET (job_status, updated_at, updated_by) = ($1, now(), 'server_give_job')
                 WHERE id = $2;
             "#,
-                ProverJobStatus::Idle.to_number(),
+                ProverJobStatus::InProgress.to_number(),
                 job.id,
             )
             .execute(transaction.conn())
@@ -174,10 +173,10 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
             "UPDATE prover_job_queue
-            SET (updated_at, job_status) = (now(), $1)
-            WHERE first_block = $2 and last_block = $2",
+            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')
+            WHERE id = $2",
             ProverJobStatus::Done.to_number(),
-            i64::from(block_number),
+            job_id,
         )
         .execute(transaction.conn())
         .await?;
@@ -190,6 +189,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(transaction.conn())
         .await?
         .rows_affected() as usize;
+        transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
         Ok(updated_rows)
@@ -207,11 +207,10 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
             "UPDATE prover_job_queue
-            SET (updated_at, job_status) = (now(), $1)
-            WHERE first_block = $2 and last_block = $3",
+            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')
+            WHERE id = $2",
             ProverJobStatus::Done.to_number(),
-            i64::from(first_block),
-            i64::from(last_block),
+            job_id
         )
         .execute(transaction.conn())
         .await?;
@@ -225,6 +224,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(transaction.conn())
         .await?
         .rows_affected() as usize;
+        transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_aggregated_proof");
         Ok(updated_rows)

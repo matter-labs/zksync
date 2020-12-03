@@ -106,9 +106,9 @@ async fn compute_proof_no_blocking<PROVER>(
 where
     PROVER: ProverImpl + Send + Sync + 'static,
 {
+    let (result_sender, result_receiver) = oneshot::channel();
+    let (panic_sender, panic_receiver) = oneshot::channel();
     let (mut result_receiver, mut panic_receiver) = {
-        let (result_sender, result_receiver) = oneshot::channel();
-        let (panic_sender, panic_receiver) = oneshot::channel();
         std::thread::spawn(move || {
             // TODO: panic sender should work
             // std::panic::set_hook(Box::new(|panic_info| {
