@@ -155,9 +155,22 @@ fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
     UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(num, precision)
 }
 
+struct FakeTokenWatcher;
+#[async_trait::async_trait]
+impl TokenWatcher for FakeTokenWatcher {
+    async fn get_token_market_amount(&self, _token: &Token) -> anyhow::Result<u64> {
+        unreachable!()
+    }
+}
+
 #[test]
 fn test_ticker_formula() {
-    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+    let validator = FeeTokenValidator::new(
+        HashMap::new(),
+        Duration::from_secs(100),
+        100,
+        FakeTokenWatcher,
+    );
 
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(
@@ -253,7 +266,12 @@ fn test_ticker_formula() {
 
 #[test]
 fn test_fee_for_unsubsidized_tokens() {
-    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+    let validator = FeeTokenValidator::new(
+        HashMap::new(),
+        Duration::from_secs(100),
+        100,
+        FakeTokenWatcher,
+    );
 
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(

@@ -38,6 +38,8 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
+use crate::fee_ticker::fee_token_validator::{TokenWatcher, UniswapTokenWatcher};
+use tokio::time::Duration;
 
 mod constants;
 mod fee;
@@ -170,12 +172,12 @@ pub enum TickerRequest {
     },
 }
 
-struct FeeTicker<API, INFO> {
+struct FeeTicker<API, INFO, W> {
     api: API,
     info: INFO,
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
-    validator: FeeTokenValidator,
+    validator: FeeTokenValidator<W>,
 }
 
 #[must_use]
@@ -193,7 +195,9 @@ pub fn run_ticker_task(
     };
 
     let cache = TokenDBCache::new(db_pool.clone());
-    let validator = FeeTokenValidator::new(cache, config.disabled_tokens);
+    // TODO Use config
+    let validator =
+        FeeTokenValidator::new(cache, Duration::from_secs(100), 100, UniswapTokenWatcher);
 
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
@@ -235,13 +239,13 @@ pub fn run_ticker_task(
     }
 }
 
-impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
+impl<API: FeeTickerAPI, INFO: FeeTickerInfo, W: TokenWatcher> FeeTicker<API, INFO, W> {
     fn new(
         api: API,
         info: INFO,
         requests: Receiver<TickerRequest>,
         config: TickerConfig,
-        validator: FeeTokenValidator,
+        validator: FeeTokenValidator<W>,
     ) -> Self {
         Self {
             api,

@@ -2,7 +2,10 @@
 //! an entity which decides whether certain ERC20 token is suitable for paying fees.
 
 // Built-in uses
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 // Workspace uses
 use zksync_types::{
     tokens::{Token, TokenLike},
@@ -13,46 +16,76 @@ use crate::utils::token_db_cache::TokenDBCache;
 
 /// Fee token validator decides whether certain ERC20 token is suitable for paying fees.
 #[derive(Debug, Clone)]
-pub(crate) struct FeeTokenValidator {
+pub(crate) struct FeeTokenValidator<W> {
     tokens_cache: TokenCacheWrapper,
     /// List of tokens that aren't accepted to pay fees in.
-    disabled_tokens: HashSet<Address>,
+    available_tokens: HashMap<Address, Instant>,
+    available_time: Duration,
+    available_amount: u64,
+    watcher: W,
 }
 
-impl FeeTokenValidator {
+impl<W: TokenWatcher> FeeTokenValidator<W> {
     pub(crate) fn new(
         cache: impl Into<TokenCacheWrapper>,
-        disabled_tokens: HashSet<Address>,
+        available_time: Duration,
+        available_amount: u64,
+        watcher: W,
     ) -> Self {
         Self {
             tokens_cache: cache.into(),
-            disabled_tokens,
+            available_tokens: Default::default(),
+            available_time,
+            available_amount,
+            watcher,
         }
     }
 
     /// Returns `true` if token can be used to pay fees.
-    pub(crate) async fn token_allowed(&self, token: TokenLike) -> anyhow::Result<bool> {
+    pub(crate) async fn token_allowed(&mut self, token: TokenLike) -> anyhow::Result<bool> {
         let token = self.resolve_token(token).await?;
-
-        self.check_token(token).await
+        if let Some(token) = token {
+            self.check_token(token).await
+        } else {
+            // Unknown tokens aren't suitable for our needs, obviously.
+            Ok(false)
+        }
     }
 
     async fn resolve_token(&self, token: TokenLike) -> anyhow::Result<Option<Token>> {
         self.tokens_cache.get_token(token).await
     }
 
-    async fn check_token(&self, token: Option<Token>) -> anyhow::Result<bool> {
-        // Currently we add tokens in zkSync manually, thus we can decide whether token is acceptable in before.
-        // Later we'll check Uniswap trading volume for tokens. That's why this function is already `async` even
-        // though it's not really `async` at this moment.
-
-        if let Some(token) = token {
-            let not_acceptable = self.disabled_tokens.contains(&token.address);
-            Ok(!not_acceptable)
-        } else {
-            // Unknown tokens aren't suitable for our needs, obviously.
-            Ok(false)
+    async fn check_token(&mut self, token: Token) -> anyhow::Result<bool> {
+        if let Some(last_token_check_time) = self.available_tokens.get(&token.address) {
+            if last_token_check_time.elapsed() < self.available_time {
+                return Ok(true);
+            }
         }
+
+        let amount = self.get_token_market_amount(&token).await?;
+        if amount >= self.available_amount {
+            self.available_tokens.insert(token.address, Instant::now());
+            return Ok(true);
+        }
+        Ok(false)
+    }
+    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64> {
+        self.watcher.get_token_market_amount(token).await
+    }
+}
+
+#[async_trait::async_trait]
+pub trait TokenWatcher {
+    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64>;
+}
+
+pub struct UniswapTokenWatcher;
+
+#[async_trait::async_trait]
+impl TokenWatcher for UniswapTokenWatcher {
+    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64> {
+        todo!()
     }
 }
 
@@ -86,8 +119,18 @@ impl TokenCacheWrapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
     use std::str::FromStr;
+
+    struct InMemoryTokenWatcher {
+        amounts: HashMap<Address, u64>,
+    }
+
+    #[async_trait::async_trait]
+    impl TokenWatcher for InMemoryTokenWatcher {
+        async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64> {
+            Ok(*self.amounts.get(&token.address).unwrap())
+        }
+    }
 
     #[tokio::test]
     async fn check_tokens() {
@@ -102,10 +145,15 @@ mod tests {
         tokens.insert(TokenLike::Address(dai_token_address), dai_token);
         tokens.insert(TokenLike::Address(phnx_token_address), phnx_token);
 
-        let mut disabled_tokens = HashSet::new();
-        disabled_tokens.insert(phnx_token_address);
-
-        let validator = FeeTokenValidator::new(tokens, disabled_tokens);
+        let mut amounts = HashMap::new();
+        amounts.insert(dai_token_address, 200);
+        amounts.insert(phnx_token_address, 10);
+        let mut validator = FeeTokenValidator::new(
+            tokens,
+            Duration::new(100, 0),
+            100,
+            InMemoryTokenWatcher { amounts },
+        );
 
         let dai_allowed = validator
             .token_allowed(TokenLike::Address(dai_token_address))
