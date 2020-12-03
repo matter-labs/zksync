@@ -13,7 +13,7 @@ use actix_web::{
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_types::BlockNumber;
 
 // Local uses
@@ -34,10 +34,17 @@ pub const MAX_LIMIT: u32 = 100;
 
 type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
-pub(crate) fn api_scope(tx_sender: TxSender, env_options: ConfigurationOptions) -> Scope {
+pub(crate) fn api_scope(
+    tx_sender: TxSender,
+    env_options: ConfigurationOptions,
+    api_server_options: ApiServerOptions,
+) -> Scope {
     web::scope("/api/v1")
         .service(config::api_scope(&env_options))
-        .service(blocks::api_scope(&env_options, tx_sender.pool.clone()))
+        .service(blocks::api_scope(
+            &api_server_options,
+            tx_sender.pool.clone(),
+        ))
         .service(transactions::api_scope(tx_sender.clone()))
         .service(operations::api_scope(tx_sender.pool.clone()))
         .service(tokens::api_scope(

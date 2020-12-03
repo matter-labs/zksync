@@ -1,11 +1,26 @@
+import { ArgumentParser } from 'argparse';
+import * as fs from 'fs';
+import * as path from 'path';
 import { deployContract } from 'ethereum-waffle';
-import { ethers } from 'ethers';
+import { Wallet } from 'ethers';
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 const MAX_CONTRACT_SIZE_BYTES = 24576;
 async function main() {
+    const parser = new ArgumentParser({
+        version: '0.1.0',
+        addHelp: true
+    });
+    parser.addArgument('--deployerPrivateKey', { required: false, help: 'Wallet used to deploy contracts' });
+    const args = parser.parseArgs(process.argv.slice(2));
+
+    const wallet = args.deployerPrivateKey
+        ? new Wallet(args.deployerPrivateKey, provider)
+        : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+
     const verifierContractCode = require('../build/ConcreteVerifier.json');
     const verifier = await deployContract(wallet, verifierContractCode, [], {
         gasLimit: 3000000

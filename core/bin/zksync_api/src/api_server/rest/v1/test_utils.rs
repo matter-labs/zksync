@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::ConnectionPool;
 use zksync_storage::{
@@ -43,6 +43,7 @@ pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
     pub env_options: ConfigurationOptions,
+    pub api_server_options: ApiServerOptions,
     pub pool: ConnectionPool,
 }
 
@@ -50,6 +51,7 @@ impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
             env_options: ConfigurationOptions::from_env(),
+            api_server_options: ApiServerOptions::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }

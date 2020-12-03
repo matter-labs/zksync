@@ -1,6 +1,7 @@
 import { expect, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import fs from 'fs';
+import * as path from 'path';
 import mock from 'mock-fs';
 import type { Network, Config } from '../src/types';
 import * as ethers from 'ethers';
@@ -9,6 +10,9 @@ import * as commands from '../src/commands';
 import { saveConfig, loadConfig, configLocation, DEFAULT_CONFIG } from '../src/config';
 
 use(chaiAsPromised);
+
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 describe('Fetching Information', () => {
     let ethDepositor: string;
@@ -21,7 +25,7 @@ describe('Fetching Information', () => {
     before('make some deposits & transactions', async () => {
         const ethProvider = new ethers.providers.JsonRpcProvider();
         const syncProvider = await zksync.getDefaultProvider('localhost', 'HTTP');
-        const ethWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC as string, "m/44'/60'/0'/0/0").connect(
+        const ethWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0").connect(
             ethProvider
         );
         ethDepositor = ethWallet.address;
@@ -255,7 +259,7 @@ describe('Config Management', () => {
 });
 
 describe('Making Transactions', () => {
-    const rich = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC as string, "m/44'/60'/0'/0/0");
+    const rich = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/0");
     const poor1 = ethers.Wallet.createRandom();
     const poor2 = ethers.Wallet.createRandom();
 

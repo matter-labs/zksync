@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
+use zksync_utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix};
 // Local imports
-use crate::utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix};
 
 #[derive(Debug, FromRow)]
 pub struct StorageBlock {

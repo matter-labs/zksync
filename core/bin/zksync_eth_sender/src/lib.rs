@@ -13,7 +13,7 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use zksync_config::{ConfigurationOptions, EthSenderOptions};
+use zksync_config::{EthClientOptions, EthSenderOptions};
 use zksync_eth_client::SignedCallResult;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -577,16 +577,19 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                     TxCheckOutcome::Pending
                 }
             }
-            // Non-successful execution.
+            // Non-successful execution, report the failure with details.
             Some(status) => {
-                // Transaction failed, report the failure with details.
+                // Check if transaction has enough confirmations.
+                if status.confirmations >= self.options.wait_confirmations {
+                    assert!(
+                        status.receipt.is_some(),
+                        "Receipt should exist for a failed transaction"
+                    );
 
-                // TODO: check confirmations for fail (#1110).
-                assert!(
-                    status.receipt.is_some(),
-                    "Receipt should exist for a failed transaction"
-                );
-                TxCheckOutcome::Failed(Box::new(status.receipt.unwrap()))
+                    TxCheckOutcome::Failed(Box::new(status.receipt.unwrap()))
+                } else {
+                    TxCheckOutcome::Pending
+                }
             }
             // Stuck transaction.
             None if op.is_stuck(current_block) => TxCheckOutcome::Stuck,
@@ -818,14 +821,13 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 #[must_use]
 pub fn run_eth_sender(
     pool: ConnectionPool,
-    config_options: ConfigurationOptions,
+    eth_client_options: EthClientOptions,
+    eth_sender_options: EthSenderOptions,
 ) -> JoinHandle<()> {
     let ethereum =
-        EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
+        EthereumHttpClient::new(&eth_client_options).expect("Ethereum client creation failed");
 
     let db = Database::new(pool);
-
-    let eth_sender_options = EthSenderOptions::from_env();
 
     tokio::spawn(async move {
         let eth_sender = ETHSender::new(eth_sender_options, db, ethereum).await;

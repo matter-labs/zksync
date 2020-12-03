@@ -91,7 +91,7 @@ Install `psql` CLI tool to interact with postgres.
 On debian-based linux:
 
 ```sh
-sudo apt-get install postgresql
+sudo apt-get install postgresql-client
 ```
 
 ## `Diesel` CLI
@@ -115,7 +115,7 @@ sudo apt-get install libpq-dev
 Also, we need [`sqlx`](https://github.com/launchbadge/sqlx) CLI (it is used to generate database wrappers):
 
 ```sh
-cargo install --version=0.1.0-beta.1 sqlx-cli
+cargo install --version=0.2.0 sqlx-cli
 ```
 
 ## `solc`
