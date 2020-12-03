@@ -512,7 +512,7 @@ mod tests {
                     cfg.pool.clone(),
                     sign_verifier.clone(),
                     fee_ticker.clone(),
-                    &cfg.env_options,
+                    &cfg.api_server_options,
                 ))
             });
 

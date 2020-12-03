@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 // External uses
+use async_trait::async_trait;
 use jsonrpc_core::{types::response::Output, ErrorCode};
 
 // Workspace uses
@@ -29,17 +30,101 @@ pub fn get_rpc_addr(network: Network) -> &'static str {
     }
 }
 
-/// `Provider` is capable of interacting with the ZKSync node via its
-/// JSON RPC interface.
-#[derive(Debug, Clone)]
-pub struct Provider {
-    rpc_addr: String,
-    client: reqwest::Client,
-    pub network: Network,
+#[async_trait]
+/// `Provider` used to connect to zkSync network in order to send transactions
+/// and retrieve some information from the server about
+/// zkSync accounts, transactions, supported tokens and the like.
+pub trait Provider {
+    /// Requests and returns information about a ZKSync account given its address.
+    async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError>;
+
+    /// Requests and returns a list of tokens supported by zkSync.
+    async fn tokens(&self) -> Result<Tokens, ClientError>;
+
+    /// Requests and returns information about transaction execution status.
+    async fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfo, ClientError>;
+
+    /// Obtains minimum fee required to process transaction in zkSync network.
+    async fn get_tx_fee(
+        &self,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: impl Into<TokenLike> + Send + 'async_trait,
+    ) -> Result<Fee, ClientError>;
+
+    /// Submits a transaction to the zkSync network.
+    /// Returns the hash of the created transaction.
+    async fn send_tx(
+        &self,
+        tx: ZkSyncTx,
+        eth_signature: Option<PackedEthSignature>,
+    ) -> Result<TxHash, ClientError>;
+
+    /// Type of network this provider is allowing access to.
+    fn network(&self) -> Network;
+
+    /// Requests and returns a smart contract address (for Ethereum network associated with network specified in `Provider`).
+    async fn contract_address(&self) -> Result<ContractAddress, ClientError>;
 }
 
-impl Provider {
-    /// Creates a new `Provider` connected to the desired zkSync network.
+/// `RpcProvider` is capable of interacting with the ZKSync node via its
+/// JSON RPC interface.
+#[derive(Debug, Clone)]
+pub struct RpcProvider {
+    rpc_addr: String,
+    client: reqwest::Client,
+    network: Network,
+}
+
+#[async_trait]
+impl Provider for RpcProvider {
+    async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
+        let msg = JsonRpcRequest::account_info(address);
+        self.send_and_deserialize(&msg).await
+    }
+
+    async fn tokens(&self) -> Result<Tokens, ClientError> {
+        let msg = JsonRpcRequest::tokens();
+        self.send_and_deserialize(&msg).await
+    }
+
+    async fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
+        let msg = JsonRpcRequest::tx_info(tx_hash);
+        self.send_and_deserialize(&msg).await
+    }
+
+    async fn get_tx_fee(
+        &self,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: impl Into<TokenLike> + Send + 'async_trait,
+    ) -> Result<Fee, ClientError> {
+        let token = token.into();
+        let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token);
+        self.send_and_deserialize(&msg).await
+    }
+
+    async fn send_tx(
+        &self,
+        tx: ZkSyncTx,
+        eth_signature: Option<PackedEthSignature>,
+    ) -> Result<TxHash, ClientError> {
+        let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
+        self.send_and_deserialize(&msg).await
+    }
+
+    fn network(&self) -> Network {
+        self.network
+    }
+
+    async fn contract_address(&self) -> Result<ContractAddress, ClientError> {
+        let msg = JsonRpcRequest::contract_address();
+        self.send_and_deserialize(&msg).await
+    }
+}
+
+impl RpcProvider {
+    /// Creates a new `RpcProvider` connected to the desired zkSync network.
     pub fn new(network: Network) -> Self {
         Self {
             rpc_addr: get_rpc_addr(network).into(),
@@ -57,38 +142,6 @@ impl Provider {
         }
     }
 
-    /// Obtains minimum fee required to process transaction in zkSync network.
-    pub async fn get_tx_fee(
-        &self,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: impl Into<TokenLike>,
-    ) -> Result<Fee, ClientError> {
-        let token = token.into();
-        let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token);
-
-        let ret = self.post(&msg).await?;
-        let fee = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-
-        Ok(fee)
-    }
-
-    /// Submits a transaction to the zkSync network.
-    /// Returns the hash of the created transaction.
-    pub async fn send_tx(
-        &self,
-        tx: ZkSyncTx,
-        eth_signature: Option<PackedEthSignature>,
-    ) -> Result<TxHash, ClientError> {
-        let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
-
-        let ret = self.post(&msg).await?;
-        let tx_hash = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_hash)
-    }
-
     /// Submits a batch transaction to the zkSync network.
     /// Returns the hashes of the created transactions.
     pub async fn send_txs_batch(
@@ -97,61 +150,13 @@ impl Provider {
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<Vec<TxHash>, ClientError> {
         let msg = JsonRpcRequest::submit_tx_batch(txs_signed, eth_signature);
-
-        let ret = self.post(&msg).await?;
-        let tx_hashes = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_hashes)
-    }
-
-    /// Requests and returns information about a ZKSync account given its address.
-    pub async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
-        let msg = JsonRpcRequest::account_info(address);
-
-        let ret = self.post(&msg).await?;
-        let account_state = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(account_state)
+        self.send_and_deserialize(&msg).await
     }
 
     /// Requests and returns information about an Ethereum operation given its `serial_id`.
     pub async fn ethop_info(&self, serial_id: u32) -> Result<EthOpInfo, ClientError> {
         let msg = JsonRpcRequest::ethop_info(serial_id);
-
-        let ret = self.post(&msg).await?;
-        let eth_op_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(eth_op_info)
-    }
-
-    /// Requests and returns information about transaction execution status.
-    pub async fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
-        let msg = JsonRpcRequest::tx_info(tx_hash);
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
-    }
-
-    /// Requests and returns a list of tokens supported by zkSync.
-    pub async fn tokens(&self) -> Result<Tokens, ClientError> {
-        let msg = JsonRpcRequest::tokens();
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
-    }
-
-    /// Requests and returns a smart contract address (for Ethereum network associated with network specified in `Provider`).
-    pub async fn contract_address(&self) -> Result<ContractAddress, ClientError> {
-        let msg = JsonRpcRequest::contract_address();
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
+        self.send_and_deserialize(&msg).await
     }
 
     /// Requests and returns eth withdrawal transaction hash for some offchain withdrawal.
@@ -160,11 +165,7 @@ impl Provider {
         withdrawal_hash: TxHash,
     ) -> Result<Option<String>, ClientError> {
         let msg = JsonRpcRequest::eth_tx_for_withdrawal(withdrawal_hash);
-
-        let ret = self.post(&msg).await?;
-        let tx_info = serde_json::from_value(ret)
-            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
-        Ok(tx_info)
+        self.send_and_deserialize(&msg).await
     }
 
     /// Performs a POST query to the JSON RPC endpoint,
@@ -200,9 +201,9 @@ impl Provider {
                 continue;
             }
 
-            match result? {
-                Output::Success(success) => return Ok(success.result),
-                Output::Failure(failure) => return Err(ClientError::RpcError(failure)),
+            return match result? {
+                Output::Success(success) => Ok(success.result),
+                Output::Failure(failure) => Err(ClientError::RpcError(failure)),
             };
         }
     }
@@ -233,6 +234,16 @@ impl Provider {
             .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
 
         Ok(reply)
+    }
+
+    async fn send_and_deserialize<R>(&self, msg: &JsonRpcRequest) -> Result<R, ClientError>
+    where
+        R: serde::de::DeserializeOwned,
+    {
+        let ret = self.post(msg).await?;
+        let result = serde_json::from_value(ret)
+            .map_err(|err| ClientError::MalformedResponse(err.to_string()))?;
+        Ok(result)
     }
 }
 

@@ -7,7 +7,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 // Workspace deps
-use zksync_config::{ConfigurationOptions, ProverOptions};
+use zksync_config::ProverOptions;
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
@@ -253,7 +253,6 @@ pub fn run_prover_server(
     connection_pool: zksync_storage::ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     prover_options: ProverOptions,
-    config_options: ConfigurationOptions,
 ) {
     thread::Builder::new()
         .name("prover_server".to_string())
@@ -278,9 +277,9 @@ pub fn run_prover_server(
                 };
 
                 // Start pool maintainer threads.
-                for offset in 0..config_options.witness_generators {
+                for offset in 0..prover_options.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
-                    let block_step = config_options.witness_generators as u32;
+                    let block_step = prover_options.witness_generators as u32;
                     log::info!(
                         "Starting witness generator ({},{})",
                         start_block,
@@ -294,15 +293,12 @@ pub fn run_prover_server(
                     );
                     pool_maintainer.start(panic_notify.clone());
                 }
-
                 // Start HTTP server.
-                let idle_provers = config_options.idle_provers;
+                let gone_timeout = prover_options.gone_timeout;
+                let idle_provers = prover_options.idle_provers;
                 HttpServer::new(move || {
-                    let app_state = AppState::new(
-                        connection_pool.clone(),
-                        prover_options.gone_timeout,
-                        idle_provers,
-                    );
+                    let app_state =
+                        AppState::new(connection_pool.clone(), gone_timeout, idle_provers);
 
                     // By calling `register_data` instead of `data` we're avoiding double
                     // `Arc` wrapping of the object.
@@ -321,7 +317,7 @@ pub fn run_prover_server(
                             web::post().to(required_replicas),
                         )
                 })
-                .bind(&config_options.prover_server_address)
+                .bind(&prover_options.prover_server_address)
                 .expect("failed to bind")
                 .run()
                 .await

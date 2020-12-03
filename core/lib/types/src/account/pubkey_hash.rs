@@ -112,9 +112,7 @@ impl<'de> Deserialize<'de> for PubKeyHash {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
-        String::deserialize(deserializer).and_then(|string| {
-            PubKeyHash::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
-        })
+        let string = String::deserialize(deserializer)?;
+        PubKeyHash::from_hex(&string).map_err(serde::de::Error::custom)
     }
 }
