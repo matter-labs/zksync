@@ -66,8 +66,8 @@ jobs:
         zk contract build-dev
         zk run deploy-eip1271
 
-#    - name: integration-tests
-#      run: zk test integration all --in-docker
+    - name: integration-tests
+      run: zk test integration all --in-docker
 
     - name: integration-testkit
       run: zk test integration testkit
