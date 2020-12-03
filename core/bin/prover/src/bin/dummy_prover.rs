@@ -1,12 +1,8 @@
 use anyhow::Error;
 use std::sync::mpsc;
 use std::time::Duration;
-use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_prover::cli_utils::main_for_prover_impl;
 use zksync_prover::{ApiClient, ProverConfig, ProverImpl};
-use zksync_prover_utils::aggregated_proofs::{
-    AggregatedProof, NewProofType, OldProofType, SingleProof,
-};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_utils::get_env;
 
@@ -51,5 +47,5 @@ impl ProverImpl for DummyProver {
 
 #[tokio::main]
 async fn main() {
-    main_for_prover_impl::<DummyProver>();
+    main_for_prover_impl::<DummyProver>().await;
 }

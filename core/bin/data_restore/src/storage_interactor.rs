@@ -3,7 +3,6 @@ use std::{convert::TryFrom, str::FromStr};
 // External deps
 use web3::types::H256;
 // Workspace deps
-use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_storage::{
     data_restore::records::{NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock},
     StorageProcessor,
@@ -83,7 +82,7 @@ pub async fn update_tree_state(
 
     let verify_op = Operation {
         action: Action::Verify {
-            proof: Box::new(EncodedProofPlonk::default()),
+            proof: Box::new(Default::default()),
         },
         block: block.clone(),
         id: None,

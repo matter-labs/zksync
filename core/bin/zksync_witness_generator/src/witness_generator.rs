@@ -3,10 +3,10 @@ use std::{thread, time};
 // External
 use futures::channel::mpsc;
 // Workspace deps
+use zksync_circuit::serialization::ProverData;
 use zksync_circuit::witness::utils::build_block_witness;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
-use zksync_prover_utils::prover_data::ProverData;
 use zksync_storage::StorageProcessor;
 use zksync_types::block::Block;
 use zksync_types::BlockNumber;

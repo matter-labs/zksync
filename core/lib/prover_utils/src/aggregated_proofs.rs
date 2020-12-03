@@ -1,7 +1,4 @@
 use crate::fs_utils::get_recursive_verification_key_path;
-use crate::serialization::{
-    serialize_fe_for_ethereum, serialize_new_proof, AggregatedProofSerde, SingleProofSerde,
-};
 use crate::{get_universal_setup_monomial_form, PlonkVerificationKey};
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
@@ -25,7 +22,7 @@ use zksync_crypto::franklin_crypto::bellman::plonk::commitments::transcript::kec
 use zksync_crypto::params::{
     RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_SIZES, RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
 };
-use zksync_crypto::proof::EncodedAggregatedProof;
+use zksync_crypto::proof::{AggregatedProof, EncodedAggregatedProof, SingleProof, Vk};
 use zksync_crypto::recursive_aggregation_circuit::circuit::{
     create_recursive_circuit_setup, create_zksync_recursive_aggregate,
     proof_recursive_aggregate_for_zksync, RecursiveAggregationCircuitBn256,
@@ -43,74 +40,6 @@ use zksync_crypto::{Engine, Fr};
 // use std::fs::File;
 // use std::sync::{mpsc, Mutex};
 // use std::time::Duration;
-
-pub type OldProofType = Proof<Engine, PlonkCsWidth4WithNextStepParams>;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SingleProof(#[serde(with = "SingleProofSerde")] pub(crate) OldProofType);
-
-impl Default for SingleProof {
-    fn default() -> Self {
-        SingleProof(OldProofType::empty())
-    }
-}
-
-pub type NewProofType = NewProof<Engine, RecursiveAggregationCircuitBn256<'static>>;
-#[derive(Serialize, Deserialize)]
-pub struct AggregatedProof {
-    #[serde(with = "AggregatedProofSerde")]
-    pub(crate) proof: NewProofType,
-    #[serde(with = "VecFrSerde")]
-    pub(crate) individual_vk_inputs: Vec<Fr>,
-    pub(crate) individual_vk_idxs: Vec<usize>,
-    #[serde(with = "VecFrSerde")]
-    pub(crate) aggr_limbs: Vec<Fr>,
-}
-
-impl Default for AggregatedProof {
-    fn default() -> Self {
-        AggregatedProof {
-            proof: NewProofType::empty(),
-            individual_vk_inputs: Vec::new(),
-            individual_vk_idxs: Vec::new(),
-            aggr_limbs: Vec::new(),
-        }
-    }
-}
-
-impl std::fmt::Debug for AggregatedProof {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AggregatedProof")
-    }
-}
-
-impl Clone for AggregatedProof {
-    fn clone(&self) -> Self {
-        let mut bytes = Vec::new();
-        self.proof
-            .write(&mut bytes)
-            .expect("Failed to serialize aggregated proof");
-        AggregatedProof {
-            proof: NewProof::read(&*bytes).expect("Failed to deserialize aggregated proof"),
-            individual_vk_inputs: self.individual_vk_inputs.clone(),
-            individual_vk_idxs: self.individual_vk_idxs.clone(),
-            aggr_limbs: self.aggr_limbs.clone(),
-        }
-    }
-}
-
-pub type Vk = SingleVk<Engine, PlonkCsWidth4WithNextStepParams>;
-
-#[derive(Serialize, Deserialize)]
-pub struct AggregatedProofData {
-    pub(crate) proof: AggregatedProof,
-    #[serde(with = "VecFrSerde")]
-    pub(crate) aggregated_limbs: Vec<Fr>,
-    #[serde(with = "VecFrSerde")]
-    pub(crate) individual_inputs: Vec<Fr>,
-    pub(crate) individual_idx: Vec<usize>,
-}
-
 #[derive(Clone)]
 pub struct SingleProofData {
     pub proof: SingleProof,
@@ -242,35 +171,4 @@ pub fn gen_aggregate_proof(
         individual_vk_idxs,
         aggr_limbs,
     })
-}
-
-impl AggregatedProof {
-    pub fn serialize_aggregated_proof(&self) -> EncodedAggregatedProof {
-        let (inputs, proof) = serialize_new_proof(&self.proof);
-
-        let subproof_limbs = self
-            .aggr_limbs
-            .iter()
-            .map(serialize_fe_for_ethereum)
-            .collect();
-        let individual_vk_inputs = self
-            .individual_vk_inputs
-            .iter()
-            .map(serialize_fe_for_ethereum)
-            .collect();
-        let individual_vk_idxs = self
-            .individual_vk_idxs
-            .iter()
-            .cloned()
-            .map(U256::from)
-            .collect();
-
-        EncodedAggregatedProof {
-            aggregated_input: inputs[0],
-            proof,
-            subproof_limbs,
-            individual_vk_inputs,
-            individual_vk_idxs,
-        }
-    }
 }

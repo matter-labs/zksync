@@ -10,13 +10,12 @@ use reqwest::Url;
 // Workspace deps
 use crate::client;
 use zksync_circuit::circuit::ZkSyncCircuit;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_circuit::serialization::ProverData;
 use zksync_crypto::Engine;
 use zksync_prover_utils::api::{
     ProverId, ProverInputRequest, ProverInputResponse, ProverOutputRequest, ProverStopped,
     WorkingOn,
 };
-use zksync_prover_utils::prover_data::ProverData;
 
 #[derive(Debug, Clone)]
 pub struct ApiClient {
@@ -61,10 +60,13 @@ impl crate::ApiClient for ApiClient {
         Ok(response.json().await?)
     }
 
-    async fn working_on(&self, job_id: i32) -> Result<(), anyhow::Error> {
+    async fn working_on(&self, job_id: i32, prover_name: &str) -> Result<(), anyhow::Error> {
         self.http_client
             .post(self.working_on_url.clone())
-            .json(&WorkingOn { job_id })
+            .json(&WorkingOn {
+                job_id,
+                prover_name: prover_name.to_string(),
+            })
             .send()
             .await?;
         Ok(())

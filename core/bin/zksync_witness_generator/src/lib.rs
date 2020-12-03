@@ -8,12 +8,18 @@ use futures::channel::mpsc;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use zksync_config::{ConfigurationOptions, ProverOptions};
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::BlockNumber;
 // Local deps
 use self::scaler::ScalerOracle;
+use zksync_circuit::serialization::ProverData;
 use zksync_prover_utils::api::{
-    ProverInputRequest, ProverInputResponse, ProverOutputRequest, WorkingOn,
+    JobRequestData, JobResultData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
+    WorkingOn,
+};
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use zksync_types::prover::{
+    ProverJobType, AGGREGATED_PROOF_JOB_PRIORITY, SINGLE_PROOF_JOB_PRIORITY,
 };
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -124,18 +130,18 @@ async fn working_on(
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
     log::trace!("Received heartbeat for prover_run with id: {}", r.job_id);
-    // let mut storage = data
-    //     .access_storage()
-    //     .await
-    //     .map_err(actix_web::error::ErrorInternalServerError)?;
-    // storage
-    //     .prover_schema()
-    //     .record_prover_is_working(r.prover_run_id)
-    //     .await
-    //     .map_err(|e| {
-    //         vlog::warn!("failed to record prover work in progress request: {}", e);
-    //         actix_web::error::ErrorInternalServerError("storage layer error")
-    //     })?;
+    let mut storage = data
+        .access_storage()
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+    storage
+        .prover_schema()
+        .record_prover_is_working(r.job_id, &r.prover_name)
+        .await
+        .map_err(|e| {
+            vlog::warn!("failed to record prover work in progress request: {}", e);
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -149,52 +155,50 @@ async fn publish(
         .access_storage()
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    todo!("storage implement publish proof");
-    // if let Err(e) = storage.prover_schema().store_proof(r.block, &r.proof).await {
-    //     vlog::error!("failed to store received proof: {}", e);
-    //     let message = if e.to_string().contains("duplicate key") {
-    //         "duplicate key"
-    //     } else {
-    //         "storage layer error"
-    //     };
-    //     return Err(actix_web::error::ErrorInternalServerError(message));
-    // }
+    let storage_result = match &r.data {
+        JobResultData::BlockProof(single_proof) => {
+            storage
+                .prover_schema()
+                .store_proof(r.job_id, r.first_block, single_proof)
+                .await
+        }
+        JobResultData::AggregatedBlockProof(aggregated_proof) => {
+            storage
+                .prover_schema()
+                .store_aggregated_proof(r.job_id, r.first_block, r.last_block, aggregated_proof)
+                .await
+        }
+    };
+    if let Err(e) = storage_result {
+        vlog::error!("failed to store received proof: {}", e);
+        let message = if e.to_string().contains("duplicate key") {
+            "duplicate key"
+        } else {
+            "storage layer error"
+        };
+        return Err(actix_web::error::ErrorInternalServerError(message));
+    }
 
     Ok(HttpResponse::Ok().finish())
 }
 
 async fn stopped(
     data: web::Data<AppState>,
-    prover_id: web::Json<i32>,
+    prover_name: web::Json<String>,
 ) -> actix_web::Result<HttpResponse> {
-    let prover_id = prover_id.into_inner();
-
     let mut storage = data
         .access_storage()
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
-    let prover_description = storage
-        .prover_schema()
-        .prover_by_id(prover_id)
-        .await
-        .map_err(|_| {
-            vlog::warn!(
-                "Received stop notification from an unknown prover with ID {}",
-                prover_id
-            );
-            actix_web::error::ErrorBadRequest("unknown prover ID")
-        })?;
-
     log::info!(
-        "Prover instance '{}' with ID {} send a stopping notification",
-        prover_description.worker,
-        prover_id
+        "Prover instance '{}' send a stopping notification",
+        &prover_name
     );
 
     storage
         .prover_schema()
-        .record_prover_stop(prover_id)
+        .record_prover_stop(&prover_name)
         .await
         .map_err(|e| {
             vlog::warn!("failed to record prover stop: {}", e);
@@ -235,6 +239,98 @@ async fn required_replicas(
     Ok(HttpResponse::Ok().json(response))
 }
 
+async fn update_prover_job_queue_loop(connection_pool: ConnectionPool) {
+    let mut interval = tokio::time::interval(Duration::from_secs(5));
+    loop {
+        interval.tick().await;
+
+        if let Ok(mut storage) = connection_pool.access_storage().await {
+            update_prover_job_queue(&mut storage)
+                .await
+                .unwrap_or_default();
+        }
+    }
+}
+
+async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::Result<()> {
+    {
+        let mut prover_schema = storage.prover_schema();
+        let next_single_block_to_add = prover_schema
+            .get_last_block_prover_job_queue(ProverJobType::SingleProof)
+            .await?
+            + 1;
+        let witness_for_next_single_block =
+            prover_schema.get_witness(next_single_block_to_add).await?;
+        if let Some(witness) = witness_for_next_single_block {
+            let prover_data: ProverData =
+                serde_json::from_value(witness).expect("incorrect single block witness");
+            let block_size = prover_data.operations.len();
+            let job_data =
+                serde_json::to_value(JobRequestData::BlockProof(prover_data, block_size))
+                    .expect("Failed to serialize single proof job data");
+            prover_schema
+                .add_prover_job_to_job_queue(
+                    next_single_block_to_add,
+                    next_single_block_to_add,
+                    job_data,
+                    SINGLE_PROOF_JOB_PRIORITY,
+                    ProverJobType::SingleProof,
+                )
+                .await?;
+        }
+    }
+
+    {
+        let next_aggregated_proof_block = storage
+            .prover_schema()
+            .get_last_block_prover_job_queue(ProverJobType::AggregatedProof)
+            .await?
+            + 1;
+        let create_block_proof_action = storage
+            .chain()
+            .operations_schema()
+            .get_aggregated_op_that_affects_block(
+                AggregatedActionType::CreateProofBlocks,
+                next_aggregated_proof_block,
+            )
+            .await?;
+        if let Some(AggregatedOperation::CreateProofBlocks(blocks)) = create_block_proof_action {
+            let first_block = *blocks.first().expect("should have 1 block");
+            let last_block = *blocks.last().expect("should have 1 block");
+            let mut data = Vec::new();
+            for block in blocks {
+                let proof = storage
+                    .prover_schema()
+                    .load_proof(block)
+                    .await?
+                    .expect("Single proof should exist");
+                let block_size = storage
+                    .chain()
+                    .block_schema()
+                    .get_block(block)
+                    .await?
+                    .expect("Block should exist")
+                    .block_chunks_size;
+                data.push((proof, block_size));
+            }
+            let job_data = serde_json::to_value(JobRequestData::AggregatedBlockProof(data))
+                .expect("Failed to serialize aggregated proof job");
+            storage
+                .prover_schema()
+                .add_prover_job_to_job_queue(
+                    first_block,
+                    last_block,
+                    job_data,
+                    AGGREGATED_PROOF_JOB_PRIORITY,
+                    ProverJobType::AggregatedProof,
+                )
+                .await?;
+        }
+    }
+    storage.prover_schema().mark_stale_jobs_as_idle().await?;
+    Ok(())
+}
+
 pub fn run_prover_server(
     connection_pool: zksync_storage::ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
@@ -248,6 +344,8 @@ pub fn run_prover_server(
             let mut actix_runtime = actix_rt::System::new("prover-server");
 
             actix_runtime.block_on(async move {
+                tokio::spawn(update_prover_job_queue_loop(connection_pool.clone()));
+
                 let last_verified_block = {
                     let mut storage = connection_pool
                         .access_storage()

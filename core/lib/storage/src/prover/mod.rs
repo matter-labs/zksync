@@ -3,12 +3,15 @@ use std::time::{self, Instant};
 // External imports
 use sqlx::Done;
 // Workspace imports
-use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::BlockNumber;
 // Local imports
-use self::records::{ActiveProver, ProverRun, StoredProof};
+use self::records::{
+    ActiveProver, ProverRun, StorageProverJobQueue, StoredAggregatedProof, StoredProof,
+};
 use crate::prover::records::StorageBlockWitness;
 use crate::{chain::block::BlockSchema, QueryResult, StorageProcessor};
+use zksync_crypto::proof::{AggregatedProof, SingleProof};
+use zksync_types::prover::{ProverJob, ProverJobStatus, ProverJobType};
 
 pub mod records;
 
@@ -20,181 +23,120 @@ pub struct ProverSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> ProverSchema<'a, 'c> {
     /// Returns the amount of blocks which await for proof, but have
     /// no assigned prover run.
-    pub async fn unstarted_jobs_count(&mut self) -> QueryResult<u64> {
-        let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
-
-        let mut last_committed_block = BlockSchema(&mut transaction)
-            .get_last_committed_block()
-            .await? as u64;
-
-        if BlockSchema(&mut transaction).pending_block_exists().await? {
-            // Existence of the pending block means that soon there will be one more block.
-            last_committed_block += 1;
-        }
-
-        let last_verified_block = BlockSchema(&mut transaction)
-            .get_last_verified_block()
-            .await? as u64;
-
-        let num_ongoing_jobs = sqlx::query!(
-            "SELECT COUNT(*) FROM prover_runs WHERE block_number > $1",
-            last_verified_block as i64
-        )
-        .fetch_one(transaction.conn())
-        .await?
-        .count
-        .unwrap_or(0) as u64;
-
-        assert!(
-            last_verified_block + num_ongoing_jobs <= last_committed_block,
-            "There are more ongoing prover jobs than blocks without proofs. \
-                Last verifier block: {}, last committed block: {}, amount of ongoing \
-                prover runs: {}",
-            last_verified_block,
-            last_committed_block,
-            num_ongoing_jobs,
-        );
-
-        let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
-
-        transaction.commit().await?;
-        metrics::histogram!("sql", start.elapsed(), "prover" => "unstarted_jobs_count");
-        Ok(result)
-    }
-
-    /// Returns the amount of blocks which await for proof (committed but not verified)
     pub async fn pending_jobs_count(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
-        let block_without_proofs = sqlx::query!(
-                "\
-            SELECT COUNT(*) as integer_value FROM operations o \
-               WHERE action_type = 'COMMIT' \
-                   AND block_number > \
-                       (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
-                   AND EXISTS \
-                       (SELECT * FROM block_witness WHERE block = o.block_number) \
-                   AND NOT EXISTS \
-                       (SELECT * FROM proofs WHERE block_number = o.block_number);"
-            )
-            .fetch_one(self.0.conn())
-            .await?
-            .integer_value
-            .unwrap_or(0) as u64;
-
-        metrics::histogram!("sql", start.elapsed(), "prover" => "pending_jobs_count");
-        Ok(block_without_proofs as u32)
-    }
-
-    /// Attempts to obtain an existing prover run given block number.
-    pub async fn get_existing_prover_run(
-        &mut self,
-        block_number: BlockNumber,
-    ) -> QueryResult<Option<ProverRun>> {
-        let start = Instant::now();
-        let prover_run = sqlx::query_as!(
-            ProverRun,
-            "SELECT * FROM prover_runs WHERE block_number = $1",
-            i64::from(block_number),
+        let pending_jobs_count = sqlx::query!(
+            "SELECT COUNT(*) FROM prover_job_queue WHERE job_status = $1",
+            ProverJobStatus::Idle.to_number()
         )
-        .fetch_optional(self.0.conn())
-        .await?;
-
-        metrics::histogram!("sql", start.elapsed(), "prover" => "get_existing_prover_run");
-        Ok(prover_run)
+        .fetch_one(self.0.conn())
+        .await?
+        .count
+        .unwrap_or(0) as u32;
+        metrics::histogram!("sql", start.elapsed(), "prover" => "pending_jobs_count");
+        Ok(pending_jobs_count)
     }
 
-    /// Given the block size, chooses the next block to prove for the certain prover.
-    /// Returns `None` if either there are no blocks of given size to prove, or
-    /// there is already an ongoing job for non-proved block.
-    pub async fn prover_run_for_next_commit(
+    pub async fn add_prover_job_to_job_queue(
         &mut self,
-        worker_: &str,
-        _prover_timeout: time::Duration,
-        block_size: usize,
-    ) -> QueryResult<Option<ProverRun>> {
+        first_block: BlockNumber,
+        last_block: BlockNumber,
+        job_data: serde_json::Value,
+        job_priority: i32,
+        job_type: ProverJobType,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+        "
+          WITH job_values as (
+            SELECT $1::int4, $2::int4, $3::text, $4::text, $5::int8, $6::int8, $7::jsonb
+            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $5 and last_block = $6 LIMIT 1)
+          ) 
+          INSERT INTO prover_job_queue (job_status, job_priority, job_type, updated_by, first_block, last_block, job_data) 
+          SELECT * from job_values
+        ",
+            ProverJobStatus::Idle.to_number(),
+            job_priority,
+            job_type.to_string(),
+            "server".to_string(),
+            i64::from(first_block),
+            i64::from(last_block),
+            job_data,
+        ).execute(self.0.conn()).await?;
+        Ok(())
+    }
+    //
+    pub async fn mark_stale_jobs_as_idle(&mut self) -> QueryResult<()> {
+        sqlx::query!(
+            "UPDATE prover_job_queue SET job_status = $1
+            WHERE job_status = $2 and (now() - updated_at) < interval '120 seconds'",
+            ProverJobStatus::Idle.to_number(),
+            ProverJobStatus::InProgress.to_number(),
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_idle_prover_job_from_job_queue(&mut self) -> QueryResult<Option<ProverJob>> {
         let start = Instant::now();
         // Select the block to prove.
         let mut transaction = self.0.start_transaction().await?;
-
-        sqlx::query!("LOCK TABLE prover_runs IN EXCLUSIVE MODE")
+        sqlx::query!("LOCK TABLE prover_job_queue IN EXCLUSIVE MODE")
             .execute(transaction.conn())
             .await?;
 
-        // Find the block that satisfies the following criteria:
-        // - Block number is greater than the index of last verified block.
-        // - There is no proof for block.
-        // - Either there is no ongoing job for the block, or the job exceeded the timeout.
-        // Return the index of such a block.
-
-        // TODO: Prover gone interval is hard-coded (#1115).
-        // Is it critical?
-        let job = sqlx::query!(
+        let prover_job_queue = sqlx::query_as!(
+            StorageProverJobQueue,
             r#"
-                WITH unsized_blocks AS (
-                    SELECT * FROM operations o
-                    WHERE action_type = 'COMMIT'
-                        AND block_number >
-                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
-                        AND NOT EXISTS
-                            (SELECT * FROM proofs WHERE block_number = o.block_number)
-                        AND NOT EXISTS
-                            (SELECT * FROM prover_runs
-                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '120 seconds')
-                )
-                SELECT min(block_number) FROM unsized_blocks
-                INNER JOIN blocks
-                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $1
+                SELECT * FROM prover_job_queue
+                WHERE job_status = $1
+                ORDER BY (job_priority, id, first_block)
+                LIMIT 1
             "#,
-            block_size as i64
-            )
-            .fetch_one(transaction.conn())
-            .await?
-            .min;
+            ProverJobStatus::Idle.to_number()
+        )
+        .fetch_optional(transaction.conn())
+        .await?;
 
-        // If there is a block to prove, create a job and store it
-        // in the `prover_runs` table; otherwise do nothing and return `None`.
-        let result = if let Some(block_number) = job {
-            let inserted_id = sqlx::query!(
+        let prover_job = if let Some(job) = prover_job_queue {
+            sqlx::query!(
                 r#"
-                INSERT INTO prover_runs ( block_number, worker )
-                VALUES ( $1, $2 )
-                RETURNING (id)
-                "#,
-                block_number,
-                worker_.to_string(),
+                UPDATE prover_job_queue 
+                SET (job_status, updated_at, updated_by) = ($1, now(), 'server')
+                WHERE id = $2;
+            "#,
+                ProverJobStatus::Idle.to_number(),
+                job.id,
             )
-            .fetch_one(transaction.conn())
-            .await?
-            .id;
-
-            let prover_run = sqlx::query_as!(
-                ProverRun,
-                "SELECT * FROM prover_runs WHERE id = $1",
-                inserted_id
-            )
-            .fetch_one(transaction.conn())
+            .execute(transaction.conn())
             .await?;
 
-            Some(prover_run)
+            Some(ProverJob::new(
+                job.id,
+                job.first_block as BlockNumber,
+                job.last_block as BlockNumber,
+                job.job_data,
+            ))
         } else {
             None
         };
-
         transaction.commit().await?;
-
-        metrics::histogram!("sql", start.elapsed(), "prover" => "prover_run_for_next_commit");
-        Ok(result)
+        Ok(prover_job)
     }
 
     /// Updates the state of ongoing prover job.
-    pub async fn record_prover_is_working(&mut self, job_id: i32) -> QueryResult<()> {
+    pub async fn record_prover_is_working(
+        &mut self,
+        job_id: i32,
+        prover_name: &str,
+    ) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
-            "UPDATE prover_runs 
-            SET updated_at = now()
-            WHERE id = $1",
-            job_id
+            "UPDATE prover_job_queue 
+            SET (updated_at, updated_by) = (now(), $1)
+            WHERE id = $2",
+            prover_name.to_string(),
+            job_id,
         )
         .execute(self.0.conn())
         .await?;
@@ -203,50 +145,16 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Adds a prover to the database.
-    pub async fn register_prover(&mut self, worker_: &str, block_size_: usize) -> QueryResult<i32> {
-        let start = Instant::now();
-        let inserted_id = sqlx::query!(
-            "INSERT INTO active_provers (worker, block_size)
-            VALUES ($1, $2)
-            RETURNING id",
-            worker_.to_string(),
-            block_size_ as i64
-        )
-        .fetch_one(self.0.conn())
-        .await?
-        .id;
-
-        metrics::histogram!("sql", start.elapsed(), "prover" => "register_prover");
-        Ok(inserted_id)
-    }
-
-    /// Gets a prover descriptor by its numeric ID.
-    pub async fn prover_by_id(&mut self, prover_id: i32) -> QueryResult<ActiveProver> {
-        let start = Instant::now();
-        let prover = sqlx::query_as!(
-            ActiveProver,
-            "SELECT * FROM active_provers WHERE id = $1",
-            prover_id
-        )
-        .fetch_one(self.0.conn())
-        .await?;
-
-        metrics::histogram!("sql", start.elapsed(), "prover" => "prover_by_id");
-        Ok(prover)
-    }
-
     /// Marks the prover as stopped.
-    pub async fn record_prover_stop(&mut self, prover_id: i32) -> QueryResult<()> {
+    pub async fn record_prover_stop(&mut self, prover_name: &str) -> QueryResult<()> {
         let start = Instant::now();
-        // TODO: It seems that it isn't actually checked if the prover has been stopped
-        // anywhere. And also it doesn't seem that prover can be restored from the stopped
-        // state (#1129).
         sqlx::query!(
-            "UPDATE active_provers 
-            SET stopped_at = now()
-            WHERE id = $1",
-            prover_id
+            "UPDATE prover_job_queue 
+            SET (updated_at, job_status) = (now(), $1)
+            WHERE updated_by = $2 and job_status = $3",
+            ProverJobStatus::Idle.to_number(),
+            prover_name,
+            ProverJobStatus::InProgress.to_number()
         )
         .execute(self.0.conn())
         .await?;
@@ -258,17 +166,28 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     /// Stores the proof for a block.
     pub async fn store_proof(
         &mut self,
+        job_id: i32,
         block_number: BlockNumber,
-        proof: &EncodedProofPlonk,
+        proof: &SingleProof,
     ) -> QueryResult<usize> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "UPDATE prover_job_queue
+            SET (updated_at, job_status) = (now(), $1)
+            WHERE first_block = $2 and last_block = $2",
+            ProverJobStatus::Done.to_number(),
+            i64::from(block_number),
+        )
+        .execute(transaction.conn())
+        .await?;
         let updated_rows = sqlx::query!(
             "INSERT INTO proofs (block_number, proof)
             VALUES ($1, $2)",
             i64::from(block_number),
             serde_json::to_value(proof).unwrap()
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?
         .rows_affected() as usize;
 
@@ -276,11 +195,46 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         Ok(updated_rows)
     }
 
+    /// Stores the aggregated proof for blocks.
+    pub async fn store_aggregated_proof(
+        &mut self,
+        job_id: i32,
+        first_block: BlockNumber,
+        last_block: BlockNumber,
+        proof: &AggregatedProof,
+    ) -> QueryResult<usize> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "UPDATE prover_job_queue
+            SET (updated_at, job_status) = (now(), $1)
+            WHERE first_block = $2 and last_block = $3",
+            ProverJobStatus::Done.to_number(),
+            i64::from(first_block),
+            i64::from(last_block),
+        )
+        .execute(transaction.conn())
+        .await?;
+        let updated_rows = sqlx::query!(
+            "INSERT INTO aggregated_proofs (first_block, last_block, proof)
+            VALUES ($1, $2, $3)",
+            i64::from(first_block),
+            i64::from(last_block),
+            serde_json::to_value(proof).unwrap()
+        )
+        .execute(transaction.conn())
+        .await?
+        .rows_affected() as usize;
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "store_aggregated_proof");
+        Ok(updated_rows)
+    }
+
     /// Gets the stored proof for a block.
     pub async fn load_proof(
         &mut self,
         block_number: BlockNumber,
-    ) -> QueryResult<Option<EncodedProofPlonk>> {
+    ) -> QueryResult<Option<SingleProof>> {
         let start = Instant::now();
         let proof = sqlx::query_as!(
             StoredProof,
@@ -292,6 +246,27 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .map(|stored| serde_json::from_value(stored.proof).unwrap());
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "load_proof");
+        Ok(proof)
+    }
+
+    /// Gets the stored proof for a block.
+    pub async fn load_aggregated_proof(
+        &mut self,
+        first_block: BlockNumber,
+        last_block: BlockNumber,
+    ) -> QueryResult<Option<AggregatedProof>> {
+        let start = Instant::now();
+        let proof = sqlx::query_as!(
+            StoredAggregatedProof,
+            "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
+            i64::from(first_block),
+            i64::from(last_block)
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|stored| serde_json::from_value(stored.proof).unwrap());
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "load_aggregated_proof");
         Ok(proof)
     }
 
@@ -335,5 +310,22 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         metrics::histogram!("sql", start.elapsed(), "prover" => "get_witness");
         Ok(block_witness
             .map(|w| serde_json::from_str(&w.witness).expect("Failed to deserialize witness")))
+    }
+
+    pub async fn get_last_block_prover_job_queue(
+        &mut self,
+        action_type: ProverJobType,
+    ) -> QueryResult<BlockNumber> {
+        let last_block = sqlx::query!(
+            "SELECT max(last_block) from prover_job_queue
+            WHERE job_type = $1",
+            action_type.to_string(),
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max
+        .unwrap_or(0);
+
+        Ok(last_block as BlockNumber)
     }
 }

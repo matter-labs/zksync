@@ -23,9 +23,8 @@ use zksync_crypto::rand::{
 // Workspace deps
 use tokio::stream::StreamExt;
 use zksync_config::ProverOptions;
-use zksync_crypto::proof::EncodedAggregatedProof;
-use zksync_crypto::{proof::EncodedProofPlonk, Engine};
-use zksync_prover_utils::aggregated_proofs::{AggregatedProof, SingleProof};
+use zksync_crypto::proof::{AggregatedProof, EncodedAggregatedProof, SingleProof};
+use zksync_crypto::Engine;
 use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverId, ProverInputRequest, ProverInputRequestAuxData,
     ProverInputResponse, ProverOutputRequest,
@@ -95,7 +94,7 @@ pub trait ProverImpl {
 #[async_trait::async_trait]
 pub trait ApiClient: Debug {
     async fn get_job(&self, req: ProverInputRequest) -> Result<ProverInputResponse, anyhow::Error>;
-    async fn working_on(&self, job_id: i32) -> Result<(), anyhow::Error>;
+    async fn working_on(&self, job_id: i32, prover_name: &str) -> Result<(), anyhow::Error>;
     async fn publish(&self, data: ProverOutputRequest) -> Result<(), anyhow::Error>;
     async fn prover_stopped(&self, prover_id: ProverId) -> Result<(), anyhow::Error>;
 }
@@ -166,6 +165,8 @@ async fn prover_work_cycle<PROVER, CLIENT>(
         let ProverInputResponse {
             job_id,
             data: job_data,
+            first_block,
+            last_block,
         } = prover_input_response;
         let job_data = if let Some(job_data) = job_data {
             job_data
@@ -187,7 +188,7 @@ async fn prover_work_cycle<PROVER, CLIENT>(
 
                 tokio::time::delay_for(timeout_value).await;
                 client
-                    .working_on(job_id)
+                    .working_on(job_id, &prover_name)
                     .await
                     .map_err(|e| log::warn!("Failed to send hearbeat"))
                     .unwrap_or_default();
@@ -210,6 +211,8 @@ async fn prover_work_cycle<PROVER, CLIENT>(
         client
             .publish(ProverOutputRequest {
                 job_id,
+                first_block,
+                last_block,
                 data: proof,
             })
             .await

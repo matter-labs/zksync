@@ -1,7 +1,7 @@
-use crate::aggregated_proofs::{AggregatedProof, SingleProof};
-use crate::prover_data::ProverData;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::BlockNumber;
+use zksync_circuit::serialization::ProverData;
+use zksync_crypto::proof::{AggregatedProof, SingleProof};
 
 pub type ProverId = String;
 
@@ -20,6 +20,8 @@ pub struct ProverInputRequestAuxData {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProverInputResponse {
     pub job_id: i32,
+    pub first_block: BlockNumber,
+    pub last_block: BlockNumber,
     pub data: Option<JobRequestData>,
 }
 
@@ -36,6 +38,8 @@ pub enum JobRequestData {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProverOutputRequest {
     pub job_id: i32,
+    pub first_block: BlockNumber,
+    pub last_block: BlockNumber,
     pub data: JobResultData,
 }
 
@@ -47,6 +51,7 @@ pub enum JobResultData {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WorkingOn {
+    pub prover_name: String,
     pub job_id: i32,
 }
 

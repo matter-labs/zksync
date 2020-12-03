@@ -305,36 +305,76 @@ async fn create_aggregated_operations(storage: &mut StorageProcessor<'_>) -> any
         }
 
         let aggregated_op_create = AggregatedOperation::CreateProofBlocks(block_numbers);
-        // TODO: should execute after proof is produced
-        let aggregated_op_publish =
-            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
-                blocks,
-                proof: Default::default(),
-                block_idxs_in_proof,
-            });
 
         storage
             .chain()
             .operations_schema()
             .store_aggregated_action(aggregated_op_create)
             .await?;
-        storage
-            .chain()
-            .operations_schema()
-            .store_aggregated_action(aggregated_op_publish)
-            .await?;
 
         log::info!(
-            "Created aggregated create proof / publish proof op: {} - {}",
+            "Created aggregated create proof op: {} - {}",
             last_aggregate_create_proof_block + 1,
             last_committed_block
         );
     }
 
-    // TODO: should execute after proof is produced
-    // if last_aggregate_create_proof_block > last_aggregate_publish_proof_block {
-    //
-    // }
+    if last_aggregate_create_proof_block > last_aggregate_publish_proof_block {
+        let create_proof_blocks =
+            if let Some(AggregatedOperation::CreateProofBlocks(create_proof_blocks)) = storage
+                .chain()
+                .operations_schema()
+                .get_aggregated_op_that_affects_block(
+                    AggregatedActionType::CreateProofBlocks,
+                    last_aggregate_create_proof_block + 1,
+                )
+                .await?
+            {
+                create_proof_blocks
+            } else {
+                panic!("Create proof blocks action should exist");
+            };
+
+        let first_block = *create_proof_blocks.first().expect("should have 1 block");
+        let last_block = *create_proof_blocks.last().expect("should have 1 block");
+        let proof = storage
+            .prover_schema()
+            .load_aggregated_proof(first_block, last_block)
+            .await?;
+
+        if let Some(proof) = proof {
+            let proof = proof.serialize_aggregated_proof();
+            let mut blocks = Vec::new();
+            let mut block_idxs_in_proof = Vec::new();
+            for (idx, block_number) in create_proof_blocks.into_iter().enumerate() {
+                let block = storage
+                    .chain()
+                    .block_schema()
+                    .get_block(block_number)
+                    .await?
+                    .expect("Failed to get last committed block from db");
+                blocks.push(block);
+                block_idxs_in_proof.push(idx);
+            }
+
+            let aggregated_op_publish =
+                AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
+                    blocks,
+                    proof,
+                    block_idxs_in_proof,
+                });
+            storage
+                .chain()
+                .operations_schema()
+                .store_aggregated_action(aggregated_op_publish)
+                .await?;
+            log::info!(
+                "Created aggregated publish proof op: {} - {}",
+                first_block,
+                last_block
+            );
+        }
+    }
 
     if last_aggregate_publish_proof_block > last_aggregate_executed_block {
         let mut blocks = Vec::new();

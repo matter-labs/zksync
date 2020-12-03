@@ -51,18 +51,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 .map(|v| v.confirmed)
                 .unwrap_or(false);
 
-            // Get the prover job details.
-            let prover_run = ProverSchema(self.0)
-                .get_existing_prover_run(tx.block_number as u32)
-                .await?;
-
             Ok(Some(TxReceiptResponse {
                 tx_hash: hex::encode(hash),
                 block_number: tx.block_number,
                 success: tx.success,
                 verified,
                 fail_reason: tx.fail_reason,
-                prover_run,
+                prover_run: None,
             }))
         } else {
             Ok(None)
@@ -83,10 +78,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let result = match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
-                let prover_run: Option<ProverRun> = ProverSchema(self.0)
-                    .get_existing_prover_run(stored_executed_prior_op.block_number as u32)
-                    .await?;
-
                 let confirm = OperationsSchema(self.0)
                     .get_operation(
                         stored_executed_prior_op.block_number as u32,
@@ -97,7 +88,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 Ok(PriorityOpReceiptResponse {
                     committed: true,
                     verified: confirm.is_some(),
-                    prover_run,
+                    prover_run: None,
                 })
             }
             None => Ok(PriorityOpReceiptResponse {

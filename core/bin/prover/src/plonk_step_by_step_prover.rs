@@ -1,10 +1,9 @@
 use crate::{ApiClient, ProverConfig, ProverImpl};
 use std::sync::Mutex;
 use std::time::Duration;
+use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_crypto::Engine;
-use zksync_prover_utils::aggregated_proofs::{
-    gen_aggregate_proof, prepare_proof_data, AggregatedProof, SingleProof,
-};
+use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_types::BlockNumber;

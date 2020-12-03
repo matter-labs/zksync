@@ -5946,6 +5946,7 @@ name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.13.0",
  "ethabi 12.0.0",
  "fnv",
  "franklin-crypto",
@@ -6107,7 +6108,6 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "backoff",
- "base64 0.13.0",
  "lazy_static",
  "log 0.4.11",
  "reqwest",

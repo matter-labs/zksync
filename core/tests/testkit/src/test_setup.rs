@@ -14,7 +14,7 @@ use zksync_types::{
 };
 
 use web3::types::TransactionReceipt;
-use zksync_crypto::proof::{EncodedAggregatedProof, EncodedProofPlonk};
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_crypto::rand::Rng;
 use zksync_types::block::Block;
 
@@ -666,18 +666,6 @@ impl TestSetup {
             .verify_block(&proof)
             .await
             .expect("block verify fail")
-    }
-
-    pub async fn execute_verify_block(
-        &mut self,
-        block: &Block,
-        proof: EncodedProofPlonk,
-    ) -> ETHExecResult {
-        unimplemented!()
-        // self.commit_account
-        //     .verify_block(block, Some(proof))
-        //     .await
-        //     .expect("block verify fail")
     }
 
     pub async fn execute_commit_and_verify_block(

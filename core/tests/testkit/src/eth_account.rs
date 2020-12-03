@@ -13,7 +13,7 @@ use web3::types::{
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::convert::FeConvert;
-use zksync_crypto::proof::{EncodedAggregatedProof, EncodedProofPlonk};
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::aggregated_operations::{

@@ -443,7 +443,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             );
             ++currentTotalBlocksProofed;
 
-            _proof.commitments[_commitmentIdxs[i]] = uint256(_committedBlocks[i].commitment);
+            uint256 mask = (~uint256(0)) >> 3;
+            require(_proof.commitments[_commitmentIdxs[i]] & mask == uint256(_committedBlocks[i].commitment) & mask, "pbl3"); // incorrect block commitment in proof
         }
 
         bool success =
