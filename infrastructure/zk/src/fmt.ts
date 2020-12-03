@@ -1,7 +1,18 @@
 import { Command } from 'commander';
 import * as utils from './utils';
 
-const IGNORED = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git'];
+const IGNORED = [
+    'target',
+    'node_modules',
+    'volumes',
+    'build',
+    'dist',
+    '.git',
+    // Below are generated contracts.
+    'generated',
+    'KeysWithPlonkVerifier.sol',
+    'TokenInit.sol'
+];
 const EXTENSIONS = ['ts', 'md', 'sol'];
 
 // If you wonder why this is written so obscurely through find and not through .prettierignore and globs,
