@@ -117,11 +117,11 @@ export default {
                 // { name: 'Transactions',       value: client.TX_PER_BLOCK(), },
                 { name: 'Status',                value: this.status, },
                 { name: 'Commit tx hash',        value: this.commit_tx_hash
-                    ? `<a target="blanc" href="${this.blockchainExplorerTx}/${this.commit_tx_hash}">${this.commit_tx_hash} <i class="fas fa-external-link-alt"></i></a>`
+                    ? `<a target="blanc" href="${blockchainExplorerTx}/${this.commit_tx_hash}">${this.commit_tx_hash} <i class="fas fa-external-link-alt"></i></a>`
                     : `Not yet sent on the chain.` },
                 { name: 'Committed at',          value: formatDate(this.committed_at)},
                 { name: 'Verify tx hash',        value: this.verify_tx_hash
-                    ? `<a target="blanc" href="${this.blockchainExplorerTx}/${this.verify_tx_hash}">${this.verify_tx_hash} <i class="fas fa-external-link-alt"></i></a>`
+                    ? `<a target="blanc" href="${blockchainExplorerTx}/${this.verify_tx_hash}">${this.verify_tx_hash} <i class="fas fa-external-link-alt"></i></a>`
                     : `Not yet sent on the chain.` },
                 { name: 'Verified at',           value: formatDate(this.verified_at)},
             ];

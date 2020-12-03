@@ -1,12 +1,6 @@
 <template>
     <span v-if="address">
-        <router-link v-if="isLocalLink" :to="'/'">
-            <span class="link-html-span mr-1" v-html="linkHtml" />
-        </router-link>
-        <a v-else-if="isOutterLink" :href="link" target="_blank" rel="noopener noreferrer">
-            <span class="link-html-span mr-1" v-html="linkHtml" />
-        </a>
-        <span v-else class="link-html-span mr-1" v-html="linkHtml" />
+        <span class="link-html-span mr-1" v-html="linkHtml" />
         <i v-if="tooltipRight===true"
             @click="clicked"
             class="far fa-copy cursorpointer" 
