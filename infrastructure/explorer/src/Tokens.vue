@@ -34,6 +34,7 @@
 <script>
 import { clientPromise } from './Client';
 import Navbar from './Navbar.vue';
+import store from './store';
 const components = {
     Navbar,
 };
@@ -67,7 +68,7 @@ export default {
             this.loading = false;
         },
         urlForToken(address) {
-            const prefix = this.store.network === 'mainnet' ? '' : `${this.store.network}.`;
+            const prefix = store.network === 'mainnet' ? '' : `${store.network}.`;
                 return `https://${prefix}etherscan.io/token/${address}`;
         },
     },

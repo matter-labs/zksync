@@ -15,9 +15,21 @@
             <b-card no-body>
                 <b-table responsive id="my-table" thead-class="displaynone" :items="props" :busy="isBusy" class="nowrap">
                     <template v-slot:cell(value)="data">
-                        <CopyableAddress v-if="data.item.name == 'New root hash'" :address="new_state_root" :linkHtml="data.item.value" />
-                        <CopyableAddress v-else-if="data.item.name == 'Commit tx hash'" :address="commit_tx_hash" :linkHtml="data.item.value" />
-                        <CopyableAddress v-else-if="data.item.name == 'Verify tx hash'" :address="verify_tx_hash" :linkHtml="data.item.value" />
+                        <CopyableAddress 
+                            v-if="data.item.name == 'New root hash'" 
+                            :address="new_state_root" 
+                            :linkHtml="data.item.value"
+                        />
+                        <CopyableAddress 
+                            v-else-if="data.item.name == 'Commit tx hash'" 
+                            :address="commit_tx_hash" 
+                            :linkHtml="data.item.value" 
+                        />
+                        <CopyableAddress 
+                            v-else-if="data.item.name == 'Verify tx hash'" 
+                            :address="verify_tx_hash" 
+                            :linkHtml="data.item.value" 
+                        />
                         <span v-else-if="data.item.name == 'Status'">
                             <ReadinessStatus :status="data.item.value == 'Pending' ? 1 : 2" />
                             <span v-html="data.item.value" class="mr-1"/>
@@ -47,6 +59,11 @@ import Navbar from './Navbar.vue';
 import Question from './Question.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
 import { clientPromise } from './Client';
+
+import { 
+    blockchainExplorerTx,
+    blockchainExplorerAddress 
+} from './constants';
 
 const components = {
     TransactionList,
@@ -161,7 +178,7 @@ export default {
                         toAddr             = tx.op.priority_op.to;
                         from               = shortenHash(tx.op.priority_op.from, 'unknown sender');
                         to                 = shortenHash(tx.op.priority_op.to, 'unknown account');
-                        from_explorer_link = `${this.blockchainExplorerAddress}/${tx.op.priority_op.from}`;
+                        from_explorer_link = `${blockchainExplorerAddress}/${tx.op.priority_op.from}`;
                         to_explorer_link   = `${this.routerBase}accounts/${tx.op.priority_op.to}`;
                         from_onchain_icon  = `<i class="fas fa-external-link-alt"></i>`;
                         to_onchain_icon    = '';
@@ -210,7 +227,7 @@ export default {
                         from               = shortenHash(tx.op.from, 'unknown account');
                         to                 = shortenHash(tx.op.to, 'unknown ethAddress');
                         from_explorer_link = `${this.routerBase}accounts/${tx.op.from}`;
-                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.op.to}`;
+                        to_explorer_link   = `${blockchainExplorerAddress}/${tx.op.to}`;
                         from_onchain_icon  = '';
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.token;
@@ -226,7 +243,7 @@ export default {
                         from               = shortenHash(tx.op.target, 'unknown account');
                         to                 = shortenHash(tx.op.target, 'unknown ethAddress');
                         from_explorer_link = `${this.routerBase}accounts/${tx.op.target}`;
-                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.op.target}`;
+                        to_explorer_link   = `${blockchainExplorerAddress}/${tx.op.target}`;
                         from_onchain_icon  = '';
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.token;
@@ -244,7 +261,7 @@ export default {
                         from               = shortenHash(tx.op.priority_op.eth_address, 'unknown account address');
                         to                 = shortenHash(tx.op.priority_op.eth_address, 'unknown account address');
                         from_explorer_link = `${this.routerBase}accounts/${tx.op.priority_op.eth_address}`;
-                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.op.priority_op.eth_address}`;
+                        to_explorer_link   = `${blockchainExplorerAddress}/${tx.op.priority_op.eth_address}`;
                         from_onchain_icon  = `<i class="fas fa-external-link-alt"></i>`;
                         to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
                         token              = tx.op.priority_op.token;
@@ -271,8 +288,10 @@ export default {
                 return {
                     tx_hash: tx.tx_hash,
                     type: `${type}`,
-                    from: `<a href="${from_explorer_link}" ${from_target}>${from} ${from_onchain_icon}</a>`,
-                    to: `<a href="${to_explorer_link}" ${to_target}>${to} ${to_onchain_icon}</a>`,
+                    from_explorer_link,
+                    to_explorer_link,
+                    from: `${from} ${from_onchain_icon}`,
+                    to: `${to} ${to_onchain_icon}`,
                     fromAddr,
                     toAddr,
                     amount,

@@ -84,6 +84,8 @@ import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
 
+import { blockchainExplorerAddress } from './constants';
+
 const components = {
     SearchField,
     CopyableAddress,
@@ -217,11 +219,11 @@ export default {
                         </a>`;
 
                     const link_from = tx.type == 'Deposit' 
-                        ? `${this.blockchainExplorerAddress}/${tx.from}`
+                        ? `${blockchainExplorerAddress}/${tx.from}`
                         : `${this.routerBase}accounts/${tx.from}`;
 
                     const link_to = tx.type == 'Withdrawal' 
-                        ? `${this.blockchainExplorerAddress}/${tx.to}`
+                        ? `${blockchainExplorerAddress}/${tx.to}`
                         : `${this.routerBase}accounts/${tx.to}`;
 
                     const target_from = tx.type == 'Deposit' 
@@ -247,7 +249,7 @@ export default {
                         </a>`;
 
                     const To = `
-                        <a href="${link_to}" ${target_to}>
+                        <local-link :to="${link_to}" ${target_to}>
                             ${
                                 tx.type == "ChangePubKey" 
                                     ? ''
@@ -255,7 +257,7 @@ export default {
                             }
 
                             ${ tx.type == "ChangePubKey" ? '' : onchain_to }
-                        </a>`;
+                        </local-link>`;
 
                     const Type = `${tx.type}`;
                     const Amount 

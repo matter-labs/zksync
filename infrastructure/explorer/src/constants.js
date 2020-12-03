@@ -1,3 +1,5 @@
+import store from './store';
+
 export const PAGE_SIZE = 20;
 export const TX_BATCH_SIZE = 50;
 
@@ -18,4 +20,10 @@ export function getTransactionStorageSlot(hash) {
     return TRANSACTION_STORAGE_CONSTANT + hash;   
 }
 
+export const blockchainExplorerTx = store.network === 'localhost' ? 'http://localhost:8000'
+         : store.network === 'mainnet' ? `https://etherscan.io/tx`
+         : `https://${store.network}.etherscan.io/tx`;
 
+export const blockchainExplorerAddress = store.network === 'localhost' ? 'http://localhost:8000'
+         : store.network === 'mainnet' ? `https://etherscan.io/address`
+         : `https://${store.network}.etherscan.io/address`;

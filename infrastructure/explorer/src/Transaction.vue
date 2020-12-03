@@ -19,32 +19,32 @@
             <b-card no-body class="table-margin-hack">
                 <b-table responsive thead-class="displaynone" :items="props">
                     <template v-slot:cell(value)="data">
-                        <CopyableAddress class="normalize-text"
+                        <EntryComponent
+                            class="normalize-text"
                             v-if="data.item['name'] == 'From'" 
-                            :address="txData.from" 
-                            :linkHtml="data.item['value']"
+                            :value="data.item.value"
                         />
-                        <CopyableAddress class="normalize-text" 
+                        <EntryComponent
+                            class="normalize-text"
                             v-else-if="data.item['name'] == 'To'" 
-                            :address="txData.to" 
-                            :linkHtml="data.item['value']"
+                            :value="data.item.value"
                         />
-                        <CopyableAddress class="normalize-text" 
+                        <EntryComponent
+                            class="normalize-text"
                             v-else-if="data.item['name'] == 'Account'" 
-                            :address="txData.from" 
-                            :linkHtml="data.item['value']"
+                            :value="data.item.value"
                         />
-                        <CopyableAddress class="normalize-text" 
-                            v-else-if="['zkSync tx hash', 'ETH Tx hash'].includes(data.item['name'])" 
-                            :address="tx_hash" 
-                            :linkHtml="data.item['value']"
+                        <EntryComponent
+                            class="normalize-text"
+                            v-else-if="['zkSync tx hash', 'ETH Tx hash'].includes(data.item['name'])"
+                            :value="data.item.value"
                         />
                         <span v-else-if="data.item.name == 'Status'">
-                            <ReadinessStatus :status="readyStateFromString(data.item.value)" />
-                            <span v-html="data.item.value" class="mr-1"/>
-                            <Question :text="data.item.value" />
+                            <ReadinessStatus :status="readyStateFromString(data.item.value.innerHTML)" />
+                            <span v-html="data.item.value.innerHTML" class="mr-1"/>
+                            <Question :text="data.item.value.innerHTML" />
                         </span>
-                        <span v-else v-html="data.item['value']" />
+                        <span v-else v-html="data.item.value.innerHTML" />
                     </template>
                 </b-table>
             </b-card>
@@ -57,7 +57,12 @@
 <script>
 
 import store from './store';
-import { formatDate, formatToken } from './utils';
+import { 
+    formatDate, 
+    formatToken, 
+    makeEntry,
+    blockchainExplorerToken 
+} from './utils';
 import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
 
@@ -66,6 +71,12 @@ import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
 import Question from './Question.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
+import EntryComponent from './links/Entry';
+
+import { 
+    blockchainExplorerTx,
+    blockchainExplorerAddress
+} from './constants'; 
 
 const components = {
     SearchField,
@@ -73,6 +84,7 @@ const components = {
     Navbar,
     Question,
     ReadinessStatus,
+    EntryComponent
 };
 
 export default {
@@ -177,96 +189,145 @@ export default {
                 },
             ];
         },
+        hashEntry() {
+            const entry =  this.onChainTx ? 
+                makeEntry('ETH Tx hash')
+                .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
+                .innerHTML(this.tx_hash)
+                : 
+                makeEntry('zkSync tx hash')
+                .innerHTML(this.tx_hash);
+
+            return entry.copyable();
+        },
+        fromLinkEntry() {
+            const entry = makeEntry('From').copyable();
+            
+            if (this.txData.tx_type == 'Deposit') {
+                entry.outterLink(`${blockchainExplorerAddress}/${this.txData.from}`)
+            } else {
+                entry.localLink(`/accounts/${this.txData.from}`)
+            }
+
+            if (this.txData.tx_type == 'Withdrawal' 
+                || this.txData.tx_type == 'FullExit') {
+                entry.layer(2);
+            }
+            if (this.txData.tx_type == 'Deposit') {
+                entry.layer(1);
+            }
+
+            entry.innerHTML(this.txData.from);
+
+            return entry;
+        },
+        toLinkEntry() {
+            const entry = makeEntry('To').copyable();
+
+            if (this.txData.tx_type == 'Withdrawal') {
+                entry.outterLink(blockchainExplorerToken(this.txData.tokenName, this.txData.to))
+            } else {
+                entry.localLink(`/accounts/${this.txData.to}`)
+            }
+
+            if (this.txData.tx_type == 'Withdrawal' 
+                || this.txData.tx_type == 'FullExit') {
+                entry.layer(1);
+            }
+            if (this.txData.tx_type == 'Deposit') {
+                entry.layer(2);
+            }
+
+            return entry.innerHTML(this.txData.to);
+        },
+        typeEntry() {
+            console.log('Getting type entry: ', this.txData.tx_type);
+            return makeEntry('Type').innerHTML(this.txData.tx_type);
+            
+        },
+        statusEntry() {
+            const entry = makeEntry('Status');
+
+            if(this.txData.fail_reason) {
+                entry.innerHTML('Rejected');
+            } else {
+                entry.innerHTML(this.txData.status);
+            }
+
+            return entry;
+        },
+        feeEntry() {
+            return makeEntry("fee")
+                .innerHTML(`${this.txData.feeTokenName} ${formatToken(this.txData.fee || 0, this.txData.feeTokenName)}`)
+        },
+        createdAtEntry() {
+            return makeEntry("Created at")
+                .innerHTML(formatDate(this.txData.created_at)) 
+        },
+        amountEntry() {
+            return makeEntry("Amount")
+                .innerHTML(`${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.feeTokenName)}`)
+        },
         props() {
             if (Object.keys(this.txData).length == 0) 
                 return [];
 
-            const tx_hash = this.txData.tx_type  == "Deposit" || this.txData.tx_type == "FullExit"
-                ? `<a href="${this.blockchainExplorerTx}/${this.tx_hash}">${this.tx_hash}</a> <i class="fas fa-external-link-alt"></i>`
-                : `${this.tx_hash}`;
-
-            const link_from 
-                = this.txData.tx_type == 'Deposit' ? `${this.blockchainExplorerAddress}/${this.txData.from}`
-                : `${this.routerBase}accounts/${this.txData.from}`;
-
-            const link_to 
-                = this.txData.tx_type == 'Withdrawal' ? this.blockchainExplorerToken(this.txData.tokenName, this.txData.to)
-                : this.txData.tx_type == 'ChangePubKey' ? ''
-                : `${this.routerBase}accounts/${this.txData.to}`;
-
-            const onchain_from
-                = this.txData.tx_type == 'Deposit' ? ` <i class="fas fa-external-link-alt"></i>`
-                : '';
-
-            const onchain_to
-                = this.txData.tx_type == 'Withdrawal' ? ` <i class="fas fa-external-link-alt"></i>`
-                : '';
-
-            const target_from
-                = this.txData.tx_type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
-                : '';
-
-            const target_to
-                = this.txData.tx_type == 'Withdrawal' ? `target="_blank" rel="noopener noreferrer"`
-                : '';
-
-            const layer_from 
-                = this.txData.tx_type == 'Withdrawal' ? `<span class='layer_icon'>L2</span>`
-                : this.txData.tx_type == 'Deposit'    ? `<span class='layer_icon'>L1</span>`
-                : this.txData.tx_type == 'FullExit'   ? `<span class='layer_icon'>L2</span>`
-                : '';
-
-            const layer_to 
-                = this.txData.tx_type == 'Withdrawal' ? `<span class='layer_icon'>L1</span>`
-                : this.txData.tx_type == 'Deposit'    ? `<span class='layer_icon'>L2</span>`
-                : this.txData.tx_type == 'FullExit'   ? `<span class='layer_icon'>L1</span>`
-                : '';
-
             const rows = this.txData.tx_type == "ChangePubKey"
                 ? [
-                    { name: 'zkSync tx hash',           value: tx_hash},
-                    { name: "Type",                     value: `${this.txData.tx_type}`   },
-                    { name: "Status",                   value: `${this.txData.status}` },
-                    { name: "Account",                  value: `<a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
-                    { name: "fee",                      value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee || 0, this.txData.feeTokenName)}` },
-                    { name: "New signer key hash",      value: `${this.txData.to.replace('sync:', '')}`},
-                    { name: "Created at",               value: formatDate(this.txData.created_at) },
+                    this.txHashEntry,
+                    this.typeEntry,
+                    this.statusEntry,
+                    this.fromLinkEntry.name("Account"),
+                    this.feeEntry,
+                    makeEntry("New signer key hash").innerHTML(`${this.txData.to.replace('sync:', '')}`),
+                    this.createdAtEntry    
                 ]
                 : this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit"
                 ? [
-                    { name: 'ETH Tx hash',    value: tx_hash},
-                    { name: "Type",           value: `${this.txData.tx_type}`   },
-                    { name: "Status",         value: `${this.txData.status}` },
-                    { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
-                    { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}">${this.txData.to}${onchain_to}</a>`      },
-                    { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.tokenName)}`    },
+                    this.hashEntry,
+                    this.typeEntry,
+                    this.statusEntry,
+                    this.fromLinkEntry,
+                    this.toLinkEntry,
+                    this.amountEntry
                 ]
                 : [
-                    { name: 'zkSync tx hash', value: tx_hash},
-                    { name: "Type",           value: `${this.txData.tx_type}`   },
-                    { name: "Status",         value: `${this.txData.status}` },
-                    { name: "From",           value: `${layer_from} <a ${target_from} href="${link_from}">${this.txData.from}${onchain_from}</a>` },
-                    { name: "To",             value: `${layer_to} <a ${target_to} href="${link_to}">${this.txData.to}${onchain_to}</a>`      },
-                    { name: "Amount",         value: `${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.tokenName)}`    },
-                    { name: "fee",            value: `${this.txData.feeTokenName} ${formatToken(this.txData.fee, this.txData.tokenName)}` },
-                    { name: "Created at",     value: formatDate(this.txData.created_at) },
+                    this.hashEntry,
+                    this.typeEntry,
+                    this.statusEntry,
+                    this.fromLinkEntry,
+                    this.toLinkEntry,
+                    this.amountEntry,
+                    this.feeEntry,
+                    this.createdAtEntry
                 ];
 
             if (this.txData.nonce != -1) {
-                rows.push({ name: "Nonce",      value: this.txData.nonce });
+                rows.push(
+                    makeEntry("Nonce")
+                    .innerHTML(this.txData.nonce)
+                );
             }
 
             if (this.txData.numEthConfirmationsToWait) {
-                rows.push({ name: 'Eth confirmations', value: this.txData.numEthConfirmationsToWait });
+                rows.push(
+                    makeEntry("Eth confirmations")
+                    .innerHTML(this.txData.numEthConfirmationsToWait)
+                )
             }
 
             if (this.txData.fail_reason) {
-                rows.push({ name: "Rejection reason:", value: `${this.txData.fail_reason}` });
-                rows.find(r => r.name == 'Status').value = 'Rejected';
+                rows.push(
+                    makeEntry("Rejection reason:")
+                    .innerHTML(this.txData.fail_reason)
+                )
             }
 
             return rows;
         },
+        onChainTx() {
+            return this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit";
+        }
     },
     components,
 };

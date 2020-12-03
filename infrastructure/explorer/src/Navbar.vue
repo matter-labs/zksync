@@ -1,11 +1,20 @@
 <template>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand href="/">
+        <b-navbar-brand :href="isMainPage ? '/' : '#'">
             <a href="https://zksync.io" target="_blank">
                 <img class="navbar-hero-img" src="./assets/ZK_dark.svg">
             </a>
-            <b-badge variant="primary" class="hero-network-name">{{store.capitalizedNetwork}}</b-badge>
+            
+            <router-link v-if="!isMainPage" class="navbar-router-link" to="/">
+                <b-badge variant="primary" class="hero-network-name">
+                    {{store.capitalizedNetwork}}
+                </b-badge>
+            </router-link>
+            <b-badge v-else variant="primary" class="hero-network-name">
+                    {{store.capitalizedNetwork}}
+            </b-badge>
+            
         </b-navbar-brand>
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
@@ -13,16 +22,18 @@
             <!-- <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">zkSync Wallet</b-nav-item> -->
             <b-nav-item 
                 v-if="store.contractAddress"
-                v-bind:href="`${blockchainExplorerAddress}/${store.contractAddress}`" 
+                v-bind:href="`${contractLink}`" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 class="nowrap">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
             <b-nav-item 
-                href="/tokens"
                 class="nowrap">
-                Tokens
+                <router-link 
+                    to='/tokens'
+                    class="navbar-router-link"
+                >Tokens</router-link>
             </b-nav-item>
             <b-nav-item 
                 v-if="store.walletLink"
@@ -50,10 +61,24 @@ const components = {
     SearchField,
 };
 
+import store from './store';
+import { blockchainExplorerAddress } from './constants';
+
 export default {
     name: 'Navbar',
     components,
+    data() {
+        return {
+            contractLink: `${blockchainExplorerAddress}/${store.contractAddress}`
+        }
+    },
+    computed: {
+        isMainPage() {
+            return this.$router.currentRoute.path === '/';
+        }
+    },
     async created() {
+        // console.log(this.$router.currentRoute);
         const client = await clientPromise;
         const { contractAddress } = await client.testnetConfig();
         this.store.contractAddress = contractAddress;
@@ -70,5 +95,8 @@ export default {
     margin-left: 0.6em;
     color: #eee;
     font-size: 0.8em;
+}
+.navbar-router-link {
+    color: inherit;
 }
 </style>

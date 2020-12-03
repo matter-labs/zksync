@@ -29,18 +29,18 @@
         <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
         <b-table responsive class="nowrap" hover outlined :items="items" :busy="loading">
             <template v-slot:cell(block_number)="data">
-                <a :href="`/blocks/${data.item.block_number}`" class="block_number_link">
+                <router-link :to="`/blocks/${data.item.block_number}`" class="block_number_link">
                     {{ data.item.block_number }}
-                </a>
+                </router-link>
             </template>
             <template v-slot:cell(status)="data">
                 <ReadinessStatus :status="data.item.status == 'Pending' ? 1 : 2" />
                 {{ data.item.status }}
             </template>
             <template v-slot:cell(new_state_root)="data">
-                <a :href="`/blocks/${data.item.block_number}`">
+                <router-link :to="`/blocks/${data.item.block_number}`">
                     {{ `${data.item.new_state_root.slice(8, 40)}...` }}
-                </a>
+                </router-link>
             </template>
         </b-table>
         <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
@@ -73,7 +73,6 @@ const components = {
 export default {
     name: 'home',
     created() {
-        console.log('Created!!!');
         this.update();
     },
     timers: {

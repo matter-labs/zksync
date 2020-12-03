@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
 
+import store from './store';
+
 export const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
 const readablyPrintableTokens = ['ETH', 'FAU'];
@@ -51,4 +53,77 @@ export function capitalize(s) {
 
 export function isBlockVerified(block) {
     return !!block && !!block.verified_at;
+}
+
+export function getLocalAccountLink(address) {
+    return `/address/${address}`;
+}
+
+export function blockchainExplorerToken(token, account) {
+    if (store.network === 'localhost') return `http://localhost:8000/${account}`;
+    const prefix = store.network === 'mainnet' ? '' : `${store.network}.`;
+    const tokenAddress = window.syncProvider.tokenSet.resolveTokenAddress(token);
+    
+    if (tokenAddress != '0x0000000000000000000000000000000000000000') {
+        return `https://${prefix}etherscan.io/token/${tokenAddress}?a=${account}`;
+    } else {
+        return `https://${prefix}etherscan.io/address/${account}`;
+    }
+}
+
+// Note that this class follows Builder pattern
+// If you see any of it's methods not returning `this`
+// it is a bug.
+class Entry {
+    constructor(name) {
+        this.name = name;
+        this.value = {};
+    }
+
+    localLink(to) {
+        this.value.isLocalLink = true;
+        this.value.to = to;
+        return this;
+    }
+
+    outterLink(to) {
+        this.value.isOutterLink = true;
+        this.value.to = to;
+        return this;
+    }   
+
+    innerHTML(innerHTML) {
+        this.value.innerHTML = innerHTML;
+        return this;
+    }
+
+    afterHTML(afterHTML) {
+        this.value.afterHTML = afterHTML;
+        return this;
+    }
+
+    layer(layer) {
+        this.value.layer = layer;
+        return this;
+    }
+
+    copyable(newValue = true) {
+        this.value.copyable = newValue;
+        return this;
+    }
+
+    tooltipRight(newValue = true) {
+        this.value.tooltipRight = newValue;
+        return this;
+    }
+
+    // Can be used to rename
+    name(newName) {
+        this.name = newName;
+        return this;
+    }
+}
+
+export function makeEntry(name) {
+    return new Entry(name);
 }
