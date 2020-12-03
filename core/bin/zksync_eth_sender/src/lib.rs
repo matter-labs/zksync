@@ -577,16 +577,19 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                     TxCheckOutcome::Pending
                 }
             }
-            // Non-successful execution.
+            // Non-successful execution, report the failure with details.
             Some(status) => {
-                // Transaction failed, report the failure with details.
+                // Check if transaction has enough confirmations.
+                if status.confirmations >= self.options.wait_confirmations {
+                    assert!(
+                        status.receipt.is_some(),
+                        "Receipt should exist for a failed transaction"
+                    );
 
-                // TODO: check confirmations for fail (#1110).
-                assert!(
-                    status.receipt.is_some(),
-                    "Receipt should exist for a failed transaction"
-                );
-                TxCheckOutcome::Failed(Box::new(status.receipt.unwrap()))
+                    TxCheckOutcome::Failed(Box::new(status.receipt.unwrap()))
+                } else {
+                    TxCheckOutcome::Pending
+                }
             }
             // Stuck transaction.
             None if op.is_stuck(current_block) => TxCheckOutcome::Stuck,
