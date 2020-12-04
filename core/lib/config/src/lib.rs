@@ -175,6 +175,8 @@ pub struct FeeTickerOptions {
     pub disabled_tokens: HashSet<Address>,
     /// Tokens for which subsidies are disabled.
     pub not_subsidized_tokens: HashSet<Address>,
+    pub uniswap_url: String,
+    pub liquidity_volume: f64,
 }
 
 impl FeeTickerOptions {
@@ -191,6 +193,8 @@ impl FeeTickerOptions {
             fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
             disabled_tokens: Self::comma_separated_addresses("TICKER_DISABLED_TOKENS"),
             not_subsidized_tokens: Self::comma_separated_addresses("NOT_SUBSIDIZED_TOKENS"),
+            uniswap_url: parse_env("TICKER_UNISWAP_URL"),
+            liquidity_volume: parse_env("TICKER_LIQUIDITY_VOLUME"),
         }
     }
 }

@@ -23,7 +23,7 @@ pub(crate) struct FeeTokenValidator<W> {
     available_tokens: HashMap<Address, Instant>,
     available_time: Duration,
     /// It's possible to use f64 here, because precision doesn't matter
-    available_amount: f64,
+    liquidity_volume: f64,
     watcher: W,
 }
 
@@ -31,14 +31,14 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     pub(crate) fn new(
         cache: impl Into<TokenCacheWrapper>,
         available_time: Duration,
-        available_amount: f64,
+        liquidity_volume: f64,
         watcher: W,
     ) -> Self {
         Self {
             tokens_cache: cache.into(),
             available_tokens: Default::default(),
             available_time,
-            available_amount,
+            liquidity_volume,
             watcher,
         }
     }
@@ -66,7 +66,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         }
 
         let amount = self.get_token_market_amount(&token).await?;
-        if amount >= self.available_amount {
+        if amount >= self.liquidity_volume {
             self.available_tokens.insert(token.address, Instant::now());
             return Ok(true);
         }
@@ -82,6 +82,8 @@ pub trait TokenWatcher {
     async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64>;
 }
 
+/// Watcher for Uniswap protocol
+/// https://thegraph.com/explorer/subgraph/uniswap/uniswap-v2
 pub struct UniswapTokenWatcher {
     client: reqwest::Client,
     addr: String,
