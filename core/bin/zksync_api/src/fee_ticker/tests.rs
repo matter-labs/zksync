@@ -158,7 +158,7 @@ fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
 struct FakeTokenWatcher;
 #[async_trait::async_trait]
 impl TokenWatcher for FakeTokenWatcher {
-    async fn get_token_market_amount(&self, _token: &Token) -> anyhow::Result<u64> {
+    async fn get_token_market_amount(&self, _token: &Token) -> anyhow::Result<f64> {
         unreachable!()
     }
 }
@@ -168,7 +168,7 @@ fn test_ticker_formula() {
     let validator = FeeTokenValidator::new(
         HashMap::new(),
         Duration::from_secs(100),
-        100,
+        100.0,
         FakeTokenWatcher,
     );
 
@@ -269,7 +269,7 @@ fn test_fee_for_unsubsidized_tokens() {
     let validator = FeeTokenValidator::new(
         HashMap::new(),
         Duration::from_secs(100),
-        100,
+        100.0,
         FakeTokenWatcher,
     );
 

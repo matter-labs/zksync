@@ -18,10 +18,12 @@ use crate::utils::token_db_cache::TokenDBCache;
 #[derive(Debug, Clone)]
 pub(crate) struct FeeTokenValidator<W> {
     tokens_cache: TokenCacheWrapper,
-    /// List of tokens that aren't accepted to pay fees in.
+    /// List of tokens that are accepted to pay fees in.
+    /// Whitelist is better in this case, because it requires fewer requests to different APIs
     available_tokens: HashMap<Address, Instant>,
     available_time: Duration,
-    available_amount: u64,
+    /// It's possible to use f64 here, because precision doesn't matter
+    available_amount: f64,
     watcher: W,
 }
 
@@ -29,7 +31,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     pub(crate) fn new(
         cache: impl Into<TokenCacheWrapper>,
         available_time: Duration,
-        available_amount: u64,
+        available_amount: f64,
         watcher: W,
     ) -> Self {
         Self {
@@ -70,22 +72,64 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         }
         Ok(false)
     }
-    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64> {
+    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
         self.watcher.get_token_market_amount(token).await
     }
 }
 
 #[async_trait::async_trait]
 pub trait TokenWatcher {
-    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64>;
+    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64>;
 }
 
-pub struct UniswapTokenWatcher;
+pub struct UniswapTokenWatcher {
+    client: reqwest::Client,
+    addr: String,
+}
+
+impl UniswapTokenWatcher {
+    pub fn new(addr: String) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            addr,
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct GraphqlResponse {
+    data: GraphqlTokenResponse,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct GraphqlTokenResponse {
+    token: TokenResponse,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct TokenResponse {
+    #[serde(rename = "tradeVolumeUSD")]
+    trade_volume_usd: String,
+}
 
 #[async_trait::async_trait]
 impl TokenWatcher for UniswapTokenWatcher {
-    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64> {
-        todo!()
+    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
+        // Uniswap has graphql API, using full graphql client for one query is overkill for current task
+        let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", token.address);
+        let request = serde_json::json!({
+            "query": query,
+        });
+
+        let response: GraphqlResponse = self
+            .client
+            .post(&self.addr)
+            .json(&request)
+            .send()
+            .await?
+            .json()
+            .await?;
+        Ok(response.data.token.trade_volume_usd.parse()?)
     }
 }
 
@@ -122,14 +166,28 @@ mod tests {
     use std::str::FromStr;
 
     struct InMemoryTokenWatcher {
-        amounts: HashMap<Address, u64>,
+        amounts: HashMap<Address, f64>,
     }
 
     #[async_trait::async_trait]
     impl TokenWatcher for InMemoryTokenWatcher {
-        async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<u64> {
+        async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
             Ok(*self.amounts.get(&token.address).unwrap())
         }
+    }
+
+    #[tokio::test]
+    async fn get_real_token_amount() {
+        let watcher = UniswapTokenWatcher::new(
+            "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2".to_string(),
+        );
+        let dai_token_address =
+            Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
+        let dai_token = Token::new(1, dai_token_address, "DAI", 18);
+
+        let amount = watcher.get_token_market_amount(&dai_token).await.unwrap();
+
+        assert!(amount > 0.0);
     }
 
     #[tokio::test]
@@ -146,12 +204,12 @@ mod tests {
         tokens.insert(TokenLike::Address(phnx_token_address), phnx_token);
 
         let mut amounts = HashMap::new();
-        amounts.insert(dai_token_address, 200);
-        amounts.insert(phnx_token_address, 10);
+        amounts.insert(dai_token_address, 200.0);
+        amounts.insert(phnx_token_address, 10.0);
         let mut validator = FeeTokenValidator::new(
             tokens,
             Duration::new(100, 0),
-            100,
+            100.0,
             InMemoryTokenWatcher { amounts },
         );
 
@@ -165,5 +223,10 @@ mod tests {
             .unwrap();
         assert_eq!(dai_allowed, true);
         assert_eq!(phnx_allowed, false);
+        assert!(validator.available_tokens.get(&dai_token_address).is_some());
+        assert!(validator
+            .available_tokens
+            .get(&phnx_token_address)
+            .is_none());
     }
 }

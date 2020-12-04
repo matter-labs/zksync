@@ -196,8 +196,14 @@ pub fn run_ticker_task(
 
     let cache = TokenDBCache::new(db_pool.clone());
     // TODO Use config
-    let validator =
-        FeeTokenValidator::new(cache, Duration::from_secs(100), 100, UniswapTokenWatcher);
+    let validator = FeeTokenValidator::new(
+        cache,
+        Duration::from_secs(100),
+        100.0,
+        UniswapTokenWatcher::new(
+            "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2".to_string(),
+        ),
+    );
 
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
