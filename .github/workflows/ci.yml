@@ -74,12 +74,6 @@ jobs:
         zk contract build-dev
         zk run deploy-eip1271
 
-    - name: integration-tests
-      run: zk test integration all --in-docker
-
-    - name: integration-testkit
-      run: zk test integration testkit
-
     - name: contracts-unit-tests
       run: zk test contracts
 
@@ -91,6 +85,12 @@ jobs:
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && zk f cargo test --release
+
+    - name: integration-tests
+      run: zk test integration all --in-docker
+
+    - name: integration-testkit
+      run: zk test integration testkit
 
     services:
       geth:
