@@ -327,6 +327,7 @@ mod tests {
             .expect("Golem token should be exist");
         // Check that GNT is alias to GMT.
         assert_eq!(golem_gnt, golem_glm);
+        assert_eq!(golem_gnt.id, 16);
 
         server.stop().await;
         Ok(())
