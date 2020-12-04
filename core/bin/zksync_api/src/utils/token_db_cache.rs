@@ -29,6 +29,8 @@ impl TokenDBCache {
         //
         // Currently, their token on Rinkeby is called GNT, but it's being renamed to the GLM.
         // So, for some period of time, we should consider GLM token name as an alias to the GNT token.
+        //
+        // TODO: Remove this case after Golem update [ZKS-173]
         match token_query {
             TokenLike::Symbol(symbol) if symbol == "GLM" => {
                 // Try to lookup Golem token as "GLM".

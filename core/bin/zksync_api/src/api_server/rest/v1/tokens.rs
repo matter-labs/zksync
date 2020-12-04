@@ -305,6 +305,10 @@ mod tests {
     }
 
     // Test special case for Golem: GLM token name should be alias for the GNT.
+    // By the way, since `TokenDBCache` is shared between this API implementation
+    // and the old RPC code, there is no need to write a test for the old implementation.
+    //
+    // TODO: Remove this case after Golem update [ZKS-173]
     #[actix_rt::test]
     async fn gnt_as_glm_alias() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
