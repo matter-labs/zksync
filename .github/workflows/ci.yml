@@ -23,7 +23,8 @@ jobs:
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
 
-    - uses: actions/cache@v2
+    - name: cache-contracts
+      uses: actions/cache@v2
       with:
         path: |
           contracts/build
@@ -31,7 +32,8 @@ jobs:
           contracts/dev-contracts/generated
         key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
 
-    - uses: actions/cache@v2
+    - name: cache-rust
+      uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
