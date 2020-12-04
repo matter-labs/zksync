@@ -226,7 +226,7 @@ export function isTokenETH(token: TokenLike): boolean {
 }
 
 export class TokenSet {
-    // TODO: handle stale entries, edge case when we rename token after adding it (#1132).
+    // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-120).
     constructor(private tokensBySymbol: Tokens) {}
 
     private resolveTokenObject(tokenLike: TokenLike) {

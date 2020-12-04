@@ -127,7 +127,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         // - Either there is no ongoing job for the block, or the job exceeded the timeout.
         // Return the index of such a block.
 
-        // TODO: Prover gone interval is hard-coded (#1115).
+        // TODO: Prover gone interval is hard-coded (ZKS-103).
         // Is it critical?
         let job = sqlx::query!(
             r#"
@@ -241,7 +241,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let start = Instant::now();
         // TODO: It seems that it isn't actually checked if the prover has been stopped
         // anywhere. And also it doesn't seem that prover can be restored from the stopped
-        // state (#1129).
+        // state (ZKS-117).
         sqlx::query!(
             "UPDATE active_provers 
             SET stopped_at = now()

@@ -255,7 +255,7 @@ async fn blocks_range(
         .await
         .map_err(ApiError::internal)?;
     // Handle edge case when "after + limit" greater than the total blocks count.
-    // TODO Handle this case directly in the `storage` crate. (#1151)
+    // TODO Handle this case directly in the `storage` crate. (ZKS-124)
     let range = if let Pagination::After(after) = pagination {
         range
             .into_iter()
