@@ -85,7 +85,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .expect("token by symbol not found");
     assert_eq!(token_b, token_b_by_symbol);
 
-    // Now check that that storing the token that already exists is the same as updating it.
+    // Now check that storing the token that already exists is the same as updating it.
     let token_c = Token {
         id: 2,
         address: "0000000000000000000000000000000000000008".parse().unwrap(),
