@@ -68,6 +68,7 @@ impl EthClientOptions {
 
 #[derive(Debug, Clone)]
 pub struct ProverOptions {
+    pub secret_auth: String,
     pub prepare_data_interval: Duration,
     pub heartbeat_interval: Duration,
     pub cycle_wait: Duration,
@@ -82,6 +83,7 @@ impl ProverOptions {
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
         Self {
+            secret_auth: get_env("PROVER_SECRET_AUTH"),
             prepare_data_interval: Duration::from_millis(parse_env("PROVER_PREPARE_DATA_INTERVAL")),
             heartbeat_interval: Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL")),
             cycle_wait: Duration::from_millis(parse_env("PROVER_CYCLE_WAIT")),
@@ -108,7 +110,7 @@ impl AdminServerOptions {
         Self {
             admin_http_server_url: parse_env("ADMIN_SERVER_API_URL"),
             admin_http_server_address: addr_from_port(parse_env("ADMIN_SERVER_API_PORT")),
-            secret_auth: parse_env("SECRET_AUTH"),
+            secret_auth: get_env("ADMIN_SERVER_SECRET_AUTH"),
         }
     }
 }

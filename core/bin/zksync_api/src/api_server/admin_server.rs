@@ -4,7 +4,7 @@ use std::thread;
 
 // External uses
 use actix_web::dev::ServiceRequest;
-use actix_web::{web, App, Error, HttpResponse, HttpServer};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use actix_web_httpauth::extractors::{
     bearer::{BearerAuth, Config},
     AuthenticationError,
@@ -76,7 +76,7 @@ impl<'a> AuthTokenValidator<'a> {
         &self,
         req: ServiceRequest,
         credentials: BearerAuth,
-    ) -> Result<ServiceRequest, Error> {
+    ) -> actix_web::Result<ServiceRequest> {
         let config = req.app_data::<Config>().cloned().unwrap_or_default();
 
         self.validate_auth_token(credentials.token())
