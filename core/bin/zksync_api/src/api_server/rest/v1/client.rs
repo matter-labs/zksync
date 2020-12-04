@@ -6,6 +6,7 @@ pub use super::{
     config::Contracts,
     tokens::TokenPriceKind,
     transactions::{SumbitErrorCode, TxReceipt},
+    Pagination,
 };
 
 // Built-in uses

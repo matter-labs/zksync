@@ -10,6 +10,7 @@ use std::{
 use rand::{thread_rng, Rng};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 // Workspace uses
+use zksync_api::client::Pagination;
 use zksync_types::{tx::TxHash, Address, BlockNumber, PriorityOp, ZkSyncPriorityOp};
 // Local uses
 
@@ -120,6 +121,22 @@ impl ApiDataPoolInner {
     /// Generates a random block number in range [0, max block number].
     pub fn random_block(&self) -> BlockNumber {
         self.random_tx_id().0
+    }
+
+    /// Generates a random pagination block range.
+    pub fn random_block_range(&self) -> (Pagination, BlockNumber) {
+        let mut rng = thread_rng();
+
+        let block_number = self.random_block();
+        let pagination = match rng.gen_range(0, 3) {
+            0 => Pagination::Before(block_number),
+            1 => Pagination::After(block_number),
+            2 => Pagination::Last,
+            _ => unreachable!(),
+        };
+
+        let limit = rng.gen_range(1, MAX_REQUEST_LIMIT + 1);
+        (pagination, limit as BlockNumber)
     }
 
     /// Generates a random transaction identifier (block number, position in block).
