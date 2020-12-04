@@ -22,7 +22,7 @@ pub(crate) struct FeeTokenValidator<W> {
     /// Whitelist is better in this case, because it requires fewer requests to different APIs
     available_tokens: HashMap<Address, Instant>,
     available_time: Duration,
-    /// It's possible to use f64 here, because precision doesn't matter
+    // It's possible to use f64 here because precision doesn't matter
     liquidity_volume: f64,
     watcher: W,
 }

@@ -172,12 +172,12 @@ pub enum TickerRequest {
     },
 }
 
-struct FeeTicker<API, INFO, W> {
+struct FeeTicker<API, INFO, WATCHER> {
     api: API,
     info: INFO,
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
-    validator: FeeTokenValidator<W>,
+    validator: FeeTokenValidator<WATCHER>,
 }
 
 #[must_use]
@@ -242,13 +242,13 @@ pub fn run_ticker_task(
     }
 }
 
-impl<API: FeeTickerAPI, INFO: FeeTickerInfo, W: TokenWatcher> FeeTicker<API, INFO, W> {
+impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<API, INFO, WATCHER> {
     fn new(
         api: API,
         info: INFO,
         requests: Receiver<TickerRequest>,
         config: TickerConfig,
-        validator: FeeTokenValidator<W>,
+        validator: FeeTokenValidator<WATCHER>,
     ) -> Self {
         Self {
             api,

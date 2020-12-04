@@ -177,7 +177,7 @@ pub struct FeeTickerOptions {
     pub not_subsidized_tokens: HashSet<Address>,
     pub uniswap_url: String,
     pub liquidity_volume: f64,
-    pub available_liquidity_seconds: u32,
+    pub available_liquidity_seconds: u64,
 }
 
 impl FeeTickerOptions {
