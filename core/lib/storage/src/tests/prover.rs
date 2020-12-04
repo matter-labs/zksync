@@ -39,7 +39,8 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
     const BLOCK_NUMBER: u32 = 1;
     const BLOCK_SIZE: usize = 100;
     // No witness stored for the block.
-    assert!(ProverSchema(&mut storage)
+    assert!(storage
+        .prover_schema()
         .get_witness(BLOCK_NUMBER)
         .await?
         .is_none());
@@ -60,7 +61,8 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?;
 
     // Now load it.
-    let loaded = ProverSchema(&mut storage)
+    let loaded = storage
+        .prover_schema()
         .get_witness(BLOCK_NUMBER)
         .await?
         .map(|value| serde_json::from_value(value).unwrap());
@@ -74,7 +76,8 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .store_witness(BLOCK_NUMBER, witness)
         .await?;
 
-    let loaded = ProverSchema(&mut storage)
+    let loaded = storage
+        .prover_schema()
         .get_witness(BLOCK_NUMBER)
         .await?
         .map(|value| serde_json::from_value(value).unwrap());

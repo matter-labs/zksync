@@ -350,7 +350,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
 /// Simple test for store/load of (average) gas price.
 #[db_test]
 async fn ethereum_gas_update(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    EthereumSchema(&mut storage).initialize_eth_data().await?;
+    storage.ethereum_schema().initialize_eth_data().await?;
     let old_price_limit = storage.ethereum_schema().load_gas_price_limit().await?;
     let old_average_price = storage.ethereum_schema().load_average_gas_price().await?;
     // This parameter is not set in `initialize_eth_data()`
