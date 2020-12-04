@@ -5,10 +5,11 @@ use num::BigUint;
 // Workspace uses
 use zksync::{
     error::ClientError,
+    provider::Provider,
     types::BlockStatus,
     utils::{biguint_to_u256, closest_packable_fee_amount},
     web3::types::H256,
-    EthereumProvider, Network, Wallet, WalletCredentials,
+    EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
 use zksync_eth_signer::PrivateKeySigner;
@@ -23,7 +24,7 @@ use crate::{config::AccountInfo, monitor::Monitor, session::save_wallet};
 pub struct TestWallet {
     monitor: Monitor,
     eth_provider: EthereumProvider<PrivateKeySigner>,
-    inner: Wallet<PrivateKeySigner>,
+    inner: Wallet<PrivateKeySigner, RpcProvider>,
     token_name: TokenLike,
 
     nonce: AtomicU32,
@@ -78,7 +79,7 @@ impl TestWallet {
     async fn from_wallet(
         token_name: TokenLike,
         monitor: Monitor,
-        inner: Wallet<PrivateKeySigner>,
+        inner: Wallet<PrivateKeySigner, RpcProvider>,
         web3_url: impl AsRef<str>,
     ) -> Self {
         let eth_provider = inner.ethereum(web3_url).await.unwrap();
@@ -255,7 +256,7 @@ impl TestWallet {
     }
 
     /// Returns an underlying wallet.
-    pub fn into_inner(self) -> Wallet<PrivateKeySigner> {
+    pub fn into_inner(self) -> Wallet<PrivateKeySigner, RpcProvider> {
         self.inner
     }
 
