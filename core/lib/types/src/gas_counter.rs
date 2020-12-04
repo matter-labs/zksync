@@ -22,7 +22,7 @@ impl CommitCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    // TODO: overvalued for quick fix of tx fails (#1121).
+    // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 300_000;
     pub const DEPOSIT_COST: u64 = 10_397;
     pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_866;
@@ -31,7 +31,7 @@ impl CommitCost {
     pub const TRANSFER_TO_NEW_COST: u64 = 862;
     pub const FULL_EXIT_COST: u64 = 10_165;
     pub const WITHDRAW_COST: u64 = 2_167;
-    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (#1121).
+    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -69,7 +69,7 @@ impl VerifyCost {
     //
     // These values are estimated using the `gas_price_test` in `testkit`.
 
-    // TODO: overvalued for quick fix of tx fails (#1121).
+    // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 1_000_000;
     pub const DEPOSIT_COST: u64 = 0;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
@@ -77,7 +77,7 @@ impl VerifyCost {
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 2_499;
     pub const WITHDRAW_COST: u64 = 45_668;
-    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (#1121).
+    pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -203,7 +203,7 @@ mod tests {
             account_id: 1,
         };
 
-        // TODO: add other operations to this test (#1122).
+        // TODO: add other operations to this test (ZKS-110).
 
         let test_vector = vec![(
             ZkSyncOp::from(change_pubkey_op),
@@ -231,7 +231,7 @@ mod tests {
             account_id: 1,
         };
 
-        // TODO: add other operations to this test (#1122).
+        // TODO: add other operations to this test (ZKS-110).
 
         let test_vector = vec![(
             ZkSyncOp::from(change_pubkey_op),

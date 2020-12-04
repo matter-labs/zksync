@@ -9,11 +9,13 @@ use zksync_types::{
     Address, Nonce, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
-use crate::{error::ClientError, operations::SyncTransactionHandle, wallet::Wallet};
+use crate::{
+    error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
+};
 
 #[derive(Debug)]
-pub struct TransferBuilder<'a, S: EthereumSigner> {
-    wallet: &'a Wallet<S>,
+pub struct TransferBuilder<'a, S: EthereumSigner, P: Provider> {
+    wallet: &'a Wallet<S, P>,
     token: Option<Token>,
     amount: Option<BigUint>,
     fee: Option<BigUint>,
@@ -21,9 +23,13 @@ pub struct TransferBuilder<'a, S: EthereumSigner> {
     nonce: Option<Nonce>,
 }
 
-impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
+impl<'a, S, P> TransferBuilder<'a, S, P>
+where
+    S: EthereumSigner + Clone,
+    P: Provider + Clone,
+{
     /// Initializes a transfer transaction building process.
-    pub fn new(wallet: &'a Wallet<S>) -> Self {
+    pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
             token: None,
@@ -79,7 +85,7 @@ impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
-    pub async fn send(self) -> Result<SyncTransactionHandle, ClientError> {
+    pub async fn send(self) -> Result<SyncTransactionHandle<P>, ClientError> {
         let provider = self.wallet.provider.clone();
 
         let (tx, eth_signature) = self.tx().await?;

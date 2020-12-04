@@ -36,7 +36,6 @@ jobs:
         rustup update stable
         cargo install  sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
-
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk

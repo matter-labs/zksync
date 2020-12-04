@@ -248,7 +248,7 @@ mod tests {
                 .await?,
             None
         );
-        // TODO Check error (#1152)
+        // TODO Check error (ZKS-125)
         client
             .token_price(&TokenLike::Id(2), TokenPriceKind::Token)
             .await
