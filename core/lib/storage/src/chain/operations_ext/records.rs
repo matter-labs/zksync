@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
+
 // Local imports
 use crate::prover::records::ProverRun;
 
@@ -67,4 +68,14 @@ pub struct TxByHashResponse {
     pub created_at: String,
     pub fail_reason: Option<String>,
     pub tx: Value,
+}
+
+#[derive(Debug, FromRow, PartialEq)]
+pub struct AccountTxReceiptResponse {
+    pub block_number: i64,
+    pub block_index: Option<i32>,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
+    pub commit_tx_hash: Option<Vec<u8>>,
+    pub verify_tx_hash: Option<Vec<u8>>,
 }

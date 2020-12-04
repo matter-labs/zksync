@@ -103,7 +103,6 @@ impl ApiAccountsData {
         // TODO Rewrite `TokensDBCache` logic to make such errors impossible. ZKS-169
         drop(storage);
 
-        // TODO This code uses same logic as the old RPC, but I'm not sure that if it is correct.
         let (account_id, account) = if let Some(state) = account_state.committed {
             state
         } else {
