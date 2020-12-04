@@ -203,8 +203,7 @@ impl ZkSyncOp {
     }
 
     pub fn is_processable_onchain_operation(&self) -> bool {
-        matches!(self, &ZkSyncOp::Deposit(_)
-        | &ZkSyncOp::Withdraw(_)
+        matches!(self, &ZkSyncOp::Withdraw(_)
         | &ZkSyncOp::FullExit(_)
         | &ZkSyncOp::ForcedExit(_))
     }

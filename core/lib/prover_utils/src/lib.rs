@@ -1,4 +1,3 @@
-use crate::aggregated_proofs::SingleProof;
 use crate::fs_utils::{get_block_verification_key_path, get_exodus_verification_key_path};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -18,7 +17,7 @@ use zksync_crypto::franklin_crypto::rescue::rescue_transcript::RescueTranscriptF
 use zksync_crypto::pairing::Engine as EngineTrait;
 use zksync_crypto::params::RECURSIVE_CIRCUIT_VK_TREE_DEPTH;
 use zksync_crypto::primitives::EthereumSerializer;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::SingleProof;
 use zksync_crypto::recursive_aggregation_circuit::circuit::create_vks_tree;
 use zksync_crypto::{Engine, Fr};
 
@@ -127,7 +126,7 @@ impl SetupForStepByStepProver {
         let valid =
             verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         anyhow::ensure!(valid, "proof for block is invalid");
-        Ok(proof)
+        Ok(proof.into())
     }
 }
 
@@ -175,69 +174,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     anyhow::ensure!(valid, "proof for exit is invalid");
 
     log::info!("Proof for circuit successful");
-    Ok(proof)
-}
-
-pub fn serialize_proof(
-    proof: &Proof<Engine, PlonkCsWidth4WithNextStepParams>,
-) -> EncodedProofPlonk {
-    let mut inputs = vec![];
-    for input in proof.input_values.iter() {
-        let ser = EthereumSerializer::serialize_fe(input);
-        inputs.push(ser);
-    }
-    let mut serialized_proof = vec![];
-
-    for c in proof.wire_commitments.iter() {
-        let (x, y) = EthereumSerializer::serialize_g1(c);
-        serialized_proof.push(x);
-        serialized_proof.push(y);
-    }
-
-    let (x, y) = EthereumSerializer::serialize_g1(&proof.grand_product_commitment);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    for c in proof.quotient_poly_commitments.iter() {
-        let (x, y) = EthereumSerializer::serialize_g1(c);
-        serialized_proof.push(x);
-        serialized_proof.push(y);
-    }
-
-    for c in proof.wire_values_at_z.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(c));
-    }
-
-    for c in proof.wire_values_at_z_omega.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(c));
-    }
-
-    serialized_proof.push(EthereumSerializer::serialize_fe(
-        &proof.grand_product_at_z_omega,
-    ));
-    serialized_proof.push(EthereumSerializer::serialize_fe(
-        &proof.quotient_polynomial_at_z,
-    ));
-    serialized_proof.push(EthereumSerializer::serialize_fe(
-        &proof.linearization_polynomial_at_z,
-    ));
-
-    for c in proof.permutation_polynomials_at_z.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(c));
-    }
-
-    let (x, y) = EthereumSerializer::serialize_g1(&proof.opening_at_z_proof);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    let (x, y) = EthereumSerializer::serialize_g1(&proof.opening_at_z_omega_proof);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    EncodedProofPlonk {
-        inputs,
-        proof: serialized_proof,
-    }
+    Ok(proof.into())
 }
 
 /// Reads universal setup from disk or downloads from network.

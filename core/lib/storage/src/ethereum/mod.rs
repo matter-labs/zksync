@@ -117,7 +117,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "load_unconfirmed_operations");
+        metrics::histogram!("sql.ethereum.load_unconfirmed_operations", start.elapsed());
         Ok(ops)
     }
 
@@ -156,7 +156,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "load_unprocessed_operations");
+        metrics::histogram!("sql.ethereum.load_unprocessed_operations", start.elapsed());
         Ok(operations)
     }
 
@@ -230,7 +230,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "save_new_eth_tx");
+        metrics::histogram!("sql.ethereum.save_new_eth_tx", start.elapsed());
         Ok(response)
     }
 
@@ -245,7 +245,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "get_eth_op_id");
+        metrics::histogram!("sql.ethereum.get_eth_op_id", start.elapsed());
         Ok(hash_entry.eth_op_id)
     }
 
@@ -260,7 +260,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "add_hash_entry");
+        metrics::histogram!("sql.ethereum.add_hash_entry", start.elapsed());
         Ok(())
     }
 
@@ -286,7 +286,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "update_eth_tx");
+        metrics::histogram!("sql.ethereum.update_eth_tx", start.elapsed());
         Ok(())
     }
 
@@ -322,7 +322,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "report_created_operation");
+        metrics::histogram!("sql.ethereum.report_created_operation", start.elapsed());
         Ok(())
     }
 
@@ -353,7 +353,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "update_gas_price");
+        metrics::histogram!("sql.ethereum.update_gas_price", start.elapsed());
         Ok(())
     }
 
@@ -426,7 +426,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "confirm_eth_tx");
+        metrics::histogram!("sql.ethereum.confirm_eth_tx", start.elapsed());
         Ok(())
     }
 
@@ -457,7 +457,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "get_next_nonce");
+        metrics::histogram!("sql.ethereum.get_next_nonce", start.elapsed());
         Ok(old_nonce_value)
     }
 
@@ -499,7 +499,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             .await?;
         }
 
-        metrics::histogram!("sql", start.elapsed(), "ethereum" => "initialize_eth_data");
+        metrics::histogram!("sql.ethereum.initialize_eth_data", start.elapsed());
         Ok(())
     }
 

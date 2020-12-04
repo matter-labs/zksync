@@ -3,9 +3,13 @@ import { ethers, Wallet } from 'ethers';
 import { readContractCode } from '../src.ts/deploy';
 import { encodeConstructorArgs, publishSourceCodeToEtherscan } from '../src.ts/publish-utils';
 import * as fs from 'fs';
+import * as path from 'path';
 import { ArgumentParser } from 'argparse';
 
 const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
+
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 (async () => {
     const parser = new ArgumentParser({
@@ -18,10 +22,14 @@ const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
         action: 'storeTrue',
         help: 'Only publish code for deployed tokens'
     });
+    parser.addArgument('--deployerPrivateKey', { required: false, help: 'Wallet used to deploy contracts' });
     const args = parser.parseArgs(process.argv.slice(2));
 
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-    const wallet = Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+    const wallet = args.deployerPrivateKey
+        ? new Wallet(args.deployerPrivateKey, provider)
+        : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+
     const contractCode = readContractCode('TestnetERC20Token');
 
     if (process.env.ETH_NETWORK === 'mainnet') {

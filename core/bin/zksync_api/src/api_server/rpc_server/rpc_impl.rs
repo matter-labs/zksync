@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 // External uses
 use jsonrpc_core::{Error, Result};
 use num::BigUint;
@@ -10,16 +11,17 @@ use zksync_types::{
 };
 
 // Local uses
-use crate::fee_ticker::{BatchFee, Fee, TokenPriceRequestType};
+use crate::{
+    api_server::tx_sender::SubmitError,
+    fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
+};
 use bigdecimal::BigDecimal;
 
 use super::{error::*, types::*, RpcApp};
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
-        use std::time::Instant;
-
-        let started = Instant::now();
+        let start = Instant::now();
 
         let account_state = self.get_account_state(&address).await?;
 
@@ -31,9 +33,10 @@ impl RpcApp {
         log::trace!(
             "account_info: address {}, total request processing {}ms",
             &address,
-            started.elapsed().as_millis()
+            start.elapsed().as_millis()
         );
 
+        metrics::histogram!("api.rpc.account_info", start.elapsed());
         Ok(AccountInfoResp {
             address,
             id: account_state.account_id,
@@ -44,8 +47,9 @@ impl RpcApp {
     }
 
     pub async fn _impl_ethop_info(self, serial_id: u32) -> Result<ETHOpInfoResp> {
+        let start = Instant::now();
         let executed_op = self.get_executed_priority_operation(serial_id).await?;
-        Ok(if let Some(executed_op) = executed_op {
+        let result = if let Some(executed_op) = executed_op {
             let block = self.get_block_info(executed_op.block_number).await?;
             ETHOpInfoResp {
                 executed: true,
@@ -60,7 +64,10 @@ impl RpcApp {
                 executed: false,
                 block: None,
             }
-        })
+        };
+
+        metrics::histogram!("api.rpc.ethop_info", start.elapsed());
+        Ok(result)
     }
 
     pub async fn _impl_get_confirmations_for_eth_op_amount(self) -> Result<u64> {
@@ -68,7 +75,9 @@ impl RpcApp {
     }
 
     pub async fn _impl_tx_info(self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
+        let start = Instant::now();
         let stored_receipt = self.get_tx_receipt(tx_hash).await?;
+        metrics::histogram!("api.rpc.tx_info", start.elapsed());
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
                 executed: true,
@@ -96,10 +105,14 @@ impl RpcApp {
         signature: Box<Option<TxEthSignature>>,
         fast_processing: Option<bool>,
     ) -> Result<TxHash> {
-        self.tx_sender
+        let start = Instant::now();
+        let result = self
+            .tx_sender
             .submit_tx(*tx, *signature, fast_processing)
             .await
-            .map_err(Error::from)
+            .map_err(Error::from);
+        metrics::histogram!("api.rpc.tx_submit", start.elapsed());
+        result
     }
 
     pub async fn _impl_submit_txs_batch(
@@ -107,13 +120,18 @@ impl RpcApp {
         txs: Vec<TxWithSignature>,
         eth_signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>> {
-        self.tx_sender
+        let start = Instant::now();
+        let result = self
+            .tx_sender
             .submit_txs_batch(txs, eth_signature)
             .await
-            .map_err(Error::from)
+            .map_err(Error::from);
+        metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
+        result
     }
 
     pub async fn _impl_contract_address(self) -> Result<ContractAddressResp> {
+        let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let config = storage.config_schema().load_config().await.map_err(|err| {
             log::warn!(
@@ -134,6 +152,8 @@ impl RpcApp {
         let gov_contract = config
             .gov_contract_addr
             .expect("Server config doesn't contain the gov contract address");
+
+        metrics::histogram!("api.rpc.contract_address", start.elapsed());
         Ok(ContractAddressResp {
             main_contract,
             gov_contract,
@@ -141,18 +161,13 @@ impl RpcApp {
     }
 
     pub async fn _impl_tokens(self) -> Result<HashMap<String, Token>> {
+        let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let mut tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
-            log::warn!(
-                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
-                file!(),
-                line!(),
-                column!(),
-                err
-            );
+            log::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
-        Ok(tokens
+        let result = tokens
             .drain()
             .map(|(id, token)| {
                 if id == 0 {
@@ -161,7 +176,9 @@ impl RpcApp {
                     (token.symbol.clone(), token)
                 }
             })
-            .collect())
+            .collect();
+        metrics::histogram!("api.rpc.tokens", start.elapsed());
+        Ok(result)
     }
 
     pub async fn _impl_get_tx_fee(
@@ -170,13 +187,16 @@ impl RpcApp {
         address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
-        Self::ticker_request(
-            self.tx_sender.ticker_requests.clone(),
-            tx_type,
-            address,
-            token,
-        )
-        .await
+        let start = Instant::now();
+        let ticker = self.tx_sender.ticker_requests.clone();
+        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
+        if !token_allowed {
+            return Err(SubmitError::InappropriateFeeToken.into());
+        }
+
+        let result = Self::ticker_request(ticker.clone(), tx_type, address, token).await;
+        metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
+        result
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -185,6 +205,7 @@ impl RpcApp {
         addresses: Vec<Address>,
         token: TokenLike,
     ) -> Result<BatchFee> {
+        let start = Instant::now();
         if tx_types.len() != addresses.len() {
             return Err(Error {
                 code: RpcErrorCodes::IncorrectTx.into(),
@@ -193,39 +214,45 @@ impl RpcApp {
             });
         }
 
-        let ticker_request_sender = self.tx_sender.ticker_requests.clone();
+        let ticker = self.tx_sender.ticker_requests.clone();
+        let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
+        if !token_allowed {
+            return Err(SubmitError::InappropriateFeeToken.into());
+        }
 
         let mut total_fee = BigUint::from(0u32);
 
         for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
-            total_fee += Self::ticker_request(
-                ticker_request_sender.clone(),
-                tx_type.clone(),
-                *address,
-                token.clone(),
-            )
-            .await?
-            .total_fee;
+            let ticker = ticker.clone();
+            let fee = Self::ticker_request(ticker, *tx_type, *address, token.clone()).await?;
+            total_fee += fee.total_fee;
         }
         // Sum of transactions can be unpackable
         total_fee = closest_packable_fee_amount(&total_fee);
 
+        metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
         Ok(BatchFee { total_fee })
     }
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {
-        Self::ticker_price_request(
+        let start = Instant::now();
+        let result = Self::ticker_price_request(
             self.tx_sender.ticker_requests.clone(),
             token,
             TokenPriceRequestType::USDForOneToken,
         )
-        .await
+        .await;
+        metrics::histogram!("api.rpc.get_token_price", start.elapsed());
+        result
     }
 
     pub async fn _impl_get_eth_tx_for_withdrawal(
         self,
         withdrawal_hash: TxHash,
     ) -> Result<Option<String>> {
-        self.eth_tx_for_withdrawal(withdrawal_hash).await
+        let start = Instant::now();
+        let result = self.eth_tx_for_withdrawal(withdrawal_hash).await;
+        metrics::histogram!("api.rpc.get_eth_tx_for_withdrawal", start.elapsed());
+        result
     }
 }

@@ -1,28 +1,111 @@
-use crate::Fr;
+use crate::bellman::plonk::better_better_cs::proof::Proof as NewProof;
+use crate::bellman::plonk::better_cs::{
+    cs::PlonkCsWidth4WithNextStepParams,
+    keys::{Proof as OldProof, VerificationKey as SingleVk},
+};
+use crate::serialization::{
+    serialize_fe_for_ethereum, serialize_new_proof, AggregatedProofSerde, SingleProofSerde,
+    VecFrSerde,
+};
+use crate::{Engine, Fr};
 use ethabi::Token;
 use recursive_aggregation_circuit::circuit::RecursiveAggregationCircuitBn256;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use zksync_basic_types::U256;
 
-/// Encoded representation of the block proof.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct EncodedProofPlonk {
-    pub inputs: Vec<U256>,
-    pub proof: Vec<U256>,
+pub type OldProofType = OldProof<Engine, PlonkCsWidth4WithNextStepParams>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SingleProof(#[serde(with = "SingleProofSerde")] pub OldProofType);
+
+impl From<OldProofType> for SingleProof {
+    fn from(proof: OldProofType) -> Self {
+        SingleProof(proof)
+    }
 }
 
-impl Default for EncodedProofPlonk {
+impl Default for SingleProof {
     fn default() -> Self {
-        Self {
-            inputs: vec![U256::default(); 1],
-            proof: vec![U256::default(); 33],
+        SingleProof(OldProofType::empty())
+    }
+}
+
+pub type NewProofType = NewProof<Engine, RecursiveAggregationCircuitBn256<'static>>;
+#[derive(Serialize, Deserialize)]
+pub struct AggregatedProof {
+    #[serde(with = "AggregatedProofSerde")]
+    pub proof: NewProofType,
+    #[serde(with = "VecFrSerde")]
+    pub individual_vk_inputs: Vec<Fr>,
+    pub individual_vk_idxs: Vec<usize>,
+    #[serde(with = "VecFrSerde")]
+    pub aggr_limbs: Vec<Fr>,
+}
+
+impl Default for AggregatedProof {
+    fn default() -> Self {
+        AggregatedProof {
+            proof: NewProofType::empty(),
+            individual_vk_inputs: Vec::new(),
+            individual_vk_idxs: Vec::new(),
+            aggr_limbs: Vec::new(),
         }
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct EncodedSingleProofForAggregation {
-    pub data: Vec<u8>,
+impl std::fmt::Debug for AggregatedProof {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AggregatedProof")
+    }
+}
+
+impl Clone for AggregatedProof {
+    fn clone(&self) -> Self {
+        let mut bytes = Vec::new();
+        self.proof
+            .write(&mut bytes)
+            .expect("Failed to serialize aggregated proof");
+        AggregatedProof {
+            proof: NewProof::read(&*bytes).expect("Failed to deserialize aggregated proof"),
+            individual_vk_inputs: self.individual_vk_inputs.clone(),
+            individual_vk_idxs: self.individual_vk_idxs.clone(),
+            aggr_limbs: self.aggr_limbs.clone(),
+        }
+    }
+}
+
+pub type Vk = SingleVk<Engine, PlonkCsWidth4WithNextStepParams>;
+
+impl AggregatedProof {
+    pub fn serialize_aggregated_proof(&self) -> EncodedAggregatedProof {
+        let (inputs, proof) = serialize_new_proof(&self.proof);
+
+        let subproof_limbs = self
+            .aggr_limbs
+            .iter()
+            .map(serialize_fe_for_ethereum)
+            .collect();
+        let individual_vk_inputs = self
+            .individual_vk_inputs
+            .iter()
+            .map(serialize_fe_for_ethereum)
+            .collect();
+        let individual_vk_idxs = self
+            .individual_vk_idxs
+            .iter()
+            .cloned()
+            .map(U256::from)
+            .collect();
+
+        EncodedAggregatedProof {
+            aggregated_input: inputs[0],
+            proof,
+            subproof_limbs,
+            individual_vk_inputs,
+            individual_vk_idxs,
+        }
+    }
 }
 
 /// Encoded representation of the aggregated block proof.

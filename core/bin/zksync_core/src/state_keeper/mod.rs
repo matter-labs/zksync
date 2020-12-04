@@ -6,6 +6,7 @@ use futures::{
     stream::StreamExt,
     SinkExt,
 };
+use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_crypto::ff;
@@ -109,6 +110,13 @@ pub struct ZkSyncStateKeeper {
     max_miniblock_iterations: usize,
     fast_miniblock_iterations: usize,
     max_number_of_withdrawals_per_block: usize,
+
+    // Two fields below are for optimization: we don't want to overwrite all the block contents over and over.
+    // With these fields we'll be able save the diff between two pending block states only.
+    /// Amount of succeeded transactions in the pending block at the last pending block synchronization step.
+    success_txs_pending_len: usize,
+    /// Amount of failed transactions in the pending block at the last pending block synchronization step.
+    failed_txs_pending_len: usize,
 }
 
 pub struct ZkSyncStateInitParams {
@@ -352,11 +360,10 @@ impl ZkSyncStateKeeper {
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
-        let is_sorted = {
-            let mut sorted = available_block_chunk_sizes.clone();
-            sorted.sort_unstable();
-            sorted == available_block_chunk_sizes
-        };
+        let is_sorted = available_block_chunk_sizes
+            .iter()
+            .tuple_windows()
+            .all(|(a, b)| a < b);
         assert!(is_sorted);
 
         let state = ZkSyncState::new(
@@ -396,6 +403,9 @@ impl ZkSyncStateKeeper {
             max_miniblock_iterations,
             fast_miniblock_iterations,
             max_number_of_withdrawals_per_block,
+
+            success_txs_pending_len: 0,
+            failed_txs_pending_len: 0,
         };
 
         let root = keeper.state.root_hash();
@@ -534,6 +544,9 @@ impl ZkSyncStateKeeper {
         let start = Instant::now();
         let mut executed_ops = Vec::new();
 
+        // We want to store this variable before moving anything from the pending block.
+        let empty_proposed_block = proposed_block.is_empty();
+
         let mut priority_op_queue = proposed_block
             .priority_ops
             .into_iter()
@@ -600,7 +613,12 @@ impl ZkSyncStateKeeper {
         if self.pending_block.pending_block_iteration > max_miniblock_iterations {
             self.seal_pending_block().await;
         } else {
-            self.store_pending_block().await;
+            // We've already incremented the pending block iteration, so this iteration will count towards
+            // reaching the block commitment timeout.
+            // However, we don't want to pointlessly save the same block again and again.
+            if !empty_proposed_block {
+                self.store_pending_block().await;
+            }
         }
 
         metrics::histogram!("state_keeper.execute_proposed_block", start.elapsed());
@@ -877,6 +895,10 @@ impl ZkSyncStateKeeper {
             ),
         );
 
+        // Once block is sealed, we refresh the counters for the next block.
+        self.success_txs_pending_len = 0;
+        self.failed_txs_pending_len = 0;
+
         // Apply fees of pending block
         let fee_updates = self
             .state
@@ -948,6 +970,20 @@ impl ZkSyncStateKeeper {
     /// so the executed transactions are persisted and won't be lost.
     async fn store_pending_block(&mut self) {
         let start = Instant::now();
+
+        // We want include only the newly appeared transactions, since the older ones are already persisted in the
+        // database.
+        // This is a required optimization, since otherwise time to process the pending block may grow without any
+        // limits if we'll be spammed by incorrect transactions (we don't have a limit for an amount of rejected
+        // transactions in the block).
+        let new_success_operations =
+            self.pending_block.success_operations[self.success_txs_pending_len..].to_vec();
+        let new_failed_operations =
+            self.pending_block.failed_txs[self.failed_txs_pending_len..].to_vec();
+
+        self.success_txs_pending_len = self.pending_block.success_operations.len();
+        self.failed_txs_pending_len = self.pending_block.failed_txs.len();
+
         // Create a pending block object to send.
         // Note that failed operations are not included, as per any operation failure
         // the full block is created immediately.
@@ -956,8 +992,8 @@ impl ZkSyncStateKeeper {
             chunks_left: self.pending_block.chunks_left,
             unprocessed_priority_op_before: self.pending_block.unprocessed_priority_op_before,
             pending_block_iteration: self.pending_block.pending_block_iteration,
-            success_operations: self.pending_block.success_operations.clone(),
-            failed_txs: self.pending_block.failed_txs.clone(),
+            success_operations: new_success_operations,
+            failed_txs: new_failed_operations,
             previous_block_root_hash: self.pending_block.previous_block_root_hash,
             timestamp: self.pending_block.timestamp,
         };
@@ -983,7 +1019,6 @@ impl ZkSyncStateKeeper {
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
-
         metrics::histogram!("state_keeper.store_pending_block", start.elapsed());
     }
 

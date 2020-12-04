@@ -47,6 +47,7 @@ pub mod mempool;
 pub mod network;
 pub mod operations;
 pub mod priority_ops;
+pub mod prover;
 pub mod tokens;
 pub mod tx;
 
@@ -71,21 +72,22 @@ pub use zksync_basic_types::*;
 pub type AccountMap = zksync_crypto::fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
+pub type SerialId = u64;
 
 use crate::block::Block;
 pub use zksync_crypto::{
     merkle_tree::{RescueHasher, SparseMerkleTree},
-    proof::EncodedProofPlonk,
     Engine, Fr,
 };
 
 use serde::{Deserialize, Serialize};
+use zksync_crypto::proof::SingleProof;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Action {
     Commit,
-    Verify { proof: Box<EncodedProofPlonk> },
+    Verify { proof: Box<SingleProof> },
 }
 
 impl Action {

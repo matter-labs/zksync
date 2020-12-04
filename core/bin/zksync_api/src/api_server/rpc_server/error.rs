@@ -9,6 +9,7 @@ pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
     FeeTooLow = 104,
+    InappropriateFeeToken = 105,
 
     MissingEthSignature = 200,
     EIP1271SignatureVerificationFail = 201,
@@ -70,6 +71,11 @@ impl From<SubmitError> for jsonrpc_core::Error {
             },
             SubmitError::TxAdd(inner) => Self {
                 code: RpcErrorCodes::from(inner).into(),
+                message: inner.to_string(),
+                data: None,
+            },
+            SubmitError::InappropriateFeeToken => Self {
+                code: RpcErrorCodes::InappropriateFeeToken.into(),
                 message: inner.to_string(),
                 data: None,
             },

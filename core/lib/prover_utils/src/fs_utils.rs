@@ -5,6 +5,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use zksync_crypto::params::{account_tree_depth, balance_tree_depth};
+use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_crypto::Engine;
 
 pub fn get_keys_root_dir() -> PathBuf {
@@ -96,4 +97,18 @@ pub fn get_recursive_verification_key_path(number_of_proofs: usize) -> PathBuf {
     let mut key = get_keys_root_dir();
     key.push(&format!("recursive_{}.key", number_of_proofs));
     key
+}
+
+pub fn load_correct_aggregated_proof() -> anyhow::Result<AggregatedProof> {
+    let mut path = get_keys_root_dir();
+    path.push("zksync-aggregated-1.json");
+    let file = File::open(path)?;
+    Ok(serde_json::from_reader(file)?)
+}
+
+pub fn load_correct_single_proof() -> anyhow::Result<SingleProof> {
+    let mut path = get_keys_root_dir();
+    path.push("zksync-6-chunks.json");
+    let file = File::open(path)?;
+    Ok(serde_json::from_reader(file)?)
 }

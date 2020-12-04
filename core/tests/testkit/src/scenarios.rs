@@ -114,7 +114,7 @@ pub async fn perform_basic_tests() {
         fee_account_address,
         test_setup.get_accounts_state().await,
         tokens,
-        test_setup.current_state_root.expect("Should exist"),
+        test_setup.last_committed_block.new_root_hash,
     )
     .await;
 

@@ -7,7 +7,7 @@ use std::time::Instant;
 use zksync_circuit::exit_circuit::create_exit_circuit_with_public_input;
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
-use zksync_crypto::proof::{EncodedAggregatedProof, EncodedProofPlonk};
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, SingleProofData};
 use zksync_prover_utils::{gen_verified_proof_for_exit_circuit, PlonkVerificationKey};
 use zksync_types::{AccountId, AccountMap, Address, TokenId};
@@ -54,5 +54,5 @@ pub fn create_exit_proof(
     )?;
 
     info!("Exit proof created: {} s", timer.elapsed().as_secs());
-    Ok((aggreagated_proof, balance))
+    todo!()
 }

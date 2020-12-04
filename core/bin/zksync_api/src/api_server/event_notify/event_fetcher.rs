@@ -160,7 +160,7 @@ impl EventFetcher {
         }
 
         self.pending_block = Some(new);
-        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "update_pending_block");
+        metrics::histogram!("api.event_fetcher.update_pending_block", start.elapsed());
         Some(executed_ops)
     }
 
@@ -179,7 +179,7 @@ impl EventFetcher {
                 .await
                 .unwrap_or_default();
         }
-        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "send_operations");
+        metrics::histogram!("api.event_fetcher.send_operations", start.elapsed());
     }
 
     async fn load_pending_block(&mut self) -> anyhow::Result<Option<PendingBlock>> {
@@ -191,7 +191,7 @@ impl EventFetcher {
             .expect("Can't get access to the storage");
         let pending_block = storage.chain().block_schema().load_pending_block().await?;
 
-        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "load_pending_block");
+        metrics::histogram!("api.event_fetcher.load_pending_block", start.elapsed());
         Ok(pending_block)
     }
 
@@ -209,7 +209,7 @@ impl EventFetcher {
             .get_last_committed_block()
             .await?;
 
-        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "last_committed_block");
+        metrics::histogram!("api.event_fetcher.last_committed_block", start.elapsed());
         Ok(last_block)
     }
 
@@ -227,7 +227,7 @@ impl EventFetcher {
             .get_last_verified_confirmed_block()
             .await?;
 
-        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "last_verified_block");
+        metrics::histogram!("api.event_fetcher.last_verified_block", start.elapsed());
         Ok(last_block)
     }
 
@@ -250,7 +250,7 @@ impl EventFetcher {
             .await
             .expect("Operation must exist");
 
-        metrics::histogram!("api", start.elapsed(), "event_fetcher" => "load_operation");
+        metrics::histogram!("api.event_fetcher.load_operation", start.elapsed());
         op.into_op(&mut storage).await
     }
 }

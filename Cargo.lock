@@ -1739,7 +1739,7 @@ dependencies = [
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#40437704ce4557a40e4669b0a768c1d122903ec6"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#b39a82a4539f389cf056b3f7cc916f1b7df3447d"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -5918,11 +5918,13 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "anyhow",
+ "async-trait",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
  "futures 0.3.8",
+ "itertools 0.9.0",
  "log 0.4.11",
  "metrics",
  "num",
@@ -5946,6 +5948,7 @@ name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.13.0",
  "ethabi 12.0.0",
  "fnv",
  "franklin-crypto",
@@ -6077,10 +6080,12 @@ name = "zksync_prover"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "backoff",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",
+ "futures 0.3.8",
  "hex",
  "log 0.4.11",
  "num",
@@ -6089,7 +6094,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
- "tokio 0.1.22",
+ "tokio 0.2.23",
  "web3 0.13.0",
  "zksync_circuit",
  "zksync_config",
@@ -6110,6 +6115,7 @@ dependencies = [
  "log 0.4.11",
  "reqwest",
  "serde",
+ "serde_json",
  "zksync_basic_types",
  "zksync_circuit",
  "zksync_crypto",
@@ -6234,6 +6240,7 @@ dependencies = [
  "criterion",
  "ethabi 12.0.0",
  "hex",
+ "lazy_static",
  "log 0.4.11",
  "num",
  "parity-crypto",
@@ -6241,6 +6248,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tiny-keccak 1.5.0",
+ "web3 0.13.0",
  "zksync_basic_types",
  "zksync_crypto",
  "zksync_utils",
@@ -6255,6 +6263,7 @@ dependencies = [
  "futures 0.3.8",
  "num",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

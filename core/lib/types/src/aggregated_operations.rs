@@ -2,6 +2,7 @@ use crate::block::Block;
 use ethabi::Token;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::{BlockNumber, H256, U256};
+use zksync_crypto::proof::EncodedAggregatedProof;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlocksCommitOperation {
@@ -60,57 +61,35 @@ impl BlocksCommitOperation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlocksCreateProofOperation {
+    pub blocks: Vec<BlockNumber>,
+    pub proofs_to_pad: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlocksProofOperation {
-    pub commitments: Vec<(H256, BlockNumber)>,
+    pub blocks: Vec<Block>,
+    pub proof: EncodedAggregatedProof,
 }
 
 impl BlocksProofOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
-        let recursive_input = Token::Array(vec![Token::Uint(U256::from(0)); 1]);
-        let proof = Token::Array(vec![Token::Uint(U256::from(0)); 33]);
-        let commitments = Token::Array(
-            self.commitments
-                .iter()
-                .map(|(commitment, _)| {
-                    Token::Uint(U256::from_big_endian(&commitment.to_fixed_bytes()))
-                })
-                .collect(),
-        );
-        let vk_indexes = Token::Array(vec![Token::Uint(U256::from(0)); self.commitments.len()]);
-        let subproof_limbs = Token::FixedArray(vec![Token::Uint(U256::from(0)); 16]);
-        vec![Token::Tuple(vec![
-            recursive_input,
-            proof,
-            commitments,
-            vk_indexes,
-            subproof_limbs,
-        ])]
+        let blocks_arg = Token::Array(self.blocks.iter().map(|b| stored_block_info(b)).collect());
+
+        let proof = self.proof.get_eth_tx_args();
+
+        vec![blocks_arg, proof]
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockExecuteOperationArg {
     pub block: Block,
-    pub commitments: Vec<H256>,
-    pub commitment_idx: usize,
 }
 
 impl BlockExecuteOperationArg {
     fn get_eth_tx_args(&self) -> Token {
-        let stored_block = Token::Tuple(vec![
-            Token::Uint(U256::from(self.block.block_number)),
-            Token::Uint(U256::from(self.block.number_of_processed_prior_ops())),
-            Token::FixedBytes(
-                self.block
-                    .get_onchain_operations_block_info()
-                    .1
-                    .as_bytes()
-                    .to_vec(),
-            ),
-            Token::Uint(U256::from(self.block.timestamp)),
-            Token::FixedBytes(self.block.get_eth_encoded_root().as_bytes().to_vec()),
-            Token::FixedBytes(self.block.block_commitment.as_bytes().to_vec()),
-        ]);
+        let stored_block = stored_block_info(&self.block);
 
         let processable_ops_pubdata = Token::Array(
             self.block
@@ -120,21 +99,7 @@ impl BlockExecuteOperationArg {
                 .collect(),
         );
 
-        let commitments_in_slot = Token::Array(
-            self.commitments
-                .iter()
-                .map(|comm| Token::FixedBytes(comm.as_bytes().to_vec()))
-                .collect(),
-        );
-
-        let commitment_index = Token::Uint(U256::from(self.commitment_idx));
-
-        Token::Tuple(vec![
-            stored_block,
-            processable_ops_pubdata,
-            commitments_in_slot,
-            commitment_index,
-        ])
+        Token::Tuple(vec![stored_block, processable_ops_pubdata])
     }
 }
 
@@ -191,7 +156,7 @@ impl std::str::FromStr for AggregatedActionType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AggregatedOperation {
     CommitBlocks(BlocksCommitOperation),
-    CreateProofBlocks(Vec<BlockNumber>),
+    CreateProofBlocks(BlocksCreateProofOperation),
     PublishProofBlocksOnchain(BlocksProofOperation),
     ExecuteBlocks(BlocksExecuteOperation),
 }
@@ -214,15 +179,17 @@ impl AggregatedOperation {
                 blocks.first().map(|b| b.block_number).unwrap_or_default(),
                 blocks.last().map(|b| b.block_number).unwrap_or_default(),
             ),
-            AggregatedOperation::CreateProofBlocks(blocks) => (
+            AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
+                blocks, ..
+            }) => (
                 blocks.first().cloned().unwrap_or_default(),
                 blocks.last().cloned().unwrap_or_default(),
             ),
             AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
-                commitments,
+                blocks, ..
             }) => (
-                commitments.first().map(|c| c.1).unwrap_or_default(),
-                commitments.last().map(|c| c.1).unwrap_or_default(),
+                blocks.first().map(|c| c.block_number).unwrap_or_default(),
+                blocks.last().map(|c| c.block_number).unwrap_or_default(),
             ),
             AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation { blocks }) => (
                 blocks

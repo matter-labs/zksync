@@ -1,5 +1,7 @@
 use crate::fs_utils::get_recursive_verification_key_path;
 use crate::{get_universal_setup_monomial_form, PlonkVerificationKey};
+use serde::export::Formatter;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use zksync_basic_types::U256;
 use zksync_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
@@ -20,12 +22,13 @@ use zksync_crypto::franklin_crypto::bellman::plonk::commitments::transcript::kec
 use zksync_crypto::params::{
     RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_SIZES, RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
 };
-use zksync_crypto::proof::EncodedAggregatedProof;
+use zksync_crypto::proof::{AggregatedProof, EncodedAggregatedProof, SingleProof, Vk};
 use zksync_crypto::recursive_aggregation_circuit::circuit::{
     create_recursive_circuit_setup, create_zksync_recursive_aggregate,
-    proof_recursive_aggregate_for_zksync,
+    proof_recursive_aggregate_for_zksync, RecursiveAggregationCircuitBn256,
 };
-use zksync_crypto::Engine;
+use zksync_crypto::serialization::VecFrSerde;
+use zksync_crypto::{Engine, Fr};
 // use models::config_options::{get_env, parse_env, AvailableBlockSizesConfig};
 // use models::primitives::serialize_fe_for_ethereum;
 // use models::prover_utils::fs_utils::get_recursive_verification_key_path;
@@ -37,10 +40,6 @@ use zksync_crypto::Engine;
 // use std::fs::File;
 // use std::sync::{mpsc, Mutex};
 // use std::time::Duration;
-
-pub type SingleProof = Proof<Engine, PlonkCsWidth4WithNextStepParams>;
-pub type Vk = SingleVk<Engine, PlonkCsWidth4WithNextStepParams>;
-
 #[derive(Clone)]
 pub struct SingleProofData {
     pub proof: SingleProof,
@@ -77,13 +76,20 @@ pub fn gen_aggregate_proof(
     single_vks: Vec<Vk>,
     proofs: Vec<SingleProofData>,
     download_setup_network: bool,
-) -> anyhow::Result<EncodedAggregatedProof> {
+) -> anyhow::Result<AggregatedProof> {
     // proofs: Vec<SingleProofData>,
     let mut individual_vk_inputs = Vec::new();
     let mut individual_vk_idxs = Vec::new();
     for p in &proofs {
-        individual_vk_inputs.push(serialize_fe_for_ethereum(&p.proof.input_values[0]));
-        individual_vk_idxs.push(U256::from(p.vk_idx));
+        let individual_input = {
+            anyhow::ensure!(
+                p.proof.0.input_values.len() == 1,
+                "Single should have one input"
+            );
+            p.proof.0.input_values[0]
+        };
+        individual_vk_inputs.push(individual_input);
+        individual_vk_idxs.push(p.vk_idx);
     }
 
     let worker = Worker::new();
@@ -106,7 +112,7 @@ pub fn gen_aggregate_proof(
     let (proofs, vk_indexes) = proofs.clone().into_iter().fold(
         (Vec::new(), Vec::new()),
         |(mut proofs, mut vk_idxs), SingleProofData { proof, vk_idx }| {
-            proofs.push(proof);
+            proofs.push(proof.0);
             vk_idxs.push(vk_idx);
             (proofs, vk_idxs)
         },
@@ -119,11 +125,7 @@ pub fn gen_aggregate_proof(
         &vk_indexes,
         &g2_bases,
     )?;
-    let aggr_limbs = aggregate
-        .limbed_aggregated_g1_elements
-        .into_iter()
-        .map(|l| serialize_fe_for_ethereum(&l))
-        .collect::<Vec<_>>();
+    let aggr_limbs = aggregate.limbed_aggregated_g1_elements.clone();
 
     let setup = create_recursive_circuit_setup(
         proofs.len(),
@@ -162,117 +164,11 @@ pub fn gen_aggregate_proof(
     if !is_valid {
         return Err(anyhow::anyhow!("Recursive proof is invalid"));
     };
-    let (inputs, proof) = serialize_new_proof(&rec_aggr_proof);
 
-    Ok(EncodedAggregatedProof {
-        aggregated_input: inputs[0],
-        proof,
-        subproof_limbs: aggr_limbs,
+    Ok(AggregatedProof {
+        proof: rec_aggr_proof,
         individual_vk_inputs,
         individual_vk_idxs,
+        aggr_limbs,
     })
-}
-
-pub fn serialize_new_proof<C: NewCircuit<Engine>>(
-    proof: &NewProof<Engine, C>,
-) -> (Vec<U256>, Vec<U256>) {
-    let mut inputs = vec![];
-    for input in proof.inputs.iter() {
-        inputs.push(serialize_fe_for_ethereum(&input));
-    }
-    let mut serialized_proof = vec![];
-
-    for c in proof.state_polys_commitments.iter() {
-        let (x, y) = serialize_g1_for_ethereum(&c);
-        serialized_proof.push(x);
-        serialized_proof.push(y);
-    }
-
-    let (x, y) = serialize_g1_for_ethereum(&proof.copy_permutation_grand_product_commitment);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    for c in proof.quotient_poly_parts_commitments.iter() {
-        let (x, y) = serialize_g1_for_ethereum(&c);
-        serialized_proof.push(x);
-        serialized_proof.push(y);
-    }
-
-    for c in proof.state_polys_openings_at_z.iter() {
-        serialized_proof.push(serialize_fe_for_ethereum(&c));
-    }
-
-    for (_, _, c) in proof.state_polys_openings_at_dilations.iter() {
-        serialized_proof.push(serialize_fe_for_ethereum(&c));
-    }
-
-    assert_eq!(proof.gate_setup_openings_at_z.len(), 0);
-
-    for (_, c) in proof.gate_selectors_openings_at_z.iter() {
-        serialized_proof.push(serialize_fe_for_ethereum(&c));
-    }
-
-    for c in proof.copy_permutation_polys_openings_at_z.iter() {
-        serialized_proof.push(serialize_fe_for_ethereum(&c));
-    }
-
-    serialized_proof.push(serialize_fe_for_ethereum(
-        &proof.copy_permutation_grand_product_opening_at_z_omega,
-    ));
-    serialized_proof.push(serialize_fe_for_ethereum(&proof.quotient_poly_opening_at_z));
-    serialized_proof.push(serialize_fe_for_ethereum(
-        &proof.linearization_poly_opening_at_z,
-    ));
-
-    let (x, y) = serialize_g1_for_ethereum(&proof.opening_proof_at_z);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    let (x, y) = serialize_g1_for_ethereum(&proof.opening_proof_at_z_omega);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    (inputs, serialized_proof)
-}
-
-pub fn serialize_fe_for_ethereum(field_element: &<Bn256 as ScalarEngine>::Fr) -> U256 {
-    let mut be_bytes = [0u8; 32];
-    field_element
-        .into_repr()
-        .write_be(&mut be_bytes[..])
-        .expect("get new root BE bytes");
-    U256::from_big_endian(&be_bytes[..])
-}
-
-pub fn serialize_g1_for_ethereum(point: &<Bn256 as EngineTrait>::G1Affine) -> (U256, U256) {
-    if point.is_zero() {
-        return (U256::zero(), U256::zero());
-    }
-    let uncompressed = point.into_uncompressed();
-
-    let uncompressed_slice = uncompressed.as_ref();
-
-    // bellman serializes points as big endian and in the form x, y
-    // ethereum expects the same order in memory
-    let x = U256::from_big_endian(&uncompressed_slice[0..32]);
-    let y = U256::from_big_endian(&uncompressed_slice[32..64]);
-
-    (x, y)
-}
-
-pub fn serialize_g2_for_ethereum(
-    point: &<Bn256 as EngineTrait>::G2Affine,
-) -> ((U256, U256), (U256, U256)) {
-    let uncompressed = point.into_uncompressed();
-
-    let uncompressed_slice = uncompressed.as_ref();
-
-    // bellman serializes points as big endian and in the form x1*u, x0, y1*u, y0
-    // ethereum expects the same order in memory
-    let x_1 = U256::from_big_endian(&uncompressed_slice[0..32]);
-    let x_0 = U256::from_big_endian(&uncompressed_slice[32..64]);
-    let y_1 = U256::from_big_endian(&uncompressed_slice[64..96]);
-    let y_0 = U256::from_big_endian(&uncompressed_slice[96..128]);
-
-    ((x_1, x_0), (y_1, y_0))
 }

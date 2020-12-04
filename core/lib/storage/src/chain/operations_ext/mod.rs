@@ -51,24 +51,19 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 .map(|v| v.confirmed)
                 .unwrap_or(false);
 
-            // Get the prover job details.
-            let prover_run = ProverSchema(self.0)
-                .get_existing_prover_run(tx.block_number as u32)
-                .await?;
-
             Ok(Some(TxReceiptResponse {
                 tx_hash: hex::encode(hash),
                 block_number: tx.block_number,
                 success: tx.success,
                 verified,
                 fail_reason: tx.fail_reason,
-                prover_run,
+                prover_run: None,
             }))
         } else {
             Ok(None)
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "tx_receipt");
+        metrics::histogram!("sql.chain.operations_ext.tx_receipt", start.elapsed());
         result
     }
 
@@ -83,10 +78,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let result = match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
-                let prover_run: Option<ProverRun> = ProverSchema(self.0)
-                    .get_existing_prover_run(stored_executed_prior_op.block_number as u32)
-                    .await?;
-
                 let confirm = OperationsSchema(self.0)
                     .get_operation(
                         stored_executed_prior_op.block_number as u32,
@@ -97,7 +88,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 Ok(PriorityOpReceiptResponse {
                     committed: true,
                     verified: confirm.is_some(),
-                    prover_run,
+                    prover_run: None,
                 })
             }
             None => Ok(PriorityOpReceiptResponse {
@@ -107,7 +98,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }),
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_priority_op_receipt");
+        metrics::histogram!(
+            "sql.chain.operations_ext.get_priority_op_receipt",
+            start.elapsed()
+        );
         result
     }
 
@@ -219,7 +213,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             None
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "find_tx_by_hash");
+        metrics::histogram!("sql.chain.operations_ext.find_tx_by_hash", start.elapsed());
         Ok(result)
     }
 
@@ -299,7 +293,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             None
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "find_priority_op_by_hash");
+        metrics::histogram!(
+            "sql.chain.operations_ext.find_priority_op_by_hash",
+            start.elapsed()
+        );
         Ok(result)
     }
 
@@ -348,7 +345,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "account_created_on");
+        metrics::histogram!(
+            "sql.chain.operations_ext.account_created_on",
+            start.elapsed()
+        );
         Ok(first_history_entry.map(|entry| entry.created_at))
     }
 
@@ -488,7 +488,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }
         }
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_account_transactions_history");
+        metrics::histogram!(
+            "sql.chain.operations_ext.get_account_transactions_history",
+            start.elapsed()
+        );
         Ok(tx_history)
     }
 
@@ -657,7 +660,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             }
         }
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations_ext" => "get_account_transactions_history_from");
+        metrics::histogram!(
+            "sql.chain.operations_ext.get_account_transactions_history_from",
+            start.elapsed()
+        );
         Ok(tx_history)
     }
 }

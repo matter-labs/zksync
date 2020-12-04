@@ -14,6 +14,8 @@ export type TokenAddress = string;
 
 export type Nonce = number | 'committed';
 
+export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet';
+
 export interface AccountState {
     address: Address;
     id?: number;

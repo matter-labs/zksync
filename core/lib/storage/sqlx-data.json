@@ -221,18 +221,6 @@
       ]
     }
   },
-  "0d81f888652e3eefdf293f5b0c65b0b12490fa448f6ebdb73eaecb76aaf882a4": {
-    "query": "UPDATE active_provers \n            SET stopped_at = now()\n            WHERE id = $1",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "0e390d0f58d24733d76253da2e4d9c9a0f5c96702d164fe3ad64af8aec43ee49": {
     "query": "\n                SELECT * FROM account_balance_updates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -494,22 +482,18 @@
       "nullable": []
     }
   },
-  "1c67bdf00f343a60fbce85d80f0b707ca2a0b15ea83eb7f86a95aad9a028e70e": {
-    "query": "SELECT COUNT(*) as integer_value FROM operations o WHERE action_type = 'COMMIT' AND block_number > (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') AND EXISTS (SELECT * FROM block_witness WHERE block = o.block_number) AND NOT EXISTS (SELECT * FROM proofs WHERE block_number = o.block_number);",
+  "1a67dacb8487735515f18c6710cd3b6ca0141f72e63ae44880b7c235e29768e4": {
+    "query": "UPDATE prover_job_queue \n            SET (updated_at, job_status) = (now(), $1)\n            WHERE updated_by = $2 and job_status = $3",
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "integer_value",
-          "type_info": "Int8"
-        }
-      ],
+      "columns": [],
       "parameters": {
-        "Left": []
+        "Left": [
+          "Int4",
+          "Text",
+          "Int4"
+        ]
       },
-      "nullable": [
-        null
-      ]
+      "nullable": []
     }
   },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
@@ -826,27 +810,6 @@
       ]
     }
   },
-  "32d15597dc0dfdfdd2ddac7cb9598c9c940998c4f484f610b68da457a1414fcb": {
-    "query": "INSERT INTO active_provers (worker, block_size)\n            VALUES ($1, $2)\n            RETURNING id",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "3538961dd16f0eb374b50b33cae9a656426720c7fdf5d26ac406f44f47692e01": {
     "query": "SELECT COUNT(*) FROM executed_transactions WHERE success = true",
     "describe": {
@@ -1027,6 +990,16 @@
       "nullable": []
     }
   },
+  "411ae4152496dfa80c3ba50ad99c5ad72cce7d072d47a9a9a2c88587bf021952": {
+    "query": "LOCK TABLE prover_job_queue IN EXCLUSIVE MODE",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
   "41a4d1c9fa9953cd94714a408afd892962f9eea9a9f1674b8dddfa72e2eb9ec2": {
     "query": "INSERT INTO eth_tx_hashes (eth_op_id, tx_hash) VALUES ($1, $2)",
     "describe": {
@@ -1063,50 +1036,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "439f184911734c059ed99d61eb344af056e7b4df75182fee3adeb625856bd68a": {
-    "query": "SELECT * FROM active_provers WHERE id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "worker",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 3,
-          "name": "stopped_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "block_size",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        true,
-        false
-      ]
     }
   },
   "44b276fda62734e9c9d9853f493340265116ab7f13599674d27aafe3d3887391": {
@@ -1146,6 +1075,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "45dc23ee9e4fd0bf52e2a82f3ed83210ec3a49c01b70a82bd6fac566da1a0f3b": {
+    "query": "SELECT max(last_block) from prover_job_queue\n            WHERE job_type = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "467fbb9388749379d5dfd834f92019a6f12457d64b53ab9ef7c7150e2dd4d4c8": {
@@ -1557,50 +1506,6 @@
       "nullable": []
     }
   },
-  "5eab94b224a40aa2b7c84aaec4409c20ce44be7ad64bd9a622c2077ad9d53a03": {
-    "query": "SELECT * FROM prover_runs WHERE id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "worker",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "updated_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        true,
-        false,
-        false
-      ]
-    }
-  },
   "60a2be4d7162d73b929f7ab712d01404d45bcc128e2b03ad3ff853a645e2fb5c": {
     "query": "\n            WITH eth_ops AS (\n                SELECT DISTINCT ON (block_number, action_type)\n                    operations.block_number,\n                    eth_tx_hashes.tx_hash,\n                    operations.action_type,\n                    operations.created_at,\n                    confirmed\n                FROM operations\n                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id\n                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id\n                ORDER BY block_number desc, action_type, confirmed\n            )\n            SELECT\n                blocks.number AS \"block_number!\",\n                blocks.root_hash AS \"new_state_root!\",\n                blocks.block_size AS \"block_size!\",\n                committed.tx_hash AS \"commit_tx_hash?\",\n                verified.tx_hash AS \"verify_tx_hash?\",\n                committed.created_at AS \"committed_at!\",\n                verified.created_at AS \"verified_at?\"\n            FROM blocks\n            INNER JOIN eth_ops committed ON\n                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true\n            LEFT JOIN eth_ops verified ON\n                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true\n            WHERE false\n                OR committed.tx_hash = $1\n                OR verified.tx_hash = $1\n                OR blocks.root_hash = $1\n                OR blocks.number = $2\n            ORDER BY blocks.number DESC\n            LIMIT 1;\n            ",
     "describe": {
@@ -1655,6 +1560,26 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "60cf573e253358218a6319233221e8c2ff0561fd7ffbf8339a11a4509d955442": {
+    "query": "SELECT count(*) from mempool_txs\n            WHERE tx_hash = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -1742,6 +1667,75 @@
       "nullable": []
     }
   },
+  "64e87611fad53aaa3b5cddddd468045d5870603f705ec1652eafb536e4a0658f": {
+    "query": "\n          WITH job_values as (\n            SELECT $1::int4, $2::int4, $3::text, 'server_add_job', $4::int8, $5::int8, $6::jsonb\n            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $4 and last_block = $5 and job_type = $3 LIMIT 1)\n          ) \n          INSERT INTO prover_job_queue (job_status, job_priority, job_type, updated_by, first_block, last_block, job_data) \n          SELECT * from job_values\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Text",
+          "Int8",
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
+    "query": "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "first_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "last_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "proof",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "6bd51c16a66835305c8fa763966bbfef13199924cbe1c97b7d7b840edea4217a": {
+    "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')\n            WHERE id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
     "query": "SELECT max(number) FROM blocks",
     "describe": {
@@ -1817,6 +1811,26 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "71a9539df6b4362ab57a5397be0da6fac8ef23554dce5281e22704964c6f2d29": {
+    "query": "SELECT COUNT(*) FROM prover_job_queue WHERE job_status = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -2105,6 +2119,20 @@
       "nullable": []
     }
   },
+  "8f829092d361a063ad41c04b018b084c7d39318fa5b20beb02d43f3dff487357": {
+    "query": "INSERT INTO aggregated_proofs (first_block, last_block, proof)\n            VALUES ($1, $2, $3)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8fc71818833ae5c6084a582ed5de6a60e7dedb566d9a09871adb6774280b4837": {
     "query": "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account) VALUES ($1, $2, $3)",
     "describe": {
@@ -2153,16 +2181,6 @@
       "nullable": []
     }
   },
-  "95fe4d101e09c7b2de73faf4a4f32523a0deb3402edaf3ce9e9e5c75b81b9a60": {
-    "query": "LOCK TABLE prover_runs IN EXCLUSIVE MODE",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": []
-    }
-  },
   "98f87793202531586603307eab53987f75f4e07614af8706e6180413f808a1b4": {
     "query": "INSERT INTO txs_batches_signatures VALUES($1, $2)",
     "describe": {
@@ -2174,27 +2192,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "99952353769f8d364b1533250ccffb1e3c508766714b118237b4457195004e37": {
-    "query": "\n                INSERT INTO prover_runs ( block_number, worker )\n                VALUES ( $1, $2 )\n                RETURNING (id)\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false
-      ]
     }
   },
   "9aeeb5e20f4f34d4b4e1987f1bf0a23ee931f12da071b134225069d32c1896de": {
@@ -2444,50 +2441,6 @@
       "nullable": []
     }
   },
-  "a5219ce88dab8f20341a7fd339b0ec36c27653d60b833f55469471db71edd648": {
-    "query": "SELECT * FROM prover_runs WHERE block_number = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "worker",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "updated_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        true,
-        false,
-        false
-      ]
-    }
-  },
   "a70d2d4dd84c5a4bed92793d0a409a9b2858a39ff485e9b1d0f1bf42e89645b6": {
     "query": "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (id)\n            DO NOTHING",
     "describe": {
@@ -2498,6 +2451,19 @@
           "Jsonb",
           "Int8",
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
+    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
         ]
       },
       "nullable": []
@@ -2574,26 +2540,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "abcb1ba77db438ed57266435357e92992da4efd7a2b254f95b58a68a4ea30df0": {
-    "query": "\n                WITH unsized_blocks AS (\n                    SELECT * FROM operations o\n                    WHERE action_type = 'COMMIT'\n                        AND block_number >\n                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')\n                        AND NOT EXISTS\n                            (SELECT * FROM proofs WHERE block_number = o.block_number)\n                        AND NOT EXISTS\n                            (SELECT * FROM prover_runs\n                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '120 seconds')\n                )\n                SELECT min(block_number) FROM unsized_blocks\n                INNER JOIN blocks\n                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "min",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -2712,6 +2658,19 @@
         true,
         false
       ]
+    }
+  },
+  "ba7b1041b86ef292034c6e53ee6347c458fea2d19c91b060179e7f01f7ea60fc": {
+    "query": "UPDATE prover_job_queue \n            SET (updated_at, updated_by) = (now(), $1)\n            WHERE id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int4"
+        ]
+      },
+      "nullable": []
     }
   },
   "baaaff359564c5d1094fcf2650d53cf9dcac5d50fc3a549c6cff53dd472350f7": {
@@ -3133,6 +3092,19 @@
       ]
     }
   },
+  "c623ce8cb2f6e17285af5aa0fe4fddbb302f7dda343778690f299d49b832e273": {
+    "query": "\n                UPDATE prover_job_queue \n                SET (job_status, updated_at, updated_by) = ($1, now(), 'server_give_job')\n                WHERE id = $2;\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "c7bc91425f35b3a77be36fe8ba80030445051a0bc2536fa4a0def7ac498fc5c2": {
     "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)\n                VALUES ($1, $2, $3, $4)",
     "describe": {
@@ -3334,16 +3306,54 @@
       ]
     }
   },
-  "e001bf06d7000d3b045a1a7c38ad1f5bfa96294bf80a07228b69de24b1cea003": {
-    "query": "UPDATE prover_runs \n            SET updated_at = now()\n            WHERE id = $1",
+  "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
+    "query": "SELECT * from mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
-      "columns": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "eth_sign_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
       "parameters": {
         "Left": [
-          "Int4"
+          "Text"
         ]
       },
-      "nullable": []
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
     }
   },
   "e42d1180b05adcce696d87de411553e385d36018fe60e0963a348adc00ad874b": {
@@ -3396,6 +3406,80 @@
       ]
     }
   },
+  "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {
+    "query": "\n                SELECT * FROM prover_job_queue\n                WHERE job_status = $1\n                ORDER BY (job_priority, id, first_block)\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "job_status",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "job_priority",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "job_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "updated_by",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 7,
+          "name": "first_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 8,
+          "name": "last_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "job_data",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "eb0993e049fd111aa11978aeb1617b11d859a008afec77a4a80a6cfadc1565ff": {
     "query": "DELETE FROM data_restore_rollup_ops",
     "describe": {
@@ -3404,26 +3488,6 @@
         "Left": []
       },
       "nullable": []
-    }
-  },
-  "ebb651eaa33767edd75a51c2d41e2ef3325d7c2ab890d7460b24c417823411b3": {
-    "query": "SELECT COUNT(*) FROM prover_runs WHERE block_number > $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "ec815cee37d8ac3557b523521a6bee44c7e8d949309e7dd9b0d0364edd2e85e9": {
