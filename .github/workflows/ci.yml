@@ -22,6 +22,15 @@ jobs:
         echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
+#
+#    - name: cache-contracts
+#      uses: actions/cache@v2
+#      with:
+#        path: |
+#          contracts/build
+#          contracts/node_modules
+#          contracts/dev-contracts/generated
+#        key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
 
     - uses: actions/cache@v2
       with:
@@ -36,7 +45,6 @@ jobs:
         rustup update stable
         cargo install  sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
-
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk
