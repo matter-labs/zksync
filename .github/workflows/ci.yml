@@ -26,6 +26,14 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: |
+          contracts/build
+          contracts/node_modules
+          contracts/dev-contracts/generated
+        key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
+
+    - uses: actions/cache@v2
+      with:
+        path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
@@ -36,11 +44,12 @@ jobs:
         rustup update stable
         cargo install  sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
-
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk
-      run: zk
+      run: |
+        zk
+        zk db setup
 
     - name: lints
       run: |
@@ -66,12 +75,6 @@ jobs:
         zk contract build-dev
         zk run deploy-eip1271
 
-    - name: integration-tests
-      run: zk test integration all --in-docker
-
-    - name: integration-testkit
-      run: zk test integration testkit
-
     - name: contracts-unit-tests
       run: zk test contracts
 
@@ -83,6 +86,12 @@ jobs:
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && zk f cargo test --release
+
+    - name: integration-tests
+      run: zk test integration all --in-docker
+
+    - name: integration-testkit
+      run: zk test integration testkit
 
     services:
       geth:
