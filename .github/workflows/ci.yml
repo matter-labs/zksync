@@ -23,7 +23,17 @@ jobs:
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
 
-    - uses: actions/cache@v2
+    - name: cache-contracts
+      uses: actions/cache@v2
+      with:
+        path: |
+          contracts/build
+          contracts/node_modules
+          contracts/dev-contracts/generated
+        key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
+
+    - name: cache-rust
+      uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
@@ -39,7 +49,9 @@ jobs:
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk
-      run: zk
+      run: |
+        zk
+        zk db setup
 
     - name: lints
       run: |
@@ -56,7 +68,7 @@ jobs:
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
-    
+
     - name: generic-init
       run: |
         # Unpack keys to build dev contracts
@@ -76,6 +88,12 @@ jobs:
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && zk f cargo test --release
+
+    - name: integration-tests
+      run: zk test integration all --in-docker
+
+    - name: integration-testkit
+      run: zk test integration testkit
 
     services:
       geth:
