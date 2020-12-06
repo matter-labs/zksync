@@ -705,7 +705,7 @@ impl ZkSyncStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
-                    self.pending_block.chunks_left -= chunks_needed;
+                    self.pending_block.chunks_left -= executed_op.chunks();
                     self.pending_block.account_updates.append(&mut updates);
                     if let Some(fee) = fee {
                         self.pending_block.collected_fees.push(fee);
