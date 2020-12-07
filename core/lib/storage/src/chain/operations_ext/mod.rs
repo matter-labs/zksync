@@ -682,108 +682,135 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         &mut self,
         address: Address,
         block_number: u64,
-        block_index: Option<u64>,
+        block_index: u32,
         direction: SearchDirection,
         limit: u64,
     ) -> QueryResult<Vec<AccountTxReceiptResponse>> {
         let start = Instant::now();
 
-        let query = LocationQuery::new(block_number, block_index, direction);
-        let receipts: Vec<_> = sqlx::query_as!(
-            AccountTxReceiptResponse,
-            r#"
-            WITH block_details AS (
-                WITH eth_ops AS (
-                    SELECT DISTINCT ON (block_number, action_type)
-                        operations.block_number,
-                        eth_tx_hashes.tx_hash,
-                        operations.action_type,
-                        operations.created_at,
-                        confirmed
-                    FROM operations
-                        left join eth_ops_binding on eth_ops_binding.op_id = operations.id
-                        left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
-                    ORDER BY block_number DESC, action_type, confirmed
-                )
-                SELECT
-                    blocks.number AS details_block_number,
-                    committed.tx_hash AS commit_tx_hash,
-                    verified.tx_hash AS verify_tx_hash
-                FROM blocks
-                INNER JOIN eth_ops committed ON
-                    committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
-                LEFT JOIN eth_ops verified ON
-                    verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
-            )
-            SELECT
-                block_number, 
-                block_index,
-                success as "success?",
-                fail_reason as "fail_reason?",
-                details.commit_tx_hash as "commit_tx_hash?",
-                details.verify_tx_hash as "verify_tx_hash?"
-            FROM executed_transactions
-            INNER JOIN block_details details ON details.details_block_number = executed_transactions.block_number
-            WHERE 
-                (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
-                AND
-                (
-                    (block_number BETWEEN $2 AND $3) 
-                    AND (($4 AND block_index IS NULL) 
-                        OR (block_index BETWEEN $5 AND $6))
-                )
-            ORDER BY block_number ASC
-            LIMIT $7
-            "#,
-            address.as_bytes(),
-            query.block_number_start,
-            query.block_number_end,
-            block_index.is_none(),
-            query.block_index_start,
-            query.block_index_end,
-            limit as i64,
-        ).fetch_all(self.0.conn())
-        .await?;
+        let block_number = block_number as i64;
+        let block_index = block_index as i32;
+
+        let receipts: Vec<_> = match direction {
+            SearchDirection::Newer => {
+                sqlx::query_as!(
+                    AccountTxReceiptResponse,
+                    r#"
+                    WITH block_details AS (
+                        WITH eth_ops AS (
+                            SELECT DISTINCT ON (block_number, action_type)
+                                operations.block_number,
+                                eth_tx_hashes.tx_hash,
+                                operations.action_type,
+                                operations.created_at,
+                                confirmed
+                            FROM operations
+                                left join eth_ops_binding on eth_ops_binding.op_id = operations.id
+                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
+                            ORDER BY block_number DESC, action_type, confirmed
+                        )
+                        SELECT
+                            blocks.number AS details_block_number,
+                            committed.tx_hash AS commit_tx_hash,
+                            verified.tx_hash AS verify_tx_hash
+                        FROM blocks
+                        INNER JOIN eth_ops committed ON
+                            committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                        LEFT JOIN eth_ops verified ON
+                            verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                    )
+                    SELECT
+                        block_number, 
+                        block_index,
+                        success as "success?",
+                        fail_reason as "fail_reason?",
+                        details.commit_tx_hash as "commit_tx_hash?",
+                        details.verify_tx_hash as "verify_tx_hash?"
+                    FROM executed_transactions
+                    LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number
+                    WHERE (
+                        (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
+                        AND (
+                            block_number = $2 AND (
+                                COALESCE(block_index, 0) >= $3
+                            ) OR (
+                                block_number > $2
+                            )
+                        )
+                    )
+                    ORDER BY block_number ASC, block_index ASC
+                    LIMIT $4
+                    "#,
+                    address.as_bytes(),
+                    block_number,
+                    block_index,
+                    limit as i64,
+                ).fetch_all(self.0.conn())
+                .await?
+            },
+
+            SearchDirection::Older => {
+                sqlx::query_as!(
+                    AccountTxReceiptResponse,
+                    r#"
+                    WITH block_details AS (
+                        WITH eth_ops AS (
+                            SELECT DISTINCT ON (block_number, action_type)
+                                operations.block_number,
+                                eth_tx_hashes.tx_hash,
+                                operations.action_type,
+                                operations.created_at,
+                                confirmed
+                            FROM operations
+                                left join eth_ops_binding on eth_ops_binding.op_id = operations.id
+                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
+                            ORDER BY block_number DESC, action_type, confirmed
+                        )
+                        SELECT
+                            blocks.number AS details_block_number,
+                            committed.tx_hash AS commit_tx_hash,
+                            verified.tx_hash AS verify_tx_hash
+                        FROM blocks
+                        INNER JOIN eth_ops committed ON
+                            committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                        LEFT JOIN eth_ops verified ON
+                            verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                    )
+                    SELECT
+                        block_number, 
+                        block_index,
+                        success as "success?",
+                        fail_reason as "fail_reason?",
+                        details.commit_tx_hash as "commit_tx_hash?",
+                        details.verify_tx_hash as "verify_tx_hash?"
+                    FROM executed_transactions
+                    LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number
+                    WHERE (
+                        (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
+                        AND (
+                            block_number = $2 AND (
+                                COALESCE(block_index, 0) <= $3
+                            ) OR (
+                                block_number < $2
+                            )
+                        )
+                    )
+                    ORDER BY block_number DESC, block_index DESC
+                    LIMIT $4
+                    "#,
+                    address.as_bytes(),
+                    block_number,
+                    block_index,
+                    limit as i64,
+                ).fetch_all(self.0.conn())
+                .await?
+            }
+        };
 
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_receipts",
             start.elapsed()
         );
         Ok(receipts)
-    }
-}
-
-// Filters for txs that older/newer than provided tx location.
-// For older blocks, block number should be between 0 and block number,
-// or for the same block number, transaction in block should be between NULL and block index.
-// For newer filter range starts on the ID and ends in the max value for the type correspondingly.
-struct LocationQuery {
-    block_number_start: i64,
-    block_number_end: i64,
-    block_index_start: Option<i32>,
-    block_index_end: Option<i32>,
-}
-
-impl LocationQuery {
-    fn new(block_number: u64, block_index: Option<u64>, direction: SearchDirection) -> Self {
-        let (block_number_start, block_number_end) = match direction {
-            // Older blocks have lesser block ID.
-            SearchDirection::Older => (0i64, block_number as i64),
-            // Newer blocks have greater block ID.
-            SearchDirection::Newer => (block_number as i64, i64::max_value()),
-        };
-        let (block_index_start, block_index_end) = match direction {
-            // Older txs have lesser index.
-            SearchDirection::Older => (None, (block_index.map(|x| x as i32))),
-            // Newer txs have greater index.
-            SearchDirection::Newer => (block_index.map(|x| x as i32), Some(i32::max_value())),
-        };
-
-        Self {
-            block_number_start,
-            block_number_end,
-            block_index_start,
-            block_index_end,
-        }
     }
 }
