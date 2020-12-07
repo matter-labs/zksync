@@ -52,6 +52,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         }
     }
 
+    // async fn get_suggested_price(&self, old_tx_gas_price: Option<U256>) -> U256 {}
+
     /// Calculates a new gas amount for the replacement of the stuck tx.
     /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
     pub async fn get_gas_price(
@@ -78,10 +80,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             log::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
-        // TODO: Currently instead of using sent txs as samples, we use the gas prices suggested by
-        // the Ethereum node (ZKS-118).
-        // // Report used price to be gathered by the statistics module.
-        // self.statistics.add_sample(price);
+        // Report used price to be gathered by the statistics module.
+        self.statistics.add_sample(price);
 
         Ok(price)
     }
@@ -211,6 +211,14 @@ impl GasStatistics {
         let average_price = self.current_sum / self.samples.len();
 
         self.current_max_price = average_price * multiplier / divider;
+    }
+
+    pub fn get_average_price(&self) -> anyhow::Result<U256> {
+        anyhow::ensure!(
+            self.samples.len() < Self::GAS_PRICE_SAMPLES_AMOUNT,
+            "Not enough samples"
+        );
+        Ok(self.current_sum / Self::GAS_PRICE_SAMPLES_AMOUNT)
     }
 
     pub fn get_limit(&self) -> U256 {
