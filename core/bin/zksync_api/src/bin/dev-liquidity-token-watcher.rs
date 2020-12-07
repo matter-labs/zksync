@@ -1,7 +1,6 @@
-//! Ticker implementation for dev environment
+//! Token watcher implementation for dev environment
 //!
-//! Implements coinmarketcap API for tokens deployed using `deploy-dev-erc20`
-//! Prices are randomly distributed around base values estimated from real world prices.
+//! Implements Uniswap API
 
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, Result};
