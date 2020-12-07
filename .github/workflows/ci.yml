@@ -39,14 +39,13 @@ jobs:
         yarn lint:md
         yarn lint:sol
         # So database will be created for compilation.
-        zk db setup
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
-        # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
-        zk f cargo clippy --tests --benches -- -D warnings
+        # Enable offline mode for sqlx to avoid unnecessary database setup. This environment variable is essential.
+        SQLX_OFFLINE=true zk f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
         cargo fmt -- --check
-        cargo clippy --all --tests --benches -- -D warnings
+        SQLX_OFFLINE=true cargo clippy --all --tests --benches -- -D warnings
     
     - name: generic-init
       run: |
