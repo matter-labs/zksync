@@ -179,6 +179,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_dev_token_liquidity_amount() {
+        let watcher = UniswapTokenWatcher::new("http://0.0.0.0:9975/graphql".to_string());
+        let dai_token_address =
+            Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
+        let dai_token = Token::new(1, dai_token_address, "DAI", 18);
+
+        let amount = watcher.get_token_market_amount(&dai_token).await.unwrap();
+
+        assert!(amount > 0.0);
+    }
+
+    #[tokio::test]
     async fn get_real_token_amount() {
         let watcher = UniswapTokenWatcher::new(
             "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2".to_string(),
