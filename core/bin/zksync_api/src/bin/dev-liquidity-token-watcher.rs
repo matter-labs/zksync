@@ -39,7 +39,7 @@ async fn handle_graphql(params: web::Json<GrqaphqlQuery>) -> Result<HttpResponse
 fn main() {
     env_logger::init();
 
-    let mut runtime = actix_rt::System::new("dev-ticker");
+    let mut runtime = actix_rt::System::new("dev-liquidity-token-watcher");
 
     runtime.block_on(async {
         HttpServer::new(move || {

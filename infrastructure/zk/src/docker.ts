@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import * as utils from './utils';
 import * as contract from './contract';
 
-const IMAGES = ['server', 'prover', 'nginx', 'geth', 'dev-ticker', 'keybase', 'ci', 'fee-seller', 'exit-tool'];
+const IMAGES = ['server', 'prover', 'nginx', 'geth', 'dev-ticker', 'keybase', 'ci', 'fee-seller', 'exit-tool', 'dev-liquidity-token-watcher'];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
     if (image == 'rust') {
