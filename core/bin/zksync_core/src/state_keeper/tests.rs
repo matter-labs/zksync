@@ -84,6 +84,22 @@ impl StateKeeperTester {
     }
 }
 
+fn create_account_and_transfer<B: Into<BigUint>>(
+    tester: &mut StateKeeperTester,
+    token_id: TokenId,
+    account_id: AccountId,
+    balance: B,
+    transfer_amount: B,
+) -> SignedZkSyncTx {
+    create_account_and_transfer_impl(
+        tester,
+        token_id,
+        account_id,
+        balance,
+        transfer_amount,
+    )
+}
+
 fn create_account_and_withdrawal<B: Into<BigUint>>(
     tester: &mut StateKeeperTester,
     token_id: TokenId,
@@ -109,6 +125,33 @@ fn create_account_and_fast_withdrawal<B: Into<BigUint>>(
     withdraw_amount: B,
 ) -> SignedZkSyncTx {
     create_account_and_withdrawal_impl(tester, token_id, account_id, balance, withdraw_amount, true)
+}
+
+fn create_account_and_transfer_impl<B: Into<BigUint>>(
+    tester: &mut StateKeeperTester,
+    token_id: TokenId,
+    account_id: AccountId,
+    balance: B,
+    transfer_amount: B,
+) -> SignedZkSyncTx {
+    let (account, sk) = tester.add_account(account_id);
+    tester.set_balance(account_id, token_id, balance);
+
+    let transfer = Transfer::new_signed(
+        account_id,
+        account.address,
+        account.address,
+        token_id,
+        transfer_amount.into(),
+        BigUint::from(1u32),
+        account.nonce,
+        &sk,
+    )
+    .unwrap();
+    SignedZkSyncTx {
+        tx: ZkSyncTx::Transfer(Box::new(transfer)),
+        eth_sign_data: None,
+    }
 }
 
 fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
@@ -420,6 +463,223 @@ async fn store_pending_block() {
 
 mod execute_proposed_block {
     use super::*;
+
+    #[tokio::test]
+    async fn just_enough_chunks() {
+        let mut tester = StateKeeperTester::new(8, 3, 3, 0);
+        //first 2 txs
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+                SignedTxVariant::Tx(second_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 4);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //second 2 txs
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+                SignedTxVariant::Tx(second_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 0);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //seal block
+        tester.state_keeper.seal_pending_block().await;
+        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.block.block_transactions.len(), 4);
+        } else {
+            panic!("Block is not received!");
+        }
+    }
+
+    #[tokio::test]
+    async fn chunks_to_fit_three_transfers_2_2_1() {
+        let mut tester = StateKeeperTester::new(6, 3, 3, 0);
+        //first 2 txs
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+                SignedTxVariant::Tx(second_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 2);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //second 2 txs
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+                SignedTxVariant::Tx(second_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.block.block_transactions.len(), 3);
+        } else {
+            panic!("Block is not received!");
+        }
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 4);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //single tx
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 2);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //seal block
+        tester.state_keeper.seal_pending_block().await;
+        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.block.block_transactions.len(), 2);
+        } else {
+            panic!("Block is not received!");
+        }
+    }
+
+    #[tokio::test]
+    async fn chunks_to_fit_three_transfers_1_1_2_1() {
+        let mut tester = StateKeeperTester::new(6, 3, 3, 0);
+        //first tx
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 4);
+        } else {
+            panic!("Block is not received!");
+        }
+        //second tx
+        let second_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(second_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 2);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //2 txs
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+                SignedTxVariant::Tx(second_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.block.block_transactions.len(), 3);
+        } else {
+            panic!("Block is not received!");
+        }
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 4);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //last single tx
+        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(first_transfer),
+            ],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.chunks_left, 2);
+        } else {
+            panic!("Block is not received!");
+        }
+
+        //seal block
+        tester.state_keeper.seal_pending_block().await;
+        if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.block.block_transactions.len(), 2);
+        } else {
+            panic!("Block is not received!");
+        }
+    }
 
     /// Checks if executing a small proposed_block is done correctly
     #[tokio::test]
