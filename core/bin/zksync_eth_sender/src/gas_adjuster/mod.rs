@@ -52,7 +52,25 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         }
     }
 
-    // async fn get_suggested_price(&self, old_tx_gas_price: Option<U256>) -> U256 {}
+    async fn get_suggested_price(
+        &self,
+        ethereum: &ETH,
+        old_tx_gas_price: Option<U256>,
+    ) -> anyhow::Result<U256> {
+        if let Ok(price) = self.statistics.get_average_price() {
+            return Ok(price);
+        }
+
+        let network_price = ethereum.gas_price().await?;
+        let scaled_price = if let Some(old_price) = old_tx_gas_price {
+            // Stuck transaction, scale it up.
+            self.scale_up(old_price, network_price)
+        } else {
+            // New transaction, use the network price as the base.
+            network_price
+        };
+        Ok(scaled_price)
+    }
 
     /// Calculates a new gas amount for the replacement of the stuck tx.
     /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
@@ -61,16 +79,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         ethereum: &ETH,
         old_tx_gas_price: Option<U256>,
     ) -> anyhow::Result<U256> {
-        let network_price = ethereum.gas_price().await?;
-
-        let scaled_price = if let Some(old_price) = old_tx_gas_price {
-            // Stuck transaction, scale it up.
-            self.scale_up(old_price, network_price)
-        } else {
-            // New transaction, use the network price as the base.
-            network_price
-        };
-
+        let scaled_price = self.get_suggested_price(ethereum, old_tx_gas_price).await?;
         // Now, cut the price if it's too big.
         let price = self.limit_max(scaled_price);
 
@@ -215,7 +224,7 @@ impl GasStatistics {
 
     pub fn get_average_price(&self) -> anyhow::Result<U256> {
         anyhow::ensure!(
-            self.samples.len() < Self::GAS_PRICE_SAMPLES_AMOUNT,
+            self.samples.len() >= Self::GAS_PRICE_SAMPLES_AMOUNT,
             "Not enough samples"
         );
         Ok(self.current_sum / Self::GAS_PRICE_SAMPLES_AMOUNT)
