@@ -14,13 +14,19 @@ use zksync_types::{
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
 
+#[derive(Clone, Debug)]
+struct AcceptanceData {
+    last_refresh: Instant,
+    allowed: bool,
+}
+
 /// Fee token validator decides whether certain ERC20 token is suitable for paying fees.
 #[derive(Debug, Clone)]
 pub(crate) struct FeeTokenValidator<W> {
     tokens_cache: TokenCacheWrapper,
     /// List of tokens that are accepted to pay fees in.
     /// Whitelist is better in this case, because it requires fewer requests to different APIs
-    available_tokens: HashMap<Address, Instant>,
+    tokens: HashMap<Address, AcceptanceData>,
     available_time: Duration,
     // It's possible to use f64 here because precision doesn't matter
     liquidity_volume: f64,
@@ -36,7 +42,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     ) -> Self {
         Self {
             tokens_cache: cache.into(),
-            available_tokens: Default::default(),
+            tokens: Default::default(),
             available_time,
             liquidity_volume,
             watcher,
@@ -59,18 +65,22 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     }
 
     async fn check_token(&mut self, token: Token) -> anyhow::Result<bool> {
-        if let Some(last_token_check_time) = self.available_tokens.get(&token.address) {
-            if last_token_check_time.elapsed() < self.available_time {
-                return Ok(true);
+        if let Some(acceptance_data) = self.tokens.get(&token.address) {
+            if acceptance_data.last_refresh.elapsed() < self.available_time {
+                return Ok(acceptance_data.allowed);
             }
         }
 
         let amount = self.get_token_market_amount(&token).await?;
-        if amount >= self.liquidity_volume {
-            self.available_tokens.insert(token.address, Instant::now());
-            return Ok(true);
-        }
-        Ok(false)
+        let allowed = amount >= self.liquidity_volume;
+        self.tokens.insert(
+            token.address,
+            AcceptanceData {
+                last_refresh: Instant::now(),
+                allowed,
+            },
+        );
+        Ok(allowed)
     }
     async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
         self.watcher.get_token_market_amount(token).await
@@ -179,18 +189,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_dev_token_liquidity_amount() {
-        let watcher = UniswapTokenWatcher::new("http://0.0.0.0:9975/graphql".to_string());
-        let dai_token_address =
-            Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
-        let dai_token = Token::new(1, dai_token_address, "DAI", 18);
-
-        let amount = watcher.get_token_market_amount(&dai_token).await.unwrap();
-
-        assert!(amount > 0.0);
-    }
-
-    #[tokio::test]
     async fn get_real_token_amount() {
         let watcher = UniswapTokenWatcher::new(
             "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2".to_string(),
@@ -237,10 +235,7 @@ mod tests {
             .unwrap();
         assert_eq!(dai_allowed, true);
         assert_eq!(phnx_allowed, false);
-        assert!(validator.available_tokens.get(&dai_token_address).is_some());
-        assert!(validator
-            .available_tokens
-            .get(&phnx_token_address)
-            .is_none());
+        assert!(validator.tokens.get(&dai_token_address).unwrap().allowed);
+        assert!(!validator.tokens.get(&phnx_token_address).unwrap().allowed);
     }
 }
