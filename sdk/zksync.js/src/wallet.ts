@@ -363,7 +363,7 @@ export class Wallet {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
         }
 
-        const feeTokenId = await this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
         const newPubKeyHash = await this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer('Set Signing Key');
@@ -506,7 +506,7 @@ export class Wallet {
     async getBalance(token: TokenLike, type: 'committed' | 'verified' = 'committed'): Promise<BigNumber> {
         const accountState = await this.getAccountState();
         const tokenSymbol = this.provider.tokenSet.resolveTokenSymbol(token);
-        let balance;
+        let balance: BigNumberish;
         if (type === 'committed') {
             balance = accountState.committed.balances[tokenSymbol] || '0';
         } else {
@@ -603,7 +603,7 @@ export class Wallet {
             const tokenAddress = this.provider.tokenSet.resolveTokenAddress(deposit.token);
             // ERC20 token deposit
             const erc20contract = new Contract(tokenAddress, IERC20_INTERFACE, this.ethSigner);
-            let nonce;
+            let nonce: number;
             if (deposit.approveDepositAmountForERC20) {
                 try {
                     const approveTx = await erc20contract.approve(
@@ -661,7 +661,7 @@ export class Wallet {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
         const ethProxy = new ETHProxy(this.ethSigner.provider, this.provider.contractAddress);
 
-        let accountId;
+        let accountId: number;
         if (withdraw.accountId != null) {
             accountId = withdraw.accountId;
         } else if (this.accountId !== undefined) {

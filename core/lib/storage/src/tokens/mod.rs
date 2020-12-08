@@ -4,17 +4,17 @@ use std::time::Instant;
 // External imports
 // Workspace imports
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DbTickerPrice, DbToken};
 use crate::tokens::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
-use zksync_utils::ratio_to_big_decimal;
 
 pub mod records;
 mod utils;
 
 /// Precision of the USD price per token
-const STORED_USD_PRICE_PRECISION: usize = 6;
+pub(crate) const STORED_USD_PRICE_PRECISION: usize = 6;
 
 /// Tokens schema handles the `tokens` table, providing methods to
 /// get and store new tokens.

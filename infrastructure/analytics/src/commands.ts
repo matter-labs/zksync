@@ -123,7 +123,7 @@ export async function collectedFees(network: Network, providerAddress: string, t
             for (const transaction of transactions) {
                 const transactionTime = new Date(transaction.created_at);
 
-                // TODO: handle fee for `CompleteWithdrawals` operation in L1 (#1123).
+                // TODO: handle fee for `CompleteWithdrawals` operation in L1 (ZKS-111).
 
                 // some transactions that are included in the block do not contain fee
                 if (utils.correctTransactionWithFee(transaction) && timePeriod.contains(transactionTime)) {

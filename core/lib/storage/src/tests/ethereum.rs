@@ -346,3 +346,26 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
 
     Ok(())
 }
+
+/// Simple test for store/load of (average) gas price.
+#[db_test]
+async fn ethereum_gas_update(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    storage.ethereum_schema().initialize_eth_data().await?;
+    let old_price_limit = storage.ethereum_schema().load_gas_price_limit().await?;
+    let old_average_price = storage.ethereum_schema().load_average_gas_price().await?;
+    // This parameter is not set in `initialize_eth_data()`
+    assert!(old_average_price.is_none());
+    // Update these values.
+    storage
+        .ethereum_schema()
+        .update_gas_price(old_price_limit + 1i32, old_price_limit - 1i32)
+        .await?;
+    // Load new ones.
+    let new_price_limit = storage.ethereum_schema().load_gas_price_limit().await?;
+    let new_average_price = storage.ethereum_schema().load_average_gas_price().await?;
+
+    assert_eq!(new_price_limit, old_price_limit + 1i32);
+    assert_eq!(new_average_price, Some(old_price_limit - 1i32));
+
+    Ok(())
+}
