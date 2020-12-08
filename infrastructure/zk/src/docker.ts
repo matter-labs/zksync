@@ -12,7 +12,8 @@ const IMAGES = [
     'ci',
     'fee-seller',
     'exit-tool',
-    'dev-liquidity-token-watcher'
+    'dev-liquidity-token-watcher',
+    'ci-integration-test'
 ];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
