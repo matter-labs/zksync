@@ -269,7 +269,7 @@ async fn get_account_transactions_history_from(
 async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut setup = TransactionsHistoryTestSetup::new();
     setup.add_block(1);
-    setup.add_block(2);
+    setup.add_block_with_rejected_op(2);
 
     // execute_operation
     commit_schema_data(&mut storage, &setup).await?;
@@ -321,6 +321,19 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
             }],
         ),
         (
+            "Get a failed transaction. (newer)",
+            ReceiptRequest {
+                block_number: 2,
+                block_index: 0,
+                direction: SearchDirection::Newer,
+                limit: 1,
+            },
+            vec![ReceiptLocation {
+                block_number: 2,
+                block_index: None,
+            }],
+        ),
+        (
             "Get some transations from the next block.",
             ReceiptRequest {
                 block_number: 1,
@@ -329,6 +342,10 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
                 limit: 5,
             },
             vec![
+                ReceiptLocation {
+                    block_number: 2,
+                    block_index: None,
+                },
                 ReceiptLocation {
                     block_number: 2,
                     block_index: Some(1),
@@ -344,10 +361,6 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
                 ReceiptLocation {
                     block_number: 2,
                     block_index: Some(4),
-                },
-                ReceiptLocation {
-                    block_number: 2,
-                    block_index: Some(5),
                 },
             ],
         ),
@@ -374,11 +387,11 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
                 },
                 ReceiptLocation {
                     block_number: 2,
-                    block_index: Some(1),
+                    block_index: None,
                 },
                 ReceiptLocation {
                     block_number: 2,
-                    block_index: Some(2),
+                    block_index: Some(1),
                 },
             ],
         ),
@@ -394,10 +407,6 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
             vec![
                 ReceiptLocation {
                     block_number: 2,
-                    block_index: Some(5),
-                },
-                ReceiptLocation {
-                    block_number: 2,
                     block_index: Some(4),
                 },
                 ReceiptLocation {
@@ -411,6 +420,10 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
                 ReceiptLocation {
                     block_number: 2,
                     block_index: Some(1),
+                },
+                ReceiptLocation {
+                    block_number: 2,
+                    block_index: None,
                 },
             ],
         ),
@@ -428,6 +441,19 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
             }],
         ),
         (
+            "Get a failed transaction. (older)",
+            ReceiptRequest {
+                block_number: 2,
+                block_index: 0,
+                direction: SearchDirection::Older,
+                limit: 1,
+            },
+            vec![ReceiptLocation {
+                block_number: 2,
+                block_index: None,
+            }],
+        ),
+        (
             "Get some transations from the previous block.",
             ReceiptRequest {
                 block_number: 2,
@@ -436,6 +462,10 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
                 limit: 5,
             },
             vec![
+                ReceiptLocation {
+                    block_number: 2,
+                    block_index: None,
+                },
                 ReceiptLocation {
                     block_number: 1,
                     block_index: Some(5),
@@ -451,10 +481,6 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
                 ReceiptLocation {
                     block_number: 1,
                     block_index: Some(2),
-                },
-                ReceiptLocation {
-                    block_number: 1,
-                    block_index: Some(1),
                 },
             ],
         ),
@@ -476,16 +502,16 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
                     block_index: Some(1),
                 },
                 ReceiptLocation {
+                    block_number: 2,
+                    block_index: None,
+                },
+                ReceiptLocation {
                     block_number: 1,
                     block_index: Some(5),
                 },
                 ReceiptLocation {
                     block_number: 1,
                     block_index: Some(4),
-                },
-                ReceiptLocation {
-                    block_number: 1,
-                    block_index: Some(3),
                 },
             ],
         ),

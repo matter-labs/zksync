@@ -738,7 +738,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                             )
                         )
                     )
-                    ORDER BY block_number ASC, block_index ASC
+                    ORDER BY block_number ASC, COALESCE(block_index, 0) ASC
                     LIMIT $4
                     "#,
                     address.as_bytes(),
@@ -795,7 +795,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                             )
                         )
                     )
-                    ORDER BY block_number DESC, block_index DESC
+                    ORDER BY block_number DESC, COALESCE(block_index, 0) DESC
                     LIMIT $4
                     "#,
                     address.as_bytes(),
