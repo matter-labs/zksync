@@ -483,7 +483,7 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn just_enough_chunks() {
         let mut tester = StateKeeperTester::new(8, 3, 3, 0);
-        
+
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
