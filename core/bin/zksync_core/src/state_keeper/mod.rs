@@ -571,6 +571,10 @@ impl ZkSyncStateKeeper {
             self.pending_block.pending_block_iteration += 1;
         }
 
+        if self.pending_block.chunks_left == 0 {
+            self.seal_pending_block().await;
+        }
+
         // If pending block contains withdrawals we seal it faster
         let max_miniblock_iterations = if self.pending_block.fast_processing_required {
             self.fast_miniblock_iterations

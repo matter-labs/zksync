@@ -7,7 +7,9 @@ use zksync_crypto::{
     rand::{Rng, SeedableRng, XorShiftRng},
     PrivateKey,
 };
-use zksync_types::{mempool::SignedTxVariant, mempool::SignedTxsBatch, tx::PackedEthSignature, AccountId, H160, *};
+use zksync_types::{
+    mempool::SignedTxVariant, mempool::SignedTxsBatch, tx::PackedEthSignature, AccountId, H160, *,
+};
 
 struct StateKeeperTester {
     state_keeper: ZkSyncStateKeeper,
@@ -91,13 +93,24 @@ fn create_account_and_transfer<B: Into<BigUint>>(
     balance: B,
     transfer_amount: B,
 ) -> SignedZkSyncTx {
-    create_account_and_transfer_impl(
-        tester,
-        token_id,
+    let (account, sk) = tester.add_account(account_id);
+    tester.set_balance(account_id, token_id, balance);
+
+    let transfer = Transfer::new_signed(
         account_id,
-        balance,
-        transfer_amount,
+        account.address,
+        account.address,
+        token_id,
+        transfer_amount.into(),
+        BigUint::from(1u32),
+        account.nonce,
+        &sk,
     )
+    .unwrap();
+    SignedZkSyncTx {
+        tx: ZkSyncTx::Transfer(Box::new(transfer)),
+        eth_sign_data: None,
+    }
 }
 
 fn create_account_and_withdrawal<B: Into<BigUint>>(
@@ -125,33 +138,6 @@ fn create_account_and_fast_withdrawal<B: Into<BigUint>>(
     withdraw_amount: B,
 ) -> SignedZkSyncTx {
     create_account_and_withdrawal_impl(tester, token_id, account_id, balance, withdraw_amount, true)
-}
-
-fn create_account_and_transfer_impl<B: Into<BigUint>>(
-    tester: &mut StateKeeperTester,
-    token_id: TokenId,
-    account_id: AccountId,
-    balance: B,
-    transfer_amount: B,
-) -> SignedZkSyncTx {
-    let (account, sk) = tester.add_account(account_id);
-    tester.set_balance(account_id, token_id, balance);
-
-    let transfer = Transfer::new_signed(
-        account_id,
-        account.address,
-        account.address,
-        token_id,
-        transfer_amount.into(),
-        BigUint::from(1u32),
-        account.nonce,
-        &sk,
-    )
-    .unwrap();
-    SignedZkSyncTx {
-        tx: ZkSyncTx::Transfer(Box::new(transfer)),
-        eth_sign_data: None,
-    }
 }
 
 fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
@@ -205,9 +191,7 @@ pub fn create_deposit(token: TokenId, amount: impl Into<BigUint>) -> PriorityOp 
 async fn apply_single_transfer(tester: &mut StateKeeperTester) {
     let transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
     let proposed_block = ProposedBlock {
-        txs: vec![
-            SignedTxVariant::Tx(transfer),
-        ],
+        txs: vec![SignedTxVariant::Tx(transfer)],
         priority_ops: Vec::new(),
     };
     tester
@@ -220,9 +204,11 @@ async fn apply_batch_with_two_transfers(tester: &mut StateKeeperTester) {
     let first_transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
     let second_transfer = create_account_and_transfer(tester, 0, 2, 200u32, 100u32);
     let proposed_block = ProposedBlock {
-        txs: vec![
-            SignedTxVariant::Batch(SignedTxsBatch{txs: vec![first_transfer, second_transfer], batch_id: 1, eth_signature: None}),
-        ],
+        txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
+            txs: vec![first_transfer, second_transfer],
+            batch_id: 1,
+            eth_signature: None,
+        })],
         priority_ops: Vec::new(),
     };
     tester
@@ -497,6 +483,7 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn just_enough_chunks() {
         let mut tester = StateKeeperTester::new(8, 3, 3, 0);
+        
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
@@ -507,14 +494,8 @@ mod execute_proposed_block {
 
         // Second batch
         apply_batch_with_two_transfers(&mut tester).await;
-        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 0);
-        } else {
-            panic!("Block is not received!");
-        }
 
-        // Seal block
-        tester.state_keeper.seal_pending_block().await;
+        // Check sealed block
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 4);
         } else {
@@ -527,6 +508,7 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_2_2_1() {
         let mut tester = StateKeeperTester::new(6, 3, 3, 0);
+
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
@@ -550,14 +532,8 @@ mod execute_proposed_block {
 
         // Single tx
         apply_single_transfer(&mut tester).await;
-        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 0);
-        } else {
-            panic!("Block is not received!");
-        }
 
-        // Seal block
-        tester.state_keeper.seal_pending_block().await;
+        // Check sealed block
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
@@ -570,6 +546,7 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_1_1_2_1() {
         let mut tester = StateKeeperTester::new(6, 3, 3, 0);
+
         // First single tx
         apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
@@ -577,6 +554,7 @@ mod execute_proposed_block {
         } else {
             panic!("Block is not received!");
         }
+
         // Second single tx
         apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
@@ -600,14 +578,8 @@ mod execute_proposed_block {
 
         // Last single tx
         apply_single_transfer(&mut tester).await;
-        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 0);
-        } else {
-            panic!("Block is not received!");
-        }
 
-        // Seal block
-        tester.state_keeper.seal_pending_block().await;
+        // Check sealed block
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 3);
         } else {
