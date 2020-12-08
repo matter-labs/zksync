@@ -202,6 +202,35 @@ pub fn create_deposit(token: TokenId, amount: impl Into<BigUint>) -> PriorityOp 
     }
 }
 
+async fn apply_single_transfer(tester: &mut StateKeeperTester) {
+    let transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
+    let proposed_block = ProposedBlock {
+        txs: vec![
+            SignedTxVariant::Tx(transfer),
+        ],
+        priority_ops: Vec::new(),
+    };
+    tester
+        .state_keeper
+        .execute_proposed_block(proposed_block)
+        .await;
+}
+
+async fn apply_batch_with_two_transfers(tester: &mut StateKeeperTester) {
+    let first_transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
+    let second_transfer = create_account_and_transfer(tester, 0, 2, 200u32, 100u32);
+    let proposed_block = ProposedBlock {
+        txs: vec![
+            SignedTxVariant::Batch(SignedTxsBatch{txs: vec![first_transfer, second_transfer], batch_id: 1, eth_signature: None}),
+        ],
+        priority_ops: Vec::new(),
+    };
+    tester
+        .state_keeper
+        .execute_proposed_block(proposed_block)
+        .await;
+}
+
 /// Checks that StateKeeper will panic with incorrect initialization data
 #[test]
 #[should_panic]
@@ -464,49 +493,27 @@ async fn store_pending_block() {
 mod execute_proposed_block {
     use super::*;
 
-    ///make two batches and seal them, check chunkes_left after each operation
+    /// Make two batches and seal them, check chunkes_left after each operation
     #[tokio::test]
     async fn just_enough_chunks() {
         let mut tester = StateKeeperTester::new(8, 3, 3, 0);
-        //first batch
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
-        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Batch(SignedTxsBatch{txs: vec![first_transfer, second_transfer], batch_id: 1, eth_signature: None}),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // First batch
+        apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.chunks_left, 4);
         } else {
             panic!("Block is not received!");
         }
 
-        //second batch
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 3, 200u32, 100u32);
-        let second_transfer = create_account_and_transfer(&mut tester, 0, 4, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Batch(SignedTxsBatch{txs: vec![first_transfer, second_transfer], batch_id: 1, eth_signature: None}),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // Second batch
+        apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.chunks_left, 0);
         } else {
             panic!("Block is not received!");
         }
 
-        //seal block
+        // Seal block
         tester.state_keeper.seal_pending_block().await;
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 4);
@@ -515,43 +522,21 @@ mod execute_proposed_block {
         }
     }
 
-    ///make two batches, only first should fit into first block,
-    ///add single tx, in the second block should be second batch and single tx
+    /// Make two batches, only first should fit into first block,
+    /// add single tx, in the second block should be second batch and single tx
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_2_2_1() {
         let mut tester = StateKeeperTester::new(6, 3, 3, 0);
-        //first batch
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
-        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Batch(SignedTxsBatch{txs: vec![first_transfer, second_transfer], batch_id: 1, eth_signature: None}),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // First batch
+        apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.chunks_left, 2);
         } else {
             panic!("Block is not received!");
         }
 
-        //second batch
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 3, 200u32, 100u32);
-        let second_transfer = create_account_and_transfer(&mut tester, 0, 4, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Batch(SignedTxsBatch{txs: vec![first_transfer, second_transfer], batch_id: 1, eth_signature: None}),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // Second batch
+        apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
@@ -563,25 +548,15 @@ mod execute_proposed_block {
             panic!("Block is not received!");
         }
 
-        //single tx
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 5, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Tx(first_transfer),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // Single tx
+        apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.chunks_left, 0);
         } else {
             panic!("Block is not received!");
         }
 
-        //seal block
+        // Seal block
         tester.state_keeper.seal_pending_block().await;
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 3);
@@ -590,59 +565,28 @@ mod execute_proposed_block {
         }
     }
 
-    ///make two single tx and a batch, only singles should fit into first block,
-    ///add single tx, in the second block should be batch and single tx
+    /// Make two single tx and a batch, only singles should fit into first block,
+    /// add single tx, in the second block should be batch and single tx
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_1_1_2_1() {
         let mut tester = StateKeeperTester::new(6, 3, 3, 0);
-        //first single tx
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 1, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Tx(first_transfer),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // First single tx
+        apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.chunks_left, 4);
         } else {
             panic!("Block is not received!");
         }
-        //second single tx
-        let second_transfer = create_account_and_transfer(&mut tester, 0, 2, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Tx(second_transfer),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // Second single tx
+        apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.chunks_left, 2);
         } else {
             panic!("Block is not received!");
         }
 
-        //first batch
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 3, 200u32, 100u32);
-        let second_transfer = create_account_and_transfer(&mut tester, 0, 4, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Batch(SignedTxsBatch{txs: vec![first_transfer, second_transfer], batch_id: 1, eth_signature: None}),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // First batch
+        apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 2);
         } else {
@@ -654,25 +598,15 @@ mod execute_proposed_block {
             panic!("Block is not received!");
         }
 
-        //last single tx
-        let first_transfer = create_account_and_transfer(&mut tester, 0, 5, 200u32, 100u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Tx(first_transfer),
-            ],
-            priority_ops: Vec::new(),
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
+        // Last single tx
+        apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.chunks_left, 0);
         } else {
             panic!("Block is not received!");
         }
 
-        //seal block
+        // Seal block
         tester.state_keeper.seal_pending_block().await;
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
             assert_eq!(block.block.block_transactions.len(), 3);
