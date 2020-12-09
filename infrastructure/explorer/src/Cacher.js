@@ -49,7 +49,7 @@ class Cacher {
 
         let toDelete = objSize - maxLeft;
         
-        // I delete the first toDelete elements, because:
+        // We delete the first toDelete elements, because:
         //
         // a) It does not really matter what elements to delete
         // b) The first elements are usually the smallest one, thus 
@@ -129,11 +129,11 @@ class Cacher {
         // Although to reach unlimited memory we could use
         // https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
         // But I believe it is an overkill
-        localStorage.set(
+        localStorage.setItem(
             BLOCK_STORAGE_CONSTANT,
             JSON.stringify(this.cachedBlocks)
         );
-        localStorage.set(
+        localStorage.setItem(
             BLOCK_TRANSACTIONS_STORAGE_CONSTANT,
             JSON.stringify(this.cachedBlocksTransactions)
         );

@@ -15,6 +15,12 @@ import * as ethers from 'ethers';
 
 import Cacher from './Cacher';
 
+function initOnUnloadSaving(cacher) {
+    window.onunload = () => {
+        cacher.saveCacheToLocalStorage();
+    }
+}
+
 async function fetch(req) {
     let r = await axios(req);
     if (r.status == 200) {
@@ -62,6 +68,7 @@ export class Client {
 
         const client = new Client(props);
         const cacher = new Cacher(client);
+        initOnUnloadSaving(cacher);
         client.cacher = cacher;
         return client;
     }

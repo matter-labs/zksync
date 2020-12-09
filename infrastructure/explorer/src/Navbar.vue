@@ -98,7 +98,6 @@ export default {
         }
     },
     async created() {
-        // console.log(this.$router.currentRoute);
         const client = await clientPromise;
         const { contractAddress } = await client.testnetConfig();
         store.contractAddress = contractAddress;
