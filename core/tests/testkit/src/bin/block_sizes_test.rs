@@ -1,7 +1,6 @@
 //! Block sizes test is used to create blocks of all available sizes, make proofs of them and verify onchain
 
 use log::info;
-use std::io::Write;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_circuit::witness::utils::build_block_witness;

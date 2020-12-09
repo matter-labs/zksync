@@ -14,9 +14,8 @@ use zksync_types::{
 };
 
 use web3::types::TransactionReceipt;
-use zksync_crypto::proof::{EncodedAggregatedProof, EncodedProofPlonk};
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_crypto::rand::Rng;
-use zksync_crypto::Fr;
 use zksync_types::block::Block;
 
 use crate::account_set::AccountSet;

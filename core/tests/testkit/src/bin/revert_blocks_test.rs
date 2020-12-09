@@ -1,22 +1,20 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
+use futures::channel::oneshot;
+use std::thread::JoinHandle;
 use web3::transports::Http;
 use zksync_crypto::Fr;
 use zksync_testkit::data_restore::verify_restore;
 use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
 use zksync_testkit::*;
 
-/// Executes blocks with some basic operations with new state keeper
-/// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
-async fn execute_blocks_with_new_state_keeper(
-    contracts: Contracts,
-    block_processing: BlockProcessing,
+async fn create_testsetup(
+    contracts: &Contracts,
     fee_account: &ZkSyncAccount,
     genesis_hash: Fr,
-) {
-    let testkit_config = TestkitConfig::from_env();
-
+    testkit_config: &TestkitConfig,
+) -> (TestSetup, JoinHandle<()>, oneshot::Sender<()>) {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
@@ -65,13 +63,27 @@ async fn execute_blocks_with_new_state_keeper(
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(
+    let test_setup = TestSetup::new(
         sk_channels,
         accounts,
         &contracts,
         commit_account,
         genesis_hash,
     );
+    (test_setup, sk_thread_handle, stop_state_keeper_sender)
+}
+
+/// Executes blocks with some basic operations with new state keeper
+/// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
+async fn execute_blocks_with_new_state_keeper(
+    contracts: &Contracts,
+    block_processing: BlockProcessing,
+    fee_account: &ZkSyncAccount,
+    genesis_hash: Fr,
+) {
+    let testkit_config = TestkitConfig::from_env();
+    let (mut test_setup, sk_thread_handle, stop_state_keeper_sender) =
+        create_testsetup(contracts, fee_account, genesis_hash, &testkit_config).await;
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
@@ -112,7 +124,7 @@ async fn execute_blocks_with_new_state_keeper(
         verify_restore(
             &testkit_config.web3_url,
             testkit_config.available_block_chunk_sizes.clone(),
-            &contracts,
+            contracts,
             fee_account.address,
             test_setup.get_accounts_state().await,
             tokens,
@@ -120,6 +132,72 @@ async fn execute_blocks_with_new_state_keeper(
         )
         .await;
     }
+
+    stop_state_keeper_sender.send(()).expect("sk stop send");
+    sk_thread_handle.join().expect("sk thread join");
+}
+
+async fn execute_blocs(
+    contracts: &Contracts,
+    fee_account: &ZkSyncAccount,
+    genesis_hash: Fr,
+    number_of_verified_blocks: u16,
+    number_of_committed_blocs: u16,
+    number_of_reverted_blocks: u16,
+) {
+    let testkit_config = TestkitConfig::from_env();
+
+    let (mut test_setup, sk_thread_handle, stop_state_keeper_sender) =
+        create_testsetup(&contracts, fee_account, genesis_hash, &testkit_config).await;
+
+    assert!(number_of_verified_blocks <= number_of_committed_blocs);
+    assert!(number_of_committed_blocs >= number_of_reverted_blocks);
+
+    let deposit_amount = parse_ether("1.0").unwrap();
+
+    let mut executed_blocks = Vec::new();
+    let token = 0;
+    for _ in 0..number_of_verified_blocks {
+        let blocks = perform_basic_operations(
+            token,
+            &mut test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::CommitAndVerify,
+        )
+        .await;
+        executed_blocks.extend(blocks.into_iter());
+    }
+
+    for _ in 0..number_of_committed_blocs - number_of_verified_blocks {
+        let blocks = perform_basic_operations(
+            token,
+            &mut test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::NoVerify,
+        )
+        .await;
+        executed_blocks.extend(blocks.into_iter());
+    }
+
+    let executed_blocks_reverse_order = executed_blocks
+        .into_iter()
+        .rev()
+        .take(number_of_reverted_blocks as usize)
+        .collect::<Vec<_>>();
+    test_setup
+        .revert_blocks(&executed_blocks_reverse_order)
+        .await
+        .expect("revert_blocks call fails");
+    verify_restore(
+        &testkit_config.web3_url,
+        testkit_config.available_block_chunk_sizes.clone(),
+        contracts,
+        fee_account.address,
+        test_setup.get_accounts_state().await,
+        vec![token],
+        test_setup.current_state_root.expect("Should exist"),
+    )
+    .await;
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
@@ -133,7 +211,7 @@ async fn revert_blocks_test() {
     println!("contracts deployed");
 
     execute_blocks_with_new_state_keeper(
-        contracts.clone(),
+        &contracts,
         BlockProcessing::NoVerify,
         &fee_account,
         genesis_hash,
@@ -142,12 +220,14 @@ async fn revert_blocks_test() {
     println!("some blocks are committed and reverted\n\n");
 
     execute_blocks_with_new_state_keeper(
-        contracts,
+        &contracts,
         BlockProcessing::CommitAndVerify,
         &fee_account,
         genesis_hash,
     )
     .await;
+    println!("some blocks are committed and verified \n\n");
+    execute_blocs(&contracts, &fee_account, genesis_hash, 2, 4, 1).await;
 }
 
 #[tokio::main]
