@@ -74,6 +74,7 @@ import {
     blockchainExplorerTx,
     blockchainExplorerAddress
 } from './constants'; 
+import { BigNumber } from 'ethers';
 
 const components = {
     SearchField,
@@ -257,8 +258,20 @@ export default {
             return entry;
         },
         feeEntry() {
-            return makeEntry("fee")
-                .innerHTML(`${this.txData.feeTokenName} ${formatToken(this.txData.fee || 0, this.txData.feeTokenName)}`);
+            const fee = this.txData.fee || 0;
+
+            try {
+                const feeBN = BigNumber.from(fee);
+                if(feeBN.eq('0')) {
+                    return makeEntry("Fee")
+                        .innerHTML('<i>This transaction is a part of a batch. The fee was payed in another transaction.</i>');
+                }
+            } catch {
+                return makeEntry("Fee");
+            }
+            
+            return makeEntry("Fee")
+                .innerHTML(`${this.txData.feeTokenName} ${formatToken(fee, this.txData.feeTokenName)}`);
         },
         createdAtEntry() {
             return makeEntry("Created at")
@@ -304,7 +317,8 @@ export default {
                     this.createdAtEntry
                 ];
 
-            if (this.txData.nonce != -1) {
+            if (this.txData.nonce != -1 
+                && (this.txData.nonce || this.txData === 0)) {
                 rows.push(
                     makeEntry("Nonce")
                     .innerHTML(this.txData.nonce)
