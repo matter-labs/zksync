@@ -13,7 +13,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct TokenData {
     address: String,
     name: String,
@@ -59,10 +59,11 @@ fn load_tokens(path: &Path) -> Tokens {
     let mut tokens: Tokens = Default::default();
     for value in values {
         if let Value::Object(value) = value {
+            let address = value["address"].as_str().unwrap().to_string();
             tokens.insert(
-                value["address"].to_string(),
+                address.clone(),
                 TokenData {
-                    address: value["address"].to_string(),
+                    address,
                     name: value["name"].to_string(),
                     volume: BigDecimal::from(500),
                 },
@@ -76,6 +77,8 @@ fn load_tokens(path: &Path) -> Tokens {
         volume: BigDecimal::from(30),
     };
     tokens.insert(phnx_token.address.clone(), phnx_token);
+
+    println!("Tokens in liquidity watcher {:?}", &tokens);
     tokens
 }
 
