@@ -223,7 +223,7 @@ impl GasStatistics {
     }
 
     pub fn get_average_price(&self) -> Option<U256> {
-        if self.samples.len() >= Self::GAS_PRICE_SAMPLES_AMOUNT {
+        if self.samples.len() < Self::GAS_PRICE_SAMPLES_AMOUNT {
             None
         } else {
             Some(self.current_sum / Self::GAS_PRICE_SAMPLES_AMOUNT)
