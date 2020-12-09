@@ -28,3 +28,8 @@ export function loadTestConfig() {
         eth: ethConfig
     };
 }
+
+export function loadTestVectorsConfig() {
+    let vectorsConfigPath = configPath('sdk/test-vectors.json');
+    return loadConfig(vectorsConfigPath);
+}
