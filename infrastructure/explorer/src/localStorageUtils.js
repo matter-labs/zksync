@@ -4,6 +4,7 @@ import {
     getTransactionStorageSlot
 } from './constants';
 
+
 export function getCachedBlock(blockNumber) {
     const storageSlot = getBlockStorageSlot(blockNumber);
     const cachedValue = localStorage.getItem(storageSlot);

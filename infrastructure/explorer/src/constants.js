@@ -9,7 +9,7 @@ export const TOKEN_STORAGE_CONSTANT = 'TOKEN_STORAGE';
 export const TRANSACTION_STORAGE_CONSTANT = 'TRANSACTION_STORAGE';
 
 export function getBlockStorageSlot(blockNumber) {
-    return BLOCK_STORAGE_CONSTANT + blockNumber
+    return BLOCK_STORAGE_CONSTANT + blockNumber;
 }
 
 export function getBlockTxStorageSlot(blockNumber) {
@@ -27,3 +27,9 @@ export const blockchainExplorerTx = store.network === 'localhost' ? 'http://loca
 export const blockchainExplorerAddress = store.network === 'localhost' ? 'http://localhost:8000'
          : store.network === 'mainnet' ? `https://etherscan.io/address`
          : `https://${store.network}.etherscan.io/address`;
+
+export const MAX_CACHED_BLOCKS = 20;
+export const MAX_CACHED_BLOCKS_TRANSACTIONS = 5;
+// Note that transactions are not saved to localStorage
+// Thus its fine if we make the user store < 3MB in RAM
+export const MAX_CACHED_TRANSACTIONS = 3000;

@@ -13,14 +13,7 @@ import { Provider } from 'zksync';
 import axios from 'axios';
 import * as ethers from 'ethers';
 
-import {
-    cacheBlock,
-    getCachedBlock,
-    cacheBlockTransactions,
-    getCachedBlockTransactions,
-    cacheTransaction,
-    getCachedTransaction
-} from './localStorageUtils';
+import Cacher from './Cacher';
 
 async function fetch(req) {
     let r = await axios(req);
@@ -65,6 +58,7 @@ export class Client {
             tokensPromise,
             ethersProvider,
             syncProvider: window.syncProvider,
+            cacher: new Cacher(this)
         };
 
         return new Client(props);
@@ -85,6 +79,7 @@ export class Client {
     }
 
     async status() {
+        console.log('Getting status');
         return fetch({
             method: 'get',
             url: `${baseUrl()}/status`,
@@ -99,7 +94,8 @@ export class Client {
     }
 
     async getBlock(blockNumber) {
-        const cached = getCachedBlock(blockNumber);
+        const cached = this.cacher.getCachedBlock(blockNumber);
+        console.log(cached);
         if(cached) {
             return cached;
         }
@@ -112,14 +108,14 @@ export class Client {
         // Cache only verified blocks since 
         // these will definitely never change again 
         if(isBlockVerified(block)) {
-            cacheBlock(block);
+            this.cacher.cacheBlock(blockNumber, block);
         }
 
         return block;
     }
 
-    async getBlockTransactions(blockNumber) {
-        const cached = getCachedBlockTransactions(blockNumber);
+    async getBlockTransactions(blockNumber, blockInfo) {
+        const cached = this.cacher.getCachedBlockTransactions(blockNumber);
         if(cached) {
             return cached;
         }
@@ -129,7 +125,14 @@ export class Client {
             url: `${baseUrl()}/blocks/${blockNumber}/transactions`,
         });
 
-        cacheBlockTransactions(blockNumber, txs);
+        // We can cache only verified transactions
+        if(blockInfo && isBlockVerified(blockInfo)) {
+            this.cacher.cacheBlockTransactions(blockNumber, txs);
+            this.cacher.cacheTransactionsFromBlock(
+                txs,
+                this
+            );
+        }
 
         return txs;
     }
@@ -142,6 +145,11 @@ export class Client {
     }
 
     async searchTx(txHash) {
+        const cached = this.cacher.getCachedTransaction(txHash);
+        if(cached) {
+            return cached;
+        }
+
         const tx = await fetch({
             method: 'get',
             url: `${baseUrl()}/transactions_all/${txHash}`,
@@ -183,7 +191,7 @@ export class Client {
             return [];
         }
         const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
-        const res = transactions.map(async (tx, index) => {
+        const res = transactions.map(async (tx) => {
             const type = tx.tx.type || '';
             const hash = tx.hash;
             const created_at = tx.created_at;

@@ -85,47 +85,41 @@ export function getTxToken(tx) {
     return tx.op.token;
 }
 
-export async function getTxAmount(tx, token, client) {
-
+export async function getTxAmount(tx, client) {
     if(isTxPriorityOp(tx)) {
-        return `${formatToken(numOrZero(tx.op.priority_op.amount), token)} ${token}`;
+        return tx.op.priority_op.amount;
     }
 
     if(tx.op.type === 'ChangePubKey') {
-        return '';
+        return 'unknown amount';
     }
 
     // TODO: Remove the hack to get the amount field in ForcedExit operations (#1124).        
     if(tx.op.type === 'ForcedExit') {
-        const txAmount = (await client.searchTx(tx.tx_hash)).amount;
-        return `${formatToken(numOrZero(txAmount), token)} ${token}`;
+        return (await client.searchTx(tx.tx_hash)).amount;
     }
     
     
     if(tx.op.type === 'FullExit') {
-        return `${formatToken(numOrZero(tx.op.withdraw_amount), token)} ${token}`;
+        return tx.op.withdraw_amount;
     }
 
-    return `${formatToken(numOrZero(tx.op.amount), token)} ${token}`;
+    return tx.op.amount;
 }
 
-export function getTxFee(tx, token) {
+export function getTxFee(tx) {
     if(isTxPriorityOp(tx)) {
-        return '';
+        return null;
     }
     
-    if(tx.op.type === 'ChangePubKey') {
-        return tx.op.fee == null ? '' :`${formatToken(tx.op.fee, token)} ${token}`;
-    }
-
-    return `${formatToken(tx.op.fee, token)} ${token}`;
+    return tx.op.fee;
 }
 
 function noFallbackError(type, field) {
     throw new Error(`No fallback \`${field}\` value for type ${type}`);
 }
 
-function numOrZero(num) {
+export function numOrZero(num) {
     // +num converts it to a number
     // It is likely that the number won't be precise
     // but we don't care since we are basically checking 

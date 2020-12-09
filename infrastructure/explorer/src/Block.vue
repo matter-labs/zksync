@@ -49,7 +49,7 @@
 
 <script>
 
-import { shortenHash, formatDate, makeEntry } from './utils';
+import { shortenHash, formatDate, makeEntry, formatToken } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
@@ -73,6 +73,7 @@ import  {
     getTxToken,
     getTxAmount,
     getTxFee,
+    numOrZero
 } from './blockUtils';
 
 const components = {
@@ -190,7 +191,7 @@ export default {
 
             const transactions = await Promise.all(txs.map(async (tx) => {
                 return {
-                    ...this.txEntries(tx, tokens, client),
+                    ...await this.txEntries(tx, tokens, client),
                     success: tx.success
                 };
             }));
@@ -251,26 +252,37 @@ export default {
             return entry;
         },
 
-        txAmountEntry(tx, tokenSymbol, client) {
-            return makeEntry('Amount')
-                .innerHTML(getTxAmount(tx, tokenSymbol, client));
+        async txAmountEntry(tx, token, client) {
+            const entry = makeEntry('Amount');
+            if(tx.op.type === 'ChangePubKey') {
+                return entry;
+            }
+
+            const amount = await getTxAmount(tx, client);
+            return entry.innerHTML(`${formatToken(numOrZero(amount), token)} ${token}`);
         },
-        txFeeEntry(tx, tokenSymbol) {
-            return makeEntry('Fee')
-                .innerHTML(getTxFee(tx, tokenSymbol));
+        txFeeEntry(tx, token) {
+            const entry = makeEntry('Fee');
+            const fee = getTxFee(tx);
+
+            if(!fee) {
+                return entry;
+            }
+
+            return entry.innerHTML(`${formatToken(numOrZero(fee), token)} ${token}`);
         },
         txCreatedAtEntry(tx) {
             return makeEntry('Created at')
                 .innerHTML(formatDate(tx.created_at));
         },
-        txEntries(tx, tokens, client) {
+        async txEntries(tx, tokens, client) {
             const tokenSymbol = tokens[getTxToken(tx)].syncSymbol;
 
             const txHash = this.txHashEntry(tx);
             const type = this.txTypeEntry(tx);
             const from = this.txFromEntry(tx);
             const to = this.txToEntry(tx);
-            const amount = this.txAmountEntry(tx, tokenSymbol, client);
+            const amount = await this.txAmountEntry(tx, tokenSymbol, client);
             const fee = this.txFeeEntry(tx, tokenSymbol);
             const createdAt = this.txCreatedAtEntry(tx);
 

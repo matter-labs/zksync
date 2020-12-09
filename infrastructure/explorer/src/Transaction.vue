@@ -55,8 +55,6 @@
 </template>
 
 <script>
-
-import store from './store';
 import { 
     formatDate, 
     formatToken, 
@@ -139,6 +137,10 @@ export default {
             }
             txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;
 
+            if (txData.tx_type == 'Withdraw') {
+                txData.tx_type = 'Withdrawal';
+            }
+
             let block = {
                 verified_at: null,
                 committed_at: null,
@@ -159,13 +161,14 @@ export default {
                 txData.numEthConfirmationsToWait = await client.getNumConfirmationsToWait(txData.tx.eth_block_number);
             }
 
+            if(block.verified_at) {
+                client.cacher.cacheTransaction(this.tx_hash, txData);
+            }
+
             txData.status = block.verified_at ? `Complete`
                            : block.committed_at ? `Pending`
                            : `Initiated`;
-
-            if (txData.tx_type == 'Withdraw') {
-                txData.tx_type = 'Withdrawal';
-            }
+            
             this.txData = txData;
         },
     },
@@ -204,9 +207,9 @@ export default {
             const entry = makeEntry('From').copyable();
             
             if (this.txData.tx_type == 'Deposit') {
-                entry.outterLink(`${blockchainExplorerAddress}/${this.txData.from}`)
+                entry.outterLink(`${blockchainExplorerAddress}/${this.txData.from}`);
             } else {
-                entry.localLink(`/accounts/${this.txData.from}`)
+                entry.localLink(`/accounts/${this.txData.from}`);
             }
 
             if (this.txData.tx_type == 'Withdrawal' 
@@ -225,9 +228,9 @@ export default {
             const entry = makeEntry('To').copyable();
 
             if (this.txData.tx_type == 'Withdrawal') {
-                entry.outterLink(blockchainExplorerToken(this.txData.tokenName, this.txData.to))
+                entry.outterLink(blockchainExplorerToken(this.txData.tokenName, this.txData.to));
             } else {
-                entry.localLink(`/accounts/${this.txData.to}`)
+                entry.localLink(`/accounts/${this.txData.to}`);
             }
 
             if (this.txData.tx_type == 'Withdrawal' 
@@ -256,15 +259,15 @@ export default {
         },
         feeEntry() {
             return makeEntry("fee")
-                .innerHTML(`${this.txData.feeTokenName} ${formatToken(this.txData.fee || 0, this.txData.feeTokenName)}`)
+                .innerHTML(`${this.txData.feeTokenName} ${formatToken(this.txData.fee || 0, this.txData.feeTokenName)}`);
         },
         createdAtEntry() {
             return makeEntry("Created at")
-                .innerHTML(formatDate(this.txData.created_at)) 
+                .innerHTML(formatDate(this.txData.created_at));
         },
         amountEntry() {
             return makeEntry("Amount")
-                .innerHTML(`${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.feeTokenName)}`)
+                .innerHTML(`${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.feeTokenName)}`);
         },
         props() {
             if (Object.keys(this.txData).length == 0) 
@@ -313,14 +316,14 @@ export default {
                 rows.push(
                     makeEntry("Eth confirmations")
                     .innerHTML(this.txData.numEthConfirmationsToWait)
-                )
+                );
             }
 
             if (this.txData.fail_reason) {
                 rows.push(
                     makeEntry("Rejection reason:")
                     .innerHTML(this.txData.fail_reason)
-                )
+                );
             }
 
             return rows;
