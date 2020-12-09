@@ -49,10 +49,8 @@
 </template>
 
 <script>
-import config from './env-config';
 import * as constants from './constants';
-import store from './store';
-import { Client, clientPromise } from './Client';
+import { clientPromise } from './Client';
 import ClosableJumbotron from './ClosableJumbotron.vue';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
@@ -75,7 +73,7 @@ export default {
         this.update();
     },
     timers: {
-        ticker: { time: 1000, autostart: true, repeat: true }
+        ticker: { time: 5000, autostart: true, repeat: true }
     },
     data() { 
         return {
@@ -184,8 +182,11 @@ export default {
         },
     },
     watch: {
-        '$route' (to, from) {
-            this.currentPage = this.page;
+        '$route' () {
+            if(!this.inactive) {
+                this.currentPage = this.page;
+                this.updateBlocks();
+            }
         },
     },
     components,
