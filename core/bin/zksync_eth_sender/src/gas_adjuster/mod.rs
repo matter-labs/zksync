@@ -57,7 +57,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         ethereum: &ETH,
         old_tx_gas_price: Option<U256>,
     ) -> anyhow::Result<U256> {
-        if let Ok(price) = self.statistics.get_average_price() {
+        if let Some(price) = self.statistics.get_average_price() {
             return Ok(price);
         }
 
@@ -222,12 +222,12 @@ impl GasStatistics {
         self.current_max_price = average_price * multiplier / divider;
     }
 
-    pub fn get_average_price(&self) -> anyhow::Result<U256> {
-        anyhow::ensure!(
-            self.samples.len() >= Self::GAS_PRICE_SAMPLES_AMOUNT,
-            "Not enough samples"
-        );
-        Ok(self.current_sum / Self::GAS_PRICE_SAMPLES_AMOUNT)
+    pub fn get_average_price(&self) -> Option<U256> {
+        if self.samples.len() >= Self::GAS_PRICE_SAMPLES_AMOUNT {
+            None
+        } else {
+            Some(self.current_sum / Self::GAS_PRICE_SAMPLES_AMOUNT)
+        }
     }
 
     pub fn get_limit(&self) -> U256 {
