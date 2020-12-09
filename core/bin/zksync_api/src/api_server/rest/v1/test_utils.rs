@@ -181,6 +181,16 @@ impl TestServerConfig {
                 18,
             ))
             .await?;
+        // Insert Golem token with old symbol (from rinkeby).
+        storage
+            .tokens_schema()
+            .store_token(Token::new(
+                16,
+                Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe ").unwrap(),
+                "GNT",
+                18,
+            ))
+            .await?;
 
         let mut accounts = AccountMap::default();
 

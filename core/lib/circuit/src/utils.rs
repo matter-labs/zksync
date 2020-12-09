@@ -51,7 +51,7 @@ where
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature = pk.verify_musig_sha256(&message_bytes, &signature, p_g, params);
 
-    // TODO: handle the case where it is not valid (#1113)
+    // TODO: handle the case where it is not valid (ZKS-101)
     // if !is_valid_signature {
     //     return None;
     // }
@@ -88,7 +88,7 @@ where
         jubjub_params,
     );
 
-    // TODO: handle the case where it is not valid (#1113)
+    // TODO: handle the case where it is not valid (ZKS-101)
     // if !is_valid_signature {
     //     return None;
     // }

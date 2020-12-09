@@ -79,7 +79,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         }
 
         // TODO: Currently instead of using sent txs as samples, we use the gas prices suggested by
-        // the Ethereum node (#1130).
+        // the Ethereum node (ZKS-118).
         // // Report used price to be gathered by the statistics module.
         // self.statistics.add_sample(price);
 

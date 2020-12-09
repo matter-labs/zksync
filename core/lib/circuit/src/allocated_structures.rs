@@ -155,7 +155,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
 
         let third_sig_msg = CircuitElement::unsafe_empty_of_some_length(
             zero_element.clone(),
-            franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow (#971).
+            franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow (ZKS-54).
         );
 
         let new_pubkey_hash = CircuitElement::unsafe_empty_of_some_length(
@@ -257,13 +257,13 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
         let second_sig_msg = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "second_part_signature_message"),
             || op.second_sig_msg.grab(),
-            E::Fr::CAPACITY as usize, //TODO: think of more consistent constant flow (#971).
+            E::Fr::CAPACITY as usize, //TODO: think of more consistent constant flow (ZKS-54).
         )?;
 
         let third_sig_msg = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "third_part_signature_message"),
             || op.third_sig_msg.grab(),
-            franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow (#971).
+            franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow (ZKS-54).
         )?;
 
         let new_pubkey_hash = CircuitElement::from_fe_with_known_length(
