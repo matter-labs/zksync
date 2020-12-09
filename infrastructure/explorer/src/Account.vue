@@ -1,6 +1,5 @@
 <template>
 <div>
-    <Navbar />
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>

@@ -1,6 +1,5 @@
 <template>
     <div>
-        <Navbar />
         <br>
         <b-container>
             <b-alert v-if="updateError" variant="danger" show>

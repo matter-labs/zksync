@@ -1,11 +1,16 @@
 <template>
-    <keep-alive max="10" include="home,tokens">
-        <router-view></router-view>
-    </keep-alive>
+    <div>
+        <Navbar />
+        <keep-alive max="10" include="home,tokens">
+            <router-view></router-view>
+        </keep-alive>
+    </div>
 </template>
 
 <script>
+import Navbar from './Navbar.vue';
 export default {
+    components: { Navbar },
     name: "app",
 };
 </script>

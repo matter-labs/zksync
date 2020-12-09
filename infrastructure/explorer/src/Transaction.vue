@@ -1,6 +1,5 @@
 <template>
 <div>
-    <Navbar />
     <br>
     <b-container>
         <div v-if="loading">
