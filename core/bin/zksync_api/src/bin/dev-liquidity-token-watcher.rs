@@ -34,7 +34,7 @@ async fn handle_graphql(
     // Now, we support only one graphql query, we will add full
     let query_parser = Regex::new(r#"\{token\(id:\s"(?P<address>.*?)"\).*"#).expect("Right regexp");
     let caps = query_parser.captures(&params.query).unwrap();
-    let address = &caps["address"];
+    let address = &caps["address"].to_ascii_lowercase();
     let volume = if let Some(token) = tokens.get(address) {
         token.volume.clone()
     } else {
@@ -59,7 +59,7 @@ fn load_tokens(path: &Path) -> Tokens {
     let mut tokens: Tokens = Default::default();
     for value in values {
         if let Value::Object(value) = value {
-            let address = value["address"].as_str().unwrap().to_string();
+            let address = value["address"].as_str().unwrap().to_ascii_lowercase();
             tokens.insert(
                 address.clone(),
                 TokenData {
@@ -77,8 +77,6 @@ fn load_tokens(path: &Path) -> Tokens {
         volume: BigDecimal::from(30),
     };
     tokens.insert(phnx_token.address.clone(), phnx_token);
-
-    vlog::error!("Tokens in liquidity watcher {:?}", &tokens);
     tokens
 }
 

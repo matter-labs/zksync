@@ -121,24 +121,20 @@ impl UniswapTokenWatcher {
     async fn get_token_amount(&mut self, address: Address) -> anyhow::Result<f64> {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
         let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
-        vlog::error!("Token market request {:?}", &query);
         let request = self.client.post(&self.addr).json(&serde_json::json!({
             "query": query,
         }));
 
         let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
 
-        let response: String = api_request_future
+        let response: GraphqlResponse = api_request_future
             .await
             .map_err(|_| anyhow::format_err!("Uniswap API request timeout"))?
             .map_err(|err| anyhow::format_err!("Uniswap API request failed: {}", err))?
-            .text()
+            .json::<GraphqlResponse>()
             .await?;
 
-        vlog::error!("Token market response {:?}", &response);
-        let data: GraphqlResponse = serde_json::from_str(&response).unwrap();
-        vlog::error!("Token market response {:?}", &data);
-        Ok(data.data.token.trade_volume_usd.parse()?)
+        Ok(response.data.token.trade_volume_usd.parse()?)
     }
     async fn update_historical_amount(&mut self, address: Address, amount: f64) {
         let mut cache = self.cache.lock().await;
@@ -169,10 +165,16 @@ struct TokenResponse {
 #[async_trait::async_trait]
 impl TokenWatcher for UniswapTokenWatcher {
     async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
-        if let Ok(amount) = self.get_token_amount(token.address).await {
-            self.update_historical_amount(token.address, amount).await;
-            return Ok(amount);
-        };
+        match self.get_token_amount(token.address).await {
+            Ok(amount) => {
+                self.update_historical_amount(token.address, amount).await;
+                return Ok(amount);
+            }
+            Err(err) => {
+                vlog::error!("Error in api: {:?}", err);
+            }
+        }
+
         if let Some(amount) = self.get_historical_amount(token.address).await {
             return Ok(amount);
         };
