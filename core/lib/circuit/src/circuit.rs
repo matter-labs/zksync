@@ -1910,7 +1910,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &rhs_valid,
         )?;
         cur.balance
-            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?; // TODO: this is actually redundant, cause they are both enforced to be of appropriate length (#1118).
+            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?; // TODO: this is actually redundant, cause they are both enforced to be of appropriate length (ZKS-106).
 
         cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),

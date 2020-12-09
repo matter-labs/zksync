@@ -137,7 +137,7 @@ export default {
             const txs = await client.getBlockTransactions(this.blockNumber);
             const tokens = await client.tokensPromise;
 
-            // TODO: Remove the hack to get the amount field in ForcedExit operations (#1124).
+            // TODO: Remove the hack to get the amount field in ForcedExit operations (ZKS-112).
             
             const transactions = await Promise.all(txs.map(async (tx) => {
                 const type = tx.op.type;

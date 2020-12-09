@@ -47,7 +47,7 @@ pub struct TxReceiptResponse {
     pub prover_run: Option<ProverRun>,
 }
 
-// TODO: add more info (#1120).
+// TODO: add more info (ZKS-108).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PriorityOpReceiptResponse {
     pub committed: bool,

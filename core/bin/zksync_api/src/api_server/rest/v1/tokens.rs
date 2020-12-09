@@ -248,7 +248,7 @@ mod tests {
                 .await?,
             None
         );
-        // TODO Check error (#1152)
+        // TODO Check error (ZKS-125)
         client
             .token_price(&TokenLike::Id(2), TokenPriceKind::Token)
             .await
@@ -299,6 +299,39 @@ mod tests {
             expected_token
         );
         assert_eq!(client.token_by_id(&TokenLike::parse("XM")).await?, None);
+
+        server.stop().await;
+        Ok(())
+    }
+
+    // Test special case for Golem: GLM token name should be alias for the GNT.
+    // By the way, since `TokenDBCache` is shared between this API implementation
+    // and the old RPC code, there is no need to write a test for the old implementation.
+    //
+    // TODO: Remove this case after Golem update [ZKS-173]
+    #[actix_rt::test]
+    async fn gnt_as_glm_alias() -> anyhow::Result<()> {
+        let cfg = TestServerConfig::default();
+        cfg.fill_database().await?;
+
+        let fee_ticker = dummy_fee_ticker(&[]);
+        let (client, server) = cfg.start_server(move |cfg| {
+            api_scope(TokenDBCache::new(cfg.pool.clone()), fee_ticker.clone())
+        });
+
+        // Get Golem token as GNT.
+        let golem_gnt = client
+            .token_by_id(&TokenLike::from("GNT"))
+            .await?
+            .expect("Golem token should be exist");
+        // Get Golem token as GMT.
+        let golem_glm = client
+            .token_by_id(&TokenLike::from("GLM"))
+            .await?
+            .expect("Golem token should be exist");
+        // Check that GNT is alias to GMT.
+        assert_eq!(golem_gnt, golem_glm);
+        assert_eq!(golem_gnt.id, 16);
 
         server.stop().await;
         Ok(())

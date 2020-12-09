@@ -25,6 +25,29 @@ impl TokenDBCache {
         token_query: impl Into<TokenLike>,
     ) -> anyhow::Result<Option<Token>> {
         let token_query = token_query.into();
+        // HACK: Special case for the Golem:
+        //
+        // Currently, their token on Rinkeby is called GNT, but it's being renamed to the GLM.
+        // So, for some period of time, we should consider GLM token name as an alias to the GNT token.
+        //
+        // TODO: Remove this case after Golem update [ZKS-173]
+        match token_query {
+            TokenLike::Symbol(symbol) if symbol == "GLM" => {
+                // Try to lookup Golem token as "GLM".
+                if let Some(token) = self.get_token_impl(TokenLike::Symbol(symbol)).await? {
+                    // If such token exists, use it.
+                    Ok(Some(token))
+                } else {
+                    // Otherwise to lookup Golem token as "GNT".
+                    self.get_token_impl(TokenLike::Symbol("GNT".to_string()))
+                        .await
+                }
+            }
+            other => self.get_token_impl(other).await,
+        }
+    }
+
+    async fn get_token_impl(&self, token_query: TokenLike) -> anyhow::Result<Option<Token>> {
         // Just return token from cache.
         if let Some(token) = self.cache.read().await.get(&token_query) {
             return Ok(Some(token.clone()));
