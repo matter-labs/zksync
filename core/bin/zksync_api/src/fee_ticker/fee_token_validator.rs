@@ -108,17 +108,17 @@ impl UniswapTokenWatcher {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct GraphqlResponse {
     data: GraphqlTokenResponse,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct GraphqlTokenResponse {
     token: TokenResponse,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct TokenResponse {
     #[serde(rename = "tradeVolumeUSD")]
     trade_volume_usd: String,
@@ -129,19 +129,23 @@ impl TokenWatcher for UniswapTokenWatcher {
     async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
         let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", token.address);
+        vlog::error!("Token market request {:?}", &query);
         let request = serde_json::json!({
             "query": query,
         });
 
-        let response: GraphqlResponse = self
+        let response = self
             .client
             .post(&self.addr)
             .json(&request)
             .send()
             .await?
-            .json()
+            .text()
             .await?;
-        Ok(response.data.token.trade_volume_usd.parse()?)
+        vlog::error!("Token market response {:?}", &response);
+        let data: GraphqlResponse = serde_json::from_str(&response).unwrap();
+        vlog::error!("Token market response {:?}", &data);
+        Ok(data.data.token.trade_volume_usd.parse()?)
     }
 }
 
@@ -188,6 +192,17 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn get_dev_token_amount() {
+        let watcher = UniswapTokenWatcher::new("http://0.0.0.0:9975/graphql".to_string());
+        let dai_token_address =
+            Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
+        let dai_token = Token::new(1, dai_token_address, "DAI", 18);
+
+        let amount = watcher.get_token_market_amount(&dai_token).await.unwrap();
+
+        assert!(amount > 0.0);
+    }
     #[tokio::test]
     async fn get_real_token_amount() {
         let watcher = UniswapTokenWatcher::new(
