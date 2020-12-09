@@ -479,7 +479,8 @@ async fn store_pending_block() {
 mod execute_proposed_block {
     use super::*;
 
-    /// Make two batches and seal them, check chunkes_left after each operation
+    /// Checks if executing a proposed_block with just enough chunks is done correctly
+    /// and checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn just_enough_chunks() {
         let mut tester = StateKeeperTester::new(8, 3, 3, 0);
@@ -503,8 +504,9 @@ mod execute_proposed_block {
         }
     }
 
-    /// Make two batches, only first should fit into first block,
-    /// add single tx, in the second block should be second batch and single tx
+    /// Checks if executing a proposed_block is done correctly
+    /// when two batches don`t fit into one block.
+    /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_2_2_1() {
         let mut tester = StateKeeperTester::new(6, 3, 3, 0);
@@ -541,8 +543,9 @@ mod execute_proposed_block {
         }
     }
 
-    /// Make two single tx and a batch, only singles should fit into first block,
-    /// add single tx, in the second block should be batch and single tx
+    /// Checks if executing a proposed_block is done correctly
+    /// when two single txs and one batch don`t fit into one block.
+    /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_1_1_2_1() {
         let mut tester = StateKeeperTester::new(6, 3, 3, 0);
