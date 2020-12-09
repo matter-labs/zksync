@@ -13,6 +13,7 @@ use zksync_types::{
 };
 // Local uses
 use crate::utils::token_db_cache::TokenDBCache;
+use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
 struct AcceptanceData {
@@ -23,6 +24,8 @@ struct AcceptanceData {
 /// Fee token validator decides whether certain ERC20 token is suitable for paying fees.
 #[derive(Debug, Clone)]
 pub(crate) struct FeeTokenValidator<W> {
+    // Storage for unconditionally valid tokens, such as ETH
+    unconditionally_valid: HashSet<Address>,
     tokens_cache: TokenCacheWrapper,
     /// List of tokens that are accepted to pay fees in.
     /// Whitelist is better in this case, because it requires fewer requests to different APIs
@@ -38,9 +41,11 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         cache: impl Into<TokenCacheWrapper>,
         available_time: Duration,
         liquidity_volume: f64,
+        unconditionally_valid: HashSet<Address>,
         watcher: W,
     ) -> Self {
         Self {
+            unconditionally_valid,
             tokens_cache: cache.into(),
             tokens: Default::default(),
             available_time,
@@ -53,6 +58,9 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     pub(crate) async fn token_allowed(&mut self, token: TokenLike) -> anyhow::Result<bool> {
         let token = self.resolve_token(token).await?;
         if let Some(token) = token {
+            if self.unconditionally_valid.contains(&token.address) {
+                return Ok(true);
+            }
             self.check_token(token).await
         } else {
             // Unknown tokens aren't suitable for our needs, obviously.
@@ -226,17 +234,25 @@ mod tests {
             Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap();
         let phnx_token = Token::new(2, phnx_token_address, "PHNX", 18);
 
+        let eth_address = Address::from_str("0000000000000000000000000000000000000000").unwrap();
+        let eth_token = Token::new(2, eth_address, "ETH", 18);
+
         let mut tokens = HashMap::new();
         tokens.insert(TokenLike::Address(dai_token_address), dai_token);
         tokens.insert(TokenLike::Address(phnx_token_address), phnx_token);
+        tokens.insert(TokenLike::Address(eth_address), eth_token);
 
         let mut amounts = HashMap::new();
         amounts.insert(dai_token_address, 200.0);
         amounts.insert(phnx_token_address, 10.0);
+        let mut unconditionally_valid = HashSet::new();
+        unconditionally_valid.insert(eth_address);
+
         let mut validator = FeeTokenValidator::new(
             tokens,
             Duration::new(100, 0),
             100.0,
+            unconditionally_valid,
             InMemoryTokenWatcher { amounts },
         );
 
@@ -248,8 +264,13 @@ mod tests {
             .token_allowed(TokenLike::Address(phnx_token_address))
             .await
             .unwrap();
+        let eth_allowed = validator
+            .token_allowed(TokenLike::Address(eth_address))
+            .await
+            .unwrap();
         assert_eq!(dai_allowed, true);
         assert_eq!(phnx_allowed, false);
+        assert_eq!(eth_allowed, true);
         assert!(validator.tokens.get(&dai_token_address).unwrap().allowed);
         assert!(!validator.tokens.get(&phnx_token_address).unwrap().allowed);
     }

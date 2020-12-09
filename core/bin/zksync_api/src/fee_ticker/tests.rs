@@ -169,6 +169,7 @@ fn test_ticker_formula() {
         HashMap::new(),
         Duration::from_secs(100),
         100.0,
+        Default::default(),
         FakeTokenWatcher,
     );
 
@@ -270,6 +271,7 @@ fn test_fee_for_unsubsidized_tokens() {
         HashMap::new(),
         Duration::from_secs(100),
         100.0,
+        Default::default(),
         FakeTokenWatcher,
     );
 

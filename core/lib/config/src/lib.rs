@@ -172,7 +172,7 @@ pub struct FeeTickerOptions {
     /// Fee increase coefficient for fast processing of withdrawal.
     pub fast_processing_coeff: f64,
     /// List of the tokens that aren't acceptable for paying fee in.
-    pub disabled_tokens: HashSet<Address>,
+    pub unconditionally_valid_tokens: HashSet<Address>,
     /// Tokens for which subsidies are disabled.
     pub not_subsidized_tokens: HashSet<Address>,
     pub uniswap_url: String,
@@ -192,7 +192,9 @@ impl FeeTickerOptions {
         Self {
             token_price_source: TokenPriceSource::from_env(),
             fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
-            disabled_tokens: Self::comma_separated_addresses("TICKER_DISABLED_TOKENS"),
+            unconditionally_valid_tokens: Self::comma_separated_addresses(
+                "TICKER_UNCONDITIONALLY_VALID_TOKENS",
+            ),
             not_subsidized_tokens: Self::comma_separated_addresses("NOT_SUBSIDIZED_TOKENS"),
             uniswap_url: parse_env("TICKER_UNISWAP_URL"),
             liquidity_volume: parse_env("TICKER_LIQUIDITY_VOLUME"),

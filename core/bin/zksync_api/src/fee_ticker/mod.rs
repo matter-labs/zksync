@@ -199,6 +199,7 @@ pub fn run_ticker_task(
         cache,
         Duration::from_secs(config.available_liquidity_seconds),
         config.liquidity_volume,
+        config.unconditionally_valid_tokens,
         UniswapTokenWatcher::new(config.uniswap_url),
     );
 
