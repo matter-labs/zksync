@@ -48,39 +48,25 @@
                     :fields="transactionFields">
                     <template v-slot:cell(TxHash) = "data">
                         <i v-if="!data.item['success']" class="fas fa-times brown" />
-                        <Entry
-                            :value="data.item['TxHash'].value"
-                        />
+                        <Entry :value="data.item['TxHash'].value" />
                     </template>
                     <template v-slot:cell(Type) = "data">
-                        <Entry
-                            :value="data.item['Type'].value"
-                        />
+                        <Entry :value="data.item['Type'].value" />
                     </template>
                     <template v-slot:cell(Block) = "data">
-                        <Entry
-                            :value="data.item['Block'].value"
-                        />
+                        <Entry :value="data.item['Block'].value" />
                     </template>
                     <template v-slot:cell(Amount) = "data">
-                       <Entry
-                            :value="data.item['Amount'].value"
-                        />
+                       <Entry :value="data.item['Amount'].value" />
                     </template>
                     <template v-slot:cell(From) = "data">
-                        <Entry
-                            :value="data.item['From'].value"
-                        />
+                        <Entry :value="data.item['From'].value" />
                     </template>
                     <template v-slot:cell(To) = "data">
-                        <Entry
-                            :value="data.item['To'].value"
-                        />
+                        <Entry :value="data.item['To'].value" />
                     </template>
                     <template v-slot:cell(CreatedAt) = "data">
-                        <Entry
-                            :value="data.item['CreatedAt'].value"
-                        />
+                        <Entry :value="data.item['CreatedAt'].value" />
                     </template>
 
                 </b-table>
