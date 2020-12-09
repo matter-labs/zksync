@@ -1,20 +1,18 @@
 <template>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand :href="isMainPage ? '/' : '#'">
+        <b-navbar-brand 
+        >
             <a href="https://zksync.io" target="_blank">
                 <img class="navbar-hero-img" src="./assets/ZK_dark.svg">
             </a>
-            
-            <router-link v-if="!isMainPage" class="navbar-router-link" to="/">
-                <b-badge variant="primary" class="hero-network-name">
-                    {{store.capitalizedNetwork}}
-                </b-badge>
-            </router-link>
-            <b-badge v-else variant="primary" class="hero-network-name">
+            <b-badge 
+                variant="primary" 
+                class="hero-network-name pointer"
+                v-on:click.prevent="goToHome"
+            >
                     {{store.capitalizedNetwork}}
             </b-badge>
-            
         </b-navbar-brand>
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
@@ -29,11 +27,10 @@
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
             <b-nav-item 
-                class="nowrap">
-                <router-link 
-                    to='/tokens'
-                    class="navbar-router-link"
-                >Tokens</router-link>
+                class="nowrap"
+                v-on:click.prevent="goToTokens"
+            >
+                Tokens
             </b-nav-item>
             <b-nav-item 
                 v-if="store.walletLink"
@@ -68,13 +65,32 @@ export default {
     name: 'Navbar',
     components,
     data() {
+        const isMainPage = (this.$router.currentRoute.path === '/');
         return {
-            contractLink: `${blockchainExplorerAddress}/${store.contractAddress}`
+            contractLink: `${blockchainExplorerAddress}/${store.contractAddress}`,
+            isMainPage
         }
     },
-    computed: {
-        isMainPage() {
-            return this.$router.currentRoute.path === '/';
+    methods: {
+        goToTokens() {
+            // Throws an error when moving  
+            // to the same route
+            try {
+                this.$router.push('/tokens');
+                this.isMainPage = false;
+            } catch {
+
+            }
+        },
+        goToHome() {
+             // Throws an error when moving  
+            // to the same route
+            try {
+                this.$router.push('/');
+                this.isMainPage = true;
+            } catch {
+
+            }
         }
     },
     async created() {
@@ -96,7 +112,7 @@ export default {
     color: #eee;
     font-size: 0.8em;
 }
-.navbar-router-link {
-    color: inherit;
+.pointer {
+    cursor: pointer;
 }
 </style>
