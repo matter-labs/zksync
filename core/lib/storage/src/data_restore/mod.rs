@@ -3,7 +3,6 @@ use std::time::Instant;
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use zksync_types::block::Block;
 use zksync_types::{AccountId, AccountUpdate, ActionType, BlockNumber, Operation, Token, ZkSyncOp};
 // Local imports
 use self::records::{
@@ -26,20 +25,6 @@ pub mod records;
 pub struct DataRestoreSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> DataRestoreSchema<'a, 'c> {
-    pub async fn save_block_transactions(&mut self, block: Block) -> QueryResult<()> {
-        let new_state = self.new_storage_state("None");
-        let mut transaction = self.0.start_transaction().await?;
-
-        BlockSchema(&mut transaction)
-            .save_block_transactions(block.block_number, block.block_transactions)
-            .await?;
-        DataRestoreSchema(&mut transaction)
-            .update_storage_state(new_state)
-            .await?;
-        transaction.commit().await?;
-        Ok(())
-    }
-
     pub async fn save_block_operations(
         &mut self,
         commit_op: Operation,
@@ -96,9 +81,6 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        // let stored_operations = data_restore_rollup_ops::table
-        //     .order(data_restore_rollup_ops::id.asc())
-        //     .load::<StoredZkSyncOp>(self.0.conn())?;
         let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
             .into_iter()
             .group_by(|op| op.block_num)

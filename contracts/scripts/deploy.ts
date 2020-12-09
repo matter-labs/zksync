@@ -2,8 +2,12 @@ import { ArgumentParser } from 'argparse';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 (async () => {
     const parser = new ArgumentParser({
@@ -24,7 +28,7 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
     const wallet = args.deployerPrivateKey
         ? new Wallet(args.deployerPrivateKey, provider)
-        : Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+        : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
     const gasPrice = args.gasPrice ? parseUnits(args.gasPrice, 'gwei') : await provider.getGasPrice();
     console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);

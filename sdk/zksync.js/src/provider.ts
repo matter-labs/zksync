@@ -11,14 +11,12 @@ import {
     TokenAddress,
     TxEthSignature,
     Fee,
-    ChangePubKeyFee
+    ChangePubKeyFee,
+    Network
 } from './types';
-import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE, TokenSet } from './utils';
+import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
 
-export async function getDefaultProvider(
-    network: 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet',
-    transport: 'WS' | 'HTTP' = 'WS'
-): Promise<Provider> {
+export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'WS'): Promise<Provider> {
     if (network === 'localhost') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('ws://127.0.0.1:3031');
@@ -118,14 +116,13 @@ export class Provider {
         return await this.transport.request('get_confirmations_for_eth_op_amount', []);
     }
 
-    async getEthTxForWithdrawal(withdrawal_hash): Promise<string> {
+    async getEthTxForWithdrawal(withdrawal_hash: string): Promise<string> {
         return await this.transport.request('get_eth_tx_for_withdrawal', [withdrawal_hash]);
     }
 
     async notifyPriorityOp(serialId: number, action: 'COMMIT' | 'VERIFY'): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise((resolve) => {
-                const startTime = new Date().getTime();
                 const subscribe = this.transport.subscribe(
                     'ethop_subscribe',
                     [serialId, action],
@@ -217,18 +214,11 @@ export class Provider {
 
 export class ETHProxy {
     private governanceContract: Contract;
-    private mainContract: Contract;
 
     constructor(private ethersProvider: ethers.providers.Provider, public contractAddress: ContractAddress) {
         this.governanceContract = new Contract(
             this.contractAddress.govContract,
             SYNC_GOV_CONTRACT_INTERFACE,
-            this.ethersProvider
-        );
-
-        this.mainContract = new Contract(
-            this.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
             this.ethersProvider
         );
     }

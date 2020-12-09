@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::test_data::{
     dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
@@ -29,6 +29,7 @@ use super::client::Client;
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
     pub env_options: ConfigurationOptions,
+    pub api_server_options: ApiServerOptions,
     pub pool: ConnectionPool,
 }
 
@@ -36,6 +37,7 @@ impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
             env_options: ConfigurationOptions::from_env(),
+            api_server_options: ApiServerOptions::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }
@@ -162,6 +164,16 @@ impl TestServerConfig {
                 1,
                 Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
                 "PHNX",
+                18,
+            ))
+            .await?;
+        // Insert Golem token with old symbol (from rinkeby).
+        storage
+            .tokens_schema()
+            .store_token(Token::new(
+                16,
+                Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe ").unwrap(),
+                "GNT",
                 18,
             ))
             .await?;
