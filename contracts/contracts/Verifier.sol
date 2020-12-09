@@ -4,7 +4,7 @@ import "./KeysWithPlonkVerifier.sol";
 
 // Hardcoded constants to avoid accessing store
 contract Verifier is KeysWithPlonkVerifier {
-    bool constant DUMMY_VERIFIER = true;
+    bool constant DUMMY_VERIFIER = false;
 
     function initialize(bytes calldata) external {}
 
