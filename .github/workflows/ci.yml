@@ -38,15 +38,14 @@ jobs:
         zk fmt --check
         yarn lint:md
         yarn lint:sol
-        # So database will be created for compilation.
-        zk db setup
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
-        # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
         zk f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
+      env:
+        SQLX_OFFLINE: "true"
     
     - name: generic-init
       run: |
@@ -61,6 +60,8 @@ jobs:
 
     - name: integration-testkit
       run: zk test integration testkit
+      env:
+        SQLX_OFFLINE: "true"
 
     - name: contracts-unit-tests
       run: zk test contracts
@@ -69,7 +70,10 @@ jobs:
       run: zk test js
 
     - name: rust-unit-tests
-      run: zk test rust
+      run: |
+        # Api tests require database setup
+        zk db setup
+        zk test rust
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && zk f cargo test --release
